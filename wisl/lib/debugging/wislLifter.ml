@@ -704,14 +704,6 @@ struct
               handle_finished_partial finished_data callers stack_direction
                 prev_id branch_case exec_data state)
 
-    let check_gil_to_exec result state =
-      match result with
-      | Stop _ as r -> (
-          match Gil_lifter.pop_to_exec state.gil_state with
-          | Some (id, case) -> ExecNext (Some id, case)
-          | None -> r)
-      | _ -> result
-
     let f prev_id branch_case exec_data state =
       let Debugger.Lifter.{ id; _ } = exec_data in
       DL.log (fun m ->
@@ -727,7 +719,7 @@ struct
             "HANDLING %a (prev %a)" L.Report_id.pp id (pp_option L.Report_id.pp)
             prev_id);
       let result = do_handle prev_id branch_case exec_data state in
-      check_gil_to_exec result state
+      result
   end
 
   let init_or_handle = Init_or_handle.f

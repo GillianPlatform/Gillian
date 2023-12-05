@@ -5,7 +5,7 @@ open Lifter
 module type S = sig
   include Lifter.S
 
-  val pop_to_exec : t -> (Logging.Report_id.t * Branch_case.t option) option
+  val should_skip_cmd : cmd_report Lifter.executed_cmd_data -> t -> bool
 end
 
 module Make
@@ -73,22 +73,21 @@ module Make
       () =
     let display = Fmt.to_to_string Cmd.pp_indexed cmd_report.cmd in
     let data = { id; display; unifys; errors; submap; branch_path; parent } in
-    let cmd, to_exec =
+    let cmd =
       match kind with
-      | Normal -> (Cmd { data; next = Nothing }, [ (id, None) ])
+      | Normal -> Cmd { data; next = Nothing }
       | Branch cases ->
           let nexts = Hashtbl.create (List.length cases) in
-          let to_exec =
-            cases
-            |> List.map (fun (case, _) ->
-                   Hashtbl.add nexts case ((), Nothing);
-                   (id, Some case))
+          let () =
+            List.iter
+              (fun (case, _) -> Hashtbl.add nexts case ((), Nothing))
+              cases
           in
-          (BranchCmd { data; nexts }, to_exec)
-      | Final -> (FinalCmd { data }, [])
+          BranchCmd { data; nexts }
+      | Final -> FinalCmd { data }
     in
     Hashtbl.replace id_map id cmd;
-    (cmd, to_exec)
+    cmd
 
   let get_id_opt = function
     | Nothing -> None
@@ -124,27 +123,22 @@ module Make
 
   let init_exn ~proc_name ~all_procs _ _ exec_data =
     let id_map = Hashtbl.create 1 in
-    let map, _ = new_cmd id_map exec_data ~parent:None () in
+    let map = new_cmd id_map exec_data ~parent:None () in
     ({ map; root_proc = proc_name; all_procs; id_map; to_exec = [] }, Stop None)
 
   let init ~proc_name ~all_procs tl_ast prog exec_data =
     Some (init_exn ~proc_name ~all_procs tl_ast prog exec_data)
 
   let should_skip_cmd (exec_data : cmd_report executed_cmd_data) state : bool =
-    let annot = exec_data.cmd_report.annot in
-    if Annot.is_hidden annot then (
-      DL.log (fun m -> m "Gil_lifter: skipping hidden cmd");
-      true)
-    else
-      let proc_name = get_proc_name exec_data in
-      if not (List.mem proc_name state.all_procs) then (
-        DL.log (fun m -> m "Gil_lifter: skipping cmd from internal proc");
-        true)
-      else false
+    let proc_name = get_proc_name exec_data in
+    not (List.mem proc_name state.all_procs)
 
   let handle_cmd prev_id branch_case exec_data state =
     let { id_map; _ } = state in
     let new_cmd = new_cmd id_map exec_data in
+    let branch_case =
+      Option_utils.coalesce branch_case exec_data.cmd_report.branch_case
+    in
     let failwith s =
       DL.failwith
         (fun () ->
@@ -162,13 +156,12 @@ module Make
       | None ->
           failwith (Fmt.str "couldn't find prev_id %a!" L.Report_id.pp prev_id)
     in
-    let to_exec =
+    let () =
       match map with
       | Cmd cmd when cmd.next = Nothing ->
           let parent = Some (map, None) in
-          let new_cmd, to_exec = new_cmd ~parent () in
-          cmd.next <- new_cmd;
-          to_exec
+          let new_cmd = new_cmd ~parent () in
+          cmd.next <- new_cmd
       | Cmd _ -> failwith "cmd.next not Nothing!"
       | BranchCmd { nexts; _ } -> (
           match branch_case with
@@ -178,20 +171,13 @@ module Make
               match Hashtbl.find_opt nexts case with
               | Some ((), Nothing) ->
                   let parent = Some (map, Some case) in
-                  let new_cmd, to_exec = new_cmd ~parent () in
-                  Hashtbl.replace nexts case ((), new_cmd);
-                  to_exec
+                  let new_cmd = new_cmd ~parent () in
+                  Hashtbl.replace nexts case ((), new_cmd)
               | Some ((), _) -> failwith "colliding cases in branch cmd"
               | None -> failwith "inserted branch case not found on parent!"))
       | _ -> failwith "can't insert to Nothing or FinalCmd"
     in
-    if should_skip_cmd exec_data state then
-      state.to_exec <- to_exec @ state.to_exec;
-    match state.to_exec with
-    | (id, case) :: rest_to_exec ->
-        state.to_exec <- rest_to_exec;
-        ExecNext (Some id, case)
-    | _ -> Stop None
+    Stop None
 
   let package_case ~bd:_ ~all_cases:_ case = Packaged.package_gil_case case
 
@@ -351,11 +337,4 @@ module Make
     let () = Hashtbl.replace variables store_id store_vars in
     let () = Hashtbl.replace variables memory_id memory_vars in
     scopes
-
-  let pop_to_exec state =
-    match state.to_exec with
-    | [] -> None
-    | (id, case) :: to_exec ->
-        state.to_exec <- to_exec;
-        Some (id, case)
 end
