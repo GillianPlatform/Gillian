@@ -121,7 +121,11 @@ type ResetViewMsg = {
   readonly type: 'reset_view';
 };
 
-export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg;
+type ClearStateMsg = {
+  readonly type: 'clear_state';
+}
+
+export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg | ClearStateMsg;
 
 // #endregion
 
