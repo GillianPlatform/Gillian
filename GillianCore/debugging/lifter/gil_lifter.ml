@@ -193,7 +193,7 @@ module Make
         ExecNext (Some id, case)
     | _ -> Stop
 
-  let package_case _ case _ = Packaged.package_gil_case case
+  let package_case ~bd:_ ~all_cases:_ case = Packaged.package_gil_case case
 
   let package_data package { id; display; unifys; errors; submap; _ } =
     let submap =
@@ -249,11 +249,11 @@ module Make
             in
             List.rev nexts)
 
-  let next_gil_step id case _ =
+  let next_gil_step id (case : Exec_map.Packaged.branch_case option) _ =
     let case =
-      case
-      |> Option.map (fun (case : Exec_map.Packaged.branch_case) ->
-             case.json |> Branch_case.of_yojson |> Result.get_ok)
+      Option.map
+        (fun (_, json) -> json |> Branch_case.of_yojson |> Result.get_ok)
+        case
     in
     (id, case)
 

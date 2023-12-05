@@ -766,38 +766,29 @@ struct
 
   let get_gil_map _ = failwith "get_gil_map: not implemented!"
 
-  let package_case (bd : branch_data) (case : branch_case) all_cases :
+  let package_case ~(bd : branch_data) ~all_cases (case : branch_case) :
       Packaged.branch_case =
     let json = branch_case_to_yojson case in
-    let kind, display =
+    let display =
       match case with
-      | IfElse b -> ("IfElse", ("If/Else", Fmt.str "%B" b))
-      | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
+      | IfElse b -> Fmt.str "%B" b
+      | LCmd x -> Fmt.str "%d" x
       | Gil x -> (
           let id, gil_case = bd in
           match gil_case with
-          | Some gil_case ->
-              let kind_display, _ =
-                Packaged.(package_gil_case gil_case).display
-              in
-              let kind = "GIL" in
-              let kind_display = Fmt.str "(GIL) %s" kind_display in
-              (* let display = Fmt.str "(%a) %s" pp_rid id display in *)
+          | Some _ ->
               let display = Int.to_string x in
-              (kind, (kind_display, display))
-          | None -> ("GIL", ("(GIL) Unknown", Fmt.str "(%a) Unknown" pp_rid id))
-          )
-      | FuncExit (label, i) ->
-          ("FuncExit", ("Return case", Fmt.str "%s-%d" label i))
-      | FuncExitPlaceholder ->
-          ("FuncExitPlaceholder", ("Return case", "<step in>"))
+              display
+          | None -> Fmt.str "(%a) Unknown" pp_rid id)
+      | FuncExit (label, i) -> Fmt.str "%s-%d" label i
+      | FuncExitPlaceholder -> "<step in>"
     in
     let display =
       match (WBranchCase.is_hidden_when_single case, all_cases) with
-      | true, [ _ ] -> ("", "")
+      | true, [ _ ] -> ""
       | _ -> display
     in
-    { kind; display; json }
+    (display, json)
 
   let package_data package { ids; display; unifys; errors; submap; _ } =
     let submap =
@@ -852,9 +843,7 @@ struct
         let id = List.hd (List.rev data.ids) in
         (id, None)
     | BranchCmd { nexts; _ }, Some case -> (
-        let case =
-          Packaged.(case.json) |> branch_case_of_yojson |> Result.get_ok
-        in
+        let case = case |> snd |> branch_case_of_yojson |> Result.get_ok in
         match Hashtbl.find_opt nexts case with
         | None -> failwith "branch case not found!"
         | Some ((id, case), _) -> (id, case))
@@ -866,7 +855,8 @@ struct
         let+ parent, case = data.parent in
         let id = id_of_map_exn parent in
         let case =
-          case |> Option.map (fun (bdata, case) -> package_case bdata case [])
+          case
+          |> Option.map (fun (bd, case) -> package_case ~bd ~all_cases:[] case)
         in
         (id, case)
 

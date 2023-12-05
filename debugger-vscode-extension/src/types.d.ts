@@ -1,10 +1,6 @@
 // #region ExecMap
 
-export type BranchCase = {
-  readonly kind: string;
-  readonly display: [string, string];
-  readonly json: any;
-};
+export type BranchCase = [string, any];
 
 type Submap =
   | readonly ['NoSubmap']
