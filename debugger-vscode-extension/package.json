@@ -152,6 +152,16 @@
           "type": "boolean",
           "default": false,
           "description": "Enables manual proof mode, i.e. disables automatical folding/unfolding."
+        },
+        "gillianDebugger.showVerifyLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Shows 'Verify' buttons by verifyable functions."
+        },
+        "gillianDebugger.showSymbolicDebugLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Shows 'Symbolic-debug' buttons by symbolically-debuggable functions."
         }
       }
     },
