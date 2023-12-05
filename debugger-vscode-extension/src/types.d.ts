@@ -14,7 +14,8 @@ type Unification = {
 };
 
 export type CmdData = {
-  readonly ids: readonly number[];
+  readonly id: readonly number;
+  readonly all_ids: readonly number[];
   readonly display: string;
   readonly unifys: readonly Unification[];
   readonly errors: readonly string[];

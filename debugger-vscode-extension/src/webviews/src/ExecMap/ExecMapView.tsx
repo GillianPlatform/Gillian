@@ -90,7 +90,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
       }
     })();
 
-    const id = `${cmdData.ids[0]}`;
+    const id = `${cmdData.id}`;
     const expanded = expandedNodes.has(id);
 
     let hasSubmap = false;
@@ -143,7 +143,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
 
     const isCurrentCmd =
       procName === currentProcName &&
-      cmdData.ids.includes(procState.currentCmdId);
+      cmdData.all_ids.includes(procState.currentCmdId);
 
     return {
       id,
@@ -155,7 +155,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
         hasParent,
         isActive,
         jump: () => {
-          jumpToId(cmdData.ids[0]);
+          jumpToId(cmdData.id);
         },
         expanded,
         toggleExpanded,

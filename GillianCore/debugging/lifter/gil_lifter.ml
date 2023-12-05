@@ -202,7 +202,7 @@ module Make
       | Proc p -> Proc p
       | Submap map -> Submap (package map)
     in
-    Packaged.{ ids = [ id ]; display; unifys; errors; submap }
+    Packaged.{ id; all_ids = [ id ]; display; unifys; errors; submap }
 
   let package = Packaged.package package_data package_case
   let get_gil_map state = package state.map

@@ -791,13 +791,14 @@ struct
     (display, json)
 
   let package_data package { ids; display; unifys; errors; submap; _ } =
+    let id = List.hd ids in
     let submap =
       match submap with
       | NoSubmap -> NoSubmap
       | Proc p -> Proc p
       | Submap map -> Submap (package map)
     in
-    Packaged.{ ids; display; unifys; errors; submap }
+    Packaged.{ id; all_ids = ids; display; unifys; errors; submap }
 
   let package = Packaged.package package_data package_case
   let get_lifted_map_exn { map; _ } = package map
