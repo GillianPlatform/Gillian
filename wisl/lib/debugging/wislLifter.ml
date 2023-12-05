@@ -641,7 +641,7 @@ struct
       | _, _ ->
           failwith
             "HORROR - tried to insert to non-Nothing map without previous id!");
-      Stop
+      Stop None
 
     let handle_finished_partial
         finished_data
@@ -678,7 +678,7 @@ struct
       | _, _ ->
           failwith
             "HORROR - tried to insert to non-Nothing map without previous id!");
-      Stop
+      Stop None
 
     let do_handle prev_id branch_case exec_data state =
       let { tl_ast; partial_cmds; _ } = state in
@@ -706,10 +706,10 @@ struct
 
     let check_gil_to_exec result state =
       match result with
-      | Stop -> (
+      | Stop _ as r -> (
           match Gil_lifter.pop_to_exec state.gil_state with
           | Some (id, case) -> ExecNext (Some id, case)
-          | None -> Stop)
+          | None -> r)
       | _ -> result
 
     let f prev_id branch_case exec_data state =

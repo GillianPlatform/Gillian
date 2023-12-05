@@ -125,7 +125,7 @@ module Make
   let init_exn ~proc_name ~all_procs _ _ exec_data =
     let id_map = Hashtbl.create 1 in
     let map, _ = new_cmd id_map exec_data ~parent:None () in
-    ({ map; root_proc = proc_name; all_procs; id_map; to_exec = [] }, Stop)
+    ({ map; root_proc = proc_name; all_procs; id_map; to_exec = [] }, Stop None)
 
   let init ~proc_name ~all_procs tl_ast prog exec_data =
     Some (init_exn ~proc_name ~all_procs tl_ast prog exec_data)
@@ -191,7 +191,7 @@ module Make
     | (id, case) :: rest_to_exec ->
         state.to_exec <- rest_to_exec;
         ExecNext (Some id, case)
-    | _ -> Stop
+    | _ -> Stop None
 
   let package_case ~bd:_ ~all_cases:_ case = Packaged.package_gil_case case
 

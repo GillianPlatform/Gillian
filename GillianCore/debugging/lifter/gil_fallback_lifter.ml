@@ -61,9 +61,9 @@ functor
     let handle_cmd prev_id branch_case exec_data { gil; tl } =
       (* TODO: defer skipping to TL lifter *)
       match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
-      | Stop -> (
+      | Stop _ as r -> (
           match tl with
-          | None -> Stop
+          | None -> r
           | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data)
       | r -> r
 

@@ -20,7 +20,7 @@ module Types = struct
   [@@deriving yojson]
 
   type handle_cmd_result =
-    | Stop
+    | Stop of Logging.Report_id.t option
     | ExecNext of (Logging.Report_id.t option * Branch_case.t option)
   [@@deriving yojson]
 end
