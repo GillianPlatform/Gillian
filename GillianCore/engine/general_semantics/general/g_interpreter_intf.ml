@@ -33,7 +33,7 @@ module type S = sig
       proc_idx : int;
       error_state : state_t;
       errors : err_t list;
-      branch_path : BranchCase.path;
+      branch_path : Branch_case.path;
     }
 
     type cont = {
@@ -45,8 +45,8 @@ module type S = sig
       loop_ids : string list;
       branch_count : int;
       prev_cmd_report_id : Logging.Report_id.t option;
-      branch_case : BranchCase.t option;
-      branch_path : BranchCase.path;
+      branch_case : Branch_case.t option;
+      branch_path : Branch_case.path;
     }
 
     (** Equal to conf_cont + the id of the required spec *)
@@ -54,7 +54,7 @@ module type S = sig
       flag : Flag.t;
       ret_val : state_vt;
       final_state : state_t;
-      branch_path : BranchCase.path;
+      branch_path : Branch_case.path;
     }
 
     type susp = {
@@ -66,7 +66,7 @@ module type S = sig
       next_idx : int;
       loop_ids : string list;
       branch_count : int;
-      branch_path : BranchCase.path;
+      branch_path : Branch_case.path;
     }
 
     type t =
@@ -85,14 +85,14 @@ module type S = sig
 
   (** To support the step-by-step behaviour of the debugger, execution is split into thunks; each invocation executes one GIL command.
     By supplying a branch path, a particular branch of execution can be selected. *)
-  type 'result cont_func_f = ?path:BranchCase.path -> unit -> 'result cont_func
+  type 'result cont_func_f = ?path:Branch_case.path -> unit -> 'result cont_func
 
   and 'result cont_func =
     | Finished of 'result list
     | Continue of {
         report_id : Logging.Report_id.t option;
-        branch_path : BranchCase.path;
-        new_branch_cases : BranchCase.t list;
+        branch_path : Branch_case.path;
+        new_branch_cases : Branch_case.t list;
         cont_func : 'result cont_func_f;
       }
     | EndOfBranch of 'result * 'result cont_func_f
@@ -108,7 +108,7 @@ module type S = sig
         annot : annot;
         branching : int;
         state : state_t;
-        branch_case : BranchCase.t option;
+        branch_case : Branch_case.t option;
         proc_name : string;
       }
       [@@deriving yojson]
@@ -123,7 +123,7 @@ module type S = sig
         proc_body_index : int;
         state : state_t option;
         errors : err_t list;
-        branch_case : BranchCase.t option;
+        branch_case : Branch_case.t option;
       }
       [@@deriving yojson]
     end

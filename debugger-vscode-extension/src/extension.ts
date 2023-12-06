@@ -9,6 +9,7 @@ import { ProviderResult } from 'vscode';
 import { activateCodeLens } from './activateCodeLens';
 import { activateDebug } from './debug';
 import vscodeVariables from './vscodeVariables';
+import { WebviewPanel } from './WebviewPanel';
 
 export function activate(context: vscode.ExtensionContext) {
   activateDebug(context, new DebugAdapterExecutableFactory());
@@ -101,6 +102,7 @@ class DebugAdapterExecutableFactory
     }
 
     console.log('Starting debugger...', { cmd, args, cwd });
+    WebviewPanel.currentPanel?.clearState();
     const options = { cwd };
     executable = new vscode.DebugAdapterExecutable(cmd, args, options);
 

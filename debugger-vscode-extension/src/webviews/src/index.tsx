@@ -24,12 +24,12 @@ VSCodeAPI.onMessage(e => {
     } else {
       store.clearUnification();
     }
-  }
-
-  if (message.type === 'unify_update') {
+  } else if (message.type === 'unify_update') {
     store.loadUnification(message.unifyId, message.unifyMap);
   } else if (message.type === 'reset_view') {
     events.publish('resetView');
+  } else if (message.type === 'clear_state') {
+    store.clear();
   }
 });
 

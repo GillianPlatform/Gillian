@@ -2021,6 +2021,10 @@ and simplify_int_arithmetic_lexpr
       Cint.to_expr (Cint.plus cl cr)
   | _ -> le
 
+(** Checks if an int expression is greater than zero.
+      
+    @returns [Some true] if definitely > 0, [Some false] if definitely < 0,
+      and [None] if both outcomes are satisfiable. *)
 and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
     bool option =
   (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)
@@ -2049,7 +2053,10 @@ and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
               | _ -> true
             then result
             else if Expr.equal e' e then None
-            else if Z.gt c Z.zero then f e'
+            else if Z.gt c Z.zero then
+              match f e' with
+              | Some true -> Some true
+              | _ -> None
             else
               match f (UnOp (IUnaryMinus, e')) with
               | Some true -> Some true
@@ -2057,6 +2064,7 @@ and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
           ce.symb (Some true)
       else None
 
+(** Same as {!check_ge_zero_int}, but for real number expressions. *)
 and check_ge_zero_num ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
     bool option =
   (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)
@@ -2080,7 +2088,10 @@ and check_ge_zero_num ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
           (fun e' c result ->
             if result <> Some true then result
             else if e' = e then None
-            else if c > 0. then f e'
+            else if c > 0. then
+              match f e' with
+              | Some true -> Some true
+              | _ -> None
             else
               match f (UnOp (FUnaryMinus, e')) with
               | Some true -> Some true

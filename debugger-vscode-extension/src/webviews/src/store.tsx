@@ -22,6 +22,7 @@ export type Store = State & {
   selectUnifyStep: (step: UnifyStep) => void;
   toggleExecNodeExpanded: (id: string) => void;
   toggleUnifyNodeExpanded: (id: number) => void;
+  clear: () => void;
 };
 
 const useStore = create<Store>(
@@ -96,6 +97,15 @@ const useStore = create<Store>(
           if (expandedNodes.has(id)) expandedNodes.delete(id);
           else expandedNodes.add(id);
         });
+      },
+      clear: () => {
+        set((state) => {
+          state.debuggerState = undefined;
+          state.unifyState.path = [];
+          state.unifyState.unifications = {};
+          state.unifyState.expandedNodes.clear();
+          state.expandedExecNodes.clear();
+        })
       },
     };
   })

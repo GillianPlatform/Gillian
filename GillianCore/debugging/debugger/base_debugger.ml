@@ -2,7 +2,6 @@ open Syntaxes.Option
 module L = Logging
 module DL = Debugger_log
 module Lift = Debugger_lifter
-module Exec_map = Exec_map
 
 let ( let** ) = Result.bind
 let ( let++ ) f o = Result.map o f
@@ -427,6 +426,34 @@ struct
 
     let update_proc_state = Update_proc_state.f
 
+    let jump_state_to_id id cfg state =
+      try
+        DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id);
+        (* state.exec_map |> snd |> Exec_map.path_of_id id |> ignore; *)
+        (* TODO *)
+        state |> update_proc_state id cfg;
+        Ok ()
+      with Failure msg -> Error msg
+
+    let jump_to_id id (state : t) =
+      let** proc_state = get_proc_state ~cmd_id:id state in
+      jump_state_to_id id state.debug_state proc_state
+
+    let handle_stop debug_state proc_state ?(is_end = false) id id' =
+      let id =
+        match id' with
+        | None -> id
+        | Some id' ->
+            jump_state_to_id id' debug_state proc_state |> Result.get_ok;
+            id
+      in
+      if is_end then
+        let () = DL.log (fun m -> m "STOP (end)") in
+        (ReachedEnd, None)
+      else
+        let () = DL.log (fun m -> m "STOP (%a)" L.Report_id.pp id) in
+        (Step, Some id)
+
     let show_result_errors = function
       | Exec_res.RSucc _ -> []
       | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
@@ -447,8 +474,8 @@ struct
 
       type execute_step =
         L.Report_id.t ->
-        ?branch_case:BranchCase.t ->
-        ?branch_path:BranchCase.path ->
+        ?branch_case:Branch_case.t ->
+        ?branch_path:Branch_case.path ->
         debug_state ->
         proc_state ->
         stop_reason * L.Report_id.t option
@@ -469,7 +496,7 @@ struct
         in
         DL.log (fun m ->
             m
-              ~json:[ ("path", BranchCase.path_to_yojson branch_path) ]
+              ~json:[ ("path", Branch_case.path_to_yojson branch_path) ]
               "Got path");
         branch_path
 
@@ -490,10 +517,10 @@ struct
         | ExecNext (id, branch_case) ->
             DL.log (fun m ->
                 m "EXEC NEXT (%a, %a)" (pp_option L.Report_id.pp) id
-                  (pp_option BranchCase.pp) branch_case);
+                  (pp_option Branch_case.pp) branch_case);
             let id = Option_utils.coalesce id default_next_id |> Option.get in
             execute_step id ?branch_case dbg state
-        | Stop -> on_stop ()
+        | Stop id -> on_stop id
 
       module Handle_continue = struct
         let get_report_and_check_type
@@ -540,7 +567,6 @@ struct
                  execute_step ~branch_path cur_report_id debug_state proc_state)
                ~continue:(fun content ->
                  update_proc_state cur_report_id debug_state proc_state;
-                 let open Exec_map in
                  let cmd = content |> of_yojson_string ConfigReport.of_yojson in
                  let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
                  let unifys = get_unifys cur_report_id debug_state proc_state in
@@ -551,10 +577,8 @@ struct
                  proc_state.lifter_state
                  |> Lifter.handle_cmd prev_id_in_frame branch_case exec_data
                  |> handle_lifter_result ~default_next_id:cur_report_id
-                      execute_step debug_state proc_state (fun () ->
-                        DL.log (fun m ->
-                            m "STOP (%a)" L.Report_id.pp cur_report_id);
-                        (Step, Some cur_report_id)))
+                      execute_step debug_state proc_state
+                      (handle_stop debug_state proc_state cur_report_id))
       end
 
       let handle_continue = Handle_continue.f
@@ -594,9 +618,8 @@ struct
           update_proc_state prev_id debug_state proc_state;
           proc_state.lifter_state
           |> Lifter.handle_cmd prev_prev_id cmd.branch_case exec_data
-          |> handle_lifter_result execute_step debug_state proc_state (fun () ->
-                 DL.log (fun m -> m "STOP (end)");
-                 (ReachedEnd, None))
+          |> handle_lifter_result execute_step debug_state proc_state
+               (handle_stop debug_state proc_state ~is_end:true prev_id)
       end
 
       let handle_end_of_branch = Handle_end_of_branch.f
@@ -713,9 +736,8 @@ struct
                let stop_reason, id =
                  handler_result
                  |> Execute_step.handle_lifter_result execute_step
-                      ~default_next_id:id debug_state proc_state (fun () ->
-                        DL.log (fun m -> m "STOP (%a)" L.Report_id.pp id);
-                        (Step, Some id))
+                      ~default_next_id:id debug_state proc_state
+                      (handle_stop debug_state proc_state id)
                in
                let id = id |> Option.get in
                update_proc_state id debug_state proc_state;
@@ -801,19 +823,6 @@ struct
 
     let launch = Launch.f
 
-    let jump_state_to_id id cfg state =
-      try
-        DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id);
-        (* state.exec_map |> snd |> Exec_map.path_of_id id |> ignore; *)
-        (* TODO *)
-        state |> update_proc_state id cfg;
-        Ok ()
-      with Failure msg -> Error msg
-
-    let jump_to_id id (state : t) =
-      let** proc_state = get_proc_state ~cmd_id:id state in
-      jump_state_to_id id state.debug_state proc_state
-
     let jump_to_start (state : t) =
       let { debug_state; _ } = state in
       let proc_state = get_proc_state_exn state in
@@ -892,7 +901,7 @@ struct
 
       let step_until_cond
           ?(reverse = false)
-          ?(branch_case : BranchCase.t option)
+          ?(branch_case : Branch_case.t option)
           (cond : frame -> frame -> int -> int -> bool)
           (debug_state : debug_state)
           (proc_state : proc_state) : stop_reason =

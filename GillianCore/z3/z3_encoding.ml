@@ -856,7 +856,9 @@ let dump_smt =
     let created = ref false in
     let create () =
       created := true;
-      Unix.mkdir folder_name 0o755
+      try Unix.mkdir folder_name 0o755 with
+      | Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+      | e -> raise e
     in
     fun () ->
       let () = if not !created then create () in
