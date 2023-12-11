@@ -16,6 +16,7 @@ The debugger is used via a custom VSCode extension, found under the ``debugger-v
 
 To try out the debugger, follow these steps:
 
+* Install `the base Gillian extension <https://marketplace.visualstudio.com/items?itemName=gillian.code-gillian>`_
 * Make sure Gillian is built (see :doc:`install`)
 * cd into ``debugger-vscode-extension/``
 * Run ``yarn`` to set up dependencies
@@ -29,7 +30,7 @@ To try out the debugger, follow these steps:
 * A new VSCode window should open in ``debugger-vscode-extension/sampleWorkspace/``, with the extension installed
 * In this window, open the workspace settings, and under the *Extensions > Gillian Debugger* section:
 
-  * Set *Run mode* to ``installed``
+  * Make sure *Run mode* is set to ``source``
   * Set *Source directory* to ``${workspaceFolder}/../../``
   * If you want to disable automatic folding and unfolding of predicates, check *Use manual proof*
 
