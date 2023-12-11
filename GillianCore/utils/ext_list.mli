@@ -11,6 +11,7 @@ val clear : 'a t -> unit
 val prepend : 'a -> 'a t -> unit
 val append : 'a -> 'a t -> unit
 val add : 'a -> 'a t -> unit
+val add_all : 'a list -> 'a t -> unit
 val length : 'a t -> int
 val to_list : 'a t -> 'a list
 val of_list : 'a list -> 'a t
@@ -31,6 +32,7 @@ val iter : ('a -> unit) -> 'a t -> unit
 val for_all2 : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool
 
 val exists : ('a -> bool) -> 'a t -> bool
+val assoc_opt : 'a -> ('a * 'b) t -> 'b option
 val remove_duplicates : ?equal:('a -> 'a -> bool) -> 'a t -> unit
 
 (** Filter-maps the list in place according to [f]

@@ -318,9 +318,9 @@ function SLL_append_node_iter(x, y){
            (#vx == #vs1 @ (#v :: #vs2)) ]];
     while(not (next = null)){
       prev := next;
-      next := [next + 1];
+      next := [next + 1]
     };
-    [prev + 1] := y;
+    [prev + 1] := y
   };
   return x
 }
@@ -342,7 +342,7 @@ function SLL_concat_iter(x, y){
         prev := next;
         next := [next + 1]
     };
-    [prev + 1] := y;
+    [prev + 1] := y
   };
   return head
 }
@@ -370,8 +370,8 @@ function SLL_copy_iter(x){
             [c] := v;
             [p + 1] := c;
             p := c;
-            t := [t + 1];
-        };
+            t := [t + 1]
+        }
     };
     return y
 }

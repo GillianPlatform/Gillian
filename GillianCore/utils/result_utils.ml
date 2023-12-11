@@ -31,3 +31,7 @@ let map_bind f x =
       (Ok []) x
   in
   List.rev rev_res
+
+let or_else f = function
+  | Ok x -> x
+  | Error e -> f e

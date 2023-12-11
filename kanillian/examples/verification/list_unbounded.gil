@@ -1,0 +1,108 @@
+import "archi64_constants.gil", "internals.gil",
+       "global_environment_common.gil", "internal_casts.gil",
+       "internal_binops.gil", "internal_stdlib.gil";
+
+
+pred Ptr(+p: List, l: Obj, o: Int):
+  (p == {{ l, o }});
+  
+pred is_ptr(+p: List):
+  (p == {{ #l, #o }}) * types(#l: Obj, #o: Int);
+  
+pred is_u32(+v : Int):
+      (0i i<=# v) * (v i<=# 4294967295i);
+
+pred SLL(+p: List, sz: Int):
+  (* First case is the Empty case *)
+  Ptr(p, #l, #o) * (* p is a pointer *)
+    (* Discriminant is zero *)
+    <mem_single>(#l, #o, "u32"; 0i, "Freeable") *
+    (* The rest is uninitialized *)
+    <mem_hole>(#l, #o i+ 4i, #o i+ 12i; "Freeable") *
+    (* The size of the list is 0 *)
+    (sz == 0i),
+
+  (* Second case is a Node(u32, Box<List>)) *)
+  Ptr(p, #l, #o) * (* p is a pointer *)
+    (* Discriminant is zero *)
+    <mem_single>(#l, #o, "u32"; 1i, "Freeable") *
+    (* It has a value, but we discard it *)
+    is_u32(#val) * <mem_single>(#l, #o i+ 4i, "u32"; #val, "Freeable") * 
+    (* There's a std::alloc::Global field, and some
+       phantom data, but they're ZSTs so we ignore them *)
+    (* Now comes the box to the rest *)
+    is_ptr(#next) * <mem_single>(#l, #o i+ 8i, "u64"; #next, "Freeable") *
+    SLL(#next, #sz_next) *
+    (* The size of the list is the size of the rest plus one *)
+    (sz == (#sz_next i+ 1i));
+
+
+spec list_length(self)
+  [[ (self == #self) * SLL(#self, #sz) *
+     (0i i<=# #sz) * (#sz i<# 18446744073709551615i) ]]
+  [[ SLL(#self, #sz) * (ret == #sz) ]]
+  normal
+
+
+proc list_length(self) {
+        temp__4 := [mem_alloc](0i, 8i);
+        temp__5 := "i__storev"("u64", {{ l-nth(temp__4, 0i), 0i }}, self);
+        self :=  {{ l-nth(temp__4, 0i), 0i }};
+        var_0 := undefined;
+        var_2 := undefined;
+        next := undefined;
+        var_4 := undefined;
+        var_5 := undefined;
+        temp__6 := [mem_alloc](0i, 16i);
+        var_6 := {{ l-nth(temp__6, 0i), 0i }};
+        temp__7 := [mem_alloc](0i, 8i);
+        var_7 := {{ l-nth(temp__7, 0i), 0i }};
+        temp__8 := [mem_alloc](0i, 8i);
+        var_8 := {{ l-nth(temp__8, 0i), 0i }};
+  bb0:  temp__9 := "i__loadv"("u64", self);
+        temp__10 := "i__loadv"("u32", {{ l-nth(temp__9, 0i), l-nth(temp__9, 1i) }});
+        var_2 := temp__10;
+        goto [(var_2 = 0i)] cc49 cc48;
+  cc49: goto bb3;
+  cc48: goto [(var_2 = 1i)] cc51 cc50;
+  cc51: goto bb1;
+  cc50: goto bb2;
+  cc47: skip;
+  bb1:  temp__11 := "i__loadv"("u64", self);
+        next :=  {{ l-nth(temp__11, 0i), (l-nth(temp__11, 1i) i+ 8i) }};
+        temp__12 := "i__ef_memcpy"(8i, 0i, var_7, next);
+        temp__13 := "i__loadv"("u64", {{ l-nth(var_7, 0i), l-nth(var_7, 1i) }});
+        temp__14 := "i__storev"("u64", var_8, temp__13);
+        temp__15 := "i__loadv"("u64", var_8);
+        var_5 := temp__15;
+        temp__16 := "list_length"(var_5);
+        var_4 := temp__16;
+        goto bb4;
+  bb2:  assert (False);
+        assume (False);
+  bb3:  var_0 := 0i;
+        goto bb6;
+  bb4:  temp__17 := "i__binop_add_maybe_ptr"(1i, var_4);
+        temp__18 := "i__storev"("u64", {{ l-nth(var_6, 0i), l-nth(var_6, 1i) }}, temp__17);
+        temp__19 := "i__value_of_bool"((not ((0i i<= (1i i+ var_4)) and ((1i i+ var_4) i<= 18446744073709551615i))));
+        temp__20 := "i__storev"("u8", {{ l-nth(var_6, 0i), (l-nth(var_6, 1i) i+ 8i) }}, temp__19);
+        temp__21 := [mem_poison](l-nth(var_6, 0i), (l-nth(var_6, 1i) i+ 9i), 7i);
+        skip;
+        temp__22 := "i__loadv"("u8", {{ l-nth(var_6, 0i), (l-nth(var_6, 1i) i+ 8i) }});
+        goto [(not (not (temp__22 = 0i)))] cc53 cc52;
+  cc53: goto bb5;
+  cc52: skip;
+        assert (False);
+        goto bb5;
+  bb5:  temp__23 := "i__loadv"("u64", {{ l-nth(var_6, 0i), l-nth(var_6, 1i) }});
+        var_0 := temp__23;
+        goto bb6;
+  bb6:  ret := var_0;
+        goto ret;
+        ret := undefined;
+  ret:  temp__0 := [mem_free](l-nth(var_7, 0i), 0i, 8i);
+        temp__1 := [mem_free](l-nth(var_6, 0i), 0i, 16i);
+        temp__2 := [mem_free](l-nth(self, 0i), 0i, 8i);
+        temp__3 := [mem_free](l-nth(var_8, 0i), 0i, 8i);
+        return
+};

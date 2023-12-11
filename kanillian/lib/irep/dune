@@ -1,0 +1,3 @@
+(library
+ (name irep_lib)
+ (libraries yojson kutils))

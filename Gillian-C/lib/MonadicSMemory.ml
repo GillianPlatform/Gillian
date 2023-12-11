@@ -51,7 +51,7 @@ type err_t =
       at_locations : string list;
       sheaptree_err : SHeapTree.err;
     }
-[@@deriving show]
+[@@deriving show, yojson]
 
 let lift_sheaptree_err loc err =
   SHeapTreeErr { at_locations = [ loc ]; sheaptree_err = err }

@@ -57,6 +57,7 @@ export function activateDebug(
             name: 'Run File',
             request: 'launch',
             program: targetResource.fsPath,
+            execMode: 'debugverify',
           });
         }
       }
@@ -74,6 +75,7 @@ export function activateDebug(
             name: 'Debug File',
             request: 'launch',
             program: targetResource.fsPath,
+            execMode: 'debugverify',
           });
         }
       }

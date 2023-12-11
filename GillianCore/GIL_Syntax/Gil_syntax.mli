@@ -742,7 +742,7 @@ module Cmd : sig
     | ReturnNormal  (** Normal return *)
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Pretty-printer *)
   val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
@@ -998,8 +998,8 @@ module BiSpec : sig
   val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Gillian.Gil_syntax.BranchCase *)
-module BranchCase : sig
+(** @canonical Gillian.Gil_syntax.Branch_case *)
+module Branch_case : sig
   (** Reasons for a branch in execution.
 
     These are used to reason about execution when using the debugger.
@@ -1009,8 +1009,8 @@ module BranchCase : sig
   type t =
     | GuardedGoto of bool  (** Effectively if/else; either true or false case *)
     | LCmd of int  (** Logical command *)
-    | SpecExec of Flag.t  (** Spec execution *)
-    | LAction of Yojson.Safe.t list  (** Logical action *)
+    | SpecExec of Flag.t * int  (** Spec execution *)
+    | LAction of int  (** Logical action *)
     | LActionFail of int  (** {i Failed} logical action*)
   [@@deriving yojson, show]
 
@@ -1018,6 +1018,8 @@ module BranchCase : sig
 
     Every termination of a symbolic execution is uniquely identified by its branch path. *)
   type path = t list [@@deriving yojson]
+
+  val pp_short : Format.formatter -> t -> unit
 end
 
 (** @canonical Gillian.Gil_syntax.Annot *)
@@ -1038,7 +1040,12 @@ module Annot : sig
     val is_hidden : t -> bool
   end
 
-  module Basic : S
+  module Basic : sig
+    include S
+
+    val equal : t -> t -> bool
+    val make : ?origin_loc:Location.t -> ?loop_info:string list -> unit -> t
+  end
 end
 
 (** @canonical Gillian.Gil_syntax.Proc *)

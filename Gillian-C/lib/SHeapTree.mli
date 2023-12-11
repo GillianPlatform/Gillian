@@ -16,6 +16,7 @@ type err =
   | RemovingNotOwned
   | WrongMemVal
   | MemoryNotFreed
+[@@deriving yojson]
 
 val pp_err : err Fmt.t
 

@@ -49,7 +49,7 @@ let ga_from_str = function
   | "cell" -> Cell
   | "bound" -> Bound
   | "freed" -> Freed
-  | ga -> failwith ("Unkown general assertion for wisl : " ^ ga)
+  | ga -> failwith ("Unknown general assertion for wisl : " ^ ga)
 
 let ga_to_setter = function
   | Cell -> SetCell

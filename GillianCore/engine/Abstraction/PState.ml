@@ -1050,20 +1050,26 @@ module Make (State : SState.S) :
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of pstate *)
+    let open Syntaxes.Result in
+    let rec aux = function
+      | Some state, Some preds, Some variants, Some wands, [] ->
+          Ok { state; preds; pred_defs = UP.init_pred_defs (); variants; wands }
+      | None, preds, variants, wands, ("state", state_yojson) :: rest ->
+          let* state = State.of_yojson state_yojson in
+          aux (Some state, preds, variants, wands, rest)
+      | state, None, variants, wands, ("preds", preds_yojson) :: rest ->
+          let* preds = Preds.of_yojson preds_yojson in
+          aux (state, Some preds, variants, wands, rest)
+      | state, preds, None, wands, ("variants", variants_yojson) :: rest ->
+          let* variants = variants_t_of_yojson variants_yojson in
+          aux (state, preds, Some variants, wands, rest)
+      | state, preds, variants, None, ("wands", variants_yojson) :: rest ->
+          let* wands = Wands.of_yojson variants_yojson in
+          aux (state, preds, variants, Some wands, rest)
+      | _ -> Error "Cannot parse yojson into PState"
+    in
     match yojson with
-    | `Assoc
-        [
-          ("state", state_yojson);
-          ("preds", preds_yojson);
-          ("wands", wands_yojson);
-          ("variants", variants_yojson);
-        ] ->
-        let open Syntaxes.Result in
-        let* state = State.of_yojson state_yojson in
-        let* preds = Preds.of_yojson preds_yojson in
-        let* wands = Wands.of_yojson wands_yojson in
-        let+ variants = variants_t_of_yojson variants_yojson in
-        { state; preds; wands; pred_defs = UP.init_pred_defs (); variants }
+    | `Assoc sections -> aux (None, None, None, None, sections)
     | _ -> Error "Cannot parse yojson into PState"
 
   let to_yojson pstate =

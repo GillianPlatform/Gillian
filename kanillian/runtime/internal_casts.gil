@@ -1,0 +1,22 @@
+#internal
+
+proc i__cast_unsign_int_same_size(v1, two_power_size) {
+        (* If we're casting iK to uK,
+          then two_power_size is should be 2^K *)
+         goto [0i i<= v1] nop cop;
+    nop: ret := v1; (* It fits already *)
+         return;
+    cop: ret := two_power_size i+ v1; (* v1 < 0, so ret fits in the unsigned type *)
+         return
+};
+
+proc i__cast_sign_int_same_size(v1, i_max, two_power_size) {
+          (* If we're casting uK to iK, then
+             i_max should be iK::MAX, e.g. 127 for i8.
+             two_power_size should be 2^K, i.e. 256 for i8 *)
+         goto [ v1 i<= i_max] nop cop;
+    nop: ret := v1; (* It fits already *)
+         return;
+    cop: ret := v1 i- two_power_size;
+         return
+};

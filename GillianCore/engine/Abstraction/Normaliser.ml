@@ -823,7 +823,7 @@ module Make (SPState : PState.S) = struct
                        "One branch of produce GA failed for: %a!\n\
                         with Message: %a. Might have lost some paths ?" Asrt.pp
                        (Asrt.GA (a, ins, outs))
-                       SPState.pp_err_t msg);
+                       SPState.pp_err msg);
                  None))
          [ astate ]
 

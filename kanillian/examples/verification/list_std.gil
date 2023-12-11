@@ -1,0 +1,367 @@
+import "archi64_constants.gil", "internals.gil",
+       "global_environment_common.gil", "internal_casts.gil",
+       "internal_binops.gil", "internal_unops.gil", "internal_stdlib.gil";  
+   
+pred is_u32(+e):
+     (0i i<=# e) * (e i<=# 4294967296i);
+
+pred ptr(+p: List, l: Obj, o: Int):
+  (p == {{ l, o }});
+
+pred dll_ptr(+p, head, tail, length):
+     ptr(p, #l, #o) *
+          <mem_single>(#l, #o, "u64"; head, "Freeable") *
+          <mem_single>(#l, #o i+ 8i, "u64"; tail, "Freeable") *
+          <mem_single>(#l, #o i+ 16i, "u64"; length, "Freeable");
+
+pred DLL_segl(+head, +next, +tail, +prev, content: List):
+     (head == next) * (tail == prev) * (content == nil),
+     ptr(head, #l, #o) *
+          <mem_single>(#l, #o, "u64"; #u, "Freeable") *
+          <mem_single>(#l, #o i+ 8i, "u64"; #v, "Freeable") *
+          <mem_single>(#l, #o i+ 16i, "u32"; #e, "Freeable") *
+          (content == (l+({{ #e }}, #contentp))) *
+          DLL_segl(#u, next, tail, head, #contentp);
+
+pred DLL(+dll, content, len):
+     dll_ptr(dll, #head, #tail, len) *
+     (len == l-len(content)) *
+     DLL_segl(#head, 0i, #tail, 0i, content);
+     facts: (l-len(content) == len);
+      
+proc as_ptr(var_1__self) {
+       var_0 := undefined;
+       var_2 := undefined;
+  bb0: skip;
+       var_2 := var_1__self;
+       var_0 := var_2;
+       skip;
+       ret := var_0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};   
+
+proc non_null_from_bv(var_1__reference) {
+       temp__1 := [mem_alloc](0i, 8i);
+       temp__2 := "i__storev"("u64", {{ l-nth(temp__1, 0i), 0i }}, var_1__reference);
+       var_1__reference := {{ l-nth(temp__1, 0i), 0i }};
+       var_0 := undefined;
+       var_2 := undefined;
+       var_3 := undefined;
+  bb0: skip;
+       skip;
+       temp__3 := "i__loadv"("u64", var_1__reference);
+       var_3 := temp__3;
+       var_2 := var_3;
+       skip;
+       var_0 := undefined;
+       var_0 := var_2;
+       skip;
+       ret := var_0;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(var_1__reference, 0i),0i, 8i);
+       return
+};
+
+proc non_null_as_ptr(var_1__self) {
+       var_0 := undefined;
+       var_2 := undefined;
+  bb0: skip;
+       var_2 := var_1__self;
+       temp__0 := "non_null_from_bv"(var_2);
+       var_0 := temp__0;
+       goto bb1;
+  bb1: skip;
+       ret := var_0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+proc gen_option_nonnull_pointer_niche(var_1) {
+       temp__1 := [mem_alloc](0i, 8i);
+       var_2 := {{ l-nth(temp__1, 0i), 0i }};
+       temp__2 := "i__binop_add_maybe_ptr"(var_2, 0i);
+       temp__3 := "i__storev"("u64", temp__2, var_1);
+       temp__4 := "i__loadv"("u64", var_2);
+       ret := temp__4;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(var_2, 0i), 0i, 8i);
+       return
+};
+
+proc node_leak(var_1__b) {
+       var_0 := undefined;
+       temp__6 := [mem_alloc](0i, 8i);
+       var_2 := {{ l-nth(temp__6, 0i), 0i }};
+       temp__7 := [mem_alloc](0i, 8i);
+       var_3 := {{ l-nth(temp__7, 0i), 0i }};
+       temp__8 := [mem_alloc](0i, 8i);
+       var_4 := {{ l-nth(temp__8, 0i), 0i }};
+       temp__9 := [mem_alloc](0i, 8i);
+       var_5 := {{ l-nth(temp__9, 0i), 0i }};
+       var_6__self := undefined;
+       var_7 := undefined;
+       temp__10 := [mem_alloc](0i, 8i);
+       var_8__self := {{ l-nth(temp__10, 0i), 0i }};
+       temp__11 := [mem_alloc](0i, 8i);
+       var_9 := {{ l-nth(temp__11, 0i), 0i }};
+       var_10__value := undefined;
+       var_11 := undefined;
+       var_12__self := undefined;
+       var_13 := undefined;
+  bb0: skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       var_10__value := var_1__b;
+       skip;
+       var_11 := var_10__value;
+       temp__12 := [mem_poison](l-nth(var_9, 0i), l-nth(var_9, 1i),  8i);
+       temp__13 := "i__storev"("u64", var_9, var_11);
+       skip;
+       temp__14 := "i__storev"("u64", var_8__self, var_9);
+       temp__15 := "i__loadv"("u64", var_8__self);
+       temp__16 := "i__loadv"("u64", temp__15);
+       var_7 := temp__15;
+       skip;
+       skip;
+       temp__17 := "i__loadv"("u64", var_7);
+       var_6__self :=  temp__17;
+       skip;
+       var_12__self :=  var_6__self;
+       skip;
+       var_13 :=  var_12__self;
+       temp__18 := "i__storev"("u64", var_5, var_13);
+       skip;
+       skip;
+       skip;
+       temp__19 := "i__loadv"("u64", var_5);
+       temp__20 := "i__storev"("u64", var_4, temp__19);
+       temp__21 := "i__loadv"("u64", var_4);
+       temp__22 := "i__storev"("u64", var_3, temp__21);
+       temp__23 := "i__loadv"("u64", var_3);
+       temp__24 := "i__storev"("u64", var_2, temp__23);
+       temp__25 := "i__loadv"("u64", var_2);
+       var_0 := 
+  temp__25;
+       skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       skip;
+       ret := var_0;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(var_9, 0i), 0i, 8i);
+       temp__1 := [mem_free](l-nth(var_8__self, 0i), 0i, 8i);
+       temp__2 := [mem_free](l-nth(var_5, 0i), 0i, 8i);
+       temp__3 := [mem_free](l-nth(var_3, 0i), 0i, 8i);
+       temp__4 := [mem_free](l-nth(var_2, 0i), 0i, 8i);
+       temp__5 := [mem_free](l-nth(var_4, 0i), 0i, 8i);
+       return
+};
+
+
+
+proc node_new(i___ret, var_1__element) {
+       temp__1 := [mem_alloc](0i, 24i);
+       var_0 := {{ l-nth(temp__1, 0i), 0i }};
+       var_2 := undefined;
+  bb0: var_2 := var_1__element;
+       temp__2 := [mem_poison](l-nth(var_0, 0i), l-nth(var_0, 1i), 24i);
+       temp__3 := "gen_option_nonnull_pointer_niche"(0i);
+       temp__4 := "i__storev"("u64", {{ l-nth(var_0, 0i), l-nth(var_0, 1i) }}, temp__3);
+       temp__5 := "gen_option_nonnull_pointer_niche"(0i);
+       temp__6 := "i__storev"("u64", {{ l-nth(var_0, 0i), (l-nth(var_0, 1i) i+ 8i) }}, temp__5);
+       temp__7 := "i__storev"("u32", {{ l-nth(var_0, 0i), (l-nth(var_0, 1i) i+ 16i) }}, var_2);
+       temp__8 := "i__ef_memcpy"(24i, 0i, i___ret, var_0);
+       ret := undefined;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(var_0, 0i), 0i, 24i);
+       return
+};
+
+pred Box_NewNode(+node, v):
+     ptr(node, #l, #o) *
+          <mem_single>(#l, #o, "u64"; 0i, "Freeable") *
+          <mem_single>(#l, #o i+ 8i, "u64"; 0i, "Freeable") *
+          <mem_single>(#l, #o i+ 16i, "u32"; v, "Freeable");
+
+spec push_front_node(var_1__self, var_2__node)
+  [[ (var_1__self == #self) * (var_2__node == #node) *
+     DLL(#self, #content, #size) * Box_NewNode(#node, #v) *
+     (0i i<=# #size) * (#size i<# 18446744073709551615i) ]]
+  [[ DLL(#self, l+({{ #v }}, #content), #size i+ 1i) ]]
+  normal
+
+proc push_front_node(var_1__self, var_2__node) {
+        temp__4 := [mem_alloc](0i, 8i);
+        temp__5 := "i__storev"("u64", {{ l-nth(temp__4, 0i), 0i }}, var_1__self);
+        var_1__self :=  {{ l-nth(temp__4, 0i), 0i }};
+        var_0 :=  null;
+        var_3 :=  undefined;
+        temp__6 := [mem_alloc](0i, 8i);
+        var_4 :=  {{ l-nth(temp__6, 0i), 0i }};
+        var_5__node :=  undefined;
+        var_6 :=  undefined;
+        var_7 :=  undefined;
+        temp__7 := [mem_alloc](0i, 8i);
+        var_8 :=  {{ l-nth(temp__7, 0i), 0i }};
+        var_9 :=  undefined;
+        var_10 :=  undefined;
+        var_11 :=  undefined;
+        var_12__head :=  undefined;
+        var_13 :=  undefined;
+        var_14 :=  undefined;
+        var_15 :=  undefined;
+        var_16 :=  undefined;
+        temp__8 := [mem_alloc](0i, 16i);
+        var_17 :=  {{ l-nth(temp__8, 0i), 0i }};
+        var_18 :=  undefined;
+        var_19 :=  undefined;
+  bb0:  temp__9 := "i__loadv"("u64", var_1__self);
+        temp__10 := "i__loadv"("u64", {{ l-nth(temp__9, 0i), l-nth(temp__9, 1i) }});
+        var_3 :=  temp__10;
+        var_18 :=  var_2__node;
+        temp__11 := "i__storev"("u64", {{ l-nth(var_18, 0i), l-nth(var_18, 1i) }}, var_3);
+        temp__12 := [mem_poison](l-nth(var_4, 0i), l-nth(var_4, 1i), 8i);
+        temp__13 := "i__binop_add_maybe_ptr"(var_4, 0i);
+        temp__14 := "i__storev"("u64", temp__13, 0i);
+        var_19 := var_2__node;
+        temp__15 := "i__loadv"("u64", var_4);
+        temp__16 := "i__storev"("u64", {{ l-nth(var_19, 0i), (l-nth(var_19, 1i) i+ 8i) }}, temp__15);
+        var_9 := var_2__node;
+        temp__17 := "node_leak"(var_9);
+        temp__18 := "i__storev"("u64", var_8, temp__17);
+        goto bb1;
+  bb1:  temp__19 := "i__loadv"("u64", var_8);
+        var_7 :=  temp__19;
+        temp__20 := "non_null_as_ptr"( var_7);
+        var_6 :=  temp__20;
+        goto bb2;
+  bb2:  var_5__node :=  undefined;
+        var_5__node :=  var_6;
+        skip;
+        temp__21 := "i__loadv"("u64", var_1__self);
+        temp__22 := "i__binop_add_maybe_ptr"({{ l-nth(temp__21, 0i), l-nth(temp__21, 1i) }}, 0i);
+        temp__23 := "i__loadv"("u64", temp__22);
+        temp__24 := "i__binop_equal_maybe_ptr"(0i, temp__23);
+        goto [temp__24] cc3 cc4;
+  cc3:  temp__26 := "i__binop_add_maybe_ptr"(0i, 0i);
+        temp__25 := temp__26;
+        goto cc5;
+  cc4:  temp__25 := 1i;
+  cc5:  skip;
+        var_10 :=  temp__25;
+        goto [(var_10 = 0i)] cc8 cc7;
+  cc8:  goto bb5;
+  cc7:  goto [(var_10 = 1i)] cc10 cc9;
+  cc10: goto bb3;
+  cc9:  goto bb4;
+  cc6:  skip;
+  bb3:  temp__27 := "i__loadv"("u64",  var_1__self);
+        temp__28 := "i__loadv"("u64", {{ l-nth(temp__27, 0i), l-nth(temp__27, 1i) }});
+        var_12__head := temp__28;
+        var_13 := var_5__node;
+        var_15 := var_12__head;
+        temp__29 := "as_ptr"(var_15);
+        var_14 := temp__29;
+        goto bb6;
+  bb4:  assert (False);
+        assume (False);
+  bb5:  var_11 := var_5__node;
+        temp__30 := "i__loadv"("u64", var_1__self);
+        temp__31 := "i__storev"("u64", {{ l-nth(temp__30, 0i), (l-nth(temp__30, 1i) i+ 8i) }}, var_11);
+        goto bb7;
+  bb6:  temp__32 := "i__storev"("u64", {{ l-nth(var_14, 0i), (l-nth(var_14, 1i) i+ 8i) }}, var_13);
+        goto bb7;
+  bb7:  var_16 := var_5__node;
+        temp__33 := "i__loadv"("u64", var_1__self);
+        temp__34 := "i__storev"("u64", {{ l-nth(temp__33, 0i), l-nth(temp__33, 1i) }}, var_16);
+        temp__35 := "i__loadv"("u64", var_1__self);
+        temp__36 := "i__loadv"("u64", {{ l-nth(temp__35, 0i), (l-nth(temp__35, 1i) i+ 16i) }});
+        temp__37 := "i__binop_add_maybe_ptr"(temp__36, 1i);
+        temp__38 := "i__storev"("u64", {{ l-nth(var_17, 0i), l-nth(var_17, 1i) }}, temp__37);
+        temp__39 := "i__loadv"("u64", var_1__self);
+        temp__40 := "i__loadv"("u64", {{ l-nth(temp__39, 0i), (l-nth(temp__39, 1i) i+ 16i) }});
+        temp__41 := "i__binop_overflow_plus_maybe_ptr"(temp__40, 1i);
+        temp__42 := "i__value_of_bool"(temp__41);
+        temp__43 := "i__storev"("u8", {{ l-nth(var_17, 0i), (l-nth(var_17, 1i) i+ 8i) }}, temp__42);
+        temp__44 := [mem_poison](l-nth(var_17, 0i), (l-nth(var_17, 1i) i+ 9i), 7i);
+        skip;
+        temp__45 := "i__loadv"("u8", {{ l-nth(var_17, 0i), (l-nth(var_17, 1i) i+ 8i) }});
+        goto [(not (not (temp__45 = 0i)))] cc12 cc11;
+  cc12: goto bb8;
+  cc11: skip;
+        assert (False);
+        goto bb8;
+  bb8:  temp__46 := "i__loadv"("u64", {{ l-nth(var_17, 0i), l-nth(var_17, 1i) }});
+        temp__47 := "i__loadv"("u64", var_1__self);
+        temp__48 := "i__storev"("u64", {{ l-nth(temp__47, 0i), (l-nth(temp__47, 1i) i+ 16i) }}, temp__46);
+        ret := null;
+        goto ret;
+        ret := undefined;
+  ret:  temp__0 := [mem_free](l-nth(var_17, 0i), 0i, 16i);
+        temp__1 := [mem_free](l-nth(var_8, 0i), 0i, 8i);
+        temp__2 := [mem_free](l-nth(var_1__self, 0i), 0i, 8i);
+        temp__3 := [mem_free](l-nth(var_4, 0i), 0i, 8i);
+        return
+};
+
+spec push_front(var_1__self, var_2__elt)
+     [[ (var_1__self == #self) * (var_2__elt == #elt) *
+          DLL(#self, #content, #size) * is_u32(#elt) *
+          (0i i<=# #size) * (#size i<# 18446744073709551615i) ]]
+     (* Adding 1 to the size does not overflow *)
+     [[ DLL(#self, l+({{ #elt }}, #content), #size i+ 1i) ]]
+     normal
+
+proc push_front(var_1__self, var_2__elt) {
+       temp__1 := [mem_alloc](0i, 8i);
+       temp__2 := "i__storev"("u64", {{ l-nth(temp__1, 0i), 0i }}, var_1__self);
+       var_1__self :=  {{ l-nth(temp__1, 0i), 0i }};
+       var_0 :=  null;
+       var_3 :=  null;
+       var_4 :=  undefined;
+       var_5 :=  undefined;
+       var_6 :=  undefined;
+       var_7 :=  undefined;
+       var_8 :=  undefined;
+       var_9 :=  undefined;
+       var_10 :=  undefined;
+       var_11 :=  undefined;
+  bb0: temp__3 := "i__loadv"("u64", var_1__self);
+       var_4 :=  temp__3;
+       var_6 :=  24i;
+       var_7 :=  8i;
+       temp__4 := "i__malloc"(var_6);
+       var_8 :=  temp__4;
+       goto bb1;
+  bb1: var_9 :=  var_8;
+       var_10 :=  var_2__elt;
+       var_11 :=  var_9;
+       temp__5 := [mem_alloc](0i, 24i);
+       temp__6 := {{ l-nth(temp__5, 0i), 0i }};
+       temp__7 := "node_new"(temp__6, var_10);
+       temp__8 := "i__ef_memcpy"(24i, 0i, var_11, temp__6);
+       goto bb2;
+  bb2: var_5 :=  var_9;
+       temp__9 := "push_front_node"( var_4, var_5);
+       goto bb3;
+  bb3: ret := null;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(var_1__self, 0i), 0i, 8i);
+       return
+};

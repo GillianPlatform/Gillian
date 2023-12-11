@@ -1,5 +1,5 @@
 module type Gil_lifter_with_state = sig
-  module Lifter : Lifter.S
+  module Lifter : Gil_lifter.S
 
   val get_state : unit -> Lifter.t
 end

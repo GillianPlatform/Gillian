@@ -1,9 +1,9 @@
 %token EOF
 
 (* key words *)
-%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
+%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -198,6 +198,11 @@ statement:
       let lend = WExpr.get_loc e in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc }
+  | lstart = FRESH; lx = IDENTIFIER
+    { let (lend, x) = lx in
+      let bare_stmt = WStmt.Fresh x in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc }
   | lx = IDENTIFIER; ASSIGN; NEW; LBRACE; ln = INTEGER; lend = RBRACE
     { let (lstart, x) = lx in
     let (_, i) = ln in
@@ -250,6 +255,20 @@ statement:
     { let bare_stmt = WStmt.Logic lc in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc }
+  | lstart = ASSERT; e = expression;
+    {
+      let bare_stmt = WStmt.Assert e in
+      let lend = WExpr.get_loc e in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+  | lstart = ASSUME; e = expression;
+    {
+      let bare_stmt = WStmt.Assume e in
+      let lend = WExpr.get_loc e in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
 
 
 expr_list:

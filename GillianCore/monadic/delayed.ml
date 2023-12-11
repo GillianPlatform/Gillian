@@ -1,5 +1,6 @@
 module Formula = Gil_syntax.Formula
 module Expr = Gil_syntax.Expr
+module Type = Gil_syntax.Type
 
 exception NonExhaustiveEntailment of Formula.t list
 

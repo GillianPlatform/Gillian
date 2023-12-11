@@ -1598,7 +1598,7 @@ module Make (State : SState.S) :
           Res_list.just_oks successes
       | Error errs
         when try_recover && !Config.unfolding
-             && Exec_mode.verification_exec !Config.current_exec_mode
+             && Exec_mode.is_verification_exec !Config.current_exec_mode
              && (not in_unification) && can_fix errs -> (
           L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
           if !Config.under_approximation then

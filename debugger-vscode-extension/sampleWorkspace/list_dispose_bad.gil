@@ -1,0 +1,29 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+pred list(x) : (x == null), <cell>(#wisl__0, #wisl__1; #v) *
+  <cell>(#wisl__0, (#wisl__1 i+ 1i); #z) *
+  types(#wisl__0 : Obj, #wisl__1 : Int) * (x == {{ #wisl__0, #wisl__1 }}) *
+  list(#z);
+
+spec list_dispose(x)
+  [[  (x == #x) * list(#x)  ]]
+  [[  emp  ]]
+  normal
+proc list_dispose(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             u := "list_dispose"(t);
+             goto [(l-nth(x, 1i) = 0i)] continue1 fail1;
+  fail1:     fail [InvalidBlockPointer](x);
+  continue1: gvar2 := [dispose](l-nth(x, 0i));
+             goto endif0;
+  else0:     skip;
+  endif0:    skip;
+             ret := null;
+             return
+};

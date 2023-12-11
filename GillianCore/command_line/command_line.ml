@@ -33,10 +33,16 @@ struct
   module Verification = Verifier.Make (SState) (SPState) (PC) (External)
   module Lifter = Lifter (Verification)
   module Abductor = Abductor.Make (SPState) (PC) (External)
-  module Debugger = Debugger.Make (ID) (PC) (Verification) (Lifter)
-  module Debug_adapter = Debug_adapter.Make (Debugger)
+
+  module Symb_debugger =
+    Debugger.Symbolic_debugger.Make (ID) (PC) (Verification) (Lifter)
+
+  module Verif_debugger =
+    Debugger.Verification_debugger.Make (ID) (PC) (Verification) (Lifter)
 
   let main () =
+    Memtrace.trace_if_requested ();
+
     let doc = "An analysis toolchain" in
 
     let man =
@@ -56,7 +62,12 @@ struct
                   (Gil_parsing));
         (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing));
         (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
-        (module Debug_verification_console.Make (PC) (Debug_adapter));
+        (module Debug_verification_console.Make
+                  (PC)
+                  (Debug_adapter.Make (Verif_debugger)));
+        (module Debug_wpst_console.Make
+                  (PC)
+                  (Debug_adapter.Make (Symb_debugger)));
         (module Bulk_console.Make (PC) (Runners));
       ]
     in

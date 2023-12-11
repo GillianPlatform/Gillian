@@ -15,10 +15,12 @@
       "esy-installer gillian.install",
       "esy-installer gillian-js.install",
       "esy-installer gillian-c.install",
-      "esy-installer wisl.install"
+      "esy-installer wisl.install",
+      "esy-installer kanillian.install"
     ],
     "release": {
       "bin": [
+        "kanillian",
         "gillian-js",
         "gillian-c",
         "wisl"
@@ -42,6 +44,10 @@
       "GILLIAN_C_RUNTIME_PATH": {
         "scope": "global",
         "val": "#{self.share}/gillian-c"
+      },
+      "KANILLIAN_RUNTIME_PATH": {
+        "scope": "global",
+        "val": "#{self.share}/kanillian"
       },
       "CPATH": {
         "scope": "global",
@@ -78,6 +84,7 @@
     "@opam/dune": "^3.0",
     "@opam/fmt": "^0.8.8",
     "@opam/flow_parser": "giltho/flow#544677c0306668679172807bec95b134f5d249f3",
+    "@opam/memtrace": "0.2.3",
     "@opam/menhir": "20220210",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
@@ -87,7 +94,7 @@
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
-    "@opam/z3": "giltho/esy-z3#f4557cea18930982ceb02d8ff13dbff2be9e02d4",
+    "@opam/z3": "GillianPlatform/esy-z3#e8b2ce266d5d8bd67c54bd226c6301f7b180bb09",
     "compcert": "giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
     "ocaml": "4.14.x"
   },
@@ -104,8 +111,6 @@
     "concurrently": "^7.6.0"
   },
   "resolutions": {
-    "@opam/conf-sqlite3": "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079",
-    "esy-gmp": "NatKarmios/esy-gmp:package.json#d68dce1a9aacc0534cca93d84d2b7f9c8105ee87",
-    "@opam/conf-python-3-7": "NatKarmios/conf-python-3-7:conf-python-3-7.opam#1a624b3cd5738a6a0f51f5638b5d101ad2c9844b"
+    "@opam/conf-sqlite3": "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079"
   }
 }

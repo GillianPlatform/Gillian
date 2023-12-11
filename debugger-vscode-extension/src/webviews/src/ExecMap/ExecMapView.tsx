@@ -52,7 +52,10 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
   const transform: TransformFunc<M, D, A> = (map, parent, aux) => {
     const { procName, branchCase = null, hasParent = true } = aux;
     const procState = procs[procName];
-    const edgeLabel = branchCase ? <>{branchCase.display[1]}</> : undefined;
+    const edgeLabel =
+      branchCase && branchCase[0] ? (
+        <>{branchCase[0]}</>
+      ) : undefined;
     const isActive = procName === currentProcName;
 
     if (map[0] == 'Nothing') {
@@ -81,13 +84,13 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
       if (map[0] === 'Cmd') {
         return [[{ procName }, map[1].next] as [A, ExecMap]];
       } else if (map[0] === 'BranchCmd') {
-        return cleanNexts(map[1].nexts, aux);
+        return cleanNexts(map[1].nexts, { procName });
       } else {
         return [];
       }
     })();
 
-    const id = `${cmdData.ids[0]}`;
+    const id = `${cmdData.id}`;
     const expanded = expandedNodes.has(id);
 
     let hasSubmap = false;
@@ -140,7 +143,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
 
     const isCurrentCmd =
       procName === currentProcName &&
-      cmdData.ids.includes(procState.currentCmdId);
+      cmdData.all_ids.includes(procState.currentCmdId);
 
     return {
       id,
@@ -152,7 +155,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
         hasParent,
         isActive,
         jump: () => {
-          jumpToId(cmdData.ids[0]);
+          jumpToId(cmdData.id);
         },
         expanded,
         toggleExpanded,

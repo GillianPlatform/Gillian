@@ -11,7 +11,8 @@
   logging
   debugger_lifter
   incrementalAnalysis
-  debug_adapter)
+  debug_adapter
+  memtrace)
  (flags
   :standard
   -open

@@ -6,12 +6,14 @@ import {
   languages,
   Range,
   TextDocument,
+  workspace,
 } from 'vscode';
 import { startDebugging } from './commands';
+import { ExecMode } from './types';
 
 export function activateCodeLens(context: ExtensionContext) {
   const commandDisposable = commands.registerCommand(
-    'extension.code-lens.debugProcedure',
+    'extension.gillian-debug.debugProcedure',
     startDebugging
   );
 
@@ -51,19 +53,29 @@ class DebugCodeLensProvider implements CodeLensProvider {
 
     const reProcedureName = /(.+?)\(/g;
 
+    const config = workspace.getConfiguration('gillianDebugger');
+    const lensKinds: [ExecMode, string][] = [];
+    if (config.showVerifyLens)
+      lensKinds.push(['debugverify', 'Verify ']);
+    if (config.showSymbolicDebugLens)
+      lensKinds.push(['debugwpst', 'Symbolic-debug ']);
     const lenses: CodeLens[] = [];
     while (reProcedure.exec(text) !== null) {
       reProcedureName.lastIndex = reProcedure.lastIndex;
       const match = reProcedureName.exec(text);
       const procedureName = match === null ? null : match[1].trim();
       if (procedureName) {
-        const codeLens = this.makeCodeLens(
-          reProcedureName.lastIndex,
-          procedureName,
-          document
-        );
-        if (codeLens !== undefined) {
-          lenses.push(codeLens);
+        for (const [execMode, commandPrefix] of lensKinds) {
+          const codeLens = this.makeCodeLens(
+            reProcedureName.lastIndex,
+            procedureName,
+            document,
+            execMode,
+            commandPrefix
+          );
+          if (codeLens !== undefined) {
+            lenses.push(codeLens);
+          }
         }
       }
     }
@@ -74,7 +86,9 @@ class DebugCodeLensProvider implements CodeLensProvider {
   private makeCodeLens(
     index: number,
     procedureName: string,
-    document: TextDocument
+    document: TextDocument,
+    execMode: ExecMode,
+    commandPrefix: string
   ) {
     const startIdx = index - procedureName.length;
     const start = document.positionAt(startIdx);
@@ -82,17 +96,22 @@ class DebugCodeLensProvider implements CodeLensProvider {
     const range = new Range(start, end);
     const debugConfig = this.createDebugConfig(
       procedureName,
-      document.uri.fsPath
+      document.uri.fsPath,
+      execMode
     );
     return new CodeLens(range, {
-      command: 'extension.code-lens.debugProcedure',
-      title: 'Debug ' + procedureName,
-      tooltip: 'Debug ' + procedureName,
+      command: 'extension.gillian-debug.debugProcedure',
+      title: commandPrefix + procedureName,
+      tooltip: commandPrefix + procedureName,
       arguments: [debugConfig],
     });
   }
 
-  private createDebugConfig(procedureName: string, program: string) {
+  private createDebugConfig(
+    procedureName: string,
+    program: string,
+    execMode: ExecMode
+  ) {
     return {
       type: 'gillian',
       name: 'Debug File',
@@ -100,6 +119,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
       program: program,
       procedureName: procedureName,
       stopOnEntry: true,
+      execMode,
     };
   }
 }

@@ -52,7 +52,7 @@ module Make (SMemory : SMemory.S) :
     | FTypes of (string * Type.t) list
     | FSVars of SS.t
 
-  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
+  type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
 
   exception Internal_State_Error of err_t list * t
@@ -246,7 +246,11 @@ module Make (SMemory : SMemory.S) :
       in
       (* Perform reduction *)
       if no_reduce then result
-      else Reduction.reduce_lexpr ~gamma ~reduce_lvars:true ~pfs result
+      else
+        try Reduction.reduce_lexpr ~gamma ~reduce_lvars:true ~pfs result
+        with Reduction.ReductionException (expr, msg) ->
+          let msg = Fmt.str "Couldn't reduce %a - %s" Expr.pp expr msg in
+          raise (Internal_State_Error ([ StateErr.EOther msg ], state))
     in
     symb_evaluate_expr e
 

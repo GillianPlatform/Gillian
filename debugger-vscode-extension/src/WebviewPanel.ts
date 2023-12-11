@@ -77,6 +77,11 @@ export class WebviewPanel {
     }
   }
 
+  public clearState() {
+    console.info('Clearing webview state')
+    this.sendMessage({ type: 'clear_state' })
+  }
+
   public updateState(state: DebuggerState) {
     console.info('Got state', state);
     this.sendMessage({ type: 'state_update', state });

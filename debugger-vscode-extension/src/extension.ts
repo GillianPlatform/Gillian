@@ -9,6 +9,7 @@ import { ProviderResult } from 'vscode';
 import { activateCodeLens } from './activateCodeLens';
 import { activateDebug } from './debug';
 import vscodeVariables from './vscodeVariables';
+import { WebviewPanel } from './WebviewPanel';
 
 export function activate(context: vscode.ExtensionContext) {
   activateDebug(context, new DebugAdapterExecutableFactory());
@@ -27,8 +28,7 @@ function expandPath(s: string): string {
 }
 
 class DebugAdapterExecutableFactory
-  implements vscode.DebugAdapterDescriptorFactory
-{
+  implements vscode.DebugAdapterDescriptorFactory {
   // The following use of a DebugAdapter factory shows how to control what debug adapter executable is used.
   // Since the code implements the default behavior, it is absolutely not neccessary and we show it here only for educational purpose.
 
@@ -55,6 +55,9 @@ class DebugAdapterExecutableFactory
           case 'c':
             langCmd = 'gillian-c';
             break;
+          case 'kani':
+            langCmd = 'kanillian';
+            break;
           case 'wisl':
           default:
             // Default to WISL
@@ -71,7 +74,9 @@ class DebugAdapterExecutableFactory
     const config = vscode.workspace.getConfiguration('gillianDebugger');
     console.log('Configuring debugger...', { config });
 
-    let args = ['debugverify', '-r', 'db'];
+    const mode = _session.configuration.execMode || 'debugverify';
+
+    let args = [mode, '-r', 'db'];
     if (config.useManualProof) {
       args.push('-m');
     }
@@ -97,6 +102,7 @@ class DebugAdapterExecutableFactory
     }
 
     console.log('Starting debugger...', { cmd, args, cwd });
+    WebviewPanel.currentPanel?.clearState();
     const options = { cwd };
     executable = new vscode.DebugAdapterExecutable(cmd, args, options);
 

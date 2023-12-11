@@ -12,12 +12,14 @@ spec list_dispose(x)
 proc list_dispose(x) {
              goto [(not (x = null))] then0 else0;
   then0:     gvar0 := "i__add"(x, 1i);
-             gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
              t := l-nth(gvar1, 2i);
              u := "list_dispose"(t);
-             goto [(l-nth(x, 1i) = 0i)] continue0 fail0;
-  fail0:     fail [InvalidBlockPointer](x);
-  continue0: gvar2 := [dispose](l-nth(x, 0i));
+             goto [(l-nth(x, 1i) = 0i)] continue1 fail1;
+  fail1:     fail [InvalidBlockPointer](x);
+  continue1: gvar2 := [dispose](l-nth(x, 0i));
              goto endif0;
   else0:     skip;
   endif0:    skip;

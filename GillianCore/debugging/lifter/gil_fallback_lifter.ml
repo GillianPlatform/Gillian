@@ -41,28 +41,33 @@ functor
     type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
     type annot = PC.Annot.t
 
-    let init_exn proc_name tl_ast exec_data =
-      let gil, gil_result = Gil_lifter.init_exn proc_name tl_ast exec_data in
+    let init_exn ~proc_name ~all_procs tl_ast prog exec_data =
+      let gil, gil_result =
+        Gil_lifter.init_exn ~proc_name ~all_procs tl_ast prog exec_data
+      in
       gil_state := Some gil;
       let ret =
-        match TLLifter.init proc_name tl_ast exec_data with
+        match TLLifter.init ~proc_name ~all_procs tl_ast prog exec_data with
         | None -> ({ gil; tl = None }, gil_result)
         | Some (tl, tl_result) -> ({ gil; tl = Some tl }, tl_result)
       in
       ret
 
-    let init proc_name tl_ast exec_data =
-      Some (init_exn proc_name tl_ast exec_data)
+    let init ~proc_name ~all_procs tl_ast prog exec_data =
+      Some (init_exn ~proc_name ~all_procs tl_ast prog exec_data)
 
     let dump = to_yojson
 
     let handle_cmd prev_id branch_case exec_data { gil; tl } =
-      match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
-      | Stop -> (
-          match tl with
-          | None -> Stop
-          | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data)
-      | r -> r
+      let () =
+        match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
+        | Stop None -> ()
+        | Stop _ -> failwith "HORROR - Gil_lifter tried to Stop with id!"
+        | _ -> failwith "HORROR - Gil_lifter didn't give Stop!"
+      in
+      match tl with
+      | None -> Stop None
+      | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data
 
     let get_gil_map state = state.gil |> Gil_lifter.get_gil_map
 

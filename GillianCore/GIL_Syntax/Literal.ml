@@ -15,7 +15,19 @@ type t = TypeDef__.literal =
   | Type of Type.t  (** GIL types ({!type:Type.t}) *)
   | LList of t list  (** Lists of GIL literals *)
   | Nono
-[@@deriving eq, ord]
+[@@deriving ord]
+
+let rec equal la lb =
+  match (la, lb) with
+  | Undefined, Undefined | Null, Null | Empty, Empty | Nono, Nono -> true
+  | Constant cl, Constant cr -> Constant.equal cr cl
+  | Bool bl, Bool br -> Bool.equal bl br
+  | Int zl, Int zr -> Z.equal zl zr
+  | Num za, Num zb -> Int.equal (Stdlib.compare za zb) 0
+  | String sl, String sr | Loc sl, Loc sr -> String.equal sl sr
+  | Type tl, Type tr -> Type.equal tl tr
+  | LList ll, LList lr -> List.for_all2 equal ll lr
+  | _ -> false
 
 let to_yojson = TypeDef__.literal_to_yojson
 let of_yojson = TypeDef__.literal_of_yojson

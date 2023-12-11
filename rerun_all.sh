@@ -1,0 +1,1 @@
+./install.sh && cd ../kani && ./producestats.sh

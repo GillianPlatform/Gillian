@@ -33,6 +33,7 @@ let append x l =
       l.last <- cell
 
 let add = append
+let add_all xs t = List.iter (fun x -> add x t) xs
 let length t = t.length
 
 let to_list t =
@@ -206,6 +207,14 @@ let exists f l =
   let rec aux = function
     | Nil -> false
     | Cons { contents; _ } when f contents -> true
+    | Cons { next; _ } -> aux next
+  in
+  aux l.first
+
+let assoc_opt a l =
+  let rec aux = function
+    | Nil -> None
+    | Cons { contents = k, v; _ } when a = k -> Some v
     | Cons { next; _ } -> aux next
   in
   aux l.first
