@@ -1,5 +1,7 @@
 type err_t = Symbol_not_found of string [@@deriving show, yojson]
 
+module StringMap : Map.S with type key = string
+
 module Concrete : sig
   open Gil_syntax
 
@@ -10,8 +12,8 @@ module Concrete : sig
   val deserialize_def : Literal.t -> def
 
   type t = {
-    symb : (string, string) PMap.t;  (** maps symbols to loc names *)
-    defs : (string, def) PMap.t;  (** maps loc names to definitions *)
+    symb : string StringMap.t;  (** maps symbols to loc names *)
+    defs : def StringMap.t;  (** maps loc names to definitions *)
   }
 
   (** Finds a location name given symbol in the global environment *)
@@ -50,8 +52,8 @@ module Symbolic : sig
   val deserialize_def : Expr.t -> def
 
   type t = {
-    symb : (string, string) PMap.t;  (** maps symbols to loc names *)
-    defs : (string, def) PMap.t;  (** maps loc names to definitions *)
+    symb : string StringMap.t;  (** maps symbols to loc names *)
+    defs : def StringMap.t;  (** maps loc names to definitions *)
   }
 
   (** Finds a location name given symbol in the global environment *)
