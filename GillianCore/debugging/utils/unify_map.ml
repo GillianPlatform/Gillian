@@ -55,7 +55,7 @@ functor
       if aux id then Success else Failure
 
     let rec build_seg ?(prev_substs = []) (id, type_, content) : unify_seg =
-      let module Subst = Verification.SUnifier.ESubst in
+      let module Subst = SVal.SESubst in
       if type_ = Content_type.assertion then
         let asrt_report =
           content |> Yojson.Safe.from_string |> AssertionReport.of_yojson

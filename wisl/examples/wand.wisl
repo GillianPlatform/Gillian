@@ -1,0 +1,72 @@
+predicate P(+x, y) {
+  (x -> y) * (y -> x)
+}
+
+predicate Q(x) {
+  x -> #k
+}
+
+lemma should_fail {
+  statement:
+    forall x, y. P(x, y) |- Q(x) * (Q(x) -* P(x, y))
+  proof:
+    package (Q(x) -* P(x, y))
+}
+
+predicate R(+x, +y) {
+  (x -> #a, y) * (y -> #b, x)
+}
+
+predicate S(+x) {
+  x -> #a
+}
+
+predicate empty() {
+  emp
+}
+
+predicate xpt(+x) {
+  x -> #k
+}
+
+
+predicate leq_five(+x) {
+  x <=# 5
+}
+
+predicate eq_five(+x) {
+  x == 5
+}
+
+predicate leq_six(+x) {
+  x <=# 6
+}
+
+lemma pure_wand {
+  statement:
+    forall x. (5 <=# x) |- (leq_five(x) -* eq_five(x))
+  proof:
+    package (leq_five(x) -* eq_five(x))
+}
+
+lemma pure_wand_fail {
+  statement:
+    forall x. (5 <=# x) |- (leq_six(x) -* eq_five(x))
+  proof:
+    package (leq_six(x) -* eq_five(x))
+}
+
+lemma should_succeed {
+  statement:
+    forall x, y. R(x, y) |- S(x) * (S(x) -* R(x, y))
+  proof:
+    package (S(x) -* R(x, y))
+}
+
+lemma empty_wand {
+  statement:
+    forall x. x -> #a |- (empty() -* xpt(x))
+  proof:
+    package (empty() -* xpt(x))
+}
+

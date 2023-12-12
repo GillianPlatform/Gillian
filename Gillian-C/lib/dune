@@ -11,8 +11,7 @@
   gillian
   gillian.alcotest-runner
   compcert
-  batteries
-  printbox
+  printbox-text
   gillian.ppx_sat.runtime
   ppx_deriving_yojson.runtime)
  (preprocess

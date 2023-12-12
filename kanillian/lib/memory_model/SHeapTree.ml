@@ -436,12 +436,7 @@ module Node = struct
 end
 
 module Tree = struct
-  type t = {
-    node : Node.t;
-    span : Range.t;
-    children : (t * t) option;
-    last_path : PathTaken.t option; [@ignore]
-  }
+  type t = { node : Node.t; span : Range.t; children : (t * t) option }
   [@@deriving yojson]
 
   module Lift = struct
@@ -496,7 +491,8 @@ module Tree = struct
     | NotOwned Totally -> true
     | _ -> false
 
-  let make ~node ~span ?children () = { node; span; children; last_path = None }
+  let make ~node ~span ?children () = { node; span; children }
+  let remove_node x = DR.ok (make ~node:(NotOwned Totally) ~span:x.span ())
 
   (* Used to change the position of a tree. The start of the tree is going to be [start], but the spans don't change. *)
   let rec realign t start =
@@ -516,7 +512,7 @@ module Tree = struct
     make ~node:t.node ~span ?children ()
 
   let with_children t ~left ~right =
-    Delayed.return { t with children = Some (left, right); last_path = None }
+    Delayed.return { t with children = Some (left, right) }
 
   let of_children_s ~left ~right =
     let open Delayed.Syntax in
@@ -533,7 +529,7 @@ module Tree = struct
           None
       | _ -> Some (left, right)
     in
-    { span; children; node; last_path = None }
+    { span; children; node }
 
   let of_children _ ~left ~right = of_children_s ~left ~right
 
@@ -542,8 +538,7 @@ module Tree = struct
     let new_node =
       Node.update_parent_perm node ~left:left.node ~right:right.node
     in
-    Delayed.return
-      { node = new_node; span; children = Some (left, right); last_path = None }
+    Delayed.return { node = new_node; span; children = Some (left, right) }
 
   let sval_leaf ~low ~perm ~value ~chunk =
     let open Delayed.Syntax in
@@ -563,12 +558,7 @@ module Tree = struct
     make ~node:(Node.make_owned ~mem_val:Zeros ~perm) ~span ()
 
   let create_root range =
-    {
-      children = None;
-      span = range;
-      node = NotOwned Totally;
-      last_path = Some Here;
-    }
+    { children = None; span = range; node = NotOwned Totally }
 
   let rec split ~range t : (Node.t * t * t) Delayed.t =
     (* this function splits a tree and returns the node in the given range *)
@@ -699,7 +689,7 @@ module Tree = struct
       then (
         log_string "Range does equal span, replacing.";
         let++ new_tree = replace_node t in
-        (t, { new_tree with last_path = Some Here }))
+        (t, new_tree))
       else
         match t.children with
         | Some (left, right) ->
@@ -753,7 +743,7 @@ module Tree = struct
                   frame_inside ~replace_node ~rebuild_parent left range
                 in
                 let+ new_parent = rebuild_parent t ~left ~right in
-                Ok (node, { new_parent with last_path = Some Left })
+                Ok (node, new_parent)
               else
                 if%sat
                   log_string "range inside right";
@@ -763,7 +753,7 @@ module Tree = struct
                     frame_inside ~replace_node ~rebuild_parent right range
                   in
                   let+ new_parent = rebuild_parent t ~left ~right in
-                  Ok (node, { new_parent with last_path = Some Right })
+                  Ok (node, new_parent)
                 else (
                   Logging.verbose (fun fmt ->
                       fmt
@@ -782,44 +772,19 @@ module Tree = struct
     let* root = extend_if_needed t range in
     frame_inside ~replace_node ~rebuild_parent root range
 
-  let get_node (t : t) range : (Node.t * t, err) DR.t =
+  let cons_node (t : t) range : (Node.t * t, err) DR.t =
     let open DR.Syntax in
-    let replace_node x = DR.ok x in
-    let rebuild_parent = with_children in
+    let replace_node x = remove_node x in
+    let rebuild_parent = of_children in
     let++ framed, rest = frame_range t ~replace_node ~rebuild_parent range in
     (framed.node, rest)
 
-  let set_node (t : t) range node : (t, err) DR.t =
+  let prod_node (t : t) range node : (t, err) DR.t =
     let open DR.Syntax in
     let replace_node _ = DR.ok (make ~node ~span:range ()) in
     let rebuild_parent = of_children in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
     t
-
-  let rem_last_get (t : t) : t =
-    let rebuild
-        ({ span = lspan; node = lnode; _ } as left)
-        ({ span = rspan; node = rnode; _ } as right) =
-      let span = (fst lspan, snd rspan) in
-      match (lnode, rnode) with
-      | NotOwned Totally, NotOwned Totally ->
-          make ~node:(NotOwned Totally) ~span ()
-      | _ -> make ~node:(NotOwned Partially) ~span ~children:(left, right) ()
-    in
-    let rec loop { span; children; last_path; _ } =
-      match last_path with
-      | None -> failwith "Imposible, removing last get, but can't follow a path"
-      | Some Here -> make ~node:Node.not_owned ~span ()
-      | Some Left ->
-          let left, right = Option.get children in
-          let left = loop left in
-          rebuild left right
-      | Some Right ->
-          let left, right = Option.get children in
-          let right = loop right in
-          rebuild left right
-    in
-    loop t
 
   let get_array (t : t) (low : Expr.t) (chunk : Chunk.t) (size : Expr.t) :
       (SVArr.t * Perm.t option * t, err) DR.t =
@@ -833,7 +798,19 @@ module Tree = struct
     let+* arr, perm = Node.decode_array ~size ~chunk framed.node in
     Ok (arr, perm, tree)
 
-  let set_array
+  let cons_array (t : t) (low : Expr.t) (chunk : Chunk.t) (size : Expr.t) :
+      (SVArr.t * Perm.t option * t, err) DR.t =
+    let open DR.Syntax in
+    let open Delayed.Syntax in
+    let* size = Delayed.reduce size in
+    let replace_node = remove_node in
+    let rebuild_parent = of_children in
+    let range = Range.of_low_chunk_and_size low chunk size in
+    let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
+    let+* arr, perm = Node.decode_array ~size ~chunk framed.node in
+    Ok (arr, perm, tree)
+
+  let prod_array
       (t : t)
       (low : Expr.t)
       (size : Expr.t)
@@ -862,7 +839,7 @@ module Tree = struct
     let++ sval, perm = Node.decode ~chunk node in
     (sval, perm, tree)
 
-  let set_single
+  let prod_single
       (t : t)
       (low : Expr.t)
       (chunk : Chunk.t)
@@ -980,12 +957,12 @@ module Tree = struct
 
   let drop_perm (t : t) (low : Expr.t) (high : Expr.t) (perm : Perm.t) :
       (t, err) DR.t =
-    let rec rec_set_perm { node; span; children; last_path } =
+    let rec rec_set_perm { node; span; children } =
       let node = Node.drop_perm_exn ~perm node in
       let children =
         Option.map (fun (a, b) -> (rec_set_perm a, rec_set_perm b)) children
       in
-      { node; span; children; last_path }
+      { node; span; children }
     in
     let open DR.Syntax in
     let range = Range.make low high in
@@ -1050,7 +1027,7 @@ module Tree = struct
       ~svarr_subst
       ~sval_subst
       ~le_subst
-      { node; span; children; last_path } =
+      { node; span; children } =
     let node = Node.substitution ~sval_subst ~svarr_subst node in
     let span = Range.substitution ~le_subst span in
     let children =
@@ -1060,7 +1037,7 @@ module Tree = struct
           (f left, f right))
         children
     in
-    { node; span; children; last_path }
+    { node; span; children }
 
   let box t =
     let rec flatten_tree { node; span; children; _ } =
@@ -1174,12 +1151,23 @@ let weak_valid_pointer (t : t) (ofs : Expr.t) : (bool, err) DR.t =
 
 let get_bounds = function
   | Freed -> Error UseAfterFree
-  | Tree x -> Ok x.bounds
+  | Tree { bounds; _ } -> Ok bounds
 
-let set_bounds t bounds =
+let load_bounds = function
+  | Freed -> Error UseAfterFree
+  | Tree { bounds = Some bounds; _ } -> Ok bounds
+  | Tree { bounds = None; _ } -> Error MissingResource
+
+let cons_bounds = function
+  | Freed -> Error UseAfterFree
+  | Tree { bounds = Some bounds; root } ->
+      Ok (bounds, Tree { root; bounds = None })
+  | Tree { bounds = None; _ } -> Error MissingResource
+
+let prod_bounds t bounds =
   match t with
   | Freed -> Error UseAfterFree
-  | Tree x -> Ok (Tree { x with bounds })
+  | Tree x -> Ok (Tree { x with bounds = Some bounds })
 
 let rem_bounds t =
   match t with
@@ -1223,7 +1211,7 @@ let free t low high =
             match tree.root with
             | None -> DR.error MissingResource
             | Some root ->
-                let+* node, _ = Tree.get_node root (low, high) in
+                let+* node, _ = Tree.cons_node root (low, high) in
                 Result.map
                   (fun () -> Freed)
                   (Node.check_perm (Some Freeable) node)
@@ -1233,7 +1221,7 @@ let free t low high =
                  "Freeing only part of an object (this might need fixing in \
                   the MM)"))
 
-let get_single t low chunk =
+let cons_single t low chunk =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
   let** span = DR.of_result (get_bounds t) in
@@ -1247,12 +1235,12 @@ let get_single t low chunk =
         (value, perm, wroot)
   else DR.error BufferOverrun
 
-let set_single t low chunk sval perm =
+let prod_single t low chunk sval perm =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
   let** root = DR.of_result (get_root t) in
   let root = Option.value root ~default:(Tree.create_root range) in
-  let** root_set = Tree.set_single root low chunk sval perm in
+  let** root_set = Tree.prod_single root low chunk sval perm in
   let** bounds = DR.of_result (get_bounds t) in
   let learned =
     match bounds with
@@ -1260,12 +1248,6 @@ let set_single t low chunk sval perm =
     | Some bounds -> [ Range.is_inside range bounds ]
   in
   DR.of_result ~learned (with_root t root_set)
-
-let rem_last_get t =
-  match t with
-  | Tree { root = Some root; bounds } ->
-      Tree { bounds; root = Some (Tree.rem_last_get root) }
-  | _ -> failwith "Impossible, removing last get with something absurd"
 
 let get_array t low size chunk =
   let open DR.Syntax in
@@ -1281,12 +1263,29 @@ let get_array t low size chunk =
         (array, perm, wroot)
   else DR.error BufferOverrun
 
-let set_array t low size chunk array perm =
+let cons_array t low size chunk =
+  let open DR.Syntax in
+  let range = Range.of_low_chunk_and_size low chunk size in
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        match root with
+        | None -> DR.error MissingResource
+        | Some root ->
+            let** array, perm, root_framed =
+              Tree.cons_array root low chunk size
+            in
+            let++ wroot = DR.of_result (with_root t root_framed) in
+            (array, perm, wroot)
+      else DR.error BufferOverrun
+
+let prod_array t low size chunk array perm =
   let open DR.Syntax in
   let range = Range.of_low_chunk_and_size low chunk size in
   let** root = DR.of_result (get_root t) in
   let root = Option.value root ~default:(Tree.create_root range) in
-  let** root_set = Tree.set_array root low size chunk array perm in
+  let** root_set = Tree.prod_array root low size chunk array perm in
   let** bounds = DR.of_result (get_bounds t) in
   let learned =
     match bounds with
@@ -1295,7 +1294,7 @@ let set_array t low size chunk array perm =
   in
   DR.of_result ~learned (with_root t root_set)
 
-let get_simple_mem_val ~expected_mem_val t low high =
+let cons_simple_mem_val ~expected_mem_val t low high =
   let open DR.Syntax in
   let range = (low, high) in
   let** span = DR.of_result (get_bounds t) in
@@ -1304,7 +1303,7 @@ let get_simple_mem_val ~expected_mem_val t low high =
     match root with
     | None -> DR.error MissingResource
     | Some root ->
-        let** node, root_framed = Tree.get_node root range in
+        let** node, root_framed = Tree.cons_node root range in
         let res =
           match node with
           | MemVal { mem_val; exact_perm = perm; _ }
@@ -1314,18 +1313,18 @@ let get_simple_mem_val ~expected_mem_val t low high =
         in
         let++ wroot =
           DR.of_result
-            (Result.bind res (fun perm ->
-                 Result.map (fun mem -> (mem, perm)) (with_root t root_framed)))
+            ( Result.bind res @@ fun perm ->
+              Result.map (fun mem -> (mem, perm)) (with_root t root_framed) )
         in
         wroot
   else DR.error BufferOverrun
 
-let set_simple_mem_val ~mem_val t low high perm =
+let prod_simple_mem_val ~mem_val t low high perm =
   let open DR.Syntax in
   let range = (low, high) in
   let** root = DR.of_result (get_root t) in
   let root = Option.value ~default:(Tree.create_root range) root in
-  let** root_set = Tree.set_node root range (Node.make_owned ~perm ~mem_val) in
+  let** root_set = Tree.prod_node root range (Node.make_owned ~perm ~mem_val) in
   let** bounds = DR.of_result (get_bounds t) in
   let learned =
     match bounds with
@@ -1334,19 +1333,19 @@ let set_simple_mem_val ~mem_val t low high perm =
   in
   DR.of_result ~learned (with_root t root_set)
 
-let get_hole =
-  get_simple_mem_val ~expected_mem_val:(function
+let cons_hole =
+  cons_simple_mem_val ~expected_mem_val:(function
     | Poisoned Totally -> true
     | _ -> false)
 
-let set_hole = set_simple_mem_val ~mem_val:(Poisoned Totally)
+let prod_hole = prod_simple_mem_val ~mem_val:(Poisoned Totally)
 
-let get_zeros =
-  get_simple_mem_val ~expected_mem_val:(function
+let cons_zeros =
+  cons_simple_mem_val ~expected_mem_val:(function
     | Zeros -> true
     | _ -> false)
 
-let set_zeros = set_simple_mem_val ~mem_val:Zeros
+let prod_zeros = prod_simple_mem_val ~mem_val:Zeros
 
 let get_freed t =
   match t with

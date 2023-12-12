@@ -2,17 +2,10 @@ open Names
 open Containers
 module L = Logging
 module SESubst = SVal.SESubst
-module SPreds = Preds.SPreds
 
 let new_lvar_name var = lvar_prefix ^ var
 
-module Make
-    (SPState : PState.S
-                 with type vt = SVal.M.t
-                  and type st = SVal.SESubst.t
-                  and type store_t = SStore.t
-                  and type preds_t = SPreds.t) =
-struct
+module Make (SPState : PState.S) = struct
   (*  ------------------------------------------------------------------
    *  List Preprocessing
    *  ------------------------------------------------------------------
@@ -298,6 +291,7 @@ struct
       | SetMem (le1, le2) -> SetMem (fe le1, fe le2)
       | ForAll (bt, a) -> ForAll (bt, fant a)
       | IsInt e -> IsInt (fe e)
+      | Impl (a, b) -> Impl (fa a, fa b)
       | _ ->
           let msg =
             Fmt.str
@@ -541,22 +535,25 @@ struct
       (string * Expr.t list * Expr.t list) list
       * Formula.t list
       * (Expr.t * Type.t) list
-      * (string * Expr.t list) list =
+      * (string * Expr.t list) list
+      * Wands.wand list =
     let f = separate_assertion in
 
     match a with
     | Star (al, ar) ->
-        let core_asrts_l, pure_l, types_l, preds_l = f al in
-        let core_asrts_r, pure_r, types_r, preds_r = f ar in
+        let core_asrts_l, pure_l, types_l, preds_l, wands_l = f al in
+        let core_asrts_r, pure_r, types_r, preds_r, wands_r = f ar in
         ( core_asrts_l @ core_asrts_r,
           pure_l @ pure_r,
           types_l @ types_r,
-          preds_l @ preds_r )
-    | GA (a, es1, es2) -> ([ (a, es1, es2) ], [], [], [])
-    | Emp -> ([], [], [], [])
-    | Types lst -> ([], [], lst, [])
-    | Pred (name, params) -> ([], [], [], [ (name, params) ])
-    | Pure f -> ([], [ f ], [], [])
+          preds_l @ preds_r,
+          wands_l @ wands_r )
+    | GA (a, es1, es2) -> ([ (a, es1, es2) ], [], [], [], [])
+    | Wand { lhs; rhs } -> ([], [], [], [], [ { lhs; rhs } ])
+    | Emp -> ([], [], [], [], [])
+    | Types lst -> ([], [], lst, [], [])
+    | Pred (name, params) -> ([], [], [], [ (name, params) ], [])
+    | Pure f -> ([], [ f ], [], [], [])
 
   (** Normalise type assertions (Intialise type environment *)
   let normalise_types
@@ -613,6 +610,8 @@ struct
 
     result
 
+  let normalise_wands (wands : Wands.wand list) : Wands.t = Wands.init wands
+
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
       (pred_defs : (string, UP.pred) Hashtbl.t)
@@ -620,9 +619,9 @@ struct
       (pfs : PFS.t)
       (gamma : Type_env.t)
       (subst : SVal.SESubst.t)
-      (pred_asrts : (string * Expr.t list) list) : SPreds.t =
+      (pred_asrts : (string * Expr.t list) list) : Preds.t =
     let fe = normalise_logic_expression store gamma subst in
-    let preds = SPreds.init [] in
+    let preds = Preds.init [] in
 
     List.iter
       (fun (pn, les) ->
@@ -648,7 +647,7 @@ struct
                 pred_def.pred.pred_facts (List.combine params les)
             in
             List.iter (fun fact -> PFS.extend pfs fact) facts;
-            SPreds.extend preds (pn, List.map fe les))
+            Preds.extend preds (pn, List.map fe les))
       pred_asrts;
 
     preds
@@ -894,7 +893,7 @@ struct
     let subst = SESubst.init [] in
 
     (* Step 2b -- Separate assertion *)
-    let c_asrts, pfs, types, preds =
+    let c_asrts, pfs, types, preds, wands =
       try separate_assertion a
       with Failure msg ->
         L.verbose (fun m -> m "I died here terribly with msg: %s!\n" msg);
@@ -939,11 +938,13 @@ struct
 
         (* Step 7 -- Construct the state *)
         let preds' = normalise_preds pred_defs store pfs gamma subst preds in
+        let wands' = normalise_wands wands in
         let astate : SPState.t =
           SPState.make_p ~preds:pred_defs ~init_data ~store ~pfs ~gamma
             ~spec_vars:svars ()
         in
         let astate = SPState.set_preds astate preds' in
+        let astate = SPState.set_wands astate wands' in
         let open Syntaxes.List in
         let res =
           let* astate = produce_core_asrts astate c_asrts' in

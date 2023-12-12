@@ -38,6 +38,12 @@ module FO_logic = struct
     (** @inline *)
     include Reduction
   end
+
+  (** @canonical Gillian.Symbolic.FO_logic.FOSolver *)
+  module FOSolver = struct
+    (** @inline *)
+    include FOSolver
+  end
 end
 
 (** @canonical Gillian.Symbolic.Memory_S

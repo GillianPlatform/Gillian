@@ -12,6 +12,11 @@ val check_sat_core :
 val check_sat :
   Gil_syntax.Formula.Set.t -> (string, Gil_syntax.Type.t) Hashtbl.t -> bool
 
+val check_sat_with_model :
+  Gil_syntax.Formula.Set.t ->
+  (string, Gil_syntax.Type.t) Hashtbl.t ->
+  bool * Z3.Model.model option
+
 (** [lift_z3_model model gamma update_subst target_vars]
     attempts to lift the variables [target_vars] from the
     z3 model [model] and sends the found bindings to the [update_subst] functions

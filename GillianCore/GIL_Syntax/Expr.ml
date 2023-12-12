@@ -70,6 +70,12 @@ let list_length x =
   | LstSub (_, _, len) -> len
   | _ -> UnOp (LstLen, x)
 
+let list_repeat x len =
+  match len with
+  | Lit (Int i) when Z.lt i (Z.of_int 100) ->
+      EList (List.init (Z.to_int i) (fun _ -> x))
+  | _ -> BinOp (x, LstRepeat, len)
+
 let list_sub ~lst ~start ~size =
   match (lst, start, size) with
   | EList el, Lit (Int starti), Lit (Int sizei) -> (
@@ -169,7 +175,19 @@ module Infix = struct
     | Lit (Num x), Lit (Num y) -> Lit (Num (x /. y))
     | _ -> BinOp (a, FDiv, b)
 
-  let ( + ) a b =
+  let ( - ) a b =
+    match (a, b) with
+    | x, Lit (Int z) when Z.equal Z.zero z -> x
+    | Lit (Num 0.), x -> UnOp (IUnaryMinus, x)
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.sub x y))
+    | BinOp (x, IPlus, y), z when equal y z -> x
+    | BinOp (x, IPlus, y), z when equal x z -> y
+    | x, y when equal x y -> zero_i
+    | _ -> BinOp (a, IMinus, b)
+
+  let rec ( + ) a b =
+    let plus = ( + ) in
+    let minus = ( - ) in
     let open! Z in
     match (a, b) with
     | Lit (Int z), x when equal z zero -> x
@@ -181,16 +199,10 @@ module Infix = struct
     | BinOp (y, IPlus, Lit (Int x)), Lit (Int z)
     | Lit (Int z), BinOp (y, IPlus, Lit (Int x)) ->
         BinOp (y, IPlus, Lit (Int (x + z)))
+    | UnOp (IUnaryMinus, x), UnOp (IUnaryMinus, y) ->
+        UnOp (IUnaryMinus, plus x y)
+    | x, UnOp (IUnaryMinus, y) -> minus x y
     | _ -> BinOp (a, IPlus, b)
-
-  let ( - ) a b =
-    match (a, b) with
-    | x, Lit (Int z) when Z.equal Z.zero z -> x
-    | Lit (Num 0.), x -> UnOp (IUnaryMinus, x)
-    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.sub x y))
-    | BinOp (x, IPlus, y), z when equal y z -> x
-    | BinOp (x, IPlus, y), z when equal x z -> y
-    | _ -> BinOp (a, IMinus, b)
 
   let ( * ) a b =
     let open! Z in
@@ -203,11 +215,26 @@ module Infix = struct
     | _ -> BinOp (a, ITimes, b)
 
   let ( / ) a b =
-    let open! Z in
     match (a, b) with
-    | x, Lit (Int z) when equal z one -> x
-    | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
+    | x, Lit (Int z) when Z.equal z Z.one -> x
+    | x, BinOp (a, ITimes, b) when equal x a -> b
+    | x, BinOp (a, ITimes, b) when equal x b -> a
+    | BinOp (a, ITimes, b), x when equal x a -> b
+    | BinOp (a, ITimes, b), x when equal x b -> a
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.div x y))
     | _ -> BinOp (a, IDiv, b)
+
+  let ( << ) a b =
+    match (a, b) with
+    | Lit (Int z), _ when Z.equal z Z.zero -> a
+    | _, Lit (Int z) when Z.equal z Z.zero -> a
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.shift_left x (Z.to_int y)))
+    | _ -> BinOp (a, LeftShift, b)
+
+  let ( ~- ) = function
+    | Lit (Int z) -> Lit (Int (Z.neg z))
+    | UnOp (IUnaryMinus, z) -> z
+    | z -> UnOp (IUnaryMinus, z)
 
   let not a =
     match a with
@@ -294,7 +321,8 @@ let rec pp fmt e =
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
   | BinOp (e1, op, e2) -> (
       match op with
-      | LstNth | StrNth -> Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
+      | LstNth | StrNth | LstRepeat ->
+          Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
       | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
@@ -334,6 +362,10 @@ let to_list (le : t) : t list option =
 
 (** From list to expression *)
 let from_list les = EList les
+
+let to_literal = function
+  | Lit lit -> Some lit
+  | _ -> None
 
 (** Fold *)
 let rec fold
@@ -384,6 +416,11 @@ let rec is_concrete (le : t) : bool =
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
+
+let is_concrete_zero_i (le : t) : bool =
+  match le with
+  | Lit (Int z) -> Z.equal Z.zero z
+  | _ -> false
 
 (** Get all the variables in --e-- *)
 let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le

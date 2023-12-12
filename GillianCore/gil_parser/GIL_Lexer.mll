@@ -176,7 +176,9 @@ rule read = parse
   | "$$LocalTime"        { GIL_Parser.LOCALTIME     }
 
 (* Binary operators *)
+  | "==>"                { GIL_Parser.LIMPLIES   }
   | "="                  { GIL_Parser.EQ     }
+  | "-*"                 { GIL_Parser.WAND   }
 
   | "i<"                 { GIL_Parser.ILT    }
   | "i>"                 { GIL_Parser.IGT    }
@@ -232,6 +234,7 @@ rule read = parse
   | "s-len"              { GIL_Parser.STRLEN }
 (* Expression keywords *)
   | "l-nth"              { GIL_Parser.LSTNTH }
+  | "l-repeat"           { GIL_Parser.LSTREPEAT }
   | "s-nth"              { GIL_Parser.STRNTH }
 (* Command keywords *)
   | ":="                 { GIL_Parser.DEFEQ }
@@ -252,6 +255,7 @@ rule read = parse
 (* Logic commands *)
   | "[*"                 { GIL_Parser.OLCMD     }
   | "*]"                 { GIL_Parser.CLCMD     }
+  | "package"            { GIL_Parser.PACKAGE   }
   | "unfold*"            { GIL_Parser.RECUNFOLD }
   (**
     macro, assert are elsewhere

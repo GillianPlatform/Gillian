@@ -6,6 +6,8 @@ type t = TypeDef__.assertion =
   | Pure of Formula.t  (** Pure formula           *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
   | GA of string * Expr.t list * Expr.t list  (** Core assertion         *)
+  | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
+      (** Magic wand of the form [P(...) -* Q(...)] *)
 [@@deriving eq]
 
 let to_yojson = TypeDef__.assertion_to_yojson
@@ -87,6 +89,12 @@ let rec map
       | Pure form -> Pure (map_p form)
       | Types lt -> Types (List.map (fun (exp, typ) -> (map_e exp, typ)) lt)
       | GA (x, es1, es2) -> GA (x, List.map map_e es1, List.map map_e es2)
+      | Wand { lhs = lhs_pred, lhs_args; rhs = rhs_pred, rhs_args } ->
+          Wand
+            {
+              lhs = (lhs_pred, List.map map_e lhs_args);
+              rhs = (rhs_pred, List.map map_e rhs_args);
+            }
     in
     f_a_after a''
 
@@ -191,6 +199,14 @@ let rec full_pp fmt a =
   | GA (a, ins, outs) ->
       let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.full_pp in
       Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
+  | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+      let lname = Pp_utils.maybe_quote_ident lname in
+      let rname = Pp_utils.maybe_quote_ident rname in
+      Fmt.pf fmt "(%s(%a) -* %s(%a))" lname
+        (Fmt.list ~sep:Fmt.comma Expr.full_pp)
+        largs rname
+        (Fmt.list ~sep:Fmt.comma Expr.full_pp)
+        rargs
 
 (** GIL logic assertions *)
 let rec pp fmt a =
@@ -207,6 +223,14 @@ let rec pp fmt a =
   | GA (a, ins, outs) ->
       let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.pp in
       Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
+  | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+      let lname = Pp_utils.maybe_quote_ident lname in
+      let rname = Pp_utils.maybe_quote_ident rname in
+      Fmt.pf fmt "(%s(%a) -* %s(%a))" lname
+        (Fmt.list ~sep:Fmt.comma Expr.pp)
+        largs rname
+        (Fmt.list ~sep:Fmt.comma Expr.pp)
+        rargs
 
 let subst_clocs (subst : string -> Expr.t) (a : t) : t =
   map None None
@@ -227,6 +251,8 @@ module Infix = struct
     | Pure True, x | x, Pure True | Emp, x | x, Emp -> x
     | (Pure False as fl), _ | _, (Pure False as fl) -> fl
     | _ -> Star (a, b)
+
+  let ( --* ) lhs rhs = Wand { lhs; rhs }
 end
 
 let star (asrts : t list) : t = List.fold_left Infix.( ** ) Emp asrts

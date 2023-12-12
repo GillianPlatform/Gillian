@@ -9,24 +9,7 @@ type mem_ac =
   | Load
   | Free
   | Move
-  | GetSingle
-  | SetSingle
-  | RemSingle
-  | GetArray
-  | SetArray
-  | RemArray
-  | GetHole
-  | SetHole
-  | RemHole
-  | GetZeros
   | SetZeros
-  | RemZeros
-  | GetBounds
-  | SetBounds
-  | RemBounds
-  | GetFreed
-  | SetFreed
-  | RemFreed
 
 type genv_ac = GetDef
 
@@ -45,19 +28,10 @@ val str_ac : ac -> string
 (** Deserializes a string into an action *)
 val ac_from_str : string -> ac
 
-(** {3 Global assertion and their actions} *)
-
-val ga_to_setter : ga -> ac
-val ga_to_getter : ga -> ac
-val ga_to_deleter : ga -> ac
-
 (** {3 Global assertion serialization } *)
 
 val str_ga : ga -> string
 val ga_from_str : string -> ga
-val ga_to_setter_str : string -> string
-val ga_to_getter_str : string -> string
-val ga_to_deleter_str : string -> string
 
 (** {3 Gillian-related things} *)
 

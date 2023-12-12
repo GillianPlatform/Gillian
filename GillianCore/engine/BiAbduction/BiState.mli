@@ -1,16 +1,9 @@
-module Make
-    (Val : Val.S)
-    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
-    (Store : Store.S with type vt = Val.t)
-    (BaseState : PState.S
-                   with type vt = Val.t
-                    and type st = ESubst.t
-                    and type store_t = Store.t) : sig
+module Make (BaseState : PState.S) : sig
   include
     State.S
-      with type vt = Val.t
-       and type st = ESubst.t
-       and type store_t = Store.t
+      with type vt = Expr.t
+       and type st = SVal.SESubst.t
+       and type store_t = SStore.t
        and type init_data = BaseState.init_data
 
   val make : procs:SS.t -> state:BaseState.t -> init_data:init_data -> t

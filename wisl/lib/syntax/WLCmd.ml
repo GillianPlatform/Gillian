@@ -3,6 +3,7 @@ open VisitorUtils
 type tt =
   | Fold of string * WLExpr.t list
   | Unfold of string * WLExpr.t list
+  | Package of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
   | ApplyLem of string * WLExpr.t list * string list
   | LogicIf of WLExpr.t * t list * t list
   | Assert of WLAssert.t * string list
@@ -41,6 +42,8 @@ let rec get_by_id id lcmd =
     match get lcmdp with
     | Fold (_, lel) | Unfold (_, lel) | ApplyLem (_, lel, _) ->
         lexpr_list_visitor lel
+    | Package { lhs = _, lel1; rhs = _, lel2 } ->
+        lexpr_list_visitor lel1 |>> (lexpr_list_visitor, lel2)
     | LogicIf (le, lcmdl1, lcmdl2) ->
         lexpr_getter le |>> (list_visitor, lcmdl1) |>> (list_visitor, lcmdl2)
     | Assert (la, _) | Invariant (la, _, _) -> lassert_getter la
@@ -77,6 +80,9 @@ let rec substitution subst { wlcnode; wlcid; wlcloc } =
     match wlcnode with
     | Fold (pname, les) -> Fold (pname, List.map fe les)
     | Unfold (pname, les) -> Unfold (pname, List.map fe les)
+    | Package { lhs = lname, largs; rhs = rname, rargs } ->
+        Package
+          { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
     | ApplyLem (lname, les, binders) ->
         ApplyLem (lname, List.map fe les, binders)
     | LogicIf (le, cmds_t, cmds_e) ->

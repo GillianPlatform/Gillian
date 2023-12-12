@@ -4,7 +4,11 @@ module L = Logging
 module SSubst = SVal.SESubst
 
 module type S = sig
-  include State.S
+  include
+    State.S
+      with type vt = Expr.t
+       and type st = SVal.SESubst.t
+       and type store_t = SStore.t
 
   val make_s :
     init_data:init_data ->
@@ -15,17 +19,22 @@ module type S = sig
     t
 
   val init : init_data -> t
+  val get_init_data : t -> init_data
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
+  val sure_is_nonempty : t -> bool
+  val consume_core_pred : string -> t -> vt list -> action_ret
+  val produce_core_pred : string -> t -> vt list -> t list
+
+  (** See {!val:SMemory.S.split_further} *)
+  val split_core_pred_further :
+    t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 module Make (SMemory : SMemory.S) :
   S
-    with type st = SVal.SESubst.t
-     and type vt = SVal.M.t
-     and type store_t = SStore.t
-     and type heap_t = SMemory.t
+    with type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t
      and type init_data = SMemory.init_data = struct
   type vt = SVal.M.t [@@deriving yojson, show]
@@ -71,6 +80,8 @@ module Make (SMemory : SMemory.S) :
        %a@]"
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars SStore.pp store pp_heap heap PFS.pp pfs Type_env.pp gamma
+
+  let sure_is_nonempty (memory, _, _, _, _) = SMemory.sure_is_nonempty memory
 
   let pp_by_need pvars cmd_lvars cmd_locs fmt state =
     let memory, store, pfs, gamma, svars = state in
@@ -170,14 +181,11 @@ module Make (SMemory : SMemory.S) :
       ~(spec_vars : SS.t) : t =
     (SMemory.init init_data, store, pfs, gamma, spec_vars)
 
-  let execute_action
-      ?(unification = false)
-      (action : string)
-      (state : t)
-      (args : vt list) : action_ret =
+  let execute_action (action : string) (state : t) (args : vt list) : action_ret
+      =
     let open Syntaxes.List in
     let heap, store, pfs, gamma, vars = state in
-    let pc = Gpc.make ~unification ~pfs ~gamma () in
+    let pc = Gpc.make ~unification:false ~pfs ~gamma () in
     let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
     match value with
     | Ok (new_heap, vs) ->
@@ -186,10 +194,34 @@ module Make (SMemory : SMemory.S) :
         Ok (new_state, vs)
     | Error err -> Error (StateErr.EMem err)
 
-  let ga_to_setter (a_id : string) = SMemory.ga_to_setter a_id
-  let ga_to_getter (a_id : string) = SMemory.ga_to_getter a_id
-  let ga_to_deleter (a_id : string) = SMemory.ga_to_deleter a_id
-  let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
+  let consume_core_pred core_pred state in_args =
+    let open Syntaxes.List in
+    let heap, store, pfs, gamma, vars = state in
+    let pc = Gpc.make ~unification:true ~pfs ~gamma () in
+    let+ Gbranch.{ value; pc } = SMemory.consume core_pred heap pc in_args in
+    match value with
+    | Ok (new_heap, vs) ->
+        let store = SStore.copy store in
+        let new_state = (new_heap, store, pc.pfs, pc.gamma, vars) in
+        Ok (new_state, vs)
+    | Error err -> Error (StateErr.EMem err)
+
+  let split_core_pred_further state core_pred ins err =
+    let heap, _, _, _, _ = state in
+    match err with
+    | StateErr.EMem err -> SMemory.split_further heap core_pred ins err
+    | _ -> None
+
+  let produce_core_pred core_pred state args =
+    let open Syntaxes.List in
+    let heap, store, pfs, gamma, vars = state in
+    (* unification false is suspicious here *)
+    let pc = Gpc.make ~unification:false ~pfs ~gamma () in
+    let+ Gbranch.{ value = new_heap; pc } =
+      SMemory.produce core_pred heap pc args
+    in
+    (new_heap, store, pc.pfs, pc.gamma, vars)
+
   let is_overlapping_asrt (a : string) : bool = SMemory.is_overlapping_asrt a
 
   let eval_expr (state : t) (e : Expr.t) : vt =
@@ -433,25 +465,6 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, gamma, _ = state in
     Reduction.reduce_lexpr ~gamma ~pfs v
 
-  let to_loc (state : t) (loc : vt) : (t * vt) option =
-    let _, _, pfs, gamma, _ = state in
-    let loc = Reduction.reduce_lexpr ~gamma ~pfs loc in
-    match loc with
-    | Lit (Loc _) | ALoc _ -> Some (state, loc)
-    | LVar x -> (
-        match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
-        | Some loc_name ->
-            if is_aloc_name loc_name then Some (state, ALoc loc_name)
-            else Some (state, Lit (Loc loc_name))
-        | None ->
-            let new_aloc = ALoc.alloc () in
-            let p : Formula.t = Eq (LVar x, ALoc new_aloc) in
-            if FOSolver.check_satisfiability (p :: PFS.to_list pfs) gamma then (
-              PFS.extend pfs p;
-              Some (state, Expr.ALoc new_aloc))
-            else None)
-    | _ -> None
-
   let copy (state : t) : t =
     let heap, store, pfs, gamma, svars = state in
     let result =
@@ -508,8 +521,9 @@ module Make (SMemory : SMemory.S) :
 
   let clear_resource (state : t) : t =
     let memory, store, pfs, gamma, svars = state in
-
     (SMemory.clear memory, store, pfs, gamma, svars)
+
+  let get_init_data (mem, _, _, _, _) = SMemory.get_init_data mem
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for symbolic execution")

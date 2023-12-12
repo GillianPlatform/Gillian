@@ -5,6 +5,7 @@ type t = TypeDef__.formula =
   | And of t * t  (** Logical conjunction *)
   | Or of t * t  (** Logical disjunction *)
   | Eq of Expr.t * Expr.t  (** Expression equality *)
+  | Impl of t * t  (** Logical implication *)
   | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
   | FLessEq of Expr.t * Expr.t  (** Expression less-than-or-equal for numbers *)
   | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
@@ -66,6 +67,7 @@ let rec map
       match a' with
       | And (a1, a2) -> And (map_a a1, map_a a2)
       | Or (a1, a2) -> Or (map_a a1, map_a a2)
+      | Impl (a1, a2) -> Impl (map_a a1, map_a a2)
       | Not a -> Not (map_a a)
       | True -> True
       | False -> False
@@ -120,6 +122,7 @@ let rec map_opt
           match a' with
           | And (a1, a2) -> aux_a_double a1 a2 (fun a1 a2 -> And (a1, a2))
           | Or (a1, a2) -> aux_a_double a1 a2 (fun a1 a2 -> Or (a1, a2))
+          | Impl (a1, a2) -> aux_a_double a1 a2 (fun a1 a2 -> Impl (a1, a2))
           | Not a -> aux_a_single a (fun a -> Not a)
           | True -> Some True
           | False -> Some False
@@ -206,6 +209,8 @@ let rec pp_parametric pp_expr fmt f =
   | And (a1, a2) -> Fmt.pf fmt "(%a /\\@ %a)" pp a1 pp a2
   (* a1 \/ a2 *)
   | Or (a1, a2) -> Fmt.pf fmt "(%a \\/@ %a)" pp a1 pp a2
+  (* a1 ==> a2 *)
+  | Impl (a1, a2) -> Fmt.pf fmt "(%a ==> %a)" pp a1 pp a2
   (* ! a *)
   | Not a -> Fmt.pf fmt "(! %a)" pp a
   (* true *)
@@ -293,6 +298,10 @@ let rec to_expr (a : t) : Expr.t option =
       match (f a1, f a2) with
       | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BOr, le2))
       | _ -> None)
+  | Impl (a1, a2) -> (
+      match (f (Not a1), f a2) with
+      | Some e1, Some e2 -> Some (Expr.BinOp (e1, BinOp.BOr, e2))
+      | _ -> None)
   | ForAll _ -> None
   | Eq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
   | FLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))
@@ -354,7 +363,7 @@ module Infix = struct
   let ( #== ) a b =
     match (a, b) with
     | Expr.Lit la, Expr.Lit lb -> of_bool (Literal.equal la lb)
-    | a, b when a == b -> True
+    | a, b when Expr.equal a b -> True
     | _ -> Eq (a, b)
 
   let ( #|| ) a b =
@@ -409,7 +418,13 @@ module Infix = struct
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x >= y)
     | _ -> fnot a #< b
 
-  let ( #=> ) fa fb = (fnot fa) #|| fb
+  let ( #=> ) fa fb =
+    match (fa, fb) with
+    | True, _ -> fb
+    | False, _ -> True
+    | _, True -> True
+    | _, False -> fnot fa
+    | _ -> Impl (fa, fb)
 end
 
 let pvars_to_lvars (pf : t) : t =

@@ -47,6 +47,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token <string> VAR
 (* Binary operators *)
 %token EQ
+%token WAND
 
 %token FLT
 %token FGT
@@ -128,6 +129,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token INVARIANT
 %token ASSUME_TYPE
 %token LSTNTH
+%token LSTREPEAT
 %token LSTSUB
 %token STRNTH
 %token BIND
@@ -155,6 +157,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token CASSERT
 %token LAND
 %token LOR
+%token LIMPLIES
 %token LNOT
 %token LTRUE
 %token LFALSE
@@ -179,6 +182,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
+%token PACKAGE
 %token FOLD
 %token UNFOLD
 %token UNFOLDALL
@@ -237,9 +241,11 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* The later an operator is listed, the higher precedence it is given. *)
 (* Logic operators have lower precedence *)
 %nonassoc DOT
+%left LIMPLIES
 %left LOR
 %left LAND
 %left separating_conjunction
+%left magic_wand
 %right LNOT
 %right ISINT
 %nonassoc LEQUAL ILLESSTHAN ILLESSTHANEQUAL FLLESSTHAN FLLESSTHANEQUAL LSLESSTHAN
@@ -399,6 +405,8 @@ expr_target:
 (* l-nth (list, n) *)
   | LSTNTH; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
      { Expr.BinOp (e1, LstNth, e2) }
+  | LSTREPEAT; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
+     { Expr.BinOp (e1, LstRepeat, e2) }
   | LSTSUB; LBRACE; e1=expr_target; COMMA; e2=expr_target; COMMA; e3 = expr_target; RBRACE
     { Expr.LstSub (e1, e2, e3) }
 (* nop le *)
@@ -667,11 +675,17 @@ g_sspec_target:
 top_level_g_assertion_target:
   a = g_assertion_target; EOF { a }
 
+predicate_call:
+  name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
+  { (name, params) }
+
 g_assertion_target:
 (* P * Q *)
 (* The precedence of the separating conjunction is not the same as the arithmetic product *)
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { Asrt.Star (left_ass, right_ass) } %prec separating_conjunction
+  | lhs = predicate_call; WAND; rhs = predicate_call
+    { Asrt.Wand {lhs; rhs } } %prec magic_wand
 (* <GA>(es; es) *)
   | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
     { Asrt.GA (v, es1, es2) }
@@ -679,8 +693,9 @@ g_assertion_target:
   | LEMP;
     { Asrt.Emp }
 (* x(e1, ..., en) *)
-  | name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
-    { (* validate_pred_assertion (name, params); *)
+  | pcall = predicate_call
+    { 
+      let (name, params) = pcall in
       Asrt.Pred (name, params)
     }
 (* types (type_pairs) *)
@@ -721,6 +736,9 @@ g_logic_cmd_target:
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | RECUNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
+  
+  | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
+    { LCmd.SL (Package { lhs; rhs })}
 
 (* unfold_all x *)
   | UNFOLDALL; name = proc_name
@@ -972,6 +990,9 @@ pure_assertion_target:
 (* P /\ Q *)
   | left_ass=pure_assertion_target; LAND; right_ass=pure_assertion_target
     { Formula.And (left_ass, right_ass) }
+(* A ==> B *)
+  | left_ass = pure_assertion_target; LIMPLIES; right_ass=pure_assertion_target
+    { Formula.Impl (left_ass, right_ass) }
 (* P \/ Q *)
   | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
     { Formula.Or (left_ass, right_ass) }

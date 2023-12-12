@@ -135,8 +135,18 @@ let ends_with a b = starts_with (List.rev a) (List.rev b)
 let pop_where f =
   let rec aux pre = function
     | [] -> (None, List.rev pre)
-    | x :: xs when f x -> (Some x, List.rev pre @ xs)
+    | x :: xs when f x -> (Some x, List.rev_append pre xs)
     | x :: xs -> aux (x :: pre) xs
+  in
+  aux []
+
+let pop_map f =
+  let rec aux pre = function
+    | [] -> None
+    | x :: xs -> (
+        match f x with
+        | Some res -> Some (res, List.rev_append pre xs)
+        | None -> aux (x :: pre) xs)
   in
   aux []
 
@@ -205,3 +215,24 @@ let rec last = function
   | [] -> None
   | [ x ] -> Some x
   | _ :: xs -> last xs
+
+let[@ocaml.tail_mod_cons] rec filter_mapi i f = function
+  | [] -> []
+  | x :: r -> (
+      match f i x with
+      | None -> filter_mapi (i + 1) f r
+      | Some x -> x :: filter_mapi (i + 1) f r)
+
+let filter_mapi f l = filter_mapi 0 f l
+
+let get_and_remove_nth n l =
+  let found = ref None in
+  let[@ocaml.tail_mod_cons] rec aux i = function
+    | [] -> []
+    | x :: r ->
+        if i = n then (
+          found := Some x;
+          r)
+        else x :: aux (i + 1) r
+  in
+  (!found, aux 0 l)

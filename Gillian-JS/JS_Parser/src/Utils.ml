@@ -1,5 +1,3 @@
-open Batteries.Incubator
-
 let search_string_forward regex str : int option =
   try Some (Str.search_forward regex str 0) with Not_found -> None
 
@@ -27,12 +25,9 @@ let check_parsing_errors errors =
       in
       raise (Error.ParserError (Error.FlowParser (messages, error_type)))
 
-module Path = PathGen.OfString
-
 let normalize_path path_str =
-  let path = Path.of_string path_str in
-  let normalized_path = Path.normalize_in_tree path in
-  Path.to_string normalized_path
+  let open Fpath in
+  of_string path_str |> Result.get_ok |> normalize |> to_string
 
 let begins_with str prefix =
   let str_len = String.length str in

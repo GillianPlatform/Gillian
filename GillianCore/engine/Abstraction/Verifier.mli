@@ -1,5 +1,4 @@
 module type S = sig
-  type st
   type heap_t
   type state
   type m_err
@@ -8,24 +7,20 @@ module type S = sig
   module SPState :
     PState.S
       with type t = state
-       and type vt = SVal.M.t
-       and type st = st
-       and type store_t = SStore.t
        and type heap_t = heap_t
        and type m_err_t = m_err
-       and type preds_t = Preds.SPreds.t
 
   module SAInterpreter :
     G_interpreter.S
       with type vt = SVal.M.t
-       and type st = st
+       and type st = SVal.SESubst.t
        and type store_t = SStore.t
        and type state_t = state
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SUnifier : Unifier.S with type st = SVal.SESubst.t
+  module SUnifier : Unifier.S
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -63,11 +58,7 @@ module Make
                  and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
-                 with type vt = SState.vt
-                  and type st = SState.st
-                  and type state_t = SState.t
-                  and type store_t = SState.store_t
-                  and type preds_t = Preds.SPreds.t
+                 with type state_t = SState.t
                   and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) :
@@ -75,6 +66,5 @@ module Make
     with type heap_t = SPState.heap_t
      and type m_err = SPState.m_err_t
      and type state = SPState.t
-     and type st = SPState.st
      and module SPState = SPState
      and type annot = PC.Annot.t

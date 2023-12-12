@@ -3,7 +3,7 @@ type t = TypeDef__.flag =
   | Normal  (** Normal return *)
   | Error  (** Error return *)
   | Bug  (** For biabduction *)
-[@@deriving yojson, show]
+[@@deriving yojson, show, eq]
 
 (** GIL spec return flag *)
 let str (flag : t) : string =

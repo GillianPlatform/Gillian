@@ -391,6 +391,14 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let exs = List.concat exsl in
         let al = List.concat all in
         (exs, concat_star (Asrt.Pred (pr, el)) al)
+    | LWand { lhs = lname, largs; rhs = rname, rargs } ->
+        let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
+        let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
+        let exs = List.concat (exs1 @ exs2) in
+        let al = List.concat (al1 @ al2) in
+        ( exs,
+          concat_star (Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) }) al
+        )
     | LPure lf ->
         let al, f = compile_lformula lf in
         ([], concat_star (Asrt.Pure f) al))
@@ -423,6 +431,18 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Unfold (pname, params, None, false)) )
+  | Package { lhs = lname, largs; rhs = rname, rargs } ->
+      let lgvars, lasrts, lparams =
+        list_split_3 (List.map compile_lexpr largs)
+      in
+      let rgvars, rasrts, rparams =
+        list_split_3 (List.map compile_lexpr rargs)
+      in
+      let existentials = List.concat (lgvars @ rgvars) in
+      let to_assert = List.concat (lasrts @ rasrts) in
+      ( build_assert existentials to_assert,
+        LCmd.SL
+          (SLCmd.Package { lhs = (lname, lparams); rhs = (rname, rparams) }) )
   | ApplyLem (ln, lel, bindings) ->
       let gvars, lasrts, params = list_split_3 (List.map compile_lexpr lel) in
       let existentials = List.concat gvars in

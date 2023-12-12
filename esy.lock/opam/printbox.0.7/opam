@@ -8,27 +8,22 @@ build: [
   ["dune" "build" "@doc" "-p" name "-j" jobs] {with-doc}
 ]
 depends: [
-  "dune" { >= "1.1" }
+  "dune" { >= "2.0" }
   "base-bytes"
   "odoc" {with-doc}
-  "ocaml" { >= "4.03" & < "5.0" }
-  "uutf" {with-test}
-  "uucp" {with-test}
-  "mdx" {with-test & >= "1.4" & < "1.6" }
+  "ocaml" { >= "4.08" }
 ]
-depopts: [
-  "tyxml"
-  "uutf"
-  "uucp"
-]
+license: "BSD-2-Clause"
 tags: [ "print" "box" "table" "tree" ]
 homepage: "https://github.com/c-cube/printbox/"
 dev-repo: "git+https://github.com/c-cube/printbox.git"
 bug-reports: "https://github.com/c-cube/printbox/issues/"
 url {
-  src: "https://github.com/c-cube/printbox/archive/0.5.tar.gz"
+  src:
+    "https://github.com/c-cube/printbox/releases/download/v0.7/printbox-0.7.tbz"
   checksum: [
-    "md5=2cd18b6198d58c27d1bbec4d18836353"
-    "sha512=6aefd975403751288de02104f0bf21d455e37c057fd9237d38af42dd8e01643514acc3a9ab96d42b0c1f5064c3a330833352ac09cd6198275f1c165db2bace7f"
+    "sha256=59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737"
+    "sha512=77af5c0479a62f7e3df96267d0f5dc1315bdafcdaa2ded7bb2cbe4cab415c6310add696a45f8ae505f1ed51d509d4dd4d74000b5eae1f518c638afdaec95774d"
   ]
 }
+x-commit-hash: "8a23ed1e54ca64183e2a47d96e6cdd02db3ffaaa"

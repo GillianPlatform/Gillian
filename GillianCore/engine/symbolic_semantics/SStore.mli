@@ -2,7 +2,7 @@
  * Interface for Symbolic stores *
 **********************************)
 
-type vt = SVal.M.t
+type vt = Expr.t
 type t [@@deriving yojson]
 
 val copy : t -> t

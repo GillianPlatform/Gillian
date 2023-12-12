@@ -20,6 +20,11 @@ module Block = struct
 
   let empty = Allocated { data = SFVL.empty; bound = None }
 
+  let is_empty t =
+    match t with
+    | Freed -> false
+    | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
+
   let substitution ~partial subst block =
     match block with
     | Freed -> Freed
@@ -413,6 +418,8 @@ let add_debugger_variables
       scopes vars
   in
   scopes
+
+let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
 
 (***** Clean-up *****)
 

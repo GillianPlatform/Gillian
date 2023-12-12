@@ -12,6 +12,8 @@ val iter_errors : ('b -> unit) -> ('a, 'b) t -> unit
 val vanish : ('ok, 'err) t
 val filter_errors : ('ok, 'err) t -> ('ok, 'err) t
 val split : ('ok, 'err) t -> 'ok list * 'err list
+val all : ('ok, 'err) t list -> ('ok list, 'err) t
+val of_list_res : ('ok, 'err) List_res.t -> ('ok, 'err) t
 
 module Syntax : sig
   val ( let** ) : ('a, 'b) t -> ('a -> ('c, 'b) t) -> ('c, 'b) t

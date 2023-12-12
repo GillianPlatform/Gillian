@@ -2,7 +2,6 @@ open Containers
 module DL = Debugger_log
 
 module type S = sig
-  type st
   type heap_t
   type state
   type m_err
@@ -11,24 +10,20 @@ module type S = sig
   module SPState :
     PState.S
       with type t = state
-       and type vt = SVal.M.t
-       and type st = st
-       and type store_t = SStore.t
        and type heap_t = heap_t
        and type m_err_t = m_err
-       and type preds_t = Preds.SPreds.t
 
   module SAInterpreter :
     G_interpreter.S
-      with type vt = SVal.M.t
-       and type st = st
+      with type vt = Expr.t
+       and type st = SVal.SESubst.t
        and type store_t = SStore.t
        and type state_t = state
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SUnifier : Unifier.S with type st = SVal.SESubst.t
+  module SUnifier : Unifier.S
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -66,11 +61,7 @@ module Make
                  and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
-                 with type vt = SState.vt
-                  and type st = SState.st
-                  and type state_t = SState.t
-                  and type store_t = SState.store_t
-                  and type preds_t = Preds.SPreds.t
+                 with type state_t = SState.t
                   and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) =
@@ -85,14 +76,12 @@ struct
 
   module Normaliser = Normaliser.Make (SPState)
 
-  type st = SPState.st
   type state = SPState.t
   type heap_t = SPState.heap_t
   type m_err = SPState.m_err_t
   type annot = PC.Annot.t
 
-  module SUnifier =
-    Unifier.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
+  module SUnifier = Unifier.Make (SState)
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
@@ -617,7 +606,9 @@ struct
             let successes, errors = Res_list.split lemma_evaluation_results in
             match errors with
             | [] -> analyse_lemma_results test successes
-            | _ -> false))
+            | _ ->
+                print_success_or_failure false;
+                false))
 
   let pred_extracting_visitor =
     object
@@ -1022,10 +1013,5 @@ struct
   end
 
   include
-    Make
-      (INTERNAL__.SState)
-      (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
-         (Preds.SPreds))
-      (PC)
-      (External)
+    Make (INTERNAL__.SState) (PState.Make (INTERNAL__.SState)) (PC) (External)
 end
