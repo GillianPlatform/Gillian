@@ -66,4 +66,5 @@ end
 
 (** Dummy ParserAndCompiler that will simply always fail. This is used when someone wants to build a command line interface
     to only reason about GIL. *)
-module Dummy : S with type init_data = unit
+module Dummy :
+  S with type init_data = unit and type Annot.t = Gil_syntax.Annot.Basic.t
