@@ -4,14 +4,26 @@ type outs = (Expr.t * Expr.t) list
 
 val outs_pp : outs Fmt.t
 
-(** The [up_step] type represents a unification plan step,
+(** The [step] type represents a unification plan step,
     consisting of an assertion together with the possible
     learned outs *)
 type step = Asrt.t * outs [@@deriving yojson]
 
-val step_pp : step Fmt.t
+type label = string * SS.t [@@deriving yojson]
+type post = Flag.t * Asrt.t list [@@deriving yojson]
 
-type t [@@deriving yojson]
+val pp_step : step Fmt.t
+
+type t =
+  | Choice of t * t
+  | ConsumeStep of step * t
+  | LabelStep of label * t
+      (** Labels provide additional existentials to be bound manually by the user *)
+  | Finished of post option
+      (** The optional assertion corresponds to some post-condition that may be produced after successfuly matching.
+          For example, a matching plan corresponding to a set of specifications will contain leaves that are respectively anntated with the corresponding post. *)
+[@@deriving yojson]
+
 type pred = { pred : Pred.t; def_up : t; guard_up : t option }
 type 'a with_up = { up : t; data : 'a }
 type spec = Spec.t with_up
@@ -42,7 +54,14 @@ val learn_expr :
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 val collect_simple_asrts : Asrt.t -> Asrt.t list
-val empty_up : t
+
+val s_init_atoms :
+  preds:(string, int list) Hashtbl.t ->
+  KB.t ->
+  Asrt.t list ->
+  (step list, Asrt.t list) result
+
+val of_step_list : ?post:post -> ?label:label -> step list -> t
 
 val init :
   ?use_params:bool ->
@@ -51,10 +70,6 @@ val init :
   (string, int list) Hashtbl.t ->
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list list) result
-
-val next : t -> (t * (string * SS.t) option) list option
-val head : t -> step option
-val posts : t -> (Flag.t * Asrt.t list) option
 
 val init_prog :
   ?preds_tbl:(string, pred) Hashtbl.t ->

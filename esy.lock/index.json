@@ -1,5 +1,5 @@
 {
-  "checksum": "0ea4b73f304f439e4b1cfbd5d4a37e34",
+  "checksum": "5a7aeb22f5e86f77a4abbcd6ebbfc580",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "yargs-parser@21.1.1@d41d8cd9": {
@@ -295,16 +295,15 @@
         "@opam/visitors@opam:20210608@7b4a1100",
         "@opam/uuidm@opam:0.9.7@a349b245",
         "@opam/sqlite3@opam:5.0.2@f8405319",
-        "@opam/printbox@opam:0.5@b264109e",
+        "@opam/printbox-text@opam:0.7@f9122d5d",
         "@opam/ppxlib@opam:0.25.1@bd0b93cc",
         "@opam/ppx_deriving_yojson@opam:3.6.1@c3ef2ec3",
         "@opam/menhir@opam:20220210@879a0c13",
         "@opam/memtrace@opam:0.2.3@d93db143",
-        "@opam/fmt@opam:0.9.0@87213963",
+        "@opam/fpath@opam:0.7.3@674d8125", "@opam/fmt@opam:0.9.0@87213963",
         "@opam/flow_parser@github:giltho/flow#544677c0306668679172807bec95b134f5d249f3@d41d8cd9",
         "@opam/dune@opam:3.8.3@ff88b4c5", "@opam/dap@opam:1.0.6@5996f56d",
         "@opam/cmdliner@opam:1.2.0@b0c6143c",
-        "@opam/batteries@opam:3.6.0@ab4e94e9",
         "@opam/alcotest@opam:1.0.1@aba26ba2"
       ],
       "devDependencies": [
@@ -334,11 +333,9 @@
       "devDependencies": []
     },
     "esy-gmp@archive:https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.xz#sha1:0578d48607ec0e272177d175fd1807c30b00fdf2@b7788c94": {
-      "id":
-        "esy-gmp@archive:https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.xz#sha1:0578d48607ec0e272177d175fd1807c30b00fdf2@b7788c94",
+      "id": "esy-gmp@archive:https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.xz#sha1:0578d48607ec0e272177d175fd1807c30b00fdf2@b7788c94",
       "name": "esy-gmp",
-      "version":
-        "archive:https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.xz#sha1:0578d48607ec0e272177d175fd1807c30b00fdf2",
+      "version": "archive:https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.xz#sha1:0578d48607ec0e272177d175fd1807c30b00fdf2",
       "source": {
         "type": "install",
         "source": [
@@ -390,7 +387,7 @@
         ]
       },
       "overrides": [],
-      "dependencies": [ "@babel/runtime@7.23.5@d41d8cd9" ],
+      "dependencies": [ "@babel/runtime@7.23.6@d41d8cd9" ],
       "devDependencies": []
     },
     "concurrently@7.6.0@d41d8cd9": {
@@ -414,11 +411,9 @@
       "devDependencies": []
     },
     "compcert@github:giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259@d41d8cd9": {
-      "id":
-        "compcert@github:giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259@d41d8cd9",
+      "id": "compcert@github:giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259@d41d8cd9",
       "name": "compcert",
-      "version":
-        "github:giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
+      "version": "github:giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
       "source": {
         "type": "install",
         "source": [
@@ -571,8 +566,7 @@
       },
       "overrides": [
         {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__zarith_opam__c__1.13_opam_override"
+          "opamoverride": "esy.lock/overrides/opam__s__zarith_opam__c__1.13_opam_override"
         }
       ],
       "dependencies": [
@@ -585,11 +579,9 @@
       ]
     },
     "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.3.tar.gz#md5:a18ea8cc1ba59d87a6ea966227732038@44ff3c39": {
-      "id":
-        "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.3.tar.gz#md5:a18ea8cc1ba59d87a6ea966227732038@44ff3c39",
+      "id": "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.3.tar.gz#md5:a18ea8cc1ba59d87a6ea966227732038@44ff3c39",
       "name": "@opam/z3",
-      "version":
-        "archive:https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.3.tar.gz#md5:a18ea8cc1ba59d87a6ea966227732038",
+      "version": "archive:https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.3.tar.gz#md5:a18ea8cc1ba59d87a6ea966227732038",
       "source": {
         "type": "install",
         "source": [
@@ -878,8 +870,7 @@
       },
       "overrides": [
         {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__uchar_opam__c__0.0.2_opam_override"
+          "opamoverride": "esy.lock/overrides/opam__s__uchar_opam__c__0.0.2_opam_override"
         }
       ],
       "dependencies": [
@@ -987,8 +978,7 @@
       },
       "overrides": [
         {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__time__now_opam__c__v0.14.0_opam_override"
+          "opamoverride": "esy.lock/overrides/opam__s__time__now_opam__c__v0.14.0_opam_override"
         }
       ],
       "dependencies": [
@@ -1330,27 +1320,56 @@
         "@opam/dune@opam:3.8.3@ff88b4c5"
       ]
     },
-    "@opam/printbox@opam:0.5@b264109e": {
-      "id": "@opam/printbox@opam:0.5@b264109e",
-      "name": "@opam/printbox",
-      "version": "opam:0.5",
+    "@opam/printbox-text@opam:0.7@f9122d5d": {
+      "id": "@opam/printbox-text@opam:0.7@f9122d5d",
+      "name": "@opam/printbox-text",
+      "version": "opam:0.7",
       "source": {
         "type": "install",
         "source": [
-          "archive:https://opam.ocaml.org/cache/md5/2c/2cd18b6198d58c27d1bbec4d18836353#md5:2cd18b6198d58c27d1bbec4d18836353",
-          "archive:https://github.com/c-cube/printbox/archive/0.5.tar.gz#md5:2cd18b6198d58c27d1bbec4d18836353"
+          "archive:https://opam.ocaml.org/cache/sha256/59/59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737#sha256:59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737",
+          "archive:https://github.com/c-cube/printbox/releases/download/v0.7/printbox-0.7.tbz#sha256:59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737"
         ],
         "opam": {
-          "name": "printbox",
-          "version": "0.5",
-          "path": "esy.lock/opam/printbox.0.5"
+          "name": "printbox-text",
+          "version": "0.7",
+          "path": "esy.lock/opam/printbox-text.0.7"
         }
       },
       "overrides": [],
       "dependencies": [
         "ocaml@4.14.1000@d41d8cd9", "@opam/uutf@opam:1.0.3@47c95a18",
-        "@opam/uucp@opam:15.1.0@ef3e0a4e", "@opam/tyxml@opam:4.6.0@5ced2c2c",
-        "@opam/dune@opam:3.8.3@ff88b4c5",
+        "@opam/uucp@opam:15.1.0@ef3e0a4e",
+        "@opam/printbox@opam:0.7@4a6803f7", "@opam/dune@opam:3.8.3@ff88b4c5",
+        "@opam/base-bytes@opam:base@19d0c2ff",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.14.1000@d41d8cd9", "@opam/uutf@opam:1.0.3@47c95a18",
+        "@opam/uucp@opam:15.1.0@ef3e0a4e",
+        "@opam/printbox@opam:0.7@4a6803f7", "@opam/dune@opam:3.8.3@ff88b4c5",
+        "@opam/base-bytes@opam:base@19d0c2ff"
+      ]
+    },
+    "@opam/printbox@opam:0.7@4a6803f7": {
+      "id": "@opam/printbox@opam:0.7@4a6803f7",
+      "name": "@opam/printbox",
+      "version": "opam:0.7",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/sha256/59/59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737#sha256:59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737",
+          "archive:https://github.com/c-cube/printbox/releases/download/v0.7/printbox-0.7.tbz#sha256:59271f9720bfe25e8bf884b38f1ba7fe161292faf6f895c89f71b615e5671737"
+        ],
+        "opam": {
+          "name": "printbox",
+          "version": "0.7",
+          "path": "esy.lock/opam/printbox.0.7"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.14.1000@d41d8cd9", "@opam/dune@opam:3.8.3@ff88b4c5",
         "@opam/base-bytes@opam:base@19d0c2ff",
         "@esy-ocaml/substs@0.0.1@d41d8cd9"
       ],
@@ -2255,8 +2274,7 @@
       },
       "overrides": [
         {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__ocamlfind_opam__c__1.9.6_opam_override"
+          "opamoverride": "esy.lock/overrides/opam__s__ocamlfind_opam__c__1.9.6_opam_override"
         }
       ],
       "dependencies": [
@@ -2282,8 +2300,7 @@
       },
       "overrides": [
         {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__ocamlbuild_opam__c__0.14.2+win_opam_override"
+          "opamoverride": "esy.lock/overrides/opam__s__ocamlbuild_opam__c__0.14.2+win_opam_override"
         }
       ],
       "dependencies": [
@@ -2292,10 +2309,8 @@
       "devDependencies": [ "ocaml@4.14.1000@d41d8cd9" ],
       "extraSources": [
         {
-          "checksum":
-            "sha256:a9b7e1829a3304e5a073d8ddea29d3d8272698e93b7e1ee659ae5e31e5cfb6b9",
-          "url":
-            "https://raw.githubusercontent.com/ocaml-opam/opam-repository-mingw/354a87b397856f2a70024c5c83fc5001074935b6/packages/ocamlbuild/ocamlbuild.0.14.2/files/ocamlbuild-0.14.2.patch",
+          "checksum": "sha256:a9b7e1829a3304e5a073d8ddea29d3d8272698e93b7e1ee659ae5e31e5cfb6b9",
+          "url": "https://raw.githubusercontent.com/ocaml-opam/opam-repository-mingw/354a87b397856f2a70024c5c83fc5001074935b6/packages/ocamlbuild/ocamlbuild.0.14.2/files/ocamlbuild-0.14.2.patch",
           "relativePath": "ocamlbuild-0.14.2.patch"
         }
       ]
@@ -2425,34 +2440,6 @@
       "devDependencies": [
         "ocaml@4.14.1000@d41d8cd9", "@opam/dune@opam:3.8.3@ff88b4c5"
       ]
-    },
-    "@opam/num@opam:1.4@16d26a67": {
-      "id": "@opam/num@opam:1.4@16d26a67",
-      "name": "@opam/num",
-      "version": "opam:1.4",
-      "source": {
-        "type": "install",
-        "source": [
-          "archive:https://opam.ocaml.org/cache/md5/cd/cda2b727e116a0b6a9c03902cc4b2415#md5:cda2b727e116a0b6a9c03902cc4b2415",
-          "archive:https://github.com/ocaml/num/archive/v1.4.tar.gz#md5:cda2b727e116a0b6a9c03902cc4b2415"
-        ],
-        "opam": {
-          "name": "num",
-          "version": "1.4",
-          "path": "esy.lock/opam/num.1.4"
-        }
-      },
-      "overrides": [
-        {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__num_opam__c__1.4_opam_override"
-        }
-      ],
-      "dependencies": [
-        "ocaml@4.14.1000@d41d8cd9", "@opam/ocamlfind@opam:1.9.6@da5169c7",
-        "@esy-ocaml/substs@0.0.1@d41d8cd9"
-      ],
-      "devDependencies": [ "ocaml@4.14.1000@d41d8cd9" ]
     },
     "@opam/mew_vi@opam:0.5.0@cf66c299": {
       "id": "@opam/mew_vi@opam:0.5.0@cf66c299",
@@ -2896,11 +2883,9 @@
       "devDependencies": [ "ocaml@4.14.1000@d41d8cd9" ]
     },
     "@opam/flow_parser@github:giltho/flow#544677c0306668679172807bec95b134f5d249f3@d41d8cd9": {
-      "id":
-        "@opam/flow_parser@github:giltho/flow#544677c0306668679172807bec95b134f5d249f3@d41d8cd9",
+      "id": "@opam/flow_parser@github:giltho/flow#544677c0306668679172807bec95b134f5d249f3@d41d8cd9",
       "name": "@opam/flow_parser",
-      "version":
-        "github:giltho/flow#544677c0306668679172807bec95b134f5d249f3",
+      "version": "github:giltho/flow#544677c0306668679172807bec95b134f5d249f3",
       "source": {
         "type": "install",
         "source": [
@@ -3260,11 +3245,9 @@
       ]
     },
     "@opam/conf-sqlite3@archive:https://sqlite.org/2021/sqlite-autoconf-3350500.tar.gz#sha256:f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0@2d70a362": {
-      "id":
-        "@opam/conf-sqlite3@archive:https://sqlite.org/2021/sqlite-autoconf-3350500.tar.gz#sha256:f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0@2d70a362",
+      "id": "@opam/conf-sqlite3@archive:https://sqlite.org/2021/sqlite-autoconf-3350500.tar.gz#sha256:f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0@2d70a362",
       "name": "@opam/conf-sqlite3",
-      "version":
-        "archive:https://sqlite.org/2021/sqlite-autoconf-3350500.tar.gz#sha256:f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0",
+      "version": "archive:https://sqlite.org/2021/sqlite-autoconf-3350500.tar.gz#sha256:f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0",
       "source": {
         "type": "install",
         "source": [
@@ -3311,8 +3294,7 @@
       },
       "overrides": [
         {
-          "opamoverride":
-            "esy.lock/overrides/opam__s__conf_gmp_opam__c__4_opam_override"
+          "opamoverride": "esy.lock/overrides/opam__s__conf_gmp_opam__c__4_opam_override"
         }
       ],
       "dependencies": [
@@ -3433,35 +3415,6 @@
         "ocaml@4.14.1000@d41d8cd9",
         "@opam/dune-configurator@opam:3.12.1@13f69e99",
         "@opam/dune@opam:3.8.3@ff88b4c5"
-      ]
-    },
-    "@opam/batteries@opam:3.6.0@ab4e94e9": {
-      "id": "@opam/batteries@opam:3.6.0@ab4e94e9",
-      "name": "@opam/batteries",
-      "version": "opam:3.6.0",
-      "source": {
-        "type": "install",
-        "source": [
-          "archive:https://opam.ocaml.org/cache/md5/1b/1bcb27dfbd130eb057561196ef851649#md5:1bcb27dfbd130eb057561196ef851649",
-          "archive:https://github.com/ocaml-batteries-team/batteries-included/archive/refs/tags/v3.6.0.tar.gz#md5:1bcb27dfbd130eb057561196ef851649"
-        ],
-        "opam": {
-          "name": "batteries",
-          "version": "3.6.0",
-          "path": "esy.lock/opam/batteries.3.6.0"
-        }
-      },
-      "overrides": [],
-      "dependencies": [
-        "ocaml@4.14.1000@d41d8cd9", "@opam/ocamlfind@opam:1.9.6@da5169c7",
-        "@opam/ocamlbuild@opam:0.14.2+win@39b9f56d",
-        "@opam/num@opam:1.4@16d26a67",
-        "@opam/camlp-streams@opam:5.0.1@daaa0f94",
-        "@esy-ocaml/substs@0.0.1@d41d8cd9"
-      ],
-      "devDependencies": [
-        "ocaml@4.14.1000@d41d8cd9", "@opam/num@opam:1.4@16d26a67",
-        "@opam/camlp-streams@opam:5.0.1@daaa0f94"
       ]
     },
     "@opam/base-unix@opam:base@87d0b2eb": {
@@ -3700,14 +3653,14 @@
       "dependencies": [],
       "devDependencies": []
     },
-    "@babel/runtime@7.23.5@d41d8cd9": {
-      "id": "@babel/runtime@7.23.5@d41d8cd9",
+    "@babel/runtime@7.23.6@d41d8cd9": {
+      "id": "@babel/runtime@7.23.6@d41d8cd9",
       "name": "@babel/runtime",
-      "version": "7.23.5",
+      "version": "7.23.6",
       "source": {
         "type": "install",
         "source": [
-          "archive:https://registry.npmjs.org/@babel/runtime/-/runtime-7.23.5.tgz#sha1:11edb98f8aeec529b82b211028177679144242db"
+          "archive:https://registry.npmjs.org/@babel/runtime/-/runtime-7.23.6.tgz#sha1:c05e610dc228855dc92ef1b53d07389ed8ab521d"
         ]
       },
       "overrides": [],

@@ -1,33 +1,51 @@
 open Containers
-open Names
 module L = Logging
 
 (** The [outs] type represents a list of learned outs, together
     with (optionally) the way of constructing them *)
-type outs = (Expr.t * Expr.t) list [@@deriving yojson]
+type outs = (Expr.t * Expr.t) list [@@deriving yojson, eq]
 
-let outs_pp = Fmt.(list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))
+let outs_pp =
+  Fmt.(
+    list ~sep:(Fmt.any "; ") (parens (pair ~sep:(Fmt.any ", ") Expr.pp Expr.pp)))
 
 (** The [up_step] type represents a unification plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.t * outs [@@deriving yojson]
+type step = Asrt.t * outs [@@deriving yojson, eq]
 
-let step_pp = Fmt.Dump.pair Asrt.pp outs_pp
+let pp_step = Fmt.pair ~sep:(Fmt.any ", ") Asrt.pp outs_pp
+let pp_step_list = Fmt.Dump.list pp_step
 
-(** The [pt] type represents a pre-unification plan,
-    consisting of a list of unification plan steps *)
-type pt = step list
+type label = string * SS.t [@@deriving eq, yojson]
 
-let pt_pp = Fmt.(brackets (list ~sep:semi step_pp))
+let pp_label ft (lab, ss) =
+  Fmt.pf ft "LABEL(%s): %a" lab (Fmt.Dump.iter SS.iter Fmt.nop Fmt.string) ss
 
+type post = Flag.t * Asrt.t list [@@deriving eq, yojson]
+
+let pp_post ft (flag, asrts) =
+  Fmt.pf ft "%a: %a" Flag.pp flag Asrt.pp (Asrt.star asrts)
+
+(** At a high level, a matching plan is a tree of assertions.
+     *)
 type t =
-  | Leaf of step option * (Flag.t * Asrt.t list) option
-      (** Final node and associated post-condition *)
-  | Inner of step * t list
-  | PhantomInner of t list
-  | LabPhantomInner of (t * (string * SS.t) option) list
+  | Choice of t * t
+  | ConsumeStep of step * t
+  | LabelStep of label * t
+      (** Labels provide additional existentials to be bound manually by the user *)
+  | Finished of post option
+      (** The optional assertion corresponds to some post-condition that may be produced after successfuly matching.
+          For example, a matching plan corresponding to a set of specifications will contain leaves that are respectively anntated with the corresponding post. *)
 [@@deriving yojson]
+
+(* type t =
+     | Leaf of step option * (Flag.t * Asrt.t list) option
+         (** Final node and associated post-condition *)
+     | Inner of step * t list
+     | PhantomInner of t list
+     | LabPhantomInner of (t * (string * SS.t) option) list
+   [@@deriving yojson] *)
 
 type 'a with_up = { up : t; data : 'a }
 type spec = Spec.t with_up
@@ -47,7 +65,6 @@ module KB = Expr.Set
 
 let kb_pp = Fmt.(braces (iter ~sep:comma KB.iter Expr.full_pp))
 
-type up_search_state = pt * SI.t * KB.t
 type preds_tbl_t = (string, pred) Hashtbl.t
 
 type up_err_t =
@@ -188,20 +205,40 @@ let rec learn_expr
   | NOp (LstCat, e :: rest) -> (
       let overall_length = Expr.list_length base_expr in
       let e_length = Expr.list_length e in
-      match is_known_expr kb e_length with
-      | true ->
-          let e_base_expr = Expr.LstSub (base_expr, Expr.zero_i, e_length) in
-          let e_outs = f e_base_expr e in
-          let kb' : KB.t =
-            List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs
-          in
-          let rest = Expr.NOp (LstCat, rest) in
-          let rest_base_expr =
-            Expr.LstSub
-              (base_expr, e_length, BinOp (overall_length, IMinus, e_length))
-          in
-          e_outs @ learn_expr kb' rest_base_expr rest
-      | false -> [])
+      if is_known_expr kb e_length then
+        let e_base_expr = Expr.LstSub (base_expr, Expr.zero_i, e_length) in
+        let e_outs = f e_base_expr e in
+        let kb' : KB.t =
+          List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs
+        in
+        let rest = Expr.NOp (LstCat, rest) in
+        let rest_base_expr =
+          Expr.LstSub
+            (base_expr, e_length, Expr.Infix.(overall_length - e_length))
+        in
+        e_outs @ learn_expr kb' rest_base_expr rest
+      else
+        match rest with
+        | [ e' ] ->
+            let e'_length = Expr.list_length e' in
+            if is_known_expr kb e'_length then
+              let e'_base_expr =
+                Expr.LstSub
+                  (base_expr, Expr.Infix.(overall_length - e'_length), e'_length)
+              in
+              let e'_outs = f e'_base_expr e' in
+              let kb' : KB.t =
+                List.fold_left (fun kb (u, _) -> KB.add u kb) kb e'_outs
+              in
+              let rest_base_expr =
+                Expr.LstSub
+                  ( base_expr,
+                    Expr.zero_i,
+                    Expr.Infix.(overall_length - e'_length) )
+              in
+              e'_outs @ learn_expr kb' rest_base_expr e
+            else []
+        | _ -> [])
   (* Floating-point plus is invertible *)
   | BinOp (e1, FPlus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
@@ -357,6 +394,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       let ins = List_utils.cross_product ins_pf1 ins_pf2 KB.union in
       let ins = List_utils.remove_duplicates ins in
       List.map minimise_unifiables ins
+  | Impl (f1, f2) -> simple_ins_formula kb (Or (Not f1, f2))
   (* Relational formulae are all treated the same *)
   | Eq (e1, e2)
   | ILess (e1, e2)
@@ -465,6 +503,16 @@ let ins_outs_assertion
   | Types [ (e, _) ] ->
       let ins = simple_ins_expr e in
       List.map (fun ins -> (ins, [])) ins
+  | Wand { lhs = _, largs; rhs = rname, rargs } ->
+      let r_ins = get_pred_ins rname in
+      let _, llie, lloe =
+        List.fold_left
+          (fun (i, lie, loe) arg ->
+            if List.mem i r_ins then (i + 1, arg :: lie, loe)
+            else (i + 1, lie, arg :: loe))
+          (0, [], []) rargs
+      in
+      ins_and_outs_from_lists kb (largs @ List.rev llie) lloe
   | _ ->
       raise (Failure "Impossible: non-simple assertion in ins_outs_assertion.")
 
@@ -473,7 +521,7 @@ let collect_simple_asrts a =
     match a with
     | Pure True | Emp -> Seq.empty
     | Pure (And (f1, f2)) -> Seq.append (aux (Pure f1)) (aux (Pure f2))
-    | Pure _ | Pred _ | GA _ -> Seq.return a
+    | Pure _ | Pred _ | GA _ | Wand _ -> Seq.return a
     | Types _ -> (
         let a = Reduction.reduce_assertion a in
         match a with
@@ -483,191 +531,107 @@ let collect_simple_asrts a =
   in
   List.of_seq (aux a)
 
-let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
-    (pt, Asrt.t list) result =
-  let prioritise (la : Asrt.t list) = List.sort Asrt.prioritise la in
-
-  L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
-
-  let simple_asrts = collect_simple_asrts a in
-  let simple_asrts =
-    if List.mem (Asrt.Pure False) simple_asrts then [ Asrt.Pure False ]
-    else simple_asrts
+let collect_and_simplify_atoms a =
+  let atoms = collect_simple_asrts a in
+  let atoms =
+    if List.mem (Asrt.Pure False) atoms then [ Asrt.Pure False ] else atoms
   in
   let separating, overlapping =
     List.partition
       (function
-        | Asrt.Pred _ | Asrt.GA _ -> true
+        | Asrt.Pred _ | Asrt.GA _ | Asrt.Wand _ -> true
         | _ -> false)
-      simple_asrts
+      atoms
   in
   let overlapping = List.sort_uniq Stdlib.compare overlapping in
-  let simple_asrts = prioritise (separating @ overlapping) in
-  let simple_asrts_io = Array.of_list simple_asrts in
+  List.sort Asrt.prioritise (separating @ overlapping)
 
-  (* Check if the assertion at index i can be added to the unification
-     plan - its ins need to be contained in the current known lvars *)
-  let visit_asrt (kb : KB.t) (i : int) : step list =
-    (* Get assertion ins and outs *)
-    let a = simple_asrts_io.(i) in
-    let ios = ins_outs_assertion preds kb a in
-    (* Check if any ins are fully known *)
-    let act_ios = List.filter (fun (ins, _) -> KB.subset ins kb) ios in
-    (* And produce the appropriate outs *)
-    List.map (fun (_, outs) -> (a, outs)) act_ios
+let s_init_atoms ~preds kb atoms =
+  let step_of_atom ~kb atom =
+    ins_outs_assertion preds kb atom
+    |> List.find_map (fun (ins, outs) ->
+           if KB.subset ins kb then Some (atom, outs) else None)
   in
-
-  (* Attempt to find an assertion in a given list that can be added
-     to the unification plan *)
-  let rec visit_asrt_lst
-      (kb : KB.t)
-      (indexes : SI.t)
-      (visited_indexes : int list) : (SI.t * step list) option =
-    if indexes = SI.empty then None
-    else
-      let i = SI.min_elt indexes in
-      let rest_indexes = SI.remove i indexes in
-      match visit_asrt kb i with
-      | [] -> visit_asrt_lst kb rest_indexes (i :: visited_indexes)
-      | ret -> Some (SI.union (SI.of_list visited_indexes) rest_indexes, ret)
-  in
-
-  let rec search (up_search_states : up_search_state list) :
-      (pt, Asrt.t list) result =
-    match up_search_states with
+  let rec search current kb rest =
+    L.verbose (fun m ->
+        m "KNOWN: @[%a@].@\n@[<v 2>CUR UP:@\n%a@]@\nTO VISIT: @[%a@]" kb_pp kb
+          pp_step_list current
+          (Fmt.list ~sep:(Fmt.any "@\n") Asrt.full_pp)
+          rest);
+    match rest with
     | [] ->
-        raise
-          (Failure
-             "UP: Should not happen: unification plan creation called with no \
-              starting state.")
-    | (up, unchecked, _) :: _ when unchecked = SI.empty ->
+        let result = List.rev current in
         L.verbose (fun m -> m "Successfully created UP.");
-        Ok (List.rev up)
-    | (up, unchecked, kb) :: rest -> (
-        L.verbose (fun m ->
-            m
-              "KNOWN: @[%a@].@\n\
-               @[<v 2>CUR UP:@\n\
-               %a@]@\n\
-               TO VISIT: @[%a@]@\n\
-               @[%a@]"
-              kb_pp kb pt_pp up
-              Fmt.(iter ~sep:comma SI.iter int)
-              unchecked
-              Fmt.(
-                iter ~sep:(any "@\n") SI.iter (fun f i ->
-                    Asrt.full_pp f simple_asrts_io.(i)))
-              unchecked);
-
-        match visit_asrt_lst kb unchecked [] with
+        Ok result
+    | rest -> (
+        match List_utils.pop_map (step_of_atom ~kb) rest with
         | None ->
             L.verbose (fun m -> m "No assertions left to visit.");
-            if rest = [] then (
-              L.verbose (fun m ->
-                  m "Missing assertions: %a"
-                    Fmt.(list ~sep:comma int)
-                    (SI.elements unchecked));
-              L.verbose (fun m -> m "Missing variables:");
-              let unchckd =
-                List.map
-                  (fun i ->
-                    match ins_outs_assertion preds kb simple_asrts_io.(i) with
-                    | (ins, _) :: _ -> ins
-                    | _ ->
-                        let message =
-                          Fmt.str
-                            "s_init: guaranteed by construction. While \
-                             handling :\n\
-                             %a"
-                            Asrt.pp a
-                        in
-                        raise (Exceptions.Impossible message))
-                  (SI.elements unchecked)
-              in
-              let unchckd =
-                List.map
-                  (fun u ->
-                    KB.diff
-                      (KB.filter
-                         (fun x ->
-                           match x with
-                           | LVar x -> is_spec_var_name x
-                           | _ -> false)
-                         u)
-                      kb)
-                  unchckd
-              in
-              let unchckd = List.filter (fun u -> u <> KB.empty) unchckd in
-              L.(
-                verbose (fun m ->
-                    m "\t%s"
-                      (String.concat "\n\t"
-                         (List.map
-                            (fun u ->
-                              Format.asprintf "%a"
-                                Fmt.(list ~sep:comma Expr.full_pp)
-                                (KB.elements u))
-                            unchckd))));
-              L.verbose (fun m -> m "Unification plan creation failure.");
-              let unchecked =
-                List.map (fun i -> simple_asrts_io.(i)) (SI.elements unchecked)
-              in
-              Error unchecked)
-            else search rest
-        | Some (new_unchecked, ret) ->
-            (* L.log L.verbose (lazy "Successfully added more assertions to the UP.");
-               L.(verbose (fun m -> m "States to examine: %d" (List.length ret)));
-               L.(verbose (fun m -> m "Unchecked remaining: %d" (SI.cardinal new_unchecked))); *)
-            let new_search_states =
-              List.map
-                (fun (a, outs) ->
-                  let new_unifiables = fst (List.split outs) in
-                  let kb' = KB.union kb (KB.of_list new_unifiables) in
-                  ((a, outs) :: up, new_unchecked, kb'))
-                ret
-            in
-            search (new_search_states @ rest))
+            Error rest
+        | Some (((_, outs) as step), rest) ->
+            let learned = List.to_seq outs |> Seq.map fst |> KB.of_seq in
+            let kb = KB.union kb learned in
+            search (step :: current) kb rest)
   in
+  search [] kb atoms
 
-  let initial_indexes = SI.of_list (List.mapi (fun i _ -> i) simple_asrts) in
-  let initial_search_state = ([], initial_indexes, kb) in
-  search [ initial_search_state ]
+let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
+    (step list, Asrt.t list) result =
+  L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
+  let atoms = collect_and_simplify_atoms a in
+  s_init_atoms ~preds kb atoms
 
-let rec lift_up (up : pt) (posts : (Flag.t * Asrt.t list) option) : t =
-  match up with
-  | [] -> Leaf (None, posts)
-  | [ p ] -> Leaf (Some p, posts)
-  | p :: up' -> Inner (p, [ lift_up up' posts ])
-
-let add_up (g_up : t) (up_post : pt * (Flag.t * Asrt.t list) option) : t =
-  match (g_up, up_post) with
-  | PhantomInner ups, (up, posts) -> PhantomInner (ups @ [ lift_up up posts ])
-  | _, (up, posts) -> PhantomInner [ g_up; lift_up up posts ]
-
-let lift_ups
-    (ups : (pt * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
-    : t =
-  let b =
-    List.exists
-      (fun (_, (lab, _)) ->
-        match lab with
-        | Some _ -> true
-        | _ -> false)
-      ups
+let of_step_list ?post ?label (steps : step list) : t =
+  let rec consume_steps = function
+    | [] -> Finished post
+    | p :: steps' -> ConsumeStep (p, consume_steps steps')
   in
-  let ups' = List.map (fun (up, (_, posts)) -> (up, posts)) ups in
-  if b then
-    (* Printf.printf "BUILDING GUP FOR SPEC WITH EXISTENTIALS\n"; *)
-    let gups =
-      List.map (fun (up, (lab, posts)) -> (lift_up up posts, lab)) ups
-    in
-    LabPhantomInner gups
-  else
-    List.fold_left
-      (fun ac (up, posts) -> add_up ac (up, posts))
-      (PhantomInner []) ups'
+  let consume_steps = consume_steps steps in
+  match label with
+  | None -> consume_steps
+  | Some label -> LabelStep (label, consume_steps)
 
-let empty_up = Leaf (None, None)
+(** Adds a linear matching plan (without choices) to a possibly non-linear one.
+    Will be under-optimised if a non-linear matching plan is passed on the lhs.
+    We try to preserve order in which the assertions are added, as to maintain priorities set by the user.
+    In the future, we could provide an option that automatically prioritizes the shortest MP on the left-hand side. *)
+let rec add_linear_up (current_up : t) (up_to_add : t) : t =
+  let rec merge_into_left left right =
+    match (left, right) with
+    | ConsumeStep (stepl, restl), ConsumeStep (stepr, restr)
+      when equal_step stepl stepr ->
+        Some (ConsumeStep (stepl, add_linear_up restl restr))
+    | LabelStep (labell, restl), LabelStep (labelr, restr)
+      when equal_label labell labelr ->
+        Some (LabelStep (labell, add_linear_up restl restr))
+    | Finished postl, Finished postr when (Option.equal equal_post) postl postr
+      -> Some current_up
+    | Choice (cl, cr), up_to_add -> (
+        (* We try to add the merge UP to the right choice*)
+        match merge_into_left cr up_to_add with
+        | Some merged -> Some (Choice (cl, merged))
+        | None -> (
+            (* If it fails we try to add it to the left*)
+            match merge_into_left cl up_to_add with
+            | Some merged -> Some (Choice (merged, cr))
+            | None ->
+                (* If this also fails, we put a choice between everything *)
+                Some (Choice (cl, Choice (cr, up_to_add)))))
+    | _ -> None
+  in
+  match merge_into_left current_up up_to_add with
+  | Some x -> x
+  | None -> Choice (current_up, up_to_add)
+
+(** This function builds a general (slightly optimised by selecting common roots) matching plan
+    once the step list for each case has been decided. *)
+let build_up (cases : (step list * label option * post option) list) : t =
+  let linear_ups =
+    List.map (fun (steps, label, post) -> of_step_list ?label ?post steps) cases
+  in
+  match linear_ups with
+  | [] -> Finished None
+  | a :: r -> List.fold_left add_linear_up a r
 
 let init
     ?(use_params : bool option)
@@ -698,101 +662,47 @@ let init
         L.verbose (fun m -> m "Known unifiables: %a\n" kb_pp known_unifiables);
         L.verbose (fun m -> m "Existentials: %a\n" kb_pp existentials);
         let known_unifiables = KB.union known_unifiables existentials in
-        (s_init known_unifiables preds asrt, (lab, posts)))
+        (s_init ~preds known_unifiables asrt, lab, posts))
       asrts_posts
   in
-  let errors, _ =
-    List.partition
-      (fun (up, _) ->
+  let successes, errors =
+    List.partition_map
+      (fun (up, lab, post) ->
         match up with
-        | Error _ -> true
-        | Ok _ -> false)
+        | Error x -> Right x
+        | Ok up -> Left (up, lab, post))
       ups
   in
-  let errors, _ = List.split errors in
-  let errors =
-    List.map
-      (fun x ->
-        match x with
-        | Error e -> e
-        | _ -> raise (Failure "UP: init: Impossible: non-error error"))
-      errors
-  in
+  match (successes, errors) with
+  | _, _ :: _ -> Error errors
+  | successes, [] -> Ok (build_up successes)
 
-  if errors <> [] then Error errors
-  else
-    Ok
-      (lift_ups
-         (List.map
-            (fun (up, (lab, posts)) ->
-              ( (match up with
-                | Ok up -> up
-                | Error _ ->
-                    raise (Failure "UP: init: Impossible: ok, but error")),
-                (lab, posts) ))
-            ups))
-
-let next (up : t) : (t * (string * SS.t) option) list option =
-  match up with
-  | Leaf _ -> None
-  | Inner (_, ups) -> Some (List.map (fun x -> (x, None)) ups)
-  | PhantomInner ups ->
-      assert (List.length ups > 0);
-      Some (List.map (fun x -> (x, None)) ups)
-  | LabPhantomInner lab_ups ->
-      assert (List.length lab_ups > 0);
-      Some lab_ups
-
-let head (up : t) : step option =
-  match up with
-  | Leaf (Some p, _) | Inner (p, _) -> Some p
-  | _ -> None
-
-let posts (up : t) : (Flag.t * Asrt.t list) option =
-  match up with
-  | Leaf (_, posts) -> posts
-  | _ -> None
-
-let rec pp ft up =
+let pp ft up =
   let open Fmt in
-  let pp_lab ft lab =
-    let lab, vars = lab in
-    pf ft " [%s: @[<h>%a@]]" lab (iter ~sep:comma SS.iter string) vars
+  let rec aux ~prefix up =
+    match up with
+    | Choice (left, right) ->
+        string ft prefix;
+        pf ft "CHOICE@\n";
+        string ft prefix;
+        string ft "├── ";
+        aux ~prefix:(prefix ^ "│   ") left;
+        string ft prefix;
+        string ft "└──";
+        aux ~prefix:(prefix ^ "   ") right
+    | ConsumeStep (step, t) ->
+        pf ft "@[<h>· %a@]@\n" pp_step step;
+        string ft prefix;
+        aux ~prefix t
+    | LabelStep (label, t) ->
+        pf ft "· %a@\n" pp_label label;
+        string ft prefix;
+        aux ~prefix t
+    | Finished post ->
+        pf ft "===FINISHED=== POST: %a@\n%s@\n" (Fmt.Dump.option pp_post) post
+          prefix
   in
-  match up with
-  | Leaf (ostep, None) ->
-      pf ft "Leaf: @[%a@], Posts = NONE"
-        (option ~none:(any "none") step_pp)
-        ostep
-  | Leaf (ostep, Some (flag, posts)) ->
-      pf ft "Leaf: @[%a@] with Flag %a, Posts:@\n  @[%a@]"
-        (option ~none:(any "none") step_pp)
-        ostep Flag.pp flag
-        (list ~sep:(any "@\n@\n") (hovbox Asrt.pp))
-        posts
-  | Inner (step, next_ups) ->
-      let pp_children ft ch =
-        if List.length ch = 1 then pp ft (List.hd ch)
-        else
-          let pp_one_child ftp (i, up) = pf ftp "Children %d@\n%a" i pp up in
-          pf ft "@[<v 2>  %a@]"
-            (iter_bindings ~sep:(any "@\n") List.iteri pp_one_child)
-            ch
-      in
-      pf ft "Inner Node: @[%a@] with %d children@\n%a" step_pp step
-        (List.length next_ups) pp_children next_ups
-  | PhantomInner next_ups ->
-      let pp_child ft (i, ch) = pf ft "Children %d@\n%a" i pp ch in
-      pf ft "@[<v 2>Phantom Node %d children@ %a@]" (List.length next_ups)
-        (iter_bindings ~sep:(any "@\n") List.iteri pp_child)
-        next_ups
-  | LabPhantomInner next_ups ->
-      let pp_child ft (i, (up, lab)) =
-        pf ft "Children %d%a@\n%a" i (option pp_lab) lab pp up
-      in
-      pf ft "@[<v 2>LabPhantom Node %d children@\n%a@]" (List.length next_ups)
-        (iter_bindings ~sep:(any "@\n") List.iteri pp_child)
-        next_ups
+  aux ~prefix:"" up
 
 let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
     ((string, spec) Hashtbl.t, up_err_t) result =
@@ -918,7 +828,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         in
         let def_up = create_or_raise defs in
         L.verbose (fun m ->
-            m "Successfully created UP of predicate %s:\n%a" name pp def_up);
+            m "Successfully created UP of predicate %s:@\n%a" name pp def_up);
         let guard_up =
           Option.map
             (fun guard -> create_or_raise [ (guard, (None, None)) ])
@@ -927,8 +837,8 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         Option.iter
           (fun up ->
             L.verbose (fun m ->
-                m "Successfully created UP of predicate's guard %s:\n%a" name pp
-                  up))
+                m "Successfully created UP of predicate's guard %s:@\n%a" name
+                  pp up))
           guard_up;
         Hashtbl.replace u_preds name { pred; def_up; guard_up })
       preds;
@@ -1101,28 +1011,26 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
 
   let extend_spec (uspec : spec) (sspecs : Spec.st list) : spec =
     let spec = Spec.extend uspec.data sspecs in
-    let ups =
-      List.map
-        (fun (asrt, posts) -> (asrt, s_init params pred_ins asrt, posts))
-        (posts_from_sspecs sspecs)
-    in
-    let new_gup =
+    let new_up =
       List.fold_left
-        (fun g_up (pre, pre_up, posts) ->
-          match pre_up with
+        (fun current_up (asrt, post) ->
+          match s_init ~preds:pred_ins params asrt with
           | Error _ ->
-              L.verbose (fun m ->
-                  m
-                    "WARNING!!! IT IS NOT POSSIBLE TO BUILD UP FOR INFERRED \
-                     SPEC of %s!PRE:@\n\
-                     @[%a@]@\n"
-                    uspec.data.spec_name Asrt.pp pre);
-              (* Printf.printf "%s" msg; *)
-              g_up
-          | Ok pre_up -> add_up g_up (pre_up, posts))
-        uspec.up ups
+              if !Config.under_approximation then (
+                L.verbose (fun m ->
+                    m
+                      "WARNING!!! IT IS NOT POSSIBLE TO BUILD UP FOR INFERRED \
+                       SPEC of %s!PRE:@\n\
+                       @[%a@]@\n"
+                      uspec.data.spec_name Asrt.pp asrt);
+                current_up)
+              else failwith "Couldn't build UP when extending spec!"
+          | Ok step_list ->
+              let new_up = of_step_list ?post step_list in
+              add_linear_up current_up new_up)
+        uspec.up (posts_from_sspecs sspecs)
     in
-    let uspec' : spec = { data = spec; up = new_gup } in
+    let uspec' : spec = { data = spec; up = new_up } in
     uspec'
   in
 

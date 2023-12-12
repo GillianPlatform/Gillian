@@ -1,5 +1,7 @@
 type err_t = Symbol_not_found of string [@@deriving show, yojson]
 
+module StringMap = Map.Make (String)
+
 module Make (Def_value : sig
   type t
   type vt
@@ -38,20 +40,20 @@ struct
   type def = FunDef of Def_value.t | GlobVar of Def_value.t
 
   type t = {
-    symb : (string, string) PMap.t;  (** maps symbols to loc names *)
-    defs : (string, def) PMap.t;  (** maps loc names to definitions *)
+    symb : string StringMap.t;  (** maps symbols to loc names *)
+    defs : def StringMap.t;  (** maps loc names to definitions *)
   }
 
-  let find_opt x s = try Some (PMap.find x s) with Not_found -> None
+  let find_opt x s = try Some (StringMap.find x s) with Not_found -> None
 
   let find_symbol genv sym =
-    try Ok (PMap.find sym genv.symb)
+    try Ok (StringMap.find sym genv.symb)
     with Not_found -> Error (Symbol_not_found sym)
 
   let set_symbol genv sym block =
     let open Delayed_hack in
     try
-      let cur_symb = PMap.find sym genv.symb in
+      let cur_symb = StringMap.find sym genv.symb in
       let cur_symb_e = Gil_syntax.Expr.loc_from_loc_name cur_symb in
       let learned =
         (Def_value.of_lt block) #== (Def_value.of_expr cur_symb_e)
@@ -59,14 +61,14 @@ struct
       return ~learned genv
     with Not_found ->
       let+ block = Delayed_hack.resolve_or_create_lt block in
-      let symb = PMap.add sym block genv.symb in
+      let symb = StringMap.add sym block genv.symb in
       { genv with symb }
 
-  let find_def genv block = PMap.find block genv.defs
+  let find_def genv block = StringMap.find block genv.defs
 
   let set_def genv block def =
     try
-      let cur_def = PMap.find block genv.defs in
+      let cur_def = StringMap.find block genv.defs in
       match (def, cur_def) with
       | GlobVar a, GlobVar b | FunDef a, FunDef b ->
           let open Delayed_hack in
@@ -75,10 +77,10 @@ struct
           failwith
             "Equality between a global variable and a function definition"
     with Not_found ->
-      let defs = PMap.add block def genv.defs in
+      let defs = StringMap.add block def genv.defs in
       Delayed_hack.return { genv with defs }
 
-  let empty = { symb = PMap.empty; defs = PMap.empty }
+  let empty = { symb = StringMap.empty; defs = StringMap.empty }
 
   (** Serialization of definitions *)
   let serialize_def def =
@@ -123,7 +125,7 @@ struct
     if !Kconfig.hide_genv then Format.fprintf fmt "{@[<v 2>@\nHIDDEN@]@\n}"
     else
       let () = Format.fprintf fmt "{@[<v 2>@\n" in
-      PMap.iter (fun s l -> pp_one fmt s l) genv.symb;
+      StringMap.iter (fun s l -> pp_one fmt s l) genv.symb;
       Format.fprintf fmt "There are %i unimplemented external functions@]@\n"
         !not_printed;
       Format.fprintf fmt "}"
@@ -145,7 +147,7 @@ struct
           GlobVar substituted
     in
     let with_substituted_defs =
-      { genv with defs = PMap.map substitute_in_def genv.defs }
+      { genv with defs = StringMap.map substitute_in_def genv.defs }
     in
     let aloc_subst =
       Subst.filter subst (fun var _ ->
@@ -153,13 +155,13 @@ struct
           | ALoc _ -> true
           | _ -> false)
     in
-    let rename_val old_loc new_loc pmap =
-      PMap.map (fun k -> if String.equal old_loc k then new_loc else k) pmap
+    let rename_val old_loc new_loc map =
+      StringMap.map (fun k -> if String.equal old_loc k then new_loc else k) map
     in
-    let rename_key old_loc new_loc pmap =
-      match find_opt old_loc pmap with
-      | None -> pmap
-      | Some d -> PMap.add new_loc d (PMap.remove old_loc pmap)
+    let rename_key old_loc new_loc map =
+      match find_opt old_loc map with
+      | None -> map
+      | Some d -> StringMap.add new_loc d (StringMap.remove old_loc map)
     in
     (* Then we substitute the locations *)
     Subst.fold aloc_subst
@@ -203,7 +205,7 @@ struct
       let def = find_def genv loc in
       build_asrt symb loc def
     in
-    PMap.foldi
+    StringMap.fold
       (fun sym loc (locs, asrts) ->
         let is_fun, asrt = assert_symb sym loc in
         let new_locs = if is_fun then loc :: locs else locs in

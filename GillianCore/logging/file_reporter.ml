@@ -25,7 +25,7 @@ let log (report : Report.t) : unit =
       match report.type_ with
       | type_ when will_log type_ ->
           let () = Loggable.pp report.content formatter in
-          Format.fprintf formatter "@,@?"
+          Format.fprintf formatter "@\n@?"
       | _ -> ())
 
 let wrap_up () =

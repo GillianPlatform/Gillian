@@ -32,11 +32,7 @@ module type S = sig
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data
 
-  val execute_action : ?unification:bool -> string -> t -> vt list -> action_ret
-  val ga_to_setter : string -> string
-  val ga_to_getter : string -> string
-  val ga_to_deleter : string -> string
-  val get_pred_defs : t -> UP.preds_tbl_t option
+  val execute_action : string -> t -> vt list -> action_ret
   val is_overlapping_asrt : string -> bool
 
   (** Expression Evaluation *)
@@ -82,9 +78,6 @@ module type S = sig
 
   (** Value simplification *)
   val simplify_val : t -> vt -> vt
-
-  (** Convert value to object location, with possible allocation *)
-  val to_loc : t -> vt -> (t * vt) option
 
   val fresh_loc : ?loc:vt -> t -> vt
 

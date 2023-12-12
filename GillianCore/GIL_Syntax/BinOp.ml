@@ -46,6 +46,7 @@ type t = TypeDef__.binop =
   | M_pow  (** Power *)
   (* Lists *)
   | LstNth  (** Nth element of a string *)
+  | LstRepeat (* [[a; b]] is the list that contains [b] times the element [a] *)
   (* Strings *)
   | StrCat  (** String concatenation *)
   | StrNth  (** Nth element of a string *)
@@ -99,6 +100,7 @@ let str (x : t) =
   | M_atan2 -> "m_atan2"
   | M_pow -> "**"
   | LstNth -> "l-nth"
+  | LstRepeat -> "l-repeat"
   | StrCat -> "++"
   | StrNth -> "s-nth"
   | SetDiff -> "-d-"

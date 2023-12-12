@@ -84,6 +84,7 @@ and binop =
   | M_atan2
   | M_pow
   | LstNth
+  | LstRepeat
   | StrCat
   | StrNth
   | SetDiff
@@ -147,6 +148,7 @@ and formula =
   | And of formula * formula
   | Or of formula * formula
   | Eq of expr * expr
+  | Impl of formula * formula
   | FLess of expr * expr
   | FLessEq of expr * expr
   | ILess of expr * expr
@@ -164,12 +166,15 @@ and assertion =
   | Pure of formula
   | Types of (expr * typ) list
   | GA of string * expr list * expr list
+  | Wand of { lhs : string * expr list; rhs : string * expr list }
 
 and bindings = string * (string * expr) list
 
 and slcmd =
   | Fold of string * expr list * bindings option
   | Unfold of string * expr list * (string * string) list option * bool
+  | Package of { lhs : string * expr list; rhs : string * expr list }
+      (** Magic wand packaging *)
   | GUnfold of string
   | ApplyLem of string * expr list * string list
   | SepAssert of assertion * string list

@@ -26,9 +26,9 @@ let lemma_proof = ref false
 
 (** {2 Hashtable sizes} *)
 
-let small_tbl_size = 1
-let medium_tbl_size = 1
-let big_tbl_size = 1
+let small_tbl_size = 0
+let medium_tbl_size = 0
+let big_tbl_size = 0
 
 (** {2 Bi-abduction config}
   These values seem to never be modified *)

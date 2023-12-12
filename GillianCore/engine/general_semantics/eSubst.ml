@@ -15,6 +15,8 @@ module type S = sig
   (** E-substitution constructor, with a list of bindings of the form (variable, value) *)
   val init : (Expr.t * vt) list -> t
 
+  val of_seq : (Expr.t * vt) Seq.t -> t
+
   (** Is the e-substitution empty? *)
   val is_empty : t -> bool
 
@@ -108,6 +110,15 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let init (exprs_les : (Expr.t * vt) list) : t =
     let subst = Hashtbl.create Config.big_tbl_size in
     List.iter
+      (fun (e, e_val) ->
+        let () = assert (Expr.is_unifiable e) in
+        Hashtbl.replace subst e e_val)
+      exprs_les;
+    subst
+
+  let of_seq (exprs_les : (Expr.t * vt) Seq.t) : t =
+    let subst = Hashtbl.create Config.big_tbl_size in
+    Seq.iter
       (fun (e, e_val) ->
         let () = assert (Expr.is_unifiable e) in
         Hashtbl.replace subst e e_val)

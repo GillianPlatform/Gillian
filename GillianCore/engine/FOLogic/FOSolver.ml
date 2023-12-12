@@ -198,12 +198,17 @@ let check_entailment
       let formulae = PFS.of_list (right_f :: (left_fs @ [] (* axioms *))) in
       let _ = Simplifications.simplify_pfs_and_gamma formulae gamma_left in
 
-      let ret =
-        Z3_encoding.check_sat
+      let ret, model =
+        Z3_encoding.check_sat_with_model
           (Formula.Set.of_list (PFS.to_list formulae))
           (Type_env.as_hashtbl gamma_left)
       in
       L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
+      if ret then
+        L.tmi (fun m ->
+            m "Here's the model: %a"
+              (Fmt.Dump.option (Fmt.of_to_string Z3.Model.to_string))
+              model);
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
          (Sys.time () -. t); *)
       not ret

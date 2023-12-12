@@ -217,6 +217,7 @@ module BinOp : sig
     | M_atan2  (** Arctangent y/x *)
     | M_pow  (** Power *)
     | LstNth  (** Nth element of a string *)
+    | LstRepeat  (** Nth element of a string *)
     | StrCat  (** String concatenation *)
     | StrNth  (** Nth element of a string *)
     | SetDiff  (** Set difference *)
@@ -269,6 +270,7 @@ module Expr : sig
   val int_z : Z.t -> t
   val string : string -> t
   val bool : bool -> t
+  val to_literal : t -> Literal.t option
 
   (** Lit (Int Z.zero) *)
   val zero_i : t
@@ -284,12 +286,14 @@ module Expr : sig
   val list_nth : t -> int -> t
   val list_nth_e : t -> t -> t
   val list_sub : lst:t -> start:t -> size:t -> t
+  val list_repeat : t -> t -> t
   val list_cons : t -> t -> t
   val list_cat : t -> t -> t
   val typeof : t -> t
   val fmod : t -> t -> t
   val imod : t -> t -> t
   val type_eq : t -> Type.t -> t
+  val is_concrete_zero_i : t -> bool
 
   module Infix : sig
     (** Floating point math *)
@@ -305,6 +309,8 @@ module Expr : sig
     val ( - ) : t -> t -> t
     val ( * ) : t -> t -> t
     val ( / ) : t -> t -> t
+    val ( << ) : t -> t -> t
+    val ( ~- ) : t -> t
 
     (** {2: } *)
 
@@ -413,6 +419,7 @@ module Formula : sig
     | And of t * t  (** Logical conjunction *)
     | Or of t * t  (** Logical disjunction *)
     | Eq of Expr.t * Expr.t  (** Expression equality *)
+    | Impl of t * t  (** Logical implication *)
     | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
     | FLessEq of Expr.t * Expr.t
         (** Expression less-than-or-equal for numbers *)
@@ -547,7 +554,6 @@ module Formula : sig
     (** [a #>=. b] is [Not FLess (b, a)] *)
     val ( #>=. ) : Expr.t -> Expr.t -> t
 
-    (** [fa #=> fb] is [(fnot fa) #|| fb] *)
     val ( #=> ) : t -> t -> t
   end
 end
@@ -563,7 +569,9 @@ module Asrt : sig
     | Pure of Formula.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | GA of string * Expr.t list * Expr.t list  (** Core assertion *)
-  [@@deriving yojson]
+    | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
+        (** Magic wand of the form [P(...) -* Q(...)] *)
+  [@@deriving yojson, eq]
 
   (** Comparison of assertions *)
   val compare : t -> t -> int
@@ -656,6 +664,8 @@ module SLCmd : sig
         (** Fold predicate *)
     | Unfold of string * Expr.t list * (string * string) list option * bool
         (** Unfold predicate *)
+    | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
+        (** Magic wand packaging *)
     | GUnfold of string  (** Global Unfold *)
     | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
     | SepAssert of Asrt.t * string list  (** Assert *)
@@ -898,7 +908,7 @@ module Flag : sig
     | Normal  (** Normal return *)
     | Error  (** Error return *)
     | Bug  (** Instant crash - for biabduction *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   val str : t -> string
   val pp : t Fmt.t
@@ -1254,6 +1264,7 @@ module Visitors : sig
            ; visit_'label : 'c -> 'f -> 'f
            ; visit_ALoc : 'c -> Expr.t -> string -> Expr.t
            ; visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+           ; visit_Impl : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
            ; visit_Apply :
                'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
            ; visit_ApplyLem :
@@ -1336,6 +1347,12 @@ module Visitors : sig
                Formula.t
            ; visit_GA :
                'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+           ; visit_Wand :
+               'c ->
+               Asrt.t ->
+               string * Expr.t list ->
+               string * Expr.t list ->
+               Asrt.t
            ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
            ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
            ; visit_GuardedGoto :
@@ -1373,6 +1390,7 @@ module Visitors : sig
            ; visit_LstCat : 'c -> NOp.t -> NOp.t
            ; visit_LstLen : 'c -> UnOp.t -> UnOp.t
            ; visit_LstNth : 'c -> BinOp.t -> BinOp.t
+           ; visit_LstRepeat : 'c -> BinOp.t -> BinOp.t
            ; visit_LstRev : 'c -> UnOp.t -> UnOp.t
            ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
            ; visit_M_abs : 'c -> UnOp.t -> UnOp.t
@@ -1465,6 +1483,12 @@ module Visitors : sig
                (string * string) list option ->
                bool ->
                SLCmd.t
+           ; visit_Package :
+               'c ->
+               SLCmd.t ->
+               string * Expr.t list ->
+               string * Expr.t list ->
+               SLCmd.t
            ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
            ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
            ; visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
@@ -1499,6 +1523,7 @@ module Visitors : sig
       method visit_'label : 'c -> 'f -> 'f
       method visit_ALoc : 'c -> Expr.t -> string -> Expr.t
       method visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+      method visit_Impl : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
 
       method visit_Apply :
         'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
@@ -1592,6 +1617,9 @@ module Visitors : sig
       method visit_GA :
         'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
 
+      method visit_Wand :
+        'c -> Asrt.t -> string * Expr.t list -> string * Expr.t list -> Asrt.t
+
       method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
       method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
 
@@ -1635,6 +1663,7 @@ module Visitors : sig
       method visit_LstCat : 'c -> NOp.t -> NOp.t
       method visit_LstLen : 'c -> UnOp.t -> UnOp.t
       method visit_LstNth : 'c -> BinOp.t -> BinOp.t
+      method visit_LstRepeat : 'c -> BinOp.t -> BinOp.t
       method visit_LstRev : 'c -> UnOp.t -> UnOp.t
       method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
       method visit_M_abs : 'c -> UnOp.t -> UnOp.t
@@ -1731,6 +1760,9 @@ module Visitors : sig
         bool ->
         SLCmd.t
 
+      method visit_Package :
+        'c -> SLCmd.t -> string * Expr.t list -> string * Expr.t list -> SLCmd.t
+
       method visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
       method visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
       method visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
@@ -1806,6 +1838,7 @@ module Visitors : sig
            ; visit_'label : 'c -> 'g -> 'f
            ; visit_ALoc : 'c -> ALoc.t -> 'f
            ; visit_And : 'c -> Formula.t -> Formula.t -> 'f
+           ; visit_Impl : 'c -> Formula.t -> Formula.t -> 'f
            ; visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
            ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
            ; visit_Arguments : 'c -> string -> 'f
@@ -1867,6 +1900,8 @@ module Visitors : sig
            ; visit_ForAll :
                'c -> (string * Type.t option) list -> Formula.t -> 'f
            ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+           ; visit_Wand :
+               'c -> string * Expr.t list -> string * Expr.t list -> 'f
            ; visit_GUnfold : 'c -> string -> 'f
            ; visit_Goto : 'c -> 'g -> 'f
            ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -1896,6 +1931,7 @@ module Visitors : sig
            ; visit_LstCat : 'c -> 'f
            ; visit_LstLen : 'c -> 'f
            ; visit_LstNth : 'c -> 'f
+           ; visit_LstRepeat : 'c -> 'f
            ; visit_LstRev : 'c -> 'f
            ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
            ; visit_M_abs : 'c -> 'f
@@ -1997,6 +2033,8 @@ module Visitors : sig
                (string * string) list option ->
                bool ->
                'f
+           ; visit_Package :
+               'c -> string * Expr.t list -> string * Expr.t list -> 'f
            ; visit_UnsignedRightShift : 'c -> 'f
            ; visit_UnsignedRightShiftL : 'c -> 'f
            ; visit_UnsignedRightShiftF : 'c -> 'f
@@ -2029,6 +2067,7 @@ module Visitors : sig
       method visit_'label : 'c -> 'g -> 'f
       method visit_ALoc : 'c -> ALoc.t -> 'f
       method visit_And : 'c -> Formula.t -> Formula.t -> 'f
+      method visit_Impl : 'c -> Formula.t -> Formula.t -> 'f
       method visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
       method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
       method visit_Arguments : 'c -> string -> 'f
@@ -2097,6 +2136,10 @@ module Visitors : sig
         'c -> (string * Type.t option) list -> Formula.t -> 'f
 
       method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+
+      method visit_Wand :
+        'c -> string * Expr.t list -> string * Expr.t list -> 'f
+
       method visit_GUnfold : 'c -> string -> 'f
       method visit_Goto : 'c -> 'g -> 'f
       method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2126,6 +2169,7 @@ module Visitors : sig
       method visit_LstCat : 'c -> 'f
       method visit_LstLen : 'c -> 'f
       method visit_LstNth : 'c -> 'f
+      method visit_LstRepeat : 'c -> 'f
       method visit_LstRev : 'c -> 'f
       method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
       method visit_M_abs : 'c -> 'f
@@ -2229,6 +2273,9 @@ module Visitors : sig
         bool ->
         'f
 
+      method visit_Package :
+        'c -> string * Expr.t list -> string * Expr.t list -> 'f
+
       method visit_UnsignedRightShift : 'c -> 'f
       method visit_UnsignedRightShiftL : 'c -> 'f
       method visit_UnsignedRightShiftF : 'c -> 'f
@@ -2264,6 +2311,7 @@ module Visitors : sig
            ; visit_'label : 'c -> 'f -> unit
            ; visit_ALoc : 'c -> string -> unit
            ; visit_And : 'c -> Formula.t -> Formula.t -> unit
+           ; visit_Impl : 'c -> Formula.t -> Formula.t -> unit
            ; visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
            ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
            ; visit_Arguments : 'c -> string -> unit
@@ -2331,6 +2379,8 @@ module Visitors : sig
            ; visit_ForAll :
                'c -> (string * Type.t option) list -> Formula.t -> unit
            ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+           ; visit_Wand :
+               'c -> string * Expr.t list -> string * Expr.t list -> unit
            ; visit_GUnfold : 'c -> string -> unit
            ; visit_Goto : 'c -> 'f -> unit
            ; visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit
@@ -2365,6 +2415,7 @@ module Visitors : sig
            ; visit_LstCat : 'c -> unit
            ; visit_LstLen : 'c -> unit
            ; visit_LstNth : 'c -> unit
+           ; visit_LstRepeat : 'c -> unit
            ; visit_LstRev : 'c -> unit
            ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
            ; visit_M_abs : 'c -> unit
@@ -2455,6 +2506,8 @@ module Visitors : sig
                (string * string) list option ->
                bool ->
                unit
+           ; visit_Package :
+               'c -> string * Expr.t list -> string * Expr.t list -> unit
            ; visit_UnsignedRightShift : 'c -> unit
            ; visit_UnsignedRightShiftL : 'c -> unit
            ; visit_UnsignedRightShiftF : 'c -> unit
@@ -2486,6 +2539,7 @@ module Visitors : sig
       method visit_'label : 'c -> 'f -> unit
       method visit_ALoc : 'c -> string -> unit
       method visit_And : 'c -> Formula.t -> Formula.t -> unit
+      method visit_Impl : 'c -> Formula.t -> Formula.t -> unit
       method visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
       method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
       method visit_Arguments : 'c -> string -> unit
@@ -2560,6 +2614,10 @@ module Visitors : sig
         'c -> (string * Type.t option) list -> Formula.t -> unit
 
       method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+
+      method visit_Wand :
+        'c -> string * Expr.t list -> string * Expr.t list -> unit
+
       method visit_GUnfold : 'c -> string -> unit
       method visit_Goto : 'c -> 'f -> unit
       method visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit
@@ -2594,6 +2652,7 @@ module Visitors : sig
       method visit_LstCat : 'c -> unit
       method visit_LstLen : 'c -> unit
       method visit_LstNth : 'c -> unit
+      method visit_LstRepeat : 'c -> unit
       method visit_LstRev : 'c -> unit
       method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
       method visit_M_abs : 'c -> unit
@@ -2685,6 +2744,9 @@ module Visitors : sig
         (string * string) list option ->
         bool ->
         unit
+
+      method visit_Package :
+        'c -> string * Expr.t list -> string * Expr.t list -> unit
 
       method visit_UnsignedRightShift : 'c -> unit
       method visit_UnsignedRightShiftL : 'c -> unit

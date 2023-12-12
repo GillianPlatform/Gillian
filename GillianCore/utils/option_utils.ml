@@ -10,3 +10,10 @@ let coalesce a b =
   match a with
   | Some _ -> a
   | None -> b
+
+let all =
+  let rec loop vs = function
+    | [] -> Some (List.rev vs)
+    | t :: ts -> Option.bind t (fun v -> loop (v :: vs) ts)
+  in
+  fun ts -> loop [] ts

@@ -13,6 +13,8 @@ type t = TypeDef__.slcmd =
   | Fold of string * Expr.t list * folding_info option  (** Fold             *)
   | Unfold of string * Expr.t list * unfold_info option * bool
       (** Unfold           *)
+  | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
+      (** Magic wand packaging *)
   | GUnfold of string  (** Global Unfold    *)
   | ApplyLem of string * Expr.t list * string list  (** Apply lemma      *)
   | SepAssert of Asrt.t * string list  (** Assert           *)
@@ -46,6 +48,12 @@ let map
   | SepAssert (a, binders) -> SepAssert (map_a a, binders)
   | Invariant (a, existentials) -> Invariant (map_a a, existentials)
   | SymbExec -> SymbExec
+  | Package { lhs = lname, largs; rhs = rname, rargs } ->
+      Package
+        {
+          lhs = (lname, List.map map_e largs);
+          rhs = (rname, List.map map_e rargs);
+        }
 
 let fold = List.fold_left SS.union SS.empty
 
@@ -54,6 +62,8 @@ let pvars (slcmd : t) : SS.t =
   match slcmd with
   | Fold (_, es, _) | Unfold (_, es, _, _) | ApplyLem (_, es, _) -> pvars_es es
   | GUnfold _ -> SS.empty
+  | Package { lhs = _, les1; rhs = _, les2 } ->
+      SS.union (pvars_es les1) (pvars_es les2)
   | SepAssert (a, _) | Invariant (a, _) -> Asrt.pvars a
   | SymbExec -> SS.empty
 
@@ -70,6 +80,8 @@ let lvars (slcmd : t) : SS.t =
       in
       SS.union lvars_finfo (lvars_es es)
   | Unfold (_, es, _, _) -> lvars_es es
+  | Package { lhs = _, les1; rhs = _, les2 } ->
+      SS.union (lvars_es les1) (lvars_es les2)
   | ApplyLem (_, es, _) -> lvars_es es
   | GUnfold _ -> SS.empty
   | SepAssert (a, binders) -> SS.union (Asrt.lvars a) (SS.of_list binders)
@@ -89,6 +101,8 @@ let locs (slcmd : t) : SS.t =
       in
       SS.union lvars_finfo (locs_es es)
   | Unfold (_, es, _, _) -> locs_es es
+  | Package { lhs = _, les1; rhs = _, les2 } ->
+      SS.union (locs_es les1) (locs_es les2)
   | ApplyLem (_, es, _) -> locs_es es
   | GUnfold _ -> SS.empty
   | SepAssert (a, _) | Invariant (a, _) -> Asrt.locs a
@@ -122,8 +136,14 @@ let pp fmt lcmd =
       let keyword = if b then "unfold*" else "unfold" in
       Fmt.pf fmt "@[%s %s%a %a@]" keyword name (Fmt.parens pp_args) les
         pp_unfold_info unfold_info
+  | Package { lhs = lname, largs; rhs = rname, rargs } ->
+      let lname = Pp_utils.maybe_quote_ident lname in
+      let rname = Pp_utils.maybe_quote_ident rname in
+      Fmt.pf fmt "@[package (%s(%a) -* %s(%a)) @]" lname pp_args largs rname
+        pp_args rargs
   | GUnfold name -> Fmt.pf fmt "unfold_all %s" name
   | ApplyLem (lem_name, lparams, binders) ->
+      let lem_name = Pp_utils.maybe_quote_ident lem_name in
       Fmt.pf fmt "@[apply %s%a %a@]" lem_name (Fmt.parens pp_args) lparams
         pp_binders binders
   | SepAssert (a, binders) ->

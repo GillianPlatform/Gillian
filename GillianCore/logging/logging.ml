@@ -90,7 +90,8 @@ module Parent = struct
         let result =
           try Ok (f ())
           with e ->
-            Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+            print_to_all
+              (Fmt.str "Original Backtrace:@\n%s" (Printexc.get_backtrace ()));
             Error e
         in
         release (Some id);
@@ -130,7 +131,8 @@ module Phase = struct
     let result =
       try Ok (f ())
       with e ->
-        Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+        print_to_all
+          (Fmt.str "Original Backtrace:@\n%s" (Printexc.get_backtrace ()));
         Error e
     in
     Report_builder.end_phase phase;

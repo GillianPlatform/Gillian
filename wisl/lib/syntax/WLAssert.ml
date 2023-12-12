@@ -4,6 +4,7 @@ module SS = Set.Make (String)
 type tt =
   | LEmp
   | LStar of t * t
+  | LWand of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
   | LPred of string * WLExpr.t list
   | LPointsTo of WLExpr.t * WLExpr.t list
   | LBlockPointsTo of WLExpr.t * WLExpr.t list
@@ -38,6 +39,8 @@ let rec get_vars_and_lvars asrt =
   | LBlockPointsTo (el, lel) ->
       double_union (WLExpr.get_vars_and_lvars el) (from_wlexpr_list lel)
   | LPure lf -> WLFormula.get_vars_and_lvars lf
+  | LWand { lhs = _, largs; rhs = _, rargs } ->
+      double_union (from_wlexpr_list largs) (from_wlexpr_list rargs)
 
 let rec get_by_id id la =
   let getter = get_by_id id in
@@ -63,6 +66,9 @@ let rec pp fmt asser =
   | LEmp -> Format.pp_print_string fmt "emp"
   | LStar (a1, a2) -> Format.fprintf fmt "@[(%a) * (%a)@]" pp a1 pp a2
   | LPred (pname, lel) -> Format.fprintf fmt "@[%s(%a)@]" pname pp_params lel
+  | LWand { lhs = lname, largs; rhs = rname, rargs } ->
+      Format.fprintf fmt "@[%s(%a) -* %s(%a)]" lname pp_params largs rname
+        pp_params rargs
   | LPointsTo (le1, le2) ->
       Format.fprintf fmt "@[(%a) -> %a@]" WLExpr.pp le1 pp_params le2
   | LBlockPointsTo (le1, le2) ->
@@ -80,6 +86,9 @@ let rec substitution (subst : (string, WLExpr.tt) Hashtbl.t) (a : t) : t =
     | LEmp -> LEmp
     | LStar (a1, a2) -> LStar (f a1, f a2)
     | LPred (name, le) -> LPred (name, List.map fe le)
+    | LWand { lhs = lname, largs; rhs = rname, rargs } ->
+        LWand
+          { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
     | LPointsTo (e1, le) -> LPointsTo (fe e1, List.map fe le)
     | LBlockPointsTo (e1, le) -> LBlockPointsTo (fe e1, List.map fe le)
     | LPure frm -> LPure (WLFormula.substitution subst frm)

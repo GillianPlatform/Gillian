@@ -40,6 +40,7 @@ rule read =
   | "invariant" { INVARIANT (curr lexbuf) }
   | "return" { RETURN (curr lexbuf) }
   | "fold"   { FOLD (curr lexbuf) }
+  | "package" { PACKAGE (curr lexbuf) }
   | "unfold" { UNFOLD (curr lexbuf) }
   | "nounfold" { NOUNFOLD (curr lexbuf) }
   | "apply"  { APPLY (curr lexbuf) }
@@ -61,6 +62,7 @@ rule read =
                read_string (Buffer.create 17) lexbuf }
   | "//"     { read_comment lexbuf }
   (* logical binary stuff *)
+  | "-*"     { WAND }
   | "->"     { ARROW }
   | "-b>"   { BLOCK_ARROW }
   | "/\\"    { LAND }

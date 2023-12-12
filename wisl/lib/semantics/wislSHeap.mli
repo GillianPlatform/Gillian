@@ -17,6 +17,7 @@ val init : unit -> t
 val alloc : t -> int -> string
 val dispose : t -> string -> (unit, err) Result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
+val is_empty : t -> bool
 
 val get_cell :
   pfs:Pure_context.t ->

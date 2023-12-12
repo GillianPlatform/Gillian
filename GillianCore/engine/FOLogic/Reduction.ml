@@ -163,12 +163,18 @@ let resolve_list (le : Expr.t) (pfs : Formula.t list) : Expr.t =
     | Eq (LVar x', le) :: rest when String.equal x' x -> (
         let le' = normalise_list_expressions le in
         match le' with
-        | EList _ | NOp (LstCat, _) -> Some le'
+        (* Weird things can happen where x reduces to e.g. `{{ l-nth(x, 0) }}`.
+           We check absence of cycles *)
+        | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
+            Some le'
+        | Expr.BinOp (_, LstRepeat, _) as ret
+          when not (SS.mem x (Expr.lvars ret)) -> Some ret
         | _ -> search x rest)
     | Eq (le, LVar x') :: rest when String.equal x' x -> (
         let le' = normalise_list_expressions le in
         match le' with
-        | EList _ | NOp (LstCat, _) -> Some le'
+        | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
+            Some le'
         | _ -> search x rest)
     | _ :: rest -> search x rest
   in
@@ -332,6 +338,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
             if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
           in
           f lst idx)
+  | Expr.BinOp (x, LstRepeat, _) -> Some x
   | _ -> None
 
 (* Finding the nth element of a list *)
@@ -1110,6 +1117,10 @@ and reduce_lexpr_loop
         | [] -> ESet []
         | [ x ] -> x
         | _ -> NOp (SetUnion, fles))
+    | BinOp (x, LstRepeat, Lit (Int i)) when Z.lt i (Z.of_int 100) ->
+        let fx = f x in
+        let result = List.init (Z.to_int i) (fun _ -> fx) in
+        EList result
     | NOp (LstCat, LstSub (x1, Lit (Int z), z1) :: LstSub (x2, y2, z3) :: rest)
       when Z.equal z Z.zero && Expr.equal x1 x2 && Expr.equal z1 y2 ->
         f
@@ -1182,6 +1193,7 @@ and reduce_lexpr_loop
           | [ x ] -> x
           | _ -> NOp (SetInter, fles))
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e)) -> f e
+    | UnOp (LstLen, BinOp (_, LstRepeat, e)) -> f e
     | UnOp (LstLen, LstSub (_, _, e)) -> f e
     | UnOp (op, le) -> (
         let fle = f le in
@@ -1480,6 +1492,9 @@ and reduce_lexpr_loop
                   | _ -> true)
                &&
                let eqs = get_equal_expressions pfs le in
+               L.tmi (fun fmt ->
+                   fmt "le: %a, z: %s, n: %s" Expr.pp le (Z.to_string z)
+                     (Z.to_string n));
                L.tmi (fun fmt -> fmt "PFS:\n%a" PFS.pp pfs);
                L.tmi (fun fmt ->
                    fmt "Found eqs: %a: %a" Expr.pp le
@@ -1952,18 +1967,10 @@ and reduce_lexpr_loop
   in
 
   let result = normalise_list_expressions result in
-  let final_result =
-    if not (Expr.equal le result) then (
-      L.(
-        tmi (fun m ->
-            m "\tReduce_lexpr: %s -> %s"
-              ((Fmt.to_to_string Expr.pp) le)
-              ((Fmt.to_to_string Expr.pp) result)));
-      f result)
-    else result
-  in
-
-  final_result
+  if not (Expr.equal le result) then (
+    L.tmi (fun m -> m "\tReduce_lexpr: %a -> %a" Expr.pp le Expr.pp result);
+    f result)
+  else result
 
 and reduce_lexpr
     ?(unification = false)
@@ -2786,6 +2793,40 @@ let rec reduce_formula_loop
               | Some _ -> False
               | None -> f @@ Eq (UnOp (TypeOf, e), Lit (Type IntType)))
           | _ -> a)
+      | Impl (left, right) -> (
+          let pfs_with_left =
+            let copy = PFS.copy pfs in
+            let () = PFS.extend copy left in
+            copy
+          in
+          let reduced_left =
+            reduce_formula_loop ~rpfs:true unification pfs_with_left gamma left
+          in
+          match (reduced_left, f right) with
+          | True, _ -> right
+          | False, _ | _, True -> True
+          | _, False -> f (Not left)
+          | _ -> Impl (left, right))
+      | ForAll
+          ( [ (i, Some IntType) ],
+            Impl
+              ( And
+                  ( ILessEq (Lit (Int z), LVar i'),
+                    ILess (LVar i'', UnOp (LstLen, l)) ),
+                Eq (BinOp (l', LstNth, LVar i'''), k) ) )
+        when Z.(equal z zero)
+             && i = i' && i' = i'' && i'' = i''' && Expr.equal l l'
+             &&
+             match l with
+             | EList _ -> true
+             | _ -> false ->
+          let l =
+            match l with
+            | EList l -> l
+            | _ -> failwith "unreachable"
+          in
+          List.map (fun x -> Formula.Infix.(x #== k)) l
+          |> List.fold_left Formula.Infix.( #&& ) Formula.True
       | ForAll (bt, a) ->
           (* Think about quantifier instantiation *)
           (* Collect binders that are in gamma *)
@@ -2989,23 +3030,23 @@ let rec reduce_assertion_loop
     (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
   let f = reduce_assertion_loop unification pfs gamma in
-
+  let fe = reduce_lexpr_loop ~unification pfs gamma in
   let result =
     match a with
     (* Empty heap *)
     | Emp -> Asrt.Emp
     (* Star *)
     | Star (a1, a2) -> (
-        let fa1 = f a1 in
-        let fa2 = f a2 in
-        match ((fa1 : Asrt.t), (fa2 : Asrt.t)) with
+        match (f a1, f a2) with
         | Emp, a | a, Emp -> a
         | Pure False, _ | _, Pure False -> Asrt.Pure False
         | Pure True, a | a, Pure True -> a
-        | _, _ -> Star (fa1, fa2))
+        | fa1, fa2 -> Star (fa1, fa2))
+    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+        Wand
+          { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
     (* Predicates *)
-    | Pred (name, les) ->
-        Pred (name, List.map (reduce_lexpr_loop ~unification pfs gamma) les)
+    | Pred (name, les) -> Pred (name, List.map fe les)
     (* Pure assertions *)
     | Pure True -> Emp
     | Pure f ->
@@ -3025,31 +3066,21 @@ let rec reduce_assertion_loop
           if lvt = [] then Emp else Types lvt
         with WrongType -> Pure False)
     (* General action *)
-    | GA (act, l_ins, l_outs) ->
-        GA
-          ( act,
-            List.map (reduce_lexpr_loop ~unification pfs gamma) l_ins,
-            List.map (reduce_lexpr_loop ~unification pfs gamma) l_outs )
+    | GA (act, l_ins, l_outs) -> GA (act, List.map fe l_ins, List.map fe l_outs)
   in
+
   if a <> result && not (a == result) then (
     L.(tmi (fun m -> m "Reduce_assertion: %a -> %a" Asrt.pp a Asrt.pp result));
     f result)
   else result
 
-let rec separate (a : Asrt.t) =
+let rec extract_lvar_equalities (a : Asrt.t) =
   match a with
-  | Emp -> ([], [], [], [])
-  | Pred _ -> ([], [], [], [ a ])
-  | Pure pf ->
-      let pfs = Formula.split_conjunct_formulae pf in
-      let a = List.map (fun pf -> Asrt.Pure pf) pfs in
-      ([], a, [], [])
-  | Types _ -> ([], [], [ a ], [])
-  | GA _ -> ([ a ], [], [], [])
-  | Star (a1, a2) ->
-      let m1, pu1, t1, pr1 = separate a1 in
-      let m2, pu2, t2, pr2 = separate a2 in
-      (m1 @ m2, pu1 @ pu2, t1 @ t2, pr1 @ pr2)
+  | Pure (Eq (LVar x, v) | Eq (v, LVar x)) ->
+      if Names.is_lvar_name x && not (Names.is_spec_var_name x) then [ (x, v) ]
+      else []
+  | Star (a1, a2) -> extract_lvar_equalities a1 @ extract_lvar_equalities a2
+  | _ -> []
 
 let reduce_assertion
     ?(unification = false)
@@ -3060,25 +3091,19 @@ let reduce_assertion
 
   let rec loop (a : Asrt.t) =
     let a' = reduce_assertion_loop unification pfs gamma a in
-    let _, pure, _, _ = separate a' in
+    let equalities = extract_lvar_equalities a' in
     let a' =
       List.fold_left
-        (fun a (pf : Asrt.t) ->
-          match pf with
-          | Pure (Eq (LVar v, x)) | Pure (Eq (x, LVar v)) ->
-              if Names.is_lvar_name v && not (Names.is_spec_var_name v) then
-                let subst =
-                  Asrt.subst_expr_for_expr ~to_subst:(LVar v) ~subst_with:x
-                in
-                match x with
-                | Lit _ -> subst a
-                | LVar w when v <> w -> subst a
-                | EList lx when not (Var.Set.mem v (Expr.lvars (EList lx))) ->
-                    subst a
-                | _ -> a
-              else a
+        (fun a (v, x) ->
+          let subst =
+            Asrt.subst_expr_for_expr ~to_subst:(LVar v) ~subst_with:x
+          in
+          match x with
+          | Lit _ -> subst a
+          | LVar w when v <> w -> subst a
+          | EList lx when not (Var.Set.mem v (Expr.lvars (EList lx))) -> subst a
           | _ -> a)
-        a' pure
+        a' equalities
     in
     let a' = reduce_assertion_loop unification pfs gamma a' in
     if a' <> a && not (a' == a) then loop a' else a'

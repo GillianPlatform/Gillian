@@ -9,24 +9,7 @@ type mem_ac =
   | Load
   | Free
   | Move
-  | GetSingle
-  | SetSingle
-  | RemSingle
-  | GetArray
-  | SetArray
-  | RemArray
-  | GetHole
-  | SetHole
-  | RemHole
-  | GetZeros
   | SetZeros
-  | RemZeros
-  | GetBounds
-  | SetBounds
-  | RemBounds
-  | GetFreed
-  | SetFreed
-  | RemFreed
 
 type genv_ac = GetDef
 type ac = AGEnv of genv_ac | AMem of mem_ac
@@ -37,36 +20,6 @@ type ga = Single | Array | Hole | Zeros | Bounds | Freed
 (* Some things about the semantics of these Actions *)
 
 let is_overlapping_asrt _ = false
-
-let ga_to_setter ga =
-  AMem
-    (match ga with
-    | Single -> SetSingle
-    | Array -> SetArray
-    | Hole -> SetHole
-    | Zeros -> SetZeros
-    | Bounds -> SetBounds
-    | Freed -> SetFreed)
-
-let ga_to_getter ga =
-  AMem
-    (match ga with
-    | Single -> GetSingle
-    | Array -> GetArray
-    | Hole -> GetHole
-    | Zeros -> GetZeros
-    | Bounds -> GetBounds
-    | Freed -> GetFreed)
-
-let ga_to_deleter ga =
-  AMem
-    (match ga with
-    | Single -> RemSingle
-    | Array -> RemArray
-    | Hole -> RemHole
-    | Zeros -> RemZeros
-    | Bounds -> RemBounds
-    | Freed -> RemFreed)
 
 (* Then serialization and deserialization functions *)
 
@@ -82,24 +35,7 @@ let str_mem_ac = function
   | Load -> "load"
   | Move -> "move"
   | Free -> "free"
-  | GetSingle -> "getSingle"
-  | SetSingle -> "setSingle"
-  | RemSingle -> "remSingle"
-  | GetArray -> "getArray"
-  | SetArray -> "setArray"
-  | RemArray -> "remArray"
-  | GetBounds -> "getBounds"
-  | SetBounds -> "setBounds"
-  | RemBounds -> "remBounds"
-  | GetHole -> "getHole"
-  | SetHole -> "setHole"
-  | RemHole -> "remHole"
-  | GetZeros -> "getZeros"
   | SetZeros -> "setZeros"
-  | RemZeros -> "remZeros"
-  | GetFreed -> "getFreed"
-  | SetFreed -> "setFreed"
-  | RemFreed -> "remFreed"
 
 let mem_ac_from_str = function
   | "alloc" -> Alloc
@@ -110,24 +46,7 @@ let mem_ac_from_str = function
   | "load" -> Load
   | "free" -> Free
   | "move" -> Move
-  | "getSingle" -> GetSingle
-  | "setSingle" -> SetSingle
-  | "remSingle" -> RemSingle
-  | "getArray" -> GetArray
-  | "setArray" -> SetArray
-  | "remArray" -> RemArray
-  | "getBounds" -> GetBounds
-  | "setBounds" -> SetBounds
-  | "remBounds" -> RemBounds
-  | "getHole" -> GetHole
-  | "setHole" -> SetHole
-  | "remHole" -> RemHole
-  | "getZeros" -> GetZeros
   | "setZeros" -> SetZeros
-  | "remZeros" -> RemZeros
-  | "getFreed" -> GetFreed
-  | "setFreed" -> SetFreed
-  | "remFreed" -> RemFreed
   | s -> failwith ("Unkown Memory Action : " ^ s)
 
 let str_genv_ac = function
@@ -167,11 +86,6 @@ let ga_from_str = function
   | "mem_hole" -> Hole
   | "mem_freed" -> Freed
   | str -> failwith ("Unkown memory assertion : " ^ str)
-
-let ga_to_action_str action str = ga_from_str str |> action |> str_ac
-let ga_to_setter_str = ga_to_action_str ga_to_setter
-let ga_to_getter_str = ga_to_action_str ga_to_getter
-let ga_to_deleter_str = ga_to_action_str ga_to_deleter
 
 (** Additional stuff *)
 

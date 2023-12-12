@@ -63,7 +63,9 @@ module type S = sig
   val initialize : Exec_mode.t -> unit
 end
 
-module Dummy : S with type init_data = unit = struct
+module Dummy :
+  S with type init_data = unit and type Annot.t = Gil_syntax.Annot.Basic.t =
+struct
   module TargetLangOptions = struct
     type t = unit
 
