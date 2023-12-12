@@ -291,6 +291,7 @@ module Make (SPState : PState.S) = struct
       | SetMem (le1, le2) -> SetMem (fe le1, fe le2)
       | ForAll (bt, a) -> ForAll (bt, fant a)
       | IsInt e -> IsInt (fe e)
+      | Impl (a, b) -> Impl (fa a, fa b)
       | _ ->
           let msg =
             Fmt.str
