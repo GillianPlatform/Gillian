@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.10"
       - name: Installing esy
-        run: sudo npm install -g esy@0.6.12 --unsafe-perm
+        run: sudo npm install -g esy@0.7.2 --unsafe-perm
       - name: Installing Python prerequisites
         run: sudo pip install sphinx furo
       - name: Restore Cache
@@ -36,9 +36,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: _export
-          key: ${{ runner.os }}-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
+          key: ${{ runner.os }}-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            ${{ runner.os }}-esy-0.6.12-
+            ${{ runner.os }}-esy-0.7.2-
       - name: Esy install
         run: "esy install"
       - name: Import Cache
@@ -280,9 +280,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: _export
-          key: docker-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
+          key: docker-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            docker-esy-0.6.12-
+            docker-esy-0.7.2-
       - name: build and export docker image
         uses: docker/build-push-action@v4
         with:
