@@ -129,12 +129,6 @@ let parse_and_compile_files files =
         | ext -> Fmt.failwith "Unknown file type '%s'!" ext)
     | _ -> failwith "Kanillian only handles one file at the moment"
   in
-  let path =
-    match Filename.extension path with
-    | ".json" -> path
-    | ".c" -> compile_c_to_symtab path
-    | ext -> Fmt.failwith "Unknown file type '%s'!" ext
-  in
   let json = load_symtab_from_file path in
   let+ goto_prog = parse_symtab_into_goto json in
   let goto_prog = Sanitize.sanitize_program goto_prog in
