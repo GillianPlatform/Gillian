@@ -1,3 +1,4 @@
+module KAnnot = Annot
 open Helpers
 open Gil_syntax
 module GType = Goto_lib.Type
@@ -337,7 +338,7 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       assume_type ~ctx ty expr
   | _ -> Error.code_error "Unreachable: assume_type for non-scalar"
 
-let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
+let rec nondet_expr ~ctx ~loc ~type_ ~expr_ref () : Val_repr.t Cs.with_body =
   let b = Body_item.make_hloc ~loc in
   let open Cs.Syntax in
   let is_symbolic_exec =
@@ -358,7 +359,7 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
   else
     match type_ with
     | StructTag tag | UnionTag tag ->
-        nondet_expr ~ctx ~loc ~type_:(Ctx.tag_lookup ctx tag) ()
+        nondet_expr ~ctx ~loc ~type_:(Ctx.tag_lookup ctx tag) ~expr_ref ()
     | Struct { components; _ } -> (
         match Ctx.one_representable_field ctx components with
         | None ->
@@ -378,13 +379,15 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
                     Cons
                       ( ( curr,
                           Val_repr.V
-                            { type_; value = nondet_expr ~ctx ~loc ~type_ () }
-                        ),
+                            {
+                              type_;
+                              value = nondet_expr ~ctx ~loc ~type_ ~expr_ref ();
+                            } ),
                         rest )
             in
             let writes = writes 0 components in
             Cs.return (Val_repr.ByCompositValue { type_; writes })
-        | Some (_, type_) -> nondet_expr ~ctx ~loc ~type_ ())
+        | Some (_, type_) -> nondet_expr ~ctx ~loc ~type_ ~expr_ref ())
     | Array (ty, sz) ->
         let rec writes cur () =
           if cur == sz then Seq.Nil
@@ -392,8 +395,10 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
             Cons
               ( ( cur,
                   Val_repr.V
-                    { type_ = ty; value = nondet_expr ~ctx ~loc ~type_:ty () }
-                ),
+                    {
+                      type_ = ty;
+                      value = nondet_expr ~ctx ~loc ~type_:ty ~expr_ref ();
+                    } ),
                 writes (cur + 1) )
         in
         let writes = writes 0 in
@@ -439,12 +444,15 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
                   (Cmd.GuardedGoto
                      (Expr.BinOp (variant, Equal, Expr.int i), block_lab, nlab))
               in
-              let v, cmds = nondet_expr ~ctx ~loc ~type_ () in
+              let v, cmds = nondet_expr ~ctx ~loc ~type_ ~expr_ref () in
               let write =
                 Memory.write ~ctx ~type_ ~annot:b ~dst:ret_ptr ~src:v
               in
               let block =
-                set_first_label ~annot:(b ~loop:[]) block_lab
+                let tl_ref = KAnnot.(Expr expr_ref) in
+                set_first_label
+                  ~annot:(b ~loop:[] ~tl_ref ?stmt_kind:None)
+                  block_lab
                   (cmds @ write @ [ b goto_end ])
               in
               (goto :: block) @ gen (i + 1) rest
@@ -872,7 +880,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
   in
   let compile_expr = compile_expr ~ctx in
   let loc = Body_item.compile_location expr.location in
-  let b = Body_item.make ~loc in
+  let id = expr.id in
+  let b = Body_item.make ~loc ~tl_ref:(KAnnot.Expr id) in
   let unhandled feature =
     let cmd = assert_unhandled ~feature [] in
     let v = Val_repr.dummy ~ctx expr.type_ in
@@ -910,7 +919,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       | ZST ->
           (* FIXME: we can't model alignment yet *)
           let* ptr =
-            nondet_expr ~ctx ~loc:expr.location ~type_:(CInteger I_size_t) ()
+            nondet_expr ~ctx ~loc:expr.location ~type_:(CInteger I_size_t)
+              ~expr_ref:id ()
           in
           let ptr =
             Val_repr.as_value ~msg:"Nondet I_size_t for ZST pointer" ptr
@@ -977,7 +987,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       | op ->
           let cmd = b (Helpers.assert_unhandled ~feature:(UnOp op) []) in
           Cs.return ~app:[ cmd ] (Val_repr.ByValue (Lit Nono)))
-  | Nondet -> nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_ ()
+  | Nondet ->
+      nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_ ~expr_ref:id ()
   | TypeCast to_cast ->
       let* to_cast_e = compile_expr to_cast in
       compile_cast ~ctx ~from:to_cast.type_ ~into:expr.type_ to_cast_e
@@ -1003,18 +1014,18 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           let cmd = b (Cmd.Goto end_lab) in
           Cs.return ~app:[ cmd ] res
         in
-        res_then |> Cs.with_label ~annot:(b ~loop:[]) then_lab
+        res_then |> Cs.with_label ~annot:(b ~loop:[] ?stmt_kind:None) then_lab
       in
       let* res_else =
         let res_else =
           let* t = compile_expr else_ in
           Val_repr.copy_into t res |> Cs.map_l b
         in
-        res_else |> Cs.with_label ~annot:(b ~loop:[]) else_lab
+        res_else |> Cs.with_label ~annot:(b ~loop:[] ?stmt_kind:None) else_lab
       in
       Error.assert_
         (Val_repr.equal res_then res_else)
-        "if branche exprs must be equal";
+        "if branch exprs must be equal";
       Cs.return ~app:[ b ~label:end_lab Skip ] res_then
   | ByteExtract { e; offset } ->
       if Ctx.is_zst_access ctx e.type_ then
@@ -1150,10 +1161,10 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
   let compile_expr_c = compile_expr ~ctx in
   let loc = Body_item.compile_location stmt.stmt_location in
-  let b = Body_item.make ~loc in
+  let b = Body_item.make ~loc ~tl_ref:(KAnnot.Stmt stmt.id) in
   let add_annot x = List.map b x in
   let set_first_label_opt label stmts =
-    Helpers.set_first_label_opt ~annot:(b ~loop:[]) label stmts
+    Helpers.set_first_label_opt ~annot:(b ~loop:[] ?stmt_kind:None) label stmts
   in
   let set_first_label label stmts = set_first_label_opt (Some label) stmts in
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in

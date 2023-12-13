@@ -33,11 +33,29 @@ module Func = struct
   }
 end
 
+module Lift_info = struct
+  type t = {
+    mutable stmt_count : int;
+    mutable expr_count : int;
+    stmt_map : (int, Stmt.t) Hashtbl.t;
+    expr_map : (int, Expr.t) Hashtbl.t;
+  }
+
+  let empty () =
+    {
+      stmt_count = 0;
+      expr_count = 0;
+      stmt_map = Hashtbl.create 1;
+      expr_map = Hashtbl.create 1;
+    }
+end
+
 type t = {
   vars : (string, Global_var.t) Hashtbl.t;
   funs : (string, Func.t) Hashtbl.t;
   types : (string, Type.t) Hashtbl.t;
   constrs : (string, unit) Hashtbl.t;
+  lift_info : Lift_info.t;
 }
 
 let of_symtab ~machine (symtab : Symtab.t) : t =
@@ -47,6 +65,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
       funs = Hashtbl.create 1;
       types = Hashtbl.create 1;
       constrs = Hashtbl.create 1;
+      lift_info = Lift_info.empty ();
     }
   in
   symtab

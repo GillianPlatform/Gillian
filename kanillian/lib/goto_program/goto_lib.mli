@@ -183,7 +183,7 @@ module rec Expr : sig
     | Nondet
     | EUnhandled of Id.t * string
 
-  and t = { value : value; type_ : Type.t; location : Location.t }
+  and t = { value : value; type_ : Type.t; location : Location.t; id : int }
   [@@deriving show]
 
   val pp_full : Format.formatter -> t -> unit
@@ -220,7 +220,13 @@ and Stmt : sig
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
-  and t = { stmt_location : Location.t; body : body; comment : string option }
+
+  and t = {
+    stmt_location : Location.t;
+    body : body;
+    comment : string option;
+    id : int;
+  }
 
   val pp : Format.formatter -> t -> unit
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
@@ -247,11 +253,23 @@ module Program : sig
     }
   end
 
+  module Lift_info : sig
+    type t = {
+      mutable stmt_count : int;
+      mutable expr_count : int;
+      stmt_map : (int, Stmt.t) Hashtbl.t;
+      expr_map : (int, Expr.t) Hashtbl.t;
+    }
+
+    val empty : unit -> t
+  end
+
   type t = {
     vars : (string, Global_var.t) Hashtbl.t;
     funs : (string, Func.t) Hashtbl.t;
     types : (string, Type.t) Hashtbl.t;
     constrs : (string, unit) Hashtbl.t;
+    lift_info : Lift_info.t;
   }
 
   val of_symtab : machine:Machine_model.t -> Symtab.t -> t
@@ -270,6 +288,7 @@ module Visitors : sig
       method visit_int_type : ctx:'a -> IntType.t -> unit
       method visit_datatype_components : ctx:'a -> Datatype_component.t -> unit
       method visit_type : ctx:'a -> Type.t -> unit
+      method visit_id : ctx:'a -> int -> unit
       method visit_expr_value : ctx:'a -> type_:Type.t -> Expr.value -> unit
       method visit_expr : ctx:'a -> Expr.t -> unit
       method visit_stmt_body : ctx:'a -> Stmt.body -> unit
@@ -294,6 +313,7 @@ module Visitors : sig
       method visit_stmt : ctx:'a -> Stmt.t -> Stmt.t
       method visit_stmt_body : ctx:'a -> Stmt.body -> Stmt.body
       method visit_type : ctx:'a -> Type.t -> Type.t
+      method visit_id : ctx:'a -> int -> int
       method visit_unop : ctx:'a -> Ops.Unary.t -> Ops.Unary.t
     end
 end

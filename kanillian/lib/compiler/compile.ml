@@ -178,43 +178,63 @@ let compile_alloc_params ~ctx params =
       else [])
     params
 
+let get_missing_function_body ~ctx (func : Program.Func.t) =
+  let lift_info = Ctx.(ctx.prog).lift_info in
+  let expr_id = lift_info.expr_count in
+  let stmt_id = lift_info.stmt_count in
+  let expr, stmt =
+    if !Kcommons.Kconfig.nondet_on_missing then
+      let nondet =
+        GExpr.
+          {
+            location = func.location;
+            type_ = func.return_type;
+            value = Nondet;
+            id = expr_id;
+          }
+      in
+      let stmt =
+        Stmt.
+          {
+            stmt_location = func.location;
+            body = Return (Some nondet);
+            comment = None;
+            id = stmt_id;
+          }
+      in
+      (nondet, stmt)
+    else
+      let cond =
+        GExpr.
+          {
+            value = BoolConstant false;
+            type_ = Bool;
+            location = func.location;
+            id = expr_id;
+          }
+      in
+      let body =
+        Stmt.Assert { cond; property_class = Some "missing_function" }
+      in
+      let stmt =
+        Stmt.
+          { body; stmt_location = func.location; comment = None; id = stmt_id }
+      in
+      (cond, stmt)
+  in
+  lift_info.expr_count <- expr_id + 1;
+  lift_info.stmt_count <- stmt_id + 1;
+  Hashtbl.replace lift_info.expr_map expr_id expr;
+  Hashtbl.replace lift_info.stmt_map stmt_id stmt;
+  stmt
+
 let compile_function ~ctx (func : Program.Func.t) : (KAnnot.t, string) Proc.t =
   let f_loc = Body_item.compile_location func.location in
   let body =
     (* If the function has no body, it's assumed to be just non-det *)
     match func.body with
     | Some b -> b
-    | None ->
-        if !Kcommons.Kconfig.nondet_on_missing then
-          let nondet =
-            GExpr.
-              {
-                location = func.location;
-                type_ = func.return_type;
-                value = Nondet;
-              }
-          in
-          Stmt.
-            {
-              stmt_location = func.location;
-              body = Return (Some nondet);
-              comment = None;
-            }
-        else
-          let body =
-            Stmt.Assert
-              {
-                cond =
-                  GExpr.
-                    {
-                      value = BoolConstant false;
-                      type_ = Bool;
-                      location = func.location;
-                    };
-                property_class = Some "missing_function";
-              }
-          in
-          Stmt.{ body; stmt_location = func.location; comment = None }
+    | None -> get_missing_function_body ~ctx func
   in
 
   (* Fmt.pr "FUNCTION %s:\n%a@?\n\n" func.symbol Stmt.pp body; *)
@@ -237,7 +257,9 @@ let compile_function ~ctx (func : Program.Func.t) : (KAnnot.t, string) Proc.t =
     b (Assignment (Kutils.Names.return_variable, Lit Undefined))
   in
   let return_block =
-    set_first_label ~annot:(b ~loop:[]) Constants.Kanillian_names.ret_label
+    set_first_label
+      ~annot:(b ~loop:[] ?tl_ref:None ?stmt_kind:None)
+      Constants.Kanillian_names.ret_label
       (free_locals @ [ b ReturnNormal ])
   in
   let alloc_params = compile_alloc_params ~ctx proc_params |> List.map b in
@@ -266,12 +288,18 @@ let compile_function ~ctx (func : Program.Func.t) : (KAnnot.t, string) Proc.t =
 let start_for_harness ~ctx (harness : Program.Func.t) =
   let cprover_start =
     let open Program.Func in
+    (* Don't worry about IDs now, they'll be set during sanitisation. *)
     let stmt stmt_body =
       Stmt.
-        { stmt_location = harness.location; body = stmt_body; comment = None }
+        {
+          stmt_location = harness.location;
+          body = stmt_body;
+          comment = None;
+          id = -1;
+        }
     in
     let expr type_ expr_value =
-      GExpr.{ location = harness.location; type_; value = expr_value }
+      GExpr.{ location = harness.location; type_; value = expr_value; id = -1 }
     in
     let harness_type =
       GType.Code { params = harness.params; return_type = harness.return_type }

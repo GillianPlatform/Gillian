@@ -25,7 +25,7 @@ module rec Expr : sig
     | Nondet
     | EUnhandled of Id.t * string
 
-  and t = { value : value; type_ : Type.t; location : Location.t }
+  and t = { value : value; type_ : Type.t; location : Location.t; id : int }
   [@@deriving show]
 
   val pp_full : Format.formatter -> t -> unit
@@ -60,7 +60,7 @@ end = struct
     | Nondet
     | EUnhandled of Id.t * string
 
-  and t = { value : value; type_ : Type.t; location : Location.t }
+  and t = { value : value; type_ : Type.t; location : Location.t; id : int }
   [@@deriving show { with_path = false }]
 
   let pp_full = pp
@@ -318,7 +318,7 @@ end = struct
     let location = Location.sloc_in_irep irep in
     let type_ = Type.type_in_irep ~machine irep in
     let value = value_of_irep ~machine ~type_ irep in
-    { value; type_; location }
+    { value; type_; location; id = -1 }
 end
 
 and Stmt : sig
@@ -349,7 +349,13 @@ and Stmt : sig
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
-  and t = { stmt_location : Location.t; body : body; comment : string option }
+
+  and t = {
+    stmt_location : Location.t;
+    body : body;
+    comment : string option;
+    id : int;
+  }
 
   val pp : Format.formatter -> t -> unit
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
@@ -382,7 +388,13 @@ end = struct
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
-  and t = { stmt_location : Location.t; body : body; comment : string option }
+
+  and t = {
+    stmt_location : Location.t;
+    body : body;
+    comment : string option;
+    id : int;
+  }
 
   let unhandled ~irep:_ id =
     (* TODO: hide the following line under a config flag. *)
@@ -549,6 +561,7 @@ end = struct
                 body = Block (this_body :: rest_of_case);
                 stmt_location = this_body.stmt_location;
                 comment = None;
+                id = -1;
               }
             in
             (rest, [], Some block)
@@ -563,6 +576,7 @@ end = struct
             body = Block (this_body :: rest_of_case);
             stmt_location = this_body.stmt_location;
             comment = None;
+            id = -1;
           }
         in
         ({ case; sw_body } :: cases, [], default)
@@ -575,5 +589,5 @@ end = struct
     let stmt_location = Location.sloc_in_irep irep in
     let body = body_of_irep ~machine irep in
     let comment = irep $? Comment |> Option.map Irep.as_just_string in
-    { body; stmt_location; comment }
+    { body; stmt_location; comment; id = -1 }
 end

@@ -67,7 +67,23 @@ let sanitize_symbol s =
 
 let sanitizer =
   object
-    inherit [unit] Visitors.map as super
+    inherit [Program.Lift_info.t] Visitors.map as super
+
+    method! visit_expr ~ctx expr =
+      let expr = super#visit_expr ~ctx expr in
+      let id = ctx.expr_count in
+      let expr = { expr with id } in
+      ctx.expr_count <- id + 1;
+      Hashtbl.replace ctx.expr_map id expr;
+      expr
+
+    method! visit_stmt ~ctx stmt =
+      let stmt = super#visit_stmt ~ctx stmt in
+      let id = ctx.stmt_count in
+      let stmt = { stmt with id } in
+      ctx.expr_count <- id + 1;
+      Hashtbl.replace ctx.stmt_map id stmt;
+      stmt
 
     method! visit_expr_value ~ctx ~type_ value =
       match value with
@@ -76,14 +92,15 @@ let sanitizer =
       | _ -> super#visit_expr_value ~ctx ~type_ value
   end
 
-let sanitize_expr = sanitizer#visit_expr ~ctx:()
-let sanitize_stmt = sanitizer#visit_stmt ~ctx:()
+let sanitize_expr lift_info = sanitizer#visit_expr ~ctx:lift_info
+let sanitize_stmt lift_info = sanitizer#visit_stmt ~ctx:lift_info
 
 let sanitize_param (p : Param.t) =
   { p with identifier = Option.map sanitize_symbol p.identifier }
 
 (** Sanitizes every variable symbol symbol. *)
-let sanitize_program (prog : Program.t) =
+let sanitize_and_index_program (prog : Program.t) =
+  let new_lift_info = Program.Lift_info.empty () in
   (* Create a second table with the new vars *)
   let new_vars = Hashtbl.create (Hashtbl.length prog.vars) in
   Hashtbl.iter
@@ -94,7 +111,7 @@ let sanitize_program (prog : Program.t) =
           {
             type_ = gvar.type_;
             symbol = new_name;
-            value = Option.map sanitize_expr gvar.value;
+            value = Option.map (sanitize_expr new_lift_info) gvar.value;
             location = gvar.location;
           }
       in
@@ -110,7 +127,7 @@ let sanitize_program (prog : Program.t) =
           {
             symbol = new_name;
             params = List.map sanitize_param func.params;
-            body = Option.map sanitize_stmt func.body;
+            body = Option.map (sanitize_stmt new_lift_info) func.body;
             location = func.location;
             return_type = func.return_type;
           }
@@ -124,4 +141,10 @@ let sanitize_program (prog : Program.t) =
       let new_name = sanitize_symbol name in
       Hashtbl.add new_constrs new_name ())
     prog.constrs;
-  { prog with funs = new_funs; vars = new_vars; constrs = new_constrs }
+  {
+    prog with
+    funs = new_funs;
+    vars = new_vars;
+    constrs = new_constrs;
+    lift_info = new_lift_info;
+  }

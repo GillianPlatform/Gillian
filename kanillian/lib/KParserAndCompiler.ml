@@ -131,7 +131,7 @@ let parse_and_compile_files files =
   in
   let json = load_symtab_from_file path in
   let+ goto_prog = parse_symtab_into_goto json in
-  let goto_prog = Sanitize.sanitize_program goto_prog in
+  let goto_prog = Sanitize.sanitize_and_index_program goto_prog in
   let context =
     Ctx.make
       ~exec_mode:!Kutils.Config.current_exec_mode
