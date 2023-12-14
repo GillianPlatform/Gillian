@@ -114,7 +114,8 @@
     "onCommand:extension.gillian-debug.debugEditorContents",
     "onLanguage:javascript",
     "onLanguage:gil",
-    "onLanguage:wisl"
+    "onLanguage:wisl",
+    "onLanguage:c"
   ],
   "contributes": {
     "configuration": {
@@ -259,6 +260,9 @@
       },
       {
         "language": "javascript"
+      },
+      {
+        "language": "c"
       }
     ],
     "debuggers": [

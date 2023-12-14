@@ -41,6 +41,9 @@ class DebugAdapterExecutableFactory
     let langCmd: string;
     // Match of the file extension first
     switch (fileExtension) {
+      case 'c':
+        langCmd = 'kanillian';
+        break;
       case 'js':
         langCmd = 'gillian-js';
         break;

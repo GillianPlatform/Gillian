@@ -17,7 +17,7 @@ export function activateCodeLens(context: ExtensionContext) {
     startDebugging
   );
 
-  const supportedLanguages = ['javascript', 'gil', 'wisl'];
+  const supportedLanguages = ['javascript', 'gil', 'wisl', 'c'];
 
   for (const language of supportedLanguages) {
     const docSelector = {
@@ -35,9 +35,15 @@ export function activateCodeLens(context: ExtensionContext) {
   }
 }
 
+const lensKinds: [ExecMode, string][] = [
+  ['debugverify', 'Verify '],
+  ['debugwpst', 'Symbolic-debug '],
+];
+
 class DebugCodeLensProvider implements CodeLensProvider {
-  async provideCodeLenses(document: TextDocument): Promise<CodeLens[]> {
+  private makeLensesFromPattern(pattern: RegExp, document: TextDocument): CodeLens[] {
     const text = document.getText();
+    const procNamePattern = /(.+?)\(/g;
 
     let reProcedure: RegExp;
     switch (document.languageId) {
@@ -59,14 +65,14 @@ class DebugCodeLensProvider implements CodeLensProvider {
     if (config.showSymbolicDebugLens)
       lensKinds.push(['debugwpst', 'Symbolic-debug ']);
     const lenses: CodeLens[] = [];
-    while (reProcedure.exec(text) !== null) {
-      reProcedureName.lastIndex = reProcedure.lastIndex;
-      const match = reProcedureName.exec(text);
+    while (pattern.exec(text) !== null) {
+      procNamePattern.lastIndex = pattern.lastIndex;
+      const match = procNamePattern.exec(text);
       const procedureName = match === null ? null : match[1].trim();
       if (procedureName) {
         for (const [execMode, commandPrefix] of lensKinds) {
           const codeLens = this.makeCodeLens(
-            reProcedureName.lastIndex,
+            procNamePattern.lastIndex,
             procedureName,
             document,
             execMode,
@@ -80,6 +86,49 @@ class DebugCodeLensProvider implements CodeLensProvider {
     }
 
     return lenses;
+  }
+
+  private makeCLens(document: TextDocument): CodeLens[] {
+    const text = document.getText();
+    const pattern = /int\s+main\s*\(\)/g;
+
+    const lenses: CodeLens[] = [];
+    let match = pattern.exec(text);
+    while (match !== null) {
+      for (const [execMode, commandPrefix] of lensKinds) {
+        const codeLens = this.makeCodeLens(
+          match.index,
+          'main',
+          document,
+          execMode,
+          commandPrefix
+        );
+        if (codeLens !== undefined) {
+          lenses.push(codeLens);
+        }
+      }
+      match = pattern.exec(text);
+    }
+
+    return lenses;
+  }
+
+  async provideCodeLenses(document: TextDocument): Promise<CodeLens[]> {
+    let pattern: RegExp;
+    switch (document.languageId) {
+      case 'gil':
+        pattern = /proc /g;
+        break;
+      case 'c':
+        return this.makeCLens(document);
+      case 'javascript':
+      case 'wisl':
+      default:
+        pattern = /function /g;
+        break;
+    }
+
+    return this.makeLensesFromPattern(pattern, document);
   }
 
   private makeCodeLens(
