@@ -150,6 +150,9 @@ module Make
           ])
         ("Gil_lifter.handle_cmd: " ^ s)
     in
+    let branch_case =
+      Option_utils.coalesce branch_case exec_data.cmd_report.branch_case
+    in
     let map =
       match Hashtbl.find_opt id_map prev_id with
       | Some map -> map
@@ -270,7 +273,8 @@ module Make
         ("select_next_path: " ^ s)
     in
     match (map, case) with
-    | (Nothing | FinalCmd _), _ -> failwith "no next path"
+    | Nothing, _ -> failwith "no next path (nothing)"
+    | FinalCmd _, _ -> failwith "no next path (final)"
     | Cmd _, Some _ -> failwith "tried to select case for non-branch cmd"
     | Cmd _, None -> path
     | BranchCmd { nexts; _ }, None ->
