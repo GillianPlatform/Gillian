@@ -485,14 +485,6 @@ struct
         stop_reason * L.Report_id.t option
 
       let get_branch_path prev_id case path state =
-        DL.log (fun m ->
-            m
-              ~json:
-                [
-                  ("id", L.Report_id.to_yojson prev_id);
-                  ("lifter_state", state.lifter_state |> Lifter.dump);
-                ]
-              "Grabbing path for step...");
         let branch_path =
           match path with
           | Some path -> path
@@ -501,7 +493,7 @@ struct
         DL.log (fun m ->
             m
               ~json:[ ("path", Branch_case.path_to_yojson branch_path) ]
-              "Got path");
+              "Got path for ID %a" L.Report_id.pp prev_id);
         branch_path
 
       let check_cur_report_id = function
