@@ -29,6 +29,7 @@ module rec Expr : sig
   [@@deriving show]
 
   val pp_full : Format.formatter -> t -> unit
+  val pp_display : Format.formatter -> t -> unit
   val as_symbol : t -> string
   val value_of_irep : machine:Machine_model.t -> type_:Type.t -> Irep.t -> value
   val of_irep : machine:Machine_model.t -> Irep.t -> t
@@ -106,6 +107,14 @@ end = struct
     (Fmt.hbox pp) ft t
 
   let show = Fmt.to_to_string pp
+
+  let pp_display ft t =
+    let open Fmt in
+    match t.value with
+    | BinOp { op; lhs; rhs } ->
+        pf ft "(%a %a %a)" pp lhs Ops.Binary.pp_display op pp rhs
+    | UnOp { op; e } -> pf ft "(%a %a)" Ops.Unary.pp_display op pp e
+    | _ -> pp ft t
 
   let unhandled ~irep:_ id msg =
     (* TODO: hide the next line behind a config flag *)
@@ -358,6 +367,7 @@ and Stmt : sig
   }
 
   val pp : Format.formatter -> t -> unit
+  val pp_display : Format.formatter -> t -> unit
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
   val of_irep : machine:Machine_model.t -> Irep.t -> t
 end = struct
@@ -401,46 +411,55 @@ end = struct
     (* Fmt.pr "%a\n@?" Yojson.Safe.pretty_print (Irep.to_yojson irep); *)
     SUnhandled id
 
-  let rec pp ft (t : t) =
+  let rec pp_with_expr ~pp_expr ft (t : t) =
+    let pp = pp_with_expr ~pp_expr in
     let open Fmt in
     match t.body with
     | Decl { lhs; value } ->
-        pf ft "@[<h>%a %a%a;@]" Type.pp lhs.type_ Expr.pp lhs
+        pf ft "@[<h>%a %a%a;@]" Type.pp lhs.type_ pp_expr lhs
           (fun ft -> function
             | None -> ()
-            | Some e -> pf ft " = %a" Expr.pp e)
+            | Some e -> pf ft " = %a" pp_expr e)
           value
-    | SAssign { lhs; rhs } -> pf ft "@[<h>%a = %a;@]" Expr.pp lhs Expr.pp rhs
+    | SAssign { lhs; rhs } -> pf ft "@[<h>%a = %a;@]" pp_expr lhs pp_expr rhs
     | SFunctionCall { lhs; func; args } ->
         let pp_lhs ft lhs =
           match lhs with
           | None -> nop ft ()
-          | Some lhs -> pf ft "%a = " Expr.pp lhs
+          | Some lhs -> pf ft "%a = " pp_expr lhs
         in
-        pf ft "@[<h>%a%a(%a);@]" pp_lhs lhs Expr.pp func
-          (list ~sep:comma Expr.pp) args
-    | Assume { cond } -> pf ft "@[<h>assume(%a);@]" Expr.pp cond
+        pf ft "@[<h>%a%a(%a);@]" pp_lhs lhs pp_expr func
+          (list ~sep:comma pp_expr) args
+    | Assume { cond } -> pf ft "@[<h>assume(%a);@]" pp_expr cond
     | Assert { cond; property_class } ->
         let pp_pc ft = function
           | None -> pf ft ""
           | Some s -> pf ft " #%s" s
         in
-        pf ft "@[<h>assert(%a);%a@]" Expr.pp cond pp_pc property_class
+        pf ft "@[<h>assert(%a);%a@]" pp_expr cond pp_pc property_class
     | Block body -> pf ft "@[<v 3>{ %a };@]" (Fmt.list ~sep:cut pp) body
     | Label (label, body) ->
         pf ft "@[<v 3>%s: {@.%a};@]" label (Fmt.list ~sep:cut pp) body
     | Skip -> pf ft "skip;"
-    | Expression e -> pf ft "@[<v 3>{ %a };@]" Expr.pp e
-    | Return e -> pf ft "@[<v 3>return %a;@]" (option Expr.pp) e
+    | Expression e -> pf ft "@[<v 3>{ %a };@]" pp_expr e
+    | Return e -> pf ft "@[<v 3>return %a;@]" (option pp_expr) e
     | Goto label -> pf ft "@[<v 3>goto %s;@]" label
     | Output { msg; value } ->
-        pf ft "@[<v 3>output (%a, %a);@]" Expr.pp msg Expr.pp value
+        pf ft "@[<v 3>output (%a, %a);@]" pp_expr msg pp_expr value
     | Switch _ -> pf ft "switch"
     | Break -> pf ft "break"
     | Ifthenelse { guard; then_; else_ } ->
-        pf ft "@[<v 3>if %a then{@\n %a } else {@\n%a;@]}" Expr.pp guard pp
+        pf ft "@[<v 3>if %a then{@\n %a } else {@\n%a;@]}" pp_expr guard pp
           then_ (option pp) else_
     | SUnhandled id -> pf ft "UNHANDLED_STMT(%s)" (Id.to_string id)
+
+  let pp = pp_with_expr ~pp_expr:Expr.pp
+
+  let pp_display fmt t =
+    match t.body with
+    | Ifthenelse { guard; _ } ->
+        Fmt.pf fmt "@[<v 3>if %a@]" Expr.pp_display guard
+    | _ -> pp_with_expr ~pp_expr:Expr.pp_display fmt t
 
   (** Lifting from Irep *)
   open Irep.Infix

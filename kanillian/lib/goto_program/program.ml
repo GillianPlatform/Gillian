@@ -30,6 +30,7 @@ module Func = struct
     return_type : Type.t;
     location : Location.t;
     symbol : string;
+    internal : bool;
   }
 end
 
@@ -37,8 +38,8 @@ module Lift_info = struct
   type t = {
     mutable stmt_count : int;
     mutable expr_count : int;
-    stmt_map : (int, Stmt.t) Hashtbl.t;
-    expr_map : (int, Expr.t) Hashtbl.t;
+    stmt_map : (int, string * Stmt.t) Hashtbl.t;
+    expr_map : (int, string * Expr.t) Hashtbl.t;
   }
 
   let empty () =
@@ -93,7 +94,15 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
                        Gerror.unexpected "function body is not a statment"
                  in
                  let func =
-                   Func.{ symbol = name; params; return_type; location; body }
+                   Func.
+                     {
+                       symbol = name;
+                       params;
+                       return_type;
+                       location;
+                       body;
+                       internal = false;
+                     }
                  in
                  let () =
                    match return_type with

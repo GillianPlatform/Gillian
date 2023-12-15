@@ -129,6 +129,7 @@ let set_global_env_proc (ctx : Ctx.t) =
     Seq.concat
       (List.to_seq [ set_variables; set_functions; constructor_calls; ret ])
   in
+  let body = Seq.map (Body_item.with_cmd_kind Harness) body in
   let body = Array.of_seq body in
   Proc.
     {
@@ -155,7 +156,7 @@ let compile_free_locals (ctx : Ctx.t) =
       locals
   in
   Hashtbl.to_seq_values locals
-  |> Seq.map (Memory.dealloc_local ~ctx)
+  |> Seq.map (Memory.dealloc_local ~ctx ~cmd_kind:(Normal false))
   |> List.of_seq
 
 let compile_alloc_params ~ctx params =
@@ -223,17 +224,24 @@ let get_missing_function_body ~ctx (func : Program.Func.t) =
   in
   lift_info.expr_count <- expr_id + 1;
   lift_info.stmt_count <- stmt_id + 1;
-  Hashtbl.replace lift_info.expr_map expr_id expr;
-  Hashtbl.replace lift_info.stmt_map stmt_id stmt;
+  let expr_display = Fmt.str "%a" GExpr.pp expr in
+  let stmt_display = Fmt.str "%a" Stmt.pp stmt in
+  Hashtbl.replace lift_info.expr_map expr_id (expr_display, expr);
+  Hashtbl.replace lift_info.stmt_map stmt_id (stmt_display, stmt);
   stmt
 
-let compile_function ~ctx (func : Program.Func.t) : (K_annot.t, string) Proc.t =
+let compile_function ?map_body ~ctx (func : Program.Func.t) :
+    (K_annot.t, string) Proc.t =
   let f_loc = Body_item.compile_location func.location in
-  let body =
+  let is_internal, body =
     (* If the function has no body, it's assumed to be just non-det *)
     match func.body with
-    | Some b -> b
-    | None -> get_missing_function_body ~ctx func
+    | Some b -> (false, b)
+    | None -> (true, get_missing_function_body ~ctx func)
+  in
+
+  let () =
+    Gillian.Debugger.Logging.to_file (Fmt.str "COMPILING %s" func.symbol)
   in
 
   (* Fmt.pr "FUNCTION %s:\n%a@?\n\n" func.symbol Stmt.pp body; *)
@@ -251,21 +259,28 @@ let compile_function ~ctx (func : Program.Func.t) : (K_annot.t, string) Proc.t =
   let proc_spec = None in
   let free_locals = compile_free_locals ctx in
   (* We add a return undef in case the function has no return *)
-  let b = Body_item.make_hloc ~loc:func.location in
+  let b = Body_item.make_hloc ~loc:func.location ~cmd_kind:(Normal false) in
   let return_undef =
     b (Assignment (Kutils.Names.return_variable, Lit Undefined))
   in
   let return_block =
-    set_first_label
-      ~annot:(b ~loop:[] ?tl_ref:None ?is_end_of_stmt:None)
+    set_first_label ~annot:(b ~loop:[] ?tl_ref:None)
       Constants.Kanillian_names.ret_label
       (free_locals @ [ b ReturnNormal ])
   in
   let alloc_params = compile_alloc_params ~ctx proc_params |> List.map b in
   let _, comp_body = compile_statement ~ctx body in
+  let proc_body = alloc_params @ comp_body @ [ return_undef ] @ return_block in
   let proc_body =
-    Array.of_list (alloc_params @ comp_body @ [ return_undef ] @ return_block)
+    if is_internal then List.map (Body_item.with_cmd_kind Internal) proc_body
+    else proc_body
   in
+  let proc_body =
+    match map_body with
+    | Some f -> List.map f proc_body
+    | None -> proc_body
+  in
+  let proc_body = Array.of_list proc_body in
   let proc_params =
     let identifiers = List.map fst proc_params in
     if Ctx.representable_in_store ctx func.return_type then identifiers
@@ -284,75 +299,110 @@ let compile_function ~ctx (func : Program.Func.t) : (K_annot.t, string) Proc.t =
       proc_calls = [];
     }
 
-let start_for_harness ~ctx (harness : Program.Func.t) =
-  let cprover_start =
-    let open Program.Func in
-    (* Don't worry about IDs now, they'll be set during sanitisation. *)
-    let stmt stmt_body =
+module Start_for_harness = struct
+  open Program.Func
+
+  let build_stmt ~harness ~(lift_info : Program.Lift_info.t) stmt_body =
+    let id = lift_info.stmt_count in
+    let stmt =
       Stmt.
         {
           stmt_location = harness.location;
           body = stmt_body;
           comment = None;
-          id = -1;
+          id;
         }
     in
-    let expr type_ expr_value =
-      GExpr.{ location = harness.location; type_; value = expr_value; id = -1 }
+    lift_info.stmt_count <- id + 1;
+    let display = Fmt.str "%a" Stmt.pp stmt in
+    Hashtbl.replace lift_info.stmt_map id (display, stmt);
+    stmt
+
+  let build_expr
+      ~(harness : t)
+      ~(lift_info : Program.Lift_info.t)
+      type_
+      expr_value =
+    let id = lift_info.expr_count in
+    let expr =
+      GExpr.{ location = harness.location; type_; value = expr_value; id }
     in
+    let display = Fmt.str "%a" GExpr.pp expr in
+    lift_info.expr_count <- id + 1;
+    Hashtbl.replace lift_info.expr_map id (display, expr);
+    expr
+
+  let build_params ~ctx ~harness ~lift_info =
+    let stmt = build_stmt ~harness ~lift_info in
+    let expr = build_expr ~harness ~lift_info in
+    List.split
+    @@ List.map
+         (fun (p : Param.t) ->
+           let ident =
+             match p.identifier with
+             | None -> Ctx.fresh_v ctx
+             | Some ident -> ident
+           in
+           let lhs = expr p.type_ (Symbol ident) in
+           let value = Some (expr p.type_ Nondet) in
+           (expr p.type_ (Symbol ident), stmt @@ Stmt.Decl { lhs; value }))
+         harness.params
+
+  let build_function ~harness ~lift_info params params_decls =
+    let stmt = build_stmt ~harness ~lift_info in
+    let expr = build_expr ~harness ~lift_info in
     let harness_type =
       GType.Code { params = harness.params; return_type = harness.return_type }
     in
-    let params, params_decls =
-      List.split
-      @@ List.map
-           (fun (p : Param.t) ->
-             let ident =
-               match p.identifier with
-               | None -> Ctx.fresh_v ctx
-               | Some ident -> ident
-             in
-             let lhs = expr p.type_ (Symbol ident) in
-             let value = Some (expr p.type_ Nondet) in
-             (expr p.type_ (Symbol ident), stmt @@ Stmt.Decl { lhs; value }))
-           harness.params
-    in
     let cprover_init_type = GType.Code { params = []; return_type = Empty } in
+    let body =
+      Some
+        (stmt
+        @@ Stmt.Block
+             ([
+                (* First call __CPROVER__initialize*)
+                stmt
+                @@ SFunctionCall
+                     {
+                       lhs = None;
+                       func =
+                         expr cprover_init_type
+                           (GExpr.Symbol Constants.CBMC_names.initialize);
+                       args = [];
+                     };
+              ]
+             @ params_decls
+             @ [
+                 stmt
+                 @@ SFunctionCall
+                      {
+                        lhs = None;
+                        func = expr harness_type (Symbol harness.symbol);
+                        args = params;
+                      };
+                 stmt @@ Return None;
+               ]))
+    in
     {
       symbol = Constants.CBMC_names.start;
       params = [];
       return_type = Empty;
-      body =
-        Some
-          (stmt
-          @@ Block
-               ([
-                  (* First call __CPROVER__initialize*)
-                  stmt
-                  @@ SFunctionCall
-                       {
-                         lhs = None;
-                         func =
-                           expr cprover_init_type
-                             (Symbol Constants.CBMC_names.initialize);
-                         args = [];
-                       };
-                ]
-               @ params_decls
-               @ [
-                   stmt
-                   @@ SFunctionCall
-                        {
-                          lhs = None;
-                          func = expr harness_type (Symbol harness.symbol);
-                          args = params;
-                        };
-                   stmt @@ Return None;
-                 ]));
+      body;
       location = harness.location;
+      internal = true;
     }
-  in
-  compile_function ~ctx cprover_start
+
+  let f ~ctx (harness : Program.Func.t) =
+    let cprover_start =
+      let lift_info = Ctx.(ctx.prog).lift_info in
+      let params, params_decls = build_params ~ctx ~harness ~lift_info in
+      build_function ~harness ~lift_info params params_decls
+    in
+    let map_body = Body_item.with_cmd_kind Harness in
+    compile_function ~map_body ~ctx cprover_start
+end
+
+let start_for_harness = Start_for_harness.f
 
 let compile (context : Ctx.t) : (K_annot.t, string) Prog.t =
   let program = context.prog in

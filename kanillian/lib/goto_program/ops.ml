@@ -34,6 +34,32 @@ module Binary = struct
     | Shl
     | Xor
   [@@deriving show { with_path = false }]
+
+  let pp_display fmt t =
+    let f = Fmt.pf fmt in
+    match t with
+    | And -> f "&&"
+    | Ashr -> f ">>"
+    | Bitand -> f "&"
+    | Bitor -> f "|"
+    | Bitnand -> f "~&"
+    | Bitxor -> f "^"
+    | Div -> f "/"
+    | Equal -> f "=="
+    | Ge -> f ">="
+    | Gt -> f ">"
+    | Le -> f "<="
+    | Lshr -> f ">>"
+    | Lt -> f "<"
+    | Minus -> f "-"
+    | Mod -> f "%%"
+    | Mult -> f "*"
+    | Notequal -> f "!="
+    | Or -> f "||"
+    | Plus -> f "+"
+    | Shl -> f "<<"
+    | Xor -> f "^"
+    | _ -> Fmt.pf fmt "%a" pp t
 end
 
 module Self = struct
@@ -58,4 +84,12 @@ module Unary = struct
     | CountLeadingZeros of { allow_zero : bool }  (**  `__builtin_ctlz(self)` *)
     | UnaryMinus  (**  `-self` *)
   [@@deriving show { with_path = false }]
+
+  let pp_display fmt t =
+    let f = Fmt.pf fmt in
+    match t with
+    | Bitnot -> f "~"
+    | Not -> f "!"
+    | UnaryMinus -> f "-"
+    | _ -> Fmt.pf fmt "%a" pp t
 end

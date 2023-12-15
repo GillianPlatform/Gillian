@@ -1,3 +1,5 @@
+module List_utils = Gillian.Utils.List_utils
+
 let assert_unhandled ~feature args =
   let open Gil_syntax in
   let open Stats.Unhandled in
@@ -14,3 +16,8 @@ let set_first_label_opt ~annot:b label stmts =
 
 let set_first_label ~annot label stmts =
   set_first_label_opt ~annot (Some label) stmts
+
+let set_end ?(is_end = true) =
+  List_utils.map_last (fun (annot, label, cmd) ->
+      let annot = K_annot.set_end ~is_end annot in
+      (annot, label, cmd))

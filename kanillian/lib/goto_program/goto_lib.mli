@@ -187,6 +187,7 @@ module rec Expr : sig
   [@@deriving show]
 
   val pp_full : Format.formatter -> t -> unit
+  val pp_display : Format.formatter -> t -> unit
   val as_symbol : t -> string
   val value_of_irep : machine:Machine_model.t -> type_:Type.t -> Irep.t -> value
   val of_irep : machine:Machine_model.t -> Irep.t -> t
@@ -229,6 +230,7 @@ and Stmt : sig
   }
 
   val pp : Format.formatter -> t -> unit
+  val pp_display : Format.formatter -> t -> unit
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
   val of_irep : machine:Machine_model.t -> Irep.t -> t
 end
@@ -250,6 +252,7 @@ module Program : sig
       return_type : Type.t;
       location : Location.t;
       symbol : string;
+      internal : bool;
     }
   end
 
@@ -257,8 +260,8 @@ module Program : sig
     type t = {
       mutable stmt_count : int;
       mutable expr_count : int;
-      stmt_map : (int, Stmt.t) Hashtbl.t;
-      expr_map : (int, Expr.t) Hashtbl.t;
+      stmt_map : (int, string * Stmt.t) Hashtbl.t;
+      expr_map : (int, string * Expr.t) Hashtbl.t;
     }
 
     val empty : unit -> t

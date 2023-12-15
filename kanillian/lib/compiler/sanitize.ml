@@ -70,19 +70,21 @@ let sanitizer =
     inherit [Program.Lift_info.t] Visitors.map as super
 
     method! visit_expr ~ctx expr =
+      let display = Fmt.to_to_string Expr.pp_display expr in
       let expr = super#visit_expr ~ctx expr in
       let id = ctx.expr_count in
       let expr = { expr with id } in
       ctx.expr_count <- id + 1;
-      Hashtbl.replace ctx.expr_map id expr;
+      Hashtbl.replace ctx.expr_map id (display, expr);
       expr
 
     method! visit_stmt ~ctx stmt =
+      let display = Fmt.to_to_string Stmt.pp_display stmt in
       let stmt = super#visit_stmt ~ctx stmt in
       let id = ctx.stmt_count in
       let stmt = { stmt with id } in
-      ctx.expr_count <- id + 1;
-      Hashtbl.replace ctx.stmt_map id stmt;
+      ctx.stmt_count <- id + 1;
+      Hashtbl.replace ctx.stmt_map id (display, stmt);
       stmt
 
     method! visit_expr_value ~ctx ~type_ value =
@@ -130,6 +132,7 @@ let sanitize_and_index_program (prog : Program.t) =
             body = Option.map (sanitize_stmt new_lift_info) func.body;
             location = func.location;
             return_type = func.return_type;
+            internal = func.internal;
           }
       in
       Hashtbl.add new_funs new_name new_fun)

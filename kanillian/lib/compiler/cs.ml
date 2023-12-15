@@ -34,6 +34,7 @@ let map_l f (x, l) = (x, List.map f l)
 (* let mapi_l f (x, l) = (x, List.mapi f l)
    let foldl_l f acc (x, l) = (x, List.fold_left f acc l) *)
 let with_label ~annot lab (x, l) = (x, Helpers.set_first_label ~annot lab l)
+let set_end ?(is_end = true) (x, l) = (x, Helpers.set_end ~is_end l)
 
 module Syntax = struct
   let ( let* ) = bind
