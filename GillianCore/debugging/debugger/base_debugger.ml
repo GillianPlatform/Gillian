@@ -905,16 +905,17 @@ struct
         | [] -> failwith "Nothing in call stack, cannot step"
         | cur_frame :: _ -> cur_frame
 
+      (* TODO: re-evaluate - I think the lifter should handle this. *)
       let step_until_cond
           ?(reverse = false)
           ?(branch_case : Branch_case.t option)
           (cond : frame -> frame -> int -> int -> bool)
           (debug_state : debug_state)
           (proc_state : proc_state) : stop_reason =
-        let prev_id_in_frame = proc_state.cur_report_id in
         let prev_frame = get_top_frame proc_state in
         let prev_stack_depth = List.length proc_state.frames in
         let rec aux () =
+          let prev_id_in_frame = proc_state.cur_report_id in
           let stop_reason =
             step_in_branch_case ~reverse ?branch_case prev_id_in_frame
               debug_state proc_state
@@ -940,12 +941,13 @@ struct
 
       (* If target language file, step until the code origin location is
          different, indicating an actual step in the target language*)
-      let is_next_tl_step prev_frame cur_frame _ _ =
-        cur_frame.source_path = prev_frame.source_path
-        && (cur_frame.start_line <> prev_frame.start_line
-           || cur_frame.start_column <> prev_frame.start_column
-           || cur_frame.end_line <> prev_frame.end_line
-           || cur_frame.end_column <> prev_frame.end_column)
+      (* let is_next_tl_step prev_frame cur_frame _ _ =
+         cur_frame.source_path = prev_frame.source_path
+         && (cur_frame.start_line <> prev_frame.start_line
+            || cur_frame.start_column <> prev_frame.start_column
+            || cur_frame.end_line <> prev_frame.end_line
+            || cur_frame.end_column <> prev_frame.end_column) *)
+      let is_next_tl_step _ _ _ _ = true
 
       let get_cond { source_file; _ } =
         if is_gil_file source_file then is_next_gil_step else is_next_tl_step
