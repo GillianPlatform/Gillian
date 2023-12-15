@@ -236,3 +236,9 @@ let get_and_remove_nth n l =
         else x :: aux (i + 1) r
   in
   (!found, aux 0 l)
+
+let map_head f = function
+  | [] -> []
+  | x :: xs -> f x :: xs
+
+let map_last f l = l |> List.rev |> map_head f |> List.rev
