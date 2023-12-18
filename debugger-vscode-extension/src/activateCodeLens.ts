@@ -35,10 +35,15 @@ export function activateCodeLens(context: ExtensionContext) {
   }
 }
 
-const lensKinds: [ExecMode, string][] = [
-  ['debugverify', 'Verify '],
-  ['debugwpst', 'Symbolic-debug '],
-];
+function getLensKinds(): [ExecMode, string][] {
+  const config = workspace.getConfiguration('gillianDebugger');
+  const lensKinds: [ExecMode, string][] = [];
+  if (config.showVerifyLens)
+      lensKinds.push(['debugverify', 'Verify ']);
+  if (config.showSymbolicDebugLens)
+    lensKinds.push(['debugwpst', 'Symbolic-debug ']);
+  return lensKinds;
+}
 
 class DebugCodeLensProvider implements CodeLensProvider {
   private makeLensesFromPattern(pattern: RegExp, document: TextDocument): CodeLens[] {
@@ -59,11 +64,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
 
     const reProcedureName = /(.+?)\(/g;
 
-    const config = workspace.getConfiguration('gillianDebugger');
-    const lensKinds: [ExecMode, string][] = [];
-    if (config.showVerifyLens) lensKinds.push(['debugverify', 'Verify ']);
-    if (config.showSymbolicDebugLens)
-      lensKinds.push(['debugwpst', 'Symbolic-debug ']);
+    const lensKinds = getLensKinds();
     const lenses: CodeLens[] = [];
     while (pattern.exec(text) !== null) {
       procNamePattern.lastIndex = pattern.lastIndex;
@@ -91,6 +92,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
   private makeCLens(document: TextDocument): CodeLens[] {
     const text = document.getText();
     const pattern = /int\s+main\s*\(\)/g;
+    const lensKinds = getLensKinds();
 
     const lenses: CodeLens[] = [];
     let match = pattern.exec(text);
