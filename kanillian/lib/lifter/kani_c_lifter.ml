@@ -156,6 +156,7 @@ struct
         | Internal | Hidden -> Ok false
         | Harness as k ->
             Fmt.error "%a cmd should have been skipped!" Annot.pp_cmd_kind k
+        | Return -> Ok true
         | Unknown -> Error "HORROR - unknown cmd kind"
 
       let resolve_case
@@ -177,7 +178,8 @@ struct
         let ({ id; kind; _ } : exec_data) = exec_data in
         let { ends; unexplored_paths; _ } = partial in
         match (kind, is_end) with
-        | Final, _ | Normal, false ->
+        | Final, _ -> Ok ()
+        | Normal, false ->
             Stack.push (id, None) unexplored_paths;
             Ok ()
         | Branch cases, false ->
@@ -196,11 +198,21 @@ struct
                    in
                    Ext_list.add (case, (id, Some gil_case)) ends)
 
+      let update_return_cmd_info ~id (partial : partial_data) =
+        partial.id <- Some id;
+        partial.display <- Some "<end of func>";
+        Ok ()
+
       let update_canonical_cmd_info
           ~id
           ~(tl_ast : tl_ast)
           ~(annot : Annot.t)
           (partial : partial_data) =
+        let- () =
+          match annot.cmd_kind with
+          | Return -> Some (update_return_cmd_info ~id partial)
+          | _ -> None
+        in
         match (annot.cmd_kind, partial.display, annot.tl_ref) with
         | (Harness | Unknown), _, _ ->
             Fmt.error "HORROR - trying to get display of %a" Annot.pp_cmd_kind
@@ -441,7 +453,7 @@ struct
           in
           DL.failwith json "Kani_c_lifter: Encountered unknown cmd kind"
       | Harness -> ExecNext (None, None)
-      | Normal _ | Func_call _ | Internal | Hidden -> (
+      | Normal _ | Func_call _ | Internal | Return | Hidden -> (
           let get_prev = get_prev ~state ~gil_case ~prev_id in
           let partial_result =
             Partial_cmds.handle ~get_prev ~tl_ast ~partials ~prev_id exec_data

@@ -144,7 +144,7 @@ let set_global_env_proc (ctx : Ctx.t) =
       proc_calls = [];
     }
 
-let compile_free_locals (ctx : Ctx.t) =
+let compile_free_locals ~cmd_kind (ctx : Ctx.t) =
   let open Kutils.Prelude in
   let locals = Hashtbl.copy ctx.locals in
   let () =
@@ -156,7 +156,7 @@ let compile_free_locals (ctx : Ctx.t) =
       locals
   in
   Hashtbl.to_seq_values locals
-  |> Seq.map (Memory.dealloc_local ~ctx ~cmd_kind:(Normal false))
+  |> Seq.map (Memory.dealloc_local ~ctx ~cmd_kind)
   |> List.of_seq
 
 let compile_alloc_params ~ctx params =
@@ -257,16 +257,19 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
       func.params
   in
   let proc_spec = None in
-  let free_locals = compile_free_locals ctx in
+  let free_locals = compile_free_locals ~cmd_kind:Hidden ctx in
   (* We add a return undef in case the function has no return *)
-  let b = Body_item.make_hloc ~loc:func.location ~cmd_kind:(Normal false) in
+  let b ?(cmd_kind = K_annot.Hidden) =
+    Body_item.make_hloc ~loc:func.location ~cmd_kind
+  in
   let return_undef =
     b (Assignment (Kutils.Names.return_variable, Lit Undefined))
   in
   let return_block =
-    set_first_label ~annot:(b ~loop:[] ?tl_ref:None)
+    set_first_label
+      ~annot:(b ~loop:[] ?tl_ref:None ?cmd_kind:None)
       Constants.Kanillian_names.ret_label
-      (free_locals @ [ b ReturnNormal ])
+      (free_locals @ [ b ~cmd_kind:Return ReturnNormal ])
   in
   let alloc_params = compile_alloc_params ~ctx proc_params |> List.map b in
   let _, comp_body = compile_statement ~ctx body in

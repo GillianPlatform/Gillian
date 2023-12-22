@@ -8,6 +8,7 @@ type cmd_kind =
   | Hidden  (** Hidden commands, e.g. the =skip= at the end of an if/else *)
   | Normal of bool  (** Is this the final GIL cmd for the C stmt/expr? *)
   | Func_call of { is_internal : bool; is_end : bool }
+  | Return
   | Unknown
 [@@deriving yojson, eq, show]
 
