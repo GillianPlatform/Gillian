@@ -62,8 +62,6 @@ class DebugCodeLensProvider implements CodeLensProvider {
         break;
     }
 
-    const reProcedureName = /(.+?)\(/g;
-
     const lensKinds = getLensKinds();
     const lenses: CodeLens[] = [];
     while (pattern.exec(text) !== null) {
@@ -97,9 +95,10 @@ class DebugCodeLensProvider implements CodeLensProvider {
     const lenses: CodeLens[] = [];
     let match = pattern.exec(text);
     while (match !== null) {
+      const ix = match.index + 'int main'.length;
       for (const [execMode, commandPrefix] of lensKinds) {
         const codeLens = this.makeCodeLens(
-          match.index,
+          ix,
           'main',
           document,
           execMode,
