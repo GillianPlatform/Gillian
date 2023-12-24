@@ -152,7 +152,6 @@ struct
       let get_is_end (annot : Annot.t) =
         match annot.cmd_kind with
         | Normal b -> Ok b
-        | Func_call { is_internal; _ } -> Ok is_internal
         | Internal | Hidden -> Ok false
         | Harness as k ->
             Fmt.error "%a cmd should have been skipped!" Annot.pp_cmd_kind k
@@ -453,7 +452,7 @@ struct
           in
           DL.failwith json "Kani_c_lifter: Encountered unknown cmd kind"
       | Harness -> ExecNext (None, None)
-      | Normal _ | Func_call _ | Internal | Return | Hidden -> (
+      | Normal _ | Internal | Return | Hidden -> (
           let get_prev = get_prev ~state ~gil_case ~prev_id in
           let partial_result =
             Partial_cmds.handle ~get_prev ~tl_ast ~partials ~prev_id exec_data

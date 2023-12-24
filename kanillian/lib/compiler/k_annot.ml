@@ -7,7 +7,6 @@ type cmd_kind =
   | Internal  (** Commands in "internal" functions, e.g. m____nondet_int() *)
   | Hidden  (** Hidden commands, e.g. the =skip= at the end of an if/else *)
   | Normal of bool  (** Is this the final GIL cmd for the C stmt/expr? *)
-  | Func_call of { is_internal : bool; is_end : bool }
   | Return
   | Unknown
 [@@deriving yojson, eq, show]
@@ -31,7 +30,6 @@ let set_end ?(is_end = true) t =
   let cmd_kind =
     match t.cmd_kind with
     | Normal _ -> Normal is_end
-    | Func_call f -> Func_call { f with is_end }
     | _ -> t.cmd_kind
   in
   { t with cmd_kind }
