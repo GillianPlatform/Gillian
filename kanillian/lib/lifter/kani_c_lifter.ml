@@ -51,6 +51,9 @@ struct
     let ( let++ ) f o = Result.map o f
     let ( let** ) o f = Result.bind o f
 
+    type canonical_cmd_data = { id : rid; display : string }
+    [@@deriving to_yojson]
+
     type partial_data = {
       prev : (rid * Branch_case.t option) option;
           (** Where to put the finished cmd in the map. *)
@@ -64,9 +67,7 @@ struct
       unifys : unification Ext_list.t;
           (** Unifications contained in this command *)
       errors : string Ext_list.t;  (** Errors occurring during this command *)
-      mutable id : rid option;
-          (** The first few cmds may be Internal; we'll assign the following data first time we get a tl_ref. *)
-      mutable display : string option;
+      mutable canonical_data : canonical_cmd_data option;
     }
     [@@deriving to_yojson]
 
@@ -113,18 +114,15 @@ struct
              ((case_kind, ix), branch_data))
 
     let finish partial =
-      let ({ prev; id; all_ids; display; ends; _ } : partial_data) = partial in
-      let** id =
-        match id with
-        | Some id -> Ok id
+      let ({ prev; canonical_data; all_ids; ends; _ } : partial_data) =
+        partial
+      in
+      let++ id, display =
+        match canonical_data with
+        | Some { id; display } -> Ok (id, display)
         | None -> Error "Trying to finish partial with no id!"
       in
       let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
-      let++ display =
-        match display with
-        | Some d -> Ok d
-        | None -> Error "Trying to finish partial with no display!"
-      in
       let ends = Ext_list.to_list ends in
       let kind =
         match ends with
@@ -144,8 +142,7 @@ struct
         ends = Ext_list.make ();
         unifys = Ext_list.make ();
         errors = Ext_list.make ();
-        id = None;
-        display = None;
+        canonical_data = None;
       }
 
     module Update = struct
@@ -198,11 +195,10 @@ struct
                    Ext_list.add (case, (id, Some gil_case)) ends)
 
       let update_return_cmd_info ~id (partial : partial_data) =
-        partial.id <- Some id;
-        partial.display <- Some "<end of func>";
+        partial.canonical_data <- Some { id; display = "<end of func>" };
         Ok ()
 
-      let update_canonical_cmd_info
+      let update_canonical_data
           ~id
           ~(tl_ast : tl_ast)
           ~(annot : Annot.t)
@@ -212,7 +208,7 @@ struct
           | Return -> Some (update_return_cmd_info ~id partial)
           | _ -> None
         in
-        match (annot.cmd_kind, partial.display, annot.tl_ref) with
+        match (annot.cmd_kind, partial.canonical_data, annot.tl_ref) with
         | (Harness | Unknown), _, _ ->
             Fmt.error "HORROR - trying to get display of %a" Annot.pp_cmd_kind
               annot.cmd_kind
@@ -229,8 +225,7 @@ struct
                   | Some (display, _) -> Ok ("Evaluating " ^ display)
                   | None -> Fmt.str "can't find expr ID %d!" id |> Result.error)
             in
-            partial.display <- Some display;
-            partial.id <- Some id
+            partial.canonical_data <- Some { id; display }
         | _ -> Ok ()
 
       let insert_id_and_case
@@ -269,7 +264,7 @@ struct
         let** () =
           update_paths ~is_end ~exec_data ~branch_case ~branch_kind partial
         in
-        let** () = update_canonical_cmd_info ~id ~tl_ast ~annot partial in
+        let** () = update_canonical_data ~id ~tl_ast ~annot partial in
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
