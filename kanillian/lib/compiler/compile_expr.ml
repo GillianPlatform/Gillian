@@ -682,7 +682,11 @@ let rec lvalue_as_access ~ctx ~read (lvalue : GExpr.t) : access Cs.with_body =
           (Fmt.str "lvalue_as_access for something that isn't an lvalue: %a"
              GExpr.pp_full lvalue)
 
-and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
+and compile_call
+    ~ctx
+    ~(b : ?nest_kind:K_annot.nest_kind -> string Cmd.t -> Body_item.t)
+    (func : GExpr.t)
+    (args : GExpr.t list) =
   let open Cs.Syntax in
   let return_type =
     match func.type_ with
@@ -777,13 +781,17 @@ and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
       by_value ~app:[ b (Logic (Assert f)) ] (Expr.Lit Null)
   | _ ->
       let* e = compile_expr ~ctx func in
-      let fname =
+      let fname, nest_kind =
         match e with
-        | Procedure (Lit (String f) as fname) -> (
-            match Constants.Internal_functions.hook f with
-            | Some fname -> Expr.string fname
-            | _ -> fname)
-        | Procedure e -> e
+        | Procedure (Lit (String f) as fname) ->
+            K_annot.(
+              let fname =
+                match Constants.Internal_functions.hook f with
+                | Some fname -> Expr.string fname
+                | _ -> fname
+              in
+              (fname, Fun_call f))
+        | Procedure e -> (e, Fun_call (Fmt.str "%a" Expr.pp e))
         | _ ->
             Error.code_error "function call of something that isn't a procedure"
       in
@@ -814,7 +822,7 @@ and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
       if Ctx.representable_in_store ctx return_type then
         let ret_var = Ctx.fresh_v ctx in
         let gil_call = Cmd.Call (ret_var, fname, args, None, None) in
-        by_value ~app:[ b gil_call ] (Expr.PVar ret_var)
+        by_value ~app:[ b ~nest_kind gil_call ] (Expr.PVar ret_var)
       else
         (* If the function returns by copy, we add first parameter
            that will contain the result. *)
@@ -825,7 +833,7 @@ and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
         let gil_call =
           Cmd.Call (unused_temp, fname, temp_arg :: args, None, None)
         in
-        by_copy ~app:[ b gil_call ] temp_arg return_type
+        by_copy ~app:[ b ~nest_kind gil_call ] temp_arg return_type
 
 and poison ~ctx ~annot (lhs : GExpr.t) =
   let type_ = lhs.type_ in
@@ -943,9 +951,10 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
   let compile_expr = compile_expr ~ctx in
   let loc = Body_item.compile_location expr.location in
   let id = expr.id in
-  let b =
+  let b_pre =
     Body_item.make ~loc ~tl_ref:(K_annot.Expr id) ~cmd_kind:(Normal false)
   in
+  let b = b_pre ?nest_kind:None in
   let unhandled feature =
     let cmd = assert_unhandled ~feature [] in
     let v = Val_repr.dummy ~ctx expr.type_ in
@@ -1000,7 +1009,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       |> Cs.map_l b
   | EAssign { lhs; rhs } -> compile_assign ~ctx ~lhs ~rhs ~annot:b
   | EFunctionCall { func; args } ->
-      compile_call ~ctx ~add_annot:b func args |> Cs.set_end
+      let b ?nest_kind cmd = b_pre ?nest_kind cmd in
+      compile_call ~ctx ~b func args |> Cs.set_end
   | If { cond; then_; else_ } ->
       let* cond_e = compile_expr cond in
       let then_lab = Ctx.fresh_lab ctx in
@@ -1168,9 +1178,10 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
   let compile_expr_c = compile_expr ~ctx in
   let loc = Body_item.compile_location stmt.stmt_location in
-  let b ?(is_end = false) =
+  let b_pre ?(is_end = false) =
     Body_item.make ~loc ~tl_ref:(K_annot.Stmt stmt.id) ~cmd_kind:(Normal is_end)
   in
+  let b = b_pre ?nest_kind:None in
   let add_annot x = List.map b x in
   let set_first_label_opt label stmts =
     Helpers.set_first_label_opt ~annot:(b ~is_end:false ~loop:[]) label stmts
@@ -1335,7 +1346,10 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       (vrep, expr @ [ b ~is_end:true Skip ])
   | SFunctionCall { lhs; func; args } -> (
       let () = log_kind "SFunctionCall" in
-      let v, pre1 = compile_call ~ctx ~add_annot:b func args in
+      let v, pre1 =
+        let b ?nest_kind cmd = b_pre ?nest_kind cmd in
+        compile_call ~ctx ~b func args
+      in
       match lhs with
       | None -> (v, pre1)
       | Some lvalue ->

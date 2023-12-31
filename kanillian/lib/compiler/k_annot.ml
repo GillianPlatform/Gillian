@@ -1,6 +1,7 @@
 module Location = Gillian.Gil_syntax.Location
 
 type tl_ref = Stmt of int | Expr of int [@@deriving yojson, eq]
+type nest_kind = Fun_call of string [@@deriving yojson, eq]
 
 type cmd_kind =
   | Harness  (** The harness code preceding the main function *)
@@ -17,10 +18,11 @@ type t = {
   tl_ref : tl_ref option;
   branch_kind : Branch_case.kind option;
   cmd_kind : cmd_kind; [@default Normal false]
+  nest_kind : nest_kind option;
 }
 [@@deriving yojson, make, eq]
 
-let make_basic = make ?tl_ref:None ?branch_kind:None ?cmd_kind:None
+let make_basic ?origin_loc ?loop_info () = make ?origin_loc ?loop_info ()
 let get_origin_loc { origin_loc; _ } = origin_loc
 let get_loop_info { loop_info; _ } = loop_info
 let set_loop_info loop_info annot = { annot with loop_info }

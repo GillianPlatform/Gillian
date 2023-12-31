@@ -25,9 +25,9 @@ let get_or_set_fresh_lab ~ctx list =
       (lab, (a, Some lab, b) :: r)
   | (_, Some lab, _) :: _ -> (lab, list)
 
-let make ?loop ?label ?loc ?tl_ref ?cmd_kind cmd : t =
+let make ?loop ?label ?loc ?tl_ref ?cmd_kind ?nest_kind cmd : t =
   let annot =
-    K_annot.make ?origin_loc:loc ?loop_info:loop ?tl_ref ?cmd_kind ()
+    K_annot.make ?origin_loc:loc ?loop_info:loop ?tl_ref ?cmd_kind ?nest_kind ()
   in
   (annot, label, cmd)
 
