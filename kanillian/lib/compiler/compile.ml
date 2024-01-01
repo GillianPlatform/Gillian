@@ -267,7 +267,7 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
   in
   let return_block =
     set_first_label
-      ~annot:(b ~loop:[] ?tl_ref:None ?cmd_kind:None)
+      ~annot:(b ~loop:[] ?display:None ?cmd_kind:None)
       Constants.Kanillian_names.ret_label
       (free_locals @ [ b ~cmd_kind:Return ReturnNormal ])
   in

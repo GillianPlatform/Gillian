@@ -1,5 +1,6 @@
 open Helpers
 open Gil_syntax
+open Utils
 open Cs.Syntax
 module Gil_branch_case = Gil_syntax.Branch_case
 module Branch_case = Kcommons.Branch_case
@@ -451,9 +452,11 @@ let rec nondet_expr ~ctx ~loc ~type_ ~expr_ref () : Val_repr.t Cs.with_body =
                 Memory.write ~ctx ~type_ ~annot:b ~dst:ret_ptr ~src:v
               in
               let block =
-                let tl_ref = K_annot.(Expr expr_ref) in
+                let display =
+                  Hashtbl.find ctx.prog.lift_info.expr_map expr_ref |> fst
+                in
                 set_first_label
-                  ~annot:(b ~loop:[] ~tl_ref ~cmd_kind:(Normal false))
+                  ~annot:(b ~loop:[] ~display ~cmd_kind:(Normal false))
                   block_lab
                   (cmds @ write @ [ b goto_end ])
               in
@@ -952,7 +955,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
   let loc = Body_item.compile_location expr.location in
   let id = expr.id in
   let b_pre =
-    Body_item.make ~loc ~tl_ref:(K_annot.Expr id) ~cmd_kind:(Normal false)
+    let display = Hashtbl.find ctx.prog.lift_info.expr_map id |> fst in
+    Body_item.make ~loc ~display ~cmd_kind:(Normal false)
   in
   let b = b_pre ?nest_kind:None in
   let unhandled feature =
@@ -1178,13 +1182,20 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
   let compile_expr_c = compile_expr ~ctx in
   let loc = Body_item.compile_location stmt.stmt_location in
-  let b_pre ?(is_end = false) =
-    Body_item.make ~loc ~tl_ref:(K_annot.Stmt stmt.id) ~cmd_kind:(Normal is_end)
+  let b_pre ?(cmd_kind = K_annot.Normal false) ?display =
+    let display =
+      display
+      |> Option_utils.or_else (fun () ->
+             Hashtbl.find ctx.prog.lift_info.stmt_map stmt.id |> fst)
+    in
+    Body_item.make ~loc ~display ~cmd_kind
   in
   let b = b_pre ?nest_kind:None in
   let add_annot x = List.map b x in
-  let set_first_label_opt label stmts =
-    Helpers.set_first_label_opt ~annot:(b ~is_end:false ~loop:[]) label stmts
+  let set_first_label_opt ?display label stmts =
+    Helpers.set_first_label_opt
+      ~annot:(b ~cmd_kind:Hidden ~loop:[] ?display)
+      label stmts
   in
   let set_first_label label stmts = set_first_label_opt (Some label) stmts in
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in
@@ -1192,7 +1203,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   match stmt.body with
   | Skip ->
       let () = log_kind "Skip" in
-      void [ b ~is_end:true Skip ]
+      void [ b ~cmd_kind:(Normal true) Skip ]
   | Block ss ->
       let () = log_kind "Block" in
       compile_statement_list ~ctx ss
@@ -1218,14 +1229,15 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
         | Some (f, _) -> f
       in
-      pre @ [ b ~is_end:true (Logic (Assume f)) ] |> void
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assume f)) ] |> void
   (* We can't output nothing, as a label might have to get attached *)
   | Assert { property_class = Some "cover"; _ } ->
       let () = log_kind "Assert (cover)" in
-      [ b ~is_end:true Skip ] |> void
+      [ b ~cmd_kind:(Normal true) Skip ] |> void
   | Assert { property_class = Some "missing_function"; _ } ->
       let () = log_kind "Assert (missing_function)" in
-      [ b ~is_end:true (Fail ("unimplemented_function", [])) ] |> void
+      [ b ~cmd_kind:(Normal true) (Fail ("unimplemented_function", [])) ]
+      |> void
   | Assert { cond; property_class = _ } ->
       let () = log_kind "Assert" in
       let e, pre = compile_expr_c cond in
@@ -1239,7 +1251,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
         | Some (f, _) -> f
       in
-      pre @ [ b ~is_end:true (Logic (Assert f)) ] |> void
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assert f)) ] |> void
   | Return e ->
       let () = log_kind "Return" in
       let e, s =
@@ -1280,7 +1292,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       (* ZSTs are just (GIL) Null values *)
       if Ctx.is_zst_access ctx ty then
         let cmd = Cmd.Assignment (lhs, Lit Null) in
-        [ b ~is_end:true cmd ] |> void
+        [ b ~cmd_kind:(Normal true) cmd ] |> void
       else if not (Ctx.representable_in_store ctx ty) then
         let ptr, alloc_cmd = Memory.alloc_ptr ~ctx ty in
         let assign = Cmd.Assignment (lhs, ptr) in
@@ -1298,13 +1310,14 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
                   Error.code_error
                     "Declaring composit value, not writing a composit")
         in
-        [ b alloc_cmd; b assign ] @ write @ [ b ~is_end:true Skip ] |> void
+        [ b alloc_cmd; b assign ] @ write @ [ b ~cmd_kind:(Normal true) Skip ]
+        |> void
       else if Ctx.in_memory ctx lhs then
         let ptr, action_cmd = Memory.alloc_ptr ~ctx ty in
         let assign = Cmd.Assignment (lhs, ptr) in
-        let write =
+        let pre, write =
           match value with
-          | None -> []
+          | None -> ([], [])
           | Some e ->
               let v, pre = compile_expr_c e in
               let v =
@@ -1312,9 +1325,13 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
                   ~msg:"declaration initial value for in-memory scalar access" v
               in
               let write = Memory.store_scalar ~ctx (Expr.PVar lhs) v ty in
-              pre @ [ b write ]
+              (pre, [ b write ])
         in
-        [ b action_cmd; b assign ] @ write @ [ b ~is_end:true Skip ] |> void
+        pre
+        @ [ b action_cmd; b assign ]
+        @ write
+        @ [ b ~cmd_kind:(Normal true) Skip ]
+        |> void
       else
         let v, s =
           match value with
@@ -1327,7 +1344,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
               (e, s)
           | None -> (Lit Undefined, [])
         in
-        s @ [ b ~is_end:true (Assignment (lhs, v)) ] |> void
+        s @ [ b ~cmd_kind:(Normal true) (Assignment (lhs, v)) ] |> void
   | SAssign { lhs; rhs } ->
       let () = log_kind "SAssign" in
       (* Special case: my patched Kani will comment "deinit" if this assignment
@@ -1343,7 +1360,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   | Expression e ->
       let () = log_kind "Expr" in
       let vrep, expr = compile_expr_c e in
-      (vrep, expr @ [ b ~is_end:true Skip ])
+      (vrep, expr @ [ b ~cmd_kind:(Normal true) Skip ])
   | SFunctionCall { lhs; func; args } -> (
       let () = log_kind "SFunctionCall" in
       let v, pre1 =

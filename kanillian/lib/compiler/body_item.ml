@@ -25,15 +25,16 @@ let get_or_set_fresh_lab ~ctx list =
       (lab, (a, Some lab, b) :: r)
   | (_, Some lab, _) :: _ -> (lab, list)
 
-let make ?loop ?label ?loc ?tl_ref ?cmd_kind ?nest_kind cmd : t =
+let make ?loop ?label ?loc ?display ?cmd_kind ?nest_kind cmd : t =
   let annot =
-    K_annot.make ?origin_loc:loc ?loop_info:loop ?tl_ref ?cmd_kind ?nest_kind ()
+    K_annot.make ?origin_loc:loc ?loop_info:loop ?display ?cmd_kind ?nest_kind
+      ()
   in
   (annot, label, cmd)
 
-let make_hloc ?loop ?label ?loc ?tl_ref ?cmd_kind cmd : t =
+let make_hloc ?loop ?label ?loc ?display ?cmd_kind cmd : t =
   let origin_loc = Option.map compile_location loc in
-  make ?loop ?label ?loc:origin_loc ?tl_ref ?cmd_kind cmd
+  make ?loop ?label ?loc:origin_loc ?display ?cmd_kind cmd
 
 let map_annot f (annot, label, cmd) = (f annot, label, cmd)
 let with_cmd_kind cmd_kind = map_annot (fun a -> K_annot.{ a with cmd_kind })

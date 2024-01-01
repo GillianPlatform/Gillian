@@ -283,7 +283,6 @@ struct
 
       let update_canonical_data
           ~id
-          ~(tl_ast : tl_ast)
           ~(annot : Annot.t)
           ~exec_data
           (partial : partial_data) =
@@ -295,25 +294,15 @@ struct
               |> Option.some
           | _ -> None
         in
-        match (annot.cmd_kind, partial.canonical_data, annot.tl_ref) with
+        match (annot.cmd_kind, partial.canonical_data, annot.display) with
         | (Harness | Unknown), _, _ ->
             Fmt.error "HORROR - trying to get display of %a" Annot.pp_cmd_kind
               annot.cmd_kind
         | (Internal | Hidden), _, _ -> Ok ()
-        | _, None, Some ref ->
-            let++ display =
-              match ref with
-              | Stmt id -> (
-                  match Hashtbl.find_opt tl_ast.lift_info.stmt_map id with
-                  | Some (display, _) -> Ok display
-                  | None -> Fmt.str "can't find stmt ID %d!" id |> Result.error)
-              | Expr id -> (
-                  match Hashtbl.find_opt tl_ast.lift_info.expr_map id with
-                  | Some (display, _) -> Ok ("Evaluating " ^ display)
-                  | None -> Fmt.str "can't find expr ID %d!" id |> Result.error)
-            in
+        | _, None, Some display ->
             partial.canonical_data <-
-              Some { id; display; callers; stack_direction }
+              Some { id; display; callers; stack_direction };
+            Ok ()
         | _ -> Ok ()
 
       let insert_id_and_case
@@ -340,7 +329,7 @@ struct
         Ext_list.add (id, (kind, case)) all_ids;
         (kind, case)
 
-      let f ~tl_ast ~prev_id exec_data partial =
+      let f ~prev_id exec_data partial =
         let id, annot =
           let { id; cmd_report; _ } = exec_data in
           (id, CmdReport.(cmd_report.annot))
@@ -352,9 +341,7 @@ struct
         let** () =
           update_paths ~is_end ~exec_data ~branch_case ~branch_kind partial
         in
-        let** () =
-          update_canonical_data ~id ~tl_ast ~annot ~exec_data partial
-        in
+        let** () = update_canonical_data ~id ~annot ~exec_data partial in
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
@@ -394,20 +381,25 @@ struct
           ])
         ("Kani_c_lifter.PartialCmds.handle: " ^ msg)
 
-    let handle ~(partials : t) ~tl_ast ~get_prev ~prev_id exec_data =
+    let handle ~(partials : t) ~get_prev ~prev_id exec_data =
+      DL.log (fun m ->
+          let report = exec_data.cmd_report in
+          let cmd = CmdReport.(report.cmd) in
+          m "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
       let partial =
         find_or_init ~partials ~get_prev ~exec_data prev_id
         |> Result_utils.or_else (fun e -> failwith ~exec_data ~partials e)
       in
       Hashtbl.replace partials exec_data.id partial;
       let result =
-        update ~tl_ast ~prev_id exec_data partial
+        update ~prev_id exec_data partial
         |> Result_utils.or_else (fun e ->
                failwith ~exec_data ~partial ~partials e)
       in
       let () =
         match result with
-        | Finished _ ->
+        | Finished { display; _ } ->
+            DL.log (fun m -> m "FINISHED %s" display);
             partial.all_ids
             |> Ext_list.iter (fun (id, _) -> Hashtbl.remove_all partials id)
         | _ -> ()

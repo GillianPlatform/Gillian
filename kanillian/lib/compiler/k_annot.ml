@@ -15,7 +15,7 @@ type cmd_kind =
 type t = {
   origin_loc : Location.t option;
   loop_info : string list;
-  tl_ref : tl_ref option;
+  display : string option;
   branch_kind : Branch_case.kind option;
   cmd_kind : cmd_kind; [@default Normal false]
   nest_kind : nest_kind option;
