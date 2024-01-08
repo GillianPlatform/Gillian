@@ -142,7 +142,7 @@ struct
              let total, count = Hashtbl.find counts kind in
              let ix =
                match (kind, total) with
-               | If_else _, 1 -> -1
+               | (If_else _ | While_loop _ | For_loop _), 1 -> -1
                | _ -> count
              in
              let () = Hashtbl.replace counts kind (total, count + 1) in
@@ -218,9 +218,10 @@ struct
         | None, prev_case -> Ok prev_case
         | Some prev_kind, Unknown -> (
             match prev_kind with
-            | If_else_kind -> (
+            | If_else_kind | For_loop_kind | While_loop_kind -> (
                 match gil_case with
-                | Some (Gil_branch_case.GuardedGoto b) -> Ok (If_else b)
+                | Some (Gil_branch_case.GuardedGoto b) ->
+                    Ok (bool_kind_to_case prev_kind b)
                 | _ -> Error "If_else_kind expects a GuardedGoto gil case"))
         | Some _, _ ->
             Error "HORROR - branch kind is set with pre-existing case!"
@@ -268,9 +269,10 @@ struct
                     Error "HORROR - stepping out when prev_callers is empty!"
                 | hd :: tl -> Ok (tl, Some (Out hd)))
             | _ ->
-                Error
+                Fmt.error
                   "WislLifter.compute_callers: HORROR - too great a stack \
-                   depth change!")
+                   depth change! (%d)"
+                  depth_change)
 
       let update_return_cmd_info
           ~id
@@ -286,12 +288,16 @@ struct
           ~(annot : Annot.t)
           ~exec_data
           (partial : partial_data) =
-        let** callers, stack_direction = get_stack_info ~partial exec_data in
         let- () =
           match annot.cmd_kind with
           | Return ->
-              update_return_cmd_info ~id ~callers ~stack_direction partial
-              |> Option.some
+              let result =
+                let** callers, stack_direction =
+                  get_stack_info ~partial exec_data
+                in
+                update_return_cmd_info ~id ~callers ~stack_direction partial
+              in
+              Some result
           | _ -> None
         in
         match (annot.cmd_kind, partial.canonical_data, annot.display) with
@@ -300,6 +306,9 @@ struct
               annot.cmd_kind
         | (Internal | Hidden), _, _ -> Ok ()
         | _, None, Some display ->
+            let** callers, stack_direction =
+              get_stack_info ~partial exec_data
+            in
             partial.canonical_data <-
               Some { id; display; callers; stack_direction };
             Ok ()
@@ -600,7 +609,7 @@ struct
 
     let f ~state ?prev_id ?gil_case (exec_data : exec_data) =
       let annot = CmdReport.(exec_data.cmd_report.annot) in
-      let { tl_ast; partial_cmds = partials; _ } = state in
+      let { partial_cmds = partials; _ } = state in
       match annot.cmd_kind with
       | Unknown ->
           let json () =
@@ -615,7 +624,7 @@ struct
       | Normal _ | Internal | Return | Hidden -> (
           let get_prev = get_prev ~state ~gil_case ~prev_id in
           let partial_result =
-            Partial_cmds.handle ~get_prev ~tl_ast ~partials ~prev_id exec_data
+            Partial_cmds.handle ~get_prev ~partials ~prev_id exec_data
           in
           match partial_result with
           | Finished finished ->

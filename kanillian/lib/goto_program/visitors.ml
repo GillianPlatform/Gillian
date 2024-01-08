@@ -93,8 +93,7 @@ class ['a] iter =
     method visit_expr ~(ctx : 'a) (e : Expr.t) =
       self#visit_location ~ctx e.location;
       self#visit_expr_value ~ctx ~type_:e.type_ e.value;
-      self#visit_type ~ctx e.type_;
-      self#visit_id ~ctx e.id
+      self#visit_type ~ctx e.type_
 
     method visit_stmt_body ~(ctx : 'a) (body : Stmt.body) =
       match body with
@@ -124,6 +123,14 @@ class ['a] iter =
           self#visit_expr ~ctx guard;
           self#visit_stmt ~ctx then_;
           Option.iter (self#visit_stmt ~ctx) else_
+      | For { init; guard; update; body } ->
+          self#visit_stmt ~ctx init;
+          self#visit_expr ~ctx guard;
+          self#visit_stmt ~ctx update;
+          self#visit_stmt ~ctx body
+      | While { guard; body } ->
+          self#visit_expr ~ctx guard;
+          self#visit_stmt ~ctx body
       | Output { msg; value } ->
           self#visit_expr ~ctx msg;
           self#visit_expr ~ctx value
@@ -322,19 +329,12 @@ class ['a] map =
       let new_value = self#visit_expr_value ~ctx ~type_:e.type_ e.value in
       let new_location = self#visit_location ~ctx e.location in
       let new_type = self#visit_type ~ctx e.type_ in
-      let new_id = self#visit_id ~ctx e.id in
 
       if
         new_value == e.value && new_location == e.location
         && new_type == e.type_
       then e
-      else
-        {
-          value = new_value;
-          location = new_location;
-          type_ = new_type;
-          id = new_id;
-        }
+      else { value = new_value; location = new_location; type_ = new_type }
 
     method visit_stmt_body ~(ctx : 'a) (body : Stmt.body) =
       match body with
@@ -386,6 +386,28 @@ class ['a] map =
             body
           else
             Ifthenelse { guard = new_guard; then_ = new_then; else_ = new_else }
+      | For { init; guard; update; body = body' } ->
+          let new_init = self#visit_stmt ~ctx init in
+          let new_guard = self#visit_expr ~ctx guard in
+          let new_update = self#visit_stmt ~ctx update in
+          let new_body = self#visit_stmt ~ctx body' in
+          if
+            new_init == init && new_guard == guard && new_update == update
+            && new_body == body'
+          then body
+          else
+            For
+              {
+                init = new_init;
+                guard = new_guard;
+                update = new_update;
+                body = new_body;
+              }
+      | While { guard; body = body' } ->
+          let new_guard = self#visit_expr ~ctx guard in
+          let new_body = self#visit_stmt ~ctx body' in
+          if new_guard == guard && new_body == body' then body
+          else While { guard = new_guard; body = new_body }
       | Switch { control; cases; default } ->
           let new_control = self#visit_expr ~ctx control in
           let changed = ref false in
@@ -422,13 +444,11 @@ class ['a] map =
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
       let new_body = self#visit_stmt_body ~ctx stmt.body in
       let new_location = self#visit_location ~ctx stmt.stmt_location in
-      let new_id = self#visit_id ~ctx stmt.id in
       if new_body == stmt.body && new_location == stmt.stmt_location then stmt
       else
         {
           body = new_body;
           stmt_location = new_location;
           comment = stmt.comment;
-          id = new_id;
         }
   end

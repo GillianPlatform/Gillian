@@ -183,11 +183,11 @@ module rec Expr : sig
     | Nondet
     | EUnhandled of Id.t * string
 
-  and t = { value : value; type_ : Type.t; location : Location.t; id : int }
+  and t = { value : value; type_ : Type.t; location : Location.t }
   [@@deriving show]
 
+  val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
   val pp_full : Format.formatter -> t -> unit
-  val pp_display : Format.formatter -> t -> unit
   val as_symbol : t -> string
   val value_of_irep : machine:Machine_model.t -> type_:Type.t -> Irep.t -> value
   val of_irep : machine:Machine_model.t -> Irep.t -> t
@@ -213,6 +213,8 @@ and Stmt : sig
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
+    | For of { init : t; guard : Expr.t; update : t; body : t }
+    | While of { guard : Expr.t; body : t }
     | Break
     | Skip
     | Expression of Expr.t
@@ -221,16 +223,17 @@ and Stmt : sig
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
-
-  and t = {
-    stmt_location : Location.t;
-    body : body;
-    comment : string option;
-    id : int;
-  }
+  and t = { stmt_location : Location.t; body : body; comment : string option }
 
   val pp : Format.formatter -> t -> unit
-  val pp_display : Format.formatter -> t -> unit
+
+  val pp_custom :
+    ?semi:bool ->
+    pp_stmt:t Fmt.t ->
+    pp_expr:Expr.t Fmt.t ->
+    ?pp_type:Type.t Fmt.t ->
+    t Fmt.t
+
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
   val of_irep : machine:Machine_model.t -> Irep.t -> t
 end
@@ -256,23 +259,13 @@ module Program : sig
     }
   end
 
-  module Lift_info : sig
-    type t = {
-      mutable stmt_count : int;
-      mutable expr_count : int;
-      stmt_map : (int, string * Stmt.t) Hashtbl.t;
-      expr_map : (int, string * Expr.t) Hashtbl.t;
-    }
-
-    val empty : unit -> t
-  end
-
   type t = {
     vars : (string, Global_var.t) Hashtbl.t;
     funs : (string, Func.t) Hashtbl.t;
     types : (string, Type.t) Hashtbl.t;
     constrs : (string, unit) Hashtbl.t;
-    lift_info : Lift_info.t;
+    base_names : (string, string) Hashtbl.t;
+    struct_tags : (string, string) Hashtbl.t;
   }
 
   val of_symtab : machine:Machine_model.t -> Symtab.t -> t

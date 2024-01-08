@@ -22,7 +22,9 @@ type t = {
 }
 [@@deriving yojson, make, eq]
 
-let make_basic ?origin_loc ?loop_info () = make ?origin_loc ?loop_info ()
+let make_basic ?origin_loc ?loop_info () =
+  make ?origin_loc ?loop_info ~cmd_kind:Hidden ()
+
 let get_origin_loc { origin_loc; _ } = origin_loc
 let get_loop_info { loop_info; _ } = loop_info
 let set_loop_info loop_info annot = { annot with loop_info }

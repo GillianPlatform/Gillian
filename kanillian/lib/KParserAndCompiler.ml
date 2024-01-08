@@ -1,4 +1,5 @@
 open Gillian
+open Utils.Syntaxes.Result
 open Kcommons
 
 let initialize _ =
@@ -63,19 +64,16 @@ type err = string
 let pp_err = Fmt.string
 
 let parse_symtab_into_goto json =
-  let tbl = Irep_lib.Symtab.of_yojson json in
-  Result.map
-    (fun tbl ->
-      let machine = Machine_model_parse.consume_from_symtab tbl in
-      if not Machine_model.(equal machine archi64) then
-        failwith "For now, kanillian can only run on archi64";
-      Kconfig.machine_model := machine;
-      Logging.normal ~severity:Warning (fun m ->
-          m
-            "Filtering every cprover_specific symbol!! Need to remove that in \
-             the future");
-      Goto_lib.Program.of_symtab ~machine tbl)
-    tbl
+  let+ tbl = Irep_lib.Symtab.of_yojson json in
+  let machine = Machine_model_parse.consume_from_symtab tbl in
+  if not Machine_model.(equal machine archi64) then
+    failwith "For now, kanillian can only run on archi64";
+  Kconfig.machine_model := machine;
+  Logging.normal ~severity:Warning (fun m ->
+      m
+        "Filtering every cprover_specific symbol!! Need to remove that in the \
+         future");
+  Goto_lib.Program.of_symtab ~machine tbl
 
 let create_compilation_result path goto_prog gil_prog =
   let open Gillian.Command_line.ParserAndCompiler in

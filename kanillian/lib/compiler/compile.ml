@@ -178,57 +178,25 @@ let compile_alloc_params ~ctx params =
       else [])
     params
 
-let get_missing_function_body ~ctx (func : Program.Func.t) =
-  let lift_info = Ctx.(ctx.prog).lift_info in
-  let expr_id = lift_info.expr_count in
-  let stmt_id = lift_info.stmt_count in
-  let expr, stmt =
-    if !Kcommons.Kconfig.nondet_on_missing then
-      let nondet =
-        GExpr.
-          {
-            location = func.location;
-            type_ = func.return_type;
-            value = Nondet;
-            id = expr_id;
-          }
-      in
-      let stmt =
-        Stmt.
-          {
-            stmt_location = func.location;
-            body = Return (Some nondet);
-            comment = None;
-            id = stmt_id;
-          }
-      in
-      (nondet, stmt)
-    else
-      let cond =
-        GExpr.
-          {
-            value = BoolConstant false;
-            type_ = Bool;
-            location = func.location;
-            id = expr_id;
-          }
-      in
-      let body =
-        Stmt.Assert { cond; property_class = Some "missing_function" }
-      in
-      let stmt =
-        Stmt.
-          { body; stmt_location = func.location; comment = None; id = stmt_id }
-      in
-      (cond, stmt)
-  in
-  lift_info.expr_count <- expr_id + 1;
-  lift_info.stmt_count <- stmt_id + 1;
-  let expr_display = Fmt.str "%a" GExpr.pp expr in
-  let stmt_display = Fmt.str "%a" Stmt.pp stmt in
-  Hashtbl.replace lift_info.expr_map expr_id (expr_display, expr);
-  Hashtbl.replace lift_info.stmt_map stmt_id (stmt_display, stmt);
-  stmt
+let get_missing_function_body (func : Program.Func.t) =
+  if !Kcommons.Kconfig.nondet_on_missing then
+    let nondet =
+      GExpr.
+        { location = func.location; type_ = func.return_type; value = Nondet }
+    in
+    Stmt.
+      {
+        stmt_location = func.location;
+        body = Return (Some nondet);
+        comment = None;
+      }
+  else
+    let cond =
+      GExpr.
+        { value = BoolConstant false; type_ = Bool; location = func.location }
+    in
+    let body = Stmt.Assert { cond; property_class = Some "missing_function" } in
+    Stmt.{ body; stmt_location = func.location; comment = None }
 
 let compile_function ?map_body ~ctx (func : Program.Func.t) :
     (K_annot.t, string) Proc.t =
@@ -237,7 +205,7 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
     (* If the function has no body, it's assumed to be just non-det *)
     match func.body with
     | Some b -> (false, b)
-    | None -> (true, get_missing_function_body ~ctx func)
+    | None -> (true, get_missing_function_body func)
   in
 
   let () =
@@ -305,39 +273,15 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
 module Start_for_harness = struct
   open Program.Func
 
-  let build_stmt ~harness ~(lift_info : Program.Lift_info.t) stmt_body =
-    let id = lift_info.stmt_count in
-    let stmt =
-      Stmt.
-        {
-          stmt_location = harness.location;
-          body = stmt_body;
-          comment = None;
-          id;
-        }
-    in
-    lift_info.stmt_count <- id + 1;
-    let display = Fmt.str "%a" Stmt.pp stmt in
-    Hashtbl.replace lift_info.stmt_map id (display, stmt);
-    stmt
+  let build_stmt ~harness body =
+    Stmt.{ stmt_location = harness.location; body; comment = None }
 
-  let build_expr
-      ~(harness : t)
-      ~(lift_info : Program.Lift_info.t)
-      type_
-      expr_value =
-    let id = lift_info.expr_count in
-    let expr =
-      GExpr.{ location = harness.location; type_; value = expr_value; id }
-    in
-    let display = Fmt.str "%a" GExpr.pp expr in
-    lift_info.expr_count <- id + 1;
-    Hashtbl.replace lift_info.expr_map id (display, expr);
-    expr
+  let build_expr ~(harness : t) type_ expr_value =
+    GExpr.{ location = harness.location; type_; value = expr_value }
 
-  let build_params ~ctx ~harness ~lift_info =
-    let stmt = build_stmt ~harness ~lift_info in
-    let expr = build_expr ~harness ~lift_info in
+  let build_params ~ctx ~harness =
+    let stmt = build_stmt ~harness in
+    let expr = build_expr ~harness in
     List.split
     @@ List.map
          (fun (p : Param.t) ->
@@ -351,9 +295,9 @@ module Start_for_harness = struct
            (expr p.type_ (Symbol ident), stmt @@ Stmt.Decl { lhs; value }))
          harness.params
 
-  let build_function ~harness ~lift_info params params_decls =
-    let stmt = build_stmt ~harness ~lift_info in
-    let expr = build_expr ~harness ~lift_info in
+  let build_function ~harness params params_decls =
+    let stmt = build_stmt ~harness in
+    let expr = build_expr ~harness in
     let harness_type =
       GType.Code { params = harness.params; return_type = harness.return_type }
     in
@@ -397,9 +341,8 @@ module Start_for_harness = struct
 
   let f ~ctx (harness : Program.Func.t) =
     let cprover_start =
-      let lift_info = Ctx.(ctx.prog).lift_info in
-      let params, params_decls = build_params ~ctx ~harness ~lift_info in
-      build_function ~harness ~lift_info params params_decls
+      let params, params_decls = build_params ~ctx ~harness in
+      build_function ~harness params params_decls
     in
     let map_body = Body_item.with_cmd_kind Harness in
     compile_function ~map_body ~ctx cprover_start

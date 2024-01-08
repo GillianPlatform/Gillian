@@ -34,30 +34,36 @@ module Func = struct
   }
 end
 
-module Lift_info = struct
-  type t = {
-    mutable stmt_count : int;
-    mutable expr_count : int;
-    stmt_map : (int, string * Stmt.t) Hashtbl.t;
-    expr_map : (int, string * Expr.t) Hashtbl.t;
-  }
-
-  let empty () =
-    {
-      stmt_count = 0;
-      expr_count = 0;
-      stmt_map = Hashtbl.create 1;
-      expr_map = Hashtbl.create 1;
-    }
-end
-
 type t = {
   vars : (string, Global_var.t) Hashtbl.t;
   funs : (string, Func.t) Hashtbl.t;
   types : (string, Type.t) Hashtbl.t;
   constrs : (string, unit) Hashtbl.t;
-  lift_info : Lift_info.t;
+  base_names : (string, string) Hashtbl.t;
+  struct_tags : (string, string) Hashtbl.t;
 }
+
+let add_struct_tag struct_tags (sym : Irep_lib.Symbol.t) =
+  let open Irep_lib.Irep.Infix in
+  let open Irep_lib.Id in
+  let open Utils.Syntaxes.Option in
+  let irep = sym.type_ in
+  (let+ id, typedef =
+     match sym.type_.id with
+     | StructTag ->
+         let* id =
+           let+ id = irep $? Identifier in
+           Irep.as_just_string id
+         in
+         let+ typedef =
+           let+ typedef = irep $? CTypedef in
+           Irep.as_just_string typedef
+         in
+         (id, typedef)
+     | _ -> None
+   in
+   Hashtbl.add struct_tags id typedef)
+  |> ignore
 
 let of_symtab ~machine (symtab : Symtab.t) : t =
   let env =
@@ -66,7 +72,8 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
       funs = Hashtbl.create 1;
       types = Hashtbl.create 1;
       constrs = Hashtbl.create 1;
-      lift_info = Lift_info.empty ();
+      base_names = Hashtbl.create 1;
+      struct_tags = Hashtbl.create 1;
     }
   in
   symtab
@@ -74,6 +81,11 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
          (* A bit hacky, not sure which should be kept and which shouldn't... *)
          if should_be_filtered name then ()
          else
+           let () =
+             if name <> sym.base_name then
+               Hashtbl.add env.base_names name sym.base_name
+           in
+           let () = add_struct_tag env.struct_tags sym in
            let location = Location.of_irep sym.location in
            let type_ = Type.of_irep ~machine sym.type_ in
            let value = SymbolValue.of_irep ~machine ~type_ sym.value in

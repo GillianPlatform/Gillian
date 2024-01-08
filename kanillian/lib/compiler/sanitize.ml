@@ -50,70 +50,60 @@ let is_kani_specific = function
     -> true
   | _ -> false
 
-let sanitize_symbol s =
-  match s with
-  | "" -> "i__empty"
-  | _ -> (
-      if is_cbmc_specific s || is_kani_specific s then s
-      else
-        let replaced = Str.global_replace (Str.regexp {|[:\.\$]|}) "_" s in
-        match String.get replaced 0 with
-        | 'A' .. 'Z' | 'a' .. 'z' -> replaced
-        | _ -> "m__" ^ replaced)
-
-let sanitize_symbol s =
-  let new_s = sanitize_symbol s in
-  new_s
+let sanitize_symbol ~(ctx : Program.t) s =
+  let s' =
+    match s with
+    | "" -> "i__empty"
+    | _ -> (
+        if is_cbmc_specific s || is_kani_specific s then s
+        else
+          let replaced = Str.global_replace (Str.regexp {|[:\.\$]|}) "_" s in
+          match String.get replaced 0 with
+          | 'A' .. 'Z' | 'a' .. 'z' -> replaced
+          | _ -> "m__" ^ replaced)
+  in
+  let () =
+    if s <> s' then
+      let base =
+        match Hashtbl.find_opt ctx.base_names s with
+        | Some v -> v
+        | None -> s
+      in
+      let () = Debugger_log.to_file (Fmt.str "## %s -> %s" s' base) in
+      Hashtbl.replace ctx.base_names s' base
+  in
+  s'
 
 let sanitizer =
   object
-    inherit [Program.Lift_info.t] Visitors.map as super
-
-    method! visit_expr ~ctx expr =
-      let display = Fmt.to_to_string Expr.pp_display expr in
-      let expr = super#visit_expr ~ctx expr in
-      let id = ctx.expr_count in
-      let expr = { expr with id } in
-      ctx.expr_count <- id + 1;
-      Hashtbl.replace ctx.expr_map id (display, expr);
-      expr
-
-    method! visit_stmt ~ctx stmt =
-      let display = Fmt.to_to_string Stmt.pp_display stmt in
-      let stmt = super#visit_stmt ~ctx stmt in
-      let id = ctx.stmt_count in
-      let stmt = { stmt with id } in
-      ctx.stmt_count <- id + 1;
-      Hashtbl.replace ctx.stmt_map id (display, stmt);
-      stmt
+    inherit [Program.t] Visitors.map as super
 
     method! visit_expr_value ~ctx ~type_ value =
       match value with
       (* Rename any other symbol *)
-      | Symbol s -> Symbol (sanitize_symbol s)
+      | Symbol s -> Symbol (sanitize_symbol ~ctx s)
       | _ -> super#visit_expr_value ~ctx ~type_ value
   end
 
-let sanitize_expr lift_info = sanitizer#visit_expr ~ctx:lift_info
-let sanitize_stmt lift_info = sanitizer#visit_stmt ~ctx:lift_info
+let sanitize_expr ~ctx = sanitizer#visit_expr ~ctx
+let sanitize_stmt ~ctx = sanitizer#visit_stmt ~ctx
 
-let sanitize_param (p : Param.t) =
-  { p with identifier = Option.map sanitize_symbol p.identifier }
+let sanitize_param ~ctx (p : Param.t) =
+  { p with identifier = Option.map (sanitize_symbol ~ctx) p.identifier }
 
 (** Sanitizes every variable symbol symbol. *)
 let sanitize_and_index_program (prog : Program.t) =
-  let new_lift_info = Program.Lift_info.empty () in
   (* Create a second table with the new vars *)
   let new_vars = Hashtbl.create (Hashtbl.length prog.vars) in
   Hashtbl.iter
     (fun name gvar ->
-      let new_name = sanitize_symbol name in
+      let new_name = sanitize_symbol ~ctx:prog name in
       let new_gvar =
         Program.Global_var.
           {
             type_ = gvar.type_;
             symbol = new_name;
-            value = Option.map (sanitize_expr new_lift_info) gvar.value;
+            value = Option.map (sanitize_expr ~ctx:prog) gvar.value;
             location = gvar.location;
           }
       in
@@ -123,13 +113,13 @@ let sanitize_and_index_program (prog : Program.t) =
   let new_funs = Hashtbl.create (Hashtbl.length prog.funs) in
   Hashtbl.iter
     (fun name func ->
-      let new_name = sanitize_symbol name in
+      let new_name = sanitize_symbol ~ctx:prog name in
       let new_fun =
         Program.Func.
           {
             symbol = new_name;
-            params = List.map sanitize_param func.params;
-            body = Option.map (sanitize_stmt new_lift_info) func.body;
+            params = List.map (sanitize_param ~ctx:prog) func.params;
+            body = Option.map (sanitize_stmt ~ctx:prog) func.body;
             location = func.location;
             return_type = func.return_type;
             internal = func.internal;
@@ -141,13 +131,7 @@ let sanitize_and_index_program (prog : Program.t) =
   let new_constrs = Hashtbl.create (Hashtbl.length prog.constrs) in
   Hashtbl.iter
     (fun name () ->
-      let new_name = sanitize_symbol name in
+      let new_name = sanitize_symbol ~ctx:prog name in
       Hashtbl.add new_constrs new_name ())
     prog.constrs;
-  {
-    prog with
-    funs = new_funs;
-    vars = new_vars;
-    constrs = new_constrs;
-    lift_info = new_lift_info;
-  }
+  { prog with funs = new_funs; vars = new_vars; constrs = new_constrs }
