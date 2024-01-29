@@ -124,9 +124,6 @@ module PP = struct
     | Ifthenelse { guard; _ } | For { guard; _ } | While { guard; _ } ->
         Fmt.pf fmt "%a ?" (expr ~ctx) guard
     | SUnhandled id -> Fmt.pf fmt "Unhandled (%s)" (Irep_lib.Id.to_string id)
-    | Expression e ->
-        Debugger_log.to_file (Fmt.str "%a" GExpr.pp_value e.value);
-        Fmt.pf fmt "EXPR!"
     | _ ->
         let pp_stmt = stmt ~ctx in
         let pp_expr = expr ~ctx in
@@ -971,43 +968,81 @@ and poison ~ctx ~annot (lhs : GExpr.t) =
   in
   pre @ [ annot write ]
 
-and compile_assign ~ctx ~annot ~lhs ~rhs =
-  let v, pre1 = compile_expr ~ctx rhs in
-  let access, pre2 = lvalue_as_access ~ctx ~read:false lhs in
-  let write =
-    match (access, v) with
+and compile_assign_val ~ctx ~annot ~lhs ~(rhs : Val_repr.t) =
+  let ( let++ ) f o = Result.map o f in
+  let access, pre = lvalue_as_access ~ctx ~read:false lhs in
+  let++ write =
+    match (access, rhs) with
     | ZST, _ ->
-        [ annot Cmd.Skip ]
+        Ok [ annot Cmd.Skip ]
         (* We need a command in case we try want to add a label *)
-    | Direct x, ByValue v -> [ annot (Assignment (x, v)) ]
+    | Direct x, ByValue v -> Ok [ annot (Assignment (x, v)) ]
     | InMemoryScalar { ptr; _ }, ByValue v ->
-        [ annot (Memory.store_scalar ~ctx ptr v lhs.type_) ]
+        Ok [ annot (Memory.store_scalar ~ctx ptr v lhs.type_) ]
     | ( InMemoryComposit { ptr = ptr_access; type_ = type_access },
         ByCopy { ptr = ptr_v; type_ = type_v } ) ->
         if not (Ctx.type_equal ctx type_v type_access) then
-          Error.unexpected "ByCopy assignment with different types on each side"
+          Result.Error
+            ( Error.unexpected,
+              "ByCopy assignment with different types on each side" )
         else
           let copy_cmd =
             Memory.memcpy ~ctx ~type_:type_access ~dst:ptr_access ~src:ptr_v
           in
-          [ annot copy_cmd ]
+          Ok [ annot copy_cmd ]
     | InMemoryComposit { ptr = dst; _ }, ByCompositValue { writes; _ } ->
-        Memory.write_composit ~ctx ~annot ~dst writes
+        Ok (Memory.write_composit ~ctx ~annot ~dst writes)
     | _ ->
         Error.code_error
           (Fmt.str
-             "Invalid assignement, wrong mix of ByCopy and Direct assignments:\n\
-              %a = %a.\n\
-              Originally: %a = %a\n\n\
-             \              Left type is %a and right type is %a" pp_access
-             access Val_repr.pp v GExpr.pp lhs GExpr.pp rhs GType.pp lhs.type_
-             GType.pp rhs.type_)
+             "Invalid assignement, wrong mix of ByCopy and Direct assignments.\n\
+              %a = %a." pp_access access Val_repr.pp rhs)
   in
-  Debugger_log.to_file (Fmt.str ">>> %d" (List.length write));
-  write
-  |> List.iter (fun (_, _, c) ->
-         Debugger_log.to_file (Fmt.str "%a" Cmd.pp_labeled c));
-  (v, pre1 @ pre2 @ write)
+  pre @ write
+
+and compile_assign ~ctx ~annot ~lhs ~rhs =
+  let v, pre = compile_expr ~ctx rhs in
+  let comp_assign =
+    match compile_assign_val ~ctx ~annot ~lhs ~rhs:v with
+    | Ok c -> c
+    | Error (throw, msg) ->
+        let msg =
+          Fmt.str
+            "%s\n\
+             Originally: %a = %a\n\n\
+            \              Left type is %a and right type is %a" msg GExpr.pp
+            lhs Val_repr.pp v GType.pp lhs.type_ GType.pp rhs.type_
+        in
+        throw msg
+  in
+  (v, pre @ comp_assign)
+
+and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
+  let open Ops.Self in
+  let open Ops.Binary in
+  let is_pre, op =
+    match op with
+    | Preincrement -> (true, Plus)
+    | Predecrement -> (true, Minus)
+    | Postincrement -> (false, Plus)
+    | Postdecrement -> (false, Minus)
+  in
+  let e_pre, comp_expr = compile_expr ~ctx e in
+  let e_pre = Val_repr.as_value ~msg:"Selfop operand" e_pre in
+  let e_post, comp_op =
+    let lhs = Val_repr.ByValue e_pre in
+    let rhs = Val_repr.ByValue (Lit (Int Z.one)) in
+    compile_binop ~ctx ~lty:ty ~rty:ty op lhs rhs
+  in
+  let comp_op = List.map annot comp_op in
+  let comp_assign =
+    match compile_assign_val ~ctx ~annot ~lhs:e ~rhs:(ByValue e_post) with
+    | Ok c -> c
+    | Error (throw, msg) -> throw msg
+  in
+  let v = if is_pre then e_post else e_pre in
+  let v = Val_repr.ByValue v in
+  (v, comp_expr @ comp_op @ comp_assign)
 
 and compile_symbol ~ctx ~b expr =
   if Ctx.is_zst_access ctx GExpr.(expr.type_) then by_value (Lit Null)
@@ -1071,12 +1106,10 @@ and compile_address_of ~ctx ~b (expr : GExpr.t) x =
   | ListMember _ -> Error.code_error "address of list member access"
 
 and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
-  let () = Gillian.Debugger.Logging.to_file (Fmt.str " E %a" GExpr.pp expr) in
   let open Cs.Syntax in
   let compile_expr = compile_expr ~ctx in
   let loc = Body_item.compile_location expr.location in
   let default_display = Fmt.str "%a" (PP.expr ~ctx) expr in
-  let () = Debugger_log.to_file (Fmt.str "> %s" default_display) in
   let b_pre ?display ?(cmd_kind = K_annot.Normal false) =
     let display = Option.value ~default:default_display display in
     Body_item.make ~loc ~display ~cmd_kind
@@ -1129,6 +1162,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       | op ->
           let cmd = b (Helpers.assert_unhandled ~feature:(UnOp op) []) in
           Cs.return ~app:[ cmd ] (Val_repr.ByValue (Lit Nono)))
+  | SelfOp { op; e } ->
+      compile_selfop ~ctx ~ty:e.type_ ~annot:b op e |> Cs.set_end
   | Nondet ->
       nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_
         ~display:default_display ()
@@ -1304,12 +1339,10 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
   | EUnhandled (id, msg) -> unhandled (ExprIrep (id, msg))
 
 and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
-  let () = Gillian.Debugger.Logging.to_file (Fmt.str " S %a" Stmt.pp stmt) in
   let compile_statement_c = compile_statement ~ctx in
   let compile_expr_c = compile_expr ~ctx in
   let loc = Body_item.compile_location stmt.stmt_location in
   let default_display = Fmt.str "%a" (PP.stmt ~ctx) stmt in
-  let () = Debugger_log.to_file (Fmt.str "> %s" default_display) in
   let b_pre ?(cmd_kind = K_annot.Normal false) ?(display = default_display) =
     Body_item.make ~loc ~display ~cmd_kind
   in
@@ -1588,7 +1621,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let guard_var = Val_repr.as_value ~msg:"for guard" guard_var in
       let _, comp_body = compile_statement_c body in
       let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
-      let _, comp_update = compile_statement_c update in
+      let _, comp_update = compile_expr_c update in
       let goto_guard =
         let cmd = Cmd.GuardedGoto (guard_var, body_lab, end_lab) in
         b ~cmd_kind:(Normal true) cmd

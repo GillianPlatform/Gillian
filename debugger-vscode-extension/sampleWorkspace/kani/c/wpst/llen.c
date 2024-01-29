@@ -31,4 +31,5 @@ int main() {
   __CPROVER_assume(x <= 3);
   node_t* l = build_list(x);
   int size = llen(l);
+  __CPROVER_assert(size == 3, "size test");
 }

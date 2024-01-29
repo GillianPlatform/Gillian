@@ -7,9 +7,9 @@ type case =
   | While_loop of bool
   | Func_exit of string
   | Unknown
-[@@deriving yojson]
+[@@deriving yojson, show]
 
-type t = Case of case * int | Func_exit_placeholder [@@deriving yojson]
+type t = Case of case * int | Func_exit_placeholder [@@deriving yojson, show]
 
 let display = function
   | Case (Unknown, i) -> Fmt.str "%d" i

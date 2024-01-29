@@ -172,6 +172,7 @@ module rec Expr : sig
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
     | UnOp of { op : Ops.Unary.t; e : t }
+    | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
     | Member of { lhs : t; field : string }
     | AddressOf of t
@@ -187,7 +188,7 @@ module rec Expr : sig
   [@@deriving show]
 
   val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
-  val pp_full : Format.formatter -> t -> unit
+  val pp_full : t Fmt.t
   val as_symbol : t -> string
   val value_of_irep : machine:Machine_model.t -> type_:Type.t -> Irep.t -> value
   val of_irep : machine:Machine_model.t -> Irep.t -> t
@@ -213,7 +214,7 @@ and Stmt : sig
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
-    | For of { init : t; guard : Expr.t; update : t; body : t }
+    | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
     | Skip
@@ -225,7 +226,7 @@ and Stmt : sig
   and switch_case = { case : Expr.t; sw_body : t }
   and t = { stmt_location : Location.t; body : body; comment : string option }
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t Fmt.t
 
   val pp_custom :
     ?semi:bool ->
@@ -266,6 +267,7 @@ module Program : sig
     constrs : (string, unit) Hashtbl.t;
     base_names : (string, string) Hashtbl.t;
     struct_tags : (string, string) Hashtbl.t;
+    unevaluated_funcs : string Gillian.Utils.Prelude.Hashset.t;
   }
 
   val of_symtab : machine:Machine_model.t -> Symtab.t -> t

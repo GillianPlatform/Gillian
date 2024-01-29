@@ -69,7 +69,6 @@ let sanitize_symbol ~(ctx : Program.t) s =
         | Some v -> v
         | None -> s
       in
-      let () = Debugger_log.to_file (Fmt.str "## %s -> %s" s' base) in
       Hashtbl.replace ctx.base_names s' base
   in
   s'

@@ -205,11 +205,12 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
     (* If the function has no body, it's assumed to be just non-det *)
     match func.body with
     | Some b -> (false, b)
-    | None -> (true, get_missing_function_body func)
-  in
-
-  let () =
-    Gillian.Debugger.Logging.to_file (Fmt.str "COMPILING %s" func.symbol)
+    | None ->
+        let () =
+          let prog = Ctx.(ctx.prog) in
+          Hashset.add prog.unevaluated_funcs func.symbol
+        in
+        (true, get_missing_function_body func)
   in
 
   (* Fmt.pr "FUNCTION %s:\n%a@?\n\n" func.symbol Stmt.pp body; *)

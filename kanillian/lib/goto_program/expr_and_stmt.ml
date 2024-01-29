@@ -1,3 +1,5 @@
+open Gillian.Utils.Syntaxes.Option
+
 module rec Expr : sig
   type value =
     | Array of t list
@@ -14,6 +16,7 @@ module rec Expr : sig
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
     | UnOp of { op : Ops.Unary.t; e : t }
+    | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
     | Member of { lhs : t; field : string }
     | AddressOf of t
@@ -50,6 +53,7 @@ end = struct
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
     | UnOp of { op : Ops.Unary.t; e : t }
+    | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
     | Member of { lhs : t; field : string }
     | AddressOf of t
@@ -81,6 +85,8 @@ end = struct
     | BinOp { op; lhs; rhs } ->
         pf ft "(%a %a %a)" pp lhs Ops.Binary.pp op pp rhs
     | UnOp { op; e } -> pf ft "(%a %a)" Ops.Unary.pp op pp e
+    | SelfOp { op; e } ->
+        pf ft "%a%a%a" Ops.Self.pp_pre op pp e Ops.Self.pp_post op
     | ByteExtract { e; offset } ->
         pf ft "EXTRACT(%a, %a, %d)" pp e pp_type t.type_ offset
     | Struct xs -> pf ft "{ %a }" (list ~sep:semi pp) xs
@@ -129,8 +135,20 @@ end = struct
     in
     ByteExtract { e = of_irep ~machine e; offset }
 
+  and selfop_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
+    let open Ops.Self in
+    let lift_selfop op = lift_selfop ~machine irep op |> Option.some in
+    let* stmt = List.assoc_opt Id.Statement irep.named_sub in
+    match stmt.id with
+    | Postincrement -> lift_selfop Postincrement
+    | Postdecrement -> lift_selfop Postdecrement
+    | Preincrement -> lift_selfop Preincrement
+    | Predecrement -> lift_selfop Predecrement
+    | _ -> None
+
   and side_effecting_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
     let of_irep = of_irep ~machine in
+    let- () = selfop_of_irep ~machine irep in
     match (irep $ Statement).id with
     | FunctionCall ->
         let func, args =
@@ -167,6 +185,14 @@ end = struct
     | _ ->
         Gerror.unexpected ~irep
           "Unary operator doesn't have exactly one operand"
+
+  and lift_selfop ~(machine : Machine_model.t) (irep : Irep.t) (op : Ops.Self.t)
+      =
+    let of_irep = of_irep ~machine in
+    match irep.sub with
+    | [ a ] -> SelfOp { op; e = of_irep a }
+    | _ ->
+        Gerror.unexpected ~irep "Self operator doesn't have exactly one operand"
 
   and value_of_irep
       ~(machine : Machine_model.t)
@@ -338,7 +364,7 @@ and Stmt : sig
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
-    | For of { init : t; guard : Expr.t; update : t; body : t }
+    | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
     | Skip
@@ -381,7 +407,7 @@ end = struct
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
-    | For of { init : t; guard : Expr.t; update : t; body : t }
+    | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
     | Skip
@@ -449,8 +475,8 @@ end = struct
         in
         pf ft "@[<v 3>if (%a)@\n%a%a@]" pp_expr guard pp then_ pp_else else_
     | For { init; guard; update; body } ->
-        pf ft "@[<v 3>for (%a; %a; %a)@\n%a@]" pp init pp_expr guard pp update
-          pp body
+        pf ft "@[<v 3>for (%a; %a; %a)@\n%a@]" pp init pp_expr guard pp_expr
+          update pp body
     | While { guard; body } ->
         pf ft "@[<v 3>while (%a)@\n%a@]" pp_expr guard pp body
     | SUnhandled id -> pf ft "UNHANDLED_STMT(%s)" (Id.to_string id)
@@ -618,6 +644,7 @@ end = struct
   and for_loop_of_irep ~machine ~unexpected (sub : Irep.t list) =
     (* For some reason, CBMC compiles for loops as a block with the init statement
           and *then* the loop, whose first sub is nil. *)
+    let e_of_irep = Expr.of_irep ~machine in
     let of_irep = of_irep ~machine in
     match sub with
     | [ init; loop ] -> (
@@ -626,7 +653,7 @@ end = struct
             let guard, update, body =
               match loop.sub with
               | [ _; guard; update; body ] ->
-                  (Expr.of_irep ~machine guard, of_irep update, of_irep body)
+                  (e_of_irep guard, e_of_irep update, of_irep body)
               | _ -> unexpected "Invalid for-loop statement"
             in
             let init = of_irep init in

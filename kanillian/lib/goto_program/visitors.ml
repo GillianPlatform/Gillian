@@ -68,6 +68,9 @@ class ['a] iter =
       | UnOp { op; e } ->
           self#visit_unop ~ctx op;
           self#visit_expr ~ctx e
+      | SelfOp { op; e } ->
+          self#visit_selfop ~ctx op;
+          self#visit_expr ~ctx e
       | ByteExtract { e; _ } | Dereference e | AddressOf e | TypeCast e ->
           self#visit_expr ~ctx e
       | Index { array; index } ->
@@ -126,7 +129,7 @@ class ['a] iter =
       | For { init; guard; update; body } ->
           self#visit_stmt ~ctx init;
           self#visit_expr ~ctx guard;
-          self#visit_stmt ~ctx update;
+          self#visit_expr ~ctx update;
           self#visit_stmt ~ctx body
       | While { guard; body } ->
           self#visit_expr ~ctx guard;
@@ -282,6 +285,11 @@ class ['a] map =
           let new_e = self#visit_expr ~ctx e in
           if new_op == op && new_e == e then ev
           else UnOp { op = new_op; e = new_e }
+      | SelfOp { op; e } ->
+          let new_op = self#visit_selfop ~ctx op in
+          let new_e = self#visit_expr ~ctx e in
+          if new_op == op && new_e == e then ev
+          else SelfOp { op = new_op; e = new_e }
       | ByteExtract { e; offset } ->
           let new_e = self#visit_expr ~ctx e in
           if new_e == e then ev else ByteExtract { e = new_e; offset }
@@ -389,7 +397,7 @@ class ['a] map =
       | For { init; guard; update; body = body' } ->
           let new_init = self#visit_stmt ~ctx init in
           let new_guard = self#visit_expr ~ctx guard in
-          let new_update = self#visit_stmt ~ctx update in
+          let new_update = self#visit_expr ~ctx update in
           let new_body = self#visit_stmt ~ctx body' in
           if
             new_init == init && new_guard == guard && new_update == update

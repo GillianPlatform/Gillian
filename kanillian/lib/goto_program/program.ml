@@ -1,3 +1,5 @@
+module Hashset = Utils.Prelude.Hashset
+
 let should_be_filtered = function
   (* The next 4 names contain arrays of size infinity.
      We don't handle that for now, we don't know if that's necessary *)
@@ -41,6 +43,7 @@ type t = {
   constrs : (string, unit) Hashtbl.t;
   base_names : (string, string) Hashtbl.t;
   struct_tags : (string, string) Hashtbl.t;
+  unevaluated_funcs : string Hashset.t;
 }
 
 let add_struct_tag struct_tags (sym : Irep_lib.Symbol.t) =
@@ -74,6 +77,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
       constrs = Hashtbl.create 1;
       base_names = Hashtbl.create 1;
       struct_tags = Hashtbl.create 1;
+      unevaluated_funcs = Hashset.empty ();
     }
   in
   symtab
