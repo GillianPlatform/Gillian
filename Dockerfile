@@ -16,7 +16,7 @@ RUN apt-get install -y \
   m4 \
   python3
 
-RUN npm install -g esy@0.6.12 --unsafe-perm
+RUN npm install -g esy@0.7.2 --unsafe-perm
 
 RUN mkdir /app
 
