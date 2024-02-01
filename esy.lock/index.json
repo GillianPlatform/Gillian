@@ -1,5 +1,5 @@
 {
-  "checksum": "9536fa2f677fd616afbecbbbe046820c",
+  "checksum": "2c2730ed63e74c903317589b74611f0e",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "yargs-parser@21.1.1@d41d8cd9": {
@@ -288,7 +288,7 @@
       "overrides": [],
       "dependencies": [
         "ocaml@5.1.4@d41d8cd9",
-        "compcert@github:GillianPlatform/CompCert#37cc3df89df614d42e3e0fadbaaebc9bd01134e9@d41d8cd9",
+        "compcert@github:GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b@d41d8cd9",
         "@opam/zarith@opam:1.13@e4e498f3",
         "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.3.tar.gz#md5:a18ea8cc1ba59d87a6ea966227732038@44ff3c39",
         "@opam/yojson@opam:2.1.2@9fd14300",
@@ -300,7 +300,7 @@
         "@opam/menhir@opam:20231231@f35eae6a",
         "@opam/memtrace@opam:0.2.3@d93db143",
         "@opam/fpath@opam:0.7.3@674d8125", "@opam/fmt@opam:0.9.0@87213963",
-        "@opam/flow_parser@github:GillianPlatform/flow:flow_parser.opam#cb0031f83272d01e140ace35c6139ba669044ffa@d41d8cd9",
+        "@opam/flow_parser@github:GillianPlatform/flow:flow_parser.opam#dfa43df0b8776f22e5fb2629a22d69a6d302e241@d41d8cd9",
         "@opam/dune@opam:3.8.3@ff88b4c5", "@opam/dap@opam:1.0.6@5996f56d",
         "@opam/cmdliner@opam:1.2.0@b0c6143c",
         "@opam/alcotest@opam:1.0.1@aba26ba2"
@@ -407,14 +407,14 @@
       ],
       "devDependencies": []
     },
-    "compcert@github:GillianPlatform/CompCert#37cc3df89df614d42e3e0fadbaaebc9bd01134e9@d41d8cd9": {
-      "id": "compcert@github:GillianPlatform/CompCert#37cc3df89df614d42e3e0fadbaaebc9bd01134e9@d41d8cd9",
+    "compcert@github:GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b@d41d8cd9": {
+      "id": "compcert@github:GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b@d41d8cd9",
       "name": "compcert",
-      "version": "github:GillianPlatform/CompCert#37cc3df89df614d42e3e0fadbaaebc9bd01134e9",
+      "version": "github:GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b",
       "source": {
         "type": "install",
         "source": [
-          "github:GillianPlatform/CompCert#37cc3df89df614d42e3e0fadbaaebc9bd01134e9"
+          "github:GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b"
         ]
       },
       "overrides": [],
@@ -2794,14 +2794,14 @@
       ],
       "devDependencies": [ "ocaml@5.1.4@d41d8cd9" ]
     },
-    "@opam/flow_parser@github:GillianPlatform/flow:flow_parser.opam#cb0031f83272d01e140ace35c6139ba669044ffa@d41d8cd9": {
-      "id": "@opam/flow_parser@github:GillianPlatform/flow:flow_parser.opam#cb0031f83272d01e140ace35c6139ba669044ffa@d41d8cd9",
+    "@opam/flow_parser@github:GillianPlatform/flow:flow_parser.opam#dfa43df0b8776f22e5fb2629a22d69a6d302e241@d41d8cd9": {
+      "id": "@opam/flow_parser@github:GillianPlatform/flow:flow_parser.opam#dfa43df0b8776f22e5fb2629a22d69a6d302e241@d41d8cd9",
       "name": "@opam/flow_parser",
-      "version": "github:GillianPlatform/flow:flow_parser.opam#cb0031f83272d01e140ace35c6139ba669044ffa",
+      "version": "github:GillianPlatform/flow:flow_parser.opam#dfa43df0b8776f22e5fb2629a22d69a6d302e241",
       "source": {
         "type": "install",
         "source": [
-          "github:GillianPlatform/flow:flow_parser.opam#cb0031f83272d01e140ace35c6139ba669044ffa"
+          "github:GillianPlatform/flow:flow_parser.opam#dfa43df0b8776f22e5fb2629a22d69a6d302e241"
         ]
       },
       "overrides": [],
@@ -2809,11 +2809,12 @@
         "ocaml@5.1.4@d41d8cd9", "@opam/wtf8@opam:1.0.2@23c2982b",
         "@opam/ppx_gen_rec@opam:2.0.0@6dd2f1ca",
         "@opam/ppx_deriving@opam:5.2.1@2315fdd0",
-        "@opam/dune@opam:3.8.3@ff88b4c5", "@esy-ocaml/substs@0.0.1@d41d8cd9"
+        "@opam/dune@opam:3.8.3@ff88b4c5", "@opam/base@opam:v0.16.3@de1ba42e",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
       ],
       "devDependencies": [
         "ocaml@5.1.4@d41d8cd9", "@opam/wtf8@opam:1.0.2@23c2982b",
-        "@opam/dune@opam:3.8.3@ff88b4c5"
+        "@opam/dune@opam:3.8.3@ff88b4c5", "@opam/base@opam:v0.16.3@de1ba42e"
       ]
     },
     "@opam/fix@opam:20230505@941a65ff": {

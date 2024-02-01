@@ -83,7 +83,7 @@
     "@opam/dap": "1.0.6",
     "@opam/dune": "^3.0",
     "@opam/fmt": "^0.8.8",
-    "@opam/flow_parser": "GillianPlatform/flow:flow_parser.opam#cb0031f83272d01e140ace35c6139ba669044ffa",
+    "@opam/flow_parser": "GillianPlatform/flow:flow_parser.opam#dfa43df0b8776f22e5fb2629a22d69a6d302e241",
     "@opam/memtrace": "0.2.3",
     "@opam/menhir": "20231231",
     "@opam/ppx_deriving_yojson": "*",
@@ -94,7 +94,7 @@
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
     "@opam/z3": "GillianPlatform/esy-z3#e8b2ce266d5d8bd67c54bd226c6301f7b180bb09",
-    "compcert": "GillianPlatform/CompCert#37cc3df89df614d42e3e0fadbaaebc9bd01134e9",
+    "compcert": "GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b",
     "ocaml": "5.1.x"
   },
   "devDependencies": {
