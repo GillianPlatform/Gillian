@@ -65,13 +65,12 @@ let resolve_require_args
       Error (Printf.sprintf "cannot import global module \"%s\"" path)
   in
   let resolve_path_expr = function
-    | Literal { value = String path; raw; comments } ->
+    | StringLiteral { value = path; raw; comments } ->
         let resolved_path =
           get_or_raise_exn prog_path loc (resolve_path path)
         in
         Ok
-          ( Literal { value = String resolved_path; raw; comments },
-            resolved_path )
+          (StringLiteral { value = resolved_path; raw; comments }, resolved_path)
     | _ -> Error "the 'id' argument must be a string"
   in
   let resolve_args = function
@@ -123,10 +122,13 @@ let rec resolve_statement prog_path (statement : (loc, loc) Statement.t) =
         let _object, _object_rps = resolve_expression prog_path _object in
         let body, body_rps = resolve_statement prog_path body in
         (With { _object; body; comments }, _object_rps @ body_rps)
-    | Switch { discriminant; cases; comments } ->
+    | Switch { discriminant; cases; exhaustive_out = _; comments } ->
         let discriminant, dis_rps = resolve_expression prog_path discriminant in
+        (* FIXME: this might be wrong! I'm copying what flow does internally. *)
+        let exhaustive_out = fst discriminant in
         let cases, cases_rps = map (resolve_switch_case prog_path) cases in
-        (Switch { discriminant; cases; comments }, dis_rps @ cases_rps)
+        ( Switch { discriminant; cases; exhaustive_out; comments },
+          dis_rps @ cases_rps )
     | Throw { argument; comments } ->
         let argument, req_paths = resolve_expression prog_path argument in
         (Throw { argument; comments }, req_paths)
@@ -161,11 +163,11 @@ let rec resolve_statement prog_path (statement : (loc, loc) Statement.t) =
         let body, body_rps = resolve_statement prog_path body in
         ( ForIn { left; right; body; each; comments },
           left_rps @ right_rps @ body_rps )
-    | Return { argument; comments } ->
+    | Return { argument; comments; return_out } ->
         let argument, req_paths =
           opt_map (resolve_expression prog_path) argument
         in
-        (Return { argument; comments }, req_paths)
+        (Return { argument; comments; return_out }, req_paths)
     | _ -> (stat, [])
   in
   ((loc, resolved_stat), req_paths)
@@ -401,9 +403,11 @@ and resolve_expressions prog_path (expressions : (loc, loc) Expression.t list) =
     the modified AST (with all the paths having been checked to exist and
     normalised) as well as the paths themselves. *)
 let resolve_imports prog_path (prog : (loc, loc) Program.t) =
-  let loc, Program.{ statements; comments; all_comments } = prog in
+  let loc, Program.{ statements; comments; all_comments; interpreter } = prog in
   let resolved_stats, req_paths = resolve_statements prog_path statements in
-  ( (loc, Program.{ statements = resolved_stats; comments; all_comments }),
+  ( ( loc,
+      Program.
+        { statements = resolved_stats; comments; all_comments; interpreter } ),
     req_paths )
 
 (** Wraps the module code inside special syntax that hides its variables from
