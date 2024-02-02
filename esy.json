@@ -102,11 +102,11 @@
     "@opam/cmitomli": "*",
     "@opam/fileutils": "*",
     "@opam/utop": "*",
-    "@opam/bos": ">=0.2.1",
     "@opam/ocaml-lsp-server": "^1.17.0",
     "@opam/odoc": "^2.2.0",
     "@opam/ocamlformat": "0.24.1",
     "@opam/ocamlfind": "*",
+    "@opam/feather": "*",
     "concurrently": "^7.6.0"
   },
   "resolutions": {
