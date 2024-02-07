@@ -25,15 +25,16 @@ let possible_hooks = [
   "p4-pre-submit";
   "post-index-change"
 ]
-open Shexp_process
-open Shexp_process.Infix
+open Feather
+open Feather.Infix
 
 let cwd = Sys.getcwd ()
 
 let githooksFolder = Filename.concat cwd "githooks"
-let gitFolder = String.trim (eval (
-  (run "git" ["rev-parse"; "--git-dir"])
-  |- read_all))
+let gitFolder =
+  process "git" ["rev-parse"; "--git-dir"]
+  |> collect stdout
+  |> String.trim
 let destination = Filename.concat gitFolder "hooks"
 let hooks_names =
   let existing = Sys.readdir githooksFolder in

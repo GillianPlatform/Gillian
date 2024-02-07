@@ -329,15 +329,15 @@ let transform_binary_op loc =
 
 let transform_assignment_op loc =
   let open Expression.Assignment in
+  let not_es5 op_name =
+    ParserError
+      (NotEcmaScript5 ("The " ^ op_name ^ " operator is not part of ES5", loc))
+  in
   function
   | PlusAssign -> Plus
   | MinusAssign -> Minus
   | MultAssign -> Times
-  | ExpAssign ->
-      raise
-        (ParserError
-           (NotEcmaScript5
-              ("The exponentiation operator is not part of ES5", loc)))
+  | ExpAssign -> raise (not_es5 "exponentiation")
   | DivAssign -> Div
   | ModAssign -> Mod
   | LShiftAssign -> Lsh
@@ -346,6 +346,9 @@ let transform_assignment_op loc =
   | BitOrAssign -> Bitor
   | BitXorAssign -> Bitxor
   | BitAndAssign -> Bitand
+  | AndAssign -> raise (not_es5 "&&=")
+  | OrAssign -> raise (not_es5 "||=")
+  | NullishAssign -> raise (not_es5 "??=")
 
 let transform_logical_op loc =
   let open Expression in
@@ -419,10 +422,10 @@ let rec transform_properties ~parent_strict start_loc annotations properties =
 and transform_prop_key key =
   let open Expression.Object.Property in
   match key with
-  | Literal (_, Literal.{ value = String s; _ }) -> PropnameString s
-  | Literal (_, Literal.{ value = Number f; _ }) -> PropnameNum f
+  | StringLiteral (_, { value = s; _ }) -> PropnameString s
+  | NumberLiteral (_, { value = f; _ }) -> PropnameNum f
   | Identifier i -> PropnameId (get_str_id i)
-  | Literal (l, _) | PrivateName (l, _) | Computed (l, _) ->
+  | BigIntLiteral (l, _) | PrivateName (l, _) | Computed (l, _) ->
       raise
         (ParserError
            (NotEcmaScript5
@@ -667,18 +670,17 @@ and transform_expression
       mk_exp (Array trans_els) loc leading_annots
   | Expression.(Identifier (_, { name; _ })) ->
       mk_exp (Var name) loc (rem_locs annotations)
-  | Expression.(Literal Literal.{ value; _ }) ->
-      let trans_val =
-        match value with
-        | Literal.Boolean b -> Bool b
-        | Number f -> Num f
-        | Null -> Null
-        | String s -> String s
-        | RegExp { pattern; flags } -> RegExp (pattern, flags)
-        | BigInt _ ->
-            raise (ParserError (NotEcmaScript5 ("BigInt not part of ES5", loc)))
-      in
-      mk_exp trans_val loc leading_annots
+  | Expression.(StringLiteral { value = s; _ }) ->
+      mk_exp (String s) loc leading_annots
+  | Expression.(BooleanLiteral { value = b; _ }) ->
+      mk_exp (Bool b) loc leading_annots
+  | Expression.(NullLiteral _) -> mk_exp Null loc leading_annots
+  | Expression.(NumberLiteral { value = f; _ }) ->
+      mk_exp (Num f) loc leading_annots
+  | Expression.(BigIntLiteral _) ->
+      raise (ParserError (NotEcmaScript5 ("BigInt not part of ES5", loc)))
+  | Expression.(RegExpLiteral { pattern; flags; _ }) ->
+      mk_exp (RegExp (pattern, flags)) loc leading_annots
   | Expression.(Call Call.{ callee; arguments = _, { arguments; _ }; _ }) ->
       let calleeloc, _ = callee in
       let callee_annots, arg_annots =
@@ -1013,7 +1015,8 @@ and transform_statement
       let trans_body = transform_statement ~parent_strict body_annot body in
       (* Every remaining annotation goes to the body *)
       mk_exp (With (trans_obj, trans_body)) loc leading_annots
-  | Statement.(Switch { discriminant; cases; comments = _ }) ->
+  | Statement.(Switch { discriminant; cases; exhaustive_out = _; comments = _ })
+    ->
       let ldisc, _ = discriminant in
       let expr_annots, other_annots = partition_inner ldisc inner_annots in
       let trans_discr =
@@ -1188,7 +1191,7 @@ and transform_statement
       mk_exp
         (For (trans_init, trans_test, trans_update, trans_body))
         loc leading_annots
-  | Statement.(Return Return.{ argument; comments = _ }) ->
+  | Statement.(Return Return.{ argument; return_out = _; comments = _ }) ->
       let trans_arg =
         option_map (transform_expression ~parent_strict inner_annots) argument
       in
@@ -1241,8 +1244,14 @@ let transform_program
     (prog : (loc, loc) Program.t) =
   let start_loc = Loc.none in
   (* As of @esy-ocaml/flow-parser v0.76, this is position (0, 0) *)
-  let loc, Program.{ statements = raw_stmts; all_comments = cmts; comments = _ }
-      =
+  let ( loc,
+        Program.
+          {
+            statements = raw_stmts;
+            all_comments = cmts;
+            interpreter = _;
+            comments = _;
+          } ) =
     prog
   in
   let strictness = force_strict || block_is_strict raw_stmts in

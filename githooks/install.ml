@@ -3,7 +3,7 @@
 #use "topfind";;
 #thread
 
-#require "shexp.process";;
+#require "feather";;
 #use "./githooks/common.ml";;
 #require "fileutils"
 
