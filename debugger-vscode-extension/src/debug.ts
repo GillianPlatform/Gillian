@@ -9,7 +9,7 @@ import {
 } from 'vscode';
 
 import { startDebugging } from './commands';
-import { BranchCase, DebuggerState, UnifyMap } from './types';
+import { BranchCase, DebuggerState, MatchMap } from './types';
 import { WebviewPanel } from './WebviewPanel';
 
 type LogEvent = {
@@ -159,14 +159,14 @@ export async function getDebuggerState() {
   }
 }
 
-export async function getUnification(
+export async function getMatch(
   id: number
-): Promise<[number, UnifyMap] | undefined> {
+): Promise<[number, MatchMap] | undefined> {
   const session = vscode.debug.activeDebugSession;
   if (session !== undefined) {
-    const result = await session.customRequest('unification', { id });
-    const { unifyId, unifyMap } = result;
-    return [unifyId, unifyMap];
+    const result = await session.customRequest('matching', { id });
+    const { matchId, matchMap } = result;
+    return [matchId, matchMap];
   }
 }
 

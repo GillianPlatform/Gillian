@@ -1,7 +1,7 @@
 import produce, { Draft, enableMapSet } from 'immer';
 import create, { State as ZState, StateCreator } from 'zustand';
-import { DebuggerState, UnifyMap, State, UnifyStep } from '../../types';
-import { requestUnification } from './VSCodeAPI';
+import { DebuggerState, MatchMap, State, MatchStep } from '../../types';
+import { requestMatching } from './VSCodeAPI';
 
 enableMapSet();
 const immer =
@@ -13,76 +13,76 @@ const immer =
 
 export type Store = State & {
   updateDebuggerState: (debuggerState: DebuggerState) => void;
-  loadUnification: (unifyId: number, map: UnifyMap) => void;
-  requestUnification: (unifyId: number) => void;
-  selectBaseUnification: (unifyId: number) => boolean;
-  clearUnification: () => void;
-  pushUnification: (unifyId: number) => boolean;
-  popUnifications: (n: number) => void;
-  selectUnifyStep: (step: UnifyStep) => void;
+  loadMatching: (matchId: number, map: MatchMap) => void;
+  requestMatching: (matchId: number) => void;
+  selectBaseMatching: (matchId: number) => boolean;
+  clearMatching: () => void;
+  pushMatching: (matchId: number) => boolean;
+  popMatchings: (n: number) => void;
+  selectMatchStep: (step: MatchStep) => void;
   toggleExecNodeExpanded: (id: string) => void;
-  toggleUnifyNodeExpanded: (id: number) => void;
+  toggleMatchNodeExpanded: (id: number) => void;
   clear: () => void;
 };
 
 const useStore = create<Store>(
   immer((set, get) => {
-    const isUnifyInStore = (unifyId: number) =>
-      get().unifyState.unifications[unifyId] !== undefined;
+    const isMatchInStore = (matchId: number) =>
+      get().matchState.matches[matchId] !== undefined;
 
     return {
-      unifyState: {
+      matchState: {
         path: [],
-        unifications: {},
+        matches: {},
         expandedNodes: new Set(),
       },
       expandedExecNodes: new Set(),
       updateDebuggerState: debuggerState => {
         set(() => ({ debuggerState }));
       },
-      loadUnification: (unifyId, map) => {
-        set(({ unifyState }) => {
-          unifyState.unifications[unifyId] = { id: unifyId, map };
+      loadMatching: (matchId, map) => {
+        set(({ matchState }) => {
+          matchState.matches[matchId] = { id: matchId, map };
         });
       },
-      requestUnification: unifyId => {
-        requestUnification(unifyId);
-        set(({ unifyState }) => {
-          unifyState.unifications[unifyId] = undefined;
+      requestMatching: matchId => {
+        requestMatching(matchId);
+        set(({ matchState }) => {
+          matchState.matches[matchId] = undefined;
         });
       },
-      selectBaseUnification: unifyId => {
-        set(({ unifyState }) => {
-          unifyState.path = [unifyId];
-          unifyState.expandedNodes.clear();
+      selectBaseMatching: matchId => {
+        set(({ matchState }) => {
+          matchState.path = [matchId];
+          matchState.expandedNodes.clear();
         });
-        return isUnifyInStore(unifyId);
+        return isMatchInStore(matchId);
       },
-      clearUnification: () => {
-        set(({ unifyState }) => {
-          unifyState.path = [];
-          unifyState.expandedNodes.clear();
+      clearMatching: () => {
+        set(({ matchState }) => {
+          matchState.path = [];
+          matchState.expandedNodes.clear();
         });
       },
-      pushUnification: (unifyId: number) => {
-        set(({ unifyState }) => {
-          unifyState.path.unshift(unifyId);
+      pushMatching: (matchId: number) => {
+        set(({ matchState }) => {
+          matchState.path.unshift(matchId);
         });
-        return isUnifyInStore(unifyId);
+        return isMatchInStore(matchId);
       },
-      popUnifications: (n: number) => {
-        set(({ unifyState }) => {
+      popMatchings: (n: number) => {
+        set(({ matchState }) => {
           while (n--) {
-            unifyState.path.shift();
+            matchState.path.shift();
           }
         });
       },
-      selectUnifyStep: step => {
-        set(({ unifyState: { path, unifications } }) => {
-          const unifyId = path[0];
-          const unification = unifications[unifyId];
-          if (unification !== undefined) {
-            unification.selected = step as any;
+      selectMatchStep: step => {
+        set(({ matchState: { path, matches } }) => {
+          const matchId = path[0];
+          const matching = matches[matchId];
+          if (matching !== undefined) {
+            matching.selected = step as any;
           }
         });
       },
@@ -92,20 +92,20 @@ const useStore = create<Store>(
           else expandedExecNodes.add(id);
         });
       },
-      toggleUnifyNodeExpanded: (id: number) => {
-        set(({ unifyState: { expandedNodes } }) => {
+      toggleMatchNodeExpanded: (id: number) => {
+        set(({ matchState: { expandedNodes } }) => {
           if (expandedNodes.has(id)) expandedNodes.delete(id);
           else expandedNodes.add(id);
         });
       },
       clear: () => {
-        set((state) => {
+        set(state => {
           state.debuggerState = undefined;
-          state.unifyState.path = [];
-          state.unifyState.unifications = {};
-          state.unifyState.expandedNodes.clear();
+          state.matchState.path = [];
+          state.matchState.matches = {};
+          state.matchState.expandedNodes.clear();
           state.expandedExecNodes.clear();
-        })
+        });
       },
     };
   })
@@ -115,26 +115,26 @@ export const mutateStore = () =>
   useStore(
     ({
       updateDebuggerState,
-      loadUnification,
-      requestUnification,
-      selectBaseUnification,
-      clearUnification,
-      pushUnification,
-      popUnifications,
-      selectUnifyStep,
+      loadMatching,
+      requestMatching,
+      selectBaseMatching,
+      clearMatching,
+      pushMatching,
+      popMatchings,
+      selectMatchStep,
       toggleExecNodeExpanded,
-      toggleUnifyNodeExpanded,
+      toggleMatchNodeExpanded,
     }) => ({
       updateDebuggerState,
-      loadUnification,
-      requestUnification,
-      selectBaseUnification,
-      clearUnification,
-      pushUnification,
-      popUnifications,
-      selectUnifyStep,
+      loadMatching,
+      requestMatching,
+      selectBaseMatching,
+      clearMatching,
+      pushMatching,
+      popMatchings,
+      selectMatchStep,
       toggleExecNodeExpanded,
-      toggleUnifyNodeExpanded,
+      toggleMatchNodeExpanded,
     })
   );
 

@@ -84,10 +84,10 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
     jump,
   } = data;
 
-  const unifyBadge = (() => {
-    if (cmdData.unifys.length === 0) return <></>;
+  const matchBadge = (() => {
+    if (cmdData.matches.length === 0) return <></>;
 
-    const [result] = cmdData.unifys[0].result;
+    const [result] = cmdData.matches[0].result;
     const colorStyle = result === 'Success' ? {} : { color: 'red' };
     return (
       <>
@@ -160,7 +160,7 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
     >
       <pre>{cmdData.display}</pre>
       <div className="node-button-row">
-        {unifyBadge}
+        {matchBadge}
         <VSCodeButton
           appearance="icon"
           aria-label="Jump here"

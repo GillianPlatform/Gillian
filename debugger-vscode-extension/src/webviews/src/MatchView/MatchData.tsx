@@ -7,19 +7,19 @@ import {
   VSCodeLink,
 } from '@vscode/webview-ui-toolkit/react';
 import React, { useEffect, useMemo } from 'react';
-import { UnifyMap, UnifySeg, UnifyStep } from '../../../types';
+import { MatchMap, MatchSeg, MatchStep } from '../../../types';
 import useStore, { mutateStore } from '../store';
-import { Code, getUnifyName, showBaseUnifyKind } from '../util';
-import { requestUnification } from '../VSCodeAPI';
+import { Code, getMatchName, showBaseMatchKind } from '../util';
+import { requestMatching } from '../VSCodeAPI';
 
-import './UnifyData.css';
+import './MatchData.css';
 
 type Props = {
-  selectStep: (step: UnifyStep) => void;
+  selectStep: (step: MatchStep) => void;
 };
 
-const extractTargets = (seg: UnifySeg): { [key: number]: UnifyStep } => {
-  if (seg[0] === 'UnifyResult') {
+const extractTargets = (seg: MatchSeg): { [key: number]: MatchStep } => {
+  if (seg[0] === 'MatchResult') {
     const [, id, result] = seg;
     return { [id]: ['Result', id, result] };
   }
@@ -28,35 +28,35 @@ const extractTargets = (seg: UnifySeg): { [key: number]: UnifyStep } => {
   return { [asrt.id]: ['Assertion', asrt], ...extractTargets(next) };
 };
 
-const UnifyData = ({ selectStep }: Props) => {
+const MatchData = ({ selectStep }: Props) => {
   const mainProcName = useStore(store => store.debuggerState?.mainProc || '');
-  const [{ path, unifications }, baseUnifyKind] = useStore(store => [
-    store.unifyState,
-    showBaseUnifyKind(store),
+  const [{ path, matches }, baseMatchKind] = useStore(store => [
+    store.matchState,
+    showBaseMatchKind(store),
   ]);
-  const { pushUnification, popUnifications } = mutateStore();
-  const [title, subtitle] = useStore(state => getUnifyName(state));
+  const { pushMatching, popMatchings } = mutateStore();
+  const [title, subtitle] = useStore(state => getMatchName(state));
 
   useEffect(() => {
-    console.log('Showing unify data', path, unifications);
-  }, [path, unifications]);
-  const unification = unifications[path[0]];
-  const selectedStep = unification?.selected;
+    console.log('Showing match data', path, matches);
+  }, [path, matches]);
+  const matching = matches[path[0]];
+  const selectedStep = matching?.selected;
 
-  const unifyJumpTargets = useMemo(() => {
-    if (unification?.map === undefined) return {};
-    const unifyMap = unification?.map as UnifyMap;
-    if (unifyMap[1][0] === 'Direct') {
-      return extractTargets(unifyMap[1][1]);
+  const matchJumpTargets = useMemo(() => {
+    if (matching?.map === undefined) return {};
+    const matchMap = matching?.map as MatchMap;
+    if (matchMap[1][0] === 'Direct') {
+      return extractTargets(matchMap[1][1]);
     } else {
-      return unifyMap[1][1].reduce(
+      return matchMap[1][1].reduce(
         (acc, seg) => ({ ...acc, ...extractTargets(seg) }),
         {}
       );
     }
-  }, [unification]);
+  }, [matching]);
 
-  const unifyNames = [
+  const matchNames = [
     <>
       <span>
         {title} ({subtitle})
@@ -64,33 +64,33 @@ const UnifyData = ({ selectStep }: Props) => {
     </>,
   ];
   for (let i = path.length - 1; i > 0; i--) {
-    const unifyId = path[i];
-    const unification = unifications[unifyId];
+    const matchId = path[i];
+    const matching = matches[matchId];
     if (
-      !unification ||
-      !unification.selected ||
-      unification.selected[0] !== 'Assertion'
+      !matching ||
+      !matching.selected ||
+      matching.selected[0] !== 'Assertion'
     ) {
-      console.error('UnifyData: malformed state', {
+      console.error('MatchData: malformed state', {
         path,
-        unifyId,
-        unification,
+        matchId,
+        matching,
       });
       continue;
     }
-    const { assertion } = unification.selected[1];
+    const { assertion } = matching.selected[1];
 
-    unifyNames.push(<Code>{assertion}</Code>);
+    matchNames.push(<Code>{assertion}</Code>);
   }
-  const unifyLinks = unifyNames.map((name, i) => {
+  const matchLinks = matchNames.map((name, i) => {
     let link =
       i > path.length - 2 ? (
         name
       ) : (
         <VSCodeLink
-          title="Step out to this unification"
+          title="Step out to this matching"
           onClick={() => {
-            popUnifications(path.length - i - 1);
+            popMatchings(path.length - i - 1);
           }}
         >
           {name}
@@ -105,7 +105,7 @@ const UnifyData = ({ selectStep }: Props) => {
       );
     }
     return (
-      <div key={`${i}`} className="unify-link">
+      <div key={`${i}`} className="match-link">
         {link}
       </div>
     );
@@ -126,9 +126,9 @@ const UnifyData = ({ selectStep }: Props) => {
     if (fold !== null) {
       const foldId = fold[0];
       const stepInFold = () => {
-        const isInStore = pushUnification(foldId);
+        const isInStore = pushMatching(foldId);
         if (!isInStore) {
-          requestUnification(foldId);
+          requestMatching(foldId);
         }
       };
       stepInFoldButton = (
@@ -153,7 +153,7 @@ const UnifyData = ({ selectStep }: Props) => {
               <VSCodeDataGridCell cellType="columnheader" gridColumn="3" />
             </VSCodeDataGridRow>
             {substitutions.map(({ assertId, subst: [expr, val] }) => {
-              const target = unifyJumpTargets[assertId];
+              const target = matchJumpTargets[assertId];
               const jumpButtonIcon =
                 target === undefined ? 'question' : 'target';
               const jumpButton = (
@@ -194,9 +194,9 @@ const UnifyData = ({ selectStep }: Props) => {
   }
 
   return (
-    <div className="unify-data-wrap">
-      <div className="unify-data">
-        <p>{unifyLinks}</p>
+    <div className="match-data-wrap">
+      <div className="match-data">
+        <p>{matchLinks}</p>
         {stepInFoldButton}
 
         <VSCodeDivider />
@@ -208,4 +208,4 @@ const UnifyData = ({ selectStep }: Props) => {
   );
 };
 
-export default UnifyData;
+export default MatchData;

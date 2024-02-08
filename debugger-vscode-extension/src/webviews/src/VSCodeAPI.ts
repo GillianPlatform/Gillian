@@ -52,8 +52,8 @@ export const startProc = (procName: string) => {
   VSCodeAPI.postMessage({ type: 'request_start_proc', procName });
 };
 
-export const requestUnification = (id: number) => {
-  VSCodeAPI.postMessage({ type: 'request_unification', id });
+export const requestMatching = (id: number) => {
+  VSCodeAPI.postMessage({ type: 'request_matching', id });
 };
 
 // Singleton to prevent multiple fetches of VsCodeAPI.

@@ -1,12 +1,12 @@
 import React, { ReactNode } from 'react';
-import { UnificationState, UnifyKind, UnifyMap } from '../../types';
+import { MatchingState, MatchKind, MatchMap } from '../../types';
 import { Store } from './store';
 
 export const Code: React.FC = ({ children }) => (
   <span className="code">{children}</span>
 );
 
-export const showUnifyKind = ([kind]: UnifyKind) => {
+export const showMatchKind = ([kind]: MatchKind) => {
   switch (kind) {
     case 'Postcondition':
       return 'post-condition';
@@ -19,26 +19,24 @@ export const showUnifyKind = ([kind]: UnifyKind) => {
   }
 };
 
-export const getBaseUnification = ({ unifyState }: Store) => {
-  const { path, unifications } = unifyState;
-  const baseUnification = unifications[path[path.length - 1]];
-  return baseUnification;
+export const getBaseMatching = ({ matchState }: Store) => {
+  const { path, matches } = matchState;
+  const baseMatching = matches[path[path.length - 1]];
+  return baseMatching;
 };
 
-export const showUnificationKind = (
-  unification: UnificationState | undefined
-) => {
-  if (!unification) return undefined;
-  return showUnifyKind((unification.map as UnifyMap)[0]);
+export const showMatchingKind = (matching: MatchingState | undefined) => {
+  if (!matching) return undefined;
+  return showMatchKind((matching.map as MatchMap)[0]);
 };
 
-export const showBaseUnifyKind = (store: Store) =>
-  showUnificationKind(getBaseUnification(store));
+export const showBaseMatchKind = (store: Store) =>
+  showMatchingKind(getBaseMatching(store));
 
-export const getUnifyName = (store: Store): [ReactNode, ReactNode] => {
-  const { path, unifications } = store.unifyState;
+export const getMatchName = (store: Store): [ReactNode, ReactNode] => {
+  const { path, matches } = store.matchState;
   if (path.length < 2) {
-    const kind = showBaseUnifyKind(store);
+    const kind = showBaseMatchKind(store);
     const procName = store.debuggerState?.mainProc || 'unknown proc';
     return [
       <>
@@ -47,8 +45,8 @@ export const getUnifyName = (store: Store): [ReactNode, ReactNode] => {
       <>Match {kind}</>,
     ];
   }
-  const prevStep = unifications[path[1]!]!.selected!;
-  if (prevStep[0] !== 'Assertion') throw 'getUnifyName error';
+  const prevStep = matches[path[1]!]!.selected!;
+  if (prevStep[0] !== 'Assertion') throw 'getMatchName error';
   const assertion = prevStep[1].assertion;
   return [
     <>Fold</>,

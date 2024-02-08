@@ -6,7 +6,7 @@ import {
   DebuggerState,
   MessageFromWebview,
   MessageToWebview,
-  UnifyMap,
+  MatchMap,
 } from './types';
 
 export class WebviewPanel {
@@ -66,11 +66,11 @@ export class WebviewPanel {
       await debug.jumpToCmd(e.cmdId);
     } else if (e.type === 'request_exec_specific') {
       await debug.execSpecificCmd(e.prevId, e.branchCase);
-    } else if (e.type === 'request_unification') {
-      const unifyData = await debug.getUnification(e.id);
-      if (unifyData !== undefined) {
-        const [unifyId, unifyMap] = unifyData;
-        this.updateUnification(unifyId, unifyMap);
+    } else if (e.type === 'request_matching') {
+      const matchData = await debug.getMatch(e.id);
+      if (matchData !== undefined) {
+        const [matchId, matchMap] = matchData;
+        this.updateMatching(matchId, matchMap);
       }
     } else if (e.type === 'request_start_proc') {
       debug.startProc(e.procName);
@@ -78,8 +78,8 @@ export class WebviewPanel {
   }
 
   public clearState() {
-    console.info('Clearing webview state')
-    this.sendMessage({ type: 'clear_state' })
+    console.info('Clearing webview state');
+    this.sendMessage({ type: 'clear_state' });
   }
 
   public updateState(state: DebuggerState) {
@@ -87,9 +87,9 @@ export class WebviewPanel {
     this.sendMessage({ type: 'state_update', state });
   }
 
-  public updateUnification(unifyId: number, unifyMap: UnifyMap) {
-    console.info('Got unification', { unifyId, unifyMap });
-    this.sendMessage({ type: 'unify_update', unifyId, unifyMap });
+  public updateMatching(matchId: number, matchMap: MatchMap) {
+    console.info('Got matching', { matchId, matchMap });
+    this.sendMessage({ type: 'match_update', matchId, matchMap });
   }
 
   public dispose() {

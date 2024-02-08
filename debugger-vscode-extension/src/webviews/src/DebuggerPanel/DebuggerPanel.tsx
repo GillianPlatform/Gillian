@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { DebuggerState } from '../../../types';
 import ExecMapView from '../ExecMap/ExecMapView';
 import useStore, { mutateStore } from '../store';
-import UnifyView from '../UnifyView/UnifyView';
+import MatchView from '../MatchView/MatchView';
 import * as events from '../events';
 
 import './DebuggerPanel.css';
@@ -17,8 +17,8 @@ const DebuggerPanel = () => {
     ({ debuggerState, expandedExecNodes }) => [debuggerState, expandedExecNodes]
   );
   const { toggleExecNodeExpanded } = mutateStore();
-  const hasUnify = useStore(
-    ({ unifyState: { path } }) => path && path.length > 0
+  const hasMatch = useStore(
+    ({ matchState: { path } }) => path && path.length > 0
   );
   const [activeTab, setActiveTab] = useState('debug-exec-tab');
 
@@ -33,10 +33,10 @@ const DebuggerPanel = () => {
   }, []);
 
   useEffect(() => {
-    if (!hasUnify) {
+    if (!hasMatch) {
       setActiveTab('debug-exec-tab');
     }
-  }, [hasUnify]);
+  }, [hasMatch]);
 
   return (
     <div className="debugger-panel">
@@ -50,9 +50,9 @@ const DebuggerPanel = () => {
           EXECUTION
         </VSCodePanelTab>
         <VSCodePanelTab
-          id="debug-unify-tab"
+          id="debug-match-tab"
           onClick={() => {
-            setActiveTab('debug-unify-tab');
+            setActiveTab('debug-match-tab');
           }}
         >
           MATCHING
@@ -67,8 +67,8 @@ const DebuggerPanel = () => {
             }}
           />
         </VSCodePanelView>
-        <VSCodePanelView id="debug-unify-panel">
-          <UnifyView />
+        <VSCodePanelView id="debug-match-panel">
+          <MatchView />
         </VSCodePanelView>
       </VSCodePanels>
     </div>
