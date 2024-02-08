@@ -30,7 +30,7 @@ val iter : t -> (string -> Type.t -> unit) -> unit
 val fold : t -> (string -> Type.t -> 'a -> 'a) -> 'a -> 'a
 val lvars : t -> Containers.SS.t
 val vars : t -> Containers.SS.t
-val unifiables : t -> Containers.SS.t
+val matchables : t -> Containers.SS.t
 val to_list : t -> (Var.t * Type.t) list
 val to_list_expr : t -> (Expr.t * Type.t) list
 val substitution : t -> SESubst.t -> bool -> t

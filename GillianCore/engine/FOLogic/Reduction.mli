@@ -20,22 +20,22 @@ val understand_lstcat :
   Expr.t list ->
   (Formula.t * Containers.SS.t) option
 
-(** [reduce_lexpr ?unification ?reduce_lvars ?pfs ?gamma e] reduces the
+(** [reduce_lexpr ?matching ?reduce_lvars ?pfs ?gamma e] reduces the
     expression [e] given (optional) pure formulae [pfs] and typing environment [gamma].
-    The [reduce_lvars] and [unification] flags should not be used by Gillian instantiation developers. *)
+    The [reduce_lvars] and [matching] flags should not be used by Gillian instantiation developers. *)
 val reduce_lexpr :
-  ?unification:bool ->
+  ?matching:bool ->
   ?reduce_lvars:bool ->
   ?pfs:PFS.t ->
   ?gamma:Type_env.t ->
   Gil_syntax.Expr.t ->
   Gil_syntax.Expr.t
 
-(** [reduce_formula ?unification ?pfs ?gamma pf] reduces the formula [pf]
+(** [reduce_formula ?matching ?pfs ?gamma pf] reduces the formula [pf]
     given (optional) pure formulae [pfs] and typing environment [gamma].
-    The [unification] flag should not be used by Gillian instantiation developers. *)
+    The [matching] flag should not be used by Gillian instantiation developers. *)
 val reduce_formula :
-  ?unification:bool ->
+  ?matching:bool ->
   ?rpfs:bool ->
   ?time:string ->
   ?pfs:PFS.t ->
@@ -43,11 +43,11 @@ val reduce_formula :
   Gil_syntax.Formula.t ->
   Gil_syntax.Formula.t
 
-(** [reduce_assertion ?unification ?pfs ?gamma a] reduces the assertion [a]
+(** [reduce_assertion ?matching ?pfs ?gamma a] reduces the assertion [a]
     given (optional) pure formulae [pfs] and typing environment [gamma].
-    The [unification] flag should not be used by Gillian instantiation developers. *)
+    The [matching] flag should not be used by Gillian instantiation developers. *)
 val reduce_assertion :
-  ?unification:bool ->
+  ?matching:bool ->
   ?pfs:PFS.t ->
   ?gamma:Type_env.t ->
   Gil_syntax.Asrt.t ->

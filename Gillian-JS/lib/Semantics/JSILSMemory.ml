@@ -528,7 +528,7 @@ module M = struct
     Ok [ (heap, [], [], []) ]
 
   let execute_action
-      ?unification:_
+      ?matching:_
       (action : string)
       (heap : t)
       (pfs : PFS.t)

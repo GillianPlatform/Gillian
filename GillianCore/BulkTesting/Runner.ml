@@ -124,8 +124,8 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
             in
             let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
             if should_execute prog filename prev_results_opt then
-              match UP.init_prog prog with
-              | Error _ -> failwith "Failed to create unification plans"
+              match MP.init_prog prog with
+              | Error _ -> failwith "Failed to create matching plans"
               | Ok prog ->
                   let () = before_execution () in
                   let ret =

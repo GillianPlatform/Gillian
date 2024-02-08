@@ -23,7 +23,7 @@ module type S = sig
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SUnifier : Unifier.S
+  module SMatcher : Matcher.S
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -81,7 +81,7 @@ struct
   type m_err = SPState.m_err_t
   type annot = PC.Annot.t
 
-  module SUnifier = Unifier.Make (SState)
+  module SMatcher = Matcher.Make (SState)
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
@@ -96,7 +96,7 @@ struct
     id : int * int;
     params : string list;
     pre_state : SPState.t;
-    post_up : UP.t;
+    post_mp : MP.t;
     flag : Flag.t option;
     spec_vars : Expr.Set.t; [@to_yojson yojson_of_expr_set]
   }
@@ -120,7 +120,7 @@ struct
   let testify
       ~(init_data : SPState.init_data)
       (func_or_lemma_name : string)
-      (preds : (string, UP.pred) Hashtbl.t)
+      (preds : (string, MP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
@@ -192,16 +192,16 @@ struct
         let pre' = Asrt.star (SPState.to_assertions ss_pre) in
         (None, Some (pre', posts))
       else
-        (* Step 4 - create a unification plan for the postconditions and s_test *)
+        (* Step 4 - create a matching plan for the postconditions and s_test *)
         let () =
-          L.verbose (fun fmt -> fmt "Creating UPs for posts of %s" name)
+          L.verbose (fun fmt -> fmt "Creating MPs for posts of %s" name)
         in
         let pvar_params =
           List.fold_left
             (fun acc x -> Expr.Set.add (Expr.PVar x) acc)
             Expr.Set.empty params
         in
-        let known_unifiables =
+        let known_matchables =
           Expr.Set.add (PVar Names.return_variable)
             (Expr.Set.union pvar_params spec_vars)
         in
@@ -213,22 +213,22 @@ struct
                 exs Expr.Set.empty)
             label
         in
-        let known_unifiables = Expr.Set.union known_unifiables existentials in
+        let known_matchables = Expr.Set.union known_matchables existentials in
         let simple_posts = List.map (fun post -> (post, (label, None))) posts in
-        let post_up =
-          UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
+        let post_mp =
+          MP.init known_matchables Expr.Set.empty pred_ins simple_posts
         in
         L.verbose (fun m -> m "END of STEP 4@\n");
-        match post_up with
+        match post_mp with
         | Error _ ->
             let msg =
-              Printf.sprintf "Warning: testify failed for %s. Cause: post_up \n"
+              Printf.sprintf "Warning: testify failed for %s. Cause: post_mp \n"
                 name
             in
             Printf.printf "%s" msg;
             L.verbose (fun m -> m "%s" msg);
             (None, None)
-        | Ok post_up ->
+        | Ok post_mp ->
             let pre' = Asrt.star (SPState.to_assertions ss_pre) in
             let ss_pre =
               match flag with
@@ -244,7 +244,7 @@ struct
                 id = (id, id');
                 params;
                 pre_state = ss_pre;
-                post_up;
+                post_mp;
                 flag;
                 spec_vars;
               }
@@ -284,7 +284,7 @@ struct
   let testify_sspec
       ~init_data
       (spec_name : string)
-      (preds : UP.preds_tbl_t)
+      (preds : MP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
@@ -307,7 +307,7 @@ struct
   let testify_spec
       ~init_data
       (spec_name : string)
-      (preds : UP.preds_tbl_t)
+      (preds : MP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (spec : Spec.t) : t list * Spec.t =
     if not spec.spec_to_verify then ([], spec)
@@ -361,7 +361,7 @@ struct
 
   let testify_lemma
       ~init_data
-      (preds : UP.preds_tbl_t)
+      (preds : MP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
@@ -421,20 +421,20 @@ struct
       (SS.elements (SPState.get_spec_vars state));
 
     L.verbose (fun m ->
-        m "Analyse result: About to unify one postcondition of %s. post: %a"
-          test.name UP.pp test.post_up);
-    let unification_result =
-      SPState.unifies state subst test.post_up Unifier.Postcondition
+        m "Analyse result: About to match one postcondition of %s. post: %a"
+          test.name MP.pp test.post_mp);
+    let matching_result =
+      SPState.matches state subst test.post_mp Matcher.Postcondition
     in
     L.normal (fun m ->
         m "Analysis result: Postcondition %a"
           (fun ft b ->
             Fmt.string ft
-            @@ if b then "unified successfully" else "not unifiable")
-          unification_result);
+            @@ if b then "matched successfully" else "not matchable")
+          matching_result);
     VerificationResults.set_result global_results test.name test.id
-      unification_result;
-    unification_result
+      matching_result;
+    matching_result
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
@@ -483,7 +483,7 @@ struct
             | id -> id
           in
           DL.log (fun m ->
-              m "Unify: setting parent to %a"
+              m "Match: setting parent to %a"
                 (Fmt.option L.Report_id.pp)
                 parent_id);
           L.Parent.with_id parent_id (fun () ->
@@ -506,7 +506,7 @@ struct
                 L.normal (fun m ->
                     m
                       "VERIFICATION FAILURE: Spec %s %a - post condition not \
-                       unifiable\n"
+                       matchable\n"
                       test.name
                       (Fmt.Dump.pair Fmt.int Fmt.int)
                       test.id);
@@ -546,7 +546,7 @@ struct
                L.normal (fun m ->
                    m
                      "VERIFICATION FAILURE: Spec %s %a - post condition not \
-                      unifiable\n"
+                      matchable\n"
                      test.name
                      (Fmt.Dump.pair Fmt.int Fmt.int)
                      test.id);
@@ -561,7 +561,7 @@ struct
     success
 
   (* FIXME: This function name is very bad! *)
-  let verify_up_to_procs (prog : annot UP.prog) (test : t) : annot UP.prog =
+  let verify_up_to_procs (prog : annot MP.prog) (test : t) : annot MP.prog =
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
     | Some _ ->
@@ -572,7 +572,7 @@ struct
         { prog with coverage = Hashtbl.create 1 }
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
-  let verify (prog : annot UP.prog) (test : t) : bool =
+  let verify (prog : annot MP.prog) (test : t) : bool =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -620,7 +620,7 @@ struct
       method! visit_GUnfold _ pred_name = SS.singleton pred_name
     end
 
-  let filter_internal_preds (prog : annot UP.prog) (pred_names : SS.t) =
+  let filter_internal_preds (prog : annot MP.prog) (pred_names : SS.t) =
     SS.filter
       (fun pred_name ->
         let pred = Prog.get_pred_exn prog.prog pred_name in
@@ -634,14 +634,14 @@ struct
       method! visit_ApplyLem _ lemma_name _ _ = SS.singleton lemma_name
     end
 
-  let filter_internal_lemmas (prog : annot UP.prog) (lemma_names : SS.t) =
+  let filter_internal_lemmas (prog : annot MP.prog) (lemma_names : SS.t) =
     SS.filter
       (fun lemma_name ->
         let lemma = Prog.get_lemma_exn prog.prog lemma_name in
         not lemma.lemma_internal)
       lemma_names
 
-  let record_proc_dependencies proc_name (prog : annot UP.prog) =
+  let record_proc_dependencies proc_name (prog : annot MP.prog) =
     let proc = Prog.get_proc_exn prog.prog proc_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_proc () proc)
@@ -656,7 +656,7 @@ struct
       (Call_graph.add_proc_lemma_use SAInterpreter.call_graph proc_name)
       lemmas_used
 
-  let record_lemma_dependencies lemma_name (prog : annot UP.prog) =
+  let record_lemma_dependencies lemma_name (prog : annot MP.prog) =
     let lemma = Prog.get_lemma_exn prog.prog lemma_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_lemma () lemma)
@@ -672,7 +672,7 @@ struct
       (Call_graph.add_lemma_call SAInterpreter.call_graph lemma_name)
       lemmas_used
 
-  let record_preds_used_by_pred pred_name (prog : annot UP.prog) =
+  let record_preds_used_by_pred pred_name (prog : annot MP.prog) =
     let pred = Prog.get_pred_exn prog.prog pred_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_pred () pred)
@@ -692,18 +692,17 @@ struct
       ~init_data
       (prog : prog_t)
       (pnames_to_verify : SS.t)
-      (lnames_to_verify : SS.t) : annot UP.prog * t list * t list =
-    let ipreds = UP.init_preds prog.preds in
+      (lnames_to_verify : SS.t) : annot MP.prog * t list * t list =
+    let ipreds = MP.init_preds prog.preds in
     match ipreds with
     | Error e ->
-        Fmt.pr
-          "Creation of unification plans for predicates failed with:\n%a\n@?"
-          UP.pp_up_err_t e;
-        Fmt.failwith "Creation of unification plans for predicates failed."
+        Fmt.pr "Creation of matching plans for predicates failed with:\n%a\n@?"
+          MP.pp_err e;
+        Fmt.failwith "Creation of matching plans for predicates failed."
     | Ok preds -> (
         let pred_ins =
           Hashtbl.fold
-            (fun name (pred : UP.pred) pred_ins ->
+            (fun name (pred : MP.pred) pred_ins ->
               Hashtbl.add pred_ins name pred.pred.pred_ins;
               pred_ins)
             preds
@@ -775,10 +774,10 @@ struct
               Fmt.(list ~sep:(any "@\n") Lemma.pp)
               (Prog.get_lemmas prog));
 
-        (* STEP 4: Create unification plans for specs and predicates *)
-        (* Printf.printf "Creating unification plans: %f\n" (cur_time -. start_time); *)
-        match UP.init_prog ~preds_tbl:preds prog with
-        | Error _ -> failwith "Creation of unification plans failed."
+        (* STEP 4: Create matching plans for specs and predicates *)
+        (* Printf.printf "Creating matching plans: %f\n" (cur_time -. start_time); *)
+        match MP.init_prog ~preds_tbl:preds prog with
+        | Error _ -> failwith "Creation of matching plans failed."
         | Ok prog' ->
             (* STEP 5: Determine static dependencies and add to call graph *)
             List.iter
@@ -961,11 +960,11 @@ struct
   module Debug = struct
     let get_tests_for_prog ~init_data (prog : prog_t) =
       let open Syntaxes.Option in
-      let ipreds = UP.init_preds prog.preds in
+      let ipreds = MP.init_preds prog.preds in
       let preds = Result.get_ok ipreds in
       let pred_ins =
         Hashtbl.fold
-          (fun name (pred : UP.pred) pred_ins ->
+          (fun name (pred : MP.pred) pred_ins ->
             Hashtbl.add pred_ins name pred.pred.pred_ins;
             pred_ins)
           preds

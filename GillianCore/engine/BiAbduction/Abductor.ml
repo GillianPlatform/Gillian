@@ -7,7 +7,7 @@ module type S = sig
   val test_prog :
     init_data:init_data ->
     ?call_graph:Call_graph.t ->
-    annot UP.prog ->
+    annot MP.prog ->
     bool ->
     SourceFiles.t option ->
     unit
@@ -54,7 +54,7 @@ module Make
     SSubst.init bindings'
 
   let make_spec
-      (_ : annot UP.prog)
+      (_ : annot MP.prog)
       (name : string)
       (params : string list)
       (bi_state_i : bi_state_t)
@@ -159,7 +159,7 @@ module Make
               params Spec.pp spec);
         Some spec
 
-  let testify ~init_data ~(prog : annot UP.prog) (bi_spec : BiSpec.t) : t list =
+  let testify ~init_data ~(prog : annot MP.prog) (bi_spec : BiSpec.t) : t list =
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
     let proc_names = Prog.get_proc_names prog.prog in
     let params = SS.of_list bi_spec.bispec_params in
@@ -186,7 +186,7 @@ module Make
 
   let run_test
       (ret_fun : result_t -> (Spec.t * Flag.t) option)
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (test : t) : (Spec.t * Flag.t) list =
     let state = SBAState.copy test.state in
     let state = SBAState.add_spec_vars state (SBAState.get_lvars state) in
@@ -214,7 +214,7 @@ module Make
       []
 
   let process_sym_exec_result
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (name : string)
       (params : string list)
       (state_i : bi_state_t)
@@ -223,10 +223,10 @@ module Make
     let process_spec = make_spec prog in
     let state_i = SBAState.copy state_i in
     let add_spec spec =
-      try UP.add_spec prog spec
+      try MP.add_spec prog spec
       with _ ->
         L.fail
-          (Format.asprintf "When trying to build an UP for %s, I died!" name)
+          (Format.asprintf "When trying to build an MP for %s, I died!" name)
     in
     match result with
     | RFail { error_state; _ } ->
@@ -249,7 +249,7 @@ module Make
   let pp_proc_stats fmt { gil_size; tests; succs; bugs; time } =
     Fmt.pf fmt "%d, %d, %d, %d, %f" gil_size tests succs bugs time
 
-  let run_tests (prog : annot UP.prog) (tests : t list) =
+  let run_tests (prog : annot MP.prog) (tests : t list) =
     let num_tests = List.length tests in
     Fmt.pr "Running tests on %d procs.\n@?" num_tests;
 
@@ -317,23 +317,23 @@ module Make
     result
 
   let get_test_results
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (succ_specs : Spec.t list)
       (error_specs : Spec.t list)
       (bug_specs : Spec.t list) =
     let bug_specs_txt =
       Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
+        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
         bug_specs
     in
     let error_specs_txt =
       Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
+        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
         error_specs
     in
     let normal_specs_txt =
       Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
+        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
         succ_specs
     in
 
@@ -388,7 +388,7 @@ module Make
     in
     sorted_tests @ rest_sorted_tests
 
-  let test_procs ~init_data ~call_graph (prog : annot UP.prog) =
+  let test_procs ~init_data ~call_graph (prog : annot MP.prog) =
     L.verbose (fun m -> m "Starting bi-abductive testing in normal mode");
     let proc_names = Prog.get_noninternal_proc_names prog.prog in
     L.verbose (fun m -> m "Proc names: %s" (str_concat proc_names));
@@ -403,11 +403,11 @@ module Make
     get_test_results prog succ_specs err_specs bug_specs
 
   let specs_equal (spec_a : Spec.t) (spec_b : Spec.t) =
-    (* FIXME: Perform a more robust comparsion based on unification *)
+    (* FIXME: Perform a more robust comparsion based on matching *)
     String.equal (Spec.hash_of_t spec_a) (Spec.hash_of_t spec_b)
 
   let test_procs_incrementally
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       ~(init_data : SPState.init_data)
       ~(prev_results : BiAbductionResults.t)
       ~(reverse_graph : Call_graph.t)
@@ -421,14 +421,14 @@ module Make
       str_concat (List.map (fun (s : Spec.t) -> s.spec_name) prev_specs)
     in
     L.verbose (fun m -> m "I will use the stored specs of: %s" prev_spec_names);
-    List.iter (fun spec -> UP.add_spec prog spec) prev_specs;
+    List.iter (fun spec -> MP.add_spec prog spec) prev_specs;
 
     let rec test_procs_aux to_test checked succ_specs error_specs bug_specs =
       (* FIXME: Keep tests in a heap/priority queue *)
       match to_test with
       | [] -> (succ_specs, error_specs, bug_specs)
       | proc_name :: rest ->
-          let () = UP.remove_spec prog proc_name in
+          let () = MP.remove_spec prog proc_name in
           let tests =
             testify ~init_data ~prog (Prog.get_bispec_exn prog.prog proc_name)
           in
@@ -477,7 +477,7 @@ module Make
   let test_prog
       ~init_data
       ?(call_graph = Call_graph.make ())
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
     let open ResultsDir in

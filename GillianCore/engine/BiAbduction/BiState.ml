@@ -51,13 +51,13 @@ module Make (State : SState.S) = struct
         (procs, first_state, state_af) :: rest
 
   let assume_a
-      ?(unification = false)
+      ?(matching = false)
       ?(production = false)
       ?time:_
       (bi_state : t)
       (fs : Formula.t list) : t option =
     let procs, state, state_af = bi_state in
-    match State.assume_a ~unification ~production state fs with
+    match State.assume_a ~matching ~production state fs with
     | Some state -> Some (procs, state, state_af)
     | None -> None
 
@@ -94,7 +94,7 @@ module Make (State : SState.S) = struct
   let simplify
       ?(save = false)
       ?(kill_new_lvars : bool option)
-      ?unification:_
+      ?matching:_
       (bi_state : t) : SVal.SESubst.t * t list =
     let kill_new_lvars = Option.value ~default:true kill_new_lvars in
     let procs, state, state_af = bi_state in
@@ -147,15 +147,15 @@ module Make (State : SState.S) = struct
     let _, state, _ = bi_state in
     State.to_assertions ?to_keep state
 
-  let evaluate_slcmd (prog : 'a UP.prog) (lcmd : SLCmd.t) (bi_state : t) :
+  let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
       (t, err_t) Res_list.t =
     let open Res_list.Syntax in
     let procs, state, state_af = bi_state in
     let++ state' = State.evaluate_slcmd prog lcmd state in
     (procs, state', state_af)
 
-  let unify_invariant _ _ _ _ _ =
-    raise (Failure "ERROR: unify_invariant called for bi-abductive execution")
+  let match_invariant _ _ _ _ _ =
+    raise (Failure "ERROR: match_invariant called for bi-abductive execution")
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for bi-abductive execution")
@@ -192,28 +192,28 @@ module Make (State : SState.S) = struct
 
   type post_res = (Flag.t * Asrt.t list) option
 
-  let unify
+  let match_
       (_ : SS.t)
       (state : State.t)
       (state_af : State.t)
       (subst : SVal.SESubst.t)
-      (up : UP.t) : (state_t * state_t * SVal.SESubst.t * post_res) list =
+      (mp : MP.t) : (state_t * state_t * SVal.SESubst.t * post_res) list =
     if not !Config.under_approximation then (
       L.print_to_all "Running bi-abduction without under-approximation?\n";
       exit 1);
     let open Syntaxes.List in
     let rec search next_state =
-      let state, state_af, subst, up = next_state in
-      match up with
-      | UP.ConsumeStep (step, rest_up) -> (
-          let unification_results = State.unify_assertion state subst step in
+      let state, state_af, subst, mp = next_state in
+      match mp with
+      | MP.ConsumeStep (step, rest_up) -> (
+          let matching_results = State.match_assertion state subst step in
           let should_copy =
-            match unification_results with
+            match matching_results with
             | _ :: _ :: _ -> true
             | _ -> false
           in
-          let* unification_result = unification_results in
-          match unification_result with
+          let* matching_result = matching_results in
+          match matching_result with
           | Ok state' ->
               if should_copy then
                 search
@@ -225,7 +225,7 @@ module Make (State : SState.S) = struct
           | Error err ->
               L.verbose (fun m ->
                   m
-                    "@[<v 2>WARNING: Unify Assertion Failed: %a with error: \
+                    "@[<v 2>WARNING: Match Assertion Failed: %a with error: \
                      %a. CUR SUBST:@\n\
                      %a@]@\n"
                     Asrt.pp (fst step) State.pp_err err SVal.SESubst.pp subst);
@@ -276,7 +276,7 @@ module Make (State : SState.S) = struct
                   verbose (fun m ->
                       m "@[<v 2>AF AFTER SIMPLIFICATION:@\n%a@]\n" State.pp
                         state_af'));
-                search (state', state_af', subst', up)))
+                search (state', state_af', subst', mp)))
       | Choice (left, right) ->
           let state_copy = State.copy state in
           let state_af_copy = State.copy state_af in
@@ -289,7 +289,7 @@ module Make (State : SState.S) = struct
           [ (state, state_af, subst, post) ]
       | LabelStep _ -> L.fail "DEATH: LABEL STEP IN BI-ABDUCTION"
     in
-    search (state, state_af, subst, up)
+    search (state, state_af, subst, mp)
 
   let update_store (state : State.t) (x : string option) (v : Expr.t) : State.t
       =
@@ -302,7 +302,7 @@ module Make (State : SState.S) = struct
         state'
 
   let run_spec
-      (spec : UP.spec)
+      (spec : MP.spec)
       (bi_state : t)
       (x : string)
       (args : Expr.t list)
@@ -310,8 +310,8 @@ module Make (State : SState.S) = struct
     (* let start_time = time() in *)
     L.(
       verbose (fun m ->
-          m "INSIDE RUN spec of %s with the following UP:@\n%a@\n"
-            spec.data.spec_name UP.pp spec.up));
+          m "INSIDE RUN spec of %s with the following MP:@\n%a@\n"
+            spec.data.spec_name MP.pp spec.mp));
     (* FIXME: CARE *)
     let subst_i, states = simplify bi_state in
     assert (List.length states = 1);
@@ -338,14 +338,14 @@ module Make (State : SState.S) = struct
     L.(
       verbose (fun m ->
           m
-            "@[<v 2>About to use the spec of %s with the following UP inside \
+            "@[<v 2>About to use the spec of %s with the following MP inside \
              BI-ABDUCTION:@\n\
              %a@]@\n"
-            spec.data.spec_name UP.pp spec.up));
-    let ret_states = unify procs state' state_af subst spec.up in
+            spec.data.spec_name MP.pp spec.mp));
+    let ret_states = match_ procs state' state_af subst spec.mp in
     L.(
       verbose (fun m ->
-          m "Concluding unification With %d results" (List.length ret_states)));
+          m "Concluding matching With %d results" (List.length ret_states)));
     let open Syntaxes.List in
     let* frame_state, state_af, subst, posts = ret_states in
     let fl, posts =
@@ -381,13 +381,13 @@ module Make (State : SState.S) = struct
     let v_ret : Expr.t = Option.value ~default:(Lit Undefined) v_ret in
     let final_state' : State.t = update_store final_state' (Some x) v_ret in
     (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
-    let _ = State.simplify ~unification:true final_state' in
+    let _ = State.simplify ~matching:true final_state' in
     let bi_state : t = (procs, final_state', state_af') in
 
     L.(
       verbose (fun m ->
           m
-            "@[<v 2>At the end of unification with AF:@\n\
+            "@[<v 2>At the end of matching with AF:@\n\
              %a@]@\n\
              @[<v 2>AND STATE:@\n\
              %a@]@\n"
@@ -396,7 +396,7 @@ module Make (State : SState.S) = struct
     (bi_state, fl)
 
   let run_spec
-      (spec : UP.spec)
+      (spec : MP.spec)
       (bi_state : t)
       (x : string)
       (args : Expr.t list)
@@ -410,9 +410,9 @@ module Make (State : SState.S) = struct
       =
     raise (Failure "produce_posts from bi_state.")
 
-  let unify_assertion (_ : t) (_ : SVal.SESubst.t) (_ : UP.step) :
+  let match_assertion (_ : t) (_ : SVal.SESubst.t) (_ : MP.step) :
       (t, err_t) Res_list.t =
-    raise (Failure "Unify assertion from bi_state.")
+    raise (Failure "Match assertion from bi_state.")
 
   let update_subst (_ : t) (_ : SVal.SESubst.t) : unit = ()
 

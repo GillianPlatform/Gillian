@@ -49,7 +49,7 @@ module type S = sig
 
   (** Assume assertion *)
   val assume_a :
-    ?unification:bool ->
+    ?matching:bool ->
     ?production:bool ->
     ?time:string ->
     t ->
@@ -74,7 +74,7 @@ module type S = sig
 
   (** State simplification *)
   val simplify :
-    ?save:bool -> ?kill_new_lvars:bool -> ?unification:bool -> t -> st * t list
+    ?save:bool -> ?kill_new_lvars:bool -> ?matching:bool -> t -> st * t list
 
   (** Value simplification *)
   val simplify_val : t -> vt -> vt
@@ -111,13 +111,13 @@ module type S = sig
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
-  val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
+  val evaluate_slcmd : 'a MP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
-  (** [unify_invariant prog revisited state invariant binders] returns a list of pairs of states.
+  (** [match_invariant prog revisited state invariant binders] returns a list of pairs of states.
       In each pair, the first element is the framed off state, and the second one is the invariant,
       i.e. the state obtained by producing the invariant *)
-  val unify_invariant :
-    'a UP.prog ->
+  val match_invariant :
+    'a MP.prog ->
     bool ->
     t ->
     Asrt.t ->
@@ -127,7 +127,7 @@ module type S = sig
   val frame_on : t -> (string * t) list -> string list -> (t, err_t) Res_list.t
 
   val run_spec :
-    UP.spec ->
+    MP.spec ->
     t ->
     string ->
     vt list ->
@@ -138,7 +138,7 @@ module type S = sig
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
   val clean_up : ?keep:Expr.Set.t -> t -> unit
-  val unify_assertion : t -> st -> UP.step -> (t, err_t) Res_list.t
+  val match_assertion : t -> st -> MP.step -> (t, err_t) Res_list.t
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t, err_t) Res_list.t
   val update_subst : t -> st -> unit

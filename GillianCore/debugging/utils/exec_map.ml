@@ -17,7 +17,7 @@
   These nodes also contain some (configurable) set of information - this
   usually includes the relevant report ID from the log database, a
   human-readable representation of the command, and any errors and
-  unifications that occurred during executing the command.
+  matches that occurred during executing the command.
   
   The child of a {!Cmd} node may be {!Nothing}, as can any child of a
   {!BranchCmd} node; this represents that there is a command here in the code,
@@ -76,11 +76,11 @@ type stop_at =
   | BeforeNothing
       (** As with [EndOfPath], but if the path ends with [Nothing], step back to the previous command *)
 
-(** Data about a unification *)
-type unification = {
+(** Data about a matching *)
+type matching = {
   id : L.Report_id.t;
-  kind : Unifier.unify_kind;
-  result : Unify_map.unify_result;
+  kind : Matcher.match_kind;
+  result : Match_map.match_result;
 }
 [@@deriving yojson]
 
@@ -152,7 +152,7 @@ module Packaged = struct
     id : L.Report_id.t;
     all_ids : L.Report_id.t list;
     display : string;
-    unifys : unification list;
+    matches : matching list;
     errors : string list;
     submap : t submap;
   }

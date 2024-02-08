@@ -8,7 +8,7 @@ let formatter = ref None
 
 let accepted_types =
   Logging_constants.Content_type.
-    [ debug; assertion; phase; cmd; unify; unify_result ]
+    [ debug; assertion; phase; cmd; match_; match_result ]
 
 let initialize () =
   let () = out_channel := Some (open_out filename) in

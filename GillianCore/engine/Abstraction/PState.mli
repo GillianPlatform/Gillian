@@ -9,7 +9,7 @@ module type S = sig
   type abs_t = string * vt list
 
   val make_p :
-    preds:UP.preds_tbl_t ->
+    preds:MP.preds_tbl_t ->
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
@@ -18,7 +18,7 @@ module type S = sig
     unit ->
     t
 
-  val init_with_pred_table : UP.preds_tbl_t -> init_data -> t
+  val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t
@@ -32,8 +32,8 @@ module type S = sig
   (** Set variants of given symbolic state *)
   val set_variants : t -> variants_t -> t
 
-  val unifies : t -> st -> UP.t -> Unifier.unify_kind -> bool
-  val add_pred_defs : UP.preds_tbl_t -> t -> t
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result

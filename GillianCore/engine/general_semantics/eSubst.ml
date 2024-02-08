@@ -111,7 +111,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let subst = Hashtbl.create Config.big_tbl_size in
     List.iter
       (fun (e, e_val) ->
-        let () = assert (Expr.is_unifiable e) in
+        let () = assert (Expr.is_matchable e) in
         Hashtbl.replace subst e e_val)
       exprs_les;
     subst
@@ -120,7 +120,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let subst = Hashtbl.create Config.big_tbl_size in
     Seq.iter
       (fun (e, e_val) ->
-        let () = assert (Expr.is_unifiable e) in
+        let () = assert (Expr.is_matchable e) in
         Hashtbl.replace subst e e_val)
       exprs_les;
     subst
@@ -170,7 +170,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param v Target value
   *)
   let add (subst : t) (e : Expr.t) (v : vt) =
-    let () = assert (Expr.is_unifiable e) in
+    let () = assert (Expr.is_matchable e) in
     Hashtbl.add subst e v
 
   (**
@@ -181,7 +181,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param v Target value
   *)
   let put (subst : t) (e : Expr.t) (v : vt) =
-    let () = assert (Expr.is_unifiable e) in
+    let () = assert (Expr.is_matchable e) in
     Hashtbl.replace subst e v
 
   (**
@@ -192,7 +192,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Returns true if the variable is in the domain of the substitution, and false otherwise
   *)
   let mem (subst : t) (e : Expr.t) =
-    let () = assert (Expr.is_unifiable e) in
+    let () = assert (Expr.is_matchable e) in
     Hashtbl.mem subst e
 
   (**
@@ -212,7 +212,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let extend (subst : t) (exprs_les : (Expr.t * vt) list) : unit =
     List.iter
       (fun (e, e_val) ->
-        let () = assert (Expr.is_unifiable e) in
+        let () = assert (Expr.is_matchable e) in
         Hashtbl.replace subst e e_val)
       exprs_les
 

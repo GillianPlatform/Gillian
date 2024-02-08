@@ -80,10 +80,10 @@ functor
       | None -> failwith "Can't get lifted map!"
       | Some map -> map
 
-    let get_unifys_at_id id { gil; tl } =
+    let get_matches_at_id id { gil; tl } =
       match tl with
-      | Some tl -> tl |> TLLifter.get_unifys_at_id id
-      | None -> gil |> Gil_lifter.get_unifys_at_id id
+      | Some tl -> tl |> TLLifter.get_matches_at_id id
+      | None -> gil |> Gil_lifter.get_matches_at_id id
 
     let get_root_id { gil; tl } =
       match tl with

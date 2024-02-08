@@ -8,29 +8,23 @@ type t = {
   gamma : Type_env.t;
   learned : Formula.Set.t;
   learned_types : (string * Type.t) list;
-  unification : bool;
+  matching : bool;
 }
 
-let copy { pfs; gamma; learned; learned_types; unification } =
+let copy { pfs; gamma; learned; learned_types; matching } =
   {
     pfs = Pure_context.copy pfs;
     gamma = Type_env.copy gamma;
     learned;
     learned_types;
-    unification;
+    matching;
   }
 
-let make ~pfs ~gamma ~unification ?(learned = []) ?(learned_types = []) () =
-  {
-    pfs;
-    gamma;
-    learned = Formula.Set.of_list learned;
-    learned_types;
-    unification;
-  }
+let make ~pfs ~gamma ~matching ?(learned = []) ?(learned_types = []) () =
+  { pfs; gamma; learned = Formula.Set.of_list learned; learned_types; matching }
 
-let init ?(unification = false) () =
-  make ~pfs:(Pure_context.init ()) ~gamma:(Type_env.init ()) ~unification ()
+let init ?(matching = false) () =
+  make ~pfs:(Pure_context.init ()) ~gamma:(Type_env.init ()) ~matching ()
 
 let empty = init ()
 
@@ -63,8 +57,7 @@ let extend pc fs =
     List.filter_map
       (fun f ->
         match
-          Engine.Reduction.reduce_formula ~unification:pc.unification ~pfs
-            ~gamma f
+          Engine.Reduction.reduce_formula ~matching:pc.matching ~pfs ~gamma f
         with
         | Formula.True -> None
         | f -> Some f)
@@ -110,13 +103,13 @@ let diff pca pcb =
     Formula.Set.diff pcb.learned pca.learned )
 
 let of_gpc (gpc : Engine.Gpc.t) =
-  let Engine.Gpc.{ pfs; gamma; unification } = gpc in
-  make ~pfs ~gamma ~unification ()
+  let Engine.Gpc.{ pfs; gamma; matching } = gpc in
+  make ~pfs ~gamma ~matching ()
 
 let to_gpc (pc : t) =
-  let { pfs; gamma; unification; learned; learned_types } = pc in
+  let { pfs; gamma; matching; learned; learned_types } = pc in
   let pfs = Pure_context.copy pfs in
   let gamma = Type_env.copy gamma in
   Formula.Set.iter (Pure_context.extend pfs) learned;
   List.iter (fun (x, y) -> Type_env.update gamma x y) learned_types;
-  Engine.Gpc.{ pfs; gamma; unification }
+  Engine.Gpc.{ pfs; gamma; matching }

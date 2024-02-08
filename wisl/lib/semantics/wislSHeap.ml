@@ -147,7 +147,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
         | Some n ->
             let n = Expr.int n in
             let open Formula.Infix in
-            Solver.sat ~unification:false ~pfs ~gamma n #<= ofs
+            Solver.sat ~matching:false ~pfs ~gamma n #<= ofs
       in
       if maybe_out_of_bound then Error (OutOfBounds (bound, loc, ofs))
       else
@@ -177,7 +177,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
         | Some n ->
             let n = Expr.int n in
             let open Formula.Infix in
-            Solver.sat ~unification:false ~pfs ~gamma n #<= ofs
+            Solver.sat ~matching:false ~pfs ~gamma n #<= ofs
       in
       if maybe_out_of_bound then Error (UseAfterFree loc_name)
       else

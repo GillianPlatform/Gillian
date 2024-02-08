@@ -401,8 +401,8 @@ module Expr : sig
   (** [var_to_expr x] returns the expression representing the program/logical variable or abstract location [x] *)
   val var_to_expr : string -> t
 
-  (** [is_unifiable x] returns whether or not the expression [e] is unifiable *)
-  val is_unifiable : t -> bool
+  (** [is_matchable x] returns whether or not the expression [e] is matchable *)
+  val is_matchable : t -> bool
 
   (** Sub-expression check *)
   val sub_expr : t -> t -> bool

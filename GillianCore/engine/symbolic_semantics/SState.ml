@@ -185,7 +185,7 @@ module Make (SMemory : SMemory.S) :
       =
     let open Syntaxes.List in
     let heap, store, pfs, gamma, vars = state in
-    let pc = Gpc.make ~unification:false ~pfs ~gamma () in
+    let pc = Gpc.make ~matching:false ~pfs ~gamma () in
     let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
     match value with
     | Ok (new_heap, vs) ->
@@ -197,7 +197,7 @@ module Make (SMemory : SMemory.S) :
   let consume_core_pred core_pred state in_args =
     let open Syntaxes.List in
     let heap, store, pfs, gamma, vars = state in
-    let pc = Gpc.make ~unification:true ~pfs ~gamma () in
+    let pc = Gpc.make ~matching:true ~pfs ~gamma () in
     let+ Gbranch.{ value; pc } = SMemory.consume core_pred heap pc in_args in
     match value with
     | Ok (new_heap, vs) ->
@@ -215,8 +215,8 @@ module Make (SMemory : SMemory.S) :
   let produce_core_pred core_pred state args =
     let open Syntaxes.List in
     let heap, store, pfs, gamma, vars = state in
-    (* unification false is suspicious here *)
-    let pc = Gpc.make ~unification:false ~pfs ~gamma () in
+    (* matching false is suspicious here *)
+    let pc = Gpc.make ~matching:false ~pfs ~gamma () in
     let+ Gbranch.{ value = new_heap; pc } =
       SMemory.produce core_pred heap pc args
     in
@@ -286,7 +286,7 @@ module Make (SMemory : SMemory.S) :
     result
 
   let assume_a
-      ?(unification = false)
+      ?(matching = false)
       ?(production = false)
       ?(time = "")
       (state : t)
@@ -305,7 +305,7 @@ module Make (SMemory : SMemory.S) :
           production
           || FOSolver.check_satisfiability
                ~time:("SState: assume_a: " ^ time)
-               ~unification
+               ~matching
                (ps @ PFS.to_list pfs)
                gamma
         then (
@@ -374,7 +374,7 @@ module Make (SMemory : SMemory.S) :
   let simplify
       ?(save = false)
       ?(kill_new_lvars = true)
-      ?(unification = false)
+      ?(matching = false)
       (state : t) : st * t list =
     let heap, store, pfs, gamma, svars = state in
     let save_spec_vars = if save then (SS.empty, true) else (svars, false) in
@@ -386,8 +386,8 @@ module Make (SMemory : SMemory.S) :
            -----------------------------------"
           pp state);
     let subst, _ =
-      Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma
-        ~unification ~save_spec_vars
+      Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma ~matching
+        ~save_spec_vars
     in
     let subst =
       SSubst.filter subst (fun x _ ->
@@ -512,12 +512,12 @@ module Make (SMemory : SMemory.S) :
       asrts_store @ SMemory.assertions heap @ asrts_pfs
       @ [ Types (Type_env.to_list_expr gamma) ]
 
-  let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
+  let evaluate_slcmd (_ : 'a MP.prog) (_ : SLCmd.t) (_ : t) :
       (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let unify_invariant _ _ _ _ _ =
-    raise (Failure "ERROR: unify_invariant called for pure symbolic execution")
+  let match_invariant _ _ _ _ _ =
+    raise (Failure "ERROR: match_invariant called for pure symbolic execution")
 
   let clear_resource (state : t) : t =
     let memory, store, pfs, gamma, svars = state in
@@ -529,7 +529,7 @@ module Make (SMemory : SMemory.S) :
     raise (Failure "ERROR: framing called for symbolic execution")
 
   let run_spec
-      (_ : UP.spec)
+      (_ : MP.spec)
       (_ : t)
       (_ : string)
       (_ : vt list)
@@ -578,8 +578,8 @@ module Make (SMemory : SMemory.S) :
             (mem, SStore.copy store, bpfs, bgamma, svars))
           multi_mems
 
-  let unify_assertion (_ : t) (_ : st) (_ : UP.step) : (t, err_t) Res_list.t =
-    raise (Failure "Unify assertion from non-abstract symbolic state.")
+  let match_assertion (_ : t) (_ : st) (_ : MP.step) : (t, err_t) Res_list.t =
+    raise (Failure "Match assertion from non-abstract symbolic state.")
 
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from non-abstract symbolic state.")

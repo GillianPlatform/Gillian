@@ -104,7 +104,7 @@ module Lift (MSM : S) :
   let apply_fix heap pfs gamma fix =
     Logging.verbose (fun m -> m "Bi-abduction trying to apply fix");
     let res = apply_fix heap fix in
-    let curr_pc = Pc.make ~unification:false ~pfs ~gamma () in
+    let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
     let results = Delayed.resolve ~curr_pc res in
 
     List.filter_map
@@ -118,7 +118,7 @@ module Lift (MSM : S) :
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Formula.Set.t * (string * Type.t) list) list =
     let process = substitution_in_place subst mem in
-    let curr_pc = Pc.make ~unification:false ~pfs ~gamma () in
+    let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
     match Delayed.resolve ~curr_pc process with
     | [] -> failwith "substitution killed every branch, that cannot happen"
     | leeloo_dallas_multibranch ->

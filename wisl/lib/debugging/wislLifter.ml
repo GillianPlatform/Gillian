@@ -4,7 +4,6 @@ open Gil_syntax
 module L = Logging
 module DL = Debugger_log
 module Exec_map = Debugger.Utils.Exec_map
-module Unify_map = Debugger.Utils.Unify_map
 open Syntaxes.Option
 open Syntaxes.Result_of_option
 open Utils
@@ -82,7 +81,7 @@ struct
     id : rid;
     all_ids : rid list;
     display : string;
-    unifys : unification list;
+    matches : matching list;
     errors : string list;
     mutable submap : map submap;
     (* branch_path : Branch_case.t list; *)
@@ -104,7 +103,7 @@ struct
       mutable display : string option;
       mutable stack_info : (rid list * stack_direction option) option;
       mutable nest_kind : nest_kind option;
-      unifys : unification Ext_list.t;
+      matches : matching Ext_list.t;
       errors : string Ext_list.t;
     }
     [@@deriving to_yojson]
@@ -119,7 +118,7 @@ struct
         display = None;
         stack_info = None;
         nest_kind = None;
-        unifys = Ext_list.make ();
+        matches = Ext_list.make ();
         errors = Ext_list.make ();
       }
 
@@ -130,7 +129,7 @@ struct
       id : rid;
       all_ids : rid list;
       display : string;
-      unifys : unification list;
+      matches : matching list;
       errors : string list;
       kind : (Branch_case.t, branch_data) cmd_kind;
       submap : map submap;
@@ -192,7 +191,7 @@ struct
              stack_info;
              ends;
              nest_kind;
-             unifys;
+             matches;
              errors;
              _;
            }
@@ -215,7 +214,7 @@ struct
         |> Option.to_result ~none:"Trying to finish partial with no stack info!"
       in
       let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
-      let unifys = unifys |> Ext_list.to_list in
+      let matches = matches |> Ext_list.to_list in
       let errors = errors |> Ext_list.to_list in
       let ends = Ext_list.to_list ends in
       let submap =
@@ -246,7 +245,7 @@ struct
           display;
           callers;
           stack_direction;
-          unifys;
+          matches;
           errors;
           submap;
           kind;
@@ -389,7 +388,7 @@ struct
         | Some _, Some _ -> Error "HORROR - multiple submaps!"
 
       let f ~tl_ast ~prog ~prev_id ~is_loop_func ~proc_name exec_data partial =
-        let { id; cmd_report; errors; unifys; _ } = exec_data in
+        let { id; cmd_report; errors; matches; _ } = exec_data in
         let annot = CmdReport.(cmd_report.annot) in
         let** branch_kind, branch_case =
           insert_id_and_case ~prev_id ~exec_data ~id partial
@@ -400,7 +399,7 @@ struct
         in
         let** () = update_submap ~prog ~annot partial in
         Ext_list.add_all errors partial.errors;
-        Ext_list.add_all unifys partial.unifys;
+        Ext_list.add_all matches partial.matches;
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
@@ -531,7 +530,7 @@ struct
               all_ids;
               id;
               display;
-              unifys;
+              matches;
               errors;
               submap;
               prev;
@@ -546,7 +545,7 @@ struct
           all_ids;
           id;
           display;
-          unifys;
+          matches;
           errors;
           submap;
           prev;
@@ -756,14 +755,15 @@ struct
     let display = Branch_case.display case in
     (display, json)
 
-  let package_data package { id; all_ids; display; unifys; errors; submap; _ } =
+  let package_data package { id; all_ids; display; matches; errors; submap; _ }
+      =
     let submap =
       match submap with
       | NoSubmap -> NoSubmap
       | Proc p -> Proc p
       | Submap map -> Submap (package map)
     in
-    Packaged.{ id; all_ids; display; unifys; errors; submap }
+    Packaged.{ id; all_ids; display; matches; errors; submap }
 
   let package =
     let package_case
@@ -779,11 +779,13 @@ struct
   let get_lifted_map_exn { map; _ } = package map
   let get_lifted_map state = Some (get_lifted_map_exn state)
 
-  let get_unifys_at_id id { id_map; _ } =
+  let get_matches_at_id id { id_map; _ } =
     let map = Hashtbl.find id_map id in
     match map with
-    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> data.unifys
-    | _ -> failwith "get_unifys_at_id: HORROR - tried to get unifys at non-cmd!"
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+        data.matches
+    | _ ->
+        failwith "get_matches_at_id: HORROR - tried to get matches at non-cmd!"
 
   let get_root_id { map; _ } =
     match map with

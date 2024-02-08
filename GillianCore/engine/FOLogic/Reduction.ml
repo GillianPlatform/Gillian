@@ -858,7 +858,7 @@ let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : Cint.t list =
   List.rev found_lengths
 
 let rec reduce_binop_inttonum_const
-    unification
+    matching
     reduce_lvars
     pfs
     gamma
@@ -866,7 +866,7 @@ let rec reduce_binop_inttonum_const
     (r : Expr.t)
     (op : BinOp.t) : Expr.t option =
   let open Utils.Syntaxes.Option in
-  let f = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma in
+  let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
   match (l, r) with
   | Lit (Num x), UnOp (IntToNum, e) | UnOp (IntToNum, e), Lit (Num x) ->
       let* () = if snd (modf x) = 0.0 then Some () else None in
@@ -898,12 +898,12 @@ let rec reduce_binop_inttonum_const
   - pfs  are used for: Car, Cdr, SetDiff
 *)
 and reduce_lexpr_loop
-    ?(unification = false)
+    ?(matching = false)
     ?(reduce_lvars = false)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (le : Expr.t) =
-  let f = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma in
+  let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
 
   (* L.verbose (fun fmt -> fmt "Reducing Expr: %a" Expr.pp le); *)
   let rec find_lstsub_inn (lst : Expr.t) (start : Expr.t) =
@@ -943,7 +943,7 @@ and reduce_lexpr_loop
               (List.hd eqs) (List.tl eqs)
           in
           f conj
-    | BinOp (ALoc x, Equal, ALoc y) when not unification -> Lit (Bool (x = y))
+    | BinOp (ALoc x, Equal, ALoc y) when not matching -> Lit (Bool (x = y))
     | LVar x when reduce_lvars -> (
         let equals = get_equal_expressions pfs (LVar x) in
         let lit_equals =
@@ -1693,8 +1693,8 @@ and reduce_lexpr_loop
             | e -> raise e)
         | _ -> (
             match
-              reduce_binop_inttonum_const unification reduce_lvars pfs gamma
-                flel fler op
+              reduce_binop_inttonum_const matching reduce_lvars pfs gamma flel
+                fler op
             with
             | Some e -> e
             | None -> (
@@ -1973,13 +1973,13 @@ and reduce_lexpr_loop
   else result
 
 and reduce_lexpr
-    ?(unification = false)
+    ?(matching = false)
     ?(reduce_lvars = false)
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (le : Expr.t) =
   (* let t = Sys.time () in *)
-  let result = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma le in
+  let result = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
   result
 
@@ -2357,15 +2357,15 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
 let rec reduce_formula_loop
     ?(top_level = false)
     ?(rpfs = false)
-    (unification : bool)
+    (matching : bool)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     ?(previous = Formula.True)
     (a : Formula.t) : Formula.t =
   if Formula.equal a previous then a
   else
-    let f = reduce_formula_loop ~rpfs unification pfs gamma in
-    let fe = reduce_lexpr_loop ~unification pfs gamma in
+    let f = reduce_formula_loop ~rpfs matching pfs gamma in
+    let fe = reduce_lexpr_loop ~matching pfs gamma in
     let result : Formula.t =
       match a with
       | Eq (e1, e2) when Expr.equal e1 e2 -> True
@@ -2519,7 +2519,7 @@ let rec reduce_formula_loop
                 -> True
               (* USUAL REDUCTIONS *)
               | ALoc _, Lit (Loc _) | Lit (Loc _), ALoc _ -> False
-              | ALoc x, ALoc y when (not unification) && x <> y -> False
+              | ALoc x, ALoc y when (not matching) && x <> y -> False
               | EList [], x
               | x, EList []
               | Lit (LList []), x
@@ -2800,7 +2800,7 @@ let rec reduce_formula_loop
             copy
           in
           let reduced_left =
-            reduce_formula_loop ~rpfs:true unification pfs_with_left gamma left
+            reduce_formula_loop ~rpfs:true matching pfs_with_left gamma left
           in
           match (reduced_left, f right) with
           | True, _ -> right
@@ -2856,13 +2856,13 @@ let rec reduce_formula_loop
     f ~previous:a result
 
 let reduce_formula
-    ?(unification = false)
+    ?(matching = false)
     ?(rpfs = false)
     ?time:_
     ?(pfs : PFS.t = PFS.init ())
     ?(gamma = Type_env.init ())
     (a : Formula.t) : Formula.t =
-  reduce_formula_loop ~top_level:true ~rpfs unification pfs gamma a
+  reduce_formula_loop ~top_level:true ~rpfs matching pfs gamma a
 
 let relate_llen
     (pfs : PFS.t)
@@ -3025,12 +3025,12 @@ let reduce_types (a : Asrt.t) : Asrt.t =
 
 (* Reduction of assertions *)
 let rec reduce_assertion_loop
-    (unification : bool)
+    (matching : bool)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
-  let f = reduce_assertion_loop unification pfs gamma in
-  let fe = reduce_lexpr_loop ~unification pfs gamma in
+  let f = reduce_assertion_loop matching pfs gamma in
+  let fe = reduce_lexpr_loop ~matching pfs gamma in
   let result =
     match a with
     (* Empty heap *)
@@ -3049,8 +3049,7 @@ let rec reduce_assertion_loop
     | Pred (name, les) -> Pred (name, List.map fe les)
     (* Pure assertions *)
     | Pure True -> Emp
-    | Pure f ->
-        Pure (reduce_formula_loop ~top_level:true unification pfs gamma f)
+    | Pure f -> Pure (reduce_formula_loop ~top_level:true matching pfs gamma f)
     (* Types *)
     | Types lvt -> (
         try
@@ -3083,14 +3082,14 @@ let rec extract_lvar_equalities (a : Asrt.t) =
   | _ -> []
 
 let reduce_assertion
-    ?(unification = false)
+    ?(matching = false)
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (a : Asrt.t) : Asrt.t =
   let a = reduce_types a in
 
   let rec loop (a : Asrt.t) =
-    let a' = reduce_assertion_loop unification pfs gamma a in
+    let a' = reduce_assertion_loop matching pfs gamma a in
     let equalities = extract_lvar_equalities a' in
     let a' =
       List.fold_left
@@ -3105,7 +3104,7 @@ let reduce_assertion
           | _ -> a)
         a' equalities
     in
-    let a' = reduce_assertion_loop unification pfs gamma a' in
+    let a' = reduce_assertion_loop matching pfs gamma a' in
     if a' <> a && not (a' == a) then loop a' else a'
   in
 

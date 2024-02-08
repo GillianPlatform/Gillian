@@ -35,8 +35,8 @@ let get_unsafe (x : t) (var : string) : Type.t =
   | false ->
       raise (Failure ("Type_env.get_unsafe: variable " ^ var ^ " not found."))
 
-(* Get all unifiable elements *)
-let unifiables (x : t) : SS.t =
+(* Get all matchable elements *)
+let matchables (x : t) : SS.t =
   Hashtbl.fold (fun var _ ac -> SS.add var ac) x SS.empty
 
 (* Get all variables *)

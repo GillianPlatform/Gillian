@@ -25,8 +25,8 @@ struct
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
       let prog =
-        match UP.init_prog debug_state.prog with
-        | Error _ -> failwith "Creation of unification plans failed"
+        match MP.init_prog debug_state.prog with
+        | Error _ -> failwith "Creation of matching plans failed"
         | Ok prog -> prog
       in
       Verification.SAInterpreter.init_evaluate_proc
@@ -34,12 +34,12 @@ struct
         prog proc_name []
         (State.init debug_state.init_data)
 
-    module Unify = struct
-      let unify_final_cmd _ ~proc_name:_ _ _ = []
-      let get_unifys _ _ _ = []
+    module Match = struct
+      let match_final_cmd _ ~proc_name:_ _ _ = []
+      let get_matches _ _ _ = []
 
-      let get_unify_map _ _ =
-        failwith "Can't get unification in symbolic debugging!"
+      let get_match_map _ _ =
+        failwith "Can't get matching in symbolic debugging!"
     end
   end
 

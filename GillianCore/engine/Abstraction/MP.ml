@@ -9,7 +9,7 @@ let outs_pp =
   Fmt.(
     list ~sep:(Fmt.any "; ") (parens (pair ~sep:(Fmt.any ", ") Expr.pp Expr.pp)))
 
-(** The [up_step] type represents a unification plan step,
+(** The [mp_step] type represents a matching plan step,
     consisting of an assertion together with the possible
     learned outs *)
 type step = Asrt.t * outs [@@deriving yojson, eq]
@@ -47,10 +47,10 @@ type t =
      | LabPhantomInner of (t * (string * SS.t) option) list
    [@@deriving yojson] *)
 
-type 'a with_up = { up : t; data : 'a }
-type spec = Spec.t with_up
-type lemma = Lemma.t with_up
-type pred = { pred : Pred.t; def_up : t; guard_up : t option }
+type 'a with_mp = { mp : t; data : 'a }
+type spec = Spec.t with_mp
+type lemma = Lemma.t with_mp
+type pred = { pred : Pred.t; def_mp : t; guard_mp : t option }
 
 type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
@@ -67,15 +67,15 @@ let kb_pp = Fmt.(braces (iter ~sep:comma KB.iter Expr.full_pp))
 
 type preds_tbl_t = (string, pred) Hashtbl.t
 
-type up_err_t =
-  | UPSpec of string * Asrt.t list list
-  | UPPred of string * Asrt.t list list
-  | UPLemma of string * Asrt.t list list
-  | UPAssert of Asrt.t * Asrt.t list list
-  | UPInvariant of Asrt.t * Asrt.t list list
+type err =
+  | MPSpec of string * Asrt.t list list
+  | MPPred of string * Asrt.t list list
+  | MPLemma of string * Asrt.t list list
+  | MPAssert of Asrt.t * Asrt.t list list
+  | MPInvariant of Asrt.t * Asrt.t list list
 [@@deriving show]
 
-exception UPError of up_err_t
+exception MPError of err
 
 let is_var (e : Expr.t) : bool =
   match e with
@@ -83,7 +83,7 @@ let is_var (e : Expr.t) : bool =
   | _ -> false
 
 (** List lengths are not required if their variables are *)
-let minimise_unifiables (kb : KB.t) : KB.t =
+let minimise_matchables (kb : KB.t) : KB.t =
   KB.fold
     (fun u ac ->
       match u with
@@ -94,7 +94,7 @@ let minimise_unifiables (kb : KB.t) : KB.t =
       | _ -> KB.add u ac)
     kb KB.empty
 
-(** [missing kb e] returns a list of unifiables that are missing
+(** [missing kb e] returns a list of matchables that are missing
     in order for the expression [e] to be known under knowledge
     base [kb]. The expression is required to have previously been
     fully reduced. *)
@@ -136,7 +136,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
               in
               match KB.mem e1 kb with
               | true -> [ KB.empty ]
-              (* List lengths are unifiables *)
+              (* List lengths are matchables *)
               | false -> [ KB.singleton e1; KB.singleton e ]))
       (* The remaining cases proceed recursively *)
       | UnOp (_, e) -> f e
@@ -155,9 +155,9 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
 let is_known_expr (kb : KB.t) (e : Expr.t) : bool =
   missing_expr kb e = [ KB.empty ]
 
-(** [learn kb e] tries to learn unifiables in the expression [e]
+(** [learn kb e] tries to learn matchables in the expression [e]
     not known in the knowledge base [kb]. It returns a list of
-    pairs, each of which contains the learned unifiable and the
+    pairs, each of which contains the learned matchable and the
     method of its construction. *)
 let rec learn_expr
     ?(top_level = false)
@@ -278,13 +278,13 @@ let rec learn_expr
 
 and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* L.(verbose (fun m -> m "Entering learn_expr_list: \nKB: %a\nList: %a" kb_pp kb Fmt.(brackets (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))) le)); *)
-  (* Learn unifiables per-element *)
+  (* Learn matchables per-element *)
   let learned_exprs =
     List.map
       (fun (e, base_expr) -> ((e, base_expr), learn_expr kb base_expr e))
       le
   in
-  (* Filter learned unifiables *)
+  (* Filter learned matchables *)
   let learned, not_learned =
     List.partition (fun (_, learned) -> learned <> []) learned_exprs
   in
@@ -292,9 +292,9 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* We have learned nothing, therefore we stop *)
   | [] -> []
   | _ ->
-      (* Get all learned unifiables in order from left to right *)
+      (* Get all learned matchables in order from left to right *)
       let learned = List.concat (snd (List.split learned)) in
-      (* Add learned unifiables to knowledge base *)
+      (* Add learned matchables to knowledge base *)
       let new_kb = List.fold_left (fun kb (e, _) -> KB.add e kb) kb learned in
       (* Recover the not-yet-learned bindings *)
       let not_learned = fst (List.split not_learned) in
@@ -365,14 +365,14 @@ let ins_and_outs_from_lists (kb : KB.t) (lei : Expr.t list) (leo : Expr.t list)
   let ins = List_utils.list_product ins in
   let ins = List.map (List.fold_left KB.union KB.empty) ins in
   let ins = List_utils.remove_duplicates ins in
-  let ins = List.map minimise_unifiables ins in
+  let ins = List.map minimise_matchables ins in
   L.(
     verbose (fun m ->
         m "Calculated ins: %a" Fmt.(brackets (list ~sep:semi kb_pp)) ins));
   let outs : outs =
     (* Trick to keep track of parameter order *)
     let leo = List.mapi (fun i u -> (u, Expr.PVar (string_of_int i))) leo in
-    (* Outs that are unifiables we learn immediately and add to knowledge base *)
+    (* Outs that are matchables we learn immediately and add to knowledge base *)
     let kb' = KB.union kb (KB.of_list (snd (List.split leo))) in
     learn_expr_list kb' leo
   in
@@ -393,7 +393,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       let ins_pf2 = f pf2 in
       let ins = List_utils.cross_product ins_pf1 ins_pf2 KB.union in
       let ins = List_utils.remove_duplicates ins in
-      List.map minimise_unifiables ins
+      List.map minimise_matchables ins
   | Impl (f1, f2) -> simple_ins_formula kb (Or (Not f1, f2))
   (* Relational formulae are all treated the same *)
   | Eq (e1, e2)
@@ -414,7 +414,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
           ins
       in
       let ins = List_utils.remove_duplicates ins in
-      List.map minimise_unifiables ins
+      List.map minimise_matchables ins
   (* Forall must exclude the binders *)
   | ForAll (binders, pf) ->
       let binders =
@@ -424,10 +424,10 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       in
       let ins_pf = f pf in
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
-      List.map minimise_unifiables ins
+      List.map minimise_matchables ins
   | IsInt e ->
       e |> simple_ins_expr |> List_utils.remove_duplicates
-      |> List.map minimise_unifiables
+      |> List.map minimise_matchables
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)
@@ -554,14 +554,14 @@ let s_init_atoms ~preds kb atoms =
   in
   let rec search current kb rest =
     L.verbose (fun m ->
-        m "KNOWN: @[%a@].@\n@[<v 2>CUR UP:@\n%a@]@\nTO VISIT: @[%a@]" kb_pp kb
+        m "KNOWN: @[%a@].@\n@[<v 2>CUR MP:@\n%a@]@\nTO VISIT: @[%a@]" kb_pp kb
           pp_step_list current
           (Fmt.list ~sep:(Fmt.any "@\n") Asrt.full_pp)
           rest);
     match rest with
     | [] ->
         let result = List.rev current in
-        L.verbose (fun m -> m "Successfully created UP.");
+        L.verbose (fun m -> m "Successfully created MP.");
         Ok result
     | rest -> (
         match List_utils.pop_map (step_of_atom ~kb) rest with
@@ -595,59 +595,59 @@ let of_step_list ?post ?label (steps : step list) : t =
     Will be under-optimised if a non-linear matching plan is passed on the lhs.
     We try to preserve order in which the assertions are added, as to maintain priorities set by the user.
     In the future, we could provide an option that automatically prioritizes the shortest MP on the left-hand side. *)
-let rec add_linear_up (current_up : t) (up_to_add : t) : t =
+let rec add_linear_mp (current_mp : t) (mp_to_add : t) : t =
   let rec merge_into_left left right =
     match (left, right) with
     | ConsumeStep (stepl, restl), ConsumeStep (stepr, restr)
       when equal_step stepl stepr ->
-        Some (ConsumeStep (stepl, add_linear_up restl restr))
+        Some (ConsumeStep (stepl, add_linear_mp restl restr))
     | LabelStep (labell, restl), LabelStep (labelr, restr)
       when equal_label labell labelr ->
-        Some (LabelStep (labell, add_linear_up restl restr))
+        Some (LabelStep (labell, add_linear_mp restl restr))
     | Finished postl, Finished postr when (Option.equal equal_post) postl postr
-      -> Some current_up
-    | Choice (cl, cr), up_to_add -> (
-        (* We try to add the merge UP to the right choice*)
-        match merge_into_left cr up_to_add with
+      -> Some current_mp
+    | Choice (cl, cr), mp_to_add -> (
+        (* We try to add the merge MP to the right choice*)
+        match merge_into_left cr mp_to_add with
         | Some merged -> Some (Choice (cl, merged))
         | None -> (
             (* If it fails we try to add it to the left*)
-            match merge_into_left cl up_to_add with
+            match merge_into_left cl mp_to_add with
             | Some merged -> Some (Choice (merged, cr))
             | None ->
                 (* If this also fails, we put a choice between everything *)
-                Some (Choice (cl, Choice (cr, up_to_add)))))
+                Some (Choice (cl, Choice (cr, mp_to_add)))))
     | _ -> None
   in
-  match merge_into_left current_up up_to_add with
+  match merge_into_left current_mp mp_to_add with
   | Some x -> x
-  | None -> Choice (current_up, up_to_add)
+  | None -> Choice (current_mp, mp_to_add)
 
 (** This function builds a general (slightly optimised by selecting common roots) matching plan
     once the step list for each case has been decided. *)
-let build_up (cases : (step list * label option * post option) list) : t =
-  let linear_ups =
+let build_mp (cases : (step list * label option * post option) list) : t =
+  let linear_mps =
     List.map (fun (steps, label, post) -> of_step_list ?label ?post steps) cases
   in
-  match linear_ups with
+  match linear_mps with
   | [] -> Finished None
-  | a :: r -> List.fold_left add_linear_up a r
+  | a :: r -> List.fold_left add_linear_mp a r
 
 let init
     ?(use_params : bool option)
-    (known_unifiables : KB.t)
+    (known_matchables : KB.t)
     (params : KB.t)
     (preds : (string, int list) Hashtbl.t)
     (asrts_posts :
       (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
     : (t, Asrt.t list list) result =
-  let known_unifiables =
+  let known_matchables =
     match use_params with
-    | None -> known_unifiables
-    | Some _ -> KB.union known_unifiables params
+    | None -> known_matchables
+    | Some _ -> KB.union known_matchables params
   in
 
-  let ups =
+  let mps =
     List.map
       (fun (asrt, (lab, posts)) ->
         let existentials =
@@ -659,28 +659,28 @@ let init
               KB.of_list existentials)
             ~none:KB.empty lab
         in
-        L.verbose (fun m -> m "Known unifiables: %a\n" kb_pp known_unifiables);
+        L.verbose (fun m -> m "Known matchables: %a\n" kb_pp known_matchables);
         L.verbose (fun m -> m "Existentials: %a\n" kb_pp existentials);
-        let known_unifiables = KB.union known_unifiables existentials in
-        (s_init ~preds known_unifiables asrt, lab, posts))
+        let known_matchables = KB.union known_matchables existentials in
+        (s_init ~preds known_matchables asrt, lab, posts))
       asrts_posts
   in
   let successes, errors =
     List.partition_map
-      (fun (up, lab, post) ->
-        match up with
+      (fun (mp, lab, post) ->
+        match mp with
         | Error x -> Right x
-        | Ok up -> Left (up, lab, post))
-      ups
+        | Ok mp -> Left (mp, lab, post))
+      mps
   in
   match (successes, errors) with
   | _, _ :: _ -> Error errors
-  | successes, [] -> Ok (build_up successes)
+  | successes, [] -> Ok (build_mp successes)
 
-let pp ft up =
+let pp ft mp =
   let open Fmt in
-  let rec aux ~prefix up =
-    match up with
+  let rec aux ~prefix mp =
+    match mp with
     | Choice (left, right) ->
         string ft prefix;
         pf ft "CHOICE@\n";
@@ -702,17 +702,17 @@ let pp ft up =
         pf ft "===FINISHED=== POST: %a@\n%s@\n" (Fmt.Dump.option pp_post) post
           prefix
   in
-  aux ~prefix:"" up
+  aux ~prefix:"" mp
 
 let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
-    ((string, spec) Hashtbl.t, up_err_t) result =
+    ((string, spec) Hashtbl.t, err) result =
   let u_specs = Hashtbl.create Config.medium_tbl_size in
   try
     List.iter
       (fun (spec : Spec.t) ->
         L.(
           verbose (fun m ->
-              m "Attempting to create UP for a spec of %s : %d specs"
+              m "Attempting to create MP for a spec of %s : %d specs"
                 spec.spec_name
                 (List.length spec.spec_sspecs)));
         let params =
@@ -736,25 +736,25 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
             spec.spec_sspecs
         in
 
-        let up = init ~use_params:true KB.empty params preds sspecs in
-        match up with
+        let mp = init ~use_params:true KB.empty params preds sspecs in
+        match mp with
         | Error err ->
-            raise (UPError (UPSpec (spec.spec_name, err)))
-            (* let msg = Printf.sprintf "Specification of %s cannot be turned into UP. %s"
+            raise (MPError (MPSpec (spec.spec_name, err)))
+            (* let msg = Printf.sprintf "Specification of %s cannot be turned into MP. %s"
                  spec.name (Spec.str spec) in
                L.fail msg *)
-        | Ok up ->
+        | Ok mp ->
             L.(
               verbose (fun m ->
-                  m "Successfully created UP of specification of %s"
+                  m "Successfully created MP of specification of %s"
                     spec.spec_name));
-            Hashtbl.replace u_specs spec.spec_name { data = spec; up })
+            Hashtbl.replace u_specs spec.spec_name { data = spec; mp })
       specs;
     Ok u_specs
-  with UPError e -> Error e
+  with MPError e -> Error e
 
 let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
-    ((string, lemma) Hashtbl.t, up_err_t) result =
+    ((string, lemma) Hashtbl.t, err) result =
   let u_lemmas = Hashtbl.create Config.medium_tbl_size in
   try
     List.iter
@@ -771,23 +771,23 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
                 (None, Some (Flag.Normal, spec.lemma_concs)) ))
             lemma.lemma_specs
         in
-        let up = init ~use_params:true KB.empty params preds sspecs in
-        match up with
+        let mp = init ~use_params:true KB.empty params preds sspecs in
+        match mp with
         | Error err ->
-            raise (UPError (UPLemma (lemma.lemma_name, err)))
-            (* let msg = Printf.sprintf "Lemma %s cannot be turned into UP" lemma.name in
+            raise (MPError (MPLemma (lemma.lemma_name, err)))
+            (* let msg = Printf.sprintf "Lemma %s cannot be turned into MP" lemma.name in
                L.fail msg *)
-        | Ok up ->
+        | Ok mp ->
             L.(
               verbose (fun m ->
-                  m "Successfully created UP of Lemma %s" lemma.lemma_name));
-            Hashtbl.replace u_lemmas lemma.lemma_name { data = lemma; up })
+                  m "Successfully created MP of Lemma %s" lemma.lemma_name));
+            Hashtbl.replace u_lemmas lemma.lemma_name { data = lemma; mp })
       lemmas;
     Ok u_lemmas
-  with UPError e -> Error e
+  with MPError e -> Error e
 
 let init_preds (preds : (string, Pred.t) Hashtbl.t) :
-    ((string, pred) Hashtbl.t, up_err_t) result =
+    ((string, pred) Hashtbl.t, err) result =
   let u_preds = Hashtbl.create Config.medium_tbl_size in
   let pred_ins =
     Hashtbl.fold
@@ -800,7 +800,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
   try
     Hashtbl.iter
       (fun name (pred : Pred.t) ->
-        L.(verbose (fun m -> m "Attempting to create UP of predicate %s" name));
+        L.(verbose (fun m -> m "Attempting to create MP of predicate %s" name));
         let known_params =
           KB.of_list
             (List.map
@@ -821,32 +821,31 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         in
         let create_or_raise defs =
           match init known_params KB.empty pred_ins defs with
-          | Error err -> raise (UPError (UPPred (pred.pred_name, err)))
-          (* let msg = Printf.sprintf "Predicate definition of %s cannot be turned into UP" pred.name in
+          | Error err -> raise (MPError (MPPred (pred.pred_name, err)))
+          (* let msg = Printf.sprintf "Predicate definition of %s cannot be turned into MP" pred.name in
              L.fail msg *)
-          | Ok up -> up
+          | Ok mp -> mp
         in
-        let def_up = create_or_raise defs in
+        let def_mp = create_or_raise defs in
         L.verbose (fun m ->
-            m "Successfully created UP of predicate %s:@\n%a" name pp def_up);
-        let guard_up =
+            m "Successfully created MP of predicate %s:@\n%a" name pp def_mp);
+        let guard_mp =
           Option.map
             (fun guard -> create_or_raise [ (guard, (None, None)) ])
             pred.pred_guard
         in
         Option.iter
-          (fun up ->
+          (fun mp ->
             L.verbose (fun m ->
-                m "Successfully created UP of predicate's guard %s:@\n%a" name
-                  pp up))
-          guard_up;
-        Hashtbl.replace u_preds name { pred; def_up; guard_up })
+                m "Successfully created MP of predicate's guard %s:@\n%a" name
+                  pp mp))
+          guard_mp;
+        Hashtbl.replace u_preds name { pred; def_mp; guard_mp })
       preds;
     Ok u_preds
-  with UPError e -> Error e
+  with MPError e -> Error e
 
-let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
-    =
+let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, err) result =
   let open Syntaxes.Result in
   let all_specs : Spec.t list = Prog.get_specs prog in
   let lemmas : Lemma.t list = Prog.get_lemmas prog in
@@ -864,7 +863,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
       (Hashtbl.create Config.medium_tbl_size)
   in
   let* lemmas =
-    L.verbose (fun fmt -> fmt "Calculating UPs for lemmas");
+    L.verbose (fun fmt -> fmt "Calculating MPs for lemmas");
     init_lemmas pred_ins lemmas
   in
   let+ specs = init_specs pred_ins all_specs in
@@ -875,7 +874,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
 
 let get_pred_def (pred_defs : preds_tbl_t) (name : string) : pred =
   match Hashtbl.find_opt pred_defs name with
-  | Some up_pred -> up_pred
+  | Some mp_pred -> mp_pred
   | None -> Fmt.failwith "DEATH. PRED %s NOT DEFINED" name
 
 let init_pred_defs () : preds_tbl_t = Hashtbl.create Config.medium_tbl_size
@@ -993,44 +992,44 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
         (fun (x, y) -> (x, (None, y)))
         (posts_from_sspecs spec.spec_sspecs)
     in
-    let up = init ~use_params:true KB.empty params pred_ins posts in
-    match up with
+    let mp = init ~use_params:true KB.empty params pred_ins posts in
+    match mp with
     | Error _ ->
         let msg =
-          Fmt.str "Spec addition: specification of %s cannot be turned into UP."
+          Fmt.str "Spec addition: specification of %s cannot be turned into MP."
             spec.spec_name
         in
         L.fail msg
-    | Ok up ->
+    | Ok mp ->
         L.(
           verbose (fun m ->
-              m "Successfully created UP of specification of %s" spec.spec_name));
-        let new_spec : spec = { data = spec; up } in
+              m "Successfully created MP of specification of %s" spec.spec_name));
+        let new_spec : spec = { data = spec; mp } in
         new_spec
   in
 
   let extend_spec (uspec : spec) (sspecs : Spec.st list) : spec =
     let spec = Spec.extend uspec.data sspecs in
-    let new_up =
+    let new_mp =
       List.fold_left
-        (fun current_up (asrt, post) ->
+        (fun current_mp (asrt, post) ->
           match s_init ~preds:pred_ins params asrt with
           | Error _ ->
               if !Config.under_approximation then (
                 L.verbose (fun m ->
                     m
-                      "WARNING!!! IT IS NOT POSSIBLE TO BUILD UP FOR INFERRED \
+                      "WARNING!!! IT IS NOT POSSIBLE TO BUILD MP FOR INFERRED \
                        SPEC of %s!PRE:@\n\
                        @[%a@]@\n"
                       uspec.data.spec_name Asrt.pp asrt);
-                current_up)
-              else failwith "Couldn't build UP when extending spec!"
+                current_mp)
+              else failwith "Couldn't build MP when extending spec!"
           | Ok step_list ->
-              let new_up = of_step_list ?post step_list in
-              add_linear_up current_up new_up)
-        uspec.up (posts_from_sspecs sspecs)
+              let new_mp = of_step_list ?post step_list in
+              add_linear_mp current_mp new_mp)
+        uspec.mp (posts_from_sspecs sspecs)
     in
-    let uspec' : spec = { data = spec; up = new_up } in
+    let uspec' : spec = { data = spec; mp = new_mp } in
     uspec'
   in
 
@@ -1060,5 +1059,5 @@ let first_time_running (prog : 'a prog) (proc_name : string) (index : int) :
   not (Hashtbl.mem prog.coverage (proc_name, index))
 
 let pp_pred_defs fmt pred_defs =
-  let pp_binding fmt (_, up_pred) = Pred.pp fmt up_pred.pred in
+  let pp_binding fmt (_, mp_pred) = Pred.pp fmt mp_pred.pred in
   Fmt.(hashtbl ~sep:(any "@\n") pp_binding) fmt pred_defs

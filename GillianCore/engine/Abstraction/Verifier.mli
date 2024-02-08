@@ -20,7 +20,7 @@ module type S = sig
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SUnifier : Unifier.S
+  module SMatcher : Matcher.S
 
   type t
   type prog_t = (annot, int) Prog.t

@@ -63,7 +63,7 @@ struct
       let prev_source_files, prev_call_graph = read_symbolic_results () in
       let proc_changes =
         get_sym_changes
-          UP.(prog.prog)
+          MP.(prog.prog)
           ~prev_source_files ~prev_call_graph ~cur_source_files
       in
       let changed_procs =
@@ -87,7 +87,7 @@ struct
       let call_graph = S_interpreter.call_graph in
       write_symbolic_results cur_source_files call_graph ~diff:""
 
-    let f (prog : PC.Annot.t UP.prog) init_data incremental source_files =
+    let f (prog : PC.Annot.t MP.prog) init_data incremental source_files =
       if incremental && prev_results_exist () then
         run_incr source_files prog init_data
       else rerun_all source_files prog init_data
@@ -149,8 +149,8 @@ struct
       L.normal (fun m -> m "\n*** Stage 2: DONE transforming the program.\n")
     in
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
-    match UP.init_prog prog with
-    | Error _ -> failwith "Creation of unification plans failed"
+    match MP.init_prog prog with
+    | Error _ -> failwith "Creation of matching plans failed"
     | Ok prog' -> run prog' init_data incremental source_files_opt
 
   let wpst

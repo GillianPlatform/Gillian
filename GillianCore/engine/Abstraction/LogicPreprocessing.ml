@@ -546,7 +546,7 @@ let unfold_bispecs
        match proc.spec with
          | None -> ()
          | Some spec ->
-             match UP.create_partial_match_spec spec with
+             match MP.create_partial_match_spec spec with
              | None -> ()
              | Some sspec ->
                  Hashtbl.replace procs name { proc with Proc.spec = Some { spec with sspecs = spec.sspecs @ [ sspec ] } }

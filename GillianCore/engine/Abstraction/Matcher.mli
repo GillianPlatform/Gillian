@@ -1,4 +1,4 @@
-type unify_kind =
+type match_kind =
   | Postcondition
   | Fold
   | FunctionCall
@@ -16,12 +16,12 @@ module type S = sig
     state : state_t;
     preds : Preds.t;
     wands : Wands.t;
-    pred_defs : UP.preds_tbl_t;
+    pred_defs : MP.preds_tbl_t;
     variants : variants_t;
   }
 
   type post_res = (Flag.t * Asrt.t list) option
-  type search_state = (t * SVal.SESubst.t * UP.t) list * err_t list
+  type search_state = (t * SVal.SESubst.t * MP.t) list * err_t list
 
   module Logging : sig
     module AstateRec : sig
@@ -35,27 +35,27 @@ module type S = sig
     end
 
     module AssertionReport : sig
-      type t = { step : UP.step; subst : SVal.SESubst.t; astate : AstateRec.t }
+      type t = { step : MP.step; subst : SVal.SESubst.t; astate : AstateRec.t }
       [@@deriving yojson]
     end
 
-    module UnifyReport : sig
+    module MatchReport : sig
       type t = {
         astate : AstateRec.t;
         subst : SVal.SESubst.t;
-        up : UP.t;
-        unify_kind : unify_kind;
+        mp : MP.t;
+        match_kind : match_kind;
       }
       [@@deriving yojson]
     end
 
-    module UnifyCaseReport : sig
-      type t = { astate : AstateRec.t; subst : SVal.SESubst.t; up : UP.t }
+    module MatchCaseReport : sig
+      type t = { astate : AstateRec.t; subst : SVal.SESubst.t; mp : MP.t }
       [@@deriving yojson]
     end
 
-    module UnifyResultReport : sig
-      type remaining_state = UnifyCaseReport.t [@@deriving yojson]
+    module MatchResultReport : sig
+      type remaining_state = MatchCaseReport.t [@@deriving yojson]
 
       type t =
         | Success of {
@@ -65,7 +65,7 @@ module type S = sig
             remaining_states : remaining_state list;
           }
         | Failure of {
-            cur_step : UP.step option;
+            cur_step : MP.step option;
             subst : SVal.SESubst.t;
             astate : AstateRec.t;
             errors : err_t list;
@@ -111,30 +111,30 @@ module type S = sig
       - If it doesn't find one, it returns Some (None, input_state) *)
   val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
-  val unify_assertion :
+  val match_assertion :
     ?no_auto_fold:bool ->
     t ->
     SVal.SESubst.t ->
-    UP.step ->
+    MP.step ->
     (t, err_t) Res_list.t
 
-  val unify :
-    ?in_unification:bool ->
+  val match_ :
+    ?in_matching:bool ->
     t ->
     SVal.SESubst.t ->
-    UP.t ->
-    unify_kind ->
+    MP.t ->
+    match_kind ->
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 
   (** Folds a predicate in the state, consuming its definition and
       producing the folded predicate.
       If the predicate has a guard, the guard is produced. *)
   val fold :
-    ?in_unification:bool ->
+    ?in_matching:bool ->
     ?additional_bindings:(Expr.t * Expr.t) list ->
-    unify_kind:unify_kind ->
+    match_kind:match_kind ->
     state:t ->
-    UP.pred ->
+    MP.pred ->
     Expr.t list ->
     (t, err_t) Res_list.t
 
@@ -143,8 +143,8 @@ module type S = sig
       and it is not abstract and we are not in manual mode,
       we attempt to fold it. *)
   val consume_pred :
-    ?in_unification:bool ->
-    ?fold_outs_info:SVal.SESubst.t * UP.step * Expr.t list ->
+    ?in_matching:bool ->
+    ?fold_outs_info:SVal.SESubst.t * MP.step * Expr.t list ->
     ?no_auto_fold:bool ->
     t ->
     string ->

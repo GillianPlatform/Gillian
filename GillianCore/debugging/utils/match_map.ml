@@ -3,17 +3,17 @@
 module L = Logging
 module DL = Debugger_log
 open Syntaxes.Option
-include Unify_map_intf
+include Match_map_intf
 
 (**/**)
 
-(** Traverses a [unify_seg] to get its result *)
+(** Traverses a [match_seg] to get its result *)
 let rec seg_result = function
   | Assertion (_, next) -> seg_result next
-  | UnifyResult (_, result) -> result
+  | MatchResult (_, result) -> result
 
-(** Gets the result of a unification.
-  When the unification is a fold, one successful case is sufficient for overall success *)
+(** Gets the result of a matching.
+  When the matching is a fold, one successful case is sufficient for overall success *)
 let result = function
   | _, Direct seg -> seg_result seg
   | _, Fold segs ->
@@ -25,23 +25,23 @@ functor
   (Verification : Verifier.S)
   ->
   struct
-    open Verification.SUnifier.Logging
+    open Verification.SMatcher.Logging
     open L.Logging_constants
 
     let result_of_id id =
       let rec aux id =
         let children = L.Log_queryer.get_children_of id in
         if children = [] then
-          Fmt.failwith "Unify_map.result_of_id: report %a has no children!"
+          Fmt.failwith "Match_map.result_of_id: report %a has no children!"
             L.Report_id.pp id;
         match
           children
           |> List.find_opt (fun (_, type_, _) ->
-                 type_ = Content_type.unify_result)
+                 type_ = Content_type.match_result)
         with
         | Some (_, _, content) -> (
             let result_report =
-              content |> Yojson.Safe.from_string |> UnifyResultReport.of_yojson
+              content |> Yojson.Safe.from_string |> MatchResultReport.of_yojson
               |> Result.get_ok
             in
             match result_report with
@@ -50,11 +50,11 @@ functor
         | None ->
             children
             |> List.exists (fun (id, type_, _) ->
-                   if type_ = Content_type.unify_case then aux id else false)
+                   if type_ = Content_type.match_case then aux id else false)
       in
       if aux id then Success else Failure
 
-    let rec build_seg ?(prev_substs = []) (id, type_, content) : unify_seg =
+    let rec build_seg ?(prev_substs = []) (id, type_, content) : match_seg =
       let module Subst = SVal.SESubst in
       if type_ = Content_type.assertion then
         let asrt_report =
@@ -80,20 +80,21 @@ functor
             | [ child ] -> Some child
             | _ ->
                 Fmt.failwith
-                  "Unify_map.build_seg: assertion %a has multiple children!"
+                  "Match_map.build_seg: assertion %a has multiple children!"
                   L.Report_id.pp id
           in
-          if type_ <> Content_type.unify then
+          if type_ <> Content_type.match_ then
             Fmt.failwith
-              "Unify_map.build_seg: report %a (child of assertion %a) has type \
+              "Match_map.build_seg: report %a (child of assertion %a) has type \
                %s (expected %s)!"
-              L.Report_id.pp child_id L.Report_id.pp id type_ Content_type.unify;
+              L.Report_id.pp child_id L.Report_id.pp id type_
+              Content_type.match_;
           (child_id, result_of_id child_id)
         in
         let seg =
           match L.Log_queryer.get_next_report_ids id with
           | [] ->
-              Fmt.failwith "Unify_map.build_seg: assertion %a has no next!"
+              Fmt.failwith "Match_map.build_seg: assertion %a has no next!"
                 L.Report_id.pp id
           | [ next_id ] ->
               let content, type_ =
@@ -102,13 +103,13 @@ functor
               build_seg ~prev_substs:substitutions (next_id, type_, content)
           | _ ->
               Fmt.failwith
-                "Unify_map.build_seg: assertion %a has multiple nexts!"
+                "Match_map.build_seg: assertion %a has multiple nexts!"
                 L.Report_id.pp id
         in
         Assertion ({ id; fold; assertion; substitutions }, seg)
-      else if type_ = Content_type.unify_result then
+      else if type_ = Content_type.match_result then
         let result_report =
-          content |> Yojson.Safe.from_string |> UnifyResultReport.of_yojson
+          content |> Yojson.Safe.from_string |> MatchResultReport.of_yojson
           |> Result.get_ok
         in
         let result =
@@ -116,64 +117,64 @@ functor
           | Success _ -> Success
           | Failure _ -> Failure
         in
-        UnifyResult (id, result)
+        MatchResult (id, result)
       else
         Fmt.failwith
-          "Unify_map.build_seg: report %a has invalid type (%s) for unify_seg!"
+          "Match_map.build_seg: report %a has invalid type (%s) for match_seg!"
           L.Report_id.pp id type_
 
-    let build_case id : unify_seg =
+    let build_case id : match_seg =
       match L.Log_queryer.get_children_of ~roots_only:true id with
       | [] ->
-          Fmt.failwith "Unify_map.build_case: id %a has no children!"
+          Fmt.failwith "Match_map.build_case: id %a has no children!"
             L.Report_id.pp id
       | [ child ] -> build_seg child
       | _ ->
-          Fmt.failwith "Unify_map.build_case: id %a has multiple children!"
+          Fmt.failwith "Match_map.build_case: id %a has multiple children!"
             L.Report_id.pp id
 
-    let build_cases id : unify_seg list =
+    let build_cases id : match_seg list =
       let rec aux id acc =
         let acc = build_case id :: acc in
         match L.Log_queryer.get_next_reports id with
         | [] -> acc
         | [ (id, type_, _) ] ->
-            if type_ <> Content_type.unify_case then
+            if type_ <> Content_type.match_case then
               Fmt.failwith
-                "Unify_map.build_cases: %a has type %s (expected %s)!"
-                L.Report_id.pp id type_ Content_type.unify_case
+                "Match_map.build_cases: %a has type %s (expected %s)!"
+                L.Report_id.pp id type_ Content_type.match_case
             else aux id acc
         | _ ->
             Fmt.failwith
-              "Unify_map.build_cases: unify_case %a has multiple nexts!"
+              "Match_map.build_cases: match_case %a has multiple nexts!"
               L.Report_id.pp id
       in
 
       aux id [] |> List.rev
 
-    let f unify_id =
+    let f match_id =
       let kind =
-        let content, _ = L.Log_queryer.get_report unify_id |> Option.get in
-        let unify_report =
-          content |> Yojson.Safe.from_string |> UnifyReport.of_yojson
+        let content, _ = L.Log_queryer.get_report match_id |> Option.get in
+        let match_report =
+          content |> Yojson.Safe.from_string |> MatchReport.of_yojson
           |> Result.get_ok
         in
-        unify_report.unify_kind
+        match_report.match_kind
       in
       let map =
         let id, type_, _ =
-          match L.Log_queryer.get_children_of ~roots_only:true unify_id with
+          match L.Log_queryer.get_children_of ~roots_only:true match_id with
           | [ child ] -> child
           | _ ->
               Fmt.failwith
-                "Unify_map.build: unify id %a should have one root child!"
-                L.Report_id.pp unify_id
+                "Match_map.build: match id %a should have one root child!"
+                L.Report_id.pp match_id
         in
-        if type_ = Content_type.unify_case then
+        if type_ = Content_type.match_case then
           let segs = build_cases id in
           Fold segs
         else
-          let seg = build_case unify_id in
+          let seg = build_case match_id in
           Direct seg
       in
       (kind, map)

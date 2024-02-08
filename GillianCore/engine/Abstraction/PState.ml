@@ -9,7 +9,7 @@ module type S = sig
   type abs_t = string * vt list
 
   val make_p :
-    preds:UP.preds_tbl_t ->
+    preds:MP.preds_tbl_t ->
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
@@ -18,7 +18,7 @@ module type S = sig
     unit ->
     t
 
-  val init_with_pred_table : UP.preds_tbl_t -> init_data -> t
+  val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t
@@ -30,8 +30,8 @@ module type S = sig
   val set_wands : t -> Wands.t -> t
 
   val set_variants : t -> variants_t -> t
-  val unifies : t -> st -> UP.t -> Unifier.unify_kind -> bool
-  val add_pred_defs : UP.preds_tbl_t -> t -> t
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
@@ -46,16 +46,16 @@ module Make (State : SState.S) :
   open Containers
   open Literal
   module L = Logging
-  module SUnifier = Unifier.Make (State)
+  module SMatcher = Matcher.Make (State)
 
   type init_data = State.init_data
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
-  type t = SUnifier.t = {
+  type t = SMatcher.t = {
     state : State.t;
     preds : Preds.t;
     wands : Wands.t;
-    pred_defs : UP.preds_tbl_t;
+    pred_defs : MP.preds_tbl_t;
     variants : variants_t;
   }
 
@@ -70,15 +70,13 @@ module Make (State : SState.S) :
   type m_err_t = State.m_err_t
 
   exception Internal_State_Error of err_t list * t
-  exception Preprocessing_Error of UP.up_err_t list
+  exception Preprocessing_Error of MP.err list
 
   let () =
     Printexc.register_printer (function
-      | Preprocessing_Error upu ->
+      | Preprocessing_Error mp_errs ->
           Some
-            (Fmt.str "Preprocessing Error: %a"
-               (Fmt.Dump.list UP.pp_up_err_t)
-               upu)
+            (Fmt.str "Preprocessing Error: %a" (Fmt.Dump.list MP.pp_err) mp_errs)
       | _ -> None)
 
   type action_ret = (t * vt list, err_t) Res_list.t
@@ -94,7 +92,7 @@ module Make (State : SState.S) :
     }
 
   let init init_data =
-    let empty_pred_defs : UP.preds_tbl_t = UP.init_pred_defs () in
+    let empty_pred_defs : MP.preds_tbl_t = MP.init_pred_defs () in
     let empty_variants : variants_t = Hashtbl.create 1 in
     {
       state = State.init init_data;
@@ -117,7 +115,7 @@ module Make (State : SState.S) :
     }
 
   let make_p
-      ~(preds : UP.preds_tbl_t)
+      ~(preds : MP.preds_tbl_t)
       ~(init_data : init_data)
       ~(store : store_t)
       ~(pfs : PFS.t)
@@ -140,10 +138,10 @@ module Make (State : SState.S) :
   let simplify
       ?(save = false)
       ?(kill_new_lvars : bool option)
-      ?(unification = false)
+      ?(matching = false)
       (astate : t) : SVal.SESubst.t * t list =
     let subst, states =
-      State.simplify ~save ?kill_new_lvars ~unification astate.state
+      State.simplify ~save ?kill_new_lvars ~matching astate.state
     in
     Preds.substitution_in_place subst astate.preds;
     Wands.substitution_in_place subst astate.wands;
@@ -178,7 +176,7 @@ module Make (State : SState.S) :
     | false, _ -> [ astate' ]
     | true, _ -> (
         let unfold_vals = Expr.base_elements v in
-        match SUnifier.unfold_with_vals astate' unfold_vals with
+        match SMatcher.unfold_with_vals astate' unfold_vals with
         | None -> [ astate' ]
         | Some next_states ->
             let* _, astate = next_states in
@@ -186,12 +184,12 @@ module Make (State : SState.S) :
             astates)
 
   let assume_a
-      ?(unification = false)
+      ?(matching = false)
       ?(production = false)
       ?(time = "")
       (astate : t)
       (fs : Formula.t list) : t option =
-    match State.assume_a ~unification ~production ~time astate.state fs with
+    match State.assume_a ~matching ~production ~time astate.state fs with
     | Some state -> Some { astate with state }
     | None -> None
 
@@ -306,18 +304,18 @@ module Make (State : SState.S) :
         let state' = set_store state store in
         state'
 
-  (* FIXME: This needs to change -> we need to return a unification ret type, so we can
+  (* FIXME: This needs to change -> we need to return a matching ret type, so we can
       compose with bi-abduction at the spec level *)
   let run_spec_aux
       ?(existential_bindings : (string * vt) list option)
       (name : string)
       (params : string list)
-      (up : UP.t)
+      (mp : MP.t)
       (astate : t)
       (x : string option)
-      (args : vt list) : (t * Flag.t, SUnifier.err_t) Res_list.t =
+      (args : vt list) : (t * Flag.t, SMatcher.err_t) Res_list.t =
     L.verbose (fun m ->
-        m "INSIDE RUN spec of %s with the following UP:@\n%a@\n" name UP.pp up);
+        m "INSIDE RUN spec of %s with the following MP:@\n%a@\n" name MP.pp mp);
     let old_store = get_store astate in
     let new_store =
       try SStore.init (List.combine params args)
@@ -343,15 +341,15 @@ module Make (State : SState.S) :
     let subst = SVal.SESubst.init (existential_bindings @ store_bindings) in
 
     L.verbose (fun m ->
-        m "About to use the spec of %s with the following UP:@\n%a@\n" name
-          UP.pp up);
+        m "About to use the spec of %s with the following MP:@\n%a@\n" name
+          MP.pp mp);
 
     let open Res_list.Syntax in
     let open Syntaxes.List in
-    let res = SUnifier.unify astate' subst up FunctionCall in
+    let res = SMatcher.match_ astate' subst mp FunctionCall in
     if List.find_opt Result.is_error res |> Option.is_some then
       L.normal (fun m ->
-          m "WARNING: Failed to unify against the precondition of procedure %s"
+          m "WARNING: Failed to match against the precondition of procedure %s"
             name);
     let** frame_state, subst, posts = res in
     let fl, posts =
@@ -365,16 +363,16 @@ module Make (State : SState.S) :
           L.fail msg
     in
     (* OK FOR DELAY ENTAILMENT *)
-    let* final_state = SUnifier.produce_posts frame_state subst posts in
+    let* final_state = SMatcher.produce_posts frame_state subst posts in
     let final_store = get_store final_state in
     let v_ret = SStore.get final_store Names.return_variable in
     let final_state = set_store final_state (SStore.copy old_store) in
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
-    let _, final_states = simplify ~unification:true final_state in
+    let _, final_states = simplify ~matching:true final_state in
     let+ final_state = final_states in
     let with_unfolded_concrete =
-      snd (Option.get (SUnifier.unfold_concrete_preds final_state))
+      snd (Option.get (SMatcher.unfold_concrete_preds final_state))
     in
     Ok (with_unfolded_concrete, fl)
 
@@ -412,8 +410,8 @@ module Make (State : SState.S) :
       preds_list;
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
-  let unify_invariant
-      (prog : 'a UP.prog)
+  let match_invariant
+      (prog : 'a MP.prog)
       (revisited : bool)
       (astate : t)
       (a : Asrt.t)
@@ -443,7 +441,7 @@ module Make (State : SState.S) :
     let asrt_alocs =
       List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
     in
-    let known_unifiables =
+    let known_matchables =
       Expr.Set.of_list (known_pvars @ known_lvars @ asrt_alocs)
     in
     let pred_ins =
@@ -454,9 +452,9 @@ module Make (State : SState.S) :
         prog.prog.preds
         (Hashtbl.create Config.medium_tbl_size)
     in
-    let up =
+    let mp =
       (* FIXME: UNDERSTAND IF THE OX SHOULD BE [] *)
-      UP.init known_unifiables Expr.Set.empty pred_ins [ (a, (None, None)) ]
+      MP.init known_matchables Expr.Set.empty pred_ins [ (a, (None, None)) ]
     in
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
@@ -477,10 +475,10 @@ module Make (State : SState.S) :
 
       L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate))
     else ();
-    let up =
-      match up with
-      | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
-      | Ok up -> up
+    let mp =
+      match mp with
+      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Ok mp -> mp
     in
     let bindings =
       List.map
@@ -492,16 +490,16 @@ module Make (State : SState.S) :
             | _ ->
                 raise
                   (Failure
-                     "Impossible: unifiable not a pvar or an lvar or an aloc")
+                     "Impossible: matchable not a pvar or an lvar or an aloc")
           in
           (e, Option.get binding))
-        (Expr.Set.elements known_unifiables)
+        (Expr.Set.elements known_matchables)
     in
     let subst = SVal.SESubst.init bindings in
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let** new_state, subst', _ =
-      let+ result = SUnifier.unify astate subst up Invariant in
+      let+ result = SMatcher.match_ astate subst mp Invariant in
       match result with
       | Ok state -> Ok state
       | Error err ->
@@ -510,8 +508,8 @@ module Make (State : SState.S) :
           let () =
             L.print_to_all
               (Format.asprintf
-                 "UNIFY INVARIANT FAILURE: with argument @[<h>%a@]. \
-                  Unification failed.@\n\
+                 "MATCH INVARIANT FAILURE: with argument @[<h>%a@]. matching \
+                  failed.@\n\
                   @[<v 2>Errors:@\n\
                   %a.@]@\n\
                   @[<v 2>Failing Model:@\n\
@@ -522,7 +520,7 @@ module Make (State : SState.S) :
           in
           Error (StateErr.EPure fail_pfs)
     in
-    (* Successful Unification *)
+    (* Successful matching *)
     (* TODO: Should the frame state have the subst produced? *)
     let frame_state = copy new_state in
     let frame_state = set_store frame_state (SStore.init []) in
@@ -533,7 +531,7 @@ module Make (State : SState.S) :
     in
     let success = List.for_all (fun (_, x_v) -> x_v <> None) new_bindings in
     if not success then
-      raise (Failure "UNIFY INVARIANT FAILURE: binders not captured")
+      raise (Failure "MATCH INVARIANT FAILURE: binders not captured")
     else
       let new_bindings =
         List.map (fun (x, x_v) -> (x, Option.get x_v)) new_bindings
@@ -604,7 +602,7 @@ module Make (State : SState.S) :
           pvar_subst_list
       in
       let invariant_state = set_store invariant_state store in
-      let* res = SUnifier.produce invariant_state full_subst a_produce in
+      let* res = SMatcher.produce invariant_state full_subst a_produce in
       match res with
       | Ok new_astate ->
           let new_state' =
@@ -619,7 +617,7 @@ module Make (State : SState.S) :
       | Error e ->
           let msg =
             Fmt.str
-              "UNIFY INVARIANT FAILURE: %a\n\
+              "MATCH INVARIANT FAILURE: %a\n\
                unable to produce variable bindings: %a." Asrt.pp a pp_err_t e
           in
           L.print_to_all msg;
@@ -643,7 +641,7 @@ module Make (State : SState.S) :
         let** astate =
           let frame_asrt = Asrt.star (to_assertions frame) in
           let full_subst = make_id_subst frame_asrt in
-          let+ produced = SUnifier.produce astate full_subst frame_asrt in
+          let+ produced = SMatcher.produce astate full_subst frame_asrt in
           match produced with
           | Error err ->
               L.print_to_all
@@ -665,7 +663,7 @@ module Make (State : SState.S) :
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let evaluate_slcmd (prog : 'a UP.prog) (lcmd : SLCmd.t) (astate : t) :
+  let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (astate : t) :
       (t, err_t) Res_list.t =
     let eval_expr e =
       try State.eval_expr astate.state e
@@ -678,14 +676,14 @@ module Make (State : SState.S) :
       | SymbExec -> failwith "Impossible: Untreated SymbExec"
       | Fold (pname, les, fold_info) ->
           let vs = List.map eval_expr les in
-          let pred = UP.get_pred_def prog.preds pname in
+          let pred = MP.get_pred_def prog.preds pname in
           let additional_bindings =
             Option.fold
               ~some:(fun (_, bindings) ->
                 List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
               ~none:[] fold_info
           in
-          SUnifier.fold ~additional_bindings ~unify_kind:LogicCommand
+          SMatcher.fold ~additional_bindings ~match_kind:LogicCommand
             ~state:astate pred vs
       | Unfold (pname, les, additional_bindings, b) ->
           (* Unfoldig predicate with name [pname] and arguments [les].
@@ -693,7 +691,7 @@ module Make (State : SState.S) :
              and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
           (* 1) We retrieve the definition of the predicate to unfold and make sure
              it is not abstract and hence can be unfolded. *)
-          let pred = UP.get_pred_def prog.preds pname in
+          let pred = MP.get_pred_def prog.preds pname in
           if pred.pred.pred_abstract then
             Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
           (* 2) We evaluate the arguments, filter to keep only the in-parameters
@@ -703,7 +701,7 @@ module Make (State : SState.S) :
           let vs = List.map Option.some vs in
           (* FIXME: make sure correct number of params *)
           (* 3) We consume the predicate from the state. *)
-          let cons_res = SUnifier.consume_pred astate pname vs in
+          let cons_res = SMatcher.consume_pred astate pname vs in
           let () =
             match (cons_res, !Config.under_approximation) with
             | [], false ->
@@ -720,20 +718,20 @@ module Make (State : SState.S) :
           L.verbose (fun m ->
               m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
                 SLCmd.pp_unfold_info additional_bindings);
-          if b then SUnifier.rec_unfold astate pname vs
+          if b then SMatcher.rec_unfold astate pname vs
           else (
             L.verbose (fun m ->
                 m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Expr.pp) vs);
             let** _, state =
-              SUnifier.unfold ?additional_bindings astate pname vs
+              SMatcher.unfold ?additional_bindings astate pname vs
             in
             let _, states =
-              simplify ~kill_new_lvars:true ~unification:true state
+              simplify ~kill_new_lvars:true ~matching:true state
             in
             Res_list.just_oks states)
       | Package { lhs; rhs } ->
           let++ astate =
-            let res = SUnifier.package_wand astate { lhs; rhs } in
+            let res = SMatcher.package_wand astate { lhs; rhs } in
             L.verbose (fun m ->
                 m "wand package returned %a"
                   (List_res.pp ~ok:pp ~err:pp_err_t)
@@ -743,7 +741,7 @@ module Make (State : SState.S) :
           Wands.extend astate.wands { lhs; rhs };
           astate
       | GUnfold pname ->
-          let** astate = SUnifier.unfold_all astate pname in
+          let** astate = SMatcher.unfold_all astate pname in
           let _, astates = simplify ~kill_new_lvars:true astate in
           Res_list.just_oks astates
       | SepAssert (a, binders) -> (
@@ -774,7 +772,7 @@ module Make (State : SState.S) :
           let asrt_alocs =
             List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
           in
-          let known_unifiables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
+          let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
           let pred_ins =
             Hashtbl.fold
@@ -785,8 +783,8 @@ module Make (State : SState.S) :
               (Hashtbl.create Config.medium_tbl_size)
           in
 
-          let up =
-            UP.init known_unifiables Expr.Set.empty pred_ins
+          let mp =
+            MP.init known_matchables Expr.Set.empty pred_ins
               [ (a, (None, None)) ]
           in
           let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
@@ -804,10 +802,10 @@ module Make (State : SState.S) :
 
             L.verbose (fun m ->
                 m "State after substitution:@\n@[%a@]\n" pp astate));
-          let up =
-            match up with
-            | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
-            | Ok up -> up
+          let mp =
+            match mp with
+            | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+            | Ok mp -> mp
           in
           let bindings =
             List.map
@@ -817,20 +815,18 @@ module Make (State : SState.S) :
                   | LVar _ | ALoc _ -> e
                   | _ ->
                       raise
-                        (Failure "Impossible: unifiable not an lvar or an aloc")
+                        (Failure "Impossible: matchable not an lvar or an aloc")
                 in
                 (id, e))
-              (Expr.Set.elements known_unifiables)
+              (Expr.Set.elements known_matchables)
           in
           (* let old_astate = copy astate in *)
           let subst = SVal.SESubst.init bindings in
           let open Syntaxes.List in
-          let* unification_result =
-            SUnifier.unify astate subst up LogicCommand
-          in
-          match unification_result with
+          let* matching_result = SMatcher.match_ astate subst mp LogicCommand in
+          match matching_result with
           | Ok (new_state, subst', _) ->
-              (* Successful Unification *)
+              (* Successful matching *)
               let lbinders = List.map (fun x -> Expr.LVar x) binders in
               let new_bindings =
                 List.map (fun e -> (e, SVal.SESubst.get subst' e)) lbinders
@@ -863,7 +859,7 @@ module Make (State : SState.S) :
               let a_produce = Asrt.star [ a_new_bindings; a_substed ] in
               let result =
                 let** new_astate =
-                  SUnifier.produce new_state full_subst a_produce
+                  SMatcher.produce new_state full_subst a_produce
                 in
                 let new_state' =
                   State.add_spec_vars new_astate.state (SS.of_list binders)
@@ -893,7 +889,7 @@ module Make (State : SState.S) :
               let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
               let msg =
                 Fmt.str
-                  "Assert failed with argument @[<h>%a@]. Unification failed.@\n\
+                  "Assert failed with argument @[<h>%a@]. matching failed.@\n\
                    @[<v 2>Errors:@\n\
                    %a.@]@\n\
                    @[<v 2>Failing Model:@\n\
@@ -908,7 +904,7 @@ module Make (State : SState.S) :
           if not (List.for_all Names.is_lvar_name binders) then
             failwith "Binding of pure variables in lemma application.";
           let lemma =
-            match UP.get_lemma prog lname with
+            match MP.get_lemma prog lname with
             | Error _ -> Fmt.failwith "Lemma %s does not exist" lname
             | Ok lemma -> lemma
           in
@@ -922,20 +918,20 @@ module Make (State : SState.S) :
           in
           let** astate, _ =
             run_spec_aux ~existential_bindings lname lemma.data.lemma_params
-              lemma.up astate None v_args
+              lemma.mp astate None v_args
           in
           let astate = add_spec_vars astate (Var.Set.of_list binders) in
-          let _, astates = simplify ~unification:true astate in
+          let _, astates = simplify ~matching:true astate in
           Res_list.just_oks astates
       | Invariant _ ->
           raise
-            (Failure "Invariant must be treated by the unify_invariant function")
+            (Failure "Invariant must be treated by the match_invariant function")
     in
     let _, astates = simplify resulting_astate in
     Res_list.just_oks astates
 
   let run_spec
-      (spec : UP.spec)
+      (spec : MP.spec)
       (astate : t)
       (x : string)
       (args : vt list)
@@ -943,29 +939,29 @@ module Make (State : SState.S) :
       (t * Flag.t, err_t) Res_list.t =
     match subst with
     | None ->
-        run_spec_aux spec.data.spec_name spec.data.spec_params spec.up astate
+        run_spec_aux spec.data.spec_name spec.data.spec_params spec.mp astate
           (Some x) args
     | Some (_, subst_lst) ->
         run_spec_aux ~existential_bindings:subst_lst spec.data.spec_name
-          spec.data.spec_params spec.up astate (Some x) args
+          spec.data.spec_params spec.mp astate (Some x) args
 
-  let unifies
+  let matches
       (astate : t)
       (subst : st)
-      (up : UP.t)
-      (unify_type : Unifier.unify_kind) : bool =
+      (mp : MP.t)
+      (match_type : Matcher.match_kind) : bool =
     if !Config.under_approximation then
       failwith
-        "WE CAN'T CHECK IF SOMETHING FULLY UNIFIES IN UNDER-APPROXIMATION MODE";
-    let unification_results = SUnifier.unify astate subst up unify_type in
-    let success = List.for_all Result.is_ok unification_results in
-    L.verbose (fun fmt -> fmt "PSTATE.unifies: Success: %b" success);
+        "WE CAN'T CHECK IF SOMETHING FULLY MATCHES IN UNDER-APPROXIMATION MODE";
+    let matching_results = SMatcher.match_ astate subst mp match_type in
+    let success = List.for_all Result.is_ok matching_results in
+    L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success);
     success
 
   let unfolding_vals (astate : t) (fs : Formula.t list) : vt list =
     State.unfolding_vals astate.state fs
 
-  let add_pred_defs (pred_defs : UP.preds_tbl_t) (astate : t) : t =
+  let add_pred_defs (pred_defs : MP.preds_tbl_t) (astate : t) : t =
     { astate with pred_defs }
 
   let fresh_loc ?(loc : vt option) (astate : t) : vt =
@@ -974,13 +970,13 @@ module Make (State : SState.S) :
   let clean_up ?keep:_ (astate : t) : unit = State.clean_up astate.state
 
   let produce (astate : t) (subst : st) (a : Asrt.t) : (t, err_t) Res_list.t =
-    SUnifier.produce astate subst a
+    SMatcher.produce astate subst a
 
-  let unify_assertion (astate : t) (subst : st) (step : UP.step) =
-    SUnifier.unify_assertion astate subst step
+  let match_assertion (astate : t) (subst : st) (step : MP.step) =
+    SMatcher.match_assertion astate subst step
 
   let produce_posts (astate : t) (subst : st) (asrts : Asrt.t list) : t list =
-    SUnifier.produce_posts astate subst asrts
+    SMatcher.produce_posts astate subst asrts
 
   let get_all_preds ?(keep : bool option) (sel : abs_t -> bool) (astate : t) :
       abs_t list =
@@ -1028,7 +1024,7 @@ module Make (State : SState.S) :
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
-    SUnifier.try_recovering astate tactic
+    SMatcher.try_recovering astate tactic
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
@@ -1053,7 +1049,7 @@ module Make (State : SState.S) :
     let open Syntaxes.Result in
     let rec aux = function
       | Some state, Some preds, Some variants, Some wands, [] ->
-          Ok { state; preds; pred_defs = UP.init_pred_defs (); variants; wands }
+          Ok { state; preds; pred_defs = MP.init_pred_defs (); variants; wands }
       | None, preds, variants, wands, ("state", state_yojson) :: rest ->
           let* state = State.of_yojson state_yojson in
           aux (Some state, preds, variants, wands, rest)

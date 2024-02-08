@@ -79,8 +79,8 @@ module Custom_commands (Debugger : Debugger.S) = struct
     end
   end
 
-  module Unification_command = struct
-    let type_ = "unification"
+  module Matching_command = struct
+    let type_ = "matching"
 
     module Arguments = struct
       type t = { id : L.Report_id.t } [@@deriving yojson]
@@ -88,8 +88,8 @@ module Custom_commands (Debugger : Debugger.S) = struct
 
     module Result = struct
       type t = {
-        unify_id : L.Report_id.t; [@key "unifyId"]
-        unify_map : Unify_map.t; [@key "unifyMap"]
+        match_id : L.Report_id.t; [@key "matchId"]
+        match_map : Match_map.t; [@key "matchMap"]
       }
       [@@deriving yojson, make]
     end
