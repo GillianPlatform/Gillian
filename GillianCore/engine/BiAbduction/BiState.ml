@@ -7,7 +7,7 @@ module Make (State : SState.S) = struct
   type state_t = State.t
   type st = SVal.SESubst.t
   type vt = Expr.t [@@deriving show, yojson]
-  type t = SS.t * state_t * state_t
+  type t = { procs : SS.t; state : state_t; af_state : state_t }
   type store_t = SStore.t
   type err_t = State.err_t [@@deriving yojson, show]
   type fix_t = State.fix_t
@@ -21,34 +21,37 @@ module Make (State : SState.S) = struct
 
   let make ~(procs : SS.t) ~(state : State.t) ~(init_data : State.init_data) : t
       =
-    (procs, state, State.init init_data)
+    { procs; state; af_state = State.init init_data }
 
   let eval_expr (bi_state : t) (e : Expr.t) =
-    let _, state, _ = bi_state in
+    let { state; _ } = bi_state in
     try State.eval_expr state e
     with State.Internal_State_Error (errs, _) ->
       raise (Internal_State_Error (errs, bi_state))
 
   let get_store (bi_state : t) : SStore.t =
-    let _, state, _ = bi_state in
+    let { state; _ } = bi_state in
     State.get_store state
 
   let set_store (bi_state : t) (store : SStore.t) : t =
-    let procs, state, af_state = bi_state in
+    let { state; _ } = bi_state in
     let state' = State.set_store state store in
-    (procs, state', af_state)
+    { bi_state with state = state' }
 
-  let assume ?(unfold = false) (bi_state : t) (v : Expr.t) : t list =
-    let procs, state, state_af = bi_state in
+  let assume ?(unfold = false) ({ procs; state; af_state } : t) (v : Expr.t) :
+      t list =
     let new_states = State.assume ~unfold state v in
     match new_states with
     | [] -> []
     | first_state :: rest ->
         (* Slight optim, we don't copy the anti_frame if we have only one state. *)
         let rest =
-          List.map (fun state' -> (procs, state', State.copy state_af)) rest
+          List.map
+            (fun state' ->
+              { procs; state = state'; af_state = State.copy af_state })
+            rest
         in
-        (procs, first_state, state_af) :: rest
+        { procs; state = first_state; af_state } :: rest
 
   let assume_a
       ?(matching = false)
@@ -56,103 +59,88 @@ module Make (State : SState.S) = struct
       ?time:_
       (bi_state : t)
       (fs : Formula.t list) : t option =
-    let procs, state, state_af = bi_state in
+    let { state; _ } = bi_state in
     match State.assume_a ~matching ~production state fs with
-    | Some state -> Some (procs, state, state_af)
+    | Some state -> Some { bi_state with state }
     | None -> None
 
   let assume_t (bi_state : t) (v : Expr.t) (t : Type.t) : t option =
-    let procs, state, state_af = bi_state in
+    let { state; _ } = bi_state in
     match State.assume_t state v t with
-    | Some state -> Some (procs, state, state_af)
+    | Some state -> Some { bi_state with state }
     | None -> None
 
-  let sat_check (bi_state : t) (v : Expr.t) : bool =
-    let _, state, _ = bi_state in
-    State.sat_check state v
+  let sat_check ({ state; _ } : t) (v : Expr.t) : bool = State.sat_check state v
 
-  let sat_check_f (bi_state : t) (fs : Formula.t list) : SVal.SESubst.t option =
-    let _, state, _ = bi_state in
+  let sat_check_f ({ state; _ } : t) (fs : Formula.t list) :
+      SVal.SESubst.t option =
     State.sat_check_f state fs
 
-  let assert_a (bi_state : t) (fs : Formula.t list) : bool =
-    let _, state, _ = bi_state in
+  let assert_a ({ state; _ } : t) (fs : Formula.t list) : bool =
     State.assert_a state fs
 
-  let equals (bi_state : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
-    let _, state, _ = bi_state in
+  let equals ({ state; _ } : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
     State.equals state v1 v2
 
-  let get_type (bi_state : t) (v : Expr.t) : Type.t option =
-    let _, state, _ = bi_state in
+  let get_type ({ state; _ } : t) (v : Expr.t) : Type.t option =
     State.get_type state v
 
-  let copy (bi_state : t) : t =
-    let procs, state, state_af = bi_state in
-    (procs, State.copy state, State.copy state_af)
+  let copy ({ procs; state; af_state } : t) : t =
+    { procs; state = State.copy state; af_state = State.copy af_state }
 
   let simplify
       ?(save = false)
       ?(kill_new_lvars : bool option)
       ?matching:_
-      (bi_state : t) : SVal.SESubst.t * t list =
+      ({ procs; state; af_state } : t) : SVal.SESubst.t * t list =
     let kill_new_lvars = Option.value ~default:true kill_new_lvars in
-    let procs, state, state_af = bi_state in
     let subst, states = State.simplify ~save ~kill_new_lvars state in
 
     let states =
       List.concat_map
         (fun state ->
-          let subst_af = SVal.SESubst.copy subst in
+          let af_subst = SVal.SESubst.copy subst in
           let svars = State.get_spec_vars state in
-          SVal.SESubst.filter_in_place subst_af (fun x x_v ->
+          SVal.SESubst.filter_in_place af_subst (fun x x_v ->
               match x with
               | LVar x -> if SS.mem x svars then None else Some x_v
               | _ -> Some x_v);
           List.map
-            (fun state_af -> (procs, state, state_af))
-            (State.substitution_in_place subst_af state_af))
+            (fun af_state -> { procs; state; af_state })
+            (State.substitution_in_place af_subst af_state))
         states
     in
 
     (subst, states)
 
-  let simplify_val (bi_state : t) (v : Expr.t) : Expr.t =
-    let _, state, _ = bi_state in
+  let simplify_val ({ state; _ } : t) (v : Expr.t) : Expr.t =
     State.simplify_val state v
 
-  let pp fmt bi_state =
-    let procs, state, state_af = bi_state in
+  let pp fmt { procs; state; af_state } =
     Fmt.pf fmt "PROCS:@\n@[<h>%a@]@\nMAIN STATE:@\n%a@\nANTI FRAME:@\n%a@\n"
       Fmt.(iter ~sep:comma SS.iter string)
-      procs State.pp state State.pp state_af
+      procs State.pp state State.pp af_state
 
   (* TODO: By-need formatter *)
   let pp_by_need _ _ _ fmt state = pp fmt state
 
   let add_spec_vars (bi_state : t) (vs : Var.Set.t) : t =
-    let procs, state, state_af = bi_state in
+    let { state; _ } = bi_state in
     let state' = State.add_spec_vars state vs in
-    (procs, state', state_af)
+    { bi_state with state = state' }
 
-  let get_spec_vars (bi_state : t) : Var.Set.t =
-    let _, state, _ = bi_state in
-    State.get_spec_vars state
+  let get_spec_vars ({ state; _ } : t) : Var.Set.t = State.get_spec_vars state
+  let get_lvars ({ state; _ } : t) : Var.Set.t = State.get_lvars state
 
-  let get_lvars (bi_state : t) : Var.Set.t =
-    let _, state, _ = bi_state in
-    State.get_lvars state
-
-  let to_assertions ?(to_keep : SS.t option) (bi_state : t) : Asrt.t list =
-    let _, state, _ = bi_state in
+  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t list =
     State.to_assertions ?to_keep state
 
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
       (t, err_t) Res_list.t =
     let open Res_list.Syntax in
-    let procs, state, state_af = bi_state in
+    let { state; _ } = bi_state in
     let++ state' = State.evaluate_slcmd prog lcmd state in
-    (procs, state', state_af)
+    { bi_state with state = state' }
 
   let match_invariant _ _ _ _ _ =
     raise (Failure "ERROR: match_invariant called for bi-abductive execution")
@@ -160,8 +148,7 @@ module Make (State : SState.S) = struct
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for bi-abductive execution")
 
-  let unfolding_vals (bi_state : t) (fs : Formula.t list) : Expr.t list =
-    let _, state, _ = bi_state in
+  let unfolding_vals ({ state; _ } : t) (fs : Formula.t list) : Expr.t list =
     State.unfolding_vals state fs
 
   let substitution_in_place ?subst_all:_ (_ : SVal.SESubst.t) (_ : t) =
@@ -170,13 +157,10 @@ module Make (State : SState.S) = struct
   let fresh_loc ?loc:_ (_ : t) : Expr.t =
     raise (Failure "fresh_loc inside BI STATE")
 
-  let clean_up ?keep:_ (bi_state : t) : unit =
-    let _, state, _ = bi_state in
-    State.clean_up state
+  let clean_up ?keep:_ ({ state; _ } : t) : unit = State.clean_up state
 
-  let get_components (bi_state : t) : State.t * State.t =
-    let _, state, state_af = bi_state in
-    (state, state_af)
+  let get_components ({ state; af_state; _ } : t) : State.t * State.t =
+    (state, af_state)
 
   let subst_in_val (subst : SVal.SESubst.t) (v : Expr.t) : Expr.t =
     SVal.SESubst.subst_in_expr subst ~partial:true v
@@ -195,7 +179,7 @@ module Make (State : SState.S) = struct
   let match_
       (_ : SS.t)
       (state : State.t)
-      (state_af : State.t)
+      (af_state : State.t)
       (subst : SVal.SESubst.t)
       (mp : MP.t) : (state_t * state_t * SVal.SESubst.t * post_res) list =
     if not !Config.under_approximation then (
@@ -203,7 +187,7 @@ module Make (State : SState.S) = struct
       exit 1);
     let open Syntaxes.List in
     let rec search next_state =
-      let state, state_af, subst, mp = next_state in
+      let state, af_state, subst, mp = next_state in
       match mp with
       | MP.ConsumeStep (step, rest_up) -> (
           let matching_results = State.match_assertion state subst step in
@@ -218,10 +202,10 @@ module Make (State : SState.S) = struct
               if should_copy then
                 search
                   ( State.copy state',
-                    State.copy state_af,
+                    State.copy af_state,
                     SVal.SESubst.copy subst,
                     rest_up )
-              else search (state', state_af, subst, rest_up)
+              else search (state', af_state, subst, rest_up)
           | Error err ->
               L.verbose (fun m ->
                   m
@@ -237,9 +221,9 @@ module Make (State : SState.S) = struct
                 let* fixes = State.get_fixes state err in
                 (* TODO: a better implementation here might be to say that apply_fix returns a list of fixed states, possibly empty *)
                 let state' = State.copy state in
-                let state_af' = State.copy state_af in
+                let af_state' = State.copy af_state in
                 let* state' = State.apply_fixes state' fixes in
-                let* state_af' = State.apply_fixes state_af' fixes in
+                let* af_state' = State.apply_fixes af_state' fixes in
                 L.verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!");
                 let new_subst, states = State.simplify state' in
                 let state' =
@@ -257,16 +241,16 @@ module Make (State : SState.S) = struct
                 L.(
                   verbose (fun m ->
                       m "@[<v 2>AF BEFORE SIMPLIFICATION:@\n%a@]@\n" State.pp
-                        state_af'));
+                        af_state'));
                 let svars = State.get_spec_vars state' in
                 SVal.SESubst.filter_in_place new_subst (fun x x_v ->
                     match x with
                     | LVar x -> if SS.mem x svars then None else Some x_v
                     | _ -> Some x_v);
                 let subst_afs =
-                  State.substitution_in_place new_subst state_af'
+                  State.substitution_in_place new_subst af_state'
                 in
-                let state_af' =
+                let af_state' =
                   match subst_afs with
                   | [ x ] -> x
                   | _ ->
@@ -275,21 +259,21 @@ module Make (State : SState.S) = struct
                 L.(
                   verbose (fun m ->
                       m "@[<v 2>AF AFTER SIMPLIFICATION:@\n%a@]\n" State.pp
-                        state_af'));
-                search (state', state_af', subst', mp)))
+                        af_state'));
+                search (state', af_state', subst', mp)))
       | Choice (left, right) ->
           let state_copy = State.copy state in
-          let state_af_copy = State.copy state_af in
+          let af_state_copy = State.copy af_state in
           let subst_copy = SVal.SESubst.copy subst in
-          let left = search (state, state_af, subst, left) in
-          let right = search (state_copy, state_af_copy, subst_copy, right) in
+          let left = search (state, af_state, subst, left) in
+          let right = search (state_copy, af_state_copy, subst_copy, right) in
           left @ right
       | Finished post ->
           L.verbose (fun m -> m "ONE SPEC IS DONE!!!@\n");
-          [ (state, state_af, subst, post) ]
+          [ (state, af_state, subst, post) ]
       | LabelStep _ -> L.fail "DEATH: LABEL STEP IN BI-ABDUCTION"
     in
-    search (state, state_af, subst, mp)
+    search (state, af_state, subst, mp)
 
   let update_store (state : State.t) (x : string option) (v : Expr.t) : State.t
       =
@@ -323,7 +307,7 @@ module Make (State : SState.S) = struct
             Fmt.(list ~sep:comma Expr.pp)
             args SVal.SESubst.pp subst_i));
 
-    let procs, state, state_af = bi_state in
+    let { procs; state; af_state } = bi_state in
 
     let old_store = State.get_store state in
 
@@ -342,12 +326,12 @@ module Make (State : SState.S) = struct
              BI-ABDUCTION:@\n\
              %a@]@\n"
             spec.data.spec_name MP.pp spec.mp));
-    let ret_states = match_ procs state' state_af subst spec.mp in
+    let ret_states = match_ procs state' af_state subst spec.mp in
     L.(
       verbose (fun m ->
           m "Concluding matching With %d results" (List.length ret_states)));
     let open Syntaxes.List in
-    let* frame_state, state_af, subst, posts = ret_states in
+    let* frame_state, af_state, subst, posts = ret_states in
     let fl, posts =
       match posts with
       | Some (fl, posts) -> (fl, posts)
@@ -370,9 +354,9 @@ module Make (State : SState.S) = struct
              %a@]@\n\
              @[<v 2>ANTI FRAME:@\n\
              %a@]@\n"
-            SVal.SESubst.pp subst State.pp frame_state State.pp state_af));
+            SVal.SESubst.pp subst State.pp frame_state State.pp af_state));
     let+ final_state = State.produce_posts frame_state subst posts in
-    let state_af' : State.t = State.copy state_af in
+    let af_state' : State.t = State.copy af_state in
     let final_store : SStore.t = State.get_store final_state in
     let v_ret : Expr.t option = SStore.get final_store Names.return_variable in
     let final_state' : State.t =
@@ -382,7 +366,7 @@ module Make (State : SState.S) = struct
     let final_state' : State.t = update_store final_state' (Some x) v_ret in
     (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
     let _ = State.simplify ~matching:true final_state' in
-    let bi_state : t = (procs, final_state', state_af') in
+    let bi_state : t = { procs; state = final_state'; af_state = af_state' } in
 
     L.(
       verbose (fun m ->
@@ -391,7 +375,7 @@ module Make (State : SState.S) = struct
              %a@]@\n\
              @[<v 2>AND STATE:@\n\
              %a@]@\n"
-            State.pp state_af' State.pp final_state'));
+            State.pp af_state' State.pp final_state'));
 
     (bi_state, fl)
 
@@ -432,8 +416,7 @@ module Make (State : SState.S) = struct
 
   (** new functions *)
 
-  let mem_constraints (bi_state : t) : Formula.t list =
-    let _, state, _ = bi_state in
+  let mem_constraints ({ state; _ } : t) : Formula.t list =
     State.mem_constraints state
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
@@ -442,13 +425,14 @@ module Make (State : SState.S) = struct
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
 
-  let rec execute_action (action : string) (astate : t) (args : Expr.t list) :
-      action_ret =
+  let rec execute_action
+      (action : string)
+      ({ procs; state; af_state } : t)
+      (args : Expr.t list) : action_ret =
     let open Syntaxes.List in
-    let procs, state, state_af = astate in
     let* ret = State.execute_action action state args in
     match ret with
-    | Ok (state', outs) -> [ Ok ((procs, state', state_af), outs) ]
+    | Ok (state', outs) -> [ Ok ({ procs; state = state'; af_state }, outs) ]
     | Error err when not (State.can_fix err) -> [ Error err ]
     | Error err -> (
         match State.get_fixes state err with
@@ -456,18 +440,15 @@ module Make (State : SState.S) = struct
         | fixes ->
             let* fix = fixes in
             let state' = State.copy state in
-            let state_af' = State.copy state_af in
+            let af_state' = State.copy af_state in
             let* state' = State.apply_fixes state' fix in
-            let* state_af' = State.apply_fixes state_af' fix in
-            execute_action action (procs, state', state_af') args)
+            let* af_state' = State.apply_fixes af_state' fix in
+            execute_action action
+              { procs; state = state'; af_state = af_state' }
+              args)
 
-  let get_equal_values bi_state =
-    let _, state, _ = bi_state in
-    State.get_equal_values state
-
-  let get_heap bi_state =
-    let _, state, _ = bi_state in
-    State.get_heap state
+  let get_equal_values { state; _ } = State.get_equal_values state
+  let get_heap { state; _ } = State.get_heap state
 
   let of_yojson _ =
     failwith
