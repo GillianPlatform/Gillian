@@ -56,7 +56,7 @@ struct
       (labeled_prog, init_data, None)
 
   let emit_specs e_prog prog file =
-    let () = Prog.update_specs e_prog UP.(prog.prog) in
+    let () = Prog.update_specs e_prog MP.(prog.prog) in
     let fname = Filename.chop_extension (Filename.basename file) in
     let dirname = Filename.dirname file in
     let out_path = Filename.concat dirname (fname ^ "_bi.gil") in
@@ -115,8 +115,8 @@ struct
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.@\n") in
     let () = Config.unfolding := false in
     let prog = LogicPreprocessing.preprocess prog true in
-    match UP.init_prog prog with
-    | Error _ -> failwith "Creation of unification plans failed."
+    match MP.init_prog prog with
+    | Error _ -> failwith "Creation of matching plans failed."
     | Ok prog' ->
         let () =
           Abductor.test_prog ~init_data ~call_graph prog' incremental

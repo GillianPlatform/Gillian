@@ -1,13 +1,13 @@
 import React, { ReactNode } from 'react';
 import { NodeProps } from 'react-flow-renderer';
 import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
-import { AssertionData, UnifyResult } from '../../../types';
+import { AssertionData, MatchResult } from '../../../types';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import type { Dims } from '../TreeMapView/TreeMapView';
 
-import './UnifyMapNode.css';
+import './MatchMapNode.css';
 
-export type UnifyMapNodeData =
+export type MatchMapNodeData =
   | {
       type: 'Assertion';
       assertionData: AssertionData;
@@ -19,7 +19,7 @@ export type UnifyMapNodeData =
     }
   | {
       type: 'Result';
-      result: UnifyResult;
+      result: MatchResult;
       setSelected: () => void;
     }
   | {
@@ -31,7 +31,7 @@ export type UnifyMapNodeData =
       type: 'Missing';
     };
 
-const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData & Dims>) => {
+const MatchMapNode = ({ data }: NodeProps<MatchMapNodeData & Dims>) => {
   const { type, width, height } = data;
   if (type === 'Root') {
     const { title, subtitle } = data;
@@ -47,7 +47,7 @@ const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData & Dims>) => {
     const [result] = data.result;
     return (
       <NodeWrap
-        classes={['unify-map-result']}
+        classes={['match-map-result']}
         noSourceHandle
         error={result !== 'Success'}
         width={width}
@@ -140,4 +140,4 @@ const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData & Dims>) => {
   );
 };
 
-export default UnifyMapNode;
+export default MatchMapNode;

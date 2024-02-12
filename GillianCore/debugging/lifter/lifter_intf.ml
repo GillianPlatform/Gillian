@@ -1,5 +1,5 @@
 module Types = struct
-  type unify_result = Unify_map.unify_result = Success | Failure
+  type match_result = Match_map.match_result = Success | Failure
   [@@deriving yojson]
 
   type ('err, 'annot, 'ast) memory_error_info = {
@@ -13,7 +13,7 @@ module Types = struct
     kind : (Branch_case.t, unit) Exec_map.cmd_kind;
     id : Logging.Report_id.t;
     cmd_report : 'cmd_report;
-    unifys : Exec_map.unification list;
+    matches : Exec_map.matching list;
     errors : string list;
     branch_path : Branch_case.path;
   }
@@ -85,8 +85,8 @@ module type S = sig
   (** Exception-raising version of {!get_lifted_map}. *)
   val get_lifted_map_exn : t -> Exec_map.Packaged.t
 
-  (** Gives a list of unifications that occurred at the specified command. *)
-  val get_unifys_at_id : Logging.Report_id.t -> t -> Exec_map.unification list
+  (** Gives a list of matches that occurred at the specified command. *)
+  val get_matches_at_id : Logging.Report_id.t -> t -> Exec_map.matching list
 
   (** Gives the id of the root (first) command in the execution map. *)
   val get_root_id : t -> Logging.Report_id.t option
@@ -160,7 +160,7 @@ module type Intf = sig
     (Branch_case.t, unit) Exec_map.cmd_kind ->
     Logging.Report_id.t ->
     'cmd_report ->
-    ?unifys:Exec_map.unification list ->
+    ?matches:Exec_map.matching list ->
     ?errors:string list ->
     Branch_case.path ->
     'cmd_report executed_cmd_data

@@ -72,7 +72,7 @@ end = struct
     | _ -> raise (Failure "assume. illegal argument to assume")
 
   let assume_a
-      ?unification:_
+      ?matching:_
       ?production:_
       ?time:_
       (state : t)
@@ -128,8 +128,7 @@ end = struct
   let equals _ v1 v2 = v1 = v2
   let get_type _ v = Some (Literal.type_of v)
 
-  let simplify ?save:_ ?kill_new_lvars:_ ?unification:_ (state : t) :
-      st * t list =
+  let simplify ?save:_ ?kill_new_lvars:_ ?matching:_ (state : t) : st * t list =
     (CVal.CESubst.init [], [ state ])
 
   let simplify_val _ v = v
@@ -147,7 +146,7 @@ end = struct
     raise (Failure "ERROR: to_assertions called for concrete executions")
 
   let run_spec
-      (_ : UP.spec)
+      (_ : MP.spec)
       (_ : t)
       (_ : string)
       (_ : vt list)
@@ -157,12 +156,12 @@ end = struct
   let unfolding_vals (_ : t) (_ : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
-  let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
+  let evaluate_slcmd (_ : 'a MP.prog) (_ : SLCmd.t) (_ : t) :
       (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let unify_invariant _ _ _ _ _ =
-    raise (Failure "ERROR: unify_invariant called for concrete execution")
+  let match_invariant _ _ _ _ _ =
+    raise (Failure "ERROR: match_invariant called for concrete execution")
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for concrete execution")
@@ -174,8 +173,8 @@ end = struct
 
   let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
 
-  let unify_assertion (_ : t) (_ : st) (_ : UP.step) =
-    raise (Failure "Unify assertion from concrete state.")
+  let match_assertion (_ : t) (_ : st) (_ : MP.step) =
+    raise (Failure "Match assertion from concrete state.")
 
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from concrete state.")

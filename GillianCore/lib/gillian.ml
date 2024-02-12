@@ -53,7 +53,7 @@ module Logic = struct
 end
 
 module Abstraction = struct
-  module UP = Engine.UP
+  module MP = Engine.MP
   module Verifier = Engine.Verifier
 end
 

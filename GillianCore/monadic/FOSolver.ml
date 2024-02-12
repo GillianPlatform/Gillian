@@ -28,8 +28,7 @@ let sat ~(pc : Pc.t) formula =
 
   Logging.tmi (fun m -> m "WITH PFS : %a" PFS.pp pfs);
   match
-    Engine.Reduction.reduce_formula ~unification:pc.unification ~pfs ~gamma
-      formula
+    Engine.Reduction.reduce_formula ~matching:pc.matching ~pfs ~gamma formula
   with
   | True ->
       Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
@@ -37,20 +36,19 @@ let sat ~(pc : Pc.t) formula =
   | False ->
       Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
       false
-  | formula -> FOSolver.sat ~unification:pc.unification ~pfs ~gamma formula
+  | formula -> FOSolver.sat ~matching:pc.matching ~pfs ~gamma formula
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
   try
     let f =
-      Engine.Reduction.reduce_formula ~unification:pc.unification ~gamma ~pfs
-        formula
+      Engine.Reduction.reduce_formula ~matching:pc.matching ~gamma ~pfs formula
     in
     match f with
     | True -> true
     | False -> false
     | _ ->
-        FOSolver.check_entailment ~unification:pc.unification
+        FOSolver.check_entailment ~matching:pc.matching
           Utils.Containers.SS.empty pfs [ f ] gamma
   with Engine.Reduction.ReductionException (e, msg) ->
     Logging.verbose (fun m ->
@@ -72,7 +70,7 @@ let resolve_loc_name ~pc loc =
     ~gamma:(build_full_gamma pc) loc
 
 let reduce_expr ~pc expr =
-  Reduction.reduce_lexpr ~unification:pc.Pc.unification ~pfs:(build_full_pfs pc)
+  Reduction.reduce_lexpr ~matching:pc.Pc.matching ~pfs:(build_full_pfs pc)
     ~gamma:(build_full_gamma pc) expr
 
 let resolve_type ~(pc : Pc.t) expr =

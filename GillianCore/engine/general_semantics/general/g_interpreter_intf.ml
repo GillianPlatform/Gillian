@@ -137,7 +137,7 @@ module type S = sig
 
   (** Evaluates a list of logical commands, in the context of a given state *)
   val evaluate_lcmds :
-    annot UP.prog ->
+    annot MP.prog ->
     LCmd.t list ->
     ?annot:annot option ->
     state_t ->
@@ -146,7 +146,7 @@ module type S = sig
   (** Begins execution of a proc, given parameters and initial state *)
   val init_evaluate_proc :
     (result_t -> 'a) ->
-    annot UP.prog ->
+    annot MP.prog ->
     string ->
     string list ->
     state_t ->
@@ -155,7 +155,7 @@ module type S = sig
   (** As with {! init_evaluate_proc}, but immediately executes the proc to completion *)
   val evaluate_proc :
     (result_t -> 'a) ->
-    annot UP.prog ->
+    annot MP.prog ->
     string ->
     string list ->
     state_t ->

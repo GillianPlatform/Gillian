@@ -4,7 +4,7 @@ module Make (SPState : PState.S) : sig
       considering the predicate table [pred_defs] and program variables [pvars].
       It returns the appropriate predicate state and all learned bindings. *)
   val normalise_assertion :
-    pred_defs:UP.preds_tbl_t ->
+    pred_defs:MP.preds_tbl_t ->
     init_data:SPState.init_data ->
     ?pvars:Utils.Containers.SS.t ->
     Asrt.t ->

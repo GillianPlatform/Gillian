@@ -7,17 +7,17 @@ type Submap =
   | readonly ['Submap', ExecMap]
   | readonly ['Proc', string];
 
-type Unification = {
+type Matching = {
   readonly id: number;
-  readonly kind: UnifyKind;
-  readonly result: UnifyResult;
+  readonly kind: MatchKind;
+  readonly result: MatchResult;
 };
 
 export type CmdData = {
   readonly id: readonly number;
   readonly all_ids: readonly number[];
   readonly display: string;
-  readonly unifys: readonly Unification[];
+  readonly matches: readonly Matching[];
   readonly errors: readonly string[];
   readonly submap: Submap;
 };
@@ -33,9 +33,9 @@ export type ExecMap =
 
 // #endregion
 
-// #region UnifyMap
+// #region MatchMap
 
-export type UnifyResult = readonly ['Success' | 'Failure'];
+export type MatchResult = readonly ['Success' | 'Failure'];
 
 export type Substitution = {
   readonly assertId: number;
@@ -44,24 +44,24 @@ export type Substitution = {
 
 export type AssertionData = {
   readonly id: number;
-  readonly fold: readonly [number, UnifyResult] | null;
+  readonly fold: readonly [number, MatchResult] | null;
   readonly assertion: string;
   readonly substitutions: readonly Substitution[];
 };
 
-export type UnifySeg =
-  | readonly ['Assertion', AssertionData, UnifySeg]
-  | readonly ['UnifyResult', number, UnifyResult];
+export type MatchSeg =
+  | readonly ['Assertion', AssertionData, MatchSeg]
+  | readonly ['MatchResult', number, MatchResult];
 
-export type UnifyKind = [
+export type MatchKind = [
   'Postcondition' | 'Fold' | 'FunctionCall' | 'Invariant' | 'LogicCommand'
 ];
 
-export type UnifyMapInner =
-  | readonly ['Direct', UnifySeg]
-  | readonly ['Fold', UnifySeg[]];
+export type MatchMapInner =
+  | readonly ['Direct', MatchSeg]
+  | readonly ['Fold', MatchSeg[]];
 
-export type UnifyMap = readonly [UnifyKind, UnifyMapInner];
+export type MatchMap = readonly [MatchKind, MatchMapInner];
 
 // #endregion
 
@@ -69,7 +69,7 @@ export type DebugProcState = {
   readonly execMap: ExecMap;
   readonly liftedExecMap: ExecMap | null;
   readonly currentCmdId: number;
-  readonly unifys: readonly Unification[];
+  readonly matches: readonly Matching[];
   readonly procName: string;
 };
 
@@ -79,25 +79,25 @@ export type DebuggerState = {
   readonly procs: Record<string, DebugProcState>;
 };
 
-export type UnifyStep =
+export type MatchStep =
   | readonly ['Assertion', AssertionData]
-  | readonly ['Result', number, UnifyResult];
+  | readonly ['Result', number, MatchResult];
 
-export type UnificationState = {
+export type MatchingState = {
   readonly id: number;
   readonly map: unknown; // TODO: fix when Immer supports recursive types
-  readonly selected?: UnifyStep;
+  readonly selected?: MatchStep;
 };
 
-export type UnifyState = {
+export type MatchState = {
   readonly path: number[];
-  readonly unifications: Record<number, UnificationState | undefined>;
+  readonly matches: Record<number, MatchingState | undefined>;
   readonly expandedNodes: Set<number>;
 };
 
 export type State = {
   readonly debuggerState?: DebuggerState;
-  readonly unifyState: UnifyState;
+  readonly matchState: MatchState;
   readonly expandedExecNodes: Set<string>;
 };
 
@@ -108,10 +108,10 @@ type StateUpdateMsg = {
   readonly state: DebuggerState;
 };
 
-type UnifyUpdateMsg = {
-  readonly type: 'unify_update';
-  readonly unifyId: number;
-  readonly unifyMap: UnifyMap;
+type MatchUpdateMsg = {
+  readonly type: 'match_update';
+  readonly matchId: number;
+  readonly matchMap: MatchMap;
 };
 
 type ResetViewMsg = {
@@ -120,9 +120,13 @@ type ResetViewMsg = {
 
 type ClearStateMsg = {
   readonly type: 'clear_state';
-}
+};
 
-export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg | ClearStateMsg;
+export type MessageToWebview =
+  | StateUpdateMsg
+  | MatchUpdateMsg
+  | ResetViewMsg
+  | ClearStateMsg;
 
 // #endregion
 
@@ -143,8 +147,8 @@ type RequestExecSpecific = {
   readonly branchCase: BranchCase | null;
 };
 
-type RequestUnification = {
-  readonly type: 'request_unification';
+type RequestMatching = {
+  readonly type: 'request_matching';
   readonly id: number;
 };
 
@@ -157,7 +161,7 @@ export type MessageFromWebview =
   | RequestStateUpdateMsg
   | RequestJump
   | RequestExecSpecific
-  | RequestUnification
+  | RequestMatching
   | RequestStartProc;
 
 // #endregion

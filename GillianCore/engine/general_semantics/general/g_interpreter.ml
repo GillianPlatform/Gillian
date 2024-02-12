@@ -372,7 +372,7 @@ struct
    * Auxiliary Functions *
    * ******************* *)
 
-  let get_cmd (prog : annot UP.prog) (cs : Call_stack.t) (i : int) :
+  let get_cmd (prog : annot MP.prog) (cs : Call_stack.t) (i : int) :
       string * (Annot.t * int Cmd.t) =
     let pid = Call_stack.get_cur_proc_id cs in
     let proc = Prog.get_proc prog.prog pid in
@@ -385,7 +385,7 @@ struct
     (pid, (annot, cmd))
 
   let get_predecessor
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (cs : Call_stack.t)
       (prev : int)
       (i : int) : int =
@@ -532,12 +532,12 @@ struct
 
     let rec eval_macro name args lcmd prog annot state =
       let macro =
-        match Macro.get UP.(prog.prog.macros) name with
+        match Macro.get MP.(prog.prog.macros) name with
         | Some macro -> macro
         | None ->
             L.verbose (fun m ->
                 m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
-                  UP.(prog.prog.macros));
+                  MP.(prog.prog.macros));
             Fmt.failwith "NO MACRO found when executing: @[<h>%a@]" LCmd.pp lcmd
       in
       let lcmds =
@@ -582,7 +582,7 @@ struct
             (Failure "Non-boolean expression in the condition of the logical if")
 
     and eval_lcmd
-        (prog : annot UP.prog)
+        (prog : annot MP.prog)
         (lcmd : LCmd.t)
         ?(annot : annot option)
         (state : State.t) : (State.t, state_err_t) Res_list.t =
@@ -601,7 +601,7 @@ struct
       | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
 
     and eval_lcmds
-        (prog : annot UP.prog)
+        (prog : annot MP.prog)
         (lcmds : LCmd.t list)
         ?(annot : annot option = None)
         (state : State.t) : (State.t, state_err_t) Res_list.t =
@@ -642,7 +642,7 @@ struct
       CConf.t
 
     type eval_state = {
-      prog : annot UP.prog;
+      prog : annot MP.prog;
       store : store_t;
       annot : annot;
       i : int;
@@ -672,7 +672,7 @@ struct
                 (Internal_error
                    "Procedure Call Error - unlifting procedure ID failed")
 
-        let get_spec_and_params (prog : annot UP.prog) pid state =
+        let get_spec_and_params (prog : annot MP.prog) pid state =
           let proc = Prog.get_proc prog.prog pid in
           let spec = Hashtbl.find_opt prog.specs pid in
           let params =
@@ -1129,7 +1129,7 @@ struct
         (* Invariant being revisited *)
         | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
             (* let () = Fmt.pr "\nRe-establishing invariant... @?" in *)
-            let _ = State.unify_invariant prog true state a binders in
+            let _ = State.match_invariant prog true state a binders in
             let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
             (* let () = Fmt.pr "\nInvariant re-established. @?" in *)
             []
@@ -1137,7 +1137,7 @@ struct
             assert (loop_action = FrameOff (List.hd loop_ids));
             (* let () = Fmt.pr "\nEstablishing invariant... @?" in *)
             let frames_and_states =
-              State.unify_invariant prog false state a binders
+              State.match_invariant prog false state a binders
             in
             (* let () = Fmt.pr "\nSuccessfully established invariant. @?" in *)
             List.map
@@ -1566,7 +1566,7 @@ struct
     let do_eval = Do_eval.f
 
     let rec eval_cmd
-        (prog : annot UP.prog)
+        (prog : annot MP.prog)
         (state : State.t)
         (cs : Call_stack.t)
         (iframes : invariant_frames)
@@ -1622,7 +1622,7 @@ struct
           List.concat_map eval_in_state states
 
     and eval_cmd_after_frame_handling
-        (prog : annot UP.prog)
+        (prog : annot MP.prog)
         (state : State.t)
         (cs : Call_stack.t)
         (iframes : invariant_frames)
@@ -1644,7 +1644,7 @@ struct
         else Nothing
       in
       (* if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1; *)
-      UP.update_coverage prog proc_name i;
+      MP.update_coverage prog proc_name i;
 
       log_configuration annot_cmd state cs i b_counter branch_case proc_name
       |> Option.iter (fun report_id ->
@@ -1689,7 +1689,7 @@ struct
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
 
   let protected_evaluate_cmd
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (state : State.t)
       (cs : Call_stack.t)
       (iframes : invariant_frames)
@@ -1759,7 +1759,7 @@ struct
     type 'a eval_step =
       (result_t -> 'a) ->
       bool ->
-      annot UP.prog ->
+      annot MP.prog ->
       'a list ->
       (CConf.t * string) list ->
       'a f
@@ -1767,7 +1767,7 @@ struct
     type 'a eval_step_state = {
       ret_fun : result_t -> 'a;
       retry : bool;
-      prog : annot UP.prog;
+      prog : annot MP.prog;
       hold_results : 'a list;
       on_hold : (CConf.t * string) list;
       branch_path : branch_path option;
@@ -2101,7 +2101,7 @@ struct
     let rec eval_step
         (ret_fun : result_t -> 'a)
         (retry : bool)
-        (prog : annot UP.prog)
+        (prog : annot MP.prog)
         (hold_results : 'a list)
         (on_hold : (CConf.t * string) list)
         (confs : CConf.t list)
@@ -2176,7 +2176,7 @@ struct
   *)
   let init_evaluate_proc
       (ret_fun : result_t -> 'a)
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (name : string)
       (params : string list)
       (state : State.t) : 'a cont_func =
@@ -2241,7 +2241,7 @@ struct
 *)
   let evaluate_proc
       (ret_fun : result_t -> 'a)
-      (prog : annot UP.prog)
+      (prog : annot MP.prog)
       (name : string)
       (params : string list)
       (state : State.t) : 'a list =

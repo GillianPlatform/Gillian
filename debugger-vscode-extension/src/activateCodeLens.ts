@@ -55,8 +55,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
 
     const config = workspace.getConfiguration('gillianDebugger');
     const lensKinds: [ExecMode, string][] = [];
-    if (config.showVerifyLens)
-      lensKinds.push(['debugverify', 'Verify ']);
+    if (config.showVerifyLens) lensKinds.push(['debugverify', 'Verify ']);
     if (config.showSymbolicDebugLens)
       lensKinds.push(['debugwpst', 'Symbolic-debug ']);
     const lenses: CodeLens[] = [];

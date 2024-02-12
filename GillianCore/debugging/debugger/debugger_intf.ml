@@ -6,7 +6,7 @@ module type S = sig
     type debug_state_view [@@deriving yojson]
 
     val get_debug_state : t -> debug_state_view
-    val get_unify_map : Logging.Report_id.t -> t -> Unify_map.t
+    val get_match_map : Logging.Report_id.t -> t -> Match_map.t
   end
 
   val launch : string -> string option -> (t, string) result

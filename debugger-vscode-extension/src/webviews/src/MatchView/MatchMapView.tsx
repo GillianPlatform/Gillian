@@ -1,62 +1,62 @@
 import React from 'react';
 import {
-  UnificationState,
-  UnifyMap,
-  UnifyMapInner,
-  UnifySeg,
-  UnifyStep,
+  MatchingState,
+  MatchMap,
+  MatchMapInner,
+  MatchSeg,
+  MatchStep,
 } from '../../../types';
 import TreeMapView, {
   TransformFunc,
   TransformResult,
   DEFAULT_NODE_SIZE,
 } from '../TreeMapView/TreeMapView';
-import UnifyMapNode, { UnifyMapNodeData } from './UnifyMapNode';
+import MatchMapNode, { MatchMapNodeData } from './MatchMapNode';
 
 import 'allotment/dist/style.css';
-import { getUnifyName } from '../util';
+import { getMatchName } from '../util';
 import useStore from '../store';
 
 type Props = {
-  unification: UnificationState;
-  selectStep: (step: UnifyStep) => void;
-  unifications: Record<number, UnificationState | undefined>;
+  matching: MatchingState;
+  selectStep: (step: MatchStep) => void;
+  matches: Record<number, MatchingState | undefined>;
   expandedNodes: Set<number>;
-  requestUnification: (id: number) => void;
+  requestMatching: (id: number) => void;
   toggleNodeExpanded: (id: number) => void;
 };
 
-type M = UnifySeg;
-type D = UnifyMapNodeData;
+type M = MatchSeg;
+type D = MatchMapNodeData;
 type A = null;
 
-const UnifyMapView = ({
-  unification,
+const MatchMapView = ({
+  matching,
   selectStep,
   expandedNodes,
-  unifications,
-  requestUnification,
+  matches,
+  requestMatching,
   toggleNodeExpanded,
 }: Props) => {
-  const unifyMap = (unification.map as UnifyMap)[1];
+  const matchMap = (matching.map as MatchMap)[1];
   const selectedId = (() => {
-    if (!unification.selected) {
+    if (!matching.selected) {
       return -1;
     }
 
-    if (unification.selected[0] === 'Assertion') {
-      return unification.selected[1].id;
-    } else if (unification.selected[0] === 'Result') {
-      return unification.selected[1];
+    if (matching.selected[0] === 'Assertion') {
+      return matching.selected[1].id;
+    } else if (matching.selected[0] === 'Result') {
+      return matching.selected[1];
     }
   })();
 
-  const [title, subtitle] = useStore(state => getUnifyName(state));
+  const [title, subtitle] = useStore(state => getMatchName(state));
   const buildInitElem = (
     id: number,
     title: React.ReactNode,
     subtitle: React.ReactNode = <></>,
-    map: UnifyMapInner
+    map: MatchMapInner
   ): TransformResult<M, D, A> => ({
     id: `root-${id}`,
     data: {
@@ -74,10 +74,10 @@ const UnifyMapView = ({
     ...DEFAULT_NODE_SIZE,
   });
 
-  const initElem = buildInitElem(unification.id, title, subtitle, unifyMap);
+  const initElem = buildInitElem(matching.id, title, subtitle, matchMap);
 
   const transform: TransformFunc<M, D, A> = map => {
-    if (map[0] === 'UnifyResult') {
+    if (map[0] === 'MatchResult') {
       const [, id, result] = map;
       return {
         id: `${id}`,
@@ -104,18 +104,18 @@ const UnifyMapView = ({
 
       const foldId = fold[0];
 
-      // Fold unification hasn't been requested yet
-      if (!(foldId in unifications)) {
-        requestUnification(foldId);
+      // Fold matching hasn't been requested yet
+      if (!(foldId in matches)) {
+        requestMatching(foldId);
         return [undefined, true];
       }
 
-      const unification = unifications[foldId];
+      const matching = matches[foldId];
 
-      // Fold unification is loading or hidden
-      if (unification === undefined || !expanded) return [undefined, true];
+      // Fold matching is loading or hidden
+      if (matching === undefined || !expanded) return [undefined, true];
 
-      const map = unification.map as UnifyMap;
+      const map = matching.map as MatchMap;
 
       const initElem = buildInitElem(foldId, <i>Fold</i>, undefined, map[1]);
       return [initElem, true];
@@ -127,8 +127,8 @@ const UnifyMapView = ({
         }
       : undefined;
 
-    const [nexts, result]: [[null, UnifySeg][], boolean | undefined] = (() => {
-      if (next[0] !== 'UnifyResult') return [[[null, next]], undefined];
+    const [nexts, result]: [[null, MatchSeg][], boolean | undefined] = (() => {
+      if (next[0] !== 'MatchResult') return [[[null, next]], undefined];
       if (next[2][0] === 'Success') return [[], true];
       return [[], false];
     })();
@@ -153,9 +153,9 @@ const UnifyMapView = ({
 
   return (
     <TreeMapView
-      {...{ initElem, transform, nodeComponent: UnifyMapNode, expandedNodes }}
+      {...{ initElem, transform, nodeComponent: MatchMapNode, expandedNodes }}
     />
   );
 };
 
-export default UnifyMapView;
+export default MatchMapView;

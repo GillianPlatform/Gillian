@@ -82,28 +82,28 @@ struct
     val launch_proc :
       proc_name:string -> debug_state_ext base_debug_state -> result_t cont_func
 
-    module Unify : sig
-      val unify_final_cmd :
+    module Match : sig
+      val match_final_cmd :
         L.Report_id.t ->
         proc_name:string ->
         (state_t, state_vt, err_t) Exec_res.t ->
         debug_state_ext base_debug_state ->
-        Exec_map.unification list
+        Exec_map.matching list
 
-      val get_unifys :
+      val get_matches :
         L.Report_id.t ->
         debug_state_ext base_debug_state ->
         proc_state_ext base_proc_state ->
-        Exec_map.unification list
+        Exec_map.matching list
 
-      val get_unify_map :
-        L.Report_id.t -> debug_state_ext base_debug_state -> Unify_map.t
+      val get_match_map :
+        L.Report_id.t -> debug_state_ext base_debug_state -> Match_map.t
     end
   end
 
   module Make (Debugger_impl : Debugger_impl) = struct
     open Debugger_impl
-    open Debugger_impl.Unify
+    open Debugger_impl.Match
 
     type nonrec breakpoints = breakpoints
     type nonrec tl_ast = tl_ast
@@ -150,7 +150,7 @@ struct
         exec_map : Exec_map.Packaged.t; [@key "execMap"]
         lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExecMap"]
         current_cmd_id : L.Report_id.t; [@key "currentCmdId"]
-        unifys : Exec_map.unification list;
+        matches : Exec_map.matching list;
         proc_name : string; [@key "procName"]
       }
       [@@deriving yojson]
@@ -185,15 +185,21 @@ struct
           Hashtbl.fold
             (fun proc_name state acc ->
               let current_cmd_id = state.cur_report_id in
-              let unifys =
-                state.lifter_state |> Lifter.get_unifys_at_id current_cmd_id
+              let matches =
+                state.lifter_state |> Lifter.get_matches_at_id current_cmd_id
               in
               let exec_map = state.lifter_state |> Lifter.get_gil_map in
               let lifted_exec_map =
                 state.lifter_state |> Lifter.get_lifted_map
               in
               let proc =
-                { exec_map; lifted_exec_map; current_cmd_id; unifys; proc_name }
+                {
+                  exec_map;
+                  lifted_exec_map;
+                  current_cmd_id;
+                  matches;
+                  proc_name;
+                }
               in
               (proc_name, proc) :: acc)
             procs []
@@ -205,7 +211,7 @@ struct
           procs;
         }
 
-      let get_unify_map id { debug_state; _ } = get_unify_map id debug_state
+      let get_match_map id { debug_state; _ } = get_match_map id debug_state
     end
 
     let top_level_scopes : Variable.scope list =
@@ -460,9 +466,9 @@ struct
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       let proc_name = (List.hd cmd.callstack).pid in
       let errors = show_result_errors result in
-      let unifys = unify_final_cmd prev_id ~proc_name result debug_state in
+      let matches = match_final_cmd prev_id ~proc_name result debug_state in
       let exec_data =
-        Lift.make_executed_cmd_data Exec_map.Final prev_id cmd ~unifys ~errors
+        Lift.make_executed_cmd_data Exec_map.Final prev_id cmd ~matches ~errors
           branch_path
       in
       (exec_data, cmd)
@@ -567,10 +573,12 @@ struct
                  update_proc_state cur_report_id debug_state proc_state;
                  let cmd = content |> of_yojson_string ConfigReport.of_yojson in
                  let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
-                 let unifys = get_unifys cur_report_id debug_state proc_state in
+                 let matches =
+                   get_matches cur_report_id debug_state proc_state
+                 in
                  let exec_data =
                    Lift.make_executed_cmd_data cmd_kind cur_report_id cmd
-                     ~unifys branch_path
+                     ~matches branch_path
                  in
                  proc_state.lifter_state
                  |> Lifter.handle_cmd prev_id_in_frame branch_case exec_data

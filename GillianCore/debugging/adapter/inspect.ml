@@ -70,11 +70,11 @@ module Make (Debugger : Debugger.S) = struct
     DL.set_rpc_command_handler rpc ~name:"Debugger state"
       (module Debugger_state_command)
       (fun _ -> Lwt.return (Debugger.Inspect.get_debug_state dbg));
-    DL.set_rpc_command_handler rpc ~name:"Unification"
-      (module Unification_command)
+    DL.set_rpc_command_handler rpc ~name:"Matching"
+      (module Matching_command)
       (fun { id } ->
-        let unify_map = dbg |> Debugger.Inspect.get_unify_map id in
-        let result = Unification_command.Result.make ~unify_id:id ~unify_map in
+        let match_map = dbg |> Debugger.Inspect.get_match_map id in
+        let result = Matching_command.Result.make ~match_id:id ~match_map in
         Lwt.return result);
     Lwt.return ()
 end

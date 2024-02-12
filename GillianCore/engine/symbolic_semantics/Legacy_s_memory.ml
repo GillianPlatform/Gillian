@@ -28,7 +28,7 @@ module type S = sig
 
   (** Execute action *)
   val execute_action :
-    ?unification:bool ->
+    ?matching:bool ->
     string ->
     t ->
     PFS.t ->
@@ -96,10 +96,7 @@ module Dummy : S with type init_data = unit = struct
   let init () = ()
   let get_init_data () = ()
   let clear () = ()
-
-  let execute_action ?unification:_ _ _ _ _ _ =
-    failwith "Please implement SMemory"
-
+  let execute_action ?matching:_ _ _ _ _ _ = failwith "Please implement SMemory"
   let ga_to_setter _ = failwith "Please implement SMemory"
   let ga_to_getter _ = failwith "Please implement SMemory"
   let ga_to_deleter _ = failwith "Please implement SMemory"
@@ -130,8 +127,7 @@ module Modernize (Old_memory : S) = struct
   let execute_action action_name heap (pc : Gpc.t) args =
     let open Syntaxes.List in
     match
-      execute_action ~unification:pc.unification action_name heap pc.pfs
-        pc.gamma args
+      execute_action ~matching:pc.matching action_name heap pc.pfs pc.gamma args
     with
     | Ok oks ->
         let+ new_heap, v, new_fofs, new_types = oks in
@@ -140,7 +136,7 @@ module Modernize (Old_memory : S) = struct
         List.iter (fun (x, t) -> Type_env.update new_gamma x t) new_types;
         List.iter (fun fof -> PFS.extend new_pfs fof) new_fofs;
         let new_pc =
-          Gpc.make ~unification:pc.unification ~pfs:new_pfs ~gamma:new_gamma ()
+          Gpc.make ~matching:pc.matching ~pfs:new_pfs ~gamma:new_gamma ()
         in
         Gbranch.{ pc = new_pc; value = Ok (new_heap, v) }
     | Error errs ->
@@ -174,7 +170,7 @@ module Modernize (Old_memory : S) = struct
   let apply_fix heap pfs gamma fix =
     let open Syntaxes.List in
     let+ heap = apply_fix heap pfs gamma fix in
-    let pc = Gpc.make ~unification:true ~pfs ~gamma () in
+    let pc = Gpc.make ~matching:true ~pfs ~gamma () in
     Gbranch.{ pc; value = heap }
 
   let split_further _ _ _ _ = None

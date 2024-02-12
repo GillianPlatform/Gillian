@@ -27,7 +27,7 @@ struct
 
   let run debug (prog : ('a, int) Prog.t) init_data : unit =
     let prog =
-      match UP.init_prog prog with
+      match MP.init_prog prog with
       | Ok prog -> prog
       | _ -> failwith "Program could not be initialised"
     in

@@ -45,7 +45,7 @@ module Exec_map = struct
   include Exec_map
 end
 
-module Unify_map = struct
+module Match_map = struct
   (** @inline *)
-  include Unify_map
+  include Match_map
 end

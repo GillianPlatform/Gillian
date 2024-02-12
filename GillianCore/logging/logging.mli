@@ -84,11 +84,11 @@ module Log_queryer : sig
   (** Gets the ID and content of any children of the given ID with type ["cmd_result"] *)
   val get_cmd_results : Report_id.t -> (Report_id.t * string) list
 
-  (** Gets the ID and content of a child, with type ["unify"], of the given ID (if it exists) *)
-  val get_unify_for : Report_id.t -> (Report_id.t * string) option
+  (** Gets the ID and content of a child, with type ["match"], of the given ID (if it exists) *)
+  val get_match_for : Report_id.t -> (Report_id.t * string) option
 
-  (** Returns the ID and content of all children of the given ID with type ["unify_result"] *)
-  val get_unify_results : Report_id.t -> (Report_id.t * string) list
+  (** Returns the ID and content of all children of the given ID with type ["match_result"] *)
+  val get_match_results : Report_id.t -> (Report_id.t * string) list
 end
 
 module Report_state : sig

@@ -34,17 +34,17 @@ let get_cmd_results cmd_report_id =
            Some (id, content)
          else None)
 
-let get_unify_for id =
+let get_match_for id =
   get_children_of id
   |> List.find_map (fun (id, type_, content) ->
-         if type_ = Logging_constants.Content_type.unify then Some (id, content)
+         if type_ = Logging_constants.Content_type.match_ then Some (id, content)
          else None)
 
-let rec get_unify_results id =
+let rec get_match_results id =
   get_children_of id
   |> List.concat_map (fun (id, type_, content) ->
-         if type_ = Logging_constants.Content_type.unify_case then
-           get_unify_results id
-         else if type_ = Logging_constants.Content_type.unify_result then
+         if type_ = Logging_constants.Content_type.match_case then
+           get_match_results id
+         else if type_ = Logging_constants.Content_type.match_result then
            [ (id, content) ]
          else [])

@@ -1,12 +1,12 @@
 
-.unify-data-wrap {
+.match-data-wrap {
   width: 100%;
   height: 100%;
   box-sizing: border-box;
   overflow: scroll;
 }
 
-.unify-data {
+.match-data {
   width: 100%;
   height: 100%;
   padding: 10px;
@@ -26,12 +26,12 @@
   overflow: hidden;
 }
 
-.unify-link {
+.match-link {
   display: flex;
   flex-direction: row;
   align-items: center;
 }
 
-.unify-link .codicon-reply {
+.match-link .codicon-reply {
   transform: rotate(0.5turn)
 }

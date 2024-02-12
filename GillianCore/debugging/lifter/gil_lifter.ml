@@ -31,7 +31,7 @@ module Make
   and cmd_data = {
     id : L.Report_id.t;
     display : string;
-    unifys : unification list;
+    matches : matching list;
     errors : string list;
     submap : map submap;
     branch_path : branch_path;
@@ -69,10 +69,10 @@ module Make
       ?(submap = NoSubmap)
       ~parent
       id_map
-      { kind; id; unifys; errors; cmd_report : cmd_report; branch_path }
+      { kind; id; matches; errors; cmd_report : cmd_report; branch_path }
       () =
     let display = Fmt.to_to_string Cmd.pp_indexed cmd_report.cmd in
-    let data = { id; display; unifys; errors; submap; branch_path; parent } in
+    let data = { id; display; matches; errors; submap; branch_path; parent } in
     let cmd =
       match kind with
       | Normal -> Cmd { data; next = Nothing }
@@ -181,14 +181,14 @@ module Make
 
   let package_case ~bd:_ ~all_cases:_ case = Packaged.package_gil_case case
 
-  let package_data package { id; display; unifys; errors; submap; _ } =
+  let package_data package { id; display; matches; errors; submap; _ } =
     let submap =
       match submap with
       | NoSubmap -> NoSubmap
       | Proc p -> Proc p
       | Submap map -> Submap (package map)
     in
-    Packaged.{ id; all_ids = [ id ]; display; unifys; errors; submap }
+    Packaged.{ id; all_ids = [ id ]; display; matches; errors; submap }
 
   let package = Packaged.package package_data package_case
   let get_gil_map state = package state.map
@@ -197,14 +197,15 @@ module Make
   let get_lifted_map_exn _ =
     failwith "get_lifted_map not implemented for GIL lifter"
 
-  let get_unifys_at_id id state =
+  let get_matches_at_id id state =
     match state |> at_id id |> fst with
     | Nothing ->
         DL.failwith
           (fun () ->
             [ ("id", L.Report_id.to_yojson id); ("state", dump state) ])
-          "get_unifys_at_id: HORROR - map is Nothing!"
-    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> data.unifys
+          "get_matches_at_id: HORROR - map is Nothing!"
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+        data.matches
 
   let get_root_id { map; _ } =
     match map with

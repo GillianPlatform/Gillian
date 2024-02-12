@@ -498,7 +498,7 @@ module Make (SPState : PState.S) = struct
 
       L.verbose (fun m -> m "About to simplify.");
       let _ =
-        Simplifications.simplify_pfs_and_gamma pfs gamma ~unification:true
+        Simplifications.simplify_pfs_and_gamma pfs gamma ~matching:true
           ~save_spec_vars:(SS.empty, true)
       in
       L.verbose (fun m -> m "Done simplifying.");
@@ -614,7 +614,7 @@ module Make (SPState : PState.S) = struct
 
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
-      (pred_defs : (string, UP.pred) Hashtbl.t)
+      (pred_defs : (string, MP.pred) Hashtbl.t)
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : Type_env.t)
@@ -739,7 +739,7 @@ module Make (SPState : PState.S) = struct
     let fos = generate_overlapping_constraints c_asrts' in
     List.iter (fun fo -> PFS.extend new_pfs fo) fos;
     let subst', _ =
-      Simplifications.simplify_pfs_and_gamma new_pfs gamma ~unification:true
+      Simplifications.simplify_pfs_and_gamma new_pfs gamma ~matching:true
         ~save_spec_vars:(SS.empty, true)
     in
     let subst = compose_substs subst subst' in
@@ -872,7 +872,7 @@ module Make (SPState : PState.S) = struct
 
   (** Given an assertion creates a symbolic state and a substitution *)
   let normalise_assertion
-      ~(pred_defs : UP.preds_tbl_t)
+      ~(pred_defs : MP.preds_tbl_t)
       ~(init_data : SPState.init_data)
       ?(pvars : SS.t option)
       (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
@@ -957,7 +957,7 @@ module Make (SPState : PState.S) = struct
               gamma
           then (
             (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
-            let _, states = SPState.simplify ~unification:true astate in
+            let _, states = SPState.simplify ~matching:true astate in
             let+ state = states in
             L.verbose (fun m ->
                 m "AFTER NORMALISATION: %d states: @\n%a" (List.length states)

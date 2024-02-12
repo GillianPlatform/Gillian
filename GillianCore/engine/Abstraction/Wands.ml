@@ -21,7 +21,7 @@ let make_query ~pred_defs ~subst wand =
   let { lhs = lname, largs; rhs = rname, rargs } = wand in
   let largs = List.map subst largs in
   let rargs = List.map subst rargs in
-  let rpred = UP.get_pred_def pred_defs rname in
+  let rpred = MP.get_pred_def pred_defs rname in
   let r_ins = Pred.in_args rpred.pred rargs in
   let r_outs = Pred.out_args rpred.pred rargs in
   match (Option_utils.all largs, Option_utils.all r_ins) with
@@ -100,7 +100,7 @@ let to_assertions (wands : t) =
   List.map wand_to_asrt !wands
 
 let wand_ins_outs ~pred_defs { lhs = _, largs; rhs = rname, rargs } =
-  let rpred = UP.get_pred_def pred_defs rname in
+  let rpred = MP.get_pred_def pred_defs rname in
   let r_ins = Pred.in_args rpred.pred rargs in
   let r_outs = Pred.out_args rpred.pred rargs in
   let ins = largs @ r_ins in
@@ -160,7 +160,7 @@ module Consume_wand = struct
 
   let consume_wand ~pred_defs ~semantic_eq (wands : t) (query : query) =
     L.verbose (fun m -> m "Wands.consume_wand: Looking for %a" pp_query query);
-    let rpred = UP.get_pred_def pred_defs query.rname in
+    let rpred = MP.get_pred_def pred_defs query.rname in
     let candidates =
       List_utils.filter_mapi
         (fun i { lhs; rhs } ->
@@ -207,7 +207,7 @@ module Consume_wand = struct
 end
 
 let consume_wand :
-    pred_defs:UP.preds_tbl_t ->
+    pred_defs:MP.preds_tbl_t ->
     semantic_eq:(Expr.t -> Expr.t -> bool) ->
     t ->
     query ->

@@ -493,9 +493,9 @@ let var_to_expr (x : string) : t =
   if Names.is_lvar_name x then LVar x
   else if is_aloc_name x then ALoc x
   else if is_pvar_name x then PVar x
-  else raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
+  else raise (Failure ("var_to_expr: Impossible matchable: " ^ x))
 
-let is_unifiable (e : t) : bool =
+let is_matchable (e : t) : bool =
   match e with
   | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
       true

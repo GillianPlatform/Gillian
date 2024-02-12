@@ -4,7 +4,7 @@ type outs = (Expr.t * Expr.t) list
 
 val outs_pp : outs Fmt.t
 
-(** The [step] type represents a unification plan step,
+(** The [step] type represents a matching plan step,
     consisting of an assertion together with the possible
     learned outs *)
 type step = Asrt.t * outs [@@deriving yojson]
@@ -24,10 +24,10 @@ type t =
           For example, a matching plan corresponding to a set of specifications will contain leaves that are respectively anntated with the corresponding post. *)
 [@@deriving yojson]
 
-type pred = { pred : Pred.t; def_up : t; guard_up : t option }
-type 'a with_up = { up : t; data : 'a }
-type spec = Spec.t with_up
-type lemma = Lemma.t with_up
+type pred = { pred : Pred.t; def_mp : t; guard_mp : t option }
+type 'a with_mp = { mp : t; data : 'a }
+type spec = Spec.t with_mp
+type lemma = Lemma.t with_mp
 
 type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
@@ -39,12 +39,12 @@ type 'annot prog = {
 
 type preds_tbl_t = (string, pred) Hashtbl.t
 
-type up_err_t =
-  | UPSpec of string * Asrt.t list list
-  | UPPred of string * Asrt.t list list
-  | UPLemma of string * Asrt.t list list
-  | UPAssert of Asrt.t * Asrt.t list list
-  | UPInvariant of Asrt.t * Asrt.t list list
+type err =
+  | MPSpec of string * Asrt.t list list
+  | MPPred of string * Asrt.t list list
+  | MPLemma of string * Asrt.t list list
+  | MPAssert of Asrt.t * Asrt.t list list
+  | MPInvariant of Asrt.t * Asrt.t list list
 [@@deriving show]
 
 module KB = Expr.Set
@@ -74,10 +74,10 @@ val init :
 val init_prog :
   ?preds_tbl:(string, pred) Hashtbl.t ->
   ('a, int) Prog.t ->
-  ('a prog, up_err_t) result
+  ('a prog, err) result
 
 val init_preds :
-  (string, Pred.t) Hashtbl.t -> ((string, pred) Hashtbl.t, up_err_t) result
+  (string, Pred.t) Hashtbl.t -> ((string, pred) Hashtbl.t, err) result
 
 val pp : Format.formatter -> t -> unit
 val get_pred_def : preds_tbl_t -> string -> pred

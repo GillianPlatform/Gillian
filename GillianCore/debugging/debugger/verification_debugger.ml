@@ -22,7 +22,7 @@ struct
     type proc_state_ext = unit
 
     type debug_state_ext = {
-      mutable unify_maps : (L.Report_id.t * Unify_map.t) list;
+      mutable match_maps : (L.Report_id.t * Match_map.t) list;
       tests : (string * Verification.t) list;
     }
 
@@ -33,7 +33,7 @@ struct
       let { init_data; prog; main_proc_name; _ } = debug_state in
       Config.Verification.set_procs_to_verify [ main_proc_name ];
       let tests = Verification.Debug.get_tests_for_prog ~init_data prog in
-      { tests; unify_maps = [] }
+      { tests; match_maps = [] }
 
     let init_proc _ _ = ()
 
@@ -46,78 +46,78 @@ struct
       Verification.verify_up_to_procs ~init_data:debug_state.init_data
         ~proc_name debug_state.prog
 
-    module Unify = struct
-      open Verification.SUnifier.Logging
+    module Match = struct
+      open Verification.SMatcher.Logging
 
-      type unify_result = Unify_map.unify_result = Success | Failure
+      type match_result = Match_map.match_result = Success | Failure
 
-      module Build_map = Unify_map.Make_builder (Verification)
+      module Build_map = Match_map.Make_builder (Verification)
 
-      let build_unify_map = Build_map.f
+      let build_match_map = Build_map.f
 
-      let is_unify_successful id =
-        L.Log_queryer.get_unify_results id
+      let is_match_successful id =
+        L.Log_queryer.get_match_results id
         |> List.exists (fun (_, content) ->
                let result =
                  content |> Yojson.Safe.from_string
-                 |> UnifyResultReport.of_yojson |> Result.get_ok
+                 |> MatchResultReport.of_yojson |> Result.get_ok
                in
                match result with
                | Success _ -> true
                | Failure _ -> false)
 
-      let do_unify prev_id test result =
-        DL.log (fun m -> m "Unifying result for %a" L.Report_id.pp prev_id);
+      let do_match prev_id test result =
+        DL.log (fun m -> m "Matching result for %a" L.Report_id.pp prev_id);
         let success = Verification.Debug.analyse_result test prev_id result in
-        let+ id, content = L.Log_queryer.get_unify_for prev_id in
+        let+ id, content = L.Log_queryer.get_match_for prev_id in
         (id, content, success)
 
       let f result proc_name prev_id debug_state =
         let* test = debug_state.ext.tests |> List.assoc_opt proc_name in
         let+ id, content, success =
-          match L.Log_queryer.get_unify_for prev_id with
-          | Some (id, content) -> Some (id, content, is_unify_successful id)
-          | None -> do_unify prev_id test result
+          match L.Log_queryer.get_match_for prev_id with
+          | Some (id, content) -> Some (id, content, is_match_successful id)
+          | None -> do_match prev_id test result
         in
-        let unify_report = content |> of_yojson_string UnifyReport.of_yojson in
-        let kind = unify_report.unify_kind in
+        let match_report = content |> of_yojson_string MatchReport.of_yojson in
+        let kind = match_report.match_kind in
         let result = if success then Success else Failure in
         (id, kind, result)
 
-      let get_unifys
+      let get_matches
           cur_report_id
           (debug_state : debug_state_ext base_debug_state)
           _ =
         let { ext; _ } = debug_state in
-        let unify =
-          let+ unify_id, _ = L.Log_queryer.get_unify_for cur_report_id in
-          let unify_map =
-            match ext.unify_maps |> List.assoc_opt unify_id with
+        let match_ =
+          let+ match_id, _ = L.Log_queryer.get_match_for cur_report_id in
+          let match_map =
+            match ext.match_maps |> List.assoc_opt match_id with
             | Some map -> map
             | None ->
-                let map = build_unify_map unify_id in
-                ext.unify_maps <- (unify_id, map) :: ext.unify_maps;
+                let map = build_match_map match_id in
+                ext.match_maps <- (match_id, map) :: ext.match_maps;
                 map
           in
-          let result = unify_map |> Unify_map.result in
-          (unify_id, fst unify_map, result)
+          let result = match_map |> Match_map.result in
+          (match_id, fst match_map, result)
         in
-        match unify with
+        match match_ with
         | None -> []
         | Some (id, kind, result) -> [ Exec_map.{ id; kind; result } ]
 
-      let unify_final_cmd prev_id ~proc_name result debug_state =
+      let match_final_cmd prev_id ~proc_name result debug_state =
         match f result proc_name prev_id debug_state with
         | None -> []
         | Some (id, kind, result) -> [ Exec_map.{ id; kind; result } ]
 
-      let get_unify_map unify_id debug_state =
+      let get_match_map match_id debug_state =
         let ext = debug_state.ext in
-        match ext.unify_maps |> List.assoc_opt unify_id with
+        match ext.match_maps |> List.assoc_opt match_id with
         | Some map -> map
         | None ->
-            let map = build_unify_map unify_id in
-            ext.unify_maps <- (unify_id, map) :: ext.unify_maps;
+            let map = build_match_map match_id in
+            ext.match_maps <- (match_id, map) :: ext.match_maps;
             map
     end
   end

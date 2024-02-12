@@ -53,9 +53,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
     const { procName, branchCase = null, hasParent = true } = aux;
     const procState = procs[procName];
     const edgeLabel =
-      branchCase && branchCase[0] ? (
-        <>{branchCase[0]}</>
-      ) : undefined;
+      branchCase && branchCase[0] ? <>{branchCase[0]}</> : undefined;
     const isActive = procName === currentProcName;
 
     if (map[0] == 'Nothing') {
