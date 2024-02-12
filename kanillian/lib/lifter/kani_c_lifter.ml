@@ -54,7 +54,7 @@ struct
     id : rid;
     all_ids : rid list;
     display : string;
-    unifys : unification list;
+    matches : matching list;
     errors : string list;
     mutable submap : map submap;
     prev : (rid * Branch_case.t option) option;
@@ -86,7 +86,7 @@ struct
       ends : (Branch_case.case * (rid * Gil_branch_case.t option)) Ext_list.t;
           (** All the end points; there may be multiple if the cmd branches. *)
       (* TODO: rename to matches *)
-      unifys : unification Ext_list.t;
+      matches : matching Ext_list.t;
           (** Unifications contained in this command *)
       errors : string Ext_list.t;  (** Errors occurring during this command *)
       mutable canonical_data : canonical_cmd_data option;
@@ -101,7 +101,7 @@ struct
       id : rid;
       all_ids : rid list;
       display : string;
-      unifys : Exec_map.unification list;
+      matches : Exec_map.matching list;
       errors : string list;
       kind : (Branch_case.t, branch_data) cmd_kind;
       callers : rid list;
@@ -154,7 +154,16 @@ struct
       |> Result.ok
 
     let finish partial =
-      let ({ prev; canonical_data; all_ids; ends; is_unevaluated_funcall; _ }
+      let ({
+             prev;
+             canonical_data;
+             all_ids;
+             ends;
+             is_unevaluated_funcall;
+             matches;
+             errors;
+             _;
+           }
             : partial_data) =
         partial
       in
@@ -168,6 +177,8 @@ struct
         (id, branch)
       in
       let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
+      let matches = Ext_list.to_list matches in
+      let errors = Ext_list.to_list errors in
       let ends = Ext_list.to_list ends in
       let++ kind =
         let++ cases = ends_to_cases ~is_unevaluated_funcall ~nest_kind ends in
@@ -182,8 +193,8 @@ struct
           id;
           all_ids;
           display;
-          unifys = [];
-          errors = [];
+          matches;
+          errors;
           kind;
           callers;
           stack_direction;
@@ -197,7 +208,7 @@ struct
         all_ids = Ext_list.make ();
         unexplored_paths = Stack.create ();
         ends = Ext_list.make ();
-        unifys = Ext_list.make ();
+        matches = Ext_list.make ();
         errors = Ext_list.make ();
         canonical_data = None;
         is_unevaluated_funcall = false;
@@ -381,13 +392,13 @@ struct
         (kind, case)
 
       let f ~prog ~prev_id exec_data partial =
-        let { id; cmd_report; unifys; errors; _ } = exec_data in
+        let { id; cmd_report; matches; errors; _ } = exec_data in
         let annot = CmdReport.(cmd_report.annot) in
         let** is_end = get_is_end annot in
         let** branch_kind, branch_case =
           insert_id_and_case ~prev_id ~exec_data ~id partial
         in
-        let () = Ext_list.add_all unifys partial.unifys in
+        let () = Ext_list.add_all matches partial.matches in
         let () = Ext_list.add_all errors partial.errors in
         let** () =
           update_paths ~is_end ~exec_data ~branch_case ~annot ~branch_kind
@@ -515,7 +526,7 @@ struct
 
     let make_new_cmd ~func_return_label finished_partial =
       let Partial_cmds.
-            { all_ids; id; display; unifys; errors; prev; kind; callers; _ } =
+            { all_ids; id; display; matches; errors; prev; kind; callers; _ } =
         finished_partial
       in
       let data =
@@ -523,7 +534,7 @@ struct
           all_ids;
           id;
           display;
-          unifys;
+          matches;
           errors;
           submap = NoSubmap;
           prev;
@@ -718,14 +729,15 @@ struct
     let display = Branch_case.display case in
     (display, json)
 
-  let package_data package { id; all_ids; display; unifys; errors; submap; _ } =
+  let package_data package { id; all_ids; display; matches; errors; submap; _ }
+      =
     let submap =
       match submap with
       | NoSubmap -> NoSubmap
       | Proc p -> Proc p
       | Submap m -> Submap (package m)
     in
-    Packaged.{ id; all_ids; display; unifys; errors; submap }
+    Packaged.{ id; all_ids; display; matches; errors; submap }
 
   let package =
     let package_case
@@ -740,7 +752,14 @@ struct
 
   let get_lifted_map_exn { map; _ } = package map
   let get_lifted_map state = Some (get_lifted_map_exn state)
-  let get_unifys_at_id _ _ = []
+
+  let get_matches_at_id id { id_map; _ } =
+    let map = Hashtbl.find id_map id in
+    match map with
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+        data.matches
+    | _ ->
+        failwith "get_matches_at_id: HORROR - tried to get matches at non-cmd!"
 
   let get_root_id { map; _ } =
     match map with
