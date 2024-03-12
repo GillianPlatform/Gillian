@@ -2,12 +2,14 @@ type kind = IfElseKind [@@deriving yojson]
 type case = IfElse of bool | FuncExit of string | Unknown [@@deriving yojson]
 type t = Case of case * int | FuncExitPlaceholder [@@deriving yojson]
 
-let display = function
-  | Case (Unknown, i) -> Fmt.str "%d" i
-  | Case (IfElse b, -1) -> Fmt.str "%B" b
-  | Case (IfElse b, i) -> Fmt.str "%B - %d" b i
-  | Case (FuncExit label, i) -> Fmt.str "%s-%d" label i
-  | FuncExitPlaceholder -> "<step in>"
+let pp fmt = function
+  | Case (Unknown, i) -> Fmt.pf fmt "%d" i
+  | Case (IfElse b, -1) -> Fmt.pf fmt "%B" b
+  | Case (IfElse b, i) -> Fmt.pf fmt "%B - %d" b i
+  | Case (FuncExit label, i) -> Fmt.pf fmt "%s-%d" label i
+  | FuncExitPlaceholder -> Fmt.pf fmt "<step in>"
+
+let display = Fmt.str "%a" pp
 
 let compare a b =
   let compare_pair (a1, a2) (b1, b2) =

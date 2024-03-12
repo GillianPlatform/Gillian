@@ -19,7 +19,7 @@ functor
   struct
     let gil_state = ref None
 
-    module Gil_lifter = Gil_lifter.Make (PC) (Verifier) (SMemory)
+    module Gil_lifter = Gil_lifter.Make (SMemory) (PC) (Verifier)
 
     module Gil_lifter_with_state = struct
       module Lifter = Gil_lifter
@@ -29,46 +29,26 @@ functor
 
     module TLLifter = TLLifter (Gil_lifter_with_state) (Verifier)
 
-    type t = {
-      gil : Gil_lifter.t; [@to_yojson Gil_lifter.dump]
-      tl : TLLifter.t option; [@to_yojson opt_to_yojson TLLifter.dump]
-    }
-    [@@deriving to_yojson]
-
     type memory = SMemory.t
     type tl_ast = PC.tl_ast
     type memory_error = SMemory.err_t
     type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
     type annot = PC.Annot.t
 
-    let init_exn ~proc_name ~all_procs tl_ast prog exec_data =
-      let gil, gil_result =
-        Gil_lifter.init_exn ~proc_name ~all_procs tl_ast prog exec_data
-      in
-      gil_state := Some gil;
-      let ret =
-        match TLLifter.init ~proc_name ~all_procs tl_ast prog exec_data with
-        | None -> ({ gil; tl = None }, gil_result)
-        | Some (tl, tl_result) -> ({ gil; tl = Some tl }, tl_result)
-      in
-      ret
+    type t = {
+      gil : Gil_lifter.t; [@to_yojson Gil_lifter.dump]
+      tl : TLLifter.t option; [@to_yojson opt_to_yojson TLLifter.dump]
+      mutable finish_gil_init : (cmd_report executed_cmd_data -> unit) option;
+          [@to_yojson fun _ -> `Null]
+    }
+    [@@deriving to_yojson]
 
-    let init ~proc_name ~all_procs tl_ast prog exec_data =
-      Some (init_exn ~proc_name ~all_procs tl_ast prog exec_data)
+    type _ Effect.t +=
+      | Step :
+          (Logging.Report_id.t option * Branch_case.t option * Branch_case.path)
+          -> cmd_report executed_cmd_data Effect.t
 
     let dump = to_yojson
-
-    let handle_cmd prev_id branch_case exec_data { gil; tl } =
-      let () =
-        match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
-        | Stop None -> ()
-        | Stop _ -> failwith "HORROR - Gil_lifter tried to Stop with id!"
-        | _ -> failwith "HORROR - Gil_lifter didn't give Stop!"
-      in
-      match tl with
-      | None -> Stop None
-      | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data
-
     let get_gil_map state = state.gil |> Gil_lifter.get_gil_map
 
     let get_lifted_map state =
@@ -80,46 +60,94 @@ functor
       | None -> failwith "Can't get lifted map!"
       | Some map -> map
 
-    let get_matches_at_id id { gil; tl } =
+    let get_matches_at_id id { gil; tl; _ } =
       match tl with
       | Some tl -> tl |> TLLifter.get_matches_at_id id
       | None -> gil |> Gil_lifter.get_matches_at_id id
 
-    let get_root_id { gil; tl } =
+    let get_root_id { gil; tl; _ } =
       match tl with
       | Some tl -> tl |> TLLifter.get_root_id
       | None -> gil |> Gil_lifter.get_root_id
 
-    let path_of_id id { gil; tl } =
-      match tl with
-      | Some tl -> tl |> TLLifter.path_of_id id
-      | None -> gil |> Gil_lifter.path_of_id id
-
-    let existing_next_steps id { gil; tl } =
-      match tl with
-      | Some tl -> tl |> TLLifter.existing_next_steps id
-      | None -> gil |> Gil_lifter.existing_next_steps id
-
-    let next_gil_step id case { gil; tl } =
-      match tl with
-      | Some tl -> tl |> TLLifter.next_gil_step id case
-      | None -> gil |> Gil_lifter.next_gil_step id case
-
-    let previous_step id { gil; tl } =
-      match tl with
-      | Some tl -> tl |> TLLifter.previous_step id
-      | None -> gil |> Gil_lifter.previous_step id
-
-    let select_next_path case id { gil; tl } =
-      match tl with
-      | Some tl -> tl |> TLLifter.select_next_path case id
-      | None -> gil |> Gil_lifter.select_next_path case id
-
-    let find_unfinished_path ?at_id { gil; tl } =
-      match tl with
-      | Some tl -> tl |> TLLifter.find_unfinished_path ?at_id
-      | None -> gil |> Gil_lifter.find_unfinished_path ?at_id
-
     let memory_error_to_exception_info = TLLifter.memory_error_to_exception_info
     let add_variables = TLLifter.add_variables
+
+    let intercept_effect f state () =
+      let open Effect.Deep in
+      try_with f ()
+        {
+          effc =
+            (fun (type a) (eff : a Effect.t) ->
+              match eff with
+              | TLLifter.Step ((id, case, _) as s) ->
+                  Some
+                    (fun (k : (a, _) continuation) ->
+                      let exec_data = Effect.perform (Step s) in
+                      let () =
+                        match state.finish_gil_init with
+                        | Some finish_gil ->
+                            let () = state.finish_gil_init <- None in
+                            finish_gil exec_data
+                        | None ->
+                            Gil_lifter.handle_cmd (Option.get id) case exec_data
+                              state.gil
+                      in
+                      Effect.Deep.continue k exec_data)
+              | Gil_lifter.Step s ->
+                  Some
+                    (fun (k : (a, _) continuation) ->
+                      let exec_data = Effect.perform (Step s) in
+                      Effect.Deep.continue k exec_data)
+              | _ -> None);
+        }
+
+    let defer_with_id tl_f gil_f state id =
+      let f =
+        match state.tl with
+        | Some tl -> fun () -> tl_f tl id
+        | None -> fun () -> gil_f state.gil id
+      in
+      intercept_effect f state ()
+
+    let step_over = defer_with_id TLLifter.step_over Gil_lifter.step_over
+    let step_in = defer_with_id TLLifter.step_in Gil_lifter.step_in
+    let step_out = defer_with_id TLLifter.step_out Gil_lifter.step_out
+
+    let step_back state =
+      defer_with_id TLLifter.step_back Gil_lifter.step_back state
+
+    let step_branch state id case =
+      let f =
+        match state.tl with
+        | Some tl -> fun () -> TLLifter.step_branch tl id case
+        | None -> fun () -> Gil_lifter.step_branch state.gil id case
+      in
+      intercept_effect f state ()
+
+    let continue = defer_with_id TLLifter.continue Gil_lifter.continue
+
+    let continue_back =
+      defer_with_id TLLifter.continue_back Gil_lifter.continue_back
+
+    let init_exn ~proc_name ~all_procs tl_ast prog =
+      let gil, finish_gil_init = Gil_lifter.init_manual proc_name all_procs in
+      let () = gil_state := Some gil in
+      let state, finish_init =
+        match TLLifter.init ~proc_name ~all_procs tl_ast prog with
+        | None ->
+            let finish_gil_init () = finish_gil_init None () in
+            ({ gil; tl = None; finish_gil_init = None }, finish_gil_init)
+        | Some (tl, finish_tl_init) ->
+            let finish_gil_init exec_data =
+              finish_gil_init (Some exec_data) () |> ignore
+            in
+            ( { gil; tl = Some tl; finish_gil_init = Some finish_gil_init },
+              finish_tl_init )
+      in
+      let finish_init = intercept_effect finish_init state in
+      (state, finish_init)
+
+    let init ~proc_name ~all_procs tl_ast prog =
+      Some (init_exn ~proc_name ~all_procs tl_ast prog)
   end

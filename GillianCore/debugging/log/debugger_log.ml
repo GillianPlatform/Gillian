@@ -108,7 +108,9 @@ let set_rpc_command_handler rpc ?name ?dump_dbg module_ f =
       | Some dump_dbg -> [ ("debug_state", dump_dbg ()) ]
       | None -> []
     in
-    let err_json backtrace = name_json @ dbg_json @ [ ("backtrace", `String backtrace) ] in
+    let err_json backtrace =
+      name_json @ dbg_json @ [ ("backtrace", `String backtrace) ]
+    in
     let%lwt () =
       match name with
       | Some name -> log_async (fun m -> m "%s request received" name)
@@ -132,5 +134,12 @@ let set_rpc_command_handler rpc ?name ?dump_dbg module_ f =
         let err_json = err_json backtrace in
         log_async (fun m -> m ~json:err_json "[Error] Not found");%lwt
         raise Not_found
+    | Effect.Unhandled _ as e ->
+        let backtrace = Printexc.get_backtrace () in
+        let err_json = err_json backtrace in
+        let s = Printexc.to_string e in
+        log_async (fun m ->
+            m ~json:err_json "[Error] Unhandled exception\n%s" s);%lwt
+        raise e
   in
   Debug_rpc.set_command_handler rpc module_ f

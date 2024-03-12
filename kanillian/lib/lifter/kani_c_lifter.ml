@@ -47,6 +47,8 @@ struct
   type branch_data = rid * Gil_branch_case.t option [@@deriving yojson]
   type exec_data = cmd_report executed_cmd_data [@@deriving yojson]
   type stack_direction = In | Out of rid [@@deriving yojson]
+  type step_args = rid option * Gil_branch_case.t option * Gil_branch_case.path
+  type _ Effect.t += Step : step_args -> exec_data Effect.t
 
   type map = (Branch_case.t, cmd_data, branch_data) Exec_map.t
 
@@ -111,10 +113,8 @@ struct
 
     type partial_result =
       | Finished of finished
-      | StepAgain of (rid option * Gil_branch_case.t option)
+      | StepAgain of (rid * Gil_branch_case.t option)
     [@@deriving yojson]
-
-    let step_again ?id ?branch_case () = StepAgain (id, branch_case)
 
     let ends_to_cases
         ~is_unevaluated_funcall
@@ -410,7 +410,7 @@ struct
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
         | None -> finish partial
-        | Some (id, branch_case) -> step_again ~id ?branch_case () |> Result.ok
+        | Some (id, branch_case) -> StepAgain (id, branch_case) |> Result.ok
     end
 
     let update = Update.f
@@ -587,15 +587,18 @@ struct
       | Some _, Nothing, _ -> Error "stepping in our out with empty map!"
       | _, Nothing, Some _ -> Error "inserting to empty map with prev!"
       | None, Nothing, None ->
-          state.map <- new_cmd;
-          Ok ()
+          let () = state.map <- new_cmd in
+          Ok new_cmd
       | _, _, None -> Error "inserting to non-empty map with no prev!"
       | Some In, _, Some (parent_id, Some Func_exit_placeholder)
       | Some In, _, Some (parent_id, None) ->
-          insert_as_submap ~state ~parent_id new_cmd
+          let new_cmd = new_cmd |> map_data (fun d -> { d with prev = None }) in
+          let++ () = insert_as_submap ~state ~parent_id new_cmd in
+          new_cmd
       | Some In, _, Some (_, Some _) -> Error "stepping in with branch case!"
       | None, _, Some (prev_id, case) ->
-          insert_as_next ~state ~prev_id ?case new_cmd
+          let++ () = insert_as_next ~state ~prev_id ?case new_cmd in
+          new_cmd
       | Some (Out prev_id), _, Some (inner_prev_id, _) ->
           let** case =
             let func_return_label =
@@ -608,7 +611,12 @@ struct
             | Some (label, ix) -> Ok (Case (Func_exit label, ix))
             | None -> Error "stepping out without function return label!"
           in
-          insert_as_next ~state ~prev_id ~case new_cmd
+          let new_cmd =
+            new_cmd
+            |> map_data (fun d -> { d with prev = Some (prev_id, Some case) })
+          in
+          let++ () = insert_as_next ~state ~prev_id ~case new_cmd in
+          new_cmd
 
     let get_return_label_from_prev ~state prev_id =
       match Hashtbl.find state.id_map prev_id with
@@ -627,9 +635,9 @@ struct
          in
          make_new_cmd ~func_return_label finished_partial
        in
-       let** () = insert_cmd ~state ~prev ~stack_direction new_cmd in
+       let** new_cmd = insert_cmd ~state ~prev ~stack_direction new_cmd in
        all_ids |> List.iter (fun id -> Hashtbl.replace id_map id new_cmd);
-       Ok ())
+       Ok new_cmd)
       |> Result_utils.or_else (failwith ~state ~finished_partial)
   end
 
@@ -677,7 +685,7 @@ struct
             ]
           in
           DL.failwith json "Kani_c_lifter: Encountered unknown cmd kind"
-      | Harness -> ExecNext (None, None)
+      | Harness -> Either.Left (exec_data.id, None)
       | Normal _ | Internal | Return | Hidden -> (
           let get_prev = get_prev ~state ~gil_case ~prev_id in
           let partial_result =
@@ -685,38 +693,12 @@ struct
           in
           match partial_result with
           | Finished finished ->
-              insert_new_cmd ~state finished;
-              Stop (Some finished.id)
-          | StepAgain (id, case) -> ExecNext (id, case))
+              let cmd = insert_new_cmd ~state finished in
+              Either.Right cmd
+          | StepAgain (id, case) -> Either.Left (id, case))
   end
 
   let init_or_handle = Init_or_handle.f
-
-  let init ~proc_name ~all_procs:_ tl_ast prog exec_data =
-    let gil_state = Gil.get_state () in
-    let+ tl_ast = tl_ast in
-    let partial_cmds = Partial_cmds.init () in
-    let id_map = Hashtbl.create 0 in
-    let state =
-      {
-        proc_name;
-        gil_state;
-        tl_ast;
-        prog;
-        partial_cmds;
-        map = Nothing;
-        id_map;
-        func_return_map = Hashtbl.create 0;
-        func_return_count = 0;
-      }
-    in
-    let result = init_or_handle ~state exec_data in
-    (state, result)
-
-  let init_exn ~proc_name ~all_procs tl_ast prog exec_data =
-    match init ~proc_name ~all_procs tl_ast prog exec_data with
-    | None -> failwith "init: kani_c_lifter needs a tl_ast!"
-    | Some x -> x
 
   let handle_cmd prev_id gil_case exec_data state =
     init_or_handle ~state ~prev_id ?gil_case exec_data
@@ -769,35 +751,6 @@ struct
 
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
-  let existing_next_steps id { gil_state; id_map; _ } =
-    Gil_lifter.existing_next_steps id gil_state
-    |> List.filter (fun (id, _) -> Hashtbl.mem id_map id)
-
-  let next_gil_step id case state =
-    let failwith s =
-      DL.failwith
-        (fun () ->
-          [
-            ("state", dump state);
-            ("id", rid_to_yojson id);
-            ("case", opt_to_yojson Packaged.branch_case_to_yojson case);
-          ])
-        ("next_gil_step: " ^ s)
-    in
-    match (Hashtbl.find state.id_map id, case) with
-    | Nothing, _ -> failwith "HORROR - cmd at id is Nothing!"
-    | FinalCmd _, _ -> failwith "can't get next at final cmd!"
-    | Cmd _, Some _ -> failwith "got branch case at non-branch cmd!"
-    | BranchCmd _, None -> failwith "expected branch case at branch cmd!"
-    | Cmd { data; _ }, None ->
-        let id = List.hd (List.rev data.all_ids) in
-        (id, None)
-    | BranchCmd { nexts; _ }, Some case -> (
-        let case = case |> snd |> Branch_case.of_yojson |> Result.get_ok in
-        match Hashtbl.find_opt nexts case with
-        | None -> failwith "branch case not found!"
-        | Some ((id, case), _) -> (id, case))
-
   let previous_step id { id_map; _ } =
     let+ id, case =
       match Hashtbl.find id_map id with
@@ -807,47 +760,263 @@ struct
     let case = case |> Option.map package_case in
     (id, case)
 
-  let select_next_path case id { gil_state; _ } =
-    Gil_lifter.select_next_path case id gil_state
-
-  let find_unfinished_path ?at_id state =
-    let { map; id_map; _ } = state in
-    let failwith m =
-      DL.failwith
-        (fun () ->
-          [
-            ("state", dump state); ("at_id", opt_to_yojson rid_to_yojson at_id);
-          ])
-        ("find_unfinished_path: " ^ m)
-    in
-    let rec aux = function
-      | Nothing -> failwith "started at Nothing"
-      | Cmd { data = { all_ids; _ }; next = Nothing } ->
-          let id = List.hd (List.rev all_ids) in
-          Some (id, None)
-      | Cmd { next; _ } -> aux next
-      | BranchCmd { nexts; _ } -> (
-          let unfinished =
-            Hashtbl.find_map
-              (fun _ (gil_step, next) ->
-                if next = Nothing then Some gil_step else None)
-              nexts
-          in
-          match unfinished with
-          | None -> Hashtbl.find_map (fun _ (_, next) -> aux next) nexts
-          | result -> result)
-      | FinalCmd _ -> None
-    in
-    let map =
-      match at_id with
-      | None -> map
-      | Some id -> Hashtbl.find id_map id
-    in
-    aux map
-
   let memory_error_to_exception_info
       (_ : (memory_error, annot, tl_ast) memory_error_info) : exception_info =
     { id = "unknown"; description = Some "Error lifting not supported yet!" }
 
   let add_variables = Memory_model.MonadicSMemory.Lift.add_variables
+
+  let select_case nexts =
+    let result =
+      Hashtbl.fold
+        (fun _ (id_case, map) acc ->
+          match (map, acc) with
+          | _, Some (Either.Right _) -> acc
+          | Nothing, _ -> Some (Either.Right id_case)
+          | map, None -> Some (Either.Left map)
+          | _ -> acc)
+        nexts None
+    in
+    Option.get result
+
+  (* If a FinalCmd is in a function call, get the caller ID
+     and the relevant branch case for stepping forward,
+     while checking that it actually exists. *)
+  let get_next_from_end state { callers; func_return_label; _ } =
+    let* caller_id = List_utils.hd_opt callers in
+    let* label, ix = func_return_label in
+    let case = Case (Func_exit label, ix) in
+    let* _ =
+      match Hashtbl.find state.id_map caller_id with
+      | BranchCmd { nexts; _ } -> Hashtbl.find_opt nexts case
+      | _ -> None
+    in
+    Some (caller_id, Some case)
+
+  let rec find_next state id case =
+    let map = Hashtbl.find state.id_map id in
+    match (map, case) with
+    | Nothing, _ -> failwith "HORROR - map is Nothing!"
+    | (FinalCmd _ | Cmd _), Some _ ->
+        failwith "HORROR - tried to step case for non-branch cmd"
+    | Cmd { next = Nothing; data = { all_ids; _ } }, None ->
+        let id = List.hd (List.rev all_ids) in
+        let case =
+          match Gil_lifter.cases_at_id id state.gil_state with
+          | [] -> None
+          | [ case ] -> Some case
+          | _ ->
+              Fmt.failwith
+                "find_next: id %a has multiple cases - not sure where to step!"
+                L.Report_id.pp id
+        in
+        Either.Right (id, case)
+    | Cmd { next; _ }, None -> Either.Left next
+    | BranchCmd { nexts; _ }, None -> select_case nexts
+    | BranchCmd { nexts; _ }, Some case -> (
+        match Hashtbl.find_opt nexts case with
+        | None -> failwith "case not found"
+        | Some ((id, case), Nothing) -> Either.Right (id, case)
+        | Some (_, next) -> Either.Left next)
+    | FinalCmd { data }, None -> (
+        match get_next_from_end state data with
+        | Some (id, case) -> find_next state id case
+        | None -> Either.left map)
+
+  let request_next state id case =
+    let rec aux id case =
+      let path = path_of_id id state in
+      let exec_data = Effect.perform (Step (Some id, case, path)) in
+      match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
+      | Either.Left (id, case) -> aux id case
+      | Either.Right map -> map
+    in
+    aux id case
+
+  let step state id case =
+    let () =
+      DL.log (fun m ->
+          m "Stepping %a %a" pp_rid id (pp_option Branch_case.pp) case)
+    in
+    match find_next state id case with
+    | Either.Left next -> next
+    | Either.Right (id, case) -> request_next state id case
+
+  let step_all state id case =
+    let cmd = Hashtbl.find state.id_map id in
+    let stack_depth = List.length (get_cmd_data_exn cmd).callers in
+    let rec aux ends = function
+      | [] -> List.rev ends
+      | (id, case) :: rest ->
+          let ends, nexts =
+            match step state id case with
+            | Nothing -> failwith "Stepped to Nothing!"
+            | Cmd { data; _ } -> (ends, (data.id, None) :: rest)
+            | BranchCmd { data; nexts } ->
+                let new_nexts =
+                  Hashtbl.to_seq_keys nexts
+                  |> Seq.map (fun case -> (data.id, Some case))
+                  |> List.of_seq
+                in
+                (ends, new_nexts @ rest)
+            | FinalCmd { data } as end_ ->
+                let stack_depth' = List.length data.callers in
+                if stack_depth' < stack_depth then
+                  failwith "Stack depth too small!"
+                else if stack_depth' > stack_depth then
+                  let next = get_next_from_end state data |> Option.get in
+                  (ends, next :: rest)
+                else (end_ :: ends, rest)
+          in
+          aux ends nexts
+    in
+    match (case, cmd) with
+    | _, Nothing -> failwith "Stepping from Nothing!"
+    | _, FinalCmd _ -> [ cmd ]
+    | None, BranchCmd { nexts; _ } ->
+        let first_steps =
+          Hashtbl.to_seq_keys nexts
+          |> Seq.map (fun case -> (id, Some case))
+          |> List.of_seq
+        in
+        aux [] first_steps
+    | _, _ -> aux [] [ (id, case) ]
+
+  let step_branch state id case =
+    let case =
+      Option.map
+        (fun (_, json) -> json |> Branch_case.of_yojson |> Result.get_ok)
+        case
+    in
+    let next = step state id case in
+    let id = (get_cmd_data_exn next).id in
+    (id, Debugger_utils.Step)
+
+  let step_over state id =
+    let map = Hashtbl.find state.id_map id in
+    let () =
+      let () =
+        match map with
+        | BranchCmd { nexts; _ } ->
+            if Hashtbl.mem nexts Func_exit_placeholder then
+              step state id (Some Func_exit_placeholder) |> ignore
+        | _ -> ()
+      in
+      let> submap =
+        match (get_cmd_data_exn map).submap with
+        | NoSubmap | Proc _ | Submap Nothing -> None
+        | Submap m -> Some m
+      in
+      let _ = step_all state (get_cmd_data_exn submap).id None in
+      ()
+    in
+    let data = get_cmd_data_exn (step state id None) in
+    (data.id, Debugger_utils.Step)
+
+  let step_in state id =
+    let cmd = Hashtbl.find state.id_map id in
+    match cmd with
+    | Nothing -> failwith "Stepping in from Nothing!"
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+        (* Only BranchCmds should have submaps *)
+        let- () =
+          match data.submap with
+          | NoSubmap | Proc _ | Submap Nothing -> None
+          | Submap m -> Some ((get_cmd_data_exn m).id, Debugger_utils.Step)
+        in
+        step_branch state id None
+
+  let step_back state id =
+    let cmd = Hashtbl.find state.id_map id in
+    let data = get_cmd_data_exn cmd in
+    let id =
+      match data.prev with
+      | Some (id, _) -> id
+      | None -> id
+    in
+    (id, Debugger_utils.Step)
+
+  let continue state id =
+    let rec aux ends = function
+      | [] -> ends
+      | (id, case) :: rest ->
+          let ends' = step_all state id case in
+          let ends', nexts =
+            ends'
+            |> List.partition_map (fun map ->
+                   let data = get_cmd_data_exn map in
+                   match get_next_from_end state data with
+                   | Some (id, case) -> Either.Right (id, case)
+                   | None -> Either.Left map)
+          in
+          aux (ends @ ends') (nexts @ rest)
+    in
+    let ends = aux [] [ (id, None) ] in
+    let id = (get_cmd_data_exn (List.hd ends)).id in
+    (id, Debugger_utils.Step)
+
+  let step_out state id =
+    let cmd = Hashtbl.find state.id_map id in
+    match (get_cmd_data_exn cmd).callers with
+    | [] -> continue state id
+    | caller_id :: _ -> step_over state caller_id
+
+  let is_breakpoint _ = true (* TODO *)
+
+  let continue_back state id =
+    let rec aux cmd =
+      let { id; _ } = get_cmd_data_exn cmd in
+      if is_breakpoint cmd then (id, Debugger_utils.Breakpoint)
+      else
+        match previous_step id state with
+        | None -> (
+            match (get_cmd_data_exn cmd).callers with
+            | [] -> (id, Debugger_utils.Step)
+            | caller_id :: _ -> aux (Hashtbl.find state.id_map caller_id))
+        | Some (id, _) -> aux (Hashtbl.find state.id_map id)
+    in
+    aux (Hashtbl.find state.id_map id)
+
+  let init ~proc_name ~all_procs:_ tl_ast prog =
+    let gil_state = Gil.get_state () in
+    let+ tl_ast = tl_ast in
+    let partial_cmds = Partial_cmds.init () in
+    let id_map = Hashtbl.create 0 in
+    let state =
+      {
+        proc_name;
+        gil_state;
+        tl_ast;
+        prog;
+        partial_cmds;
+        map = Nothing;
+        id_map;
+        func_return_map = Hashtbl.create 0;
+        func_return_count = 0;
+      }
+    in
+    let finish_init () =
+      let rec aux id_case =
+        let id, case, path =
+          match id_case with
+          | Some (id, case) ->
+              let path = path_of_id id state in
+              (Some id, case, path)
+          | None -> (None, None, [])
+        in
+        let exec_data = Effect.perform (Step (id, case, path)) in
+        match init_or_handle ~state ?prev_id:id ?gil_case:case exec_data with
+        | Either.Left (id, case) -> aux (Some (id, case))
+        | Either.Right map -> map
+      in
+      let map = aux None in
+      let id = (get_cmd_data_exn map).id in
+      (id, Debugger_utils.Step)
+    in
+    (state, finish_init)
+
+  let init_exn ~proc_name ~all_procs tl_ast prog =
+    match init ~proc_name ~all_procs tl_ast prog with
+    | None -> failwith "init: wislLifter needs a tl_ast!"
+    | Some x -> x
 end

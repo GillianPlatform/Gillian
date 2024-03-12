@@ -1625,7 +1625,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let goto_guard =
         let cmd = Cmd.GuardedGoto (guard_var, body_lab, end_lab) in
         b ~cmd_kind:(Normal true) cmd
-        |> Body_item.with_branch_kind (Some Branch_case.While_loop_kind)
+        |> Body_item.with_branch_kind (Some Branch_case.For_loop_kind)
       in
       let goto_loop = b ~cmd_kind:Hidden (Cmd.Goto loop_lab) in
       let end_ = b ~cmd_kind:Hidden ~label:end_lab Skip in

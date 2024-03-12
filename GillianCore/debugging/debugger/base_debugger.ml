@@ -33,7 +33,7 @@ struct
   type 'ext base_proc_state = {
     mutable cont_func : result_t cont_func_f option;
     mutable breakpoints : breakpoints; [@default Hashtbl.create 0]
-    mutable cur_report_id : L.Report_id.t;
+    mutable cur_report_id : L.Report_id.t option;
     (* TODO: The below fields only depend on the
             cur_report_id and could be refactored to use this *)
     mutable top_level_scopes : Variable.scope list;
@@ -184,7 +184,7 @@ struct
         let procs =
           Hashtbl.fold
             (fun proc_name state acc ->
-              let current_cmd_id = state.cur_report_id in
+              let current_cmd_id = Option.get state.cur_report_id in
               let matches =
                 state.lifter_state |> Lifter.get_matches_at_id current_cmd_id
               in
@@ -414,7 +414,7 @@ struct
 
       let f report_id cfg state =
         let cmd = get_cmd report_id in
-        state.cur_report_id <- report_id;
+        state.cur_report_id <- Some report_id;
         state.frames <-
           call_stack_to_frames cmd.callstack cmd.proc_line cfg.prog;
         let lifted_scopes, variables =
@@ -433,8 +433,6 @@ struct
     let jump_state_to_id id cfg state =
       try
         DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id);
-        (* state.exec_map |> snd |> Exec_map.path_of_id id |> ignore; *)
-        (* TODO *)
         state |> update_proc_state id cfg;
         Ok ()
       with Failure msg -> Error msg
@@ -473,28 +471,22 @@ struct
       in
       (exec_data, cmd)
 
-    module Execute_step = struct
-      open Verification.SAInterpreter.Logging
-
-      type execute_step =
-        L.Report_id.t ->
-        ?branch_case:Branch_case.t ->
-        ?branch_path:Branch_case.path ->
-        debug_state ->
-        proc_state ->
-        stop_reason * L.Report_id.t option
-
-      let get_branch_path prev_id case path state =
-        let branch_path =
-          match path with
-          | Some path -> path
-          | None -> state.lifter_state |> Lifter.select_next_path case prev_id
+    let jump_to_start (state : t) =
+      let { debug_state; _ } = state in
+      let proc_state = get_proc_state_exn state in
+      let result =
+        let** root_id =
+          proc_state.lifter_state |> Lifter.get_root_id
+          |> Option.to_result ~none:"Debugger.jump_to_start: No root id found!"
         in
-        DL.log (fun m ->
-            m
-              ~json:[ ("path", Branch_case.path_to_yojson branch_path) ]
-              "Got path for ID %a" L.Report_id.pp prev_id);
-        branch_path
+        jump_state_to_id root_id debug_state proc_state
+      in
+      match result with
+      | Error msg -> failwith msg
+      | Ok () -> ()
+
+    module Step = struct
+      open Verification.SAInterpreter.Logging
 
       let check_cur_report_id = function
         | None ->
@@ -502,297 +494,250 @@ struct
               "Did not log report. Check the logging level is set correctly"
         | Some id -> id
 
-      let handle_lifter_result
-          (execute_step : execute_step)
-          ?default_next_id
-          dbg
-          state
-          on_stop
-          (result : Lift.handle_cmd_result) =
-        match result with
-        | ExecNext (id, branch_case) ->
-            DL.log (fun m ->
-                m "EXEC NEXT (%a, %a)" (pp_option L.Report_id.pp) id
-                  (pp_option Branch_case.pp) branch_case);
-            let id = Option_utils.coalesce id default_next_id |> Option.get in
-            execute_step id ?branch_case dbg state
-        | Stop id -> on_stop id
+      (* A command step with no results *should* mean that we're returning.
+         If we're at the top of the callstack, this *should* mean that we're hitting the end of the program. *)
+      let is_eob ~content ~type_ ~id =
+        let is_root =
+          match
+            content |> Yojson.Safe.from_string |> ConfigReport.of_yojson
+          with
+          | Error _ ->
+              DL.log (fun m ->
+                  m
+                    "Handle_continue.is_eob: Not a ConfigReport (type %s); I'm \
+                     not sure what to do here."
+                    type_);
+              true
+          | Ok report -> (
+              match report.callstack with
+              | [] -> failwith "HORROR: Empty callstack!"
+              | [ _ ] -> true
+              | _ -> false)
+        in
+        if is_root then
+          L.Log_queryer.get_cmd_results id
+          |> List.for_all (fun (_, content) ->
+                 let result = content |> of_yojson_string CmdResult.of_yojson in
+                 result.errors <> [])
+        else false
 
-      module Handle_continue = struct
-        (* A command step with no results *should* mean that we're returning.
-           If we're at the top of the callstack, this *should* mean that we're hitting the end of the program. *)
-        let is_eob ~content ~type_ ~id =
-          let is_root =
-            match
-              content |> Yojson.Safe.from_string |> ConfigReport.of_yojson
-            with
-            | Error _ ->
-                DL.log (fun m ->
-                    m
-                      "Handle_continue.is_eob: Not a ConfigReport (type %s); \
-                       I'm not sure what to do here."
-                      type_);
-                true
-            | Ok report -> (
-                match report.callstack with
-                | [] -> failwith "HORROR: Empty callstack!"
-                | [ _ ] -> true
-                | _ -> false)
-          in
-          if is_root then
-            L.Log_queryer.get_cmd_results id
-            |> List.for_all (fun (_, content) ->
-                   let result =
-                     content |> of_yojson_string CmdResult.of_yojson
-                   in
-                   result.errors <> [])
-          else false
+      type continue_kind = ProcInit | EoB | Continue
 
-        let get_report_and_check_type
-            ?(log_context = "execute_step")
-            ~on_proc_init
-            ~on_eob
-            ~continue
-            id =
-          let content, type_ = Option.get @@ L.Log_queryer.get_report id in
+      let get_report_and_check_type ?(log_context = "execute_step") id =
+        let content, type_ = Option.get @@ L.Log_queryer.get_report id in
+        let kind =
           if type_ = Content_type.proc_init then (
             DL.log (fun m -> m "Debugger.%s: Skipping proc_init..." log_context);
-            on_proc_init ())
+            ProcInit)
           else if is_eob ~content ~type_ ~id then (
             DL.log (fun m ->
                 m
                   "Debugger.%s: No non-error results for %a; stepping again \
                    for EoB"
                   log_context L.Report_id.pp id);
-            on_eob ())
-          else continue content
+            EoB)
+          else Continue
+        in
+        (kind, content)
 
-        let f
-            (execute_step : execute_step)
-            prev_id_in_frame
-            cur_report_id
-            branch_case
-            branch_path
-            new_branch_cases
-            cont_func
-            debug_state
-            proc_state =
-          let cur_report_id = check_cur_report_id cur_report_id in
-          proc_state.cont_func <- Some cont_func;
-          cur_report_id
-          |> get_report_and_check_type
-               ~on_proc_init:(fun () ->
-                 execute_step prev_id_in_frame debug_state proc_state)
-               ~on_eob:(fun () ->
-                 execute_step ~branch_path cur_report_id debug_state proc_state)
-               ~continue:(fun content ->
-                 update_proc_state cur_report_id debug_state proc_state;
-                 let cmd = content |> of_yojson_string ConfigReport.of_yojson in
-                 let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
-                 let matches =
-                   get_matches cur_report_id debug_state proc_state
-                 in
-                 let exec_data =
-                   Lift.make_executed_cmd_data cmd_kind cur_report_id cmd
-                     ~matches branch_path
-                 in
-                 proc_state.lifter_state
-                 |> Lifter.handle_cmd prev_id_in_frame branch_case exec_data
-                 |> handle_lifter_result ~default_next_id:cur_report_id
-                      execute_step debug_state proc_state
-                      (handle_stop debug_state proc_state cur_report_id))
-      end
+      (*
+        This is a bit weird; it hinges on the fact that the ReturnNormal GIL cmd gives no results
+        FIXME: I don't think g_interpreter actually logs the result?
+        this means we need to get results via cont_func and needs to be changed.
+      *)
+      let find_or_exec_eob
+          id
+          (cont_func : 'a Verification.SAInterpreter.cont_func_f) =
+        ignore id;
+        (* TODO try to find result in log *)
+        match cont_func ~selector:(IdCase (id, None)) () with
+        | Finished _ ->
+            failwith "HORROR: Shouldn't encounter Finished when debugging!"
+        | Continue _ -> failwith "Expected EoB, got Continue!"
+        | EndOfBranch (result, cont_func) -> (result, cont_func)
 
-      let handle_continue = Handle_continue.f
-
-      module Handle_end_of_branch = struct
-        let get_prev prev_id =
-          let prev =
-            let+ content, type_ = L.Log_queryer.get_report prev_id in
-            (prev_id, content, type_)
-          in
-          match prev with
-          | Some (prev_id, content, type_) when type_ = Content_type.cmd ->
-              (prev_id, content)
-          | Some (prev_id, _, type_) ->
-              Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
-                L.Report_id.pp prev_id type_ Content_type.cmd
-          | None ->
-              Fmt.failwith "EndOfBranch: prev id '%a' doesn't exist!"
-                L.Report_id.pp prev_id
-
-        let f
-            (execute_step : execute_step)
-            prev_id_in_frame
-            result
-            cont_func
-            branch_path
-            debug_state
-            proc_state =
-          proc_state.cont_func <- Some cont_func;
-          let prev_id, content = get_prev prev_id_in_frame in
-          let prev_prev_id =
-            L.Log_queryer.get_previous_report_id prev_id |> Option.get
-          in
-          let exec_data, cmd =
-            build_final_cmd_data content result prev_id branch_path debug_state
-          in
-          update_proc_state prev_id debug_state proc_state;
-          proc_state.lifter_state
-          |> Lifter.handle_cmd prev_prev_id cmd.branch_case exec_data
-          |> handle_lifter_result execute_step debug_state proc_state
-               (handle_stop debug_state proc_state ~is_end:true prev_id)
-      end
-
-      let handle_end_of_branch = Handle_end_of_branch.f
-
-      let rec f
-          prev_id_in_frame
-          ?branch_case
-          ?branch_path
-          debug_state
-          proc_state =
-        let open Verification.SAInterpreter in
-        match proc_state.cont_func with
-        | None ->
-            DL.log (fun m -> m "No cont_func; reached end");
-            (ReachedEnd, None)
-        | Some cont_func -> (
-            let branch_path =
-              get_branch_path prev_id_in_frame branch_case branch_path
-                proc_state
+      let find_or_exec_next
+          id
+          case
+          path
+          (cont_func : 'a Verification.SAInterpreter.cont_func_f) =
+        let next =
+          let* id = id in
+          L.Log_queryer.get_next_reports id
+          |> List.find_map (fun (_, content, type_) ->
+                 if type_ = Content_type.cmd then
+                   let cmd =
+                     content |> of_yojson_string Logging.ConfigReport.of_yojson
+                   in
+                   match (case, cmd.branch_case) with
+                   | Some case, Some bc when bc = case -> Some id
+                   | None, _ -> Some id
+                   | _ -> None
+                 else None)
+        in
+        match next with
+        | Some id ->
+            let new_branch_cases =
+              L.Log_queryer.get_cmd_results id
+              |> List.filter_map (fun (_, content) ->
+                     let result =
+                       of_yojson_string Logging.CmdResult.of_yojson content
+                     in
+                     result.branch_case)
             in
-            match cont_func ~path:branch_path () with
+            let branch_path = List_utils.cons_opt case path in
+            (id, branch_path, new_branch_cases, cont_func)
+        | None -> (
+            let selector =
+              match id with
+              | Some id -> IdCase (id, case)
+              | None -> Path path
+            in
+            match cont_func ~selector () with
             | Finished _ ->
-                proc_state.cont_func <- None;
                 failwith "HORROR: Shouldn't encounter Finished when debugging!"
-            | EndOfBranch (result, cont_func) ->
-                handle_end_of_branch f prev_id_in_frame result cont_func
-                  branch_path debug_state proc_state
+            | EndOfBranch _ -> failwith "Unexpected EndOfBranch!"
             | Continue { report_id; branch_path; new_branch_cases; cont_func }
               ->
-                handle_continue f prev_id_in_frame report_id branch_case
-                  branch_path new_branch_cases cont_func debug_state proc_state)
+                let id = check_cur_report_id report_id in
+                (id, branch_path, new_branch_cases, cont_func))
+
+      let get_next_step id case path debug_state proc_state =
+        let cont_func =
+          Option_utils.or_else
+            (fun () -> failwith "HORROR: No cont func!")
+            proc_state.cont_func
+        in
+        let id, path, new_branch_cases, cont_func =
+          find_or_exec_next id case path cont_func
+        in
+        let continue_kind, content = get_report_and_check_type id in
+        let exec_data, cont_func =
+          match continue_kind with
+          | ProcInit -> failwith "Unexpected ProcInit!"
+          | Continue ->
+              let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
+              let matches = get_matches id debug_state proc_state in
+              let report =
+                of_yojson_string Logging.ConfigReport.of_yojson content
+              in
+              let exec_data =
+                Lift.make_executed_cmd_data cmd_kind id report ~matches path
+              in
+              (exec_data, cont_func)
+          | EoB ->
+              let result, cont_func = find_or_exec_eob id cont_func in
+              let exec_data, _ =
+                build_final_cmd_data content result id path debug_state
+              in
+              (exec_data, cont_func)
+        in
+        let () = proc_state.cont_func <- Some cont_func in
+        exec_data
+
+      let handle_step_effect id case path proc_state { debug_state; _ } =
+        let () =
+          let> id = id in
+          jump_state_to_id id debug_state proc_state |> Result.get_ok
+        in
+        let exec_data = get_next_step id case path debug_state proc_state in
+        let () = update_proc_state exec_data.id debug_state proc_state in
+        exec_data
+
+      let with_lifter_effects f proc_state state =
+        let open Effect.Deep in
+        let open Lifter in
+        try_with f ()
+          {
+            effc =
+              (fun (type a) (eff : a Effect.t) ->
+                match eff with
+                | Step (id, case, path) ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        let step_result =
+                          handle_step_effect id case path proc_state state
+                        in
+                        Effect.Deep.continue k step_result)
+                | _ ->
+                    let s = Printexc.to_string (Effect.Unhandled eff) in
+                    Fmt.failwith "HORROR: effect leak!\n%s" s);
+          }
+
+      let lifter_call lifter_func proc_state state =
+        let stop_id, stop_reason =
+          with_lifter_effects lifter_func proc_state state
+        in
+        let++ () = jump_state_to_id stop_id state.debug_state proc_state in
+        stop_reason
+
+      let lifter_call_with_id state lifter_func =
+        let proc_state = get_proc_state_exn state in
+        let { cur_report_id; lifter_state; _ } = proc_state in
+        let id = Option.get cur_report_id in
+        let f () = lifter_func lifter_state id in
+        lifter_call f proc_state state |> Result.get_ok
+
+      let over state = lifter_call_with_id state Lifter.step_over
+      let in_ state = lifter_call_with_id state Lifter.step_in
+      let out state = lifter_call_with_id state Lifter.step_out
+
+      let branch case id state =
+        let proc_state = get_proc_state_exn ~cmd_id:id state in
+        let { lifter_state; _ } = proc_state in
+        let f () = Lifter.step_branch lifter_state id case in
+        lifter_call f proc_state state
+
+      let back state = lifter_call_with_id state Lifter.step_back
+      let continue state = lifter_call_with_id state Lifter.continue
+      let continue_back state = lifter_call_with_id state Lifter.continue_back
     end
 
-    let execute_step = Execute_step.f
-
     module Launch_proc = struct
-      open Verification.SAInterpreter.Logging
-
-      let handle_end_of_branch
-          proc_name
-          result
-          prev_id
-          report_state
-          cont_func
-          debug_state =
-        match prev_id with
-        | None -> Error "Nothing to run"
-        | Some prev_id ->
-            let lifter_state, _ =
-              let prev_content, _ =
-                L.Log_queryer.get_report prev_id |> Option.get
-              in
-              let exec_data, _ =
-                build_final_cmd_data prev_content result prev_id [] debug_state
-              in
-              Lifter.init_exn ~proc_name ~all_procs:debug_state.proc_names
-                debug_state.tl_ast debug_state.prog exec_data
-            in
-            let proc_state =
-              let make ext =
-                make_base_proc_state ~cont_func ~cur_report_id:prev_id
-                  ~top_level_scopes ~lifter_state ~report_state ~ext ()
-              in
-              let ext = Debugger_impl.init_proc debug_state (make ()) in
-              make ext
-            in
-            proc_state |> update_proc_state prev_id debug_state;
-            Ok (proc_state, ReachedEnd)
-
-      let init_lifter
-          ~proc_name
-          ~report_id
-          ~cmd_report
-          ~branch_path
-          ~new_branch_cases
-          debug_state =
-        let { proc_names; tl_ast; prog; _ } = debug_state in
-        let kind = Exec_map.kind_of_cases new_branch_cases in
-        let exec_data =
-          Lift.make_executed_cmd_data kind report_id cmd_report branch_path
+      let check_init_report id =
+        let** id =
+          Option.to_result ~none:"HORROR: No report from initial cont!" id
         in
-        Lifter.init_exn ~proc_name ~all_procs:proc_names tl_ast prog exec_data
+        match L.Log_queryer.get_report id with
+        | None -> Error "HORROR: No report on initial cont_func!"
+        | Some (_, type_)
+          when type_ = L.Logging_constants.Content_type.proc_init -> Ok ()
+        | Some _ -> Error "HORROR: Initial report is not a proc_init!"
 
-      let handle_continue
-          proc_name
-          new_branch_cases
-          branch_path
-          cur_report_id
-          build_proc_state
-          (cont_func : result_t cont_func_f)
-          report_state
-          debug_state =
-        let id = cur_report_id |> Execute_step.check_cur_report_id in
-        let aux () = build_proc_state (Some id) (cont_func ~path:[] ()) in
-        id
-        |> Execute_step.Handle_continue.get_report_and_check_type
-             ~log_context:"launch_proc" ~on_proc_init:aux ~on_eob:aux
-             ~continue:(fun content ->
-               let cmd_report =
-                 content |> of_yojson_string ConfigReport.of_yojson
-               in
-               let lifter_state, handler_result =
-                 init_lifter ~proc_name ~report_id:id ~cmd_report ~branch_path
-                   ~new_branch_cases debug_state
+      (* For the initial step, we should always get a blank Continue *)
+      let get_cont_func proc_name debug_state =
+        match Debugger_impl.launch_proc ~proc_name debug_state with
+        | Continue
+            { report_id; branch_path = []; new_branch_cases = []; cont_func } ->
+            let++ () = check_init_report report_id in
+            cont_func
+        | _ -> Error "HORROR: Unexpected conf from initial cont!"
+
+      let init_lifter proc_name debug_state =
+        let { proc_names; tl_ast; prog; _ } = debug_state in
+        Lifter.init_exn ~proc_name ~all_procs:proc_names tl_ast prog
+
+      let f proc_name state =
+        let { debug_state; _ } = state in
+        let report_state = L.Report_state.clone debug_state.report_state_base in
+        report_state
+        |> L.Report_state.with_state (fun () ->
+               let** cont_func = get_cont_func proc_name debug_state in
+               let lifter_state, init_lifter' =
+                 init_lifter proc_name debug_state
                in
                let proc_state =
                  let make ext =
-                   make_base_proc_state ~cont_func ~cur_report_id:id
-                     ~top_level_scopes ~lifter_state ~report_state ~ext ()
+                   make_base_proc_state ~cont_func ~top_level_scopes
+                     ~lifter_state ~report_state ~ext ()
                  in
                  let ext = Debugger_impl.init_proc debug_state (make ()) in
                  make ext
                in
-               let stop_reason, id =
-                 handler_result
-                 |> Execute_step.handle_lifter_result execute_step
-                      ~default_next_id:id debug_state proc_state
-                      (handle_stop debug_state proc_state id)
+               let** stop_reason =
+                 Step.lifter_call init_lifter' proc_state state
                in
-               let id = id |> Option.get in
-               update_proc_state id debug_state proc_state;
                Ok (proc_state, stop_reason))
-
-      let rec build_proc_state
-          proc_name
-          report_state
-          debug_state
-          prev_id
-          cont_func =
-        let build_proc_state =
-          build_proc_state proc_name report_state debug_state
-        in
-        match cont_func with
-        | Finished _ ->
-            Error "HORROR: Shouldn't encounter Finished when debugging!"
-        | EndOfBranch (result, cont_func) ->
-            handle_end_of_branch proc_name result prev_id report_state cont_func
-              debug_state
-        | Continue { report_id; branch_path; new_branch_cases; cont_func } ->
-            handle_continue proc_name new_branch_cases branch_path report_id
-              build_proc_state cont_func report_state debug_state
-
-      let f proc_name debug_state =
-        let report_state = L.Report_state.clone debug_state.report_state_base in
-        report_state
-        |> L.Report_state.with_state (fun () ->
-               let cont_func =
-                 Debugger_impl.launch_proc ~proc_name debug_state
-               in
-               build_proc_state proc_name report_state debug_state None
-                 cont_func)
     end
 
     let launch_proc = Launch_proc.f
@@ -837,231 +782,26 @@ struct
         let debug_state = build_debug_state file_name proc_name in
         let proc_name = debug_state.main_proc_name in
         let state = make_state debug_state in
-        let++ main_proc_state, _ = launch_proc proc_name debug_state in
+        let++ main_proc_state, _ = launch_proc proc_name state in
         main_proc_state.report_state |> L.Report_state.activate;
         Hashtbl.add state.procs proc_name main_proc_state;
         state
     end
 
     let launch = Launch.f
+    let step_in = Step.in_
+    let step ?(reverse = false) = if reverse then Step.back else Step.over
+    let step_specific = Step.branch
+    let step_out = Step.out
 
-    let jump_to_start (state : t) =
-      let { debug_state; _ } = state in
-      let proc_state = get_proc_state_exn state in
-      let result =
-        let** root_id =
-          proc_state.lifter_state |> Lifter.get_root_id
-          |> Option.to_result ~none:"Debugger.jump_to_start: No root id found!"
-        in
-        jump_state_to_id root_id debug_state proc_state
-      in
-      match result with
-      | Error msg -> failwith msg
-      | Ok () -> ()
-
-    module Step_in_branch_case = struct
-      let step_backwards debug_state proc_state =
-        match
-          let { lifter_state; cur_report_id; _ } = proc_state in
-          lifter_state |> Lifter.previous_step cur_report_id
-        with
-        | None -> ReachedStart
-        | Some (prev_id, _) ->
-            update_proc_state prev_id debug_state proc_state;
-            Step
-
-      let select_next branch_case nexts =
-        match branch_case with
-        | Some branch_case ->
-            List.find_opt (fun (_, bc) -> bc |> Option.get = branch_case) nexts
-            |> Option.map fst
-        | None -> Some (List.hd nexts |> fst)
-
-      let step_forwards prev_id_in_frame branch_case debug_state proc_state =
-        let next_id =
-          match
-            proc_state.lifter_state
-            |> Lifter.existing_next_steps proc_state.cur_report_id
-          with
-          | [] -> None
-          | nexts -> select_next branch_case nexts
-        in
-        match next_id with
-        | None ->
-            DL.log (fun m -> m "No next report ID; executing next step");
-            execute_step ?branch_case prev_id_in_frame debug_state proc_state
-            |> fst
-        | Some id ->
-            DL.show_report id "Next report ID found; not executing";
-            update_proc_state id debug_state proc_state;
-            Step
-
-      let f
-          prev_id_in_frame
-          ?branch_case
-          ?(reverse = false)
-          debug_state
-          proc_state =
-        let stop_reason =
-          if reverse then step_backwards debug_state proc_state
-          else step_forwards prev_id_in_frame branch_case debug_state proc_state
-        in
-        if has_hit_breakpoint proc_state then Breakpoint
-        else if List.length proc_state.errors > 0 then
-          let () = proc_state.cont_func <- None in
-          ExecutionError
-        else stop_reason
-    end
-
-    let step_in_branch_case = Step_in_branch_case.f
-
-    module Step_case = struct
-      let get_top_frame state =
-        match state.frames with
-        | [] -> failwith "Nothing in call stack, cannot step"
-        | cur_frame :: _ -> cur_frame
-
-      (* TODO: re-evaluate - I think the lifter should handle this. *)
-      let step_until_cond
-          ?(reverse = false)
-          ?(branch_case : Branch_case.t option)
-          (cond : frame -> frame -> int -> int -> bool)
-          (debug_state : debug_state)
-          (proc_state : proc_state) : stop_reason =
-        let prev_frame = get_top_frame proc_state in
-        let prev_stack_depth = List.length proc_state.frames in
-        let rec aux () =
-          let prev_id_in_frame = proc_state.cur_report_id in
-          let stop_reason =
-            step_in_branch_case ~reverse ?branch_case prev_id_in_frame
-              debug_state proc_state
-          in
-          match stop_reason with
-          | Step ->
-              let cur_frame = get_top_frame proc_state in
-              let cur_stack_depth = List.length proc_state.frames in
-              if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
-                stop_reason
-              else aux ()
-          | other_stop_reason -> other_stop_reason
-        in
-        aux ()
-
-      (* If GIL file, step until next cmd in the same frame (like in
-         regular debuggers) *)
-      let is_next_gil_step prev_frame cur_frame prev_stack_depth cur_stack_depth
-          =
-        cur_frame.source_path = prev_frame.source_path
-        && cur_frame.name = prev_frame.name
-        || cur_stack_depth < prev_stack_depth
-
-      (* If target language file, step until the code origin location is
-         different, indicating an actual step in the target language*)
-      (* let is_next_tl_step prev_frame cur_frame _ _ =
-         cur_frame.source_path = prev_frame.source_path
-         && (cur_frame.start_line <> prev_frame.start_line
-            || cur_frame.start_column <> prev_frame.start_column
-            || cur_frame.end_line <> prev_frame.end_line
-            || cur_frame.end_column <> prev_frame.end_column) *)
-      let is_next_tl_step _ _ _ _ = true
-
-      let get_cond { source_file; _ } =
-        if is_gil_file source_file then is_next_gil_step else is_next_tl_step
-
-      let f ?(reverse = false) ?branch_case debug_state proc_state =
-        let cond = get_cond debug_state in
-        step_until_cond ~reverse ?branch_case cond debug_state proc_state
-    end
-
-    let step_case = Step_case.f
-
-    let step_in ?(reverse = false) state =
-      let proc_state = get_proc_state_exn state in
-      step_case ~reverse state.debug_state proc_state
-
-    let step ?(reverse = false) state =
-      let proc_state = get_proc_state_exn state in
-      step_case ~reverse state.debug_state proc_state
-
-    let step_specific branch_case prev_id state =
-      let { debug_state; _ } = state in
-      let** proc_state = state |> get_proc_state ~cmd_id:prev_id in
-      let id, branch_case =
-        proc_state.lifter_state |> Lifter.next_gil_step prev_id branch_case
-      in
-      let++ () = jump_state_to_id id debug_state proc_state in
-      proc_state |> step_case ?branch_case debug_state
-
-    let step_out state =
-      let proc_state = get_proc_state_exn state in
-      step_case state.debug_state proc_state
-
-    module Run = struct
-      let log_run current_id state =
-        DL.log (fun m ->
-            m
-              ~json:
-                [
-                  ("current_id", L.Report_id.to_yojson current_id);
-                  ("lifter_state", state.lifter_state |> Lifter.dump);
-                ]
-              "Debugger.run")
-
-      let run_backwards ~on_step dbg state =
-        let stop_reason = step_case ~reverse:true dbg state in
-        match stop_reason with
-        | Step -> on_step ()
-        | Breakpoint -> Breakpoint
-        | other_stop_reason -> other_stop_reason
-
-      let run_forwards
-          ~on_step
-          ~on_other_reason
-          current_id
-          debug_state
-          proc_state =
-        let unfinished =
-          proc_state.lifter_state
-          |> Lifter.find_unfinished_path ~at_id:current_id
-        in
-        match unfinished with
-        | None ->
-            DL.log (fun m -> m "Debugger.run: map has no unfinished branches");
-            ReachedEnd
-        | Some (prev_id, branch_case) -> (
-            jump_state_to_id prev_id debug_state proc_state |> Result.get_ok;
-            let stop_reason = step_case ?branch_case debug_state proc_state in
-            match stop_reason with
-            | Step -> on_step ()
-            | Breakpoint -> Breakpoint
-            | _ -> on_other_reason ())
-
-      let f ?(reverse = false) ?(launch = false) state =
-        let { debug_state; _ } = state in
-        let proc_state = get_proc_state_exn state in
-        let current_id = proc_state.cur_report_id in
-        log_run current_id proc_state;
-        let rec aux ?(launch = false) count =
-          if count > 100 then failwith "Debugger.run: infinite loop?";
-          let on_step () = aux count in
-          let on_other_reason () = aux (count + 1) in
-          (* We need to check if a breakpoint has been hit if run is called
-             immediately after launching to prevent missing a breakpoint on the first
-             line *)
-          if launch && has_hit_breakpoint proc_state then Breakpoint
-          else if reverse then run_backwards ~on_step debug_state proc_state
-          else
-            run_forwards ~on_step ~on_other_reason current_id debug_state
-              proc_state
-        in
-        aux ~launch 0
-    end
-
-    let run = Run.f
+    let run ?(reverse = false) ?(launch = false) =
+      ignore launch;
+      (* TODO *)
+      if reverse then Step.continue_back else Step.continue
 
     let start_proc proc_name state =
       let { debug_state; procs } = state in
-      let++ proc_state, stop_reason = launch_proc proc_name debug_state in
+      let++ proc_state, stop_reason = launch_proc proc_name state in
       Hashtbl.add procs proc_name proc_state;
       debug_state.cur_proc_name <- proc_name;
       stop_reason

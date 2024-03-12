@@ -142,6 +142,12 @@ let at_path_exn ?(stop_at = EndOfPath) path map =
   | Some map -> map
   | None -> failwith "Exec_map.at_path"
 
+let map_data f = function
+  | Nothing -> Nothing
+  | Cmd { data; next } -> Cmd { data = f data; next }
+  | BranchCmd { data; nexts } -> BranchCmd { data = f data; nexts }
+  | FinalCmd { data } -> FinalCmd { data = f data }
+
 (** An Exec_map to be passed to the debugger frontend and displayed *)
 module Packaged = struct
   type branch_case = string * Yojson.Safe.t [@@deriving yojson]

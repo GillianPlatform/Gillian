@@ -7,8 +7,8 @@ module Make
     (Verification : Gillian.Abstraction.Verifier.S with type annot = PC.Annot.t) =
 struct
   module Gil_lifter =
-    Gillian.Debugger.Lifter.Gil_lifter.Make (PC) (Verification)
-      (Semantics.Symbolic)
+    Gillian.Debugger.Lifter.Gil_lifter.Make (Semantics.Symbolic) (PC)
+      (Verification)
 
   include Gil_lifter
 
