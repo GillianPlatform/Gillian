@@ -10,42 +10,42 @@ module Make (Debugger : Debugger.S) = struct
   open Custom_events (Debugger)
   open Custom_commands (Debugger)
 
-  let run dbg rpc =
+  let run ~dump_dbg dbg rpc =
     let send_stopped_events = send_stopped_events dbg rpc in
     let promise, _ = Lwt.task () in
     Lwt.pause ();%lwt
-    DL.set_rpc_command_handler rpc ~name:"Continue"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Continue"
       (module Continue_command)
       (fun _ ->
         let stop_reason = Debugger.run dbg in
         send_stopped_events stop_reason;%lwt
         Lwt.return (Continue_command.Result.make ()));
-    DL.set_rpc_command_handler rpc ~name:"Next"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Next"
       (module Next_command)
       (fun _ ->
         let stop_reason = Debugger.step dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Reverse"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Reverse continue"
       (module Reverse_continue_command)
       (fun _ ->
         let stop_reason = Debugger.run ~reverse:true dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Step back"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Step back"
       (module Step_back_command)
       (fun _ ->
         let stop_reason = Debugger.step ~reverse:true dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Step in"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Step in"
       (module Step_in_command)
       (fun _ ->
         let stop_reason = Debugger.step_in dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Step out"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Step out"
       (module Step_out_command)
       (fun _ ->
         let stop_reason = Debugger.step_out dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Jump"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Jump"
       (module Jump_command)
       (fun { id } ->
         match dbg |> Debugger.jump_to_id id with
@@ -55,7 +55,7 @@ module Make (Debugger : Debugger.S) = struct
         | Ok () ->
             send_stopped_events Step;%lwt
             Lwt.return (Jump_command.Result.make ~success:true ()));
-    DL.set_rpc_command_handler rpc ~name:"Step specific"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Step specific"
       (module Step_specific_command)
       (fun { prev_id; branch_case } ->
         match dbg |> Debugger.step_specific branch_case prev_id with
@@ -65,7 +65,7 @@ module Make (Debugger : Debugger.S) = struct
         | Ok stop_reason ->
             send_stopped_events stop_reason;%lwt
             Lwt.return (Step_specific_command.Result.make ~success:true ()));
-    DL.set_rpc_command_handler rpc ~name:"Start proc"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Start proc"
       (module Start_proc_command)
       (fun { proc_name } ->
         match dbg |> Debugger.start_proc proc_name with

@@ -9,13 +9,13 @@ module DL = Debugger_log
 module Make (Debugger : Debugger.S) = struct
   open Custom_events (Debugger)
 
-  let run launch_args dbg rpc =
+  let run ~dump_dbg launch_args dbg rpc =
     let promise, resolver = Lwt.task () in
     Lwt.pause ();%lwt
     let send_initialize_event () =
       Debug_rpc.send_event rpc (module Initialized_event) ()
     in
-    DL.set_rpc_command_handler rpc ~name:"Configuration-done"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Configuration-done"
       (module Configuration_done_command)
       (fun _ ->
         let open Launch_command.Arguments in
@@ -43,7 +43,7 @@ module Make (Debugger : Debugger.S) = struct
             Stopped_event.Payload.(
               make ~reason:Stopped_event.Payload.Reason.Entry
                 ~thread_id:(Some 0) ()));
-    DL.set_rpc_command_handler rpc ~name:"Disconnect"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Disconnect"
       (module Disconnect_command)
       (fun _ ->
         DL.log (fun m -> m "Interrupting the debugger is not supported");

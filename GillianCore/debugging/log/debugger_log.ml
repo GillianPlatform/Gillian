@@ -96,14 +96,19 @@ let setup rpc =
   reset ();
   rpc_ref := Some rpc
 
-let set_rpc_command_handler rpc ?name module_ f =
+let set_rpc_command_handler rpc ?name ?dump_dbg module_ f =
   let f x =
     let name_json =
       match name with
       | Some name -> [ ("dap_cmd", `String name) ]
       | None -> []
     in
-    let err_json backtrace = name_json @ [ ("backtrace", `String backtrace) ] in
+    let dbg_json =
+      match dump_dbg with
+      | Some dump_dbg -> [ ("debug_state", dump_dbg ()) ]
+      | None -> []
+    in
+    let err_json backtrace = name_json @ dbg_json @ [ ("backtrace", `String backtrace) ] in
     let%lwt () =
       match name with
       | Some name -> log_async (fun m -> m "%s request received" name)

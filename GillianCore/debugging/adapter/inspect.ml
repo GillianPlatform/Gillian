@@ -9,13 +9,13 @@ module DL = Debugger_log
 module Make (Debugger : Debugger.S) = struct
   open Custom_commands (Debugger)
 
-  let run dbg rpc =
-    DL.set_rpc_command_handler rpc ~name:"Threads"
+  let run ~dump_dbg dbg rpc =
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Threads"
       (module Threads_command)
       (fun () ->
         let main_thread = Thread.make ~id:0 ~name:"main" in
         Lwt.return (Threads_command.Result.make ~threads:[ main_thread ] ()));
-    DL.set_rpc_command_handler rpc ~name:"Stack trace"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Stack trace"
       (module Stack_trace_command)
       (fun _ ->
         let (frames : frame list) = Debugger.get_frames dbg in
@@ -31,7 +31,7 @@ module Make (Debugger : Debugger.S) = struct
                    ~end_column:(Some frame.end_column) ())
         in
         Lwt.return Stack_trace_command.Result.(make ~stack_frames ()));
-    DL.set_rpc_command_handler rpc ~name:"Scopes"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Scopes"
       (module Scopes_command)
       (fun _ ->
         let scopes = Debugger.get_scopes dbg in
@@ -43,7 +43,7 @@ module Make (Debugger : Debugger.S) = struct
                  Scope.make ~name ~variables_reference ~expensive:false ())
         in
         Lwt.return (Scopes_command.Result.make ~scopes ()));
-    DL.set_rpc_command_handler rpc ~name:"Variables"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Variables"
       (module Variables_command)
       (fun args ->
         let variables = Debugger.get_variables args.variables_reference dbg in
@@ -57,7 +57,7 @@ module Make (Debugger : Debugger.S) = struct
                  Variable.make ~name ~value ~type_ ~variables_reference ())
         in
         Lwt.return (Variables_command.Result.make ~variables ()));
-    DL.set_rpc_command_handler rpc ~name:"Exception info"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Exception info"
       (module Exception_info_command)
       (fun _ ->
         let exception_info = Debugger.get_exception_info dbg in
@@ -67,10 +67,10 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.return
           (Exception_info_command.Result.make ~exception_id ~description
              ~break_mode ()));
-    DL.set_rpc_command_handler rpc ~name:"Debugger state"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Debugger state"
       (module Debugger_state_command)
       (fun _ -> Lwt.return (Debugger.Inspect.get_debug_state dbg));
-    DL.set_rpc_command_handler rpc ~name:"Matching"
+    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Matching"
       (module Matching_command)
       (fun { id } ->
         let match_map = dbg |> Debugger.Inspect.get_match_map id in
