@@ -187,6 +187,9 @@ struct
       | Return _ -> true
       | _ -> false
 
+    let is_loop_end ~is_loop_func ~proc_name exec_data =
+      is_loop_func && get_fun_call_name exec_data = Some proc_name
+
     let finish ~is_loop_func ~proc_name ~exec_data partial =
       let ({
              prev;
@@ -227,20 +230,19 @@ struct
         | Some (LoopBody p) -> Proc p
         | _ -> NoSubmap
       in
-      let++ display, kind =
+      let++ kind =
         match ends with
-        | _ when is_return exec_data -> Ok (display, Final)
-        | [] -> Ok (display, Final)
+        | _ when is_return exec_data -> Ok Final
+        | [] -> Ok Final
         | [ (Unknown, _) ] ->
-            if is_loop_func && get_fun_call_name exec_data = Some proc_name then
-              Ok ("<end of loop>", Final)
-            else Ok (display, Normal)
+            if is_loop_end ~is_loop_func ~proc_name exec_data then Ok Final
+            else Ok Normal
         | ends ->
             let++ cases = ends_to_cases ~nest_kind ends in
             let cases =
               List.sort (fun (a, _) (b, _) -> Branch_case.compare a b) cases
             in
-            (display, Branch cases)
+            Branch cases
       in
       Finished
         {
@@ -332,13 +334,19 @@ struct
           ~id
           ~tl_ast
           ~annot
+          ~is_loop_func
+          ~proc_name
           ~exec_data
           (partial : partial_data) =
         match (partial.display, annot.stmt_kind, annot.origin_id) with
         | None, (Normal _ | Return _), Some origin_id ->
             let** display =
-              get_origin_node_str tl_ast (Some origin_id)
-              |> Option.to_result ~none:"Couldn't get display!"
+              match get_origin_node_str tl_ast (Some origin_id) with
+              | Some display -> Ok display
+              | None ->
+                  if is_loop_end ~is_loop_func ~proc_name exec_data then
+                    Ok "<end of loop>"
+                  else Error "Couldn't get display!"
             in
             let** stack_info = get_stack_info ~partial exec_data in
             partial.id <- Some id;
@@ -400,7 +408,8 @@ struct
         in
         let** () = update_paths ~exec_data ~branch_case ~branch_kind partial in
         let** () =
-          update_canonical_cmd_info ~id ~tl_ast ~annot ~exec_data partial
+          update_canonical_cmd_info ~id ~tl_ast ~annot ~exec_data ~is_loop_func
+            ~proc_name partial
         in
         let** () = update_submap ~prog ~annot partial in
         Ext_list.add_all errors partial.errors;
