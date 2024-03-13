@@ -96,7 +96,10 @@ let setup rpc =
   reset ();
   rpc_ref := Some rpc
 
-let set_rpc_command_handler rpc ?name ?dump_dbg module_ f =
+let dump_dbg : (unit -> Yojson.Safe.t) option ref = ref None
+let set_debug_state_dumper f = dump_dbg := Some f
+
+let set_rpc_command_handler rpc ?name module_ f =
   let f x =
     let name_json =
       match name with
@@ -104,7 +107,7 @@ let set_rpc_command_handler rpc ?name ?dump_dbg module_ f =
       | None -> []
     in
     let dbg_json =
-      match dump_dbg with
+      match !dump_dbg with
       | Some dump_dbg -> [ ("debug_state", dump_dbg ()) ]
       | None -> []
     in

@@ -36,11 +36,11 @@ end
 include module type of Public
 
 val setup : Debug_rpc.t -> unit
+val set_debug_state_dumper : (unit -> Yojson.Safe.t) -> unit
 
 val set_rpc_command_handler :
   Debug_rpc.t ->
   ?name:string ->
-  ?dump_dbg:(unit -> Yojson.Safe.t) ->
   (module Debug_protocol.COMMAND
      with type Arguments.t = 'a
       and type Result.t = 'b) ->

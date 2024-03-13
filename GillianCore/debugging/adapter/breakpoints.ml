@@ -7,9 +7,9 @@ module DL = Debugger_log
 (**/**)
 
 module Make (Debugger : Debugger.S) = struct
-  let run ~dump_dbg dbg rpc =
+  let run dbg rpc =
     Lwt.pause ();%lwt
-    DL.set_rpc_command_handler rpc ~dump_dbg ~name:"Set breakpoints"
+    DL.set_rpc_command_handler rpc ~name:"Set breakpoints"
       (module Set_breakpoints_command)
       (fun args ->
         let source =
