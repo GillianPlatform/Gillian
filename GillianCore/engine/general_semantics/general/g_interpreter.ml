@@ -158,7 +158,7 @@ struct
   type conf_selector =
     | Path of Branch_case.path
     | IdCase of L.Report_id.t * Branch_case.t option
-  [@@deriving to_yojson]
+  [@@deriving to_yojson, show]
 
   type 'result cont_func_f =
     ?selector:conf_selector -> unit -> 'result cont_func
@@ -1963,7 +1963,10 @@ struct
       in
       match List.find_map pred results with
       | Some result -> Ok result
-      | None -> Error "No result for selector!"
+      | None ->
+          Fmt.error "No result for selector (%a)!"
+            (pp_option pp_conf_selector)
+            selector
 
     let end_of_branch results eval_step_state =
       let { conf; rest_confs; ret_fun; f; selector; _ } = eval_step_state in

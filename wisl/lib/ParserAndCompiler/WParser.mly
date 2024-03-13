@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME EXIST FORALL
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -28,6 +28,7 @@
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
 %token <CodeLoc.t> TBOOL
+%token <CodeLoc.t> TSTRING
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -189,6 +190,11 @@ logic_cmds:
   | LCMD; lcmds = separated_list(SEMICOLON, logic_command); RCBRACE { lcmds }
  */
 
+type_target:
+  | TLIST { WType.WList }
+  | TINT { WType.WInt }
+  | TBOOL { WType.WBool }
+  | TSTRING { WType.WString }
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -266,6 +272,12 @@ statement:
     {
       let bare_stmt = WStmt.Assume e in
       let lend = WExpr.get_loc e in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+  | lstart = ASSUME_TYPE; LBRACE; e = expression; COMMA; t = type_target; lend = RBRACE;
+    {
+      let bare_stmt = WStmt.AssumeType (e, t) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
@@ -390,11 +402,6 @@ predicate:
         pred_loc;
         pred_id;
       } }
-
-type_target:
-  | TLIST { WType.WList }
-  | TINT { WType.WInt }
-  | TBOOL { WType.WBool }
 
 pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))

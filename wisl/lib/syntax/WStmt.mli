@@ -13,6 +13,7 @@ type tt =
   | Logic of WLCmd.t  (** logic command *)
   | Assert of WExpr.t  (** non-SL assertion *)
   | Assume of WExpr.t  (** non-SL assumption *)
+  | AssumeType of WExpr.t * WType.t  (** type assumption *)
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
 

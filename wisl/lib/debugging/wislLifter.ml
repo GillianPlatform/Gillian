@@ -231,18 +231,14 @@ struct
         | _ -> NoSubmap
       in
       let++ kind =
-        match ends with
-        | _ when is_return exec_data -> Ok Final
-        | [] -> Ok Final
-        | [ (Unknown, _) ] ->
-            if is_loop_end ~is_loop_func ~proc_name exec_data then Ok Final
-            else Ok Normal
-        | ends ->
-            let++ cases = ends_to_cases ~nest_kind ends in
-            let cases =
-              List.sort (fun (a, _) (b, _) -> Branch_case.compare a b) cases
-            in
-            Branch cases
+        let++ cases = ends_to_cases ~nest_kind ends in
+        match cases with
+        | _ when is_return exec_data -> Final
+        | [] -> Final
+        | [ (Case (Unknown, _), _) ] ->
+            if is_loop_end ~is_loop_func ~proc_name exec_data then Final
+            else Normal
+        | _ -> Branch cases
       in
       Finished
         {
@@ -274,7 +270,7 @@ struct
         | None, prev_case -> Ok prev_case
         | Some prev_kind, Unknown -> (
             match prev_kind with
-            | IfElseKind -> (
+            | IfElseKind | WhileLoopKind -> (
                 match gil_case with
                 | Some (Gil_branch_case.GuardedGoto b) -> Ok (IfElse b)
                 | _ -> Error "IfElseKind expects a GuardedGoto gil case"))
@@ -423,18 +419,9 @@ struct
 
     let update = Update.f
 
-    let find_or_init ~partials ~get_prev ~exec_data prev_id =
-      let ({ id; _ } : exec_data) = exec_data in
+    let find_or_init ~partials ~get_prev prev_id =
       let partial =
         let* prev_id = prev_id in
-        let () =
-          DL.log (fun m ->
-              let t_json =
-                partials |> to_yojson |> Yojson.Safe.pretty_to_string
-              in
-              m "%a: Looking for prev_id %a in:\n%s" pp_rid id pp_rid prev_id
-                t_json)
-        in
         Hashtbl.find_opt partials prev_id
       in
       match partial with
@@ -463,7 +450,7 @@ struct
         ~prev_id
         exec_data =
       let partial =
-        find_or_init ~partials ~get_prev ~exec_data prev_id
+        find_or_init ~partials ~get_prev prev_id
         |> Result_utils.or_else (fun e -> failwith ~exec_data ~partials e)
       in
       Hashtbl.replace partials exec_data.id partial;
@@ -525,6 +512,7 @@ struct
       let Partial_cmds.{ all_ids; kind; callers; _ } = finished_partial in
       match (kind, callers) with
       | Final, caller_id :: _ ->
+          let () = DL.log (fun m -> m "A") in
           let label, count =
             match Hashtbl.find_opt state.func_return_map caller_id with
             | Some (label, count) -> (label, count)
@@ -535,7 +523,9 @@ struct
           let cont_id = all_ids |> List.rev |> List.hd in
           let** () = update_caller_branches ~caller_id ~cont_id label state in
           Ok (Some label)
-      | _ -> Ok None
+      | _ ->
+          let () = DL.log (fun m -> m "B") in
+          Ok None
 
     let make_new_cmd ~func_return_label finished_partial : map =
       let Partial_cmds.
@@ -606,26 +596,42 @@ struct
           parent_data.submap <- Submap new_cmd;
           Ok ()
 
-    let insert_cmd ~state ~prev ~stack_direction ~func_return_label new_cmd =
+    let insert_cmd ~state ~prev ~stack_direction new_cmd =
       match (stack_direction, state.map, prev) with
       | Some _, Nothing, _ -> Error "stepping in our out with empty map!"
       | _, Nothing, Some _ -> Error "inserting to empty map with prev!"
       | None, Nothing, None ->
           state.map <- new_cmd;
-          Ok ()
+          Ok new_cmd
       | _, _, None -> Error "inserting to non-empty map with no prev!"
-      | Some In, _, Some (_, Some _) -> Error "stepping in with branch case!"
+      | Some In, _, Some (parent_id, Some FuncExitPlaceholder)
       | Some In, _, Some (parent_id, None) ->
-          insert_as_submap ~state ~parent_id new_cmd
+          let new_cmd = new_cmd |> map_data (fun d -> { d with prev = None }) in
+          let++ () = insert_as_submap ~state ~parent_id new_cmd in
+          new_cmd
+      | Some In, _, Some (_, Some case) ->
+          Fmt.error "stepping in with branch case (%a)!" Branch_case.pp case
       | None, _, Some (prev_id, case) ->
-          insert_as_next ~state ~prev_id ?case new_cmd
-      | Some (Out prev_id), _, _ ->
+          let++ () = insert_as_next ~state ~prev_id ?case new_cmd in
+          new_cmd
+      | Some (Out prev_id), _, Some (inner_prev_id, _) ->
           let** case =
+            let func_return_label =
+              match Hashtbl.find state.id_map inner_prev_id with
+              | Nothing -> None
+              | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+                  data.func_return_label
+            in
             match func_return_label with
             | Some (label, ix) -> Ok (Case (FuncExit label, ix))
             | None -> Error "stepping out without function return label!"
           in
-          insert_as_next ~state ~prev_id ~case new_cmd
+          let new_cmd =
+            new_cmd
+            |> map_data (fun d -> { d with prev = Some (prev_id, Some case) })
+          in
+          let++ () = insert_as_next ~state ~prev_id ~case new_cmd in
+          new_cmd
 
     let f ~state finished_partial =
       let r =
@@ -637,9 +643,7 @@ struct
           resolve_func_branches ~state finished_partial
         in
         let new_cmd = make_new_cmd ~func_return_label finished_partial in
-        let** () =
-          insert_cmd ~state ~prev ~stack_direction ~func_return_label new_cmd
-        in
+        let** new_cmd = insert_cmd ~state ~prev ~stack_direction new_cmd in
         all_ids |> List.iter (fun id -> Hashtbl.replace id_map id new_cmd);
         Ok new_cmd
       in
@@ -685,8 +689,8 @@ struct
       in
       match map with
       | Nothing -> Error "got Nothing map!"
-      | FinalCmd _ -> Error "prev map is Final!"
-      | Cmd { data; _ } -> Ok (Some (data.id, None, data.callers))
+      | FinalCmd { data } | Cmd { data; _ } ->
+          Ok (Some (data.id, None, data.callers))
       | BranchCmd { data; nexts } -> (
           let case =
             Hashtbl.find_map

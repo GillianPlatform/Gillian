@@ -1017,7 +1017,7 @@ module Branch_case : sig
   (** A list of branch cases describes the path of execution.
 
     Every termination of a symbolic execution is uniquely identified by its branch path. *)
-  type path = t list [@@deriving yojson]
+  type path = t list [@@deriving yojson, show]
 
   val pp_short : Format.formatter -> t -> unit
 end
