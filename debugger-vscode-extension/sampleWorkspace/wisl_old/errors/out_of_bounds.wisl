@@ -1,7 +1,0 @@
-{ emp }
-function out_of_bounds() {
-  arr := new(1);
-  x := [arr + 1];
-  return 0
-}
-{ emp }
