@@ -90,7 +90,8 @@ module Local = struct
 
         method! visit_stmt_body ~ctx (s : Stmt.body) =
           match s with
-          | Decl { lhs = { value = Symbol x; type_; location } as lhs; value }
+          | Decl
+              { lhs = { value = Symbol x; type_; location; _ } as lhs; value }
             ->
               Hashtbl.replace locals x { symbol = x; type_; location };
               super#visit_expr ~ctx lhs;

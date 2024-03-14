@@ -172,6 +172,7 @@ module rec Expr : sig
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
     | UnOp of { op : Ops.Unary.t; e : t }
+    | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
     | Member of { lhs : t; field : string }
     | AddressOf of t
@@ -186,7 +187,8 @@ module rec Expr : sig
   and t = { value : value; type_ : Type.t; location : Location.t }
   [@@deriving show]
 
-  val pp_full : Format.formatter -> t -> unit
+  val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
+  val pp_full : t Fmt.t
   val as_symbol : t -> string
   val value_of_irep : machine:Machine_model.t -> type_:Type.t -> Irep.t -> value
   val of_irep : machine:Machine_model.t -> Irep.t -> t
@@ -212,6 +214,8 @@ and Stmt : sig
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
+    | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
+    | While of { guard : Expr.t; body : t }
     | Break
     | Skip
     | Expression of Expr.t
@@ -222,7 +226,15 @@ and Stmt : sig
   and switch_case = { case : Expr.t; sw_body : t }
   and t = { stmt_location : Location.t; body : body; comment : string option }
 
-  val pp : Format.formatter -> t -> unit
+  val pp : t Fmt.t
+
+  val pp_custom :
+    ?semi:bool ->
+    pp_stmt:t Fmt.t ->
+    pp_expr:Expr.t Fmt.t ->
+    ?pp_type:Type.t Fmt.t ->
+    t Fmt.t
+
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
   val of_irep : machine:Machine_model.t -> Irep.t -> t
 end
@@ -244,6 +256,7 @@ module Program : sig
       return_type : Type.t;
       location : Location.t;
       symbol : string;
+      internal : bool;
     }
   end
 
@@ -252,6 +265,9 @@ module Program : sig
     funs : (string, Func.t) Hashtbl.t;
     types : (string, Type.t) Hashtbl.t;
     constrs : (string, unit) Hashtbl.t;
+    base_names : (string, string) Hashtbl.t;
+    struct_tags : (string, string) Hashtbl.t;
+    unevaluated_funcs : string Gillian.Utils.Prelude.Hashset.t;
   }
 
   val of_symtab : machine:Machine_model.t -> Symtab.t -> t
@@ -270,6 +286,7 @@ module Visitors : sig
       method visit_int_type : ctx:'a -> IntType.t -> unit
       method visit_datatype_components : ctx:'a -> Datatype_component.t -> unit
       method visit_type : ctx:'a -> Type.t -> unit
+      method visit_id : ctx:'a -> int -> unit
       method visit_expr_value : ctx:'a -> type_:Type.t -> Expr.value -> unit
       method visit_expr : ctx:'a -> Expr.t -> unit
       method visit_stmt_body : ctx:'a -> Stmt.body -> unit
@@ -294,6 +311,7 @@ module Visitors : sig
       method visit_stmt : ctx:'a -> Stmt.t -> Stmt.t
       method visit_stmt_body : ctx:'a -> Stmt.body -> Stmt.body
       method visit_type : ctx:'a -> Type.t -> Type.t
+      method visit_id : ctx:'a -> int -> int
       method visit_unop : ctx:'a -> Ops.Unary.t -> Ops.Unary.t
     end
 end

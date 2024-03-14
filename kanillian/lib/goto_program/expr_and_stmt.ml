@@ -1,3 +1,5 @@
+open Gillian.Utils.Syntaxes.Option
+
 module rec Expr : sig
   type value =
     | Array of t list
@@ -14,6 +16,7 @@ module rec Expr : sig
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
     | UnOp of { op : Ops.Unary.t; e : t }
+    | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
     | Member of { lhs : t; field : string }
     | AddressOf of t
@@ -28,6 +31,7 @@ module rec Expr : sig
   and t = { value : value; type_ : Type.t; location : Location.t }
   [@@deriving show]
 
+  val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
   val pp_full : Format.formatter -> t -> unit
   val as_symbol : t -> string
   val value_of_irep : machine:Machine_model.t -> type_:Type.t -> Irep.t -> value
@@ -49,6 +53,7 @@ end = struct
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
     | UnOp of { op : Ops.Unary.t; e : t }
+    | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
     | Member of { lhs : t; field : string }
     | AddressOf of t
@@ -63,48 +68,46 @@ end = struct
   and t = { value : value; type_ : Type.t; location : Location.t }
   [@@deriving show { with_path = false }]
 
-  let pp_full = pp
+  let pp_custom ~pp ?(pp_type = Type.pp) ft t =
+    let open Fmt in
+    match t.value with
+    | Array x -> pf ft "%a" (list ~sep:comma pp) x
+    | EAssign { lhs; rhs } -> pf ft "%a = %a" pp lhs pp rhs
+    | IntConstant z -> pf ft "%a" Z.pp_print z
+    | CBoolConstant b -> pf ft "%d" (if b then 1 else 0)
+    | DoubleConstant f -> pf ft "%f" f
+    | FloatConstant f -> pf ft "%fF" f
+    | PointerConstant 0 -> pf ft "NULL"
+    | PointerConstant k -> pf ft "POINTER(%d)" k
+    | Symbol s -> pf ft "%s" s
+    | EFunctionCall { func; args } ->
+        pf ft "%a(%a)" pp func (list ~sep:comma pp) args
+    | BinOp { op; lhs; rhs } ->
+        pf ft "(%a %a %a)" pp lhs Ops.Binary.pp op pp rhs
+    | UnOp { op; e } -> pf ft "(%a %a)" Ops.Unary.pp op pp e
+    | SelfOp { op; e } ->
+        pf ft "%a%a%a" Ops.Self.pp_pre op pp e Ops.Self.pp_post op
+    | ByteExtract { e; offset } ->
+        pf ft "EXTRACT(%a, %a, %d)" pp e pp_type t.type_ offset
+    | Struct xs -> pf ft "{ %a }" (list ~sep:semi pp) xs
+    | Member { lhs; field } -> pf ft "%a.%s" pp lhs field
+    | Index { array; index } -> pf ft "%a[%a]" pp array pp index
+    | StringConstant s -> pf ft "\"%s\"" s
+    | TypeCast value -> pf ft "((%a) %a)" pp_type t.type_ pp value
+    | Nondet -> pf ft "NONDET"
+    | BoolConstant b -> pf ft "%b" b
+    | AddressOf e -> pf ft "&%a" pp e
+    | Dereference e -> pf ft "*%a" pp e
+    | If { cond; then_; else_ } ->
+        pf ft "%a ? %a : %a" pp cond pp then_ pp else_
+    | StatementExpression _ -> pf ft "STMTEXPR"
+    | EUnhandled (id, msg) -> (
+        match msg with
+        | "" -> pf ft "UNHANDLED_EXPR(%s)" (Id.to_string id)
+        | _ -> pf ft "UNHANDLED_EXPR(%s::%s)" (Id.to_string id) msg)
 
-  let pp ft t =
-    let rec pp ft t =
-      let open Fmt in
-      match t.value with
-      | Array x -> pf ft "%a" (list ~sep:comma pp) x
-      | EAssign { lhs; rhs } -> pf ft "%a = %a" pp lhs pp rhs
-      | IntConstant z -> pf ft "%a" Z.pp_print z
-      | CBoolConstant b -> pf ft "%d" (if b then 1 else 0)
-      | DoubleConstant f -> pf ft "%f" f
-      | FloatConstant f -> pf ft "%fF" f
-      | PointerConstant 0 -> pf ft "NULL"
-      | PointerConstant k -> pf ft "POINTER(%d)" k
-      | Symbol s -> pf ft "%s" s
-      | EFunctionCall { func; args } ->
-          pf ft "%a(%a)" pp func (list ~sep:comma pp) args
-      | BinOp { op; lhs; rhs } ->
-          pf ft "(%a %a %a)" pp lhs Ops.Binary.pp op pp rhs
-      | UnOp { op; e } -> pf ft "(%a %a)" Ops.Unary.pp op pp e
-      | ByteExtract { e; offset } ->
-          pf ft "EXTRACT(%a, %a, %d)" pp e Type.pp t.type_ offset
-      | Struct xs -> pf ft "{ %a }" (list ~sep:semi pp) xs
-      | Member { lhs; field } -> pf ft "%a.%s" pp lhs field
-      | Index { array; index } -> pf ft "%a[%a]" pp array pp index
-      | StringConstant s -> pf ft "\"%s\"" s
-      | TypeCast value -> pf ft "((%a) %a)" Type.pp t.type_ pp value
-      | Nondet -> pf ft "NONDET"
-      | BoolConstant b -> pf ft "%b" b
-      | AddressOf e -> pf ft "&%a" pp e
-      | Dereference e -> pf ft "*%a" pp e
-      | If { cond; then_; else_ } ->
-          pf ft "%a ? %a : %a" pp cond pp then_ pp else_
-      | StatementExpression _ -> pf ft "STMTEXPR"
-      | EUnhandled (id, msg) -> (
-          match msg with
-          | "" -> pf ft "UNHANDLED_EXPR(%s)" (Id.to_string id)
-          | _ -> pf ft "UNHANDLED_EXPR(%s::%s)" (Id.to_string id) msg)
-    in
-
-    (Fmt.hbox pp) ft t
-
+  let rec pp ft t = pp_custom ~pp ft t
+  let pp_full = Fmt.hbox pp
   let show = Fmt.to_to_string pp
 
   let unhandled ~irep:_ id msg =
@@ -132,8 +135,20 @@ end = struct
     in
     ByteExtract { e = of_irep ~machine e; offset }
 
+  and selfop_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
+    let open Ops.Self in
+    let lift_selfop op = lift_selfop ~machine irep op |> Option.some in
+    let* stmt = List.assoc_opt Id.Statement irep.named_sub in
+    match stmt.id with
+    | Postincrement -> lift_selfop Postincrement
+    | Postdecrement -> lift_selfop Postdecrement
+    | Preincrement -> lift_selfop Preincrement
+    | Predecrement -> lift_selfop Predecrement
+    | _ -> None
+
   and side_effecting_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
     let of_irep = of_irep ~machine in
+    let- () = selfop_of_irep ~machine irep in
     match (irep $ Statement).id with
     | FunctionCall ->
         let func, args =
@@ -170,6 +185,14 @@ end = struct
     | _ ->
         Gerror.unexpected ~irep
           "Unary operator doesn't have exactly one operand"
+
+  and lift_selfop ~(machine : Machine_model.t) (irep : Irep.t) (op : Ops.Self.t)
+      =
+    let of_irep = of_irep ~machine in
+    match irep.sub with
+    | [ a ] -> SelfOp { op; e = of_irep a }
+    | _ ->
+        Gerror.unexpected ~irep "Self operator doesn't have exactly one operand"
 
   and value_of_irep
       ~(machine : Machine_model.t)
@@ -341,6 +364,8 @@ and Stmt : sig
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
+    | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
+    | While of { guard : Expr.t; body : t }
     | Break
     | Skip
     | Expression of Expr.t
@@ -352,6 +377,14 @@ and Stmt : sig
   and t = { stmt_location : Location.t; body : body; comment : string option }
 
   val pp : Format.formatter -> t -> unit
+
+  val pp_custom :
+    ?semi:bool ->
+    pp_stmt:t Fmt.t ->
+    pp_expr:Expr.t Fmt.t ->
+    ?pp_type:Type.t Fmt.t ->
+    t Fmt.t
+
   val body_of_irep : machine:Machine_model.t -> Irep.t -> body
   val of_irep : machine:Machine_model.t -> Irep.t -> t
 end = struct
@@ -374,6 +407,8 @@ end = struct
         default : t option;
       }
     | Ifthenelse of { guard : Expr.t; then_ : t; else_ : t option }
+    | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
+    | While of { guard : Expr.t; body : t }
     | Break
     | Skip
     | Expression of Expr.t
@@ -389,46 +424,64 @@ end = struct
     (* Fmt.pr "%a\n@?" Yojson.Safe.pretty_print (Irep.to_yojson irep); *)
     SUnhandled id
 
-  let rec pp ft (t : t) =
+  let pp_custom
+      ?(semi = true)
+      ~pp_stmt:pp
+      ~pp_expr
+      ?(pp_type = Type.pp)
+      ft
+      (t : t) =
+    let term = if semi then ";" else "" in
     let open Fmt in
     match t.body with
     | Decl { lhs; value } ->
-        pf ft "@[<h>%a %a%a;@]" Type.pp lhs.type_ Expr.pp lhs
+        pf ft "@[<h>%a %a%a%s@]" pp_type lhs.type_ pp_expr lhs
           (fun ft -> function
             | None -> ()
-            | Some e -> pf ft " = %a" Expr.pp e)
-          value
-    | SAssign { lhs; rhs } -> pf ft "@[<h>%a = %a;@]" Expr.pp lhs Expr.pp rhs
+            | Some e -> pf ft " = %a" pp_expr e)
+          value term
+    | SAssign { lhs; rhs } ->
+        pf ft "@[<h>%a = %a%s@]" pp_expr lhs pp_expr rhs term
     | SFunctionCall { lhs; func; args } ->
         let pp_lhs ft lhs =
           match lhs with
           | None -> nop ft ()
-          | Some lhs -> pf ft "%a = " Expr.pp lhs
+          | Some lhs -> pf ft "%a = " pp_expr lhs
         in
-        pf ft "@[<h>%a%a(%a);@]" pp_lhs lhs Expr.pp func
-          (list ~sep:comma Expr.pp) args
-    | Assume { cond } -> pf ft "@[<h>assume(%a);@]" Expr.pp cond
+        pf ft "@[<h>%a%a(%a)%s@]" pp_lhs lhs pp_expr func
+          (list ~sep:comma pp_expr) args term
+    | Assume { cond } -> pf ft "@[<h>assume(%a)%s@]" pp_expr cond term
     | Assert { cond; property_class } ->
         let pp_pc ft = function
           | None -> pf ft ""
           | Some s -> pf ft " #%s" s
         in
-        pf ft "@[<h>assert(%a);%a@]" Expr.pp cond pp_pc property_class
-    | Block body -> pf ft "@[<v 3>{ %a };@]" (Fmt.list ~sep:cut pp) body
+        pf ft "@[<h>assert(%a);%a@]" pp_expr cond pp_pc property_class
+    | Block body -> pf ft "@[<v 3>{ %a }%s@]" (Fmt.list ~sep:cut pp) body term
     | Label (label, body) ->
-        pf ft "@[<v 3>%s: {@.%a};@]" label (Fmt.list ~sep:cut pp) body
+        pf ft "@[<v 3>%s: {@.%a}%s@]" label (Fmt.list ~sep:cut pp) body term
     | Skip -> pf ft "skip;"
-    | Expression e -> pf ft "@[<v 3>{ %a };@]" Expr.pp e
-    | Return e -> pf ft "@[<v 3>return %a;@]" (option Expr.pp) e
-    | Goto label -> pf ft "@[<v 3>goto %s;@]" label
+    | Expression e -> pf ft "@[<v 3>{ %a }%s@]" pp_expr e term
+    | Return e -> pf ft "@[<v 3>return %a%s@]" (option pp_expr) e term
+    | Goto label -> pf ft "@[<v 3>goto %s%s@]" label term
     | Output { msg; value } ->
-        pf ft "@[<v 3>output (%a, %a);@]" Expr.pp msg Expr.pp value
+        pf ft "@[<v 3>output (%a, %a);@]" pp_expr msg pp_expr value
     | Switch _ -> pf ft "switch"
     | Break -> pf ft "break"
     | Ifthenelse { guard; then_; else_ } ->
-        pf ft "@[<v 3>if %a then{@\n %a } else {@\n%a;@]}" Expr.pp guard pp
-          then_ (option pp) else_
+        let pp_else ft = function
+          | None -> ()
+          | Some else_ -> pf ft "@\nelse@\n%a" pp else_
+        in
+        pf ft "@[<v 3>if (%a)@\n%a%a@]" pp_expr guard pp then_ pp_else else_
+    | For { init; guard; update; body } ->
+        pf ft "@[<v 3>for (%a; %a; %a)@\n%a@]" pp init pp_expr guard pp_expr
+          update pp body
+    | While { guard; body } ->
+        pf ft "@[<v 3>while (%a)@\n%a@]" pp_expr guard pp body
     | SUnhandled id -> pf ft "UNHANDLED_STMT(%s)" (Id.to_string id)
+
+  let rec pp ft t = pp_custom ~pp_stmt:pp ~pp_expr:Expr.pp ft t
 
   (** Lifting from Irep *)
   open Irep.Infix
@@ -436,6 +489,7 @@ end = struct
   open Lift_utils
 
   let rec body_of_irep ~(machine : Machine_model.t) (irep : Irep.t) : body =
+    let open Utils.Syntaxes.Option in
     let of_irep = of_irep ~machine in
     let expr_of_irep = Expr.of_irep ~machine in
     let unexpected = Gerror.unexpected ~irep in
@@ -448,6 +502,7 @@ end = struct
         let label = irep $ Destination |> Irep.as_just_string in
         Goto label
     | Block ->
+        let- () = for_loop_of_irep ~machine ~unexpected irep.sub in
         let content = List.map of_irep irep.sub in
         Block content
     | Label ->
@@ -522,9 +577,18 @@ end = struct
           | _ -> unexpected "Invalid if-then-else statement"
         in
         Ifthenelse { guard; then_; else_ }
+    | For -> failwith "Unexpected for-loop statement"
+    | While ->
+        let guard, body =
+          match irep.sub with
+          | [ a; b ] -> (expr_of_irep a, of_irep b)
+          | _ -> unexpected "Invalid while-loop statement"
+        in
+        While { guard; body }
     | id -> unhandled ~irep id
 
   and switch_cases_of_irep ~machine l =
+    let switch_cases_of_irep = switch_cases_of_irep ~machine in
     let is_switch_case irep =
       match (irep $ Statement).id with
       | SwitchCase -> true
@@ -541,7 +605,7 @@ end = struct
         if not (is_switch_case irep) then
           Gerror.unexpected ~irep "Default case is not a SwitchCase";
         let _, stmt = exactly_two ~msg:"default switch_case" irep in
-        match switch_cases_of_irep ~machine r with
+        match switch_cases_of_irep r with
         | rest, rest_of_case, None ->
             let block =
               let this_body = of_irep ~machine stmt in
@@ -554,7 +618,7 @@ end = struct
             (rest, [], Some block)
         | _, _, Some _ -> Gerror.unexpected "two default switch_cases!")
     | irep :: r when is_switch_case irep ->
-        let cases, rest_of_case, default = switch_cases_of_irep ~machine r in
+        let cases, rest_of_case, default = switch_cases_of_irep r in
         let case, body = exactly_two irep in
         let case = Expr.of_irep ~machine case in
         let this_body = of_irep ~machine body in
@@ -567,7 +631,7 @@ end = struct
         in
         ({ case; sw_body } :: cases, [], default)
     | irep :: r ->
-        let cases, rest_of_case, default = switch_cases_of_irep ~machine r in
+        let cases, rest_of_case, default = switch_cases_of_irep r in
         let content = of_irep ~machine irep in
         (cases, content :: rest_of_case, default)
 
@@ -576,4 +640,24 @@ end = struct
     let body = body_of_irep ~machine irep in
     let comment = irep $? Comment |> Option.map Irep.as_just_string in
     { body; stmt_location; comment }
+
+  and for_loop_of_irep ~machine ~unexpected (sub : Irep.t list) =
+    (* For some reason, CBMC compiles for loops as a block with the init statement
+          and *then* the loop, whose first sub is nil. *)
+    let e_of_irep = Expr.of_irep ~machine in
+    let of_irep = of_irep ~machine in
+    match sub with
+    | [ init; loop ] -> (
+        match (loop $ Statement).id with
+        | For ->
+            let guard, update, body =
+              match loop.sub with
+              | [ _; guard; update; body ] ->
+                  (e_of_irep guard, e_of_irep update, of_irep body)
+              | _ -> unexpected "Invalid for-loop statement"
+            in
+            let init = of_irep init in
+            Some (For { init; guard; update; body })
+        | _ -> None)
+    | _ -> None
 end

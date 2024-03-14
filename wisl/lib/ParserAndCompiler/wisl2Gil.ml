@@ -674,12 +674,13 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         WAnnot.make ~origin_id:sid_while ~origin_loc:(CodeLoc.to_location sloc)
           ()
       in
+      let annot_branch = { annot with branch_kind = Some WhileLoopKind } in
       let annot_hidden = WAnnot.{ annot with stmt_kind = Hidden } in
       let headlabopt = Some looplab in
       let headcmd = Cmd.Skip in
       let headcmd_lab = (annot_hidden, headlabopt, headcmd) in
       let loopcmd = Cmd.GuardedGoto (guard, bodlab, endlab) in
-      let loopcmd_lab = (annot, None, loopcmd) in
+      let loopcmd_lab = (annot_branch, None, loopcmd) in
       let backcmd = Cmd.Goto looplab in
       let backcmd_lab = (annot_hidden, None, backcmd) in
       let endcmd = Cmd.Skip in
@@ -912,6 +913,15 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         let formula = Formula.Eq (comp_e, Expr.bool true) in
         Cmd.Logic (LCmd.Assume formula)
       in
+      let comp_rest, new_functions = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+  | { snode = AssumeType (e, t); sid; sloc } :: rest ->
+      let typ = WType.to_gil t in
+      let annot =
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
+      let cmdle, comp_e = compile_expr e in
+      let cmd = Cmd.Logic (LCmd.AssumeType (comp_e, typ)) in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
 

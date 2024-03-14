@@ -46,6 +46,7 @@ rule read =
   | "apply"  { APPLY (curr lexbuf) }
   | "assert" { ASSERT (curr lexbuf) }
   | "assume" { ASSUME (curr lexbuf) }
+  | "assume_type" { ASSUME_TYPE (curr lexbuf) }
   | "with" { WITH (curr lexbuf) }
   | "variant" { VARIANT (curr lexbuf) }
   | "statement" { STATEMENT (curr lexbuf) }
@@ -57,6 +58,7 @@ rule read =
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }
   | "Bool" { TBOOL (curr lexbuf) }
+  | "String" { TSTRING (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }

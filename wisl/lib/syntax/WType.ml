@@ -37,6 +37,13 @@ let pp fmt t =
   | WAny -> s "Any"
   | WSet -> s "Set"
 
+let to_gil = function
+  | WList -> Gil_syntax.Type.ListType
+  | WInt -> Gil_syntax.Type.IntType
+  | WString -> Gil_syntax.Type.StringType
+  | WBool -> Gil_syntax.Type.BooleanType
+  | t -> Fmt.failwith "Can't convert type '%a' to GIL!" pp t
+
 exception Unmatching_types
 
 module TypeMap = Map.Make (struct

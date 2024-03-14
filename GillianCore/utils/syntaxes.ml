@@ -18,6 +18,7 @@ end
 module Option = struct
   let ( let+ ) o f = Option.map f o
   let ( let* ) o f = Option.bind o f
+  let ( let> ) o f = Option.iter f o
 
   let ( let- ) o f =
     match o with

@@ -1,4 +1,5 @@
 open Gillian
+open Utils.Syntaxes.Result
 open Kcommons
 
 let initialize _ =
@@ -14,7 +15,7 @@ let other_imports = []
 type init_data = unit
 type tl_ast = Program.t
 
-module Annot = Kanillian_compiler.Annot
+module Annot = Kanillian_compiler.K_annot
 
 module TargetLangOptions = struct
   type t = {
@@ -63,19 +64,16 @@ type err = string
 let pp_err = Fmt.string
 
 let parse_symtab_into_goto json =
-  let tbl = Irep_lib.Symtab.of_yojson json in
-  Result.map
-    (fun tbl ->
-      let machine = Machine_model_parse.consume_from_symtab tbl in
-      if not Machine_model.(equal machine archi64) then
-        failwith "For now, kanillian can only run on archi64";
-      Kconfig.machine_model := machine;
-      Logging.normal ~severity:Warning (fun m ->
-          m
-            "Filtering every cprover_specific symbol!! Need to remove that in \
-             the future");
-      Goto_lib.Program.of_symtab ~machine tbl)
-    tbl
+  let+ tbl = Irep_lib.Symtab.of_yojson json in
+  let machine = Machine_model_parse.consume_from_symtab tbl in
+  if not Machine_model.(equal machine archi64) then
+    failwith "For now, kanillian can only run on archi64";
+  Kconfig.machine_model := machine;
+  Logging.normal ~severity:Warning (fun m ->
+      m
+        "Filtering every cprover_specific symbol!! Need to remove that in the \
+         future");
+  Goto_lib.Program.of_symtab ~machine tbl
 
 let create_compilation_result path goto_prog gil_prog =
   let open Gillian.Command_line.ParserAndCompiler in
@@ -129,15 +127,9 @@ let parse_and_compile_files files =
         | ext -> Fmt.failwith "Unknown file type '%s'!" ext)
     | _ -> failwith "Kanillian only handles one file at the moment"
   in
-  let path =
-    match Filename.extension path with
-    | ".json" -> path
-    | ".c" -> compile_c_to_symtab path
-    | ext -> Fmt.failwith "Unknown file type '%s'!" ext
-  in
   let json = load_symtab_from_file path in
   let+ goto_prog = parse_symtab_into_goto json in
-  let goto_prog = Sanitize.sanitize_program goto_prog in
+  let goto_prog = Sanitize.sanitize_and_index_program goto_prog in
   let context =
     Ctx.make
       ~exec_mode:!Kutils.Config.current_exec_mode

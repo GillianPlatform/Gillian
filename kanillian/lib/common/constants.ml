@@ -33,6 +33,28 @@ module Internal_functions = struct
     | "__rust_dealloc" -> Some Rust.rust_dealloc
     | "__rust_realloc" -> Some Rust.rust_realloc
     | _ -> None
+
+  let names =
+    [
+      malloc;
+      calloc;
+      memmove;
+      memcpy;
+      memset;
+      memcmp;
+      store_zeros;
+      loadv;
+      storev;
+      get_function_name;
+      ef_memcpy;
+      val_of_bool;
+      bool_of_val;
+      glob_set_fun;
+      Rust.rust_alloc;
+      Rust.rust_alloc_zeroed;
+      Rust.rust_dealloc;
+      Rust.rust_realloc;
+    ]
 end
 
 module CBMC_names = struct

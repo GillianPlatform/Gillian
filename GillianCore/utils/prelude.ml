@@ -20,6 +20,14 @@ let of_yojson_string of_yojson s =
 module Hashtbl = struct
   include Hashtbl
 
+  let find_or_else_add tbl k f =
+    match find_opt tbl k with
+    | Some x -> x
+    | None ->
+        let v = f () in
+        add tbl k v;
+        v
+
   (** Analog to {!List.map} *)
   let map f tbl =
     let tbl' = create (length tbl) in

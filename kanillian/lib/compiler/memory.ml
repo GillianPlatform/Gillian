@@ -71,7 +71,7 @@ let alloc_temp ~ctx ~location ty : Expr.t Cs.with_cmds =
   Cs.return ~app:[ alloc_cmd; assign ] (Expr.PVar temp)
 
 (** Should only be called for a local that is in memory*)
-let dealloc_local ~ctx (l : Ctx.Local.t) : Body_item.t =
+let dealloc_local ~ctx ~cmd_kind (l : Ctx.Local.t) : Body_item.t =
   if not (Ctx.in_memory ctx l.symbol) then
     Error.code_error "dealloc_local: local is not in memory";
   let free = Interface.(str_ac (AMem Free)) in
@@ -82,7 +82,7 @@ let dealloc_local ~ctx (l : Ctx.Local.t) : Body_item.t =
       (var, free, [ Expr.list_nth (Expr.PVar l.symbol) 0; Expr.zero_i; size ])
   in
   let loc = Body_item.compile_location l.location in
-  Body_item.make ~loc cmd
+  Body_item.make ~loc ~cmd_kind cmd
 
 (** Loads a value into the given variable.
     If no variable is given, one is created.

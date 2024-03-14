@@ -39,6 +39,20 @@ end
 module Self = struct
   type t = Postdecrement | Postincrement | Predecrement | Preincrement
   [@@deriving show { with_path = false }]
+
+  let pp_pre fmt t =
+    let f = Fmt.pf fmt in
+    match t with
+    | Preincrement -> f "++"
+    | Predecrement -> f "--"
+    | Postincrement | Postdecrement -> ()
+
+  let pp_post fmt t =
+    let f = Fmt.pf fmt in
+    match t with
+    | Preincrement | Predecrement -> ()
+    | Postincrement -> f "++"
+    | Postdecrement -> f "--"
 end
 
 module Unary = struct
@@ -58,4 +72,12 @@ module Unary = struct
     | CountLeadingZeros of { allow_zero : bool }  (**  `__builtin_ctlz(self)` *)
     | UnaryMinus  (**  `-self` *)
   [@@deriving show { with_path = false }]
+
+  let pp_display fmt t =
+    let f = Fmt.pf fmt in
+    match t with
+    | Bitnot -> f "~"
+    | Not -> f "!"
+    | UnaryMinus -> f "-"
+    | _ -> Fmt.pf fmt "%a" pp t
 end

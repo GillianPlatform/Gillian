@@ -25,7 +25,7 @@ module Make (Debugger : Debugger.S) = struct
       (fun _ ->
         let stop_reason = Debugger.step dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Reverse"
+    DL.set_rpc_command_handler rpc ~name:"Reverse continue"
       (module Reverse_continue_command)
       (fun _ ->
         let stop_reason = Debugger.run ~reverse:true dbg in

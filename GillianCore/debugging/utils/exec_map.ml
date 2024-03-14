@@ -127,11 +127,26 @@ let at_path ?(stop_at = EndOfPath) path map =
   in
   aux (List.rev path) map
 
+let get_cmd_data = function
+  | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> Some data
+  | Nothing -> None
+
+let get_cmd_data_exn map =
+  match get_cmd_data map with
+  | Some map -> map
+  | None -> failwith "Tried to get data from Nothing map"
+
 (** Exception-raising equivalent to [at_path] *)
 let at_path_exn ?(stop_at = EndOfPath) path map =
   match at_path ~stop_at path map with
   | Some map -> map
   | None -> failwith "Exec_map.at_path"
+
+let map_data f = function
+  | Nothing -> Nothing
+  | Cmd { data; next } -> Cmd { data = f data; next }
+  | BranchCmd { data; nexts } -> BranchCmd { data = f data; nexts }
+  | FinalCmd { data } -> FinalCmd { data = f data }
 
 (** An Exec_map to be passed to the debugger frontend and displayed *)
 module Packaged = struct

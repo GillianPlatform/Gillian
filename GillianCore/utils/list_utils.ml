@@ -216,7 +216,7 @@ let rec last = function
   | [ x ] -> Some x
   | _ :: xs -> last xs
 
-let[@ocaml.tail_mod_cons] rec filter_mapi i f = function
+let[@tail_mod_cons] rec filter_mapi i f = function
   | [] -> []
   | x :: r -> (
       match f i x with
@@ -227,7 +227,7 @@ let filter_mapi f l = filter_mapi 0 f l
 
 let get_and_remove_nth n l =
   let found = ref None in
-  let[@ocaml.tail_mod_cons] rec aux i = function
+  let[@tail_mod_cons] rec aux i = function
     | [] -> []
     | x :: r ->
         if i = n then (
@@ -236,3 +236,13 @@ let get_and_remove_nth n l =
         else x :: aux (i + 1) r
   in
   (!found, aux 0 l)
+
+let map_head f = function
+  | [] -> []
+  | x :: xs -> f x :: xs
+
+let[@tail_mod_cons] rec map_last f l =
+  match l with
+  | [] -> []
+  | [ x ] -> [ f x ]
+  | x :: l' -> x :: map_last f l'

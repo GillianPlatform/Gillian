@@ -46,7 +46,17 @@ module Public = struct
     | Some rpc ->
         to_file
           (match json with
-          | _ :: _ -> msg ^ " (+)"
+          | _ :: _ ->
+              let err_info =
+                match List.assoc_opt "backtrace" json with
+                | Some (`String bt) ->
+                    let json_s =
+                      json |> JsonMap.to_yojson |> Yojson.Safe.pretty_to_string
+                    in
+                    Fmt.str "\n%s\n%s" json_s bt
+                | _ -> ""
+              in
+              msg ^ " (+)" ^ err_info
           | [] -> msg);
         Debug_rpc.send_event rpc (module Log_event) { msg; json }
     | None -> Lwt.return_unit
@@ -86,6 +96,9 @@ let setup rpc =
   reset ();
   rpc_ref := Some rpc
 
+let dump_dbg : (unit -> Yojson.Safe.t) option ref = ref None
+let set_debug_state_dumper f = dump_dbg := Some f
+
 let set_rpc_command_handler rpc ?name module_ f =
   let f x =
     let name_json =
@@ -93,7 +106,14 @@ let set_rpc_command_handler rpc ?name module_ f =
       | Some name -> [ ("dap_cmd", `String name) ]
       | None -> []
     in
-    let err_json backtrace = name_json @ [ ("backtrace", `String backtrace) ] in
+    let dbg_json =
+      match !dump_dbg with
+      | Some dump_dbg -> [ ("debug_state", dump_dbg ()) ]
+      | None -> []
+    in
+    let err_json backtrace =
+      name_json @ dbg_json @ [ ("backtrace", `String backtrace) ]
+    in
     let%lwt () =
       match name with
       | Some name -> log_async (fun m -> m "%s request received" name)
@@ -117,5 +137,12 @@ let set_rpc_command_handler rpc ?name module_ f =
         let err_json = err_json backtrace in
         log_async (fun m -> m ~json:err_json "[Error] Not found");%lwt
         raise Not_found
+    | Effect.Unhandled _ as e ->
+        let backtrace = Printexc.get_backtrace () in
+        let err_json = err_json backtrace in
+        let s = Printexc.to_string e in
+        log_async (fun m ->
+            m ~json:err_json "[Error] Unhandled exception\n%s" s);%lwt
+        raise e
   in
   Debug_rpc.set_command_handler rpc module_ f

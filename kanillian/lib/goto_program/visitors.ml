@@ -48,6 +48,10 @@ class ['a] iter =
       | UnionTag _
       | IncompleteStruct _ -> ()
 
+    method visit_id ~(ctx : 'a) (_id : int) =
+      let _ = ctx in
+      ()
+
     method visit_expr_value ~(ctx : 'a) ~type_:_ (ev : Expr.value) =
       match ev with
       | Array l | Struct l -> List.iter (self#visit_expr ~ctx) l
@@ -63,6 +67,9 @@ class ['a] iter =
           self#visit_expr ~ctx rhs
       | UnOp { op; e } ->
           self#visit_unop ~ctx op;
+          self#visit_expr ~ctx e
+      | SelfOp { op; e } ->
+          self#visit_selfop ~ctx op;
           self#visit_expr ~ctx e
       | ByteExtract { e; _ } | Dereference e | AddressOf e | TypeCast e ->
           self#visit_expr ~ctx e
@@ -119,6 +126,14 @@ class ['a] iter =
           self#visit_expr ~ctx guard;
           self#visit_stmt ~ctx then_;
           Option.iter (self#visit_stmt ~ctx) else_
+      | For { init; guard; update; body } ->
+          self#visit_stmt ~ctx init;
+          self#visit_expr ~ctx guard;
+          self#visit_expr ~ctx update;
+          self#visit_stmt ~ctx body
+      | While { guard; body } ->
+          self#visit_expr ~ctx guard;
+          self#visit_stmt ~ctx body
       | Output { msg; value } ->
           self#visit_expr ~ctx msg;
           self#visit_expr ~ctx value
@@ -232,6 +247,10 @@ class ['a] map =
       | UnionTag _
       | IncompleteStruct _ -> type_
 
+    method visit_id ~(ctx : 'a) (id : int) =
+      let _ = ctx in
+      id
+
     method visit_expr_value ~(ctx : 'a) ~type_:_ (ev : Expr.value) =
       match ev with
       | Array l ->
@@ -266,6 +285,11 @@ class ['a] map =
           let new_e = self#visit_expr ~ctx e in
           if new_op == op && new_e == e then ev
           else UnOp { op = new_op; e = new_e }
+      | SelfOp { op; e } ->
+          let new_op = self#visit_selfop ~ctx op in
+          let new_e = self#visit_expr ~ctx e in
+          if new_op == op && new_e == e then ev
+          else SelfOp { op = new_op; e = new_e }
       | ByteExtract { e; offset } ->
           let new_e = self#visit_expr ~ctx e in
           if new_e == e then ev else ByteExtract { e = new_e; offset }
@@ -312,8 +336,8 @@ class ['a] map =
     method visit_expr ~(ctx : 'a) (e : Expr.t) =
       let new_value = self#visit_expr_value ~ctx ~type_:e.type_ e.value in
       let new_location = self#visit_location ~ctx e.location in
-
       let new_type = self#visit_type ~ctx e.type_ in
+
       if
         new_value == e.value && new_location == e.location
         && new_type == e.type_
@@ -370,6 +394,28 @@ class ['a] map =
             body
           else
             Ifthenelse { guard = new_guard; then_ = new_then; else_ = new_else }
+      | For { init; guard; update; body = body' } ->
+          let new_init = self#visit_stmt ~ctx init in
+          let new_guard = self#visit_expr ~ctx guard in
+          let new_update = self#visit_expr ~ctx update in
+          let new_body = self#visit_stmt ~ctx body' in
+          if
+            new_init == init && new_guard == guard && new_update == update
+            && new_body == body'
+          then body
+          else
+            For
+              {
+                init = new_init;
+                guard = new_guard;
+                update = new_update;
+                body = new_body;
+              }
+      | While { guard; body = body' } ->
+          let new_guard = self#visit_expr ~ctx guard in
+          let new_body = self#visit_stmt ~ctx body' in
+          if new_guard == guard && new_body == body' then body
+          else While { guard = new_guard; body = new_body }
       | Switch { control; cases; default } ->
           let new_control = self#visit_expr ~ctx control in
           let changed = ref false in

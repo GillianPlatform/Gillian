@@ -1,4 +1,3 @@
-module KAnnot = Annot
 open Gil_syntax
 module GType = Goto_lib.Type
 
@@ -74,7 +73,7 @@ let assumption_of_ret_by_copy ~ctx ty =
   let types = Asrt.Types [ (loc, ObjectType) ] in
   Asrt.Star (types, hole)
 
-let bispec ~ctx ~(compiled : (KAnnot.t, string) Proc.t) (f : Program.Func.t) =
+let bispec ~ctx ~(compiled : (K_annot.t, string) Proc.t) (f : Program.Func.t) =
   let ret_type_assume =
     if Ctx.representable_in_store ctx f.return_type then Asrt.Emp
     else assumption_of_ret_by_copy ~ctx f.return_type

@@ -6,7 +6,7 @@ type t =
   | LActionFail of int
 [@@deriving show, yojson]
 
-type path = t list [@@deriving yojson]
+type path = t list [@@deriving yojson, show]
 
 let pp_short fmt = function
   | GuardedGoto b -> Fmt.pf fmt "%B" b

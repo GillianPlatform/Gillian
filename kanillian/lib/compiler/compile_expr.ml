@@ -1,7 +1,135 @@
 open Helpers
 open Gil_syntax
+open Cs.Syntax
+module Gil_branch_case = Gil_syntax.Branch_case
+module Branch_case = Kcommons.Branch_case
 module GType = Goto_lib.Type
 module GExpr = Goto_lib.Expr
+
+module PP = struct
+  open Goto_lib
+  open Utils.Syntaxes.Option
+
+  let binop fmt t =
+    let open Ops.Binary in
+    let f = Fmt.pf fmt in
+    match t with
+    | And -> f "&&"
+    | Ashr -> f ">>"
+    | Bitand -> f "&"
+    | Bitor -> f "|"
+    | Bitnand -> f "~&"
+    | Bitxor -> f "^"
+    | Div -> f "/"
+    | Equal -> f "=="
+    | Ge -> f ">="
+    | Gt -> f ">"
+    | Le -> f "<="
+    | Lshr -> f ">>"
+    | Lt -> f "<"
+    | Minus -> f "-"
+    | Mod -> f "%%"
+    | Mult -> f "*"
+    | Notequal -> f "!="
+    | Or -> f "||"
+    | Plus -> f "+"
+    | Shl -> f "<<"
+    | Xor -> f "^"
+    | _ -> Fmt.pf fmt "%a" pp t
+
+  let unop fmt t =
+    let open Ops.Unary in
+    let f = Fmt.pf fmt in
+    match t with
+    | Bitnot -> f "~"
+    | Not -> f "!"
+    | UnaryMinus -> f "-"
+    | _ -> Fmt.pf fmt "%a" pp t
+
+  let rec type_ ~(ctx : Ctx.t) ft (t : Type.t) =
+    let pp = type_ ~ctx in
+    let open Fmt in
+    match t with
+    | Array (t, sz) -> pf ft "%a[%d]" pp t sz
+    | CInteger I_bool -> pf ft "bool"
+    | CInteger I_char -> pf ft "char"
+    | CInteger I_int -> pf ft "int"
+    | CInteger I_size_t -> pf ft "size_t"
+    | CInteger I_ssize_t -> pf ft "ssize_t"
+    | Pointer t -> pf ft "%a*" pp t
+    | StructTag s -> (
+        match Hashtbl.find_opt ctx.prog.struct_tags s with
+        | Some t -> pf ft "%s" t
+        | None -> Type.pp ft t)
+    | Empty -> Fmt.string ft "void"
+    | t -> Type.pp ft t
+
+  let rec null ft (t : GExpr.t) =
+    match t.value with
+    | TypeCast t' -> (
+        match (t.type_, t'.value) with
+        | Pointer _, IntConstant i when Z.equal i Z.zero ->
+            Fmt.pf ft "NULL";
+            Some ()
+        | _ -> null ft t')
+    | _ -> None
+
+  let rec expr ~(ctx : Ctx.t) ft (t : GExpr.t) =
+    let pp = expr ~ctx in
+    let pp_type = type_ ~ctx in
+    let open Fmt in
+    let- () = null ft t in
+    let- () =
+      match t.value with
+      | Symbol x ->
+          let* x = Hashtbl.find_opt ctx.prog.base_names x in
+          pf ft "%s" x;
+          Some ()
+      | BinOp { op; lhs; rhs } ->
+          pf ft "(%a %a %a)" pp lhs binop op pp rhs;
+          Some ()
+      | UnOp { op; e } ->
+          pf ft "(%a %a)" unop op pp e;
+          Some ()
+      | Member { lhs = { value = Dereference t'; _ }; field } ->
+          pf ft "%a->%s" pp t' field;
+          Some ()
+      | AddressOf t' -> (
+          match t'.value with
+          | Index { array; index } -> (
+              match (array.value, index.value) with
+              | StringConstant s, IntConstant i when Z.equal i Z.zero ->
+                  pf ft "\"%s\"" s;
+                  Some ()
+              | _ -> None)
+          | _ -> None)
+      | EFunctionCall { func; args } ->
+          let* s =
+            match func.value with
+            | Symbol "__CPROVER_assert" -> Some "assert"
+            | Symbol "__CPROVER_assume" -> Some "assume"
+            | _ -> None
+          in
+          pf ft "%s %a" s (list ~sep:comma pp) args;
+          Some ()
+      | TypeCast { value = TypeCast t'; _ } ->
+          pf ft "((%a) %a)" pp_type t.type_ pp t';
+          Some ()
+      | _ -> None
+    in
+    GExpr.pp_custom ~pp ~pp_type ft t
+
+  let rec stmt ~ctx fmt (t : Stmt.t) =
+    match t.body with
+    | Ifthenelse { guard; _ } | For { guard; _ } | While { guard; _ } ->
+        Fmt.pf fmt "%a ?" (expr ~ctx) guard
+    | SUnhandled id -> Fmt.pf fmt "Unhandled (%s)" (Irep_lib.Id.to_string id)
+    | _ ->
+        let pp_stmt = stmt ~ctx in
+        let pp_expr = expr ~ctx in
+        let pp_type = type_ ~ctx in
+        Stmt.pp_custom ~semi:false ~pp_stmt ~pp_expr ~pp_type fmt t
+end
 
 type access =
   | InMemoryFunction of { ptr : Expr.t; symbol : string option }
@@ -337,9 +465,10 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       assume_type ~ctx ty expr
   | _ -> Error.code_error "Unreachable: assume_type for non-scalar"
 
-let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
+let rec nondet_expr ~ctx ~loc ~type_ ~display () : Val_repr.t Cs.with_body =
   let b = Body_item.make_hloc ~loc in
   let open Cs.Syntax in
+  let nondet_expr = nondet_expr ~ctx ~loc ~display in
   let is_symbolic_exec =
     let open Gillian.Utils in
     Exec_mode.is_symbolic_exec !Config.current_exec_mode
@@ -358,7 +487,7 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
   else
     match type_ with
     | StructTag tag | UnionTag tag ->
-        nondet_expr ~ctx ~loc ~type_:(Ctx.tag_lookup ctx tag) ()
+        nondet_expr ~type_:(Ctx.tag_lookup ctx tag) ()
     | Struct { components; _ } -> (
         match Ctx.one_representable_field ctx components with
         | None ->
@@ -377,23 +506,19 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
                   else
                     Cons
                       ( ( curr,
-                          Val_repr.V
-                            { type_; value = nondet_expr ~ctx ~loc ~type_ () }
-                        ),
+                          Val_repr.V { type_; value = nondet_expr ~type_ () } ),
                         rest )
             in
             let writes = writes 0 components in
             Cs.return (Val_repr.ByCompositValue { type_; writes })
-        | Some (_, type_) -> nondet_expr ~ctx ~loc ~type_ ())
+        | Some (_, type_) -> nondet_expr ~type_ ())
     | Array (ty, sz) ->
         let rec writes cur () =
           if cur == sz then Seq.Nil
           else
             Cons
               ( ( cur,
-                  Val_repr.V
-                    { type_ = ty; value = nondet_expr ~ctx ~loc ~type_:ty () }
-                ),
+                  Val_repr.V { type_ = ty; value = nondet_expr ~type_:ty () } ),
                 writes (cur + 1) )
         in
         let writes = writes 0 in
@@ -439,12 +564,14 @@ let rec nondet_expr ~ctx ~loc ~type_ () : Val_repr.t Cs.with_body =
                   (Cmd.GuardedGoto
                      (Expr.BinOp (variant, Equal, Expr.int i), block_lab, nlab))
               in
-              let v, cmds = nondet_expr ~ctx ~loc ~type_ () in
+              let v, cmds = nondet_expr ~type_ () in
               let write =
                 Memory.write ~ctx ~type_ ~annot:b ~dst:ret_ptr ~src:v
               in
               let block =
-                set_first_label ~annot:(b ~loop:[]) block_lab
+                set_first_label
+                  ~annot:(b ~loop:[] ~display ~cmd_kind:(Normal false))
+                  block_lab
                   (cmds @ write @ [ b goto_end ])
               in
               (goto :: block) @ gen (i + 1) rest
@@ -531,6 +658,9 @@ let compile_cast ~(ctx : Ctx.t) ~(from : GType.t) ~(into : GType.t) e :
   | Unhandled ->
       let cmd = Helpers.assert_unhandled ~feature:(Cast (from, into)) [] in
       Cs.return ~app:[ cmd ] (Val_repr.dummy ~ctx into)
+
+let by_value ?app t = Cs.return ?app (Val_repr.ByValue t)
+let by_copy ?app ptr type_ = Cs.return ?app (Val_repr.ByCopy { ptr; type_ })
 
 let rec lvalue_as_access ~ctx ~read (lvalue : GExpr.t) : access Cs.with_body =
   if Ctx.is_zst_access ctx lvalue.type_ then Cs.return ZST
@@ -669,7 +799,11 @@ let rec lvalue_as_access ~ctx ~read (lvalue : GExpr.t) : access Cs.with_body =
           (Fmt.str "lvalue_as_access for something that isn't an lvalue: %a"
              GExpr.pp_full lvalue)
 
-and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
+and compile_call
+    ~ctx
+    ~(b : ?nest_kind:K_annot.nest_kind -> string Cmd.t -> Body_item.t)
+    (func : GExpr.t)
+    (args : GExpr.t list) =
   let open Cs.Syntax in
   let return_type =
     match func.type_ with
@@ -764,13 +898,17 @@ and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
       by_value ~app:[ b (Logic (Assert f)) ] (Expr.Lit Null)
   | _ ->
       let* e = compile_expr ~ctx func in
-      let fname =
+      let fname, nest_kind =
         match e with
-        | Procedure (Lit (String f) as fname) -> (
-            match Constants.Internal_functions.hook f with
-            | Some fname -> Expr.string fname
-            | _ -> fname)
-        | Procedure e -> e
+        | Procedure (Lit (String f) as fname) ->
+            K_annot.(
+              let fname =
+                match Constants.Internal_functions.hook f with
+                | Some fname -> Expr.string fname
+                | _ -> fname
+              in
+              (fname, Fun_call f))
+        | Procedure e -> (e, Fun_call (Fmt.str "%a" Expr.pp e))
         | _ ->
             Error.code_error "function call of something that isn't a procedure"
       in
@@ -801,7 +939,7 @@ and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
       if Ctx.representable_in_store ctx return_type then
         let ret_var = Ctx.fresh_v ctx in
         let gil_call = Cmd.Call (ret_var, fname, args, None, None) in
-        by_value ~app:[ b gil_call ] (Expr.PVar ret_var)
+        by_value ~app:[ b ~nest_kind gil_call ] (Expr.PVar ret_var)
       else
         (* If the function returns by copy, we add first parameter
            that will contain the result. *)
@@ -812,7 +950,7 @@ and compile_call ~ctx ~add_annot:b (func : GExpr.t) (args : GExpr.t list) =
         let gil_call =
           Cmd.Call (unused_temp, fname, temp_arg :: args, None, None)
         in
-        by_copy ~app:[ b gil_call ] temp_arg return_type
+        by_copy ~app:[ b ~nest_kind gil_call ] temp_arg return_type
 
 and poison ~ctx ~annot (lhs : GExpr.t) =
   let type_ = lhs.type_ in
@@ -830,116 +968,161 @@ and poison ~ctx ~annot (lhs : GExpr.t) =
   in
   pre @ [ annot write ]
 
-and compile_assign ~ctx ~annot ~lhs ~rhs =
-  let v, pre1 = compile_expr ~ctx rhs in
-  let access, pre2 = lvalue_as_access ~ctx ~read:false lhs in
-  let write =
-    match (access, v) with
+and compile_assign_val ~ctx ~annot ~lhs ~(rhs : Val_repr.t) =
+  let ( let++ ) f o = Result.map o f in
+  let access, pre = lvalue_as_access ~ctx ~read:false lhs in
+  let++ write =
+    match (access, rhs) with
     | ZST, _ ->
-        [ annot Cmd.Skip ]
+        Ok [ annot Cmd.Skip ]
         (* We need a command in case we try want to add a label *)
-    | Direct x, ByValue v -> [ annot (Assignment (x, v)) ]
+    | Direct x, ByValue v -> Ok [ annot (Assignment (x, v)) ]
     | InMemoryScalar { ptr; _ }, ByValue v ->
-        [ annot (Memory.store_scalar ~ctx ptr v lhs.type_) ]
+        Ok [ annot (Memory.store_scalar ~ctx ptr v lhs.type_) ]
     | ( InMemoryComposit { ptr = ptr_access; type_ = type_access },
         ByCopy { ptr = ptr_v; type_ = type_v } ) ->
         if not (Ctx.type_equal ctx type_v type_access) then
-          Error.unexpected "ByCopy assignment with different types on each side"
+          Result.Error
+            ( Error.unexpected,
+              "ByCopy assignment with different types on each side" )
         else
           let copy_cmd =
             Memory.memcpy ~ctx ~type_:type_access ~dst:ptr_access ~src:ptr_v
           in
-          [ annot copy_cmd ]
+          Ok [ annot copy_cmd ]
     | InMemoryComposit { ptr = dst; _ }, ByCompositValue { writes; _ } ->
-        Memory.write_composit ~ctx ~annot ~dst writes
+        Ok (Memory.write_composit ~ctx ~annot ~dst writes)
     | _ ->
         Error.code_error
           (Fmt.str
-             "Invalid assignement, wrong mix of ByCopy and Direct assignments:\n\
-              %a = %a.\n\
-              Originally: %a = %a\n\n\
-             \              Left type is %a and right type is %a" pp_access
-             access Val_repr.pp v GExpr.pp lhs GExpr.pp rhs GType.pp lhs.type_
-             GType.pp rhs.type_)
+             "Invalid assignement, wrong mix of ByCopy and Direct assignments.\n\
+              %a = %a." pp_access access Val_repr.pp rhs)
   in
-  (v, pre1 @ pre2 @ write)
+  pre @ write
+
+and compile_assign ~ctx ~annot ~lhs ~rhs =
+  let v, pre = compile_expr ~ctx rhs in
+  let comp_assign =
+    match compile_assign_val ~ctx ~annot ~lhs ~rhs:v with
+    | Ok c -> c
+    | Error (throw, msg) ->
+        let msg =
+          Fmt.str
+            "%s\n\
+             Originally: %a = %a\n\n\
+            \              Left type is %a and right type is %a" msg GExpr.pp
+            lhs Val_repr.pp v GType.pp lhs.type_ GType.pp rhs.type_
+        in
+        throw msg
+  in
+  (v, pre @ comp_assign)
+
+and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
+  let open Ops.Self in
+  let open Ops.Binary in
+  let is_pre, op =
+    match op with
+    | Preincrement -> (true, Plus)
+    | Predecrement -> (true, Minus)
+    | Postincrement -> (false, Plus)
+    | Postdecrement -> (false, Minus)
+  in
+  let e_pre, comp_expr = compile_expr ~ctx e in
+  let e_pre = Val_repr.as_value ~msg:"Selfop operand" e_pre in
+  let e_post, comp_op =
+    let lhs = Val_repr.ByValue e_pre in
+    let rhs = Val_repr.ByValue (Lit (Int Z.one)) in
+    compile_binop ~ctx ~lty:ty ~rty:ty op lhs rhs
+  in
+  let comp_op = List.map annot comp_op in
+  let comp_assign =
+    match compile_assign_val ~ctx ~annot ~lhs:e ~rhs:(ByValue e_post) with
+    | Ok c -> c
+    | Error (throw, msg) -> throw msg
+  in
+  let v = if is_pre then e_post else e_pre in
+  let v = Val_repr.ByValue v in
+  (v, comp_expr @ comp_op @ comp_assign)
+
+and compile_symbol ~ctx ~b expr =
+  if Ctx.is_zst_access ctx GExpr.(expr.type_) then by_value (Lit Null)
+  else
+    let* access = lvalue_as_access ~ctx ~read:true expr in
+    match access with
+    | ZST -> by_value (Lit Null)
+    | Direct x -> by_value (Expr.PVar x)
+    | ListMember { list; index; _ } ->
+        by_value (Expr.list_nth (PVar list) index)
+    | InMemoryScalar { loaded = Some e; _ } -> by_value e
+    | InMemoryScalar { loaded = None; ptr } ->
+        let* var = Memory.load_scalar ~ctx ptr expr.type_ |> Cs.map_l b in
+        by_value (PVar var)
+    | InMemoryComposit { ptr; type_ } -> by_copy ptr type_
+    | InMemoryFunction { symbol = Some sym; _ } ->
+        Cs.return (Val_repr.Procedure (Expr.string sym))
+    | InMemoryFunction { ptr; symbol = None } ->
+        let symbol = Ctx.fresh_v ctx in
+        let get_name = Constants.Internal_functions.get_function_name in
+        let call =
+          Cmd.Call (symbol, Lit (String get_name), [ ptr ], None, None)
+        in
+        Cs.return ~app:[ b call ] (Val_repr.Procedure (Expr.PVar symbol))
+    | DirectFunction symbol ->
+        Cs.return (Val_repr.Procedure (Lit (String symbol)))
+
+and compile_address_of ~ctx ~b (expr : GExpr.t) x =
+  let* access = lvalue_as_access ~ctx ~read:true x in
+  match access with
+  | ZST ->
+      let display = Fmt.str "%a" (PP.expr ~ctx) expr in
+      (* FIXME: we can't model alignment yet *)
+      let* ptr =
+        nondet_expr ~ctx ~loc:expr.location ~type_:(CInteger I_size_t) ~display
+          ()
+      in
+      let ptr = Val_repr.as_value ~msg:"Nondet I_size_t for ZST pointer" ptr in
+      (* We need to assert that the ZST pointer is not null.
+          If the null pointer is not zero, I don't know what to do.
+      *)
+      assert ctx.machine.null_is_zero;
+      let assume_not_null =
+        let open Formula.Infix in
+        b (Cmd.Logic (Assume (fnot ptr #== Expr.zero_i)))
+      in
+      let assume_align_8 =
+        let open Formula.Infix in
+        let mod_8 = Expr.BinOp (ptr, IMod, Expr.int 8) in
+        b (Cmd.Logic (Assume mod_8 #== Expr.zero_i))
+      in
+      Cs.return ~app:[ assume_not_null; assume_align_8 ] (Val_repr.ByValue ptr)
+      (* Should probably just return a long, with a nondet value that has the right offset *)
+  | InMemoryScalar { ptr; _ }
+  | InMemoryComposit { ptr; _ }
+  | InMemoryFunction { ptr; _ } -> by_value ptr
+  | DirectFunction symbol ->
+      let+ ptr = Genv.lookup_symbol ~ctx symbol |> Cs.map_l b in
+      Val_repr.ByValue ptr
+  | Direct x -> Error.code_error ("address of direct access to " ^ x)
+  | ListMember _ -> Error.code_error "address of list member access"
 
 and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
   let open Cs.Syntax in
-  let by_value ?app t = Cs.return ?app (Val_repr.ByValue t) in
-  let by_copy ?app ptr type_ =
-    Cs.return ?app (Val_repr.ByCopy { ptr; type_ })
-  in
   let compile_expr = compile_expr ~ctx in
   let loc = Body_item.compile_location expr.location in
-  let b = Body_item.make ~loc in
+  let default_display = Fmt.str "%a" (PP.expr ~ctx) expr in
+  let b_pre ?display ?(cmd_kind = K_annot.Normal false) =
+    let display = Option.value ~default:default_display display in
+    Body_item.make ~loc ~display ~cmd_kind
+  in
+  let b = b_pre ?branch_kind:None ?nest_kind:None ?cmd_kind:None in
   let unhandled feature =
     let cmd = assert_unhandled ~feature [] in
     let v = Val_repr.dummy ~ctx expr.type_ in
     Cs.return ~app:[ b cmd ] v
   in
   match expr.value with
-  | Symbol _ | Dereference _ | Index _ | Member _ -> (
-      if Ctx.is_zst_access ctx expr.type_ then by_value (Lit Null)
-      else
-        let* access = lvalue_as_access ~ctx ~read:true expr in
-        match access with
-        | ZST -> by_value (Lit Null)
-        | Direct x -> by_value (Expr.PVar x)
-        | ListMember { list; index; _ } ->
-            by_value (Expr.list_nth (PVar list) index)
-        | InMemoryScalar { loaded = Some e; _ } -> by_value e
-        | InMemoryScalar { loaded = None; ptr } ->
-            let* var = Memory.load_scalar ~ctx ptr expr.type_ |> Cs.map_l b in
-            by_value (PVar var)
-        | InMemoryComposit { ptr; type_ } -> by_copy ptr type_
-        | InMemoryFunction { symbol = Some sym; _ } ->
-            Cs.return (Val_repr.Procedure (Expr.string sym))
-        | InMemoryFunction { ptr; symbol = None } ->
-            let symbol = Ctx.fresh_v ctx in
-            let get_name = Constants.Internal_functions.get_function_name in
-            let call =
-              Cmd.Call (symbol, Lit (String get_name), [ ptr ], None, None)
-            in
-            Cs.return ~app:[ b call ] (Val_repr.Procedure (Expr.PVar symbol))
-        | DirectFunction symbol ->
-            Cs.return (Val_repr.Procedure (Lit (String symbol))))
-  | AddressOf x -> (
-      let* access = lvalue_as_access ~ctx ~read:true x in
-      match access with
-      | ZST ->
-          (* FIXME: we can't model alignment yet *)
-          let* ptr =
-            nondet_expr ~ctx ~loc:expr.location ~type_:(CInteger I_size_t) ()
-          in
-          let ptr =
-            Val_repr.as_value ~msg:"Nondet I_size_t for ZST pointer" ptr
-          in
-          (* We need to assert that the ZST pointer is not null.
-             If the null pointer is not zero, I don't know what to do.
-          *)
-          assert ctx.machine.null_is_zero;
-          let assume_not_null =
-            let open Formula.Infix in
-            b (Cmd.Logic (Assume (fnot ptr #== Expr.zero_i)))
-          in
-          let assume_align_8 =
-            let open Formula.Infix in
-            let mod_8 = Expr.BinOp (ptr, IMod, Expr.int 8) in
-            b (Cmd.Logic (Assume mod_8 #== Expr.zero_i))
-          in
-          Cs.return
-            ~app:[ assume_not_null; assume_align_8 ]
-            (Val_repr.ByValue ptr)
-          (* Should probably just return a long, with a nondet value that has the right offset *)
-      | InMemoryScalar { ptr; _ }
-      | InMemoryComposit { ptr; _ }
-      | InMemoryFunction { ptr; _ } -> by_value ptr
-      | DirectFunction symbol ->
-          let+ ptr = Genv.lookup_symbol ~ctx symbol |> Cs.map_l b in
-          Val_repr.ByValue ptr
-      | Direct x -> Error.code_error ("address of direct access to " ^ x)
-      | ListMember _ -> Error.code_error "address of list member access")
+  | Symbol _ | Dereference _ | Index _ | Member _ -> compile_symbol ~ctx ~b expr
+  | AddressOf x -> compile_address_of ~ctx ~b expr x
   | BoolConstant b -> by_value (Lit (Bool b))
   | CBoolConstant b ->
       let z = if b then Z.one else Z.zero in
@@ -954,7 +1137,9 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       let* e2 = compile_expr rhs in
       let lty = lhs.type_ in
       let rty = rhs.type_ in
-      let+ e = compile_binop ~ctx ~lty ~rty op e1 e2 |> Cs.map_l b in
+      let+ e =
+        compile_binop ~ctx ~lty ~rty op e1 e2 |> Cs.map_l b |> Cs.set_end
+      in
       Val_repr.ByValue e
   | UnOp { op; e } -> (
       let* comp_e = compile_expr e in
@@ -977,13 +1162,20 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       | op ->
           let cmd = b (Helpers.assert_unhandled ~feature:(UnOp op) []) in
           Cs.return ~app:[ cmd ] (Val_repr.ByValue (Lit Nono)))
-  | Nondet -> nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_ ()
+  | SelfOp { op; e } ->
+      compile_selfop ~ctx ~ty:e.type_ ~annot:b op e |> Cs.set_end
+  | Nondet ->
+      nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_
+        ~display:default_display ()
+      |> Cs.set_end
   | TypeCast to_cast ->
       let* to_cast_e = compile_expr to_cast in
       compile_cast ~ctx ~from:to_cast.type_ ~into:expr.type_ to_cast_e
       |> Cs.map_l b
-  | EAssign { lhs; rhs } -> compile_assign ~ctx ~lhs ~rhs ~annot:b
-  | EFunctionCall { func; args } -> compile_call ~ctx ~add_annot:b func args
+  | EAssign { lhs; rhs } -> compile_assign ~ctx ~lhs ~rhs ~annot:b |> Cs.set_end
+  | EFunctionCall { func; args } ->
+      let b ?nest_kind cmd = b_pre ?nest_kind cmd in
+      compile_call ~ctx ~b func args |> Cs.set_end
   | If { cond; then_; else_ } ->
       let* cond_e = compile_expr cond in
       let then_lab = Ctx.fresh_lab ctx in
@@ -1003,18 +1195,18 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           let cmd = b (Cmd.Goto end_lab) in
           Cs.return ~app:[ cmd ] res
         in
-        res_then |> Cs.with_label ~annot:(b ~loop:[]) then_lab
+        res_then |> Cs.with_label ~annot:(b ?display:None ~loop:[]) then_lab
       in
       let* res_else =
         let res_else =
           let* t = compile_expr else_ in
           Val_repr.copy_into t res |> Cs.map_l b
         in
-        res_else |> Cs.with_label ~annot:(b ~loop:[]) else_lab
+        res_else |> Cs.with_label ~annot:(b ?display:None ~loop:[]) else_lab
       in
       Error.assert_
         (Val_repr.equal res_then res_else)
-        "if branche exprs must be equal";
+        "if branch exprs must be equal";
       Cs.return ~app:[ b ~label:end_lab Skip ] res_then
   | ByteExtract { e; offset } ->
       if Ctx.is_zst_access ctx e.type_ then
@@ -1150,21 +1342,36 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
   let compile_expr_c = compile_expr ~ctx in
   let loc = Body_item.compile_location stmt.stmt_location in
-  let b = Body_item.make ~loc in
+  let default_display = Fmt.str "%a" (PP.stmt ~ctx) stmt in
+  let b_pre ?(cmd_kind = K_annot.Normal false) ?(display = default_display) =
+    Body_item.make ~loc ~display ~cmd_kind
+  in
+  let b = b_pre ?nest_kind:None in
   let add_annot x = List.map b x in
-  let set_first_label_opt label stmts =
-    Helpers.set_first_label_opt ~annot:(b ~loop:[]) label stmts
+  let set_first_label_opt ?display label stmts =
+    Helpers.set_first_label_opt
+      ~annot:(b ?branch_kind:None ~cmd_kind:Hidden ~loop:[] ?display)
+      label stmts
   in
   let set_first_label label stmts = set_first_label_opt (Some label) stmts in
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in
+  let log_kind kind = Debugger_log.to_file ("COMPILING " ^ kind ^ " STMT") in
   match stmt.body with
-  | Skip -> void [ b Skip ]
-  | Block ss -> compile_statement_list ~ctx ss
+  | Skip ->
+      let () = log_kind "Skip" in
+      void [ b ~cmd_kind:(Normal true) Skip ]
+  | Block ss ->
+      let () = log_kind "Block" in
+      compile_statement_list ~ctx ss
   | Label (s, ss) ->
+      let () = log_kind "Label" in
       let v, cmds = compile_statement_list ~ctx ss in
       (v, set_first_label s cmds)
-  | Goto lab -> [ b (Goto lab) ] |> void
+  | Goto lab ->
+      let () = log_kind "Goto" in
+      [ b (Goto lab) ] |> void
   | Assume { cond } ->
+      let () = log_kind "Assume" in
       let e, pre = compile_expr_c cond in
       let e = Val_repr.as_value ~msg:"Assume operand" e in
       (* FIXME: hack to avoid wrong compilation to be in the way.
@@ -1178,12 +1385,17 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
         | Some (f, _) -> f
       in
-      pre @ [ b (Logic (Assume f)) ] |> void
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assume f)) ] |> void
   (* We can't output nothing, as a label might have to get attached *)
-  | Assert { property_class = Some "cover"; _ } -> [ b Skip ] |> void
+  | Assert { property_class = Some "cover"; _ } ->
+      let () = log_kind "Assert (cover)" in
+      [ b ~cmd_kind:(Normal true) Skip ] |> void
   | Assert { property_class = Some "missing_function"; _ } ->
-      [ b (Fail ("unimplemented_function", [])) ] |> void
+      let () = log_kind "Assert (missing_function)" in
+      [ b ~cmd_kind:(Normal true) (Fail ("unimplemented_function", [])) ]
+      |> void
   | Assert { cond; property_class = _ } ->
+      let () = log_kind "Assert" in
       let e, pre = compile_expr_c cond in
       let e = Val_repr.as_value ~msg:"Assert operand" e in
       let e =
@@ -1195,8 +1407,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
         | Some (f, _) -> f
       in
-      pre @ [ b (Logic (Assert f)) ] |> void
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assert f)) ] |> void
   | Return e ->
+      let () = log_kind "Return" in
       let e, s =
         match e with
         | Some e -> (
@@ -1223,8 +1436,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       s
       @ add_annot
           [ Assignment (variable, e); Goto Constants.Kanillian_names.ret_label ]
-      |> void
+      |> void |> Cs.set_end
   | Decl { lhs = glhs; value } ->
+      let () = log_kind "Decl" in
       (* TODO:
          I have too many if/elses for deciding how things should be done,
          and that's all over the compiler. I should probably have a variant
@@ -1234,7 +1448,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       (* ZSTs are just (GIL) Null values *)
       if Ctx.is_zst_access ctx ty then
         let cmd = Cmd.Assignment (lhs, Lit Null) in
-        [ b cmd ] |> void
+        [ b ~cmd_kind:(Normal true) cmd ] |> void
       else if not (Ctx.representable_in_store ctx ty) then
         let ptr, alloc_cmd = Memory.alloc_ptr ~ctx ty in
         let assign = Cmd.Assignment (lhs, ptr) in
@@ -1252,13 +1466,14 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
                   Error.code_error
                     "Declaring composit value, not writing a composit")
         in
-        [ b alloc_cmd; b assign ] @ write |> void
+        [ b alloc_cmd; b assign ] @ write @ [ b ~cmd_kind:(Normal true) Skip ]
+        |> void
       else if Ctx.in_memory ctx lhs then
         let ptr, action_cmd = Memory.alloc_ptr ~ctx ty in
         let assign = Cmd.Assignment (lhs, ptr) in
-        let write =
+        let pre, write =
           match value with
-          | None -> []
+          | None -> ([], [])
           | Some e ->
               let v, pre = compile_expr_c e in
               let v =
@@ -1266,9 +1481,13 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
                   ~msg:"declaration initial value for in-memory scalar access" v
               in
               let write = Memory.store_scalar ~ctx (Expr.PVar lhs) v ty in
-              pre @ [ b write ]
+              (pre, [ b write ])
         in
-        [ b action_cmd; b assign ] @ write |> void
+        pre
+        @ [ b action_cmd; b assign ]
+        @ write
+        @ [ b ~cmd_kind:(Normal true) Skip ]
+        |> void
       else
         let v, s =
           match value with
@@ -1281,8 +1500,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
               (e, s)
           | None -> (Lit Undefined, [])
         in
-        s @ [ b (Assignment (lhs, v)) ] |> void
+        s @ [ b ~cmd_kind:(Normal true) (Assignment (lhs, v)) ] |> void
   | SAssign { lhs; rhs } ->
+      let () = log_kind "SAssign" in
       (* Special case: my patched Kani will comment "deinit" if this assignment
          correspond to a deinit that CBMC doesn't handle. *)
       let body =
@@ -1292,10 +1512,16 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
             let _, body = compile_assign ~ctx ~annot:b ~lhs ~rhs in
             body
       in
-      body |> void
-  | Expression e -> compile_expr_c e
+      body |> void |> Cs.set_end
+  | Expression e ->
+      let () = log_kind "Expr" in
+      compile_expr_c e
   | SFunctionCall { lhs; func; args } -> (
-      let v, pre1 = compile_call ~ctx ~add_annot:b func args in
+      let () = log_kind "SFunctionCall" in
+      let v, pre1 =
+        let b ?nest_kind cmd = b_pre ?nest_kind cmd in
+        compile_call ~ctx ~b func args
+      in
       match lhs with
       | None -> (v, pre1)
       | Some lvalue ->
@@ -1316,6 +1542,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
           in
           pre1 @ pre2 @ write |> void)
   | Switch { control; cases; default } ->
+      let () = log_kind "Switch" in
       let end_lab = Ctx.fresh_lab ctx in
       let next_lab = ref None in
       let control_ty = control.type_ in
@@ -1361,6 +1588,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let end_ = [ b ~label:end_lab Skip ] in
       control_s @ compiled_cases @ default_block @ end_ |> void
   | Ifthenelse { guard; then_; else_ } ->
+      let () = log_kind "Ifthenelse" in
       let comp_guard, cmd_guard = compile_expr_c guard in
       let comp_guard = Val_repr.as_value ~msg:"ifthenelse guard" comp_guard in
       let _, comp_then_ = compile_statement_c then_ in
@@ -1374,16 +1602,64 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         | None -> (end_lab, [])
         | Some else_ -> Body_item.get_or_set_fresh_lab ~ctx else_
       in
-      let goto_guard = b (Cmd.GuardedGoto (comp_guard, then_lab, else_lab)) in
-      let end_ = [ b ~label:end_lab Skip ] in
-      cmd_guard @ [ goto_guard ] @ comp_then_ @ comp_else @ end_ |> void
+      let goto_guard =
+        b (Cmd.GuardedGoto (comp_guard, then_lab, else_lab))
+        |> Body_item.with_branch_kind (Some Branch_case.If_else_kind)
+        |> Body_item.set_end
+      in
+      let end_ =
+        b ~label:end_lab Skip |> Body_item.with_cmd_kind K_annot.Hidden
+      in
+      cmd_guard @ [ goto_guard ] @ comp_then_ @ comp_else @ [ end_ ] |> void
+  | For { init; guard; update; body } ->
+      let () = log_kind "For" in
+      let _, comp_init = compile_statement_c init in
+      let loop_lab = Ctx.fresh_lab ctx in
+      let end_lab = Ctx.fresh_lab ctx in
+      let guard_var, comp_guard = compile_expr_c guard in
+      let comp_guard = set_first_label loop_lab comp_guard in
+      let guard_var = Val_repr.as_value ~msg:"for guard" guard_var in
+      let _, comp_body = compile_statement_c body in
+      let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
+      let _, comp_update = compile_expr_c update in
+      let goto_guard =
+        let cmd = Cmd.GuardedGoto (guard_var, body_lab, end_lab) in
+        b ~cmd_kind:(Normal true) cmd
+        |> Body_item.with_branch_kind (Some Branch_case.For_loop_kind)
+      in
+      let goto_loop = b ~cmd_kind:Hidden (Cmd.Goto loop_lab) in
+      let end_ = b ~cmd_kind:Hidden ~label:end_lab Skip in
+      comp_init @ comp_guard @ [ goto_guard ] @ comp_body @ comp_update
+      @ [ goto_loop; end_ ]
+      |> void
+  | While { guard; body } ->
+      let () = log_kind "While" in
+      let loop_lab = Ctx.fresh_lab ctx in
+      let end_lab = Ctx.fresh_lab ctx in
+      let guard_var, comp_guard = compile_expr_c guard in
+      let comp_guard = set_first_label loop_lab comp_guard in
+      let guard_var = Val_repr.as_value ~msg:"while guard" guard_var in
+      let _, comp_body = compile_statement_c body in
+      let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
+      let goto_guard =
+        b ~cmd_kind:(Normal true)
+          (Cmd.GuardedGoto (guard_var, body_lab, end_lab))
+        |> Body_item.with_branch_kind (Some Branch_case.While_loop_kind)
+      in
+      let goto_loop = b ~cmd_kind:Hidden (Cmd.Goto loop_lab) in
+      let end_ = b ~cmd_kind:Hidden ~label:end_lab Skip in
+      comp_guard @ [ goto_guard ] @ comp_body @ [ goto_loop; end_ ] |> void
   | Break ->
+      let () = log_kind "Break" in
       (match ctx.break_lab with
       | None -> Error.unexpected "Break call outside of loop of switch"
       | Some break_lab -> [ b (Cmd.Goto break_lab) ])
       |> void
-  | SUnhandled id -> [ b (assert_unhandled ~feature:(StmtIrep id) []) ] |> void
+  | SUnhandled id ->
+      let () = log_kind "SUnhandled" in
+      [ b (assert_unhandled ~feature:(StmtIrep id) []) ] |> void
   | Output _ ->
+      let () = log_kind "Output" in
       let () = Stats.Unhandled.signal OutputStmt in
       [ b Skip ] |> void
 

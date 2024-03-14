@@ -1,5 +1,6 @@
 open Literal
 open Branch_case
+open Syntaxes.Result
 module L = Logging
 module DL = Debugger_log
 include G_interpreter_intf
@@ -54,6 +55,7 @@ struct
       error_state : state_t;
       errors : err_t list;
       branch_path : branch_path;
+      prev_cmd_report_id : Logging.Report_id.t option;
     }
     [@@deriving yojson]
 
@@ -77,6 +79,7 @@ struct
       ret_val : state_vt;
       final_state : state_t;
       branch_path : branch_path;
+      prev_cmd_report_id : Logging.Report_id.t option;
     }
     [@@deriving yojson]
 
@@ -90,6 +93,7 @@ struct
       loop_ids : string list;
       branch_count : int;
       branch_path : branch_path;
+      prev_cmd_report_id : Logging.Report_id.t option;
     }
     [@@deriving yojson]
 
@@ -130,6 +134,12 @@ struct
           branch_case;
         }
 
+    let get_prev_cmd_id = function
+      | ConfErr { prev_cmd_report_id; _ } -> prev_cmd_report_id
+      | ConfFinish { prev_cmd_report_id; _ } -> prev_cmd_report_id
+      | ConfSusp { prev_cmd_report_id; _ } -> prev_cmd_report_id
+      | ConfCont { prev_cmd_report_id; _ } -> prev_cmd_report_id
+
     let get_branch_case = function
       | ConfCont { branch_case; _ } -> branch_case
       | _ -> None
@@ -145,7 +155,13 @@ struct
   type conf_t = BConfErr of err_t list | BConfCont of State.t
   type result_t = (State.t, State.vt, err_t) Exec_res.t [@@deriving yojson]
 
-  type 'result cont_func_f = ?path:Branch_case.path -> unit -> 'result cont_func
+  type conf_selector =
+    | Path of Branch_case.path
+    | IdCase of L.Report_id.t * Branch_case.t option
+  [@@deriving to_yojson, show]
+
+  type 'result cont_func_f =
+    ?selector:conf_selector -> unit -> 'result cont_func
 
   and 'result cont_func =
     | Finished of 'result list
@@ -657,6 +673,7 @@ struct
       eval_expr : Expr.t -> Val.t;
       loop_action : loop_action;
       branch_path : branch_path;
+      prev_cmd_report_id : L.Report_id.t option;
     }
 
     module Do_eval = struct
@@ -725,7 +742,7 @@ struct
             b_counter
             has_branched
             spec_name : CConf.t =
-          let { i; cs; branch_path; _ } = eval_state in
+          let { i; cs; branch_path; prev_cmd_report_id; _ } = eval_state in
           let process_ret_cont new_j =
             process_ret_cont new_j eval_state ix ret_state fl b_counter
               has_branched
@@ -757,6 +774,7 @@ struct
                               spec_name));
                     ];
                   branch_path;
+                  prev_cmd_report_id;
                 }
 
         let symb_exec_proc x pid v_args j params args eval_state () =
@@ -777,7 +795,9 @@ struct
           ]
 
         let exec_with_spec spec x j args pid subst symb_exec_proc eval_state =
-          let { state; i; b_counter; cs; branch_path; _ } = eval_state in
+          let { state; i; b_counter; cs; branch_path; prev_cmd_report_id; _ } =
+            eval_state
+          in
           let process_ret = process_ret pid j eval_state in
           match !symb_exec_next with
           | true ->
@@ -814,6 +834,7 @@ struct
                                     spec.data.spec_name));
                           ];
                         branch_path;
+                        prev_cmd_report_id;
                       };
                   ]
               else
@@ -848,6 +869,7 @@ struct
                             error_state = state;
                             errors;
                             branch_path;
+                            prev_cmd_report_id;
                           };
                       ]
                 in
@@ -864,6 +886,7 @@ struct
             prev;
             prev_loop_ids;
             branch_path;
+            prev_cmd_report_id;
             _;
           } =
             eval_state
@@ -882,6 +905,7 @@ struct
                   next_idx = i;
                   branch_path;
                   branch_count = b_counter;
+                  prev_cmd_report_id;
                 };
             ])
           else symb_exec_proc ()
@@ -961,6 +985,7 @@ struct
           prev_loop_ids;
           make_confcont;
           eval_expr;
+          prev_cmd_report_id;
           _;
         } =
           state
@@ -1081,6 +1106,7 @@ struct
                           error_state = state;
                           errors = List.map (fun x -> Exec_err.EState x) errs;
                           branch_path;
+                          prev_cmd_report_id;
                         };
                     ])
               else
@@ -1093,6 +1119,7 @@ struct
                       error_state = state;
                       errors = List.map (fun x -> Exec_err.EState x) errs;
                       branch_path;
+                      prev_cmd_report_id;
                     };
                 ]
         in
@@ -1113,6 +1140,7 @@ struct
           loop_action;
           branch_path;
           annot;
+          prev_cmd_report_id;
           _;
         } =
           state
@@ -1157,6 +1185,7 @@ struct
                         error_state = state;
                         errors;
                         branch_path;
+                        prev_cmd_report_id;
                       })
               frames_and_states
         | _ ->
@@ -1193,6 +1222,7 @@ struct
                         error_state = state;
                         errors;
                         branch_path;
+                        prev_cmd_report_id;
                       };
                   ]
             in
@@ -1375,6 +1405,7 @@ struct
           state;
           iframes;
           b_counter;
+          prev_cmd_report_id;
           _;
         } =
           eval_state
@@ -1397,6 +1428,7 @@ struct
                     ret_val = v_ret;
                     final_state = state;
                     branch_path;
+                    prev_cmd_report_id;
                   };
               ]
           | ( Some v_ret,
@@ -1442,6 +1474,7 @@ struct
           state;
           iframes;
           b_counter;
+          prev_cmd_report_id;
           _;
         } =
           eval_state
@@ -1460,6 +1493,7 @@ struct
                   ret_val = v_ret;
                   final_state = state;
                   branch_path : branch_path;
+                  prev_cmd_report_id;
                 };
             ]
         | ( Some v_ret,
@@ -1652,9 +1686,8 @@ struct
              L.Parent.set report_id);
 
       let branch_path = List_utils.cons_opt branch_case branch_path in
-      let make_confcont =
-        CConf.make_cont ?prev_cmd_report_id:!report_id_ref ~branch_path
-      in
+      let prev_cmd_report_id = !report_id_ref in
+      let make_confcont = CConf.make_cont ?prev_cmd_report_id ~branch_path in
       DL.log (fun m ->
           m
             ~json:[ ("path", branch_path_to_yojson branch_path) ]
@@ -1677,6 +1710,7 @@ struct
           eval_expr;
           loop_action;
           branch_path;
+          prev_cmd_report_id;
         }
       in
 
@@ -1705,6 +1739,7 @@ struct
       | _, (_, LAction _) -> simplify state
       | _ -> [ state ]
     in
+    let prev_cmd_report_id = !report_id_ref in
     List.concat_map
       (fun state ->
         try
@@ -1720,6 +1755,7 @@ struct
                   error_state;
                   errors;
                   branch_path = List_utils.cons_opt branch_case branch_path;
+                  prev_cmd_report_id;
                 };
             ]
         | State.Internal_State_Error (errs, error_state) ->
@@ -1732,6 +1768,7 @@ struct
                   error_state;
                   errors = List.map (fun x -> Exec_err.EState x) errs;
                   branch_path = List_utils.cons_opt branch_case branch_path;
+                  prev_cmd_report_id;
                 };
             ])
       states
@@ -1750,11 +1787,8 @@ struct
   module Evaluate_cmd_step = struct
     open CConf
 
-    type 'a f =
-      CConf.t list ->
-      branch_path option ->
-      (branch_path * result_t) list ->
-      'a cont_func
+    type results = (L.Report_id.t option * branch_path * result_t) list
+    type 'a f = CConf.t list -> conf_selector option -> results -> 'a cont_func
 
     type 'a eval_step =
       (result_t -> 'a) ->
@@ -1771,12 +1805,13 @@ struct
       hold_results : 'a list;
       on_hold : (CConf.t * string) list;
       branch_path : branch_path option;
-      results : (branch_path * result_t) list;
+      results : results;
       conf : CConf.t option;
       rest_confs : CConf.t list;
       parent_id_ref : L.Report_id.t option ref;
       f : 'a f;
       eval_step : 'a eval_step;
+      selector : conf_selector option;
     }
 
     let log_confcont parent_id_ref is_first = function
@@ -1842,6 +1877,7 @@ struct
             error_state = state;
             errors;
             branch_path;
+            _;
           }
         :: _ ->
           CmdResult.log_result
@@ -1872,16 +1908,26 @@ struct
               }
           else cont_func ()
 
-    let select_conf branch_path confs =
-      match branch_path with
+    let select_conf selector confs =
+      match selector with
       | None ->
           DL.log (fun m ->
-              m "HORROR: branch_path shouldn't be None when debugging!");
+              m
+                "select_conf - HORROR: selector shouldn't be None when \
+                 debugging!");
           List_utils.hd_tl confs
-      | Some branch_path ->
-          confs
-          |> List_utils.pop_where (fun conf ->
-                 CConf.get_branch_path conf = branch_path)
+      | Some selector ->
+          let f =
+            match selector with
+            | Path path -> fun conf -> CConf.get_branch_path conf = path
+            | IdCase (id, case) -> (
+                fun conf ->
+                  let case' = CConf.get_branch_case conf in
+                  match CConf.get_prev_cmd_id conf with
+                  | Some id' when id = id' && case = case' -> true
+                  | _ -> false)
+          in
+          List_utils.pop_where f confs
 
     let debug_log conf rest_confs =
       DL.log (fun m ->
@@ -1898,41 +1944,61 @@ struct
               ]
             "G_interpreter.evaluate_cmd_step: Evaluating conf")
 
-    let end_of_branch ?branch_case results eval_step_state =
-      let { conf; rest_confs; branch_path; ret_fun; f; _ } = eval_step_state in
-      match branch_path with
-      | None -> failwith "HORROR: branch_path shouldn't be None when debugging!"
-      | Some branch_path -> (
-          match results |> List.assoc_opt branch_path with
-          | None ->
-              DL.failwith
-                (fun () ->
-                  let result_jsons =
-                    results
-                    |> List.map (fun (path, result) ->
-                           `Assoc
-                             [
-                               ("path", branch_path_to_yojson path);
-                               ("result", result_t_to_yojson result);
-                             ])
-                  in
-                  let conf_json =
-                    match conf with
-                    | None -> `Null
-                    | Some conf -> CConf.to_yojson conf
-                  in
-                  [
-                    ("branch_path", branch_path_to_yojson branch_path);
-                    ( "branch_case",
-                      opt_to_yojson branch_case_to_yojson branch_case );
-                    ("results", `List result_jsons);
-                    ("conf", conf_json);
-                    ("rest_confs", `List (List.map CConf.to_yojson rest_confs));
-                  ])
-                "No result for branch path!"
-          | Some result ->
-              EndOfBranch
-                (ret_fun result, fun ?path () -> f rest_confs path results))
+    let find_result selector results =
+      let* pred =
+        match selector with
+        | None ->
+            Error
+              "find_result - HORROR: selector shouldn't be None when debugging!"
+        | Some (IdCase (id, _)) ->
+            Ok
+              (fun (id', _, result) ->
+                match id' with
+                | Some id' when id' = id -> Some result
+                | _ -> None)
+        | Some (Path path) ->
+            Ok
+              (fun (_, path', result) ->
+                if path = path' then Some result else None)
+      in
+      match List.find_map pred results with
+      | Some result -> Ok result
+      | None ->
+          Fmt.error "No result for selector (%a)!"
+            (pp_option pp_conf_selector)
+            selector
+
+    let end_of_branch results eval_step_state =
+      let { conf; rest_confs; ret_fun; f; selector; _ } = eval_step_state in
+      match find_result selector results with
+      | Error msg ->
+          DL.failwith
+            (fun () ->
+              let result_jsons =
+                results
+                |> List.map (fun (id, path, result) ->
+                       `Assoc
+                         [
+                           ("id", opt_to_yojson L.Report_id.to_yojson id);
+                           ("path", branch_path_to_yojson path);
+                           ("result", result_t_to_yojson result);
+                         ])
+              in
+              let conf_json =
+                match conf with
+                | None -> `Null
+                | Some conf -> CConf.to_yojson conf
+              in
+              [
+                ("selector", opt_to_yojson conf_selector_to_yojson selector);
+                ("results", `List result_jsons);
+                ("conf", conf_json);
+                ("rest_confs", `List (List.map CConf.to_yojson rest_confs));
+              ])
+            msg
+      | Ok result ->
+          EndOfBranch
+            (ret_fun result, fun ?selector () -> f rest_confs selector results)
 
     module Handle_conf = struct
       let none eval_step_state =
@@ -1954,7 +2020,7 @@ struct
         | [] when !Config.debug -> end_of_branch results eval_step_state
         | [] ->
             let results =
-              List.map (fun (_, result) -> ret_fun result) results
+              List.map (fun (_, _, result) -> ret_fun result) results
             in
             let results = hold_results @ results in
             if not retry then Finished results
@@ -1966,8 +2032,9 @@ struct
                      if Hashtbl.mem prog.specs pid then Some conf else None)
                    on_hold
                in
-               continue_or_pause hold_confs (fun ?path () ->
-                   eval_step ret_fun false prog results [] hold_confs path []))
+               continue_or_pause hold_confs (fun ?selector () ->
+                   eval_step ret_fun false prog results [] hold_confs selector
+                     []))
                 eval_step_state
 
       let cont (cconf : CConf.cont) eval_step_state =
@@ -1995,7 +2062,7 @@ struct
             b_counter parent_id_ref branch_path branch_case
         in
         continue_or_pause ~new_confs:true next_confs
-          (fun ?path () -> f (next_confs @ rest_confs) path results)
+          (fun ?selector () -> f (next_confs @ rest_confs) selector results)
           eval_step_state
 
       let max_branch (cconf : CConf.cont) eval_step_state =
@@ -2026,33 +2093,39 @@ struct
                parent_id_ref := Some report_id;
                L.Parent.set report_id);
         continue_or_pause []
-          (fun ?path () -> f rest_confs path results)
+          (fun ?selector () -> f rest_confs selector results)
           eval_step_state
 
       let err (cconf : CConf.err) eval_step_state =
         let { results; rest_confs; f; _ } = eval_step_state in
-        let { callstack; proc_idx; error_state; errors; branch_path } = cconf in
+        let { callstack; proc_idx; error_state; errors; branch_path; _ } =
+          cconf
+        in
         let proc = Call_stack.get_cur_proc_id callstack in
         let result = Exec_res.RFail { proc; proc_idx; error_state; errors } in
-        let results = (branch_path, result) :: results in
+        let results =
+          (cconf.prev_cmd_report_id, branch_path, result) :: results
+        in
         if !Config.debug then end_of_branch results eval_step_state
         else
           continue_or_pause rest_confs
-            (fun ?path () -> f rest_confs path results)
+            (fun ?selector () -> f rest_confs selector results)
             eval_step_state
 
       let finish (cconf : CConf.finish) eval_step_state =
         let { results; rest_confs; f; _ } = eval_step_state in
-        let { flag; ret_val; final_state; branch_path } = cconf in
+        let { flag; ret_val; final_state; branch_path; _ } = cconf in
         let result =
           Exec_res.RSucc
             { flag; ret_val; final_state; last_report = L.Parent.get () }
         in
-        let results = (branch_path, result) :: results in
+        let results =
+          (cconf.prev_cmd_report_id, branch_path, result) :: results
+        in
         if !Config.debug then end_of_branch results eval_step_state
         else
           continue_or_pause rest_confs
-            (fun ?path () -> f rest_confs path results)
+            (fun ?selector () -> f rest_confs selector results)
             eval_step_state
 
       let susp (cconf : CConf.susp) eval_step_state =
@@ -2092,9 +2165,9 @@ struct
           verbose (fun m ->
               m "Suspending a computation that was trying to call %s" fid));
         continue_or_pause []
-          (fun ?path () ->
+          (fun ?selector () ->
             eval_step ret_fun retry prog hold_results ((conf, fid) :: on_hold)
-              rest_confs path results)
+              rest_confs selector results)
           eval_step_state
     end
 
@@ -2105,15 +2178,16 @@ struct
         (hold_results : 'a list)
         (on_hold : (CConf.t * string) list)
         (confs : CConf.t list)
-        (branch_path : branch_path option)
-        (results : (branch_path * result_t) list) : 'a cont_func =
+        (selector : conf_selector option)
+        (results : results) : 'a cont_func =
       let f = eval_step ret_fun retry prog hold_results on_hold in
       let parent_id_ref = ref None in
 
       Fun.protect
         ~finally:(fun () -> L.Parent.release !parent_id_ref)
         (fun () ->
-          let conf, rest_confs = select_conf branch_path confs in
+          let conf, rest_confs = select_conf selector confs in
+          let branch_path = Option.map get_branch_path conf in
           let eval_step_state =
             {
               ret_fun;
@@ -2128,6 +2202,7 @@ struct
               parent_id_ref;
               f;
               eval_step;
+              selector;
             }
           in
           debug_log conf rest_confs;
@@ -2143,7 +2218,7 @@ struct
           | Some (ConfSusp c) when retry -> Handle_conf.susp c eval_step_state
           | Some _ ->
               continue_or_pause rest_confs
-                (fun ?path () -> f rest_confs path results)
+                (fun ?selector () -> f rest_confs selector results)
                 eval_step_state)
   end
 
@@ -2225,8 +2300,8 @@ struct
         branch_path = [];
         new_branch_cases = [];
         cont_func =
-          (fun ?path () ->
-            evaluate_cmd_step ret_fun true prog [] [] [ conf ] path []);
+          (fun ?selector () ->
+            evaluate_cmd_step ret_fun true prog [] [] [ conf ] selector []);
       }
 
   (**

@@ -15,6 +15,7 @@ type tt =
   | Logic of WLCmd.t
   | Assert of WExpr.t
   | Assume of WExpr.t
+  | AssumeType of WExpr.t * WType.t
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
 
@@ -53,6 +54,8 @@ and pp fmt stmt =
   | Logic lcmd -> Format.fprintf fmt "@[[[ %a ]]@]" WLCmd.pp lcmd
   | Assert e -> Format.fprintf fmt "@[assert %a@]" WExpr.pp e
   | Assume e -> Format.fprintf fmt "@[assume %a@]" WExpr.pp e
+  | AssumeType (e, t) ->
+      Format.fprintf fmt "@[assume_type (%a, %a)@]" WExpr.pp e WType.pp t
 
 and pp_head fmt stmt =
   match get stmt with
@@ -93,8 +96,12 @@ let rec get_by_id id stmt =
   let lcmd_getter = WLCmd.get_by_id id in
   let aux s =
     match get s with
-    | Dispose e | Lookup (_, e) | VarAssign (_, e) | Assert e | Assume e ->
-        expr_getter e
+    | Dispose e
+    | Lookup (_, e)
+    | VarAssign (_, e)
+    | Assert e
+    | Assume e
+    | AssumeType (e, _) -> expr_getter e
     | Update (e1, e2) -> expr_getter e1 |>> (expr_getter, e2)
     | FunCall (_, _, el, _) -> expr_list_visitor el
     | While (e, sl) -> expr_getter e |>> (list_visitor, sl)

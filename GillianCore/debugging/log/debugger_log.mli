@@ -36,6 +36,7 @@ end
 include module type of Public
 
 val setup : Debug_rpc.t -> unit
+val set_debug_state_dumper : (unit -> Yojson.Safe.t) -> unit
 
 val set_rpc_command_handler :
   Debug_rpc.t ->

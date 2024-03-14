@@ -34,6 +34,7 @@ module type S = sig
       error_state : state_t;
       errors : err_t list;
       branch_path : Branch_case.path;
+      prev_cmd_report_id : Logging.Report_id.t option;
     }
 
     type cont = {
@@ -55,6 +56,7 @@ module type S = sig
       ret_val : state_vt;
       final_state : state_t;
       branch_path : Branch_case.path;
+      prev_cmd_report_id : Logging.Report_id.t option;
     }
 
     type susp = {
@@ -67,6 +69,7 @@ module type S = sig
       loop_ids : string list;
       branch_count : int;
       branch_path : Branch_case.path;
+      prev_cmd_report_id : Logging.Report_id.t option;
     }
 
     type t =
@@ -83,9 +86,14 @@ module type S = sig
     In the symbolic case, this is the result of {i one branch} of execution *)
   type result_t = (state_t, state_vt, err_t) Exec_res.t
 
+  type conf_selector =
+    | Path of Branch_case.path
+    | IdCase of Logging.Report_id.t * Branch_case.t option
+
   (** To support the step-by-step behaviour of the debugger, execution is split into thunks; each invocation executes one GIL command.
-    By supplying a branch path, a particular branch of execution can be selected. *)
-  type 'result cont_func_f = ?path:Branch_case.path -> unit -> 'result cont_func
+    By supplying a branch path, or an ID and branch case, a particular branch of execution can be selected. *)
+  type 'result cont_func_f =
+    ?selector:conf_selector -> unit -> 'result cont_func
 
   and 'result cont_func =
     | Finished of 'result list

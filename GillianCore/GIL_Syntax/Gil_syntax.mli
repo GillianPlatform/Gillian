@@ -5,7 +5,7 @@ module Location : sig
   type position = { pos_line : int; pos_column : int } [@@deriving yojson]
 
   type t = { loc_start : position; loc_end : position; loc_source : string }
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   val none : t
   val pp : t Fmt.t
@@ -1017,7 +1017,7 @@ module Branch_case : sig
   (** A list of branch cases describes the path of execution.
 
     Every termination of a symbolic execution is uniquely identified by its branch path. *)
-  type path = t list [@@deriving yojson]
+  type path = t list [@@deriving yojson, show]
 
   val pp_short : Format.formatter -> t -> unit
 end

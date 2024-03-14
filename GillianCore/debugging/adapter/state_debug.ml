@@ -5,6 +5,8 @@ module Make (Debugger : Debugger.S) = struct
   module Breakpoints = Breakpoints.Make (Debugger)
 
   let run launch_args dbg rpc =
+    Debugger_log.set_debug_state_dumper (fun () ->
+        Debugger.Inspect.(get_debug_state dbg |> debug_state_view_to_yojson));
     Lwt.join
       [
         Lifecycle.run launch_args dbg rpc;
