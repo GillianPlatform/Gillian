@@ -24,7 +24,7 @@ function build_list(size) {
 
 function main() {
   fresh x;
-  assume_type (x, Int);
+  // assume_type (x, Int);
   assume (x >= 2);
   assume (x <= 3);
   l := build_list(x);

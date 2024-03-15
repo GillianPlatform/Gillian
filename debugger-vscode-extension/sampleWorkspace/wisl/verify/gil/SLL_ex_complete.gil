@@ -1,0 +1,857 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+lemma SLLseg_concat_SLL(x, y)
+  [[  emp * (x == #x) * (y == #y) * SLLseg(#x, #y, #vx) * SLL(#y, #vy) ]]
+  [[  SLL(#x, l+ (#vx, #vy)) ]]
+  [*  unfold SLLseg(#x, #y, #vx) ;
+      if ((not (#vx = {{  }}))) then {
+                                  sep_assert (<cell>(#wisl__0, 0i; #nv) *
+                                              <bound>(#wisl__0; 2i) *
+                                              <cell>(#wisl__0, 1i; #nnext) *
+                                              types(#wisl__0 : Obj) *
+                                              (#x == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+                                  #nv, #nnext];
+                                  apply SLLseg_concat_SLL(#nnext, #y) 
+      }  *]
+
+lemma list_member_append(vs, v, r, w)
+  [[  emp * (vs == #vs) * (v == #v) * (r == #r) * (w == #w) *
+      list_member(#vs, #v, #r) ]]
+  [[  list_member(l+ (#vs, {{ #w }}), #v, (#r or (#w = #v))) ]]
+  [*  if ((#w = #v)) then {
+                       
+      }; unfold list_member(#vs, #v, #r) ;
+      if ((not (#vs = {{  }}))) then {
+                                  sep_assert ((#vs == l+ ({{ #nv }}, #nvs)) *
+                                              list_member(#nvs, #v, #nr)) [bind: #nv,
+                                  #nvs, #nr];
+                                  apply list_member_append(#nvs, #v, #nr, #w) 
+      }  *]
+
+lemma SLLseg_to_SLL(x)
+  [[  emp * (x == #x) * SLLseg(#x, null, #vx) ]]
+  [[  SLL(#x, #vx) ]]
+  [*  unfold SLLseg(#x, null, #vx) ;
+      if ((not (#vx = {{  }}))) then {
+                                  sep_assert (<cell>(#wisl__0, 0i; #nv) *
+                                              <bound>(#wisl__0; 2i) *
+                                              <cell>(#wisl__0, 1i; #nnext) *
+                                              types(#wisl__0 : Obj) *
+                                              (#x == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+                                  #nv, #nnext]; apply SLLseg_to_SLL(#nnext) 
+      }  *]
+
+lemma SSLseg_append(x, vs, v, z)
+  [[  emp * (x == #x) * (vs == #vs) * (v == #v) * (z == #z) *
+      SLLseg(#x, #y, #vs) * <cell>(#wisl__1, 0i; #v) *
+      <bound>(#wisl__1; 2i) * <cell>(#wisl__1, 1i; #z) *
+      types(#wisl__1 : Obj) * (#y == {{ #wisl__1, 0i }}) ]]
+  [[  SLLseg(#x, #z, l+ (#vs, {{ #v }})) ]]
+  [*  unfold SLLseg(#x, #y, #vs) ;
+      if ((not (#x = #y))) then {
+        sep_assert (<cell>(#wisl__0, 0i; #nv) * <bound>(#wisl__0; 2i) *
+                    <cell>(#wisl__0, 1i; #nnext) * types(#wisl__0 : Obj) *
+                    (#x == {{ #wisl__0, 0i }}) * SLLseg(#nnext, #y, #nvs) *
+                    (#vs == l+ ({{ #nv }}, #nvs))) [bind: #wisl__0,
+        #nv, #nnext, #nvs]; apply SSLseg_append(#nnext, #nvs, #v, #z) ;
+        fold SLLseg(#x, #z, l+ (#vs, {{ #v }}))
+      } else { fold SLLseg(#y, #z, {{ #v }}) }  *]
+
+lemma list_member_concat(vs1, vs2, v)
+  [[  emp * (vs1 == #vs1) * (vs2 == #vs2) * (v == #v) *
+      list_member(#vs1, #v, #r1) * list_member(#vs2, #v, #r2) ]]
+  [[  list_member(l+ (#vs1, #vs2), #v, (#r1 or #r2)) ]]
+  [*  unfold list_member(#vs1, #v, #r1) ;
+      if ((not (#vs1 = {{  }}))) then {
+                                   sep_assert ((#vs1 ==
+                                               l+ ({{ #nv1 }}, #nvs1)) *
+                                               list_member(#nvs1, #v, #nr1)) [bind: #nv1,
+                                   #nvs1, #nr1];
+                                   apply list_member_concat(#nvs1, #vs2, #v) 
+      }  *]
+pred SLL(+x, vs : List) : (x == null) * (vs == {{  }}),
+  <cell>(#wisl__1, 0i; #v) * <bound>(#wisl__1; 2i) *
+  <cell>(#wisl__1, 1i; #next) * types(#wisl__1 : Obj) *
+  (x == {{ #wisl__1, 0i }}) * SLL(#next, #vs) * (vs == l+ ({{ #v }}, #vs));
+
+
+pred SLLseg(+x, y, vs : List) : (x == y) * (vs == {{  }}),
+  <cell>(#wisl__0, 0i; #v) * <bound>(#wisl__0; 2i) *
+  <cell>(#wisl__0, 1i; #next) * types(#wisl__0 : Obj) *
+  (x == {{ #wisl__0, 0i }}) * SLLseg(#next, y, #vs) *
+  (vs == l+ ({{ #v }}, #vs));
+
+
+pred list_member(+vs : List, +v, r : Bool) : (vs == {{  }}) * (r == false),
+  (vs == l+ ({{ v }}, #rest)) * (r == true) * list_member(#rest, v, #mem),
+  (vs == l+ ({{ #v }}, #rest)) * (! (#v == v)) * list_member(#rest, v, r);
+
+spec SLL_concat_iter_loop0(head, next, prev)
+  [[  (prev == #pvar_prev) *
+      (next == #pvar_next) *
+      (head == #pvar_head) *
+      SLLseg(#pvar_head, #pvar_prev, #vs1) *
+      <cell>(#wisl__0, 0i; #v) *
+      <bound>(#wisl__0; 2i) *
+      <cell>(#wisl__0, 1i; #pvar_next) *
+      types(#wisl__0 : Obj) *
+      (#pvar_prev == {{ #wisl__0, 0i }}) *
+      SLL(#pvar_next, #vs2) *
+      (#vx == l+ (#vs1, l+ ({{ #v }}, #vs2)))  ]]
+  [[  SLLseg(#pvar_head, #new_pvar_prev, #vs1__new) *
+      <cell>(#wisl__1, 0i; #v__new) *
+      <bound>(#wisl__1; 2i) *
+      <cell>(#wisl__1, 1i; #new_pvar_next) *
+      types(#wisl__1 : Obj) *
+      (#new_pvar_prev == {{ #wisl__1, 0i }}) *
+      SLL(#new_pvar_next, #vs2__new) *
+      (#vx == l+ (#vs1__new, l+ ({{ #v__new }}, #vs2__new))) *
+      (ret == {{ #pvar_head, #new_pvar_next, #new_pvar_prev }}) *
+      (#new_pvar_next == null)  ]]
+  normal
+proc SLL_concat_iter_loop0(head, next, prev) {
+             goto [(not (next = null))] then0 else0;
+  then0:     sep_assert ((prev == #prev)) [bind: #prev];
+             prev := next;
+             gvar0 := "i__add"(next, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             next := l-nth(gvar1, 2i);
+             apply SSLseg_append(head, #vs1, #v, prev) ;
+             loopretvar__ := "SLL_concat_iter_loop0"(head, next, prev);
+             goto endif0;
+  else0:     loopretvar__ := {{ head, next, prev }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_copy(x)
+  [[  (x == #x) * SLL(#x, #vs)  ]]
+  [[  SLL(#x, #vs) * SLL(ret, #vs)  ]]
+  normal
+proc SLL_copy(x) {
+             y := null;
+             goto [(not (x = null))] then0 else0;
+  then0:     goto [((typeOf x) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar0 := [getcell](l-nth(x, 0i), l-nth(x, 1i));
+             k := l-nth(gvar0, 2i);
+             y := "SLL_allocate_node"(k);
+             gvar1 := "i__add"(x, 1i);
+             goto [((typeOf gvar1) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
+             t := l-nth(gvar2, 2i);
+             z := "SLL_copy"(t);
+             gvar3 := "i__add"(y, 1i);
+             gvar4 := [getcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i));
+             gvar5 := [setcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i), z);
+             goto endif0;
+  else0:     skip;
+  endif0:    skip;
+             ret := y;
+             return
+};
+
+
+spec SLL_remove(x, k)
+  [[  (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #mem)  ]]
+  [[  SLL(ret, #nvs) * list_member(#nvs, #k, false)  ]]
+  normal
+proc SLL_remove(x, k) {
+             goto [(x = null)] then1 else1;
+  then1:     skip;
+             goto endif1;
+  else1:     goto [((typeOf x) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar0 := [getcell](l-nth(x, 0i), l-nth(x, 1i));
+             v := l-nth(gvar0, 2i);
+             gvar1 := "i__add"(x, 1i);
+             goto [((typeOf gvar1) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
+             next := l-nth(gvar2, 2i);
+             goto [(v = k)] then0 else0;
+  then0:     goto [(l-nth(x, 1i) = 0i)] continue2 fail2;
+  fail2:     fail [InvalidBlockPointer](x);
+  continue2: gvar3 := [dispose](l-nth(x, 0i));
+             x := "SLL_remove"(next, k);
+             goto endif0;
+  else0:     z := "SLL_remove"(next, k);
+             gvar4 := "i__add"(x, 1i);
+             gvar5 := [getcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i));
+             gvar6 := [setcell](l-nth(gvar5, 0i), l-nth(gvar5, 1i), z);
+  endif0:    skip;
+  endif1:    skip;
+             fold list_member({{  }},
+  #k,
+  false);
+             ret := x;
+             return
+};
+
+
+spec SLL_copy_iter_loop0(p, t, v, x, y)
+  [[  (y == #pvar_y) *
+      (x == #pvar_x) *
+      (v == #pvar_v) *
+      (t == #pvar_t) *
+      (p == #pvar_p) *
+      SLLseg(#pvar_x, #pvar_t, #alpha1) *
+      SLL(#pvar_t, #alpha2) *
+      (#pvar_v == #a) *
+      (#alpha == l+ (#alpha1, #alpha2)) *
+      SLLseg(#pvar_y, #pvar_p, #alpha3) *
+      <cell>(#wisl__0, 0i; #a) *
+      <bound>(#wisl__0; 2i) *
+      <cell>(#wisl__0, 1i; null) *
+      types(#wisl__0 : Obj) *
+      (#pvar_p == {{ #wisl__0, 0i }}) *
+      (#alpha1 == l+ (#alpha3, {{ #a }}))  ]]
+  [[  SLLseg(#pvar_x, #new_pvar_t, #alpha1__new) *
+      SLL(#new_pvar_t, #alpha2__new) *
+      (#new_pvar_v == #a__new) *
+      (#alpha == l+ (#alpha1__new, #alpha2__new)) *
+      SLLseg(#pvar_y, #new_pvar_p, #alpha3__new) *
+      <cell>(#wisl__1, 0i; #a__new) *
+      <bound>(#wisl__1; 2i) *
+      <cell>(#wisl__1, 1i; null) *
+      types(#wisl__1 : Obj) *
+      (#new_pvar_p == {{ #wisl__1, 0i }}) *
+      (#alpha1__new == l+ (#alpha3__new, {{ #a__new }})) *
+      (ret == {{ #new_pvar_p, #new_pvar_t, #new_pvar_v, #pvar_x, #pvar_y }}) *
+      (#new_pvar_t == null)  ]]
+  normal
+proc SLL_copy_iter_loop0(p, t, v, x, y) {
+             goto [(not (t = null))] then0 else0;
+  then0:     sep_assert ((t == #t) * (p == #p)) [bind: #t, #p];
+             goto [((typeOf t) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar0 := [getcell](l-nth(t, 0i), l-nth(t, 1i));
+             v := l-nth(gvar0, 2i);
+             c := [alloc](2i);
+             gvar1 := [getcell](l-nth(c, 0i), l-nth(c, 1i));
+             gvar2 := [setcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i), v);
+             gvar3 := "i__add"(p, 1i);
+             gvar4 := [getcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i));
+             gvar5 := [setcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i), c);
+             p := c;
+             gvar6 := "i__add"(t, 1i);
+             goto [((typeOf gvar6) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar7 := [getcell](l-nth(gvar6, 0i), l-nth(gvar6, 1i));
+             t := l-nth(gvar7, 2i);
+             apply SSLseg_append(x, #alpha1, v, t) ;
+             apply SSLseg_append(y, #alpha3, #a, p) ;
+             loopretvar__ := "SLL_copy_iter_loop0"(p, t, v, x, y);
+             goto endif0;
+  else0:     loopretvar__ := {{ p, t, v, x, y }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_concat_iter(x, y)
+  [[  (x == #x) * (y == #y) * SLL(#x, #vx) * SLL(#y, #vy)  ]]
+  [[  SLL(ret, l+ (#vx, #vy))  ]]
+  normal
+proc SLL_concat_iter(x, y) {
+             goto [(x = null)] then0 else0;
+  then0:     head := y;
+             goto endif0;
+  else0:     head := x;
+             prev := head;
+             gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             next := l-nth(gvar1, 2i);
+             gvar2 := "SLL_concat_iter_loop0"(head, next, prev);
+             head := l-nth(gvar2, 0i);
+             next := l-nth(gvar2, 1i);
+             prev := l-nth(gvar2, 2i);
+             gvar3 := "i__add"(prev, 1i);
+             gvar4 := [getcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i));
+             gvar5 := [setcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i), y);
+             sep_assert (SLLseg(head, prev, #svs) *
+                         <cell>(#wisl__0, 0i; #sv) * <bound>(#wisl__0; 2i) *
+                         <cell>(#wisl__0, 1i; y) * types(#wisl__0 : Obj) *
+                         (prev == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+             #svs, #sv];
+             apply SSLseg_append(head, #svs, #sv, y) ;
+             apply SLLseg_concat_SLL(head, y) ;
+  endif0:    skip;
+             ret := head;
+             return
+};
+
+
+spec SLL_length_iter_loop0(n, x, y)
+  [[  (y == #pvar_y) *
+      (x == #pvar_x) *
+      (n == #pvar_n) *
+      SLLseg(#pvar_x, #pvar_y, #nvx) *
+      SLL(#pvar_y, #nvy) *
+      (#vx == l+ (#nvx, #nvy)) *
+      (#pvar_n == (l-len #nvx))  ]]
+  [[  SLLseg(#pvar_x, #new_pvar_y, #nvx__new) *
+      SLL(#new_pvar_y, #nvy__new) *
+      (#vx == l+ (#nvx__new, #nvy__new)) *
+      (#new_pvar_n == (l-len #nvx__new)) *
+      (ret == {{ #new_pvar_n, #pvar_x, #new_pvar_y }}) *
+      (#new_pvar_y == null)  ]]
+  normal
+proc SLL_length_iter_loop0(n, x, y) {
+             goto [(not (y = null))] then0 else0;
+  then0:     sep_assert ((y == #y)) [bind: #y];
+             sep_assert (<cell>(#wisl__0, 0i; #v) * <bound>(#wisl__0; 2i) *
+                         <cell>(#wisl__0, 1i; #z) * types(#wisl__0 : Obj) *
+                         (#y == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+             #v, #z];
+             gvar0 := "i__add"(y, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             y := l-nth(gvar1, 2i);
+             gvar2 := "i__add"(n, 1i);
+             n := gvar2;
+             apply SSLseg_append(x, #nvx, #v, y) ;
+             loopretvar__ := "SLL_length_iter_loop0"(n, x, y);
+             goto endif0;
+  else0:     loopretvar__ := {{ n, x, y }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_free_iter_loop0(x)
+  [[  (x == #pvar_x) * SLL(#pvar_x, #rvs)  ]]
+  [[  SLL(#new_pvar_x, #rvs__new) *
+      (ret == {{ #new_pvar_x }}) *
+      (#new_pvar_x == null)  ]]
+  normal
+proc SLL_free_iter_loop0(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     y := x;
+             gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             x := l-nth(gvar1, 2i);
+             goto [(l-nth(y, 1i) = 0i)] continue1 fail1;
+  fail1:     fail [InvalidBlockPointer](y);
+  continue1: gvar2 := [dispose](l-nth(y, 0i));
+             loopretvar__ := "SLL_free_iter_loop0"(x);
+             goto endif0;
+  else0:     loopretvar__ := {{ x }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_length(x)
+  [[  (x == #x) * SLL(#x, #vs)  ]]
+  [[  (ret == (l-len #vs))  ]]
+  normal
+proc SLL_length(x) {
+             n := 0i;
+             goto [(x = null)] then0 else0;
+  then0:     n := 0i;
+             goto endif0;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             n := "SLL_length"(t);
+             gvar2 := "i__add"(1i, n);
+             n := gvar2;
+  endif0:    skip;
+             ret := n;
+             return
+};
+
+
+spec SLL_free_iter(x)
+  [[  (x == #x) * SLL(#x, #vs)  ]]
+  [[  (ret == null)  ]]
+  normal
+proc SLL_free_iter(x) {
+    gvar0 := "SLL_free_iter_loop0"(x);
+    x := l-nth(gvar0, 0i);
+    ret := null;
+    return
+};
+
+
+spec SLL_append(x, k)
+  [[  (x == #x) * (k == #k) * SLL(#x, #vs)  ]]
+  [[  SLL(ret, l+ (#vs, {{ #k }}))  ]]
+  normal
+proc SLL_append(x, k) {
+             goto [(x = null)] then0 else0;
+  then0:     x := "SLL_allocate_node"(k);
+             goto endif0;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             z := "SLL_append"(t, k);
+             gvar2 := "i__add"(x, 1i);
+             gvar3 := [getcell](l-nth(gvar2, 0i), l-nth(gvar2, 1i));
+             gvar4 := [setcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i), z);
+  endif0:    skip;
+             ret := x;
+             return
+};
+
+
+spec SLL_append_iter(x, k)
+  [[  (x == #x) * (k == #k) * SLL(#x, #vx)  ]]
+  [[  SLL(ret, l+ (#vx, {{ #k }}))  ]]
+  normal
+proc SLL_append_iter(x, k) {
+             y := "SLL_allocate_node"(k);
+             goto [(x = null)] then0 else0;
+  then0:     x := y;
+             goto endif0;
+  else0:     head := x;
+             prev := head;
+             gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             next := l-nth(gvar1, 2i);
+             gvar2 := "SLL_append_iter_loop0"(head, next, prev);
+             head := l-nth(gvar2, 0i);
+             next := l-nth(gvar2, 1i);
+             prev := l-nth(gvar2, 2i);
+             gvar3 := "i__add"(prev, 1i);
+             gvar4 := [getcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i));
+             gvar5 := [setcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i), y);
+             sep_assert (SLLseg(head, prev, #svs) *
+                         <cell>(#wisl__0, 0i; #sv) * <bound>(#wisl__0; 2i) *
+                         <cell>(#wisl__0, 1i; y) * types(#wisl__0 : Obj) *
+                         (prev == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+             #svs, #sv];
+             apply SSLseg_append(head, #svs, #sv, y) ;
+             sep_assert (SLLseg(head, y, #vx)) ;
+             apply SLLseg_concat_SLL(head, y) ;
+  endif0:    skip;
+             ret := x;
+             return
+};
+
+
+spec SLL_length_iter(x)
+  [[  (x == #x) * SLL(x, #vx)  ]]
+  [[  SLL(#x, #vx) * (ret == (l-len #vx))  ]]
+  normal
+proc SLL_length_iter(x) {
+    y := x;
+    n := 0i;
+    gvar0 := "SLL_length_iter_loop0"(n, x, y);
+    n := l-nth(gvar0, 0i);
+    x := l-nth(gvar0, 1i);
+    y := l-nth(gvar0, 2i);
+    unfold SLL(null, #nvy) ;
+    apply SLLseg_to_SLL(x) ;
+    ret := n;
+    return
+};
+
+
+spec SLL_append_node_iter(x, y)
+  [[  (x == #x) * (y == #y) * SLL(#x, #vs) * SLL(#y, {{ #vy }})  ]]
+  [[  SLL(ret, l+ (#vs, {{ #vy }}))  ]]
+  normal
+proc SLL_append_node_iter(x, y) {
+             goto [(x = null)] then0 else0;
+  then0:     x := y;
+             goto endif0;
+  else0:     head := x;
+             prev := head;
+             gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             next := l-nth(gvar1, 2i);
+             gvar2 := "SLL_append_node_iter_loop0"(head, next, prev);
+             head := l-nth(gvar2, 0i);
+             next := l-nth(gvar2, 1i);
+             prev := l-nth(gvar2, 2i);
+             gvar3 := "i__add"(prev, 1i);
+             gvar4 := [getcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i));
+             gvar5 := [setcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i), y);
+             sep_assert (SLLseg(head, prev, #svs) *
+                         <cell>(#wisl__0, 0i; #sv) * <bound>(#wisl__0; 2i) *
+                         <cell>(#wisl__0, 1i; y) * types(#wisl__0 : Obj) *
+                         (prev == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+             #svs, #sv];
+             apply SSLseg_append(head, #svs, #sv, y) ;
+             sep_assert (SLLseg(head, y, #vs)) ;
+             apply SLLseg_concat_SLL(head, y) ;
+  endif0:    skip;
+             ret := x;
+             return
+};
+
+
+spec SLL_copy_iter(x)
+  [[  (x == #x) * SLL(#x, #alpha)  ]]
+  [[  SLL(#x, #alpha) * SLL(ret, #alpha)  ]]
+  normal
+proc SLL_copy_iter(x) {
+             y := null;
+             goto [(x = null)] then0 else0;
+  then0:     skip;
+             goto endif0;
+  else0:     y := [alloc](2i);
+             goto [((typeOf x) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar0 := [getcell](l-nth(x, 0i), l-nth(x, 1i));
+             v := l-nth(gvar0, 2i);
+             gvar1 := [getcell](l-nth(y, 0i), l-nth(y, 1i));
+             gvar2 := [setcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i), v);
+             gvar3 := "i__add"(x, 1i);
+             goto [((typeOf gvar3) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar4 := [getcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i));
+             t := l-nth(gvar4, 2i);
+             p := y;
+             fold SLLseg(x,
+  t,
+  {{ v }});
+             fold SLLseg(y,
+  p,
+  {{  }});
+             gvar5 := "SLL_copy_iter_loop0"(p, t, v, x, y);
+             p := l-nth(gvar5, 0i);
+             t := l-nth(gvar5, 1i);
+             v := l-nth(gvar5, 2i);
+             x := l-nth(gvar5, 3i);
+             y := l-nth(gvar5, 4i);
+             sep_assert (SLLseg(y, p, #alpha3)) [bind: #alpha3];
+             apply SSLseg_append(y, #alpha3, v, null) ;
+             apply SLLseg_to_SLL(x) ;
+             apply SLLseg_to_SLL(y) ;
+  endif0:    skip;
+             ret := y;
+             return
+};
+
+
+spec SLL_concat(x, y)
+  [[  (x == #x) * (y == #y) * SLL(#x, #vx) * SLL(#y, #vy)  ]]
+  [[  SLL(ret, l+ (#vx, #vy))  ]]
+  normal
+proc SLL_concat(x, y) {
+             goto [(x = null)] then0 else0;
+  then0:     x := y;
+             goto endif0;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             z := "SLL_concat"(t, y);
+             gvar2 := "i__add"(x, 1i);
+             gvar3 := [getcell](l-nth(gvar2, 0i), l-nth(gvar2, 1i));
+             gvar4 := [setcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i), z);
+  endif0:    skip;
+             ret := x;
+             return
+};
+
+
+spec SLL_append_iter_loop0(head, next, prev)
+  [[  (prev == #pvar_prev) *
+      (next == #pvar_next) *
+      (head == #pvar_head) *
+      SLLseg(#pvar_head, #pvar_prev, #vs1) *
+      <cell>(#wisl__0, 0i; #v) *
+      <bound>(#wisl__0; 2i) *
+      <cell>(#wisl__0, 1i; #pvar_next) *
+      types(#wisl__0 : Obj) *
+      (#pvar_prev == {{ #wisl__0, 0i }}) *
+      SLL(#pvar_next, #vs2) *
+      (#vx == l+ (#vs1, l+ ({{ #v }}, #vs2)))  ]]
+  [[  SLLseg(#pvar_head, #new_pvar_prev, #vs1__new) *
+      <cell>(#wisl__1, 0i; #v__new) *
+      <bound>(#wisl__1; 2i) *
+      <cell>(#wisl__1, 1i; #new_pvar_next) *
+      types(#wisl__1 : Obj) *
+      (#new_pvar_prev == {{ #wisl__1, 0i }}) *
+      SLL(#new_pvar_next, #vs2__new) *
+      (#vx == l+ (#vs1__new, l+ ({{ #v__new }}, #vs2__new))) *
+      (ret == {{ #pvar_head, #new_pvar_next, #new_pvar_prev }}) *
+      (#new_pvar_next == null)  ]]
+  normal
+proc SLL_append_iter_loop0(head, next, prev) {
+             goto [(not (next = null))] then0 else0;
+  then0:     sep_assert ((prev == #prev)) [bind: #prev];
+             prev := next;
+             gvar0 := "i__add"(next, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             next := l-nth(gvar1, 2i);
+             apply SSLseg_append(head, #vs1, #v, prev) ;
+             loopretvar__ := "SLL_append_iter_loop0"(head, next, prev);
+             goto endif0;
+  else0:     loopretvar__ := {{ head, next, prev }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_allocate_node(v)
+  [[  (v == #v)  ]]
+  [[  SLL(ret, {{ #v }})  ]]
+  normal
+proc SLL_allocate_node(v) {
+    t := [alloc](2i);
+    gvar0 := [getcell](l-nth(t, 0i), l-nth(t, 1i));
+    gvar1 := [setcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i), v);
+    ret := t;
+    return
+};
+
+
+spec SLL_append_node(x, y)
+  [[  (x == #x) * (y == #y) * SLL(#x, #vs) * SLL(#y, {{ #vy }})  ]]
+  [[  SLL(ret, l+ (#vs, {{ #vy }}))  ]]
+  normal
+proc SLL_append_node(x, y) {
+             goto [(x = null)] then0 else0;
+  then0:     x := y;
+             goto endif0;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             z := "SLL_append_node"(t, y);
+             gvar2 := "i__add"(x, 1i);
+             gvar3 := [getcell](l-nth(gvar2, 0i), l-nth(gvar2, 1i));
+             gvar4 := [setcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i), z);
+  endif0:    skip;
+             ret := x;
+             return
+};
+
+
+spec SLL_member_iter_loop0(found, k, next, x)
+  [[  (x == #pvar_x) *
+      (next == #pvar_next) *
+      (k == #pvar_k) *
+      (found == #pvar_found) *
+      SLLseg(#pvar_x, #pvar_next, #beta) *
+      SLL(#pvar_next, #gamma) *
+      (#alpha == l+ (#beta, #gamma)) *
+      (#r == (#pvar_found or #rg)) *
+      list_member(#beta, #pvar_k, #pvar_found) *
+      list_member(#gamma, #pvar_k, #rg)  ]]
+  [[  SLLseg(#pvar_x, #new_pvar_next, #beta__new) *
+      SLL(#new_pvar_next, #gamma__new) *
+      (#alpha == l+ (#beta__new, #gamma__new)) *
+      (#r == (#new_pvar_found or #rg__new)) *
+      list_member(#beta__new, #pvar_k, #new_pvar_found) *
+      list_member(#gamma__new, #pvar_k, #rg__new) *
+      (ret == {{ #new_pvar_found, #pvar_k, #new_pvar_next, #pvar_x }}) *
+      ((! (#new_pvar_found == false)) \/
+      (#new_pvar_next == null))  ]]
+  normal
+proc SLL_member_iter_loop0(found, k, next, x) {
+             goto [((found = false) and (not (next = null)))] then0 else0;
+  then0:     sep_assert ((found == false)) ;
+             sep_assert ((next == #next)) [bind: #next];
+             sep_assert (<cell>(#wisl__0, 0i; #v) * <bound>(#wisl__0; 2i) *
+                         <cell>(#wisl__0, 1i; #z) * types(#wisl__0 : Obj) *
+                         (#next == {{ #wisl__0, 0i }})) [bind: #wisl__0,
+             #v, #z];
+             goto [((typeOf next) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar0 := [getcell](l-nth(next, 0i), l-nth(next, 1i));
+             v := l-nth(gvar0, 2i);
+             found := (v = k);
+             gvar1 := "i__add"(next, 1i);
+             goto [((typeOf gvar1) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
+             next := l-nth(gvar2, 2i);
+             apply SSLseg_append(x, #beta, #v, next) ;
+             unfold list_member(#gamma, k, #rg) ;
+             apply list_member_append(#beta, k, false, #v) ;
+             loopretvar__ := "SLL_member_iter_loop0"(found, k, next, x);
+             goto endif0;
+  else0:     loopretvar__ := {{ found, k, next, x }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_member_iter(x, k)
+  [[  (x == #x) * (k == #k) * SLL(#x, #alpha) * list_member(#alpha, #k, #r)  ]]
+  [[  SLL(#x, #alpha) * list_member(#alpha, #k, #r) * (ret == #r)  ]]
+  normal
+proc SLL_member_iter(x, k) {
+    found := false;
+    next := x;
+    gvar0 := "SLL_member_iter_loop0"(found, k, next, x);
+    found := l-nth(gvar0, 0i);
+    k := l-nth(gvar0, 1i);
+    next := l-nth(gvar0, 2i);
+    x := l-nth(gvar0, 3i);
+    if ((found = false)) then { apply SLLseg_to_SLL(#x) ;
+      unfold list_member({{  }}, #k, false) 
+  } else {
+    sep_assert (SLLseg(#x, next, #beta) * SLL(next, #gamma)) [bind: #beta,
+    #gamma]; apply list_member_concat(#beta, #gamma, #k) ;
+    apply SLLseg_concat_SLL(#x, next) 
+  };
+    ret := found;
+    return
+};
+
+
+spec SLL_reverse(x)
+  [[  (x == #x) * SLL(#x, #vs)  ]]
+  [[  SLL(ret, (l-rev #vs))  ]]
+  normal
+proc SLL_reverse(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             gvar2 := "i__add"(x, 1i);
+             gvar3 := [getcell](l-nth(gvar2, 0i), l-nth(gvar2, 1i));
+             gvar4 := [setcell](l-nth(gvar3, 0i), l-nth(gvar3, 1i), null);
+             z := "SLL_reverse"(t);
+             y := "SLL_append_node"(z, x);
+             goto endif0;
+  else0:     y := null;
+  endif0:    skip;
+             ret := y;
+             return
+};
+
+
+spec SLL_free(x)
+  [[  (x == #x) * SLL(#x, #vs)  ]]
+  [[  (ret == null)  ]]
+  normal
+proc SLL_free(x) {
+             goto [(x = null)] then0 else0;
+  then0:     skip;
+             goto endif0;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             z := "SLL_free"(t);
+             goto [(l-nth(x, 1i) = 0i)] continue1 fail1;
+  fail1:     fail [InvalidBlockPointer](x);
+  continue1: gvar2 := [dispose](l-nth(x, 0i));
+  endif0:    skip;
+             ret := null;
+             return
+};
+
+
+spec SLL_append_node_iter_loop0(head, next, prev)
+  [[  (prev == #pvar_prev) *
+      (next == #pvar_next) *
+      (head == #pvar_head) *
+      SLLseg(#pvar_head, #pvar_prev, #vs1) *
+      <cell>(#wisl__0, 0i; #v) *
+      <bound>(#wisl__0; 2i) *
+      <cell>(#wisl__0, 1i; #pvar_next) *
+      types(#wisl__0 : Obj) *
+      (#pvar_prev == {{ #wisl__0, 0i }}) *
+      SLL(#pvar_next, #vs2) *
+      (#vx == l+ (#vs1, l+ ({{ #v }}, #vs2)))  ]]
+  [[  SLLseg(#pvar_head, #new_pvar_prev, #vs1__new) *
+      <cell>(#wisl__1, 0i; #v__new) *
+      <bound>(#wisl__1; 2i) *
+      <cell>(#wisl__1, 1i; #new_pvar_next) *
+      types(#wisl__1 : Obj) *
+      (#new_pvar_prev == {{ #wisl__1, 0i }}) *
+      SLL(#new_pvar_next, #vs2__new) *
+      (#vx == l+ (#vs1__new, l+ ({{ #v__new }}, #vs2__new))) *
+      (ret == {{ #pvar_head, #new_pvar_next, #new_pvar_prev }}) *
+      (#new_pvar_next == null)  ]]
+  normal
+proc SLL_append_node_iter_loop0(head, next, prev) {
+             goto [(not (next = null))] then0 else0;
+  then0:     sep_assert ((prev == #prev)) [bind: #prev];
+             prev := next;
+             gvar0 := "i__add"(next, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             next := l-nth(gvar1, 2i);
+             apply SSLseg_append(head, #vs1, #v, prev) ;
+             loopretvar__ := "SLL_append_node_iter_loop0"(head, next, prev);
+             goto endif0;
+  else0:     loopretvar__ := {{ head, next, prev }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec SLL_prepend(x, k)
+  [[  (x == #x) * (k == #k) * SLL(#x, #vs)  ]]
+  [[  SLL(ret, l+ ({{ #k }}, #vs))  ]]
+  normal
+proc SLL_prepend(x, k) {
+    z := "SLL_allocate_node"(k);
+    gvar0 := "i__add"(z, 1i);
+    gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+    gvar2 := [setcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i), x);
+    ret := z;
+    return
+};
+
+
+spec SLL_member(x, k)
+  [[  (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #r)  ]]
+  [[  SLL(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r)  ]]
+  normal
+proc SLL_member(x, k) {
+             found := false;
+             goto [(x = null)] then1 else1;
+  then1:     skip;
+             goto endif1;
+  else1:     goto [((typeOf x) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar0 := [getcell](l-nth(x, 0i), l-nth(x, 1i));
+             v := l-nth(gvar0, 2i);
+             goto [(v = k)] then0 else0;
+  then0:     found := true;
+             goto endif0;
+  else0:     gvar1 := "i__add"(x, 1i);
+             goto [((typeOf gvar1) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
+             t := l-nth(gvar2, 2i);
+             found := "SLL_member"(t, k);
+  endif0:    skip;
+  endif1:    skip;
+             ret := found;
+             return
+};

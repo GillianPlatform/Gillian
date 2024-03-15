@@ -14,17 +14,19 @@ proc llen(x) {
              goto [(x = null)] then0 else0;
   then0:     n := 0i;
              goto endif0;
-  else0:     goto [(l-nth(x, 1i) = 0i)] continue0 fail0;
-  fail0:     fail [InvalidBlockPointer](x);
-  continue0: gvar0 := [dispose](l-nth(x, 0i));
-             gvar1 := "i__add"(x, 1i);
-             goto [((typeOf gvar1) = List)] continue1 fail1;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             gvar2 := "i__add"(t, 1i);
+             goto [((typeOf gvar2) = List)] continue1 fail1;
   fail1:     fail [InvalidPointer]();
-  continue1: gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
-             t := l-nth(gvar2, 2i);
+  continue1: gvar3 := [getcell](l-nth(gvar2, 0i), l-nth(gvar2, 1i));
+             t := l-nth(gvar3, 2i);
              n := "llen"(t);
-             gvar3 := "i__add"(n, 1i);
-             n := gvar3;
+             gvar4 := "i__add"(n, 1i);
+             n := gvar4;
   endif0:    skip;
              ret := n;
              return

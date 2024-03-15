@@ -5,11 +5,9 @@ predicate list(+x, alpha) {
 
 { (x == #x) * list(#x, #alpha) }
 function llen(x) {
-
     if (x = null) {
-        n := 0
+        n := 1
     } else {
-        free(x);
         t := [x+1];
         n := llen(t);
         n := n + 1
