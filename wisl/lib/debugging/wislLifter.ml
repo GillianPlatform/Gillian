@@ -106,6 +106,7 @@ struct
       mutable display : string option;
       mutable stack_info : (rid list * stack_direction option) option;
       mutable nest_kind : nest_kind option;
+      mutable is_loop_end : bool;
       matches : matching Ext_list.t;
       errors : string Ext_list.t;
     }
@@ -123,6 +124,7 @@ struct
         display = None;
         stack_info = None;
         nest_kind = None;
+        is_loop_end = false;
         matches = Ext_list.make ();
         errors = Ext_list.make ();
       }
@@ -190,7 +192,7 @@ struct
     let is_loop_end ~is_loop_func ~proc_name exec_data =
       is_loop_func && get_fun_call_name exec_data = Some proc_name
 
-    let finish ~is_loop_func ~proc_name ~exec_data partial =
+    let finish ~exec_data partial =
       let ({
              prev;
              all_ids;
@@ -201,6 +203,7 @@ struct
              nest_kind;
              matches;
              errors;
+             is_loop_end;
              _;
            }
             : partial_data) =
@@ -234,10 +237,9 @@ struct
         let++ cases = ends_to_cases ~nest_kind ends in
         match cases with
         | _ when is_return exec_data -> Final
+        | _ when is_loop_end -> Final
         | [] -> Final
-        | [ (Case (Unknown, _), _) ] ->
-            if is_loop_end ~is_loop_func ~proc_name exec_data then Final
-            else Normal
+        | [ (Case (Unknown, _), _) ] -> Normal
         | _ -> Branch cases
       in
       Finished
@@ -341,6 +343,7 @@ struct
               | Some display -> Ok display
               | None ->
                   if is_loop_end ~is_loop_func ~proc_name exec_data then
+                    let () = partial.is_loop_end <- true in
                     Ok "<end of loop>"
                   else Error "Couldn't get display!"
             in
@@ -413,7 +416,7 @@ struct
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
-        | None -> finish ~is_loop_func ~proc_name ~exec_data partial
+        | None -> finish ~exec_data partial
         | Some (id, branch_case) -> step_again ~id ?branch_case ()
     end
 
