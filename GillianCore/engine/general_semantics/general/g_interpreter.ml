@@ -1739,7 +1739,6 @@ struct
       | _, (_, LAction _) -> simplify state
       | _ -> [ state ]
     in
-    let prev_cmd_report_id = !report_id_ref in
     List.concat_map
       (fun state ->
         try
@@ -1755,7 +1754,7 @@ struct
                   error_state;
                   errors;
                   branch_path = List_utils.cons_opt branch_case branch_path;
-                  prev_cmd_report_id;
+                  prev_cmd_report_id = !report_id_ref;
                 };
             ]
         | State.Internal_State_Error (errs, error_state) ->
@@ -1768,7 +1767,7 @@ struct
                   error_state;
                   errors = List.map (fun x -> Exec_err.EState x) errs;
                   branch_path = List_utils.cons_opt branch_case branch_path;
-                  prev_cmd_report_id;
+                  prev_cmd_report_id = !report_id_ref;
                 };
             ])
       states

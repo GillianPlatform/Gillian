@@ -1,0 +1,18 @@
+predicate list(+x, alpha) {
+    (x == null) * (alpha == nil);
+    (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
+}
+
+{ (x == #x) * list(#x, #alpha) }
+function llen(x) {
+    if (x = null) {
+        n := 0
+    } else {
+        t := [x+1];
+        t := [t+1];
+        n := llen(t);
+        n := n + 1
+    };
+    return n
+}
+{ list(#x, #alpha) * (ret == len(#alpha)) }

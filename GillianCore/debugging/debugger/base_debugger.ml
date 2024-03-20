@@ -496,30 +496,11 @@ struct
 
       (* A command step with no results *should* mean that we're returning.
          If we're at the top of the callstack, this *should* mean that we're hitting the end of the program. *)
-      let is_eob ~content ~type_ ~id =
-        let is_root =
-          match
-            content |> Yojson.Safe.from_string |> ConfigReport.of_yojson
-          with
-          | Error _ ->
-              DL.log (fun m ->
-                  m
-                    "Handle_continue.is_eob: Not a ConfigReport (type %s); I'm \
-                     not sure what to do here."
-                    type_);
-              true
-          | Ok report -> (
-              match report.callstack with
-              | [] -> failwith "HORROR: Empty callstack!"
-              | [ _ ] -> true
-              | _ -> false)
-        in
-        if is_root then
-          L.Log_queryer.get_cmd_results id
-          |> List.for_all (fun (_, content) ->
-                 let result = content |> of_yojson_string CmdResult.of_yojson in
-                 result.errors <> [])
-        else false
+      let is_eob ~id =
+        L.Log_queryer.get_cmd_results id
+        |> List.for_all (fun (_, content) ->
+               let result = content |> of_yojson_string CmdResult.of_yojson in
+               result.errors <> [])
 
       type continue_kind = ProcInit | EoB | Continue
 
@@ -529,7 +510,7 @@ struct
           if type_ = Content_type.proc_init then (
             DL.log (fun m -> m "Debugger.%s: Skipping proc_init..." log_context);
             ProcInit)
-          else if is_eob ~content ~type_ ~id then (
+          else if is_eob ~id then (
             DL.log (fun m ->
                 m
                   "Debugger.%s: No non-error results for %a; stepping again \
