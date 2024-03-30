@@ -1,6 +1,11 @@
 open Cmdliner
+open Command_line_utils
 
-module Make (PC : ParserAndCompiler.S) : Console.S = struct
+module Make
+    (ID : Init_data.S)
+    (PC : ParserAndCompiler.S with type init_data = ID.t)
+    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
+struct
   open Common_args.Make (PC)
 
   let mode =
@@ -19,14 +24,20 @@ module Make (PC : ParserAndCompiler.S) : Console.S = struct
     in
     Arg.(last & vflag_all [ Verification ] [ concrete; wpst; verif; act ])
 
-  let process_files files =
+  let parse_eprog files =
     let progs =
       ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
         (PC.parse_and_compile_files files)
     in
-    List.iter
-      (fun (path, prog) -> Io_utils.save_file_pp path Prog.pp_labeled prog)
-      progs.gil_progs
+    let e_progs = progs.gil_progs in
+    let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+    let path, e_prog = List.hd e_progs in
+    (path, e_prog, progs.init_data)
+
+  let process_files files =
+    let path, e_prog, init_data = parse_eprog files in
+    burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data) e_prog
+      (Some path)
 
   let compile files mode runtime_path ci tl_opts =
     let () = Config.ci := ci in
