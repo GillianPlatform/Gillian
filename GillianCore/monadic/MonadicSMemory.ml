@@ -71,7 +71,10 @@ end
 
 (* FIXME: Lift should not be necessary, the monad should just match !!! *)
 module Lift (MSM : S) :
-  SMemory.S with type t = MSM.t and type init_data = MSM.init_data = struct
+  SMemory.S
+    with type t = MSM.t
+     and type err_t = MSM.err_t
+     and type init_data = MSM.init_data = struct
   include MSM
 
   let assertions ?to_keep t =
