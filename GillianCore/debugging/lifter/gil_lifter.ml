@@ -328,13 +328,18 @@ functor
 
     let continue state id =
       let open Utils.Syntaxes.Option in
-      let rec aux stack ends =
+      let rec aux ?(first = false) stack ends =
         match stack with
         | [] -> List.rev ends
         | (id, case) :: rest -> (
-            match step state id case with
-            | Either.Left nexts -> aux (nexts @ rest) ends
-            | Either.Right end_id -> aux rest (end_id :: ends))
+            let is_breakpoint =
+              (not first) && Effect.perform (IsBreakpoint id)
+            in
+            if is_breakpoint then aux rest (id :: ends)
+            else
+              match step state id case with
+              | Either.Left nexts -> aux (nexts @ rest) ends
+              | Either.Right end_id -> aux rest (end_id :: ends))
       in
       let end_ =
         let end_, stack =
@@ -351,7 +356,7 @@ functor
               (None, stack)
         in
         let- () = end_ in
-        let ends = aux stack [] in
+        let ends = aux ~first:true stack [] in
         List.hd ends
       in
       (end_, Debugger_utils.Step)

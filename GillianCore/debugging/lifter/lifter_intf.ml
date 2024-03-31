@@ -10,7 +10,6 @@ module Types = struct
   }
 
   type 'cmd_report executed_cmd_data = {
-    is_breakpoint : bool;
     kind : (Branch_case.t, unit) Exec_map.cmd_kind;
     id : Logging.Report_id.t;
     cmd_report : 'cmd_report;
@@ -24,6 +23,8 @@ module Types = struct
     | Stop of Logging.Report_id.t option
     | ExecNext of (Logging.Report_id.t option * Branch_case.t option)
   [@@deriving yojson]
+
+  type _ Effect.t += IsBreakpoint : Logging.Report_id.t -> bool Effect.t
 end
 
 include Types
@@ -125,7 +126,6 @@ module type Intf = sig
   module type S = S
 
   val make_executed_cmd_data :
-    ?is_breakpoint:bool ->
     (Branch_case.t, unit) Exec_map.cmd_kind ->
     Logging.Report_id.t ->
     'cmd_report ->

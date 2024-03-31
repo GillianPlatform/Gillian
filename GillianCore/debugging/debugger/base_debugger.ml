@@ -180,7 +180,6 @@ struct
       [@@deriving yojson]
 
       let get_debug_state ({ debug_state; procs } : t) : debug_state_view =
-        DL.log (fun m -> m "Getting debug state");
         let procs =
           Hashtbl.fold
             (fun proc_name state acc ->
@@ -204,7 +203,6 @@ struct
               (proc_name, proc) :: acc)
             procs []
         in
-        DL.log (fun m -> m "Got debug state");
         {
           main_proc_name = debug_state.main_proc_name;
           current_proc_name = debug_state.cur_proc_name;
@@ -314,16 +312,6 @@ struct
 
     let process_files = Process_files.f
 
-    let has_hit_breakpoint dbg =
-      match dbg.frames with
-      | [] -> false
-      | frame :: _ ->
-          if Hashtbl.mem dbg.breakpoints frame.source_path then
-            let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
-            (* Currently only one breakpoint per line is supported *)
-            Breakpoints.mem frame.start_line breakpoints
-          else false
-
     let rec call_stack_to_frames call_stack next_proc_body_idx prog =
       match call_stack with
       | [] -> []
@@ -348,6 +336,16 @@ struct
               ~start_line ~start_column ~end_line ~end_column
           in
           frame :: call_stack_to_frames rest se.call_index prog
+
+    let has_hit_breakpoint frames breakpoints =
+      match frames with
+      | [] -> false
+      | frame :: _ ->
+          if Hashtbl.mem breakpoints frame.source_path then
+            let breakpoints = Hashtbl.find breakpoints frame.source_path in
+            (* Currently only one breakpoint per line is supported *)
+            Breakpoints.mem frame.start_line breakpoints
+          else false
 
     module Update_proc_state = struct
       let get_cmd id =
@@ -640,6 +638,19 @@ struct
                           handle_step_effect id case path proc_state state
                         in
                         Effect.Deep.continue k step_result)
+                | Lift.IsBreakpoint id ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        let cmd = Update_proc_state.get_cmd id in
+                        let breakpoints = proc_state.breakpoints in
+                        let frames =
+                          call_stack_to_frames cmd.callstack cmd.proc_line
+                            state.debug_state.prog
+                        in
+                        let is_breakpoint =
+                          has_hit_breakpoint frames breakpoints
+                        in
+                        Effect.Deep.continue k is_breakpoint)
                 | _ ->
                     let s = Printexc.to_string (Effect.Unhandled eff) in
                     Fmt.failwith "HORROR: effect leak!\n%s" s);
