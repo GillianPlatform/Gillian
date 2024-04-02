@@ -88,6 +88,7 @@ class ['a] iter =
           self#visit_expr ~ctx then_;
           self#visit_expr ~ctx else_
       | StatementExpression stmts -> List.iter (self#visit_stmt ~ctx) stmts
+      | Comma exprs -> List.iter (self#visit_expr ~ctx) exprs
       | Nondet
       | Symbol _
       | IntConstant _
@@ -336,6 +337,12 @@ class ['a] map =
             map_mark_changed ~changed (self#visit_stmt ~ctx) stmts
           in
           if not !changed then ev else StatementExpression new_stmts
+      | Comma exprs ->
+          let changed = ref false in
+          let new_exprs =
+            map_mark_changed ~changed (self#visit_expr ~ctx) exprs
+          in
+          if not !changed then ev else Comma new_exprs
       | Nondet
       | Symbol _
       | IntConstant _

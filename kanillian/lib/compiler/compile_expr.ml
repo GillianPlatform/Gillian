@@ -1064,6 +1064,18 @@ and compile_op_assign ~ctx ~annot ~lhs ~rhs ~op =
   in
   Val_repr.ByValue e
 
+and compile_comma ~ctx exprs =
+  let rec aux = function
+    | [] -> Error.code_error "Empty comma!"
+    | [ e ] ->
+        let+ e = compile_expr ~ctx e in
+        e
+    | e :: es ->
+        let* _ = compile_expr ~ctx e in
+        aux es
+  in
+  aux exprs
+
 and compile_symbol ~ctx ~b expr =
   if Ctx.is_zst_access ctx GExpr.(expr.type_) then by_value (Lit Null)
   else
@@ -1357,6 +1369,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       in
       Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes })
   | StatementExpression l -> compile_statement_list ~ctx l
+  | Comma exprs -> compile_comma ~ctx exprs
   | EUnhandled (id, msg) -> unhandled (ExprIrep (id, msg))
 
 and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
