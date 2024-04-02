@@ -60,6 +60,10 @@ class ['a] iter =
       | EAssign { lhs; rhs } ->
           self#visit_expr ~ctx lhs;
           self#visit_expr ~ctx rhs
+      | EOpAssign { lhs; rhs; op } ->
+          self#visit_expr ~ctx lhs;
+          self#visit_expr ~ctx rhs;
+          self#visit_binop ~ctx op
       | EFunctionCall { func; args } ->
           self#visit_expr ~ctx func;
           List.iter (self#visit_expr ~ctx) args
@@ -266,6 +270,12 @@ class ['a] map =
           let new_rhs = self#visit_expr ~ctx rhs in
           if new_lhs == lhs && new_rhs == rhs then ev
           else EAssign { lhs = new_lhs; rhs = new_rhs }
+      | EOpAssign { lhs; rhs; op } ->
+          let new_lhs = self#visit_expr ~ctx lhs in
+          let new_rhs = self#visit_expr ~ctx rhs in
+          let new_op = self#visit_binop ~ctx op in
+          if new_lhs == lhs && new_rhs == rhs && new_op == op then ev
+          else EOpAssign { lhs = new_lhs; rhs = new_rhs; op = new_op }
       | Struct l ->
           let changed = ref false in
           let new_elems = map_mark_changed ~changed (self#visit_expr ~ctx) l in

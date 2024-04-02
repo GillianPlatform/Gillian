@@ -1017,9 +1017,10 @@ and compile_assign ~ctx ~annot ~lhs ~rhs =
   in
   (v, pre @ comp_assign)
 
-and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
+and compile_selfop ~ctx ~annot op (e : GExpr.t) =
   let open Ops.Self in
   let open Ops.Binary in
+  let ty = e.type_ in
   let is_pre, op =
     match op with
     | Preincrement -> (true, Plus)
@@ -1028,9 +1029,8 @@ and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
     | Postdecrement -> (false, Minus)
   in
   let e_pre, comp_expr = compile_expr ~ctx e in
-  let e_pre = Val_repr.as_value ~msg:"Selfop operand" e_pre in
   let e_post, comp_op =
-    let lhs = Val_repr.ByValue e_pre in
+    let lhs = e_pre in
     let rhs = Val_repr.ByValue (Lit (Int Z.one)) in
     compile_binop ~ctx ~lty:ty ~rty:ty op lhs rhs
   in
@@ -1040,9 +1040,29 @@ and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
     | Ok c -> c
     | Error (throw, msg) -> throw msg
   in
-  let v = if is_pre then e_post else e_pre in
+  let v =
+    if is_pre then e_post else Val_repr.as_value ~msg:"Selfop operand" e_pre
+  in
   let v = Val_repr.ByValue v in
   (v, comp_expr @ comp_op @ comp_assign)
+
+and compile_op_assign ~ctx ~annot ~lhs ~rhs ~op =
+  let compile_expr = compile_expr ~ctx in
+  let* lhs_vr = compile_expr lhs in
+  let* rhs_vr = compile_expr rhs in
+  let lty = lhs.type_ in
+  let rty = rhs.type_ in
+  let* e =
+    let e, comp_op = compile_binop ~ctx ~lty ~rty op lhs_vr rhs_vr in
+    let comp_op = List.map annot comp_op in
+    (e, comp_op)
+  in
+  let+ () =
+    match compile_assign_val ~ctx ~annot ~lhs ~rhs:(ByValue e) with
+    | Ok c -> ((), c)
+    | Error (throw, msg) -> ((), throw msg)
+  in
+  Val_repr.ByValue e
 
 and compile_symbol ~ctx ~b expr =
   if Ctx.is_zst_access ctx GExpr.(expr.type_) then by_value (Lit Null)
@@ -1162,8 +1182,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       | op ->
           let cmd = b (Helpers.assert_unhandled ~feature:(UnOp op) []) in
           Cs.return ~app:[ cmd ] (Val_repr.ByValue (Lit Nono)))
-  | SelfOp { op; e } ->
-      compile_selfop ~ctx ~ty:e.type_ ~annot:b op e |> Cs.set_end
+  | SelfOp { op; e } -> compile_selfop ~ctx ~annot:b op e |> Cs.set_end
   | Nondet ->
       nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_
         ~display:default_display ()
@@ -1173,6 +1192,8 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       compile_cast ~ctx ~from:to_cast.type_ ~into:expr.type_ to_cast_e
       |> Cs.map_l b
   | EAssign { lhs; rhs } -> compile_assign ~ctx ~lhs ~rhs ~annot:b |> Cs.set_end
+  | EOpAssign { lhs; rhs; op } ->
+      compile_op_assign ~ctx ~annot:b ~lhs ~rhs ~op |> Cs.set_end
   | EFunctionCall { func; args } ->
       let b ?nest_kind cmd = b_pre ?nest_kind cmd in
       compile_call ~ctx ~b func args |> Cs.set_end
