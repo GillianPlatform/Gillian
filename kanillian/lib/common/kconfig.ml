@@ -1,3 +1,5 @@
+let include_dirs : string list ref = ref []
+let source_dirs : string list ref = ref []
 let machine_model = ref Machine_model.archi64
 let kstats_file : string option ref = ref None
 let harness : string option ref = ref None
@@ -16,3 +18,4 @@ let ptr_chunk () : Chunk.t =
   | Arch32 -> U32
 
 let nondet_on_missing = ref true
+let print_unhandled = ref false
