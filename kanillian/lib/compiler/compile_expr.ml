@@ -1619,7 +1619,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let guard_var, comp_guard = compile_expr_c guard in
       let comp_guard = set_first_label loop_lab comp_guard in
       let guard_var = Val_repr.as_value ~msg:"for guard" guard_var in
-      let _, comp_body = compile_statement_c body in
+      let _, comp_body = compile_loop_body ~ctx ~loop_lab ~end_lab body in
       let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
       let _, comp_update = compile_expr_c update in
       let goto_guard =
@@ -1639,7 +1639,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let guard_var, comp_guard = compile_expr_c guard in
       let comp_guard = set_first_label loop_lab comp_guard in
       let guard_var = Val_repr.as_value ~msg:"while guard" guard_var in
-      let _, comp_body = compile_statement_c body in
+      let _, comp_body = compile_loop_body ~ctx ~loop_lab ~end_lab body in
       let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
       let goto_guard =
         b ~cmd_kind:(Normal true)
@@ -1652,8 +1652,14 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   | Break ->
       let () = log_kind "Break" in
       (match ctx.break_lab with
-      | None -> Error.unexpected "Break call outside of loop of switch"
+      | None -> Error.unexpected "Break call outside of loop or switch"
       | Some break_lab -> [ b (Cmd.Goto break_lab) ])
+      |> void
+  | Continue ->
+      let () = log_kind "Continue" in
+      (match ctx.continue_lab with
+      | None -> Error.unexpected "Break call outside of loop or switch"
+      | Some continue_lab -> [ b (Cmd.Goto continue_lab) ])
       |> void
   | SUnhandled id ->
       let () = log_kind "SUnhandled" in
@@ -1671,3 +1677,9 @@ and compile_statement_list ~ctx stmts : Val_repr.t Cs.with_body =
         aux (List.rev_append cstmt acc) last_v stmts
   in
   aux [] (Val_repr.ByValue (Lit Nono)) stmts
+
+and compile_loop_body ~ctx ~loop_lab ~end_lab body =
+  let ctx =
+    Ctx.{ ctx with break_lab = Some end_lab; continue_lab = Some loop_lab }
+  in
+  compile_statement ~ctx body
