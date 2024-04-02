@@ -221,6 +221,7 @@ and Stmt : sig
     | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
+    | Continue
     | Skip
     | Expression of Expr.t
     | Output of { msg : Expr.t; value : Expr.t }

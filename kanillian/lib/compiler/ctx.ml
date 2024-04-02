@@ -114,6 +114,7 @@ type t = {
   fresh_lab : unit -> string;
   harness : string option;
   break_lab : string option;
+  continue_lab : string option;
 }
 
 let make ~exec_mode ~machine ~prog ~harness () =
@@ -128,6 +129,7 @@ let make ~exec_mode ~machine ~prog ~harness () =
     fresh_lab = Generators.label ();
     harness;
     break_lab = None;
+    continue_lab = None;
   }
 
 let with_new_generators t =

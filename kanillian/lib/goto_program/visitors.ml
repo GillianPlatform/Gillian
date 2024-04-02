@@ -139,7 +139,7 @@ class ['a] iter =
       | Output { msg; value } ->
           self#visit_expr ~ctx msg;
           self#visit_expr ~ctx value
-      | Goto _ | Skip | SUnhandled _ | Break -> ()
+      | Goto _ | Skip | SUnhandled _ | Break | Continue -> ()
 
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
       self#visit_location ~ctx stmt.stmt_location;
@@ -451,7 +451,7 @@ class ['a] map =
           let new_value = self#visit_expr ~ctx value in
           if new_msg == msg && new_value == value then body
           else Output { msg = new_msg; value = new_value }
-      | Goto _ | Skip | SUnhandled _ | Break -> body
+      | Goto _ | Skip | SUnhandled _ | Break | Continue -> body
 
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
       let new_body = self#visit_stmt_body ~ctx stmt.body in

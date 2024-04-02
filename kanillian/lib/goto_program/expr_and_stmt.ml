@@ -367,6 +367,7 @@ and Stmt : sig
     | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
+    | Continue
     | Skip
     | Expression of Expr.t
     | Output of { msg : Expr.t; value : Expr.t }
@@ -410,6 +411,7 @@ end = struct
     | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
+    | Continue
     | Skip
     | Expression of Expr.t
     | Output of { msg : Expr.t; value : Expr.t }
@@ -472,6 +474,7 @@ end = struct
         pf ft "@[<v 3>output (%a, %a);@]" pp_expr msg pp_expr value
     | Switch _ -> pf ft "switch"
     | Break -> pf ft "break"
+    | Continue -> pf ft "continue"
     | Ifthenelse { guard; then_; else_ } ->
         let pp_else ft = function
           | None -> ()
@@ -572,6 +575,7 @@ end = struct
         let value = expr_of_irep value in
         Output { msg; value }
     | Break -> Break
+    | Continue -> Continue
     | Ifthenelse ->
         let guard, then_, else_ =
           match irep.sub with
