@@ -419,9 +419,13 @@ end = struct
   and switch_case = { case : Expr.t; sw_body : t }
   and t = { stmt_location : Location.t; body : body; comment : string option }
 
-  let unhandled ~irep:_ id =
-    (* TODO: hide the following line under a config flag. *)
-    (* Fmt.pr "%a\n@?" Yojson.Safe.pretty_print (Irep.to_yojson irep); *)
+  let unhandled ~irep id =
+    let () =
+      if !Kconfig.print_unhandled then
+        Fmt.pr "UNHANDLED STATEMENT:\n%a\n@?"
+          (Yojson.Safe.pretty_print ?std:None)
+          (Irep.to_yojson irep)
+    in
     SUnhandled id
 
   let pp_custom

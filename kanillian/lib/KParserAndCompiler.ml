@@ -1,4 +1,5 @@
 open Gillian
+open Gillian.Utils.Prelude
 open Utils.Syntaxes.Result
 open Kcommons
 
@@ -19,14 +20,35 @@ module Annot = Kanillian_compiler.K_annot
 
 module TargetLangOptions = struct
   type t = {
+    include_dirs : string list;
+    source_dirs : string list;
     kstats_file : string option;
     harness : string option;
     hide_genv : bool;
+    print_unhandled : bool;
   }
 
   let term =
     let open Cmdliner in
     let docs = Manpage.s_common_options in
+
+    let docv = "DIR" in
+    let doc =
+      "Add $(docv) to the list of directories used to search for included .h \
+       and .c files."
+    in
+    let include_dirs =
+      Arg.(value & opt_all dir [] & info [ "I" ] ~docs ~doc ~docv)
+    in
+
+    let doc =
+      "Add $(docv) to the list of directories used to find .c files to link \
+       against. These are searched recursively."
+    in
+    let source_dirs =
+      Arg.(value & opt_all dir [] & info [ "S"; "source" ] ~docs ~doc ~docv)
+    in
+
     let doc =
       "If set, write out a file containing the statistics about the \
        compilation process. If the file already exists, it adds to stats to \
@@ -38,6 +60,7 @@ module TargetLangOptions = struct
         & opt (some string) None
         & info [ "kstats-file"; "kstats" ] ~docs ~doc)
     in
+
     let doc =
       "Decides the entry point of the proof. Note that this is different from \
        the --entry-point option."
@@ -46,17 +69,50 @@ module TargetLangOptions = struct
     let harness =
       Arg.(value & opt (some string) None & info [ "harness" ] ~docs ~doc ~docv)
     in
+
     let doc = "Hide the global environment from the logs" in
     let hide_genv = Arg.(value & flag & info [ "hide-genv" ] ~docs ~doc) in
-    let opt kstats_file harness hide_genv =
-      { kstats_file; harness; hide_genv }
-    in
-    Term.(const opt $ kstats_file $ harness $ hide_genv)
 
-  let apply { kstats_file; harness; hide_genv } =
+    let doc = "Print unhandled expressions and statements in compilation" in
+    let print_unhandled =
+      Arg.(value & flag & info [ "print-unhandled" ] ~docs ~doc)
+    in
+
+    let opt
+        include_dirs
+        source_dirs
+        kstats_file
+        harness
+        hide_genv
+        print_unhandled =
+      {
+        include_dirs;
+        source_dirs;
+        kstats_file;
+        harness;
+        hide_genv;
+        print_unhandled;
+      }
+    in
+    Term.(
+      const opt $ include_dirs $ source_dirs $ kstats_file $ harness $ hide_genv
+      $ print_unhandled)
+
+  let apply
+      {
+        include_dirs;
+        source_dirs;
+        kstats_file;
+        harness;
+        hide_genv;
+        print_unhandled;
+      } =
+    Kconfig.include_dirs := include_dirs;
+    Kconfig.source_dirs := source_dirs;
     Kconfig.kstats_file := kstats_file;
     Kconfig.harness := harness;
-    Kconfig.hide_genv := hide_genv
+    Kconfig.hide_genv := hide_genv;
+    Kconfig.print_unhandled := print_unhandled
 end
 
 type err = string
@@ -88,11 +144,31 @@ let create_compilation_result path goto_prog gil_prog =
     init_data = ();
   }
 
+let rec get_c_paths acc = function
+  | [] -> acc
+  | dir :: rest ->
+      let files = Gillian.Utils.Io_utils.get_files dir in
+      let c_files = List.filter (fun p -> Filename.extension p = ".c") files in
+      let acc = SS.add_seq (List.to_seq c_files) acc in
+      get_c_paths acc rest
+
 let compile_c_to_symtab c_file =
+  let c_files =
+    let source_dirs = !Kconfig.source_dirs in
+    let set = SS.(add c_file empty) in
+    get_c_paths set source_dirs
+    |> SS.elements |> List.map Filename.quote |> String.concat " "
+  in
   let symtab_file = c_file ^ ".symtab.json" in
+  let includes =
+    !Kconfig.include_dirs
+    |> List.map (fun dir -> Fmt.str "-I %s" (Filename.quote dir))
+    |> String.concat " "
+  in
   let status =
     Sys.command
-      (Fmt.str "cbmc %s --show-symbol-table --json-ui > %s" c_file symtab_file)
+      (Fmt.str "cbmc %s %s --show-symbol-table --json-ui > %s" c_files includes
+         symtab_file)
   in
   if status <> 0 then
     Fmt.failwith "CMBC failed to compile %s with return code %d" c_file status;
