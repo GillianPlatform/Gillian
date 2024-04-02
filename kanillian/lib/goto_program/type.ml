@@ -1,3 +1,5 @@
+type enum_component = Typedefs__.enum_component = { name : string; value : int }
+
 type t = Typedefs__.type_ =
   | Array of t * int
   | Bool
@@ -13,6 +15,8 @@ type t = Typedefs__.type_ =
   | StructTag of string
   | Union of { components : Typedefs__.datatype_component list; tag : string }
   | UnionTag of string
+  | Enum of { components : Typedefs__.enum_component list; tag : string }
+  | EnumTag of string
   | Constructor
   | Empty
   | Vector of { type_ : t; size : int }
@@ -34,6 +38,8 @@ let show_simple = function
   | StructTag _ -> "StructTag"
   | Union _ -> "Union"
   | UnionTag _ -> "UnionTag"
+  | Enum _ -> "Enum"
+  | EnumTag _ -> "EnumTag"
   | Constructor -> "Constructor"
   | Empty -> "Empty"
   | Vector _ -> "Vector"
@@ -132,6 +138,19 @@ let rec of_irep ~(machine : Machine_model.t) (irep : Irep.t) : t =
   | UnionTag ->
       let identifier = irep $ Identifier |> Irep.as_just_string in
       UnionTag identifier
+  | CEnum ->
+      let tag = irep $ Tag |> Irep.as_just_string in
+      let components =
+        (irep $ Body).sub
+        |> List.map (fun irep ->
+               let name = irep $ Identifier |> Irep.as_just_string in
+               let value = irep $ Value |> Irep.as_just_int in
+               { name; value })
+      in
+      Enum { tag; components }
+  | CEnumTag ->
+      let identifier = irep $ Identifier |> Irep.as_just_string in
+      EnumTag identifier
   | Constructor -> Constructor
   | Empty -> Empty
   | other -> failwith ("unhandled type: " ^ Id.to_string other)
@@ -194,7 +213,7 @@ let rec bit_size_of ~(machine : Machine_model.t) ~(tag_lookup : string -> t) t =
   match t with
   | Array (ty, sz) | Vector { type_ = ty; size = sz } -> sz * bit_size_of ty
   | CInteger I_bool -> machine.bool_width
-  | CInteger I_int -> machine.int_width
+  | CInteger I_int | Enum _ | EnumTag _ -> machine.int_width
   | CInteger I_char -> machine.char_width
   | CInteger (I_size_t | I_ssize_t) | Pointer _ -> machine.pointer_width
   | Float -> 32

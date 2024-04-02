@@ -46,6 +46,8 @@ class ['a] iter =
       | Unsignedbv _
       | StructTag _
       | UnionTag _
+      | Enum _
+      | EnumTag _
       | IncompleteStruct _ -> ()
 
     method visit_id ~(ctx : 'a) (_id : int) =
@@ -245,6 +247,8 @@ class ['a] map =
       | Unsignedbv _
       | StructTag _
       | UnionTag _
+      | Enum _
+      | EnumTag _
       | IncompleteStruct _ -> type_
 
     method visit_id ~(ctx : 'a) (id : int) =

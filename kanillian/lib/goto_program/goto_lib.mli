@@ -117,6 +117,8 @@ and Datatype_component : sig
 end
 
 and Type : sig
+  type enum_component = { name : string; value : int }
+
   type t =
     | Array of t * int
     | Bool
@@ -132,6 +134,8 @@ and Type : sig
     | StructTag of string
     | Union of { components : Datatype_component.t list; tag : string }
     | UnionTag of string
+    | Enum of { components : enum_component list; tag : string }
+    | EnumTag of string
     | Constructor
     | Empty
     | Vector of { type_ : t; size : int }
