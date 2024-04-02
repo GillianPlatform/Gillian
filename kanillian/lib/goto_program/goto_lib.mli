@@ -186,6 +186,7 @@ module rec Expr : sig
     | TypeCast of t
     | If of { cond : t; then_ : t; else_ : t }
     | StatementExpression of Stmt.t list
+    | Comma of t list
     | Nondet
     | EUnhandled of Id.t * string
 

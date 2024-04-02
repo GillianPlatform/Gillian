@@ -26,6 +26,7 @@ module rec Expr : sig
     | TypeCast of t
     | If of { cond : t; then_ : t; else_ : t }
     | StatementExpression of Stmt.t list
+    | Comma of t list
     | Nondet
     | EUnhandled of Id.t * string
 
@@ -64,6 +65,7 @@ end = struct
     | TypeCast of t
     | If of { cond : t; then_ : t; else_ : t }
     | StatementExpression of Stmt.t list
+    | Comma of t list
     | Nondet
     | EUnhandled of Id.t * string
 
@@ -105,6 +107,7 @@ end = struct
     | If { cond; then_; else_ } ->
         pf ft "%a ? %a : %a" pp cond pp then_ pp else_
     | StatementExpression _ -> pf ft "STMTEXPR"
+    | Comma es -> pf ft "%a" (list ~sep:comma pp) es
     | EUnhandled (id, msg) -> (
         match msg with
         | "" -> pf ft "UNHANDLED_EXPR(%s)" (Id.to_string id)
@@ -117,7 +120,7 @@ end = struct
   let unhandled ~irep id msg =
     let () =
       if !Kconfig.print_unhandled then
-        Fmt.pr "UNHANDLED STATEMENT:\n%a\n@?"
+        Fmt.pr "UNHANDLED EXPRESSION:\n%a\n@?"
           (Yojson.Safe.pretty_print ?std:None)
           (Irep.to_yojson irep)
     in
@@ -305,6 +308,7 @@ end = struct
         Symbol name
     | Dereference -> Dereference (of_irep (exactly_one irep))
     | SideEffect -> side_effecting_of_irep ~machine irep
+    | Comma -> Comma (List.map of_irep irep.sub)
     | AddressOf ->
         let pointee = exactly_one ~msg:"AddressOf" irep in
         AddressOf (of_irep pointee)
