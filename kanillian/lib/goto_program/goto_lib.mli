@@ -175,6 +175,7 @@ module rec Expr : sig
     | ByteExtract of { e : t; offset : int }
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
+    | EOpAssign of { lhs : t; rhs : t; op : Ops.Binary.t }
     | UnOp of { op : Ops.Unary.t; e : t }
     | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
