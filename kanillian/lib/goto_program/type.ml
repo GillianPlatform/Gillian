@@ -213,20 +213,21 @@ let rec bit_size_of ~(machine : Machine_model.t) ~(tag_lookup : string -> t) t =
   match t with
   | Array (ty, sz) | Vector { type_ = ty; size = sz } -> sz * bit_size_of ty
   | CInteger I_bool -> machine.bool_width
-  | CInteger I_int | Enum _ | EnumTag _ -> machine.int_width
+  | CInteger I_int -> machine.int_width
   | CInteger I_char -> machine.char_width
   | CInteger (I_size_t | I_ssize_t) | Pointer _ -> machine.pointer_width
   | Float -> 32
   | Double -> 64
   | Signedbv { width } | Unsignedbv { width } -> width
   | Empty -> 0
-  | StructTag x | UnionTag x -> bit_size_of (tag_lookup x)
+  | StructTag x | UnionTag x | EnumTag x -> bit_size_of (tag_lookup x)
   | Struct { components; _ } ->
       List.fold_left (fun x y -> x + dc_bit_size y) 0 components
   | Union { components; _ } ->
       (* I don't have to think about aligning everything on the biggest alignment,
          because Kani sends padding fields when necessary *)
       List.fold_left (fun x y -> max x (dc_bit_size y)) 0 components
+  | Enum _ -> bit_size_of (Signedbv { width = 32 })
   | Bool -> Gerror.code_error "bit_size_of Bool"
   | Code _ -> Gerror.code_error "bit_size_of Code"
   | Constructor -> Gerror.code_error "bit_size_of Constructor"
