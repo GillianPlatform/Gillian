@@ -39,12 +39,15 @@ let rec representable_in_store ~prog ~machine (type_ : Type.t) =
   | Signedbv _
   | Unsignedbv _
   | Pointer _
+  | Enum _
   | Empty -> true
   | Struct { components; _ } ->
       is_overflow_result ~prog type_
       || Program.is_zst ~prog ~machine type_
       || Option.is_some (one_representable_field ~prog ~machine components)
   | StructTag tag ->
+      representable_in_store ~prog ~machine (Hashtbl.find prog.types tag)
+  | EnumTag tag ->
       representable_in_store ~prog ~machine (Hashtbl.find prog.types tag)
   | _ -> Program.is_zst ~prog ~machine type_
 
