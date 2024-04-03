@@ -263,12 +263,14 @@ let compile_binop
         | CInteger (I_int | I_char | I_bool | I_ssize_t)
         | Unsignedbv _ | Signedbv _ -> GilBinop ILessThanEqual
         | CInteger I_size_t | Pointer _ -> Proc leq_maybe_ptr
+        | Float -> GilBinop FLessThanEqual
         | _ -> Unhandled `With_type)
     | Lt -> (
         match lty with
         | CInteger (I_int | I_char | I_bool | I_ssize_t)
         | Unsignedbv _ | Signedbv _ -> GilBinop ILessThan
         | CInteger I_size_t | Pointer _ -> Proc lt_maybe_ptr
+        | Float -> GilBinop FLessThan
         | _ -> Unhandled `With_type)
     | Gt -> (
         match lty with
@@ -276,6 +278,7 @@ let compile_binop
         | Unsignedbv _ | Signedbv _ ->
             GilBinop ILessThanEqual ||> fun e -> Expr.Infix.not e
         | CInteger I_size_t | Pointer _ -> Proc gt_maybe_ptr
+        | Float -> GilBinop FLessThanEqual ||> fun e -> Expr.Infix.not e
         | _ -> Unhandled `With_type)
     | Ge -> (
         match lty with
@@ -283,6 +286,7 @@ let compile_binop
         | Unsignedbv _ | Signedbv _ ->
             GilBinop ILessThan ||> fun e -> Expr.Infix.not e
         | CInteger I_size_t | Pointer _ -> Proc geq_maybe_ptr
+        | Float -> GilBinop FLessThan ||> fun e -> Expr.Infix.not e
         | _ -> Unhandled `With_type)
     | Plus -> (
         match (lty, rty) with
@@ -303,6 +307,7 @@ let compile_binop
         | Signedbv { width = widtha }, Signedbv { width = widthb }
           when widtha == widthb ->
             GilBinop IPlus |||> assert_int_in_bounds ~ty:lty
+        | Float, Float -> GilBinop FPlus
         | _ -> Unhandled `With_type)
     | Minus -> (
         match (lty, rty) with
@@ -318,22 +323,26 @@ let compile_binop
         | Signedbv { width = widtha }, Signedbv { width = widthb }
           when widtha == widthb ->
             GilBinop IMinus |||> assert_int_in_bounds ~ty:lty
+        | Float, Float -> GilBinop FMinus
         | _ -> Unhandled `With_type)
     | Mult -> (
         match lty with
         | Unsignedbv _ -> GilBinop ITimes ||> modulo_max ~ty:lty
         | CInteger _ | Signedbv _ ->
             GilBinop ITimes |||> assert_int_in_bounds ~ty:lty
+        | Float -> GilBinop FTimes
         | _ -> Unhandled `With_type)
     | Div -> (
         match lty with
         | CInteger _ | Unsignedbv _ | Signedbv _ ->
             GilBinop IDiv |||> assert_int_in_bounds ~ty:lty
+        | Float -> GilBinop FDiv
         | _ -> Unhandled `With_type)
     | Mod -> (
         match lty with
         | CInteger I_size_t -> Proc mod_maybe_ptr
         | CInteger _ | Unsignedbv _ | Signedbv _ -> GilBinop IMod
+        | Float -> GilBinop FMod
         | _ -> Unhandled `With_type)
     | Or -> GilBinop BinOp.BOr
     | And -> GilBinop BinOp.BAnd
@@ -640,6 +649,8 @@ let compile_cast ~(ctx : Ctx.t) ~(from : GType.t) ~(into : GType.t) e :
               ( Constants.Cast_functions.unsign_int_same_size,
                 [ imax; two_power_size ] )
         | U8, I8 | U16, I16 | U32, I32 | U64, I64 | U128, I128 -> Nop
+        | ( (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128),
+            (F32 | F64) ) -> App (fun e -> Expr.UnOp (IntToNum, e))
         | _ -> Unhandled)
   in
   match cast_with with
