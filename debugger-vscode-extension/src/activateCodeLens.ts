@@ -38,15 +38,17 @@ export function activateCodeLens(context: ExtensionContext) {
 function getLensKinds(): [ExecMode, string][] {
   const config = workspace.getConfiguration('gillianDebugger');
   const lensKinds: [ExecMode, string][] = [];
-  if (config.showVerifyLens)
-      lensKinds.push(['debugverify', 'Verify ']);
+  if (config.showVerifyLens) lensKinds.push(['debugverify', 'Verify ']);
   if (config.showSymbolicDebugLens)
     lensKinds.push(['debugwpst', 'Symbolic-debug ']);
   return lensKinds;
 }
 
 class DebugCodeLensProvider implements CodeLensProvider {
-  private makeLensesFromPattern(pattern: RegExp, document: TextDocument): CodeLens[] {
+  private makeLensesFromPattern(
+    pattern: RegExp,
+    document: TextDocument
+  ): CodeLens[] {
     const text = document.getText();
     const procNamePattern = /(.+?)\(/g;
 

@@ -163,6 +163,38 @@
           "type": "boolean",
           "default": true,
           "description": "Shows 'Symbolic-debug' buttons by symbolically-debuggable functions."
+        },
+        "gillianDebugger.wislArgs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Command-line arguments when invoking WISL"
+        },
+        "gillianDebugger.gillianCArgs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Command-line arguments when invoking Gillian-C"
+        },
+        "gillianDebugger.gillianJsArgs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Command-line arguments when invoking Gillian-JS"
+        },
+        "gillianDebugger.kanillianArgs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Command-line arguments when invoking Kanillian"
         }
       }
     },
