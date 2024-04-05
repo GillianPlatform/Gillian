@@ -80,6 +80,9 @@ struct
     }
     [@@deriving to_yojson]
 
+    type partial_end = Branch_case.case * (rid * Gil_branch_case.t option)
+    [@@deriving to_yojson]
+
     type partial_data = {
       prev : (rid * Branch_case.t option * rid list) option;
           (** Where to put the finished cmd in the map. *)
@@ -87,7 +90,7 @@ struct
           (** All the GIL cmd IDs that build into this one (and the relevant branch case info). *)
       unexplored_paths : (rid * Gil_branch_case.t option) Stack.t;
           (** All the paths that haven't been explored yet; a stack means depth-first exploration. *)
-      ends : (Branch_case.case * (rid * Gil_branch_case.t option)) Ext_list.t;
+      ends : partial_end Ext_list.t;
           (** All the end points; there may be multiple if the cmd branches. *)
       (* TODO: rename to matches *)
       matches : matching Ext_list.t;
@@ -118,16 +121,20 @@ struct
       | StepAgain of (rid * Gil_branch_case.t option)
     [@@deriving yojson]
 
+    let is_func_unevaluated prog pid =
+      Hashset.mem Program.(prog.unevaluated_funcs) pid
+      || List.mem pid Constants.Internal_functions.names
+
     let ends_to_cases
-        ~is_unevaluated_funcall
+        ~prog
         ~nest_kind
         (ends : (Branch_case.case * branch_data) list) =
       let open Annot in
       let open Branch_case in
       let- () =
         match (nest_kind, ends) with
-        | Some (Fun_call _), [ (Unknown, bdata) ] ->
-            if is_unevaluated_funcall then None
+        | Some (Fun_call pid), [ (Unknown, bdata) ] ->
+            if is_func_unevaluated prog pid then None
             else Some (Ok [ (Func_exit_placeholder, bdata) ])
         | Some (Fun_call _), _ ->
             Some (Error "Unexpected branching in cmd with Fun_call nest")
@@ -155,21 +162,41 @@ struct
              (Case (kind, ix), branch_data))
       |> Result.ok
 
-    let finish partial =
-      let ({
-             prev;
-             canonical_data;
-             all_ids;
-             ends;
-             is_unevaluated_funcall;
-             matches;
-             errors;
-             _;
-           }
+    let make_canonical_data_for_error
+        ~(canonical_data : canonical_cmd_data option)
+        ~ends
+        ~errors
+        ~all_ids
+        ~prev : (canonical_cmd_data * partial_end list) option =
+      let/ () = canonical_data |> Option.map (fun c -> (c, ends)) in
+      match errors with
+      | [] -> None
+      | _ ->
+          let _, _, callers = Option.get prev in
+          let c =
+            {
+              id = all_ids |> List.rev |> List.hd;
+              display = "<error>";
+              callers;
+              stack_direction = None;
+              nest_kind = None;
+            }
+          in
+          Some (c, [])
+
+    let finish ~prog partial =
+      let ({ prev; canonical_data; all_ids; ends; matches; errors; _ }
             : partial_data) =
         partial
       in
-      let** { id; display; callers; stack_direction; nest_kind } =
+      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
+      let errors = Ext_list.to_list errors in
+      let ends = Ext_list.to_list ends in
+      let canonical_data =
+        make_canonical_data_for_error ~canonical_data ~ends ~errors ~all_ids
+          ~prev
+      in
+      let** { id; display; callers; stack_direction; nest_kind }, ends =
         Result_utils.of_option
           ~none:"Trying to finish partial with no canonical data!"
           canonical_data
@@ -178,12 +205,10 @@ struct
         let+ id, branch, _ = prev in
         (id, branch)
       in
-      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
       let matches = Ext_list.to_list matches in
-      let errors = Ext_list.to_list errors in
-      let ends = Ext_list.to_list ends in
+
       let++ kind =
-        let++ cases = ends_to_cases ~is_unevaluated_funcall ~nest_kind ends in
+        let++ cases = ends_to_cases ~prog ~nest_kind ends in
         match cases with
         | [] -> Final
         | [ (Case (Unknown, _), _) ] -> Normal
@@ -420,7 +445,7 @@ struct
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
-        | None -> finish partial
+        | None -> finish ~prog partial
         | Some (id, branch_case) -> StepAgain (id, branch_case) |> Result.ok
     end
 
@@ -464,8 +489,15 @@ struct
       in
       let () =
         match result with
-        | Finished { display; _ } ->
-            DL.log (fun m -> m "FINISHED %s" display);
+        | Finished ({ display; _ } as fin) ->
+            DL.log (fun m ->
+                m
+                  ~json:
+                    [
+                      ("finished", finished_to_yojson fin);
+                      ("partial", partial_data_to_yojson partial);
+                    ]
+                  "FINISHED %s" display);
             partial.all_ids
             |> Ext_list.iter (fun (id, _) -> Hashtbl.remove_all partials id)
         | _ -> ()
