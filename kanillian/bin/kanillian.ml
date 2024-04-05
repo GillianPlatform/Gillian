@@ -1,5 +1,5 @@
 open Memory_model
-open Kanillian_lib
+open Kanillian_compiler
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 module Init_data = Gillian.General.Init_data.Dummy
 

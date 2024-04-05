@@ -5,12 +5,13 @@ open Gillian.Utils
 open Prelude
 open Syntaxes.Option
 open Syntaxes.Result_of_option
+open Kanillian_compiler
 module Program = Goto_lib.Program
 module Branch_case = Kcommons.Branch_case
 module Gil_branch_case = Gillian.Gil_syntax.Branch_case
 module DL = Gillian.Debugger.Logging
 module Exec_map = Gillian.Debugger.Utils.Exec_map
-module Annot = Kanillian_compiler.K_annot
+module Annot = K_annot
 open Annot
 open Branch_case
 
@@ -30,8 +31,7 @@ let ( let** ) o f = Result.bind o f
 module Make
     (SMemory : Gillian.Symbolic.Memory_S)
     (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
-    (Verification : Engine.Verifier.S
-                      with type annot = Kanillian_compiler.K_annot.t) =
+    (Verification : Engine.Verifier.S with type annot = K_annot.t) =
 struct
   open Exec_map
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport
@@ -41,6 +41,8 @@ struct
   type memory = SMemory.t
   type cmd_report = CmdReport.t [@@deriving yojson]
   type annot = Annot.t
+  type init_data = KParserAndCompiler.init_data
+  type pc_err = KParserAndCompiler.err
 
   module Gil_lifter = Gil.Lifter
 
@@ -282,11 +284,13 @@ struct
         match partial.prev with
         | None -> Ok ([], None)
         | Some (prev_id, _, prev_callers) -> (
+            let cs = exec_data.cmd_report.callstack in
             let depth_change =
-              let cs = exec_data.cmd_report.callstack in
               assert ((List.hd cs).pid = exec_data.cmd_report.proc_name);
               let prev_depth = List.length prev_callers in
-              List.length cs - prev_depth - 1
+              let new_depth = List.length cs - 2 in
+              (* FIXME: Minus 2 to account for harness *)
+              new_depth - prev_depth
             in
             match depth_change with
             | 0 -> Ok (prev_callers, None)
@@ -297,8 +301,15 @@ struct
                     Error "HORROR - stepping out when prev_callers is empty!"
                 | hd :: tl -> Ok (tl, Some (Out hd)))
             | _ ->
-                Fmt.error "HORROR - too great a stack depth change! (%d)"
-                  depth_change)
+                let callers =
+                  List.map
+                    (fun c -> Verification.SAInterpreter.Call_stack.(c.pid))
+                    cs
+                in
+                Fmt.error "HORROR - too great a stack depth change! (%d)\n[%a]"
+                  depth_change
+                  (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+                  callers)
 
       let update_unevaluated_funcall
           ~(prog : Program.t)
@@ -1054,4 +1065,9 @@ struct
     match init ~proc_name ~all_procs tl_ast prog with
     | None -> failwith "init: wislLifter needs a tl_ast!"
     | Some x -> x
+
+  let parse_and_compile_files ~entrypoint files =
+    let () = Kconfig.harness := Some entrypoint in
+    KParserAndCompiler.parse_and_compile_files files
+    |> Result.map (fun r -> (r, Constants.CBMC_names.start))
 end
