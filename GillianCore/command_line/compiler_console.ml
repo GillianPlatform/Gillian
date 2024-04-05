@@ -27,10 +27,17 @@ module Make
       ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
         (PC.parse_and_compile_files files)
     in
+    let pp_annot fmt annot =
+      Fmt.pf fmt "%a"
+        (Yojson.Safe.pretty_print ?std:None)
+        (PC.Annot.to_yojson annot)
+    in
     List.iteri
       (fun i (path, prog) ->
         let init_data = if i = 0 then ID.to_yojson progs.init_data else `Null in
-        burn_gil ~init_data ~pp_prog:Prog.pp_labeled prog (Some path))
+        burn_gil ~init_data
+          ~pp_prog:(Prog.pp_labeled ~pp_annot)
+          prog (Some path))
       progs.gil_progs
 
   let compile files mode runtime_path ci tl_opts =

@@ -22,6 +22,7 @@ let leak_check = ref false
 
 (* let perform_syntax_checks = ref false *)
 let lemma_proof = ref false
+let dump_annots = ref false
 
 (* FIXME: it seems like ngil files are never used anymore *)
 

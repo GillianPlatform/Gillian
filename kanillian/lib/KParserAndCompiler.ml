@@ -143,6 +143,7 @@ let create_compilation_result path goto_prog gil_prog =
     tl_ast = goto_prog;
     init_data = ();
   }
+
 let cbmc_version_checked = ref false
 
 let check_cbmc_version () =

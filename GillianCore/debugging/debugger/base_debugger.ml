@@ -299,8 +299,12 @@ struct
           if already_compiled then parse_gil_file (List.hd files)
           else compile_tl_files files
         in
+        let pp_annot fmt annot =
+          Fmt.pf fmt "%a" Yojson.Safe.pp (Annot.to_yojson annot)
+        in
         Command_line_utils.burn_gil ~init_data:(ID.to_yojson init_data)
-          ~pp_prog:Prog.pp_labeled e_prog outfile;
+          ~pp_prog:(Prog.pp_labeled ~pp_annot)
+          e_prog outfile;
         (* Prog.perform_syntax_checks e_prog; *)
         let other_imports =
           Command_line_utils.convert_other_imports PC.other_imports
@@ -310,7 +314,9 @@ struct
             ~other_imports e_prog
         in
         L.verbose (fun m ->
-            m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog);
+            m "@\nProgram as parsed:@\n%a@\n"
+              (Prog.pp_indexed ?pp_annot:None)
+              prog);
         let prog = Debugger_impl.preprocess_prog ~no_unfold prog in
         (prog, init_data, source_files_opt, tl_ast)
     end
