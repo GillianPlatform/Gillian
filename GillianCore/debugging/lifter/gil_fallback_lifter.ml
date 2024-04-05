@@ -13,7 +13,9 @@ functor
         and type tl_ast = PC.tl_ast
         and type memory_error = SMemory.err_t
         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-        and type annot = PC.Annot.t)
+        and type annot = PC.Annot.t
+        and type init_data = PC.init_data
+        and type pc_err = PC.err)
   (Verifier : Verifier.S with type annot = PC.Annot.t)
   ->
   struct
@@ -34,6 +36,8 @@ functor
     type memory_error = SMemory.err_t
     type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
     type annot = PC.Annot.t
+    type init_data = PC.init_data
+    type pc_err = PC.err
 
     type t = {
       gil : Gil_lifter.t; [@to_yojson Gil_lifter.dump]
@@ -150,4 +154,6 @@ functor
 
     let init ~proc_name ~all_procs tl_ast prog =
       Some (init_exn ~proc_name ~all_procs tl_ast prog)
+
+    let parse_and_compile_files = TLLifter.parse_and_compile_files
   end

@@ -4,19 +4,18 @@ open Utils.Syntaxes.Result
 open Kcommons
 
 let initialize _ =
-  let open Kanillian_compiler in
   Utils.Config.entry_point := Constants.CBMC_names.start;
   Option.iter
     (fun kstats_file -> at_exit (fun () -> Stats.report kstats_file))
     !Kconfig.kstats_file
 
-let env_var_import_path = Some Kanillian_compiler.Imports.env_path_var
+let env_var_import_path = Some Imports.env_path_var
 let other_imports = []
 
 type init_data = unit
 type tl_ast = Program.t
 
-module Annot = Kanillian_compiler.K_annot
+module Annot = K_annot
 
 module TargetLangOptions = struct
   type t = {
@@ -191,7 +190,6 @@ let load_symtab_from_file file =
   | Error msg -> Fmt.failwith "Malformed symtab file - %s" msg
 
 let parse_and_compile_files files =
-  let open Kanillian_compiler in
   let open Utils.Syntaxes.Result in
   (* Call CBMC ourselves *)
   let path =

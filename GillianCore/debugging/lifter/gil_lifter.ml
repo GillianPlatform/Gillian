@@ -42,6 +42,8 @@ functor
     type memory = SMemory.t
     type tl_ast = PC.tl_ast
     type memory_error = SMemory.err_t
+    type init_data = PC.init_data
+    type pc_err = PC.err
 
     type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
     [@@deriving yojson]
@@ -389,4 +391,7 @@ functor
 
     let init ~proc_name ~all_procs tl_ast prog =
       Some (init_exn ~proc_name ~all_procs tl_ast prog)
+
+    let parse_and_compile_files ~entrypoint files =
+      PC.parse_and_compile_files files |> Result.map (fun r -> (r, entrypoint))
   end

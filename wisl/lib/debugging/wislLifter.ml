@@ -37,6 +37,8 @@ struct
   type tl_ast = WParserAndCompiler.tl_ast
   type memory = WislSMemory.t
   type annot = Annot.t
+  type init_data = WParserAndCompiler.init_data
+  type pc_err = WParserAndCompiler.err
 
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport
   module Gil_lifter = Gil.Lifter
@@ -1176,4 +1178,8 @@ struct
     match init ~proc_name ~all_procs tl_ast prog with
     | None -> failwith "init: wislLifter needs a tl_ast!"
     | Some x -> x
+
+  let parse_and_compile_files ~entrypoint files =
+    WParserAndCompiler.parse_and_compile_files files
+    |> Result.map (fun r -> (r, entrypoint))
 end

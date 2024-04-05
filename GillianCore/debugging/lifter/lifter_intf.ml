@@ -35,6 +35,8 @@ module type S = sig
 
   type memory_error
   type tl_ast
+  type init_data
+  type pc_err
   type memory
   type cmd_report
   type annot
@@ -114,6 +116,16 @@ module type S = sig
     get_new_scope_id:(unit -> int) ->
     Variable.ts ->
     Variable.scope list
+
+  (* A proxy for ParserAndCompiler.parse_and_compile_files; this allows specifying an entrypoint function,
+     and can receive a new entrypoint function to substitute it with.
+     This is necessary for debugging harnessed programs, like with Kanillian. *)
+  val parse_and_compile_files :
+    entrypoint:string ->
+    string list ->
+    ( (annot, tl_ast, init_data) ParserAndCompiler.compiled_progs * string,
+      pc_err )
+    result
 end
 
 module type Intf = sig
