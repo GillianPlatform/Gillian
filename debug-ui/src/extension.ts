@@ -78,9 +78,34 @@ class DebugAdapterExecutableFactory
     const config = vscode.workspace.getConfiguration('gillianDebugger');
     console.log('Configuring debugger...', { config });
 
+    let extraArgsKey: string | undefined;
+    switch (langCmd) {
+      case 'wisl':
+        extraArgsKey = 'wislArgs';
+        break;
+      case 'gillian-c':
+        extraArgsKey = 'gillianCArgs';
+        break;
+      case 'gillian-js':
+        extraArgsKey = 'gillianJsArgs';
+        break;
+      case 'kanillian':
+        extraArgsKey = 'kanillianArgs';
+        break;
+    }
+
+    let extraArgs: string[] = [];
+    if (extraArgsKey && config[extraArgsKey]) {
+      const workspaceFolder =
+        vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath || '.';
+      extraArgs = config[extraArgsKey].map((arg: string) =>
+        arg.replace('${workspaceFolder}', workspaceFolder)
+      );
+    }
+
     const mode = _session.configuration.execMode || 'debugverify';
 
-    let args = [mode, '-r', 'db'];
+    let args = [mode, '-r', 'db', ...extraArgs];
     if (config.useManualProof) {
       args.push('-m');
     }
