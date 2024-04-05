@@ -10,6 +10,16 @@ proc i__malloc(sz) {
       return
 };
 
+(* FIXME: this doesn't match actual semantics, (hopefully) good enough for now *)
+proc i__calloc(n, sz) {
+      sz_full := n i* sz;
+      ptr := "i__malloc"(sz_full);
+      loc := l-nth(ptr, 0i);
+      u := [mem_zeroinit](loc, 0i, sz_full);
+      ret := ptr;
+      return
+};
+
 proc i__free(ptr) {
          chunk := "i__ptr_chunk"();
          ptr_sz := "i__ptr_size"();
