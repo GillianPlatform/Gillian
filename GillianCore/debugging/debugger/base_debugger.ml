@@ -148,7 +148,6 @@ struct
     module Inspect = struct
       type debug_proc_state_view = {
         exec_map : Exec_map.Packaged.t; [@key "execMap"]
-        lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExecMap"]
         current_cmd_id : L.Report_id.t; [@key "currentCmdId"]
         matches : Exec_map.matching list;
         proc_name : string; [@key "procName"]
@@ -183,23 +182,17 @@ struct
         let procs =
           Hashtbl.fold
             (fun proc_name state acc ->
+              let { lifter_state; _ } = state in
               let current_cmd_id = Option.get state.cur_report_id in
               let matches =
-                state.lifter_state |> Lifter.get_matches_at_id current_cmd_id
+                Lifter.get_matches_at_id current_cmd_id lifter_state
               in
-              let exec_map = state.lifter_state |> Lifter.get_gil_map in
-              let lifted_exec_map =
-                state.lifter_state |> Lifter.get_lifted_map
+              let exec_map =
+                match Lifter.get_lifted_map lifter_state with
+                | Some map -> map
+                | None -> Lifter.get_gil_map lifter_state
               in
-              let proc =
-                {
-                  exec_map;
-                  lifted_exec_map;
-                  current_cmd_id;
-                  matches;
-                  proc_name;
-                }
-              in
+              let proc = { exec_map; current_cmd_id; matches; proc_name } in
               (proc_name, proc) :: acc)
             procs []
         in

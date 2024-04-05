@@ -25,8 +25,7 @@ type A = {
 const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
   const { mainProc: mainProcName, currentProc: currentProcName, procs } = state;
   const mainProc = procs[mainProcName];
-  const { execMap, liftedExecMap } = mainProc;
-  const usedExecMap = liftedExecMap ?? execMap;
+  const { execMap } = mainProc;
 
   const initElem: TransformResult<M, D, A> = {
     id: 'root',
@@ -35,7 +34,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
       procName: mainProcName,
       isActive: currentProcName === mainProcName,
     },
-    nexts: [[{ procName: mainProcName }, usedExecMap]],
+    nexts: [[{ procName: mainProcName }, execMap]],
     ...DEFAULT_NODE_SIZE,
   };
 
@@ -125,7 +124,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
           };
           return result;
         } else {
-          return transform(proc.liftedExecMap || proc.execMap, undefined, {
+          return transform(proc.execMap, undefined, {
             procName: submapProcName,
             hasParent: false,
           });

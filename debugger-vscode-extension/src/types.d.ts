@@ -67,7 +67,6 @@ export type MatchMap = readonly [MatchKind, MatchMapInner];
 
 export type DebugProcState = {
   readonly execMap: ExecMap;
-  readonly liftedExecMap: ExecMap | null;
   readonly currentCmdId: number;
   readonly matches: readonly Matching[];
   readonly procName: string;
