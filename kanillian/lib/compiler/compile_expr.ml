@@ -651,6 +651,9 @@ let compile_cast ~(ctx : Ctx.t) ~(from : GType.t) ~(into : GType.t) e :
         | U8, I8 | U16, I16 | U32, I32 | U64, I64 | U128, I128 -> Nop
         | ( (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128),
             (F32 | F64) ) -> App (fun e -> Expr.UnOp (IntToNum, e))
+        | ( (F32 | F64),
+            (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) ) ->
+            App (fun e -> Expr.UnOp (NumToInt, e))
         | _ -> Unhandled)
   in
   match cast_with with
