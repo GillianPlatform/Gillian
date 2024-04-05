@@ -7,7 +7,7 @@
     "messageType": "STATUS-MESSAGE"
   },
   {
-    "messageText": "Parsing /home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c",
+    "messageText": "Parsing /home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c",
     "messageType": "STATUS-MESSAGE"
   },
   {
@@ -22,7 +22,7 @@
     "messageText": "function '__nondet_int' is not declared",
     "messageType": "WARNING",
     "sourceLocation": {
-      "file": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c",
+      "file": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c",
       "function": "main",
       "line": "2",
       "workingDirectory": "/home/nat/code/Gillian"
@@ -345,7 +345,7 @@
           "id": "",
           "namedSub": {
             "file": {
-              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
             },
             "function": {
               "id": "main"
@@ -412,7 +412,7 @@
           "id": "",
           "namedSub": {
             "file": {
-              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
             },
             "function": {
               "id": "main"
@@ -449,7 +449,7 @@
               "id": "",
               "namedSub": {
                 "file": {
-                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                 },
                 "function": {
                   "id": "main"
@@ -485,7 +485,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -1923,7 +1923,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "line": {
                       "id": "1"
@@ -2005,7 +2005,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "line": {
                       "id": "1"
@@ -2049,7 +2049,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "line": {
                           "id": "1"
@@ -2069,7 +2069,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "line": {
                               "id": "1"
@@ -2114,7 +2114,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "line": {
                       "id": "1"
@@ -3114,7 +3114,7 @@
               "id": "",
               "namedSub": {
                 "file": {
-                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                 },
                 "line": {
                   "id": "1"
@@ -6275,7 +6275,7 @@
           "id": "",
           "namedSub": {
             "file": {
-              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
             },
             "line": {
               "id": "1"
@@ -6290,7 +6290,7 @@
         "name": "main",
         "prettyName": "main",
         "prettyType": "signed int ()",
-        "prettyValue": "{\n  signed int x=__nondet_int();\n  __CPROVER_assume(x > -100);\n  __CPROVER_assume(x < 100);\n  if(x < 0)\n  {\n    x = x * x;\n  }\n\n  __CPROVER_assert(x >= 0, \"nice\");\n  return 0;\n}",
+        "prettyValue": "{\n  signed int x=__nondet_int();\n  __CPROVER_assume(x > -100);\n  __CPROVER_assume(x < 100);\n  if(x < 0)\n  {\n    x = x * x;\n  }\n\n  __CPROVER_assert(x >= 0, \"x >= 0\");\n  return 0;\n}",
         "type": {
           "id": "code",
           "namedSub": {
@@ -6298,7 +6298,7 @@
               "id": "",
               "namedSub": {
                 "file": {
-                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                 },
                 "line": {
                   "id": "1"
@@ -6336,7 +6336,7 @@
               "id": "",
               "namedSub": {
                 "file": {
-                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                 },
                 "function": {
                   "id": "main"
@@ -6353,7 +6353,7 @@
               "id": "",
               "namedSub": {
                 "file": {
-                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                 },
                 "line": {
                   "id": "1"
@@ -6378,7 +6378,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -6406,7 +6406,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -6442,7 +6442,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -6478,7 +6478,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -6532,7 +6532,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -6560,7 +6560,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -6607,7 +6607,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -6706,7 +6706,7 @@
                               "id": "",
                               "namedSub": {
                                 "file": {
-                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                 },
                                 "function": {
                                   "id": "main"
@@ -6734,7 +6734,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -6770,7 +6770,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -6806,7 +6806,7 @@
                                       "id": "",
                                       "namedSub": {
                                         "file": {
-                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                         },
                                         "function": {
                                           "id": "main"
@@ -6852,7 +6852,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -6880,7 +6880,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -6927,7 +6927,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -7026,7 +7026,7 @@
                               "id": "",
                               "namedSub": {
                                 "file": {
-                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                 },
                                 "function": {
                                   "id": "main"
@@ -7054,7 +7054,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -7093,7 +7093,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -7137,7 +7137,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -7165,7 +7165,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -7193,7 +7193,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -7232,7 +7232,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -7270,7 +7270,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -7287,7 +7287,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -7315,7 +7315,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -7343,7 +7343,7 @@
                               "id": "",
                               "namedSub": {
                                 "file": {
-                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                 },
                                 "function": {
                                   "id": "main"
@@ -7382,7 +7382,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -7418,7 +7418,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -7454,7 +7454,7 @@
                                       "id": "",
                                       "namedSub": {
                                         "file": {
-                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                         },
                                         "function": {
                                           "id": "main"
@@ -7493,7 +7493,7 @@
                                       "id": "",
                                       "namedSub": {
                                         "file": {
-                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                         },
                                         "function": {
                                           "id": "main"
@@ -7542,7 +7542,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -7570,7 +7570,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
@@ -7617,7 +7617,7 @@
                           "id": "",
                           "namedSub": {
                             "file": {
-                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                              "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                             },
                             "function": {
                               "id": "main"
@@ -7779,7 +7779,7 @@
                               "id": "",
                               "namedSub": {
                                 "file": {
-                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                  "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                 },
                                 "function": {
                                   "id": "main"
@@ -7807,7 +7807,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -7846,7 +7846,7 @@
                                   "id": "",
                                   "namedSub": {
                                     "file": {
-                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                     },
                                     "function": {
                                       "id": "main"
@@ -7929,7 +7929,7 @@
                                       "id": "",
                                       "namedSub": {
                                         "file": {
-                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                                         },
                                         "function": {
                                           "id": "main"
@@ -7960,7 +7960,7 @@
                                               }
                                             },
                                             "value": {
-                                              "id": "5"
+                                              "id": "7"
                                             }
                                           }
                                         }
@@ -7980,7 +7980,7 @@
                                       ]
                                     },
                                     "value": {
-                                      "id": "nice"
+                                      "id": "x >= 0"
                                     }
                                   }
                                 },
@@ -8020,7 +8020,7 @@
                   "id": "",
                   "namedSub": {
                     "file": {
-                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                      "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                     },
                     "function": {
                       "id": "main"
@@ -8051,7 +8051,7 @@
                       "id": "",
                       "namedSub": {
                         "file": {
-                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani/c/wpst/simple_branch.c"
+                          "id": "/home/nat/code/Gillian/debugger-vscode-extension/sampleWorkspace/kani-c/wpst/simple_branch.c"
                         },
                         "function": {
                           "id": "main"
