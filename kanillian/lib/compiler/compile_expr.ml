@@ -1166,19 +1166,38 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
     let v = Val_repr.dummy ~ctx expr.type_ in
     Cs.return ~app:[ b cmd ] v
   in
+  let log_type t =
+    Debugger_log.to_file (Fmt.str "COMPILING %s EXPR  (%s)" t default_display)
+  in
   match expr.value with
-  | Symbol _ | Dereference _ | Index _ | Member _ -> compile_symbol ~ctx ~b expr
-  | AddressOf x -> compile_address_of ~ctx ~b expr x
-  | BoolConstant b -> by_value (Lit (Bool b))
+  | Symbol _ | Dereference _ | Index _ | Member _ ->
+      let () = log_type "Symbol-esque" in
+      let clean_annot annot =
+        K_annot.{ annot with display = None; cmd_kind = Normal false }
+      in
+      compile_symbol ~ctx ~b expr |> Cs.map_l (Body_item.map_annot clean_annot)
+  | AddressOf x ->
+      let () = log_type "AddressOf" in
+      compile_address_of ~ctx ~b expr x
+  | BoolConstant b ->
+      let () = log_type "BoolConstant" in
+      by_value (Lit (Bool b))
   | CBoolConstant b ->
+      let () = log_type "CBoolConstant" in
       let z = if b then Z.one else Z.zero in
       by_value (Lit (Int z))
   | PointerConstant b ->
+      let () = log_type "PointerConstant" in
       let z = Z.of_int b in
       by_value (Lit (Int z))
-  | IntConstant z -> by_value (Lit (Int z))
-  | DoubleConstant f | FloatConstant f -> by_value (Lit (Num f))
+  | IntConstant z ->
+      let () = log_type "IntConstant" in
+      by_value (Lit (Int z))
+  | DoubleConstant f | FloatConstant f ->
+      let () = log_type "DoubleConstant/FloatConstant" in
+      by_value (Lit (Num f))
   | BinOp { op; lhs; rhs } ->
+      let () = log_type "BinOp" in
       let* e1 = compile_expr lhs in
       let* e2 = compile_expr rhs in
       let lty = lhs.type_ in
@@ -1188,6 +1207,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       in
       Val_repr.ByValue e
   | UnOp { op; e } -> (
+      let () = log_type "UnOp" in
       let* comp_e = compile_expr e in
       let comp_e = Val_repr.as_value ~msg:"Unary operand" comp_e in
       match op with
@@ -1208,22 +1228,31 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       | op ->
           let cmd = b (Helpers.assert_unhandled ~feature:(UnOp op) []) in
           Cs.return ~app:[ cmd ] (Val_repr.ByValue (Lit Nono)))
-  | SelfOp { op; e } -> compile_selfop ~ctx ~annot:b op e |> Cs.set_end
+  | SelfOp { op; e } ->
+      let () = log_type "SelfOp" in
+      compile_selfop ~ctx ~annot:b op e |> Cs.set_end
   | Nondet ->
+      let () = log_type "Nondet" in
       nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_
         ~display:default_display ()
       |> Cs.set_end
   | TypeCast to_cast ->
+      let () = log_type "TypeCast" in
       let* to_cast_e = compile_expr to_cast in
       compile_cast ~ctx ~from:to_cast.type_ ~into:expr.type_ to_cast_e
       |> Cs.map_l b
-  | EAssign { lhs; rhs } -> compile_assign ~ctx ~lhs ~rhs ~annot:b |> Cs.set_end
+  | EAssign { lhs; rhs } ->
+      let () = log_type "EAssign" in
+      compile_assign ~ctx ~lhs ~rhs ~annot:b |> Cs.set_end
   | EOpAssign { lhs; rhs; op } ->
+      let () = log_type "EOpAssign" in
       compile_op_assign ~ctx ~annot:b ~lhs ~rhs ~op |> Cs.set_end
   | EFunctionCall { func; args } ->
+      let () = log_type "EFunctionCall" in
       let b ?nest_kind cmd = b_pre ?nest_kind cmd in
       compile_call ~ctx ~b func args |> Cs.set_end
   | If { cond; then_; else_ } ->
+      let () = log_type "If" in
       let* cond_e = compile_expr cond in
       let then_lab = Ctx.fresh_lab ctx in
       let else_lab = Ctx.fresh_lab ctx in
@@ -1256,6 +1285,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
         "if branch exprs must be equal";
       Cs.return ~app:[ b ~label:end_lab Skip ] res_then
   | ByteExtract { e; offset } ->
+      let () = log_type "ByteExtract" in
       if Ctx.is_zst_access ctx e.type_ then
         if Ctx.is_zst_access ctx expr.type_ && offset == 0 then
           Cs.return Val_repr.null
@@ -1286,6 +1316,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           by_value (PVar var)
         else by_copy new_ptr expr.type_
   | Struct elems -> (
+      let () = log_type "Struct" in
       let fields = Ctx.resolve_struct_components ctx expr.type_ in
       match Ctx.one_representable_field ctx fields with
       | Some (accesses, _) ->
@@ -1349,6 +1380,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           let writes = writes 0 fields elems in
           Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes }))
   | Array elems ->
+      let () = log_type "Array" in
       let elem_type =
         match expr.type_ with
         | Array (elem_type, _) -> elem_type
@@ -1367,6 +1399,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       let writes = writes 0 elems in
       Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes })
   | StringConstant str ->
+      let () = log_type "StringConstant" in
       let char_type = GType.CInteger I_char in
       (* Size could be different from 1 n some architecture,
          might as well anticipate here *)
@@ -1382,9 +1415,15 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
                    } ))
       in
       Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes })
-  | StatementExpression l -> compile_statement_list ~ctx l
-  | Comma exprs -> compile_comma ~ctx exprs
-  | EUnhandled (id, msg) -> unhandled (ExprIrep (id, msg))
+  | StatementExpression l ->
+      let () = log_type "StatementExpression" in
+      compile_statement_list ~ctx l
+  | Comma exprs ->
+      let () = log_type "Comma" in
+      compile_comma ~ctx exprs
+  | EUnhandled (id, msg) ->
+      let () = log_type "Unhandled" in
+      unhandled (ExprIrep (id, msg))
 
 and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
