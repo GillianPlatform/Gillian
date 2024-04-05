@@ -990,7 +990,7 @@ struct
         } =
           state
         in
-        DL.log (fun m ->
+        (* DL.log (fun m ->
             m
               ~json:
                 [
@@ -998,7 +998,8 @@ struct
                   ("a", `String a);
                   ("es", `List (List.map Expr.to_yojson es));
                 ]
-              "LAction");
+              "LAction"); *)
+        DL.to_file "LAction";
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let open Utils.Syntaxes.List in
         let v_es = List.map eval_expr es in
@@ -1007,14 +1008,14 @@ struct
           match oks with
           | [] -> []
           | (state', vs) :: rest_rets ->
-              DL.log (fun m ->
+              (* DL.log (fun m ->
                   m
                     ~json:
                       [
                         ("state'", state_t_to_yojson state');
                         ("vs", `List (List.map state_vt_to_yojson vs));
                       ]
-                    "Ok");
+                    "Ok"); *)
               let e' = Expr.EList (List.map Val.to_expr vs) in
               let v' = eval_expr e' in
               let state'' = update_store state' x v' in
@@ -1045,11 +1046,12 @@ struct
           match errors with
           | [] -> []
           | errs ->
-              DL.log (fun m ->
+              (* DL.log (fun m ->
                   m
                     ~json:
                       [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
-                    "Error");
+                    "Error"); *)
+              DL.to_file "Error";
               if Exec_mode.is_verification_exec !Config.current_exec_mode then (
                 let tactic_from_params =
                   let recovery_params =
@@ -1145,7 +1147,7 @@ struct
         } =
           state
         in
-        DL.log (fun m -> m "LCmd");
+        DL.to_file "LCmd";
         match lcmd with
         | SL SymbExec ->
             symb_exec_next := true;
@@ -1321,7 +1323,7 @@ struct
         } =
           eval_state
         in
-        DL.log (fun m -> m "PhiAssignment");
+        DL.to_file "PhiAssignment";
         let j = get_predecessor prog cs prev i in
         let state' =
           List.fold_left
@@ -1339,7 +1341,7 @@ struct
       (* Function call *)
       let eval_call x e args j subst eval_state =
         let { eval_expr; _ } = eval_state in
-        DL.log (fun m -> m "Call");
+        DL.to_file "Call";
         let pid = eval_expr e in
         let v_args = List.map eval_expr args in
         let result = eval_proc_call x pid v_args j subst eval_state in
@@ -1361,7 +1363,7 @@ struct
         } =
           eval_state
         in
-        DL.log (fun m -> m "ECall");
+        DL.to_file "ECall";
         let pid =
           match pid with
           | PVar pid -> pid
@@ -1381,7 +1383,7 @@ struct
       (* Function application *)
       let eval_apply x pid_args j state =
         let { eval_expr; _ } = state in
-        DL.log (fun m -> m "Apply");
+        DL.to_file "Apply";
         let v_pid_args = eval_expr pid_args in
         let v_pid_args_list = Val.to_list v_pid_args in
         match v_pid_args_list with
@@ -1551,10 +1553,11 @@ struct
             ]
         (* Assignment *)
         | Assignment (x, e) ->
-            DL.log (fun m ->
+            (* DL.log (fun m ->
                 m
                   ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
-                  "Assignment");
+                  "Assignment"); *)
+            DL.to_file "Assignment";
             let v = eval_expr e in
             let state' = update_store state x v in
             [
@@ -1577,7 +1580,7 @@ struct
         | Apply (x, pid_args, j) -> eval_apply x pid_args j eval_state
         (* Arguments *)
         | Arguments x ->
-            DL.log (fun m -> m "Arguments");
+            DL.to_file "Arguments";
             let args = Call_stack.get_cur_args cs in
             let args = Val.from_list args in
             let state' = update_store state x args in
@@ -1688,11 +1691,11 @@ struct
       let branch_path = List_utils.cons_opt branch_case branch_path in
       let prev_cmd_report_id = !report_id_ref in
       let make_confcont = CConf.make_cont ?prev_cmd_report_id ~branch_path in
-      DL.log (fun m ->
+
+      (* DL.log (fun m ->
           m
             ~json:[ ("path", branch_path_to_yojson branch_path) ]
-            "G_interpreter: stepping with path");
-
+            "G_interpreter: stepping with path"); *)
       let eval_state =
         {
           prog;
@@ -1820,8 +1823,9 @@ struct
             callstack;
             next_idx = proc_body_index;
             branch_case;
-            prev_cmd_report_id;
-            _;
+            
+            (* prev_cmd_report_id; *)
+          _;
           } ->
           let cmd_step : CmdResult.t =
             {
@@ -1832,16 +1836,17 @@ struct
               branch_case;
             }
           in
-          if is_first then (
-            prev_cmd_report_id
-            |> Option.iter (fun prev_report_id ->
-                   L.Parent.release !parent_id_ref;
-                   L.Parent.set prev_report_id;
-                   parent_id_ref := Some prev_report_id);
-            DL.log (fun m ->
-                m
-                  ~json:[ ("conf", CmdResult.to_yojson cmd_step) ]
-                  "Debugger.evaluate_cmd_step: New ConfCont"));
+          (* if is_first then (
+             prev_cmd_report_id
+             |> Option.iter (fun prev_report_id ->
+                    L.Parent.release !parent_id_ref;
+                    L.Parent.set prev_report_id;
+                    parent_id_ref := Some prev_report_id);
+             DL.log (fun m ->
+                 m
+                   ~json:[ ("conf", CmdResult.to_yojson cmd_step) ]
+                   "Debugger.evaluate_cmd_step: New ConfCont")); *)
+          ignore (parent_id_ref, is_first);
           CmdResult.log_result cmd_step |> ignore;
           Some cmd_step
       | _ -> None
@@ -1929,7 +1934,7 @@ struct
           List_utils.pop_where f confs
 
     let debug_log conf rest_confs =
-      DL.log (fun m ->
+      (* DL.log (fun m ->
           let conf_json =
             match conf with
             | None -> `Null
@@ -1941,7 +1946,8 @@ struct
                 ("conf", conf_json);
                 ("rest_confs", `List (List.map CConf.to_yojson rest_confs));
               ]
-            "G_interpreter.evaluate_cmd_step: Evaluating conf")
+            "G_interpreter.evaluate_cmd_step: Evaluating conf") *)
+      ignore (conf, rest_confs)
 
     let find_result selector results =
       let* pred =

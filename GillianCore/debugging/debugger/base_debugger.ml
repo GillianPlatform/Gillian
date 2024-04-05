@@ -359,8 +359,8 @@ struct
               Fmt.failwith
                 "Debugger: don't know how to handle report of type '%s'!" type_
             else
-              DL.show_report id ("Debugger.update...: Got report type " ^ type_);
-            content |> of_yojson_string Logging.ConfigReport.of_yojson
+              (* DL.show_report id ("Debugger.update...: Got report type " ^ type_); *)
+              content |> of_yojson_string Logging.ConfigReport.of_yojson
 
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
@@ -429,7 +429,7 @@ struct
 
     let jump_state_to_id id cfg state =
       try
-        DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id);
+        (* DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id); *)
         state |> update_proc_state id cfg;
         Ok ()
       with Failure msg -> Error msg

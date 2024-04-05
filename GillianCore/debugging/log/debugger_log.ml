@@ -25,9 +25,10 @@ module Public = struct
   exception FailureJson of string * JsonMap.t
 
   let to_file line =
-    let out = open_out_gen [ Open_append; Open_creat ] 0o666 file_name in
-    Printf.fprintf out "%s\n" line;
-    close_out out
+    if !Utils.Config.debug then (
+      let out = open_out_gen [ Open_append; Open_creat ] 0o666 file_name in
+      Printf.fprintf out "%s\n" line;
+      close_out out)
 
   let enabled () = Option.is_some !rpc_ref
   let reset () = if Sys.file_exists file_name then Sys.remove file_name else ()
@@ -114,12 +115,12 @@ let set_rpc_command_handler rpc ?name module_ f =
     let err_json backtrace =
       name_json @ dbg_json @ [ ("backtrace", `String backtrace) ]
     in
-    let%lwt () =
-      match name with
-      | Some name -> log_async (fun m -> m "%s request received" name)
-      | None -> Lwt.return_unit
-    in
 
+    (* let%lwt () =
+         match name with
+         | Some name -> log_async (fun m -> m "%s request received" name)
+         | None -> Lwt.return_unit
+       in *)
     try%lwt f x with
     | FailureJson (e, json) ->
         let backtrace = Printexc.get_backtrace () in
