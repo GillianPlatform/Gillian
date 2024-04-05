@@ -136,8 +136,14 @@ struct
       parse_eprog files already_compiled
     in
     let () =
-      burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data)
-        e_prog outfile_opt
+      let pp_annot fmt annot =
+        Fmt.pf fmt "%a"
+          (Yojson.Safe.pretty_print ?std:None)
+          (PC.Annot.to_yojson annot)
+      in
+      burn_gil
+        ~pp_prog:(Prog.pp_labeled ~pp_annot)
+        ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
     in
     let () = L.normal (fun m -> m "*** Stage 2: Transforming the program.\n") in
     let prog =

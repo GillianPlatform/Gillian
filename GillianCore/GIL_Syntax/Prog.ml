@@ -157,7 +157,12 @@ let get_lemma_exn (prog : ('a, 'b) t) (name : string) : Lemma.t =
   | Some lemma -> lemma
   | None -> failwith (Printf.sprintf "could not find lemma %s" name)
 
-let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
+let pp
+    ~(show_labels : bool)
+    ~(pp_label : 'b Fmt.t)
+    ?(pp_annot : 'a Fmt.t option)
+    fmt
+    (prog : ('a, 'b) t) =
   let proc_names = Hashtbl.to_seq_keys prog.procs in
   let pp_list ppp = Fmt.list ~sep:(Fmt.any "@\n") ppp in
   let npp pp =
@@ -189,11 +194,14 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     (get_ospecs prog)
     (pp_list (npp BiSpec.pp))
     (get_bispecs prog)
-    (pp_list (npp (Proc.pp ~show_labels ~pp_label)))
+    (pp_list (npp (Proc.pp ~show_labels ~pp_label ?pp_annot)))
     (get_procs ~proc_names:(List.of_seq proc_names) prog)
 
-let pp_labeled fmt x = pp ~show_labels:true ~pp_label:Fmt.string fmt x
-let pp_indexed fmt x = pp ~show_labels:false ~pp_label:Fmt.int fmt x
+let pp_labeled fmt ?pp_annot c =
+  pp ~show_labels:true ~pp_label:Fmt.string ?pp_annot fmt c
+
+let pp_indexed fmt ?pp_annot c =
+  pp ~show_labels:false ~pp_label:Fmt.int ?pp_annot fmt c
 
 (* let perform_syntax_checks (prog : t) : unit =
    if (!Config.perform_syntax_checks)

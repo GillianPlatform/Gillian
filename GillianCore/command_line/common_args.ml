@@ -137,6 +137,10 @@ module Make (PC : ParserAndCompiler.S) = struct
     let doc = "Dump every smt query sent to z3" in
     Arg.(value & flag & info [ "dump-smt" ] ~doc)
 
+  let dump_annots =
+    let doc = "Dump annotations produced in compilation" in
+    Arg.(value & flag & info [ "dump-annots" ] ~doc)
+
   let use (term : (unit -> unit) Term.t) : unit Term.t =
     let apply_common
         logging_mode
@@ -146,7 +150,8 @@ module Make (PC : ParserAndCompiler.S) = struct
         tl_opts
         result_dir
         pbn
-        dump_smt =
+        dump_smt
+        dump_annots =
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
@@ -156,12 +161,14 @@ module Make (PC : ParserAndCompiler.S) = struct
       PC.TargetLangOptions.apply tl_opts;
       Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;
       Config.pbn := pbn;
-      Config.dump_smt := dump_smt
+      Config.dump_smt := dump_smt;
+      Config.dump_annots := dump_annots
     in
     let common_term =
       Term.(
         const apply_common $ logging_mode $ reporters $ runtime_path $ ci
-        $ PC.TargetLangOptions.term $ result_directory $ pbn $ dump_smt)
+        $ PC.TargetLangOptions.term $ result_directory $ pbn $ dump_smt
+        $ dump_annots)
     in
     Term.(term $ common_term)
 end

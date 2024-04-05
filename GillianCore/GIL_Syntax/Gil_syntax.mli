@@ -1076,15 +1076,17 @@ module Proc : sig
   val pp :
     show_labels:bool ->
     pp_label:'a Fmt.t ->
+    ?pp_annot:'b Fmt.t ->
     Format.formatter ->
     ('b, 'a) t ->
     unit
 
   (** Print labelled *)
-  val pp_labeled : Format.formatter -> ('a, string) t -> unit
+  val pp_labeled :
+    Format.formatter -> ?pp_annot:'a Fmt.t -> ('a, string) t -> unit
 
   (** Print indexed *)
-  val pp_indexed : Format.formatter -> ('a, int) t -> unit
+  val pp_indexed : Format.formatter -> ?pp_annot:'a Fmt.t -> ('a, int) t -> unit
 
   (** Returns the indexed procedure for a labeled procedures where the labels can be of any type.
     Equality of labels is decided by structural equality *)
@@ -1242,15 +1244,17 @@ module Prog : sig
   val pp :
     show_labels:bool ->
     pp_label:'b Fmt.t ->
+    ?pp_annot:'a Fmt.t ->
     Format.formatter ->
     ('a, 'b) t ->
     unit
 
   (** Print labelled *)
-  val pp_labeled : Format.formatter -> ('a, string) t -> unit
+  val pp_labeled :
+    Format.formatter -> ?pp_annot:'a Fmt.t -> ('a, string) t -> unit
 
   (** Print indexed *)
-  val pp_indexed : Format.formatter -> ('a, int) t -> unit
+  val pp_indexed : Format.formatter -> ?pp_annot:'a Fmt.t -> ('a, int) t -> unit
 end
 
 (** @canonical Gillian.Gil_syntax.Visitors *)

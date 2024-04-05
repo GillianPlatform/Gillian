@@ -36,8 +36,14 @@ struct
 
   let process_files files =
     let path, e_prog, init_data = parse_eprog files in
-    burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data) e_prog
-      (Some path)
+    let pp_annot fmt annot =
+      Fmt.pf fmt "%a"
+        (Yojson.Safe.pretty_print ?std:None)
+        (PC.Annot.to_yojson annot)
+    in
+    burn_gil
+      ~pp_prog:(Prog.pp_labeled ~pp_annot)
+      ~init_data:(ID.to_yojson init_data) e_prog (Some path)
 
   let compile files mode runtime_path ci tl_opts =
     let () = Config.ci := ci in
