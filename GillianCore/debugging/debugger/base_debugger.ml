@@ -462,28 +462,15 @@ struct
 
     let build_final_cmd_data content result prev_id branch_path debug_state =
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
-      let proc_name = (List.hd cmd.callstack).pid in
-      let errors = show_result_errors result in
-      let matches = match_final_cmd prev_id ~proc_name result debug_state in
       let exec_data =
-        Lift.make_executed_cmd_data Exec_map.Final prev_id cmd ~matches ~errors
+        let proc_name = (List.hd cmd.callstack).pid in
+        let errors = show_result_errors result in
+        let matches = match_final_cmd prev_id ~proc_name result debug_state in
+        let next_kind = Exec_map.Zero in
+        Lift.make_executed_cmd_data next_kind prev_id cmd ~matches ~errors
           branch_path
       in
       (exec_data, cmd)
-
-    let jump_to_start (state : t) =
-      let { debug_state; _ } = state in
-      let proc_state = get_proc_state_exn state in
-      let result =
-        let** root_id =
-          proc_state.lifter_state |> Lifter.get_root_id
-          |> Option.to_result ~none:"Debugger.jump_to_start: No root id found!"
-        in
-        jump_state_to_id root_id debug_state proc_state
-      in
-      match result with
-      | Error msg -> failwith msg
-      | Ok () -> ()
 
     module Step = struct
       open Verification.SAInterpreter.Logging

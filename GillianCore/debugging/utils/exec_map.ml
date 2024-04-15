@@ -32,42 +32,72 @@
 (**/**)
 
 module L = Logging
+open Utils.Prelude
+open Utils.Syntaxes.Option
 
 (**/**)
 
 (** The "kind" of a command in an exec map *)
-type ('c, 'bd) cmd_kind =
-  | Normal  (** A command that doesn't branch or terminate *)
-  | Branch of ('c * 'bd) list  (** A branching command *)
-  | Final  (** A terminating command *)
+type ('c, 'bd) next_kind =
+  | One of 'bd  (** A command that doesn't branch or terminate *)
+  | Many of ('c * 'bd) list  (** A branching command *)
+  | Zero  (** A terminating command *)
 [@@deriving yojson]
 
 (** Maps a list of branches to [Normal] if empty, or [Branch] *)
 let kind_of_cases = function
-  | [] -> Normal
-  | cases -> Branch (List.map (fun case -> (case, ())) cases)
+  | [] -> One ()
+  | cases -> Many (List.map (fun case -> (case, ())) cases)
 
 (** An exec map / node in an exec map; takes the following type parameters:
   - ['branch_case]: the type that identifies a branch case
   - ['cmd_data]: the type of the data attached to each non-[Nothing] node
   - ['branch_data]: additional data attached to each branch case
   *)
-type ('branch_case, 'cmd_data, 'branch_data) t =
-  | Nothing  (** An empty space; represents a command yet to be executed*)
-  | Cmd of {
-      data : 'cmd_data;
-      mutable next : ('branch_case, 'cmd_data, 'branch_data) t;
-    }  (** A non-branching command with one next command *)
-  | BranchCmd of {
-      data : 'cmd_data;
-      nexts :
-        ( 'branch_case,
-          'branch_data * ('branch_case, 'cmd_data, 'branch_data) t )
-        Hashtbl.t;
-    }  (** A branching command, with one or more branch cases *)
-  | FinalCmd of { data : 'cmd_data }
-      (** A command with no subsequent ones, either due to normal termination or an error*)
+(* type ('branch_case, 'cmd_data, 'branch_data) t =
+     | Nothing  (** An empty space; represents a command yet to be executed*)
+     | Cmd of {
+         data : 'cmd_data;
+         mutable next : ('branch_case, 'cmd_data, 'branch_data) t;
+       }  (** A non-branching command with one next command *)
+     | BranchCmd of {
+         data : 'cmd_data;
+         nexts :
+           ( 'branch_case,
+             'branch_data * ('branch_case, 'cmd_data, 'branch_data) t )
+           Hashtbl.t;
+       }  (** A branching command, with one or more branch cases *)
+     | FinalCmd of { data : 'cmd_data }
+         (** A command with no subsequent ones, either due to normal termination or an error*)
+   [@@deriving yojson] *)
+
+type ('id, 'case, 'branch_data) next =
+  | Single of ('id option * 'branch_data)
+  | Branch of ('case * ('id option * 'branch_data)) list
 [@@deriving yojson]
+
+type ('id, 'case, 'data, 'bdata) node = {
+  data : 'data;
+  next : ('id, 'case, 'bdata) next option;
+}
+[@@deriving yojson]
+
+type ('id, 'case, 'cmd_data, 'branch_data) entry =
+  | Node of ('id, 'case, 'cmd_data, 'branch_data) node
+  | Alias of 'id
+[@@deriving yojson]
+
+type ('id, 'branch_case, 'cmd_data, 'branch_data) map = {
+  mutable root : 'id option;
+  entries : ('id, ('id, 'branch_case, 'cmd_data, 'branch_data) entry) Hashtbl.t;
+}
+[@@deriving yojson]
+
+(**/**)
+
+(**/**)
+
+(** A command in an exec map *)
 
 (** Used for various map-traversal commands; signifies when to stop exploring paths *)
 type stop_at =
@@ -90,17 +120,73 @@ type 't submap =
   | Proc of string  (** Embed the execution of another proc as a submap *)
 [@@deriving yojson]
 
+let make () = { root = None; entries = Hashtbl.create 1 }
+
+(* Gets the node at an ID (while resolving aliases), along with its true ID *)
+let rec get_with_id map id =
+  match Hashtbl.find_opt map.entries id with
+  | Some (Node node) -> Some (node, id)
+  | Some (Alias id) -> get_with_id map id
+  | None -> None
+
+(* Gets the node at an ID (while resolving aliases) *)
+let get map id = get_with_id map id |> Option.map fst
+
+let map_node_extra map id f =
+  match get_with_id map id with
+  | Some (node, id) ->
+      let new_node, aux = f node in
+      let () = Hashtbl.replace map.entries id (Node new_node) in
+      Some aux
+  | None -> None
+
+let map_node_extra_exn map id f =
+  match map_node_extra map id f with
+  | Some aux -> aux
+  | None -> raise Not_found
+
+(* Maps a node at an ID, returning true if found, and false if not *)
+let map_node map id f =
+  let f node = (f node, ()) in
+  match map_node_extra map id f with
+  | Some () -> true
+  | None -> false
+
+(* Maps a node at an ID. Raises [Not_found] if not found. *)
+let map_node_exn map id f = if map_node map f id then () else raise Not_found
+
+let insert map ~id ~all_ids node =
+  let () =
+    List.iter (fun id' -> Hashtbl.replace map.entries id' (Alias id)) all_ids
+  in
+  let () = Hashtbl.replace map.entries id (Node node) in
+  ()
+
+let get_exn map id =
+  match get map id with
+  | Some node -> node
+  | None -> failwith "Exec_map.get"
+
 (** Traverse the map depth-first, giving the path to the first node that matches the given predicate (or [None] otherwise) *)
 let find_path pred map =
-  let rec aux acc = function
-    | (Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data })
-      when pred data -> Some acc
-    | Cmd { next; _ } -> aux acc next
-    | BranchCmd { nexts; _ } ->
-        nexts |> Hashtbl.find_map (fun case (_, next) -> aux (case :: acc) next)
-    | _ -> None
+  let rec aux acc node =
+    let/ () = if pred node then Some acc else None in
+    let* next = node.next in
+    match next with
+    | Single (None, _) -> None
+    | Single (Some id, _) ->
+        let* next = get map id in
+        aux acc next
+    | Branch cases ->
+        cases
+        |> List.find_map (fun (case, (id, _)) ->
+               let* id = id in
+               let* next = get map id in
+               aux (case :: acc) next)
   in
-  aux [] map
+  let* root_id = map.root in
+  let* root = get map root_id in
+  aux [] root
 
 (** Exception-raising equivalent to [find_path] *)
 let find_path_exn pred map =
@@ -110,31 +196,32 @@ let find_path_exn pred map =
 
 (** Gets the node at the given path *)
 let at_path ?(stop_at = EndOfPath) path map =
-  let rec aux path map =
-    match (map, path, stop_at) with
-    | map, [], StartOfPath -> Some map
-    | (Cmd { next = Nothing; _ } as map), [], BeforeNothing -> Some map
-    | (BranchCmd { nexts; _ } as map), [ case ], BeforeNothing
-      when Hashtbl.find_opt nexts case |> Option.map snd = Some Nothing ->
-        Some map
-    | Cmd { next; _ }, _, _ -> aux path next
-    | BranchCmd { nexts; _ }, case :: path, _ -> (
-        match Hashtbl.find_opt nexts case with
-        | Some (_, next) -> aux path next
-        | None -> None)
-    | map, [], (EndOfPath | BeforeNothing) -> Some map
+  let is_branch_empty case nexts =
+    match List.assoc_opt case nexts with
+    | Some (None, _) -> true
+    | _ -> false
+  in
+  let rec aux path node =
+    match (node.next, path, stop_at) with
+    | _, [], StartOfPath -> Some node
+    | Some (Single (None, _)), [], BeforeNothing -> Some node
+    | Some (Branch nexts), [ case ], BeforeNothing
+      when is_branch_empty case nexts -> Some node
+    | Some (Single (Some id, _)), _, _ ->
+        let* next = get map id in
+        aux path next
+    | Some (Branch nexts), case :: path, _ -> (
+        match List.assoc_opt case nexts with
+        | Some (Some id, _) ->
+            let* next = get map id in
+            aux path next
+        | _ -> None)
+    | _, [], (EndOfPath | BeforeNothing) -> Some node
     | _, _, _ -> None
   in
-  aux (List.rev path) map
-
-let get_cmd_data = function
-  | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> Some data
-  | Nothing -> None
-
-let get_cmd_data_exn map =
-  match get_cmd_data map with
-  | Some map -> map
-  | None -> failwith "Tried to get data from Nothing map"
+  let* root_id = map.root in
+  let* root = get map root_id in
+  aux (List.rev path) root
 
 (** Exception-raising equivalent to [at_path] *)
 let at_path_exn ?(stop_at = EndOfPath) path map =
@@ -142,67 +229,53 @@ let at_path_exn ?(stop_at = EndOfPath) path map =
   | Some map -> map
   | None -> failwith "Exec_map.at_path"
 
-let map_data f = function
-  | Nothing -> Nothing
-  | Cmd { data; next } -> Cmd { data = f data; next }
-  | BranchCmd { data; nexts } -> BranchCmd { data = f data; nexts }
-  | FinalCmd { data } -> FinalCmd { data = f data }
-
 (** An Exec_map to be passed to the debugger frontend and displayed *)
 module Packaged = struct
-  type branch_case = string * Yojson.Safe.t [@@deriving yojson]
+  type id = L.Report_id.t [@@deriving yojson]
+  type branch_case = Yojson.Safe.t [@@deriving yojson]
 
-  (* Need this to avoid name conflict *)
-  (**/**)
-
-  type ('branch_case, 'cmd_data, 'branch_data) _map =
-    ('branch_case, 'cmd_data, 'branch_data) t
-  [@@deriving yojson]
-
-  (**/**)
-
-  type t = (branch_case, cmd_data, unit) _map
-
-  and cmd_data = {
+  type cmd_data = {
     id : L.Report_id.t;
     all_ids : L.Report_id.t list;
     display : string;
     matches : matching list;
     errors : string list;
-    submap : t submap;
+    submap : id submap;
   }
   [@@deriving yojson]
 
+  type branch_data = string [@@deriving yojson]
+
+  type t = (L.Report_id.t, branch_case, cmd_data, branch_data) map
+  [@@deriving yojson]
+
   (** Converts a GIL branch case to a packaged branch case *)
-  let package_gil_case (case : Branch_case.t) : branch_case =
+  let package_gil_case (case : Branch_case.t) : branch_case * branch_data =
     let json = Branch_case.to_yojson case in
     let display = Fmt.str "%a" Branch_case.pp_short case in
-    (display, json)
+    (json, display)
 
   (** Converts an Exec_map to a packaged Exec_map *)
-  let package package_data package_case (map : ('c, 'd, 'bd) _map) : t =
-    let rec aux map =
-      match map with
-      | Nothing -> Nothing
-      | Cmd { data; next } ->
-          Cmd { data = package_data aux data; next = aux next }
-      | BranchCmd { data; nexts } ->
-          let data = package_data aux data in
-          let all_cases =
-            nexts |> Hashtbl.to_seq |> List.of_seq
-            |> List.map (fun (c, (bd, _)) -> (c, bd))
-          in
-          let nexts =
-            nexts
-            |> Hashtbl.map (fun case (bdata, next) ->
-                   let case = package_case ~bd:bdata ~all_cases case in
-                   let next = aux next in
-                   (case, ((), next)))
-          in
-          BranchCmd { data; nexts }
-      | FinalCmd { data } ->
-          let data = package_data aux data in
-          FinalCmd { data }
+  let package
+      package_id
+      package_node
+      ({ root; entries } : ('i, 'c, 'd, 'bd) map) : t =
+    let map' =
+      {
+        root = Option.map package_id root;
+        entries = Hashtbl.create (Hashtbl.length entries);
+      }
     in
-    aux map
+    let () =
+      Hashtbl.iter
+        (fun id entry ->
+          let entry' =
+            match entry with
+            | Node node -> Node (package_node node)
+            | Alias id -> Alias (package_id id)
+          in
+          Hashtbl.replace map'.entries (package_id id) entry')
+        entries
+    in
+    map'
 end
