@@ -246,3 +246,8 @@ let[@tail_mod_cons] rec map_last f l =
   | [] -> []
   | [ x ] -> [ f x ]
   | x :: l' -> x :: map_last f l'
+
+let[@tail_mod_cons] rec assoc_replace k v = function
+  | [] -> [ (k, v) ]
+  | (k', _) :: r when k = k' -> (k, v) :: r
+  | x :: r -> x :: assoc_replace k v r

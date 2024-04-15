@@ -11,7 +11,6 @@ module type S = sig
 
   val launch : string -> string option -> (t, string) result
   val jump_to_id : Logging.Report_id.t -> t -> (unit, string) result
-  val jump_to_start : t -> unit
   val step_in : t -> stop_reason
   val step : ?reverse:bool -> t -> stop_reason
 

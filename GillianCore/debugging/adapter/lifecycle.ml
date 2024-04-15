@@ -19,7 +19,7 @@ module Make (Debugger : Debugger.S) = struct
       (module Configuration_done_command)
       (fun _ ->
         let open Launch_command.Arguments in
-        if not launch_args.stop_on_entry then (
+        if not launch_args.stop_on_entry then
           let stop_reason = Debugger.run ~launch:true dbg in
           match stop_reason with
           | Step ->
@@ -34,9 +34,7 @@ module Make (Debugger : Debugger.S) = struct
                 Stopped_event.Payload.(
                   make ~reason:Stopped_event.Payload.Reason.Exception
                     ~thread_id:(Some 0) ())
-          | reason ->
-              dbg |> Debugger.jump_to_start;
-              send_stopped_events dbg rpc reason)
+          | reason -> send_stopped_events dbg rpc reason
         else
           Debug_rpc.send_event rpc
             (module Stopped_event)
