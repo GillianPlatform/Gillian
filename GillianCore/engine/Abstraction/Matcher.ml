@@ -336,9 +336,9 @@ module Make (State : SState.S) :
       preds_list;
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
-  type handle_pure_result = Success of state_t | Abort of Formula.t | Vanish
+  type cons_pure_result = Success of state_t | Abort of Formula.t | Vanish
 
-  let handle_pure (state : state_t) (f : Formula.t) : handle_pure_result =
+  let cons_pure (state : state_t) (f : Formula.t) : cons_pure_result =
     if !Config.under_approximation then
       (* [sat_check_f] returns the model in case of SAT, None otherwise. *)
       match State.assume_a ~matching:true state [ f ] with
@@ -1117,7 +1117,7 @@ module Make (State : SState.S) :
       (subst : SVal.SESubst.t)
       (step : MP.step)
       (vos : Expr.t list)
-      (eos : Expr.t list) : handle_pure_result =
+      (eos : Expr.t list) : cons_pure_result =
     let ( let+ ) x f = List.map f x in
     let outs = snd step in
     L.verbose (fun fmt ->
@@ -1178,7 +1178,7 @@ module Make (State : SState.S) :
               | Abort _ | Vanish -> ac
               | Success state ->
                   let pf : Formula.t = Eq (vd, od) in
-                  handle_pure state pf)
+                  cons_pure state pf)
             (Success state) vos eos
         with Invalid_argument _ ->
           Fmt.failwith "Invalid amount of args for the following MP step : %a"
@@ -1376,7 +1376,7 @@ module Make (State : SState.S) :
                   Reduction.reduce_formula ~matching:true discharges_pf
                 in
                 let to_asrt = Formula.Infix.( #&& ) pf discharges_pf in
-                match handle_pure state to_asrt with
+                match cons_pure state to_asrt with
                 | Success new_state ->
                     Res_list.return
                       { state = new_state; preds; wands; pred_defs; variants }
