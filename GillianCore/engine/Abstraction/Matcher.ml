@@ -340,7 +340,6 @@ module Make (State : SState.S) :
 
   let cons_pure (state : state_t) (f : Formula.t) : cons_pure_result =
     if !Config.under_approximation then
-      (* [sat_check_f] returns the model in case of SAT, None otherwise. *)
       match State.assume_a ~matching:true state [ f ] with
       | Some state -> Success state
       | None -> Vanish
