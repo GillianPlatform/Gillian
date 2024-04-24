@@ -8,7 +8,7 @@ bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
 homepage: "https://github.com/GillianPlatform/Gillian/"
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
 build: [
-  ["dune" "subst"] {dev}
+  # ["dune" "subst"] {dev}
   [
     "dune"
     "build"
