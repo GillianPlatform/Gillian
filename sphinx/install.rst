@@ -48,8 +48,7 @@ Linux / macOS
    .. code-block:: bash
 
     cd Gillian
-    esy install
-    esy build
+    esy
 
    This may take a while, as esy will install and build sandboxed versions of every dependency, including OCaml and Z3.
 

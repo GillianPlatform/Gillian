@@ -1,0 +1,57 @@
+opam-version: 2.0
+authors: ["Sacha-Élie Ayoun", "Nat Karmios", "Petar Maksimović", "José Fragoso Santos"]
+maintainer: ["GillianPlatform"]
+name: "gillian"
+synopsis: "A parametric compositional symbolic execution for Correctness and Incorrectness"
+license: "BSD-3-Clause"
+bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
+homepage: "https://github.com/GillianPlatform/Gillian/"
+dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "@install"
+    "@runtest" {with-test}
+    "@doc" {with-doc}
+  ]
+]
+depends: [
+  #   "dependencies": {
+  #   "@opam/alcotest": "1.0.1",
+  #   "@opam/cmdliner": "^1.1.1",
+  #   "@opam/dap": "1.0.6",
+  #   "@opam/fmt": "^0.8.8",
+  #   "@opam/dune": "^3.0",
+  #   "@opam/memtrace": "0.2.3",
+  #   "@opam/menhir": "20231231",
+  #   "@opam/ppx_deriving_yojson": "*",
+  #   "@opam/ppxlib": ">=0.18.0",
+  #   "@opam/sqlite3": "5.0.2",
+  #   "@opam/visitors": ">=2.3",
+  #   "@opam/yojson": "^1.7.0",
+  #   "@opam/zarith": ">=1.12",
+  #   "@opam/z3": "GillianPlatform/esy-z3#e8b2ce266d5d8bd67c54bd226c6301f7b180bb09",
+  #   "ocaml": "5.1.x"
+  # },
+  "dune" { >= "3.0" }
+  "alcotest" { >= "1.0.1" }
+  "cmdliner" { >= "1.1.1" }
+  "dap" { = "1.0.6" }
+  "fmt" { >= "0.8.8" }
+  "memtrace" { = "0.2.3" }
+  "menhir" { = "20231231" }
+  "ppx_deriving_yojson"
+  "ppxlib" { >= "0.18.0" }
+  "sqlite3" { = "5.0.2" }
+  "visitors" { >= "2.3" }
+  "yojson" { >= "1.7.0" }
+  "zarith" { >= "1.12" }
+  "z3" { = "4.13.0" }
+  "odoc" { with-doc }
+]

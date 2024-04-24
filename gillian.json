@@ -22,9 +22,9 @@
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
     "@opam/z3": "GillianPlatform/esy-z3#e8b2ce266d5d8bd67c54bd226c6301f7b180bb09",
-    "ocaml": "^4.14.x"
+    "ocaml": "5.1.x"
   },
   "devDependencies": {
-    "ocaml": "4.14.x"
+    "ocaml": "5.1.x"
   }
 }
