@@ -1,6 +1,6 @@
 opam-version: "2.0"
-authors: ["Sacha-Élie Ayoun", "Nat Karmios", "Petar Maksimović", "José Fragoso Santos"]
-maintainer: ["GillianPlatform"]
+authors: "Sacha-Élie Ayoun,Nat Karmios,Petar Maksimović,José Fragoso Santos"
+maintainer: "GillianPlatform"
 name: "gillian"
 synopsis: "A parametric compositional symbolic execution for Correctness and Incorrectness"
 license: "BSD-3-Clause"
