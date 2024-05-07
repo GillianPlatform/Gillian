@@ -1,5 +1,6 @@
 // This file is inspired by one of the bugs found using Gillian-C in the Collections-C library.
 
+#include <gillian-c/gillian-c.h>
 #include <stdlib.h>
 #include <string.h>
 #define INITIAL_CAPACITY 4
@@ -43,6 +44,6 @@ int main() {
         push(&arr, i);
     for (unsigned int i = init_loops; i > 0; i--)
         remove(&arr, 0);
-    __CPROVER_assert(arr.size == 0, "failed final check");
+    ASSERT(arr.size == 0);
     return 0;
 }
