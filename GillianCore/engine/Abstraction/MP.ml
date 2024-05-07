@@ -273,6 +273,12 @@ let rec learn_expr
       | true, true | false, false -> []
       | false, true -> f (BinOp (base_expr, IPlus, e2)) e1
       | true, false -> f (BinOp (e1, IMinus, base_expr)) e2)
+  | BinOp (e1, ITimes, e2) -> (
+      let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
+      match (ike1, ike2) with
+      | true, true | false, false -> []
+      | true, false -> f (BinOp (base_expr, IDiv, e1)) e2
+      | false, true -> f (BinOp (base_expr, IDiv, e2)) e1)
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
 

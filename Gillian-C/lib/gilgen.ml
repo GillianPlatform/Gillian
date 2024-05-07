@@ -343,17 +343,15 @@ let make_free_cmd fname var_list =
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
 let make_symb_gen ~fname ~ctx assigned_id type_string =
-  let gen_str = Generators.gen_str ~fname in
+  let gen_str = Generators.gen_str ~fname Prefix.lvar in
   let assigned = true_name assigned_id in
-  let fresh_svar = Cmd.Logic (FreshSVar assigned) in
-  let lvar_val = Expr.LVar (gen_str Prefix.lvar) in
-  let assume_list =
-    Cmd.Logic
-      (LCmd.Assume
-         (Eq (PVar assigned, Expr.EList [ Lit (String type_string); lvar_val ])))
-  in
+  let fresh_svar = Cmd.Logic (FreshSVar gen_str) in
+  let lvar_val = Expr.LVar gen_str in
   let assume_val_t = Cmd.Logic (LCmd.AssumeType (lvar_val, Type.IntType)) in
-  add_annots ~ctx [ fresh_svar; assume_list; assume_val_t ]
+  let assignment =
+    Cmd.Assignment (assigned, Expr.EList [ Lit (String type_string); lvar_val ])
+  in
+  add_annots ~ctx [ fresh_svar; assume_val_t; assignment ]
 
 let is_call name e =
   match e with

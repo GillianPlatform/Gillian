@@ -2081,7 +2081,7 @@ struct
         in
         let proc_name, annot_cmd = get_cmd prog cs i in
         if !Config.current_exec_mode <> Exec_mode.BiAbduction then
-          Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+          L.normal (fun m -> m "WARNING: MAX BRANCHING STOP: %d.\n" b_counter);
         L.set_previous prev_cmd_report_id;
         L.(
           verbose (fun m ->

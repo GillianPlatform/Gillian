@@ -15,13 +15,29 @@ struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
+  let start_time = ref (Sys.time ())
+
   let json_ui =
     let doc = "Output some of the UI in JSON." in
     Arg.(value & flag & info [ "json-ui" ] ~doc)
 
+  let unroll_depth =
+    let default = 100 in
+    let doc = "How many times are recursive calls called/loops unrolled" in
+    Arg.(value & opt int default & info [ "unroll" ] ~doc)
+
   module Run = struct
     open ResultsDir
     open ChangeTracker
+
+    let counter_example res =
+      let error_state =
+        match res with
+        | Exec_res.RFail f -> f.error_state
+        | _ -> failwith "Expected failure"
+      in
+      let subst = SState.sat_check_f error_state [] in
+      subst
 
     let run_main prog init_data =
       let all_results =
@@ -46,11 +62,31 @@ struct
             | _ -> false)
           all_results
       in
+      let total_time = Sys.time () -. !start_time in
+      Printf.printf "Total time (Compilation + Symbolic testing): %fs\n"
+        total_time;
       if success then (
         Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!";
         exit 0)
       else (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!";
+        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occured!";
+        let first_error =
+          List.find
+            (function
+              | Exec_res.RFail _ -> true
+              | _ -> false)
+            all_results
+        in
+        let counter_example = counter_example first_error in
+        Fmt.pr "Here's a counter example: %a@\n@?"
+          (Fmt.option
+             ~none:(Fmt.any "Couldn't produce counter-example")
+             SVal.SESubst.pp)
+          counter_example;
+        Fmt.pr "Here's an example of final error state: %a@\n@?"
+          (Exec_res.pp SState.pp S_interpreter.pp_state_vt
+             S_interpreter.pp_err_t)
+          first_error;
         exit 1)
 
     let run_incr source_files prog init_data =
@@ -132,6 +168,7 @@ struct
       (e_prog, init_data, None)
 
   let process_files files already_compiled outfile_opt incremental =
+    let t = Sys.time () in
     let e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled
     in
@@ -148,6 +185,7 @@ struct
     let () =
       L.normal (fun m -> m "\n*** Stage 2: DONE transforming the program.\n")
     in
+    Printf.printf "Compilation time: %fs\n" (Sys.time () -. t);
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
     match MP.init_prog prog with
     | Error _ -> failwith "Creation of matching plans failed"
@@ -162,6 +200,7 @@ struct
       incremental
       entry_point
       json_ui
+      unroll
       () =
     let () = Fmt_tty.setup_std_outputs () in
     let () = Config.json_ui := json_ui in
@@ -171,6 +210,7 @@ struct
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
     let () = PC.initialize Symbolic in
+    let () = Config.max_branching := unroll in
     let () = process_files files already_compiled outfile_opt incremental in
     let () = if stats then Statistics.print_statistics () in
     (* TODO: wrap-up should be done using [Stdlib.onexit] instead *)
@@ -179,7 +219,7 @@ struct
   let wpst_t =
     Term.(
       const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
-      $ incremental $ entry_point $ json_ui)
+      $ incremental $ entry_point $ json_ui $ unroll_depth)
 
   let wpst_info =
     let doc = "Symbolically executes a file of the target language" in
