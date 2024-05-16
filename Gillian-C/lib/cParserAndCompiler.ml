@@ -21,6 +21,7 @@ module TargetLangOptions = struct
     pp_full_trees : bool;
     allocated_functions : bool;
     alloc_can_fail : bool;
+    cbmc : bool;
   }
 
   let term =
@@ -95,6 +96,10 @@ module TargetLangOptions = struct
     let alloc_can_fail =
       Arg.(value & flag & info [ "alloc-can-fail" ] ~docs ~doc)
     in
+    let doc =
+      "Enable CBMC builtin functions for assert, assume, nondet, etc."
+    in
+    let cbmc = Arg.(value & flag & info [ "cbmc" ] ~docs ~doc) in
     let opt
         include_dirs
         source_dirs
@@ -107,7 +112,8 @@ module TargetLangOptions = struct
         fstruct_passing
         pp_full_trees
         allocated_functions
-        alloc_can_fail =
+        alloc_can_fail
+        cbmc =
       {
         include_dirs;
         source_dirs;
@@ -121,12 +127,13 @@ module TargetLangOptions = struct
         pp_full_trees;
         allocated_functions;
         alloc_can_fail;
+        cbmc;
       }
     in
     Term.(
       const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
       $ hundef $ hmultdef $ verbose_compcert $ fstruct_passing $ pp_full_trees
-      $ allocated_functions $ alloc_can_fail)
+      $ allocated_functions $ alloc_can_fail $ cbmc)
 
   let apply
       {
@@ -142,6 +149,7 @@ module TargetLangOptions = struct
         pp_full_trees;
         allocated_functions;
         alloc_can_fail;
+        cbmc;
       } =
     let rec get_c_paths dirs =
       match dirs with
@@ -164,7 +172,8 @@ module TargetLangOptions = struct
     Config_compcert.Features.set_fstruct_passing fstruct_passing;
     Config.pp_full_tree := pp_full_trees;
     Config.allocated_functions := allocated_functions;
-    Config.alloc_can_fail := alloc_can_fail
+    Config.alloc_can_fail := alloc_can_fail;
+    Config.cbmc := cbmc
 end
 
 type init_data = Global_env.t
@@ -393,7 +402,13 @@ let parse_and_compile_files paths =
         link rest new_unresolved new_defined
   in
   let unresolved_syms = link paths SS.empty SS.empty in
-  let to_ignore = Config_compcert.references_to_ignore |> SS.of_list in
+  let to_ignore =
+    let compcert_ignores = Config_compcert.references_to_ignore in
+    let cbmc_ignores =
+      if !Config.cbmc then [ Builtin_Functions.nondet_int_f ] else []
+    in
+    compcert_ignores @ cbmc_ignores |> SS.of_list
+  in
   let unresolved_syms = SS.diff unresolved_syms to_ignore in
   let () =
     if (not (SS.is_empty unresolved_syms)) && not hide_undef then

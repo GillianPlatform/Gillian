@@ -106,7 +106,10 @@ end
 
 module Builtin_Functions = struct
   let assert_f = "ASSERT"
+  let assert_cbmc_f = "__CPROVER_assert"
   let assume_f = "ASSUME"
+  let assume_cbmc_f = "__CPROVER_assume"
+  let nondet_int_f = "__nondet_int"
 end
 
 module BinOp_Functions = struct
