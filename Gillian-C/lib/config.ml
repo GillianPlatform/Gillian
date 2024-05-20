@@ -9,3 +9,4 @@ let verbose_compcert = ref false
 let pp_full_tree = ref false
 let allocated_functions = ref false
 let alloc_can_fail = ref false
+let cbmc = ref false

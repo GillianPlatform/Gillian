@@ -358,8 +358,17 @@ let is_call name e =
   | Csharpminor.Eaddrof l when String.equal (true_name l) name -> true
   | _ -> false
 
-let is_assert_call = is_call Builtin_Functions.assert_f
-let is_assume_call = is_call Builtin_Functions.assume_f
+let is_assert_call e =
+  (!Config.cbmc && is_call Builtin_Functions.assert_cbmc_f e)
+  || is_call Builtin_Functions.assert_f e
+
+let is_assume_call e =
+  (!Config.cbmc && is_call Builtin_Functions.assume_cbmc_f e)
+  || is_call Builtin_Functions.assume_f e
+
+let is_nondet_int_call e =
+  !Config.cbmc && is_call Builtin_Functions.nondet_int_f e
+
 let is_printf_call = is_call "printf"
 let last_invariant = ref None (* Dirty hack *)
 let set_invariant l = last_invariant := Some l
@@ -529,6 +538,8 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assume form) in
       (add_annots ~ctx:context (cmds @ [ assert_cmd ]), [])
+  | Scall (Some id, _, ex, []) when is_nondet_int_call ex ->
+      (make_symb_gen ~ctx:context id CConstants.VTypes.int_type, [])
   | Scall (None, _, ex, args) when is_printf_call ex ->
       let cmds, egil = List.split (List.map trans_expr args) in
       let leftvar = gen_str Prefix.gvar in
