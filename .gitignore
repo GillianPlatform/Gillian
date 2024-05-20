@@ -77,6 +77,11 @@ gillian_smt_queries
 *.deps
 *.i
 
+# Melange / JS things for debugger
+vscode/extension/js
+vscode/webview/js
+vscode/webview/out
+
 # Dependency graphs
 with-depgraph.esy.lock
 with-depgraph.json

@@ -6,7 +6,8 @@
  Gillian-C
  kanillian
  Gillian-Alcotest-Runner
- ppx_sat)
+ ppx_sat
+ vscode)
 
 (env
  (opt

@@ -1,0 +1,8 @@
+(melange.emit
+ (alias melange_extension)
+ (target js)
+ (libraries bindings cma_configuration components reason-react)
+ (module_systems es6)
+ (promote (until-clean))
+ (preprocess
+  (pps melange.ppx reason-react-ppx)))
