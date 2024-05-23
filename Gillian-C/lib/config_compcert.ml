@@ -4,6 +4,7 @@ let set_verbose_invocation () = option_v := true
 
 module Features = struct
   let set_fstruct_passing b = option_fstruct_passing := b
+  let set_fpacked_structs b = option_fpacked_structs := b
 end
 
 module Warnings = struct
