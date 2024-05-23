@@ -2,6 +2,7 @@ open Gillian.Gil_syntax
 open Compcert
 open Csharpminor
 open CConstants
+open Utils.Syntaxes.Option
 module Logging = Gillian.Logging
 module SS = Gillian.Utils.Containers.SS
 module Call_graph = Gillian.Utils.Call_graph
@@ -74,6 +75,7 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Ocmpl Cge -> call BinOp_Functions.cmpl_ge
   | Ocmpl Clt -> call BinOp_Functions.cmpl_lt
   | Ocmpl Ceq -> call BinOp_Functions.cmpl_eq
+  | Ocmpl Cne -> call BinOp_Functions.cmpl_ne
   (* OCmplu *)
   | Ocmplu Ceq -> call BinOp_Functions.cmplu_eq
   | Ocmplu Cne -> call BinOp_Functions.cmplu_ne
@@ -168,18 +170,12 @@ let get_struct_member_type
     (clight_prog : Clight.coq_function Ctypes.program)
     struct_id
     member_offset =
-  let members_opt =
+  let* members =
     (* An optional list of the members of the struct *)
     List.find_map
       (fun (Ctypes.Composite (composite_def_id, _, m, _)) ->
         if Camlcoq.P.eq struct_id composite_def_id then Some m else None)
       clight_prog.prog_types
-  in
-  let members =
-    (* A list of the members of the struct *)
-    match members_opt with
-    | Some members -> members
-    | None -> failwith "Failed to get the members of the struct"
   in
   let fx m =
     match m with
@@ -204,29 +200,27 @@ let rec get_struct_id clight_prog fname fid expr =
   match expr with
   | Eaddrof id -> (
       match get_typ_from_id clight_prog fid id with
-      | Tstruct (struct_id, _) -> struct_id
-      | Tpointer (Tstruct (struct_id, _), _) -> struct_id
-      | _ -> failwith "Wrong, type was something")
+      | Tstruct (struct_id, _) -> Some struct_id
+      | Tpointer (Tstruct (struct_id, _), _) -> Some struct_id
+      | _ -> None)
   | Evar id -> (
       match get_typ_from_id clight_prog fid id with
-      | Tpointer (Tstruct (struct_id, _), _) -> struct_id
+      | Tpointer (Tstruct (struct_id, _), _) -> Some struct_id
       (* Dereferencing a pointer to a pointer here *)
-      | Tpointer (Tpointer (Tstruct (struct_id, _), _), _) -> struct_id
-      | _ -> failwith "Wrong, type was something")
+      | Tpointer (Tpointer (Tstruct (struct_id, _), _), _) -> Some struct_id
+      | _ -> None)
   | Ebinop (_, expr', Econst (Ointconst ofs))
   | Ebinop (_, expr', Econst (Olongconst ofs)) -> (
-      let struct_id = get_struct_id clight_prog fname fid expr' in
-      let member_typ_opt = get_struct_member_type clight_prog struct_id ofs in
-      match member_typ_opt with
+      let* struct_id = get_struct_id clight_prog fname fid expr' in
+      let member_typ = get_struct_member_type clight_prog struct_id ofs in
+      match member_typ with
       (* Note: What's the significance of both cases below *)
-      | Some (Tpointer (Tstruct (struct_id, _), _)) -> struct_id
-      | Some (Tstruct (struct_id, _)) -> struct_id
-      | _ -> failwith "Didn't find a struct here")
+      | Some (Tpointer (Tstruct (struct_id, _), _)) -> Some struct_id
+      | Some (Tstruct (struct_id, _)) -> Some struct_id
+      | _ -> None)
   (* Double check this case - it looks suspicious *)
-  | Eload (_memory_chunk, expr') ->
-      let struct_id = get_struct_id clight_prog fname fid expr' in
-      struct_id
-  | _ -> failwith "Unsupported expression passed to get_struct_id"
+  | Eload (_memory_chunk, expr') -> get_struct_id clight_prog fname fid expr'
+  | _ -> None
 
 (* Convert the compcert chunk to Gillian chunk by checking if Csm expression
    evalutes to a pointer chunk *)
@@ -242,9 +236,11 @@ let to_gil_chunk_h clight_prog fname fid compcert_chunk expp =
       | _ -> Chunk.of_compcert compcert_chunk)
   | Ebinop (_, e, Econst (Ointconst ofs))
   | Ebinop (_, e, Econst (Olongconst ofs)) -> (
-      let struct_id = get_struct_id clight_prog fname fid e in
-      let member_typ_opt = get_struct_member_type clight_prog struct_id ofs in
-      match member_typ_opt with
+      let member_typ =
+        let* struct_id = get_struct_id clight_prog fname fid e in
+        get_struct_member_type clight_prog struct_id ofs
+      in
+      match member_typ with
       | Some member_typ -> (
           match member_typ with
           | Tpointer _ -> Chunk.Mptr
@@ -343,13 +339,13 @@ let make_free_cmd fname var_list =
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
 let make_symb_gen ~fname ~ctx assigned_id type_string =
-  let gen_str = Generators.gen_str ~fname Prefix.lvar in
+  let gen_str = Generators.gen_str ~fname Prefix.gvar in
   let assigned = true_name assigned_id in
   let fresh_svar = Cmd.Logic (FreshSVar gen_str) in
-  let lvar_val = Expr.LVar gen_str in
-  let assume_val_t = Cmd.Logic (LCmd.AssumeType (lvar_val, Type.IntType)) in
+  let gvar_val = Expr.PVar gen_str in
+  let assume_val_t = Cmd.Logic (LCmd.AssumeType (gvar_val, Type.IntType)) in
   let assignment =
-    Cmd.Assignment (assigned, Expr.EList [ Lit (String type_string); lvar_val ])
+    Cmd.Assignment (assigned, Expr.EList [ Lit (String type_string); gvar_val ])
   in
   add_annots ~ctx [ fresh_svar; assume_val_t; assignment ]
 
@@ -359,15 +355,15 @@ let is_call name e =
   | _ -> false
 
 let is_assert_call e =
-  (!Config.cbmc && is_call Builtin_Functions.assert_cbmc_f e)
+  (!Config.cbmc && is_call CBMC_Builtin_Functions.assert_ e)
   || is_call Builtin_Functions.assert_f e
 
 let is_assume_call e =
-  (!Config.cbmc && is_call Builtin_Functions.assume_cbmc_f e)
+  (!Config.cbmc && is_call CBMC_Builtin_Functions.assume e)
   || is_call Builtin_Functions.assume_f e
 
 let is_nondet_int_call e =
-  !Config.cbmc && is_call Builtin_Functions.nondet_int_f e
+  !Config.cbmc && is_call CBMC_Builtin_Functions.nondet_int e
 
 let is_printf_call = is_call "printf"
 let last_invariant = ref None (* Dirty hack *)
@@ -536,8 +532,8 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
       let form = Formula.Eq (egil, one) in
-      let assert_cmd = Cmd.Logic (Assume form) in
-      (add_annots ~ctx:context (cmds @ [ assert_cmd ]), [])
+      let assume_cmd = Cmd.Logic (Assume form) in
+      (add_annots ~ctx:context (cmds @ [ assume_cmd ]), [])
   | Scall (Some id, _, ex, []) when is_nondet_int_call ex ->
       (make_symb_gen ~ctx:context id CConstants.VTypes.int_type, [])
   | Scall (None, _, ex, args) when is_printf_call ex ->
