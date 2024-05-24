@@ -32,6 +32,11 @@ let fresh_then, reset_then = fresh_sth "glab_then_"
 let fresh_else, reset_else = fresh_sth "glab_else_"
 let fresh_var, reset_var = fresh_sth "gvar_aux_"
 
+let resource_error args =
+  if Utils.Exec_mode.is_biabduction_exec !Config.current_exec_mode then
+    GCmd.Logic (GLCmd.Assume False)
+  else Fail (JSILNames.resourceError, args)
+
 let reset_generators () =
   reset_then ();
   reset_else ();
@@ -254,7 +259,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         GuardedGoto (BinOp (lnth_expr, Equal, Lit Nono), then_lab, else_lab)
       in
       let cmd5 : string GCmd.t =
-        Fail (JSILNames.resourceError, [ Expr.PVar aux1; Expr.PVar aux2 ])
+        resource_error [ Expr.PVar aux1; Expr.PVar aux2 ]
       in
       let cmd6 : string GCmd.t = Assignment (x, lnth_expr) in
       [
@@ -319,7 +324,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         GuardedGoto (BinOp (e3', Equal, Lit Nono), then_lab, else_lab)
       in
       let cmd5 : string GCmd.t =
-        Fail (JSILNames.resourceError, [ Expr.PVar aux1; Expr.PVar aux2 ])
+        resource_error [ Expr.PVar aux1; Expr.PVar aux2 ]
       in
       let cmd6 : string GCmd.t =
         LAction (aux4, JSILNames.setCell, [ e1'; e2'; Expr.Lit Nono ])
@@ -355,7 +360,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let cmd3 : string GCmd.t =
         GuardedGoto (BinOp (e2, Equal, Lit Empty), then_lab, else_lab)
       in
-      let cmd4 : string GCmd.t = Fail (JSILNames.resourceError, [ e1 ]) in
+      let cmd4 : string GCmd.t = resource_error [ e1 ] in
       let cmd5 : string GCmd.t = LAction (aux3, JSILNames.delObj, [ e1 ]) in
       [
         (lab, cmd1);
@@ -407,9 +412,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         GuardedGoto
           (BinOp (Expr.PVar aux2, Equal, Lit Empty), then_lab, else_lab)
       in
-      let cmd4 : string GCmd.t =
-        Fail (JSILNames.resourceError, [ Expr.PVar aux1 ])
-      in
+      let cmd4 : string GCmd.t = resource_error [ Expr.PVar aux1 ] in
       let cmd5 : string GCmd.t =
         Assignment (x, BinOp (PVar aux2, LstNth, Expr.one_i))
       in
@@ -442,9 +445,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let cmd3 : string GCmd.t =
         GuardedGoto (BinOp (e', Equal, Lit Nono), then_lab, else_lab)
       in
-      let cmd4 : string GCmd.t =
-        Fail (JSILNames.resourceError, [ Expr.PVar aux1 ])
-      in
+      let cmd4 : string GCmd.t = resource_error [ Expr.PVar aux1 ] in
       let cmd5 : string GCmd.t =
         Assignment (x, BinOp (Expr.PVar aux2, LstNth, Expr.one_i))
       in
