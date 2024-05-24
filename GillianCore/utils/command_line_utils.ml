@@ -17,7 +17,7 @@ let burn_gil ~(init_data : Yojson.Safe.t) ~pp_prog prog outfile_opt =
         | `Null -> ()
         | init_data ->
             Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
-              (Yojson.Safe.pretty_print ~std:true)
+              (Yojson.Safe.pretty_print ~std:false)
               init_data
       in
       let () = pp_prog fmt prog in

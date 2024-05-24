@@ -54,7 +54,7 @@ struct
                S_interpreter.state_vt_to_yojson S_interpreter.err_t_to_yojson)
             all_results
         in
-        Fmt.pr "%a" (Yojson.Safe.pretty_print ~std:true) (`List json_results));
+        Fmt.pr "%a" (Yojson.Safe.pretty_print ~std:false) (`List json_results));
       let success =
         List.for_all
           (function

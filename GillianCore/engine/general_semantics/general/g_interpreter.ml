@@ -891,8 +891,7 @@ struct
           } =
             eval_state
           in
-          if Hashtbl.mem prog.prog.bi_specs pid then (
-            Fmt.pr "Susping!\n";
+          if Hashtbl.mem prog.prog.bi_specs pid then
             [
               CConf.ConfSusp
                 {
@@ -907,7 +906,7 @@ struct
                   branch_count = b_counter;
                   prev_cmd_report_id;
                 };
-            ])
+            ]
           else symb_exec_proc ()
 
         let f x pid v_args j subst eval_state =
@@ -2128,7 +2127,6 @@ struct
             eval_step_state
 
       let susp (cconf : CConf.susp) eval_step_state =
-        Fmt.pr "Handing susp!\n";
         let {
           eval_step;
           ret_fun;
