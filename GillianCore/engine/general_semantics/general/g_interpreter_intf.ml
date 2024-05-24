@@ -168,6 +168,11 @@ module type S = sig
     string list ->
     state_t ->
     'a list
+
+  (* Checks for memory leaks (might not detect all leaks).
+     If the result is a success but there is a leak, it is transformed to an error.
+  *)
+  val check_leaks : result_t -> result_t
 end
 
 (** @canonical Gillian.General.G_interpreter *)

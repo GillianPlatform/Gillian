@@ -1,6 +1,8 @@
 // This file is inspired by one of the bugs found using Gillian-C in the Collections-C library.
-
+#include <gillian-c/gillian-c.h>
 #include <stdlib.h>
+
+void abort() { ASSUME(0); }
 
 typedef struct Array {
     int *buffer;
@@ -39,6 +41,8 @@ pred valid_array(+ar, content) {
 }*/
 void push(Array *ar, int value) {
     if (ar->size == ar->capacity) {
+        if (SIZE_MAX / 2 - 1 < ar->capacity)
+            abort();
         ar->capacity *= 2;
         int *new_buffer = malloc(ar->capacity * sizeof(int));
         memcpy(new_buffer, ar->buffer, ar->size * sizeof(int));

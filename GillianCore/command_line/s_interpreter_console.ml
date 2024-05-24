@@ -26,6 +26,10 @@ struct
     let doc = "How many times are recursive calls called/loops unrolled" in
     Arg.(value & opt int default & info [ "unroll" ] ~doc)
 
+  let check_leaks =
+    let doc = "Check for memory leaks" in
+    Arg.(value & flag & info [ "leak-check" ] ~doc)
+
   module Run = struct
     open ResultsDir
     open ChangeTracker
@@ -41,9 +45,16 @@ struct
 
     let run_main prog init_data =
       let all_results =
-        S_interpreter.evaluate_proc
-          (fun x -> x)
-          prog !Config.entry_point [] (SState.init init_data)
+        let open Syntaxes.List in
+        let+ result_before_leak_check =
+          S_interpreter.evaluate_proc
+            (fun x -> x)
+            prog !Config.entry_point [] (SState.init init_data)
+        in
+        if !Config.leak_check then
+          let () = L.verbose (fun m -> m "Checking for memory leaks") in
+          S_interpreter.check_leaks result_before_leak_check
+        else result_before_leak_check
       in
       if !Config.json_ui then (
         Fmt.pr "===JSON RESULTS===\n@?";
@@ -201,6 +212,7 @@ struct
       entry_point
       json_ui
       unroll
+      leak_check
       () =
     let () = Fmt_tty.setup_std_outputs () in
     let () = Config.json_ui := json_ui in
@@ -209,6 +221,7 @@ struct
     let () = Config.stats := stats in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
+    let () = Config.leak_check := leak_check in
     let () = PC.initialize Symbolic in
     let () = Config.max_branching := unroll in
     let () = process_files files already_compiled outfile_opt incremental in
@@ -219,7 +232,7 @@ struct
   let wpst_t =
     Term.(
       const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
-      $ incremental $ entry_point $ json_ui $ unroll_depth)
+      $ incremental $ entry_point $ json_ui $ unroll_depth $ check_leaks)
 
   let wpst_info =
     let doc = "Symbolically executes a file of the target language" in

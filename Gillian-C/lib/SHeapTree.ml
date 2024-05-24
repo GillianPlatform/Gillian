@@ -1492,6 +1492,12 @@ let move dst_tree dst_ofs src_tree src_ofs size =
             else DR.error BufferOverrun
       else DR.error BufferOverrun
 
+let is_empty_or_freed t =
+  match t with
+  | Freed -> true
+  | Tree { bounds; root } ->
+      Option.is_none bounds && Option.fold ~none:true ~some:Tree.is_empty root
+
 let assertions ~loc t =
   let loc = Expr.loc_from_loc_name loc in
   match t with

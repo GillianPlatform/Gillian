@@ -2320,10 +2320,20 @@ struct
     let init_func = init_evaluate_proc ret_fun prog name params state in
     evaluate_cmd_iter init_func
 
-  (**
-  Evaluation of programs
-
-  @param prog Target GIL program
-  @return Final configurations
-*)
+  (* Checks for memory leaks.
+     This check might not raise an issue even though there
+     is a leak.
+  *)
+  let check_leaks result =
+    match result with
+    | Exec_res.RSucc { final_state; _ } when State.sure_is_nonempty final_state
+      ->
+        Exec_res.RFail
+          {
+            proc = "Memory Leak Check post-execution";
+            proc_idx = -1;
+            error_state = final_state;
+            errors = [ Exec_err.ELeak ];
+          }
+    | _ -> result
 end

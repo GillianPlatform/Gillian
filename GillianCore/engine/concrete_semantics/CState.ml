@@ -195,6 +195,8 @@ end = struct
   let try_recovering _ _ : (t list, string) result =
     Error "try_recovering not supported in concrete execution"
 
+  let sure_is_nonempty _ = false
+
   let pp_err fmt (err : err_t) : unit =
     match err with
     | EMem m_err -> CMemory.pp_err fmt m_err

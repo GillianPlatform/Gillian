@@ -18,6 +18,7 @@ let previously_normalised = ref false
 let unfolding = ref true
 let manual_proof = ref false
 let max_branching = ref 100
+let leak_check = ref false
 
 (* let perform_syntax_checks = ref false *)
 let lemma_proof = ref false

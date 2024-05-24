@@ -414,6 +414,8 @@ module Make (State : SState.S) = struct
   let try_recovering _ _ : (t list, string) result =
     Error "try_recovering not supported in bi-abduction yet"
 
+  let sure_is_nonempty _ = false
+
   (** new functions *)
 
   let mem_constraints ({ state; _ } : t) : Formula.t list =
