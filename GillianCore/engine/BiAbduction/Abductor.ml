@@ -10,7 +10,7 @@ module type S = sig
     annot MP.prog ->
     bool ->
     SourceFiles.t option ->
-    unit
+    Gillian_result.t
 end
 
 module Make
@@ -209,7 +209,7 @@ module Make
             m "WARNING: %d vanished while creating the for %s!" !count test.name);
       result
     with Failure msg ->
-      L.print_to_all
+      print_to_all
         (Printf.sprintf "ERROR in proc %s with message:\n%s\n" test.name msg);
       []
 
@@ -338,9 +338,9 @@ module Make
     in
 
     if !Config.specs_to_stdout then (
-      L.print_to_all bug_specs_txt;
-      L.print_to_all error_specs_txt;
-      L.print_to_all normal_specs_txt)
+      print_to_all bug_specs_txt;
+      print_to_all error_specs_txt;
+      print_to_all normal_specs_txt)
     else (
       L.normal (fun m -> m "%s" bug_specs_txt);
       L.normal (fun m -> m "%s" error_specs_txt);
@@ -357,7 +357,7 @@ module Make
     let offset = if auxiliaries then 12 else 0 in
     let len_succ = len_succ - offset in
     let () =
-      L.print_to_all
+      print_to_all
         (Printf.sprintf "SUCCESS SPECS: %d\nERROR SPECS: %d\nBUG SPECS: %d"
            len_succ (List.length error_specs) (List.length bug_specs))
     in
@@ -479,7 +479,7 @@ module Make
       ?(call_graph = Call_graph.make ())
       (prog : annot MP.prog)
       (incremental : bool)
-      (source_files : SourceFiles.t option) : unit =
+      (source_files : SourceFiles.t option) : Gillian_result.t =
     let open ResultsDir in
     let open ChangeTracker in
     if incremental && prev_results_exist () then
@@ -508,7 +508,10 @@ module Make
       let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
       let results = BiAbductionResults.merge prev_results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-      write_biabduction_results cur_source_files call_graph ~diff results
+      let () =
+        write_biabduction_results cur_source_files call_graph ~diff results
+      in
+      Gillian_result.ok
     else
       (* Test all procedures *)
       let cur_source_files =
@@ -516,7 +519,11 @@ module Make
       in
       let dyn_call_graph = SBAInterpreter.call_graph in
       let results = test_procs ~init_data ~call_graph prog in
-      write_biabduction_results cur_source_files dyn_call_graph ~diff:"" results
+      let () =
+        write_biabduction_results cur_source_files dyn_call_graph ~diff:""
+          results
+      in
+      Gillian_result.ok
 end
 
 module From_scratch

@@ -49,7 +49,13 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
     in
     Fmt_tty.setup_std_outputs ();
     let n = List.length lst in
-    AlcotestCore.run ~and_exit:true
-      (Printf.sprintf "Running %i test suites" n)
-      lst
+    Gillian.Utils.Gillian_result.(
+      try
+        let () =
+          AlcotestCore.run ~and_exit:false
+            (Printf.sprintf "Running %i test suites" n)
+            lst
+        in
+        ok
+      with AlcotestCore.Test_error -> unknown_failure)
 end

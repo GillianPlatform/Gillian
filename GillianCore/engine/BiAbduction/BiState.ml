@@ -183,8 +183,8 @@ module Make (State : SState.S) = struct
       (subst : SVal.SESubst.t)
       (mp : MP.t) : (state_t * state_t * SVal.SESubst.t * post_res) list =
     if not !Config.under_approximation then (
-      L.print_to_all "Running bi-abduction without under-approximation?\n";
-      exit 1);
+      print_to_all "Running bi-abduction without under-approximation?\n";
+      raise Gillian_result.(Exn Internal_error));
     let open Syntaxes.List in
     let rec search next_state =
       let state, af_state, subst, mp = next_state in

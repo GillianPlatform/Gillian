@@ -5,16 +5,20 @@ type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   init_data : 'init_data;
 }
 
-let get_progs_or_fail ~pp_err = function
+let get_progs ~pp_err =
+  let open Gillian_result in
+  function
   | Ok progs -> (
       match progs.gil_progs with
       | [] ->
-          Fmt.pr "Error: expected at least one GIL program\n";
-          exit 1
-      | _ -> progs)
-  | Error err ->
-      Fmt.pr "Error during compilation to GIL:\n%a" pp_err err;
-      exit 1
+          let () = print_to_all "Error: expected at least one GIL program\n" in
+          verification_failure
+      | _ -> Ok progs)
+  | Error (err, f) ->
+      let () =
+        print_to_all (Fmt.str "Error during compilation to GIL:\n%a" pp_err err)
+      in
+      Error f
 
 module type S = sig
   module TargetLangOptions : sig
@@ -45,7 +49,10 @@ module type S = sig
       then compiles them to a single or a set of GIL programs. The returned GIL
       program(s) should be ready to be analysed. *)
   val parse_and_compile_files :
-    string list -> ((Annot.t, tl_ast, init_data) compiled_progs, err) result
+    string list ->
+    ( (Annot.t, tl_ast, init_data) compiled_progs,
+      err * Gillian_result.failure )
+    result
 
   (** [other_imports] is an association list that maps extensions to a parser
       and compiler. For example, it is possible to import a JSIL file in a GIL
@@ -54,7 +61,10 @@ module type S = sig
       [parse_and_compile_jsil_file] is a function that takes a file path, parses
       the file as a JSIL program, and compiles this to a GIL program. *)
   val other_imports :
-    (string * (string -> ((Annot.t, string) Prog.t, err) result)) list
+    (string
+    * (string ->
+      ((Annot.t, string) Prog.t, err * Gillian_result.failure) result))
+    list
 
   (** Contains the name of the environment variable which contains the path to where the runtime is stored. *)
   val env_var_import_path : string option

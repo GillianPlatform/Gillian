@@ -37,7 +37,7 @@ module type S = sig
     prog_t ->
     bool ->
     SourceFiles.t option ->
-    unit
+    Gillian_result.t
 
   val verify_up_to_procs :
     ?proc_name:string ->
@@ -516,17 +516,21 @@ struct
   let analyse_proc_results
       (test : t)
       (flag : Flag.t)
-      (rets : SAInterpreter.result_t list) : bool =
-    if rets = [] then (
-      L.(
-        normal (fun m ->
-            m "ERROR: Function %s evaluates to 0 results." test.name));
-      exit 1);
-    let success = List.for_all (analyse_proc_result test flag) rets in
-    print_success_or_failure success;
-    success
+      (rets : SAInterpreter.result_t list) : Gillian_result.t =
+    match rets with
+    | [] ->
+        let () =
+          L.normal (fun m ->
+              m "ERROR: Function %s evaluates to 0 results." test.name)
+        in
+        Gillian_result.internal_error
+    | _ ->
+        let success = List.for_all (analyse_proc_result test flag) rets in
+        let () = print_success_or_failure success in
+        Gillian_result.(if success then ok else verification_failure)
 
-  let analyse_lemma_results (test : t) (rets : SPState.t list) : bool =
+  let analyse_lemma_results (test : t) (rets : SPState.t list) :
+      Gillian_result.t =
     let success : bool =
       rets <> []
       && List.fold_left
@@ -553,12 +557,16 @@ struct
                false))
            true rets
     in
-    if rets = [] then (
-      L.(
-        normal (fun m -> m "ERROR: Lemma %s evaluates to 0 results." test.name));
-      exit 1);
-    print_success_or_failure success;
-    success
+    match rets with
+    | [] ->
+        let () =
+          L.normal (fun m ->
+              m "ERROR: Lemma %s evaluates to 0 results." test.name)
+        in
+        Gillian_result.internal_error
+    | _ ->
+        let () = print_success_or_failure success in
+        Gillian_result.(if success then ok else verification_failure)
 
   (* FIXME: This function name is very bad! *)
   let verify_up_to_procs (prog : annot MP.prog) (test : t) : annot MP.prog =
@@ -572,7 +580,7 @@ struct
         { prog with coverage = Hashtbl.create 1 }
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
-  let verify (prog : annot MP.prog) (test : t) : bool =
+  let verify (prog : annot MP.prog) (test : t) : Gillian_result.t =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -592,10 +600,13 @@ struct
         let lemma = Prog.get_lemma_exn prog.prog test.name in
         match lemma.lemma_proof with
         | None ->
+            let open Gillian_result in
             if !Config.lemma_proof then
-              raise
-                (Failure (Printf.sprintf "Lemma %s WITHOUT proof" test.name))
-            else true (* It's already correct *)
+              let () =
+                L.normal (fun m -> m "Lemma %s WITHOUT proof" test.name)
+              in
+              verification_failure
+            else ok (* It's already correct *)
         | Some proof -> (
             let msg = "Verifying lemma " ^ test.name ^ "... " in
             L.tmi (fun fmt -> fmt "%s" msg);
@@ -607,8 +618,8 @@ struct
             match errors with
             | [] -> analyse_lemma_results test successes
             | _ ->
-                print_success_or_failure false;
-                false))
+                let () = print_success_or_failure false in
+                Gillian_result.verification_failure))
 
   let pred_extracting_visitor =
     object
@@ -681,12 +692,16 @@ struct
       (Call_graph.add_pred_call SAInterpreter.call_graph pred_name)
       preds_used
 
-  let check_previously_verified prev_results cur_verified =
-    Option.fold ~none:true
-      ~some:(fun res ->
-        VerificationResults.check_previously_verified
-          ~printer:print_success_or_failure res cur_verified)
-      prev_results
+  let check_previously_verified prev_results cur_verified : Gillian_result.t =
+    Gillian_result.(
+      match prev_results with
+      | None -> ok
+      | Some res ->
+          let success =
+            VerificationResults.check_previously_verified
+              ~printer:print_success_or_failure res cur_verified
+          in
+          if success then ok else unknown_failure)
 
   let get_tests_to_verify
       ~init_data
@@ -796,29 +811,34 @@ struct
       ?(prev_results : VerificationResults.t option)
       (prog : prog_t)
       (pnames_to_verify : SS.t)
-      (lnames_to_verify : SS.t) : unit =
+      (lnames_to_verify : SS.t) : Gillian_result.t =
     let prog', tests', tests =
       get_tests_to_verify ~init_data prog pnames_to_verify lnames_to_verify
     in
     (* STEP 6: Run the symbolic tests *)
     let cur_time = Sys.time () in
     Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
-    let success : bool =
+    let result =
+      let open Gillian_result in
       List.fold_left
-        (fun ac test -> if verify prog' test then ac else false)
-        true (tests' @ tests)
+        (fun ac test -> merge (verify prog' test) ac)
+        ok (tests' @ tests)
     in
     let end_time = Sys.time () in
     let cur_verified = SS.union pnames_to_verify lnames_to_verify in
-    let success =
-      success && check_previously_verified prev_results cur_verified
+    let result =
+      Gillian_result.merge result
+        (check_previously_verified prev_results cur_verified)
     in
     let msg : string =
-      if success then "All specs succeeded:" else "There were failures:"
+      match result with
+      | Ok () -> "All specs succeeded:"
+      | Error _ -> "There were failures:"
     in
     let msg : string = Printf.sprintf "%s %f%!" msg (end_time -. !start_time) in
-    Printf.printf "%s\n" msg;
-    L.normal (fun m -> m "%s" msg)
+    let () = Printf.printf "%s\n" msg in
+    let () = L.normal (fun m -> m "%s" msg) in
+    result
 
   let verify_up_to_procs
       ?(proc_name : string option)
@@ -876,7 +896,7 @@ struct
       ~(init_data : SPState.init_data)
       (prog : prog_t)
       (incremental : bool)
-      (source_files : SourceFiles.t option) : unit =
+      (source_files : SourceFiles.t option) : Gillian_result.t =
     let f prog incremental source_files =
       let open ResultsDir in
       let open ChangeTracker in
@@ -919,7 +939,7 @@ struct
         in
         if !Config.Verification.verify_only_some_of_the_things then
           failwith "Cannot use --incremental and --procs or --lemma together";
-        let () =
+        let result =
           verify_procs ~init_data ~prev_results:results prog procs_to_verify
             lemmas_to_verify
         in
@@ -928,7 +948,10 @@ struct
         let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
         let results = VerificationResults.merge results cur_results in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-        write_verif_results cur_source_files call_graph ~diff results)
+        let () =
+          write_verif_results cur_source_files call_graph ~diff results
+        in
+        result)
       else
         (* Analyse all procedures and lemmas *)
         let cur_source_files =
@@ -948,11 +971,15 @@ struct
                 (SS.of_list !Config.Verification.lemmas_to_verify) )
           else (procs_to_verify, lemmas_to_verify)
         in
-        let () =
+        let result =
           verify_procs ~init_data prog procs_to_verify lemmas_to_verify
         in
         let call_graph = SAInterpreter.call_graph in
-        write_verif_results cur_source_files call_graph ~diff:"" global_results
+        let () =
+          write_verif_results cur_source_files call_graph ~diff:""
+            global_results
+        in
+        result
     in
     L.Phase.with_normal ~title:"Program verification" (fun () ->
         f prog incremental source_files)

@@ -11,5 +11,5 @@ module type S = sig
     (string, 'test) Hashtbl.t ->
     unit
 
-  val run : unit -> unit
+  val run : unit -> Gillian_result.t
 end

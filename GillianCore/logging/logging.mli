@@ -157,9 +157,6 @@ end
 (** Writes the string and then raises a failure. *)
 val fail : string -> 'a
 
-(** Output the strings in every file and prints it to stdout *)
-val print_to_all : string -> unit
-
 (** @canonical Gillian.Logging.Phase *)
 module Phase : sig
   (** Starts a phase with logging level set to [Normal] *)

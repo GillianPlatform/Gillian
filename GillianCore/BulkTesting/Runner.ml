@@ -1,7 +1,7 @@
 module type S = sig
   val cmd_name : string
   val exec_mode : Exec_mode.t
-  val run_all : test_suite_path:string -> incremental:bool -> unit
+  val run_all : test_suite_path:string -> incremental:bool -> Gillian_result.t
 end
 
 module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
@@ -113,7 +113,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       let filename = Filename.basename (Filename.chop_extension test.path) in
       let res =
         match PC.parse_and_compile_files [ test.path ] with
-        | Error err -> ParseAndCompileError err
+        | Error (err, _) -> ParseAndCompileError err
         | Ok progs ->
             let e_progs = progs.gil_progs in
             let () = Hashtbl.add cur_source_files filename progs.source_files in
@@ -171,10 +171,13 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       else None
     in
     let () = register_expectations prev_results_opt in
-    let () = Backend.run () in
-    if is_wpst then
-      ResultsDir.write_bulk_symbolic_results ~tests_ran:!tests_ran
-        cur_source_files cur_call_graphs
+    let result = Backend.run () in
+    let () =
+      if is_wpst then
+        ResultsDir.write_bulk_symbolic_results ~tests_ran:!tests_ran
+          cur_source_files cur_call_graphs
+    in
+    result
 end
 
 type t = (module S)

@@ -49,7 +49,7 @@ end
 (** @canonical Gillian.Utils.Exec_mode *)
 module Exec_mode = struct
   (** @inline *)
-  include Exec_mode
+  include Config.Exec_mode
 end
 
 (** @canonical Gillian.Utils.Ext_list *)
@@ -110,6 +110,12 @@ end
 module List_res = struct
   (** @inline *)
   include List_res
+end
+
+(** @canonical Gillian.Utils.Gililan_failure *)
+module Gillian_result = struct
+  (** @inline *)
+  include Gillian_result
 end
 
 (**/**)

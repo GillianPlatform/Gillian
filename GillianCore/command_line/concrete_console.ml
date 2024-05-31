@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 
 module Make
     (ID : Init_data.S)
@@ -13,19 +14,15 @@ struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
-  let return_to_exit (ret_ok : bool) : unit =
-    match ret_ok with
-    | false -> exit 1
-    | true -> ()
-
-  let valid_concrete_result (ret : C_interpreter.result_t list) : bool =
+  let concrete_result (ret : C_interpreter.result_t list) : Gillian_result.t =
     assert (List.length ret = 1);
     let ret = List.hd ret in
+    let open Gillian_result in
     match ret with
-    | Exec_res.RSucc { flag = Flag.Normal; _ } -> true
-    | _ -> false
+    | Exec_res.RSucc { flag = Flag.Normal; _ } -> ok
+    | _ -> verification_failure
 
-  let run debug (prog : ('a, int) Prog.t) init_data : unit =
+  let run debug (prog : ('a, int) Prog.t) init_data : Gillian_result.t =
     let prog =
       match MP.init_prog prog with
       | Ok prog -> prog
@@ -41,17 +38,17 @@ struct
         Format.printf "Final state: @\n%a@\n" C_interpreter.Logging.pp_result
           ret
     in
-    return_to_exit (valid_concrete_result ret)
+    concrete_result ret
 
   let parse_eprog files already_compiled =
     if not already_compiled then (
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
+      let* progs =
+        ParserAndCompiler.get_progs ~pp_err:PC.pp_err
           (PC.parse_and_compile_files files)
       in
       let e_progs, init_data = (progs.gil_progs, progs.init_data) in
       Gil_parsing.cache_labelled_progs (List.tl e_progs);
-      (snd (List.hd e_progs), init_data))
+      Ok (snd (List.hd e_progs), init_data))
     else
       let Gil_parsing.{ labeled_prog; init_data } =
         Gil_parsing.parse_eprog_from_file (List.hd files)
@@ -61,25 +58,28 @@ struct
         | Ok d -> d
         | Error e -> failwith e
       in
-      (labeled_prog, init_data)
+      Ok (labeled_prog, init_data)
 
   let exec files already_compiled debug outfile_opt no_heap entry_point () =
     let () = Config.current_exec_mode := Concrete in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
     let () = PC.initialize Concrete in
-    let e_prog, init_data = parse_eprog files already_compiled in
-    let () =
-      burn_gil ~init_data:(ID.to_yojson init_data) ~pp_prog:Prog.pp_labeled
-        e_prog outfile_opt
+    let result =
+      let* e_prog, init_data = parse_eprog files already_compiled in
+      let () =
+        burn_gil ~init_data:(ID.to_yojson init_data) ~pp_prog:Prog.pp_labeled
+          e_prog outfile_opt
+      in
+      let prog =
+        Gil_parsing.eprog_to_prog
+          ~other_imports:(convert_other_imports PC.other_imports)
+          e_prog
+      in
+      run debug prog init_data
     in
-    let prog =
-      Gil_parsing.eprog_to_prog
-        ~other_imports:(convert_other_imports PC.other_imports)
-        e_prog
-    in
-    let () = run debug prog init_data in
-    Logging.wrap_up ()
+    let () = Logging.wrap_up () in
+    Gillian_result.to_exit_code result
 
   let debug =
     let doc =

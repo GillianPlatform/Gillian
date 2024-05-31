@@ -214,6 +214,33 @@ let opt_to_yojson (to_yojson : 'a -> Yojson.Safe.t) = function
   | None -> `Null
   | Some x -> to_yojson x
 
+(** Converts a [Result] to yojson *)
+let result_to_yojson
+    (ok_to_yojson : 'a -> Yojson.Safe.t)
+    (err_to_yojson : 'b -> Yojson.Safe.t) = function
+  | Ok x -> `List [ `String "Ok"; ok_to_yojson x ]
+  | Error x -> `List [ `String "Error"; err_to_yojson x ]
+
+let result_of_yojson
+    (ok_of_yojson : Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or)
+    (err_of_yojson : Yojson.Safe.t -> 'b Ppx_deriving_yojson_runtime.error_or) :
+    Yojson.Safe.t -> ('a, 'b) result Ppx_deriving_yojson_runtime.error_or =
+  Syntaxes.Result.(
+    function
+    | `List [ `String "Ok"; x ] ->
+        let* ok = ok_of_yojson x in
+        Ok (Ok ok)
+    | `List [ `String "Error"; x ] ->
+        let* err = err_of_yojson x in
+        Ok (Error err)
+    | _ -> Error "Failed to parse result of yojson")
+
 (** Converts a list of values to yojson *)
 let list_to_yojson (to_yojson : 'a -> Yojson.Safe.t) xs =
   `List (xs |> List.map to_yojson)
+
+let print_to_all (str : string) =
+  Logging.normal (fun m -> m "%s" str);
+  if !Config.debug then Debugger_log.to_file str else print_endline str
+
+(* if not !debug then print_endline str *)

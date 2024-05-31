@@ -1,3 +1,3 @@
 module type S = sig
-  val cmds : unit Cmdliner.Cmd.t list
+  val cmds : int Cmdliner.Cmd.t list
 end

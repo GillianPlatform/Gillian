@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 module L = Logging
 
 module Make
@@ -45,15 +46,15 @@ struct
 
   let parse_eprog files already_compiled =
     if not already_compiled then
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
+      let* progs =
+        ParserAndCompiler.get_progs ~pp_err:PC.pp_err
           (PC.parse_and_compile_files files)
       in
       let e_progs = progs.gil_progs in
       let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
       let e_prog = snd (List.hd e_progs) in
       let source_files = progs.source_files in
-      (e_prog, progs.init_data, Some source_files)
+      Ok (e_prog, progs.init_data, Some source_files)
     else
       let e_prog, init_data =
         let Gil_parsing.{ labeled_prog; init_data } =
@@ -66,12 +67,12 @@ struct
         in
         (labeled_prog, init_data)
       in
-      (e_prog, init_data, None)
+      Ok (e_prog, init_data, None)
 
   let process_files files already_compiled outfile_opt no_unfold incremental =
     Verification.start_time := Sys.time ();
     Fmt.pr "Parsing and compiling...\n@?";
-    let e_prog, init_data, source_files_opt =
+    let* e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled
     in
     let () =
@@ -118,11 +119,12 @@ struct
     let () = Config.manual_proof := manual in
     let () = Config.Verification.set_procs_to_verify procs_to_verify in
     let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
-    let () =
+    let result =
       process_files files already_compiled outfile_opt no_unfold incremental
     in
     let () = if stats then Statistics.print_statistics () in
-    Logging.wrap_up ()
+    let () = Logging.wrap_up () in
+    Gillian_result.to_exit_code result
 
   let verify_t =
     Term.(

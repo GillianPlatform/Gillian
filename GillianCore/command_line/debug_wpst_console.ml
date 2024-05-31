@@ -19,8 +19,9 @@ module Make (PC : ParserAndCompiler.S) (Debug_adapter : Debug_adapter.S) :
     Cmd.info "debugwpst" ~doc ~man
 
   let start_debug_adapter () =
-    Config.current_exec_mode := Utils.Exec_mode.Symbolic;
-    Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
+    Config.current_exec_mode := Exec_mode.Symbolic;
+    Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout);
+    0
 
   let debug_wpst_t = Common_args.use Term.(const start_debug_adapter)
   let debug_wpst_cmd = Cmd.v debug_wpst_info debug_wpst_t

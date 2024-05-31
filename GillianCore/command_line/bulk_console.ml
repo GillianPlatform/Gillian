@@ -18,7 +18,8 @@ struct
       let () = PC.initialize exec_mode in
       let () = Logging.Mode.set_mode Disabled in
       let () = Printexc.record_backtrace false in
-      Runner.run_all runner ~test_suite_path ~incremental
+      let result = Runner.run_all runner ~test_suite_path ~incremental in
+      Gillian_result.to_exit_code result
     in
     let run_t = Term.(const run $ path_t $ no_print_failures $ incremental) in
     let run_info =

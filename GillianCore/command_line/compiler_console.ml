@@ -1,4 +1,5 @@
 open Cmdliner
+open Utils.Syntaxes.Result
 
 module Make (PC : ParserAndCompiler.S) : Console.S = struct
   open Common_args.Make (PC)
@@ -20,8 +21,8 @@ module Make (PC : ParserAndCompiler.S) : Console.S = struct
     Arg.(last & vflag_all [ Verification ] [ concrete; wpst; verif; act ])
 
   let process_files files =
-    let progs =
-      ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
+    let+ progs =
+      ParserAndCompiler.get_progs ~pp_err:PC.pp_err
         (PC.parse_and_compile_files files)
     in
     List.iter
@@ -36,7 +37,8 @@ module Make (PC : ParserAndCompiler.S) : Console.S = struct
     let () =
       Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
     in
-    process_files files
+    let result = process_files files in
+    Gillian_result.to_exit_code result
 
   let compile_t =
     Term.(

@@ -2214,7 +2214,7 @@ let rec translate_expr tr_ctx e :
         | _ -> raise (Failure "JS2JSIL: Impossible")
       in
 
-      Logging.print_to_all ("BiAnnot: " ^ bi_annot);
+      Prelude.print_to_all ("BiAnnot: " ^ bi_annot);
 
       let cmds_args, proc_args, errs_args =
         translate_arg_list xes tr_ctx.tr_err_lab

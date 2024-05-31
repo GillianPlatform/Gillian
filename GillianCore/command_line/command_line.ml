@@ -56,9 +56,9 @@ struct
     let consoles : (module Console.S) list =
       [
         (module Compiler_console.Make (PC));
-        (module C_interpreter_console.Make (ID) (PC) (CState) (C_interpreter)
+        (module Concrete_console.Make (ID) (PC) (CState) (C_interpreter)
                   (Gil_parsing));
-        (module S_interpreter_console.Make (ID) (PC) (SState) (S_interpreter)
+        (module Wpst_console.Make (ID) (PC) (SState) (S_interpreter)
                   (Gil_parsing));
         (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing));
         (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
@@ -74,5 +74,13 @@ struct
     let cmds =
       consoles |> List.concat_map (fun (module C : Console.S) -> C.cmds)
     in
-    exit (Cmd.eval (Cmd.group info cmds))
+    let exit_code =
+      try Cmd.eval' (Cmd.group info cmds)
+      with e ->
+        let open Printexc in
+        let () = print_to_all (to_string e) in
+        let () = print_to_all (get_backtrace ()) in
+        Gillian_result.(to_exit_code internal_error)
+    in
+    exit exit_code
 end

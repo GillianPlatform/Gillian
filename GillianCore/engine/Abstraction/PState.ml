@@ -506,7 +506,7 @@ module Make (State : SState.S) :
           let fail_pfs : Formula.t = State.get_failing_constraint err in
           let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
           let () =
-            L.print_to_all
+            print_to_all
               (Format.asprintf
                  "MATCH INVARIANT FAILURE: with argument @[<h>%a@]. matching \
                   failed.@\n\
@@ -620,7 +620,7 @@ module Make (State : SState.S) :
               "MATCH INVARIANT FAILURE: %a\n\
                unable to produce variable bindings: %a." Asrt.pp a pp_err_t e
           in
-          L.print_to_all msg;
+          print_to_all msg;
           Res_list.error_with e
 
   let frame_on (astate : t) (iframes : (string * t) list) (ids : string list) :
@@ -644,7 +644,7 @@ module Make (State : SState.S) :
           let+ produced = SMatcher.produce astate full_subst frame_asrt in
           match produced with
           | Error err ->
-              L.print_to_all
+              print_to_all
                 (Fmt.str "Unable to produce frame for loop %s, because of :\n%a"
                    id pp_err_t err);
               Error err
@@ -898,7 +898,7 @@ module Make (State : SState.S) :
                   Fmt.(option ~none:(any "CANNOT CREATE MODEL") SVal.SESubst.pp)
                   failing_model
               in
-              L.print_to_all msg;
+              print_to_all msg;
               Res_list.error_with (StateErr.EPure fail_pfs))
       | ApplyLem (lname, args, binders) ->
           if not (List.for_all Names.is_lvar_name binders) then

@@ -2,7 +2,7 @@
  * Timing and Statistics *
  *************************)
 
-open Containers
+open Prelude
 
 let active () = !Config.stats || Logging.Mode.enabled ()
 let time () = if not (active ()) then 0. else Sys.time ()
@@ -20,13 +20,13 @@ let update_statistics (fname : string) (time : float) =
   else Hashtbl.add statistics fname [ time ]
 
 let print_statistics () =
-  Logging.print_to_all "\n STATISTICS \n ========== \n";
+  print_to_all "\n STATISTICS \n ========== \n";
 
   let keys : SS.t =
     SS.of_list (Hashtbl.fold (fun k _ ac -> k :: ac) statistics [])
   in
 
-  Logging.print_to_all (Printf.sprintf "Executed commands: %d" !exec_cmds);
+  print_to_all (Printf.sprintf "Executed commands: %d" !exec_cmds);
 
   (* Process each item in statistics table *)
   SS.iter
@@ -50,8 +50,8 @@ let print_statistics () =
       std :=
         (List.fold_left (fun ac t -> ac +. ((!avg -. t) ** 2.)) 0. lt /. len)
         ** 0.5;
-      Logging.print_to_all (Printf.sprintf "\t%s" f);
-      Logging.print_to_all
+      print_to_all (Printf.sprintf "\t%s" f);
+      print_to_all
         (Printf.sprintf "Tot: %f\tCll: %d\nMin: %f\tMax: %f\nAvg: %f\tStd: %f\n"
            !tot (int_of_float len) !min !max !avg !std))
     keys

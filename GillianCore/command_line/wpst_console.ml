@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 module L = Logging
 module SS = Containers.SS
 
@@ -23,7 +24,7 @@ struct
     open ResultsDir
     open ChangeTracker
 
-    let run_main prog init_data =
+    let run_main prog init_data : Gillian_result.t =
       let all_results =
         S_interpreter.evaluate_proc
           (fun x -> x)
@@ -46,12 +47,15 @@ struct
             | _ -> false)
           all_results
       in
-      if success then (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!";
-        exit 0)
-      else (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!";
-        exit 1)
+      let () =
+        if success then
+          print_to_all
+            (Fmt.str "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!")
+        else
+          print_to_all
+            (Fmt.str "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!")
+      in
+      Gillian_result.(if success then ok else verification_failure)
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
@@ -72,20 +76,26 @@ struct
          @ proc_changes.dependent_procs)
       in
       if SS.mem !Config.entry_point changed_procs then
-        let () = run_main prog init_data in
+        let result = run_main prog init_data in
         let cur_call_graph = S_interpreter.call_graph in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-        write_symbolic_results cur_source_files cur_call_graph ~diff
-      else write_symbolic_results cur_source_files prev_call_graph ~diff:""
+        let () = write_symbolic_results cur_source_files cur_call_graph ~diff in
+        result
+      else
+        let () =
+          write_symbolic_results cur_source_files prev_call_graph ~diff:""
+        in
+        Gillian_result.ok
 
     let rerun_all source_files prog init_data =
       (* Always re-run program *)
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let () = run_main prog init_data in
+      let result = run_main prog init_data in
       let call_graph = S_interpreter.call_graph in
-      write_symbolic_results cur_source_files call_graph ~diff:""
+      let () = write_symbolic_results cur_source_files call_graph ~diff:"" in
+      result
 
     let f (prog : PC.Annot.t MP.prog) init_data incremental source_files =
       if incremental && prev_results_exist () then
@@ -104,8 +114,8 @@ struct
                *** Stage 1: Parsing program in original language and compiling \
                to Gil. ***@\n")
       in
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
+      let* progs =
+        ParserAndCompiler.get_progs ~pp_err:PC.pp_err
           (PC.parse_and_compile_files files)
       in
       let init_data = progs.init_data in
@@ -113,7 +123,7 @@ struct
       let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
       let e_prog = snd (List.hd e_progs) in
       let source_files = progs.source_files in
-      (e_prog, init_data, Some source_files)
+      Ok (e_prog, init_data, Some source_files)
     else
       let () =
         L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
@@ -129,10 +139,10 @@ struct
         in
         (labeled_prog, init_data)
       in
-      (e_prog, init_data, None)
+      Ok (e_prog, init_data, None)
 
   let process_files files already_compiled outfile_opt incremental =
-    let e_prog, init_data, source_files_opt =
+    let* e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled
     in
     let () =
@@ -150,7 +160,9 @@ struct
     in
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
     match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed"
+    | Error _ ->
+        let () = print_to_all "Creation of matching plans failed" in
+        Gillian_result.verification_failure
     | Ok prog' -> run prog' init_data incremental source_files_opt
 
   let wpst
@@ -171,10 +183,11 @@ struct
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
     let () = PC.initialize Symbolic in
-    let () = process_files files already_compiled outfile_opt incremental in
+    let result = process_files files already_compiled outfile_opt incremental in
     let () = if stats then Statistics.print_statistics () in
     (* TODO: wrap-up should be done using [Stdlib.onexit] instead *)
-    Logging.wrap_up ()
+    let () = Logging.wrap_up () in
+    Gillian_result.to_exit_code result
 
   let wpst_t =
     Term.(

@@ -78,12 +78,14 @@ let parse_and_compile_js path =
     let core_prog = JSIL2GIL.jsil2core_prog ext_prog in
     Ok (core_prog, JavaScriptSource js_prog)
   with
-  | JS_Parser.Error.ParserError e -> Error (JSParserErr e)
+  | JS_Parser.Error.ParserError e ->
+      Error (JSParserErr e, Gillian_result.Verification_failure)
   | JS2JSIL_Preprocessing.EarlyError e ->
-      Error
-        (JS2GILErr
-           (Printf.sprintf "\nParser post-processing threw an EarlyError: %s\n"
-              e))
+      let err =
+        JS2GILErr
+          (Printf.sprintf "\nParser post-processing threw an EarlyError: %s\n" e)
+      in
+      Error (err, Gillian_result.Verification_failure)
 
 (*
   | _ ->

@@ -1,7 +1,10 @@
 open Compcert
 open Config_compcert
 open CConstants
+open Gillian.Utils.Syntaxes.Result
+open Gillian.Utils.List_utils
 module SS = Gillian.Utils.Containers.SS
+module Gillian_result = Gillian.Utils.Gillian_result
 
 let small_tbl_size = Gillian.Utils.Config.small_tbl_size
 
@@ -187,11 +190,9 @@ module Annot = Gillian.Gil_syntax.Annot.Basic
 
 let pp_err fmt e = Driveraux.print_error fmt e
 
-let get_or_print_and_die = function
-  | Errors.OK e -> e
-  | Errors.Error e ->
-      Format.printf "%a\n@?" Driveraux.print_error e;
-      exit 1
+let map_compcert_result = function
+  | Errors.OK e -> Ok e
+  | Errors.Error e -> Error (e, Gillian_result.Verification_failure)
 
 let parse_annots file =
   let parse_with_error token lexbuf =
@@ -287,9 +288,9 @@ let parse_and_compile_file path exec_mode =
   let () = Frontend.preprocess path pathi in
   let () = write_dependencies_file path in
   let c_prog = Frontend.parse_c_file path pathi in
-  let clight = get_or_print_and_die (SimplExpr.transl_program c_prog) in
-  let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
-  let csm = get_or_print_and_die (Cshmgen.transl_program last_clight) in
+  let* clight = map_compcert_result (SimplExpr.transl_program c_prog) in
+  let* last_clight = map_compcert_result (SimplLocals.transf_program clight) in
+  let* csm = map_compcert_result (Cshmgen.transl_program last_clight) in
   let () =
     if !Config.burn_csm then
       let pathcsm = Filename.chop_extension path ^ ".csm" in
@@ -311,7 +312,7 @@ let parse_and_compile_file path exec_mode =
         Hashtbl.add trans_procs proc_name (mangle_proc proc_body mangled_syms))
       prog.procs
   in
-  ({ prog with procs = trans_procs }, compilation_data)
+  Ok ({ prog with procs = trans_procs }, compilation_data)
 
 exception Linker_error
 
@@ -362,12 +363,13 @@ let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
   (* Compile all C input files to GIL *)
   let paths = paths @ !Config.source_paths in
-  let () =
-    List.iter
+  let* () =
+    iter_results
       (fun path ->
         if not (Hashtbl.mem compiled_progs path) then
-          Hashtbl.add compiled_progs path
-            (parse_and_compile_file path exec_mode))
+          let+ prog = parse_and_compile_file path exec_mode in
+          Hashtbl.add compiled_progs path prog
+        else Ok ())
       paths
   in
 

@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 module L = Logging
 
 module Make
@@ -32,15 +33,15 @@ struct
                *** Stage 1: Parsing program in original language and compiling \
                to Gil. ***@\n")
       in
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
+      let* progs =
+        ParserAndCompiler.get_progs ~pp_err:PC.pp_err
           (PC.parse_and_compile_files files)
       in
       let e_progs = progs.gil_progs in
       let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
       let e_prog = snd (List.hd e_progs) in
       let source_files = progs.source_files in
-      (e_prog, progs.init_data, Some source_files)
+      Ok (e_prog, progs.init_data, Some source_files)
     else
       let () =
         L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
@@ -53,7 +54,7 @@ struct
         | Ok d -> d
         | Error e -> failwith e
       in
-      (labeled_prog, init_data, None)
+      Ok (labeled_prog, init_data, None)
 
   let emit_specs e_prog prog file =
     let () = Prog.update_specs e_prog MP.(prog.prog) in
@@ -93,7 +94,7 @@ struct
       should_emit_specs
       incremental =
     let file = List.hd files in
-    let e_prog, init_data, source_files_opt =
+    let* e_prog, init_data, source_files_opt =
       parse_eprog file files already_compiled
     in
     let () =
@@ -116,13 +117,16 @@ struct
     let () = Config.unfolding := false in
     let prog = LogicPreprocessing.preprocess prog true in
     match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed."
+    | Error _ ->
+        let () = print_to_all "Creation of matching plans failed." in
+        Gillian_result.verification_failure
     | Ok prog' ->
-        let () =
+        let result =
           Abductor.test_prog ~init_data ~call_graph prog' incremental
             source_files_opt
         in
-        if should_emit_specs then emit_specs e_prog prog' file
+        let () = if should_emit_specs then emit_specs e_prog prog' file in
+        result
 
   let act
       files
@@ -145,12 +149,13 @@ struct
     let () = Config.specs_to_stdout := specs_to_stdout in
     let () = Config.max_branching := bi_unroll_depth in
     let () = Config.under_approximation := true in
-    let () =
+    let result =
       process_files files already_compiled outfile_opt should_emit_specs
         incremental
     in
     let () = if !Config.stats then Statistics.print_statistics () in
-    Logging.wrap_up ()
+    let () = Logging.wrap_up () in
+    Gillian_result.to_exit_code result
 
   let act_t =
     Term.(

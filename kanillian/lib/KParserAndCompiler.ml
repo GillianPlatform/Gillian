@@ -1,5 +1,6 @@
 open Gillian
 open Utils.Syntaxes.Result
+module Gillian_result = Utils.Gillian_result
 open Kcommons
 
 let initialize _ =
@@ -64,10 +65,18 @@ type err = string
 let pp_err = Fmt.string
 
 let parse_symtab_into_goto json =
-  let+ tbl = Irep_lib.Symtab.of_yojson json in
+  let* tbl =
+    Irep_lib.Symtab.of_yojson json
+    |> Result.map_error (fun e -> (e, Gillian_result.Verification_failure))
+  in
   let machine = Machine_model_parse.consume_from_symtab tbl in
-  if not Machine_model.(equal machine archi64) then
-    failwith "For now, kanillian can only run on archi64";
+  let+ () =
+    if not Machine_model.(equal machine archi64) then
+      Error
+        ( "For now, kanillian can only run on archi64",
+          Gillian_result.Internal_error )
+    else Ok ()
+  in
   Kconfig.machine_model := machine;
   Logging.normal ~severity:Warning (fun m ->
       m

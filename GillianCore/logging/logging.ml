@@ -68,7 +68,7 @@ end
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
-  print_endline str
+  if not !Config.debug then print_endline str
 
 (* Failure *)
 let fail msg =

@@ -1,0 +1,5 @@
+(library
+ (name config)
+ (public_name gillian.config)
+ ; (libraries unix str logging debugger_log fmt yojson zarith)
+ )

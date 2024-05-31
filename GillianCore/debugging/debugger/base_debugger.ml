@@ -259,7 +259,7 @@ struct
                 Fmt.pr "Error: expected at least one GIL program\n";
                 exit 1
             | _ -> progs)
-        | Error err ->
+        | Error (err, _) ->
             Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
             exit 1
 

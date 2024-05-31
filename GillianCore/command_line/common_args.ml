@@ -137,7 +137,7 @@ module Make (PC : ParserAndCompiler.S) = struct
     let doc = "Dump every smt query sent to z3" in
     Arg.(value & flag & info [ "dump-smt" ] ~doc)
 
-  let use (term : (unit -> unit) Term.t) : unit Term.t =
+  let use (term : (unit -> 'a) Term.t) : 'a Term.t =
     let apply_common
         logging_mode
         reporters

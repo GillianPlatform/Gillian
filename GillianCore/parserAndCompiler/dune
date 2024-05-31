@@ -2,4 +2,13 @@
  (name parserAndCompiler)
  (public_name gillian.parserAndCompiler)
  (libraries cmdliner gil_syntax utils incrementalAnalysis)
- (flags :standard -open Gil_syntax -open Utils -open IncrementalAnalysis))
+ (flags
+  :standard
+  -open
+  Gil_syntax
+  -open
+  Utils
+  -open
+  IncrementalAnalysis
+  -open
+  Utils.Prelude))

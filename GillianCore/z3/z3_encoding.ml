@@ -873,7 +873,7 @@ let encode_assertion_top_level
       Fmt.str "Failed to encode %a in gamma %a with error %s\n" Formula.pp a
         pp_tyenv gamma s
     in
-    Logging.print_to_all msg;
+    print_to_all msg;
     raise exn
 
 (** Gets the list of lvar names that are only used in llen *)
@@ -998,7 +998,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =
             (Z3.Solver.get_reason_unknown master_solver)
             (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
             (List.map Z3.Expr.to_string encoded_assertions);
-        exit 1
+        raise Gillian_result.(Exn Verification_failure)
     | SATISFIABLE -> Solver.get_model master_solver
     | UNSATISFIABLE -> None
   in

@@ -106,3 +106,5 @@ module Verification = struct
         lemmas_to_verify := a;
         verify_only_some_of_the_things := true
 end
+
+module Exec_mode = Exec_mode
