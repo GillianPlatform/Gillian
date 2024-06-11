@@ -134,6 +134,7 @@ module type S = sig
     (string * (string * vt) list) option ->
     (t * Flag.t, err_t) Res_list.t
 
+  val sure_is_nonempty : t -> bool
   val unfolding_vals : t -> Formula.t list -> vt list
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list

@@ -31,6 +31,11 @@ jobs:
         run: sudo npm install -g esy@0.7.2 --unsafe-perm
       - name: Installing Python prerequisites
         run: sudo pip install sphinx furo
+      - name: Linking thing for Apple Silicon?
+        if: runner.os == 'macos'
+        run: |
+          sudo ln -s $(which pkg-config) pkg-config
+          sudo ln -s $(which python3.10) python3.10
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v3
@@ -39,6 +44,7 @@ jobs:
           key: ${{ runner.os }}-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
             ${{ runner.os }}-esy-0.7.2-
+
       - name: Esy install
         run: "esy install"
       - name: Import Cache
@@ -233,7 +239,7 @@ jobs:
         with:
           repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
-          ref: c14d61c5d636e0bf5e4d608ec0e880575ddef6a7
+          ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
       - name: Symbolic Testing Collections-C
         run: "./runGillianTests.sh"
         working-directory: collections-c

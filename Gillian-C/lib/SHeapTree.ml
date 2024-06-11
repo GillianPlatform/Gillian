@@ -298,24 +298,6 @@ module Node = struct
             Delayed.map
               (SVArr.concat_knowing_size (values_l, size_l) (values_r, size_r))
               (fun values -> mk (Array { chunk = chunk_l; values }))
-        | Array { chunk; values }, Undef _ ->
-            let size_l, size_r =
-              let open Expr.Infix in
-              let size_chunk = Chunk.size_expr chunk in
-              (size_a / size_chunk, size_b / size_chunk)
-            in
-            Delayed.map
-              (SVArr.concat_knowing_size (values, size_l) (AllUndef, size_r))
-              (fun values -> mk (Array { chunk; values }))
-        | Undef _, Array { chunk; values } ->
-            let size_l, size_r =
-              let open Expr.Infix in
-              let size_chunk = Chunk.size_expr chunk in
-              (size_a / size_chunk, size_b / size_chunk)
-            in
-            Delayed.map
-              (SVArr.concat_knowing_size (AllUndef, size_l) (values, size_r))
-              (fun values -> mk (Array { chunk; values }))
         | Array { chunk; values }, Zeros ->
             let size_l, size_r =
               let open Expr.Infix in
@@ -1509,6 +1491,12 @@ let move dst_tree dst_ofs src_tree src_ofs size =
                   DR.of_result (with_root dst_tree new_dst_root)
             else DR.error BufferOverrun
       else DR.error BufferOverrun
+
+let is_empty_or_freed t =
+  match t with
+  | Freed -> true
+  | Tree { bounds; root } ->
+      Option.is_none bounds && Option.fold ~none:true ~some:Tree.is_empty root
 
 let assertions ~loc t =
   let loc = Expr.loc_from_loc_name loc in

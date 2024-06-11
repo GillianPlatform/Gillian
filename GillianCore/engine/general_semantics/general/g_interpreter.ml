@@ -891,8 +891,7 @@ struct
           } =
             eval_state
           in
-          if Hashtbl.mem prog.prog.bi_specs pid then (
-            Fmt.pr "Susping!\n";
+          if Hashtbl.mem prog.prog.bi_specs pid then
             [
               CConf.ConfSusp
                 {
@@ -907,7 +906,7 @@ struct
                   branch_count = b_counter;
                   prev_cmd_report_id;
                 };
-            ])
+            ]
           else symb_exec_proc ()
 
         let f x pid v_args j subst eval_state =
@@ -2081,7 +2080,7 @@ struct
         in
         let proc_name, annot_cmd = get_cmd prog cs i in
         if !Config.current_exec_mode <> Exec_mode.BiAbduction then
-          Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+          L.normal (fun m -> m "WARNING: MAX BRANCHING STOP: %d.\n" b_counter);
         L.set_previous prev_cmd_report_id;
         L.(
           verbose (fun m ->
@@ -2128,7 +2127,6 @@ struct
             eval_step_state
 
       let susp (cconf : CConf.susp) eval_step_state =
-        Fmt.pr "Handing susp!\n";
         let {
           eval_step;
           ret_fun;
@@ -2322,10 +2320,20 @@ struct
     let init_func = init_evaluate_proc ret_fun prog name params state in
     evaluate_cmd_iter init_func
 
-  (**
-  Evaluation of programs
-
-  @param prog Target GIL program
-  @return Final configurations
-*)
+  (* Checks for memory leaks.
+     This check might not raise an issue even though there
+     is a leak.
+  *)
+  let check_leaks result =
+    match result with
+    | Exec_res.RSucc { final_state; _ } when State.sure_is_nonempty final_state
+      ->
+        Exec_res.RFail
+          {
+            proc = "Memory Leak Check post-execution";
+            proc_idx = -1;
+            error_state = final_state;
+            errors = [ Exec_err.ELeak ];
+          }
+    | _ -> result
 end

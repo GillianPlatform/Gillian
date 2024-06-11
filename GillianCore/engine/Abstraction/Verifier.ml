@@ -777,7 +777,9 @@ struct
         (* STEP 4: Create matching plans for specs and predicates *)
         (* Printf.printf "Creating matching plans: %f\n" (cur_time -. start_time); *)
         match MP.init_prog ~preds_tbl:preds prog with
-        | Error _ -> failwith "Creation of matching plans failed."
+        | Error e ->
+            Fmt.failwith "Creation of matching plans failed:@\n %a@\n@?"
+              MP.pp_err e
         | Ok prog' ->
             (* STEP 5: Determine static dependencies and add to call graph *)
             List.iter

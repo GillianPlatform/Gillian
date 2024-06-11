@@ -32,6 +32,12 @@ proc i__binop_cmpl_eq(v1, v2) {
   unde: fail[comparison]("Using long comparison operator for non-long elements")
 };
 
+proc i__binop_cmpl_ne(v1, v2) {
+      ir := "i__binop_cmpl_eq"(v1, v2);
+      ret := "i__neg_bool_value"(ir);
+      return
+};
+
 proc i__binop_cmpu_gt(v1, v2) {
       ir := "i__binop_cmpu_le"(v1, v2);
       ret := "i__neg_bool_value"(ir);
@@ -123,8 +129,9 @@ proc i__binop_mull(v1, v2) {
 proc i__binop_divlu(v1, v2) {
         goto [ l-nth(v1, 0i) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "long" ] blon unde;
-        assert (! (l-nth(v2, 1i) == 0i));
-  blon: goto [ l-nth(v2, 1i) = 1i ] blr1 divl;
+  blon: assert (0i i<=# l-nth(v1, 1i));
+        assert (0i i<# l-nth(v2, 1i));
+        goto [ l-nth(v2, 1i) = 1i ] blr1 divl;
   blr1: ret := v1;
         return;
   divl: ret := {{ "long", l-nth(v1, 1i) i/ l-nth(v2, 1i) }};

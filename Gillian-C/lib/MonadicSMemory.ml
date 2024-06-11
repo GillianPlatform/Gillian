@@ -394,10 +394,14 @@ let just_functions genv =
 
 let init genv = { genv; mem = just_functions genv }
 
-let sure_is_nonempty _ =
-  (* TODO: Implementing this would require filtering functions
-           from the global environment. We over-approximate by returning false *)
-  false
+let sure_is_nonempty state =
+  let is_genv loc = String_map.find_opt loc state.genv |> Option.is_some in
+  let is_empty =
+    Mem.SMap.for_all
+      (fun loc tree -> is_genv loc || SHeapTree.is_empty_or_freed tree)
+      state.mem
+  in
+  not is_empty
 
 let get_init_data { genv; _ } = genv
 let clear { genv; _ } = { genv; mem = just_functions genv }

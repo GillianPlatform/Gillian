@@ -100,7 +100,7 @@ let write_json json ?dirname filename =
   in
   let json_path = Filename.concat dir_path filename in
   let channel = open_out json_path in
-  Yojson.Safe.pretty_to_channel ~std:true channel json;
+  Yojson.Safe.pretty_to_channel channel json;
   close_out channel
 
 let write_str str filename =

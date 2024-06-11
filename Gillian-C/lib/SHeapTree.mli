@@ -37,6 +37,7 @@ val pp_full : t Fmt.t
 val empty : t
 val freed : t
 val is_empty : t -> bool
+val is_empty_or_freed : t -> bool
 val lvars : t -> SS.t
 val alocs : t -> SS.t
 val cons_bounds : t -> (Range.t option * t) or_error

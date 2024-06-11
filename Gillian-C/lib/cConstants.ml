@@ -109,6 +109,12 @@ module Builtin_Functions = struct
   let assume_f = "ASSUME"
 end
 
+module CBMC_Builtin_Functions = struct
+  let assert_ = "__CPROVER_assert"
+  let assume = "__CPROVER_assume"
+  let nondet_int = "__nondet_int"
+end
+
 module BinOp_Functions = struct
   let add = "i__binop_add"
   let sub = "i__binop_sub"
@@ -141,6 +147,7 @@ module BinOp_Functions = struct
   let cmpl_ge = "i__binop_cmpl_ge"
   let cmpl_lt = "i__binop_cmpl_lt"
   let cmpl_eq = "i__binop_cmpl_eq"
+  let cmpl_ne = "i__binop_cmpl_ne"
   let cmpu_le = "i__binop_cmpu_le"
   let cmpu_gt = "i__binop_cmpu_gt"
   let cmpu_ne = "i__binop_cmpu_ne"

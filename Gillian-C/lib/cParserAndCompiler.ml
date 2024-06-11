@@ -18,9 +18,11 @@ module TargetLangOptions = struct
     hide_mult_def : bool;
     verbose_compcert : bool;
     fstruct_passing : bool;
+    fpacked_structs : bool;
     pp_full_trees : bool;
     allocated_functions : bool;
     alloc_can_fail : bool;
+    cbmc : bool;
   }
 
   let term =
@@ -75,6 +77,13 @@ module TargetLangOptions = struct
       Arg.(value & flag & info [ "fstruct-passing" ] ~docs ~doc)
     in
     let doc =
+      "Enable CompCert's packed-struct feature, which lets one specify \
+       'packed' structs, which ensures no gaps beween fields."
+    in
+    let fpacked_structs =
+      Arg.(value & flag & info [ "fpacked-structs" ] ~docs ~doc)
+    in
+    let doc =
       "Show full symbolic heap trees in the log, otherwise, just shows a \
        flattened version"
     in
@@ -95,6 +104,10 @@ module TargetLangOptions = struct
     let alloc_can_fail =
       Arg.(value & flag & info [ "alloc-can-fail" ] ~docs ~doc)
     in
+    let doc =
+      "Enable CBMC builtin functions for assert, assume, nondet, etc."
+    in
+    let cbmc = Arg.(value & flag & info [ "cbmc" ] ~docs ~doc) in
     let opt
         include_dirs
         source_dirs
@@ -105,9 +118,11 @@ module TargetLangOptions = struct
         hide_mult_def
         verbose_compcert
         fstruct_passing
+        fpacked_structs
         pp_full_trees
         allocated_functions
-        alloc_can_fail =
+        alloc_can_fail
+        cbmc =
       {
         include_dirs;
         source_dirs;
@@ -118,15 +133,17 @@ module TargetLangOptions = struct
         hide_mult_def;
         verbose_compcert;
         fstruct_passing;
+        fpacked_structs;
         pp_full_trees;
         allocated_functions;
         alloc_can_fail;
+        cbmc;
       }
     in
     Term.(
       const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
-      $ hundef $ hmultdef $ verbose_compcert $ fstruct_passing $ pp_full_trees
-      $ allocated_functions $ alloc_can_fail)
+      $ hundef $ hmultdef $ verbose_compcert $ fstruct_passing $ fpacked_structs
+      $ pp_full_trees $ allocated_functions $ alloc_can_fail $ cbmc)
 
   let apply
       {
@@ -139,9 +156,11 @@ module TargetLangOptions = struct
         hide_mult_def;
         verbose_compcert;
         fstruct_passing;
+        fpacked_structs;
         pp_full_trees;
         allocated_functions;
         alloc_can_fail;
+        cbmc;
       } =
     let rec get_c_paths dirs =
       match dirs with
@@ -162,9 +181,11 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def;
     Config.verbose_compcert := verbose_compcert;
     Config_compcert.Features.set_fstruct_passing fstruct_passing;
+    Config_compcert.Features.set_fpacked_structs fpacked_structs;
     Config.pp_full_tree := pp_full_trees;
     Config.allocated_functions := allocated_functions;
-    Config.alloc_can_fail := alloc_can_fail
+    Config.alloc_can_fail := alloc_can_fail;
+    Config.cbmc := cbmc
 end
 
 type init_data = Global_env.t
@@ -283,9 +304,12 @@ let write_dependencies_file c_path =
   Preprocessor.restore_options prev_options
 
 let parse_and_compile_file path exec_mode =
+  let () = Fmt.pr "A\n" in
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
+  let () = Fmt.pr "B\n" in
   let () = write_dependencies_file path in
+  let () = Fmt.pr "C\n" in
   let c_prog = Frontend.parse_c_file path pathi in
   let clight = get_or_print_and_die (SimplExpr.transl_program c_prog) in
   let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
@@ -298,6 +322,7 @@ let parse_and_compile_file path exec_mode =
       let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
       close_out oc
   in
+  let () = Fmt.pr "D\n" in
   let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in
   let prog, compilation_data =
@@ -370,7 +395,6 @@ let parse_and_compile_files paths =
             (parse_and_compile_file path exec_mode))
       paths
   in
-
   (* Attempt to match all symbol references to definitions *)
   let hide_undef = !Config.hide_undef in
   let hide_mult_def = !Config.hide_mult_def in
@@ -393,7 +417,15 @@ let parse_and_compile_files paths =
         link rest new_unresolved new_defined
   in
   let unresolved_syms = link paths SS.empty SS.empty in
-  let to_ignore = Config_compcert.references_to_ignore |> SS.of_list in
+  let to_ignore =
+    let compcert_ignores = Config_compcert.references_to_ignore in
+    let cbmc_ignores =
+      if !Config.cbmc then
+        CBMC_Builtin_Functions.[ assert_; assume; nondet_int ]
+      else []
+    in
+    compcert_ignores @ cbmc_ignores |> SS.of_list
+  in
   let unresolved_syms = SS.diff unresolved_syms to_ignore in
   let () =
     if (not (SS.is_empty unresolved_syms)) && not hide_undef then
