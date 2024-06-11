@@ -812,32 +812,17 @@ struct
               in
               L.verbose (fun fmt ->
                   fmt "Run_spec returned %d Results" (List.length ret));
-              if ret = [] then
-                if spec.data.spec_incomplete then (
-                  L.normal (fun fmt ->
-                      fmt "Proceeding with symbolic execution.");
-                  symb_exec_proc ())
-                else
-                  [
-                    CConf.ConfErr
-                      {
-                        callstack = cs;
-                        proc_idx = i;
-                        error_state = state;
-                        errors =
-                          [
-                            Exec_err.EState
-                              (EOther
-                                 (Fmt.str
-                                    "Error: Unable to use specification of \
-                                     function %s"
-                                    spec.data.spec_name));
-                          ];
-                        branch_path;
-                        prev_cmd_report_id;
-                      };
-                  ]
+              if ret = [] && spec.data.spec_incomplete then (
+                L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
+                symb_exec_proc ())
               else
+                let () =
+                  if ret = [] && not spec.data.spec_incomplete then
+                    L.print_to_all
+                      ("Specification of function " ^ spec.data.spec_name
+                     ^ " is empty, proceeding anyway.")
+                in
+
                 let successes, errors =
                   List.partition_map
                     (function

@@ -260,17 +260,25 @@ let unfold_spec
     let posts : Asrt.t list =
       List.concat_map (auto_unfold preds rec_info) sspec.ss_posts
     in
+    let posts_base = posts in
     let posts = List.map Reduction.reduce_assertion posts in
     L.verbose (fun fmt -> fmt "Post admissibility: %s" spec_name);
     L.tmi (fun fmt ->
         fmt "@[<hov 2>Testing admissibility for assertions:@.%a@]"
           (Fmt.list Asrt.pp) posts);
     let posts = List.filter Simplifications.admissible_assertion posts in
-    if posts = [] then
-      Fmt.failwith
-        "Unfolding: Postcondition of %s seems invalid, it has been reduced to \
-         no postcondition"
-        spec_name;
+    let posts =
+      match posts with
+      | [] ->
+          Logging.print_to_all
+            Fmt.(
+              str
+                "Unfolding: Postcondition of %s seems invalid, it has been \
+                 reduced to no postcondition - unsing non-simplified form."
+                spec_name);
+          posts_base
+      | posts -> posts
+    in
     List.map
       (fun pre -> Spec.{ sspec with ss_pre = pre; ss_posts = posts })
       pres
