@@ -1,9 +1,19 @@
+
+OCAML_VARIANT=ocaml-variants.5.2.0+options
+DEV_PACKAGES=ocaml-lsp-server,feather,fileutils
+BUILD_PACKAGES=ocamlformat.0.26.2,odoc
+
 build:
 	dune build @all
 
 init-dev:
-	opam switch create . --packages=ocaml-variants.5.2.0+options,ocaml-lsp-server,ocamlformat,feather,fileutils,odoc.0.26.2 -y --deps-only --locked
+	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only --locked
 	opam exec -- ./githooks/install.ml
+	
+init-ci:
+	opam install . -y --locked
+	opam install ${BUILD_PACKAGES} -y --locked
+	
 	
 docs:
 	@echo "===== BUILDING ODOC ====="

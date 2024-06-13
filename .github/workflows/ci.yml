@@ -42,7 +42,7 @@ jobs:
             ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0
 
       - name: Install dependencies
-        run: make init-dev
+        run: make init-ci
       - name: Build Gillian
         run: opam exec -- dune build @all
       - name: Basic tests
