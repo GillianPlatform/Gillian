@@ -135,7 +135,7 @@
           "default": "source",
           "enumDescriptions": [
             "Run installed Gillian binaries",
-            "Run Gillian from source, using esy"
+            "Run Gillian from source, using the current opam switch."
           ],
           "description": "Specifies how to run Gillian."
         },

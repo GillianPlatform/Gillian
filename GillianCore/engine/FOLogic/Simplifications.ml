@@ -603,15 +603,16 @@ let simplify_pfs_and_gamma
                               PFS.substitution temp_subst lpfs;
 
                               (if SESubst.mem result (LVar v) then
-                               let le' =
-                                 Option.get (SESubst.get result (LVar v))
-                               in
-                               (* L.(
-                                  verbose (fun m ->
-                                      m "Multiples in subst: %s %s"
-                                        ((Fmt.to_to_string Expr.pp) le)
-                                        ((Fmt.to_to_string Expr.pp) le'))); *)
-                               if le <> le' then PFS.extend lpfs (Eq (le, le')));
+                                 let le' =
+                                   Option.get (SESubst.get result (LVar v))
+                                 in
+                                 (* L.(
+                                    verbose (fun m ->
+                                        m "Multiples in subst: %s %s"
+                                          ((Fmt.to_to_string Expr.pp) le)
+                                          ((Fmt.to_to_string Expr.pp) le'))); *)
+                                 if le <> le' then
+                                   PFS.extend lpfs (Eq (le, le')));
                               SESubst.iter result (fun x le ->
                                   let sle =
                                     SESubst.subst_in_expr temp_subst

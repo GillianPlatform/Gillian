@@ -154,7 +154,8 @@ module Make (PC : ParserAndCompiler.S) = struct
       L.initialize reporters;
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
-      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;
+      Config.set_runtime_paths ?default_folders:PC.default_import_paths
+        runtime_path;
       Config.pbn := pbn;
       Config.dump_smt := dump_smt
     in

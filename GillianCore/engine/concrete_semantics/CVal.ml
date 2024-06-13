@@ -30,4 +30,5 @@ end
 
 (** @canonical Gillian.Concrete.Subst *)
 and CSubst : (Subst.S with type vt = M.t) = Subst.Make (M)
+
 and CESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)

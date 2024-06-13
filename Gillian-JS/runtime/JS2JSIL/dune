@@ -1,4 +1,7 @@
 (install
+ (section
+  (site
+   (gillian-js runtime)))
  (files
   Array.jsil
   Boolean.jsil
@@ -17,5 +20,4 @@
   harness.js
   initial_heap.jsil
   internals_builtins_procs.jsil)
- (section share)
  (package gillian-js))

@@ -43,8 +43,6 @@ Let's take it for a spin! Open ``list_length_rec.wisl``, and click *Debug llen* 
   :width: 250px
   :align: center
 
-.. note:: Make sure you aren't running any ``esy`` processes (e.g. ``esy watch``), as this may prevent the debugger from starting.
-
 You should then be presented with a new panel showing the path of execution in a graph. Here you can see the current command in the highlighted node, and two subsequent commands yet to be executed.
 
 .. image:: _static/img/debug/init.png

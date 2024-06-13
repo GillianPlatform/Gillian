@@ -91,8 +91,7 @@ Reproducing the Results
 
 .. code-block:: bash
 
-   esy
-   esy x javert bulk-exec [relative path to your Test262 folder]/test
+   dune exec -- gillian-js bulk-exec [relative path to your Test262 folder]/test
 
 For example, we normally clone Test262 in the same folder as the Gillian project and change its folder name from ``javert-test262`` to ``test262``. We then run all of the tests by executing the following commands from within the ``Gillian`` folder:
 
@@ -101,8 +100,7 @@ For example, we normally clone Test262 in the same folder as the Gillian project
    cd ..
    git clone https://github.com/GillianPlatform/javert-test262.git test262
    cd Gillian
-   esy
-   esy x javert bulk-exec ../test262/test
+   dune exec -- gillian-js bulk-exec ../test262/test
 
 The testing should take approximately thirty minutes. The bulk tester will actively report progress, folder-by-folder, and signal any test failures encountered. In the end, a list of all failed tests (the eight given above) will be printed.
 
@@ -110,7 +108,7 @@ The testing should take approximately thirty minutes. The bulk tester will activ
 
 .. code-block:: bash
 
-   esy x javert bulk-exec ../test262/test/built-ins/Array/prototype/reduce/
+   dune exec -- gillian-js bulk-exec ../test262/test/built-ins/Array/prototype/reduce/
 
 4. If you would like to examine the filtered tests, you can find them in ``test262_filtering.ml`` `[link] <https://github.com/GillianPlatform/Gillian/blob/PLDI20/Gillian-JS/lib/Test262/Test262_filtering.ml>`_.
 

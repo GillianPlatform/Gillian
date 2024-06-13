@@ -4,37 +4,37 @@ Developing Gillian
 Executing a command in the test environment
 ===========================================
 
-``esy`` lets you execute a command in a `test environment <https://esy.sh/docs/en/environment.html#test-environment>`_ where all built binaries and installed files are correctly added to your path. In particular, Gillian-JS, Gillian-C and wisl export specific environment variables that allow them to properly find their respective runtime files.
+``dune`` lets you execute a command in an execution environment where all built binaries and installed files are correctly added to your path. In particular, Gillian-JS, Gillian-C and wisl require to be executed in this environment to work correctly and find their runtime files.
 
 To run any command under this environment:
 
 .. code-block:: bash
 
-    esy x <command>
+    dune exec -- <command>
 
 To access the different manuals, you can use:
 
 .. code-block:: bash
 
-    esy x gillian-js --help
-    esy x gillian-c --help
-    esy x wisl --help
+    dune exec -- gillian-js --help
+    dune exec -- gillian-c --help
+    dune exec -- wisl --help
 
 You can get even more precise help about specific commands; for example:
 
 .. code-block:: bash
 
-    esy x gillian-js verify --help
+    dune exec -- gillian-js verify --help
 
 Rebuilding after modifications
 ==============================
-Since ``esy`` is our build system, running the ``esy`` command without any arguments will rebuild the project after modification.
+Since ``dune`` is our build system, running the ``dune build`` command without any arguments will rebuild the project after modification.
 
 You can automatically rebuild on changes by running:
 
 .. code-block:: bash
 
-    esy watch
+    dune build --watch
 
 Code style
 ==========
@@ -43,7 +43,7 @@ You can automatically format the code by running:
 
 .. code-block:: bash
 
-    esy format
+    dune fmt
 
 It's recommended that you install the provided git hooks (by running ``githooks/install.ml``) to enforce code style.
 
@@ -86,7 +86,7 @@ Building Documentation
 
    .. code-block:: bash
 
-    esy docs
+    make docs
 
 After building, you'll find the sphinx documentation at ``_docs/sphinx``, and the API reference at ``_docs/odoc``.
 
@@ -106,4 +106,4 @@ If you want to automatically rebuild on changes, take these additional steps.
 
    .. code-block:: bash
 
-    esy docs:watch
+    make docs-watch

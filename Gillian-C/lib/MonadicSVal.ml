@@ -195,7 +195,7 @@ module SVArray = struct
     let learned =
       List.map
         (let open Formula.Infix in
-        fun (e, t) -> (Expr.typeof e) #== (Expr.type_ t))
+         fun (e, t) -> (Expr.typeof e) #== (Expr.type_ t))
         gamma
     in
     (Expr.EList (List.rev rev_l), learned)

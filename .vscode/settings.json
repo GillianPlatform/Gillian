@@ -16,11 +16,11 @@
     "random": "c",
     "ranges": "c",
     "base.h": "c"
-},
+  },
   "python.pythonPath": "/usr/bin/python3",
   "ocaml.sandbox": {
-    "kind": "esy",
-    "root": "${workspaceFolder:Gillian}"
+    "kind": "opam",
+    "switch": "${workspaceFolder:Gillian}"
   },
   // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
   "typescript.tsc.autoDetect": "off"

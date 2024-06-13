@@ -2,15 +2,14 @@
 
 set -euo pipefail
 
-if command -v esy >/dev/null 2>&1; then
+if command -v opam >/dev/null 2>&1; then
   echo "[INFO] Running source code formatting"
-  esy format-check
+  opam exec -- dune fmt
 
   echo "[INFO] Running build"
-  esy
-
+  opam exec -- dune build
   exit 0
 else
-  echo >&2 "[WARN] Failed precommit validation: esy isn't available"
+  echo >&2 "[ERR] Failed precommit validation: opam isn't available"
   exit 1
 fi

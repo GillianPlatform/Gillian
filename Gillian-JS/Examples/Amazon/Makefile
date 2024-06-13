@@ -1,7 +1,7 @@
 ifdef GITHUB_ACTIONS
 	VERIFY=gillian-js verify
 else
-	VERIFY=esy x gillian-js verify
+	VERIFY=dune exec -- gillian-js verify
 endif
 
 default:

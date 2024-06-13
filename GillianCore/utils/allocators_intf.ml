@@ -46,7 +46,8 @@ module type Intf = sig
       
     Assumes that [A]'s resetter has already been registered *)
   module Make_with_prefix
-      (A : S_with_stringify) (P : sig
+      (A : S_with_stringify)
+      (P : sig
         val prefix : string
       end) : S with type t = string
 end

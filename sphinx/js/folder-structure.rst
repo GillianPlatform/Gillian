@@ -8,7 +8,7 @@ Folder Structure
 
   * ``bin``: The Gillian-JS binary
 
-  * ``environment``: Execution environment, not part of the repository, created using ``esy init:env``. It contains useful scripts for testing Gillian-JS, and examples are copied in it so that they can be safely modified.
+  * ``environment``: Execution environment, not part of the repository, created using ``make js-init-env``. It contains useful scripts for testing Gillian-JS, and examples are copied in it so that they can be safely modified.
 
   * ``examples``: Various examples
 

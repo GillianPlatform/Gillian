@@ -24,5 +24,7 @@
   global_environment_bi.gil
   global_environment_archi64.gil
   global_environment_archi32.gil)
- (section share)
+ (section
+  (site
+   (gillian-c runtime)))
  (package gillian-c))

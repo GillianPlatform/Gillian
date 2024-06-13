@@ -1,6 +1,0 @@
-; This should make a comeback when rely works with ocaml 4.11
-; (library
-;  (name gillian_bulk_rely)
-;  (public_name gillian-bulk-rely)
-;  (libraries gillian.bulk rely.lib gillian.gil_syntax)
-;  (flags :standard -open Bulk -open Gil_syntax))

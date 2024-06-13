@@ -277,41 +277,36 @@ module Program : sig
 end
 
 module Visitors : sig
-  class ['a] iter :
-    object
-      method visit_location : ctx:'a -> Location.t -> unit
-      method visit_binop : ctx:'a -> Ops.Binary.t -> unit
-      method visit_unop : ctx:'a -> Ops.Unary.t -> unit
-      method visit_selfop : ctx:'a -> Ops.Self.t -> unit
-      method visit_int_type : ctx:'a -> IntType.t -> unit
-      method visit_datatype_components : ctx:'a -> Datatype_component.t -> unit
-      method visit_type : ctx:'a -> Type.t -> unit
-      method visit_id : ctx:'a -> int -> unit
-      method visit_expr_value : ctx:'a -> type_:Type.t -> Expr.value -> unit
-      method visit_expr : ctx:'a -> Expr.t -> unit
-      method visit_stmt_body : ctx:'a -> Stmt.body -> unit
-      method visit_stmt : ctx:'a -> Stmt.t -> unit
-    end
+  class ['a] iter : object
+    method visit_location : ctx:'a -> Location.t -> unit
+    method visit_binop : ctx:'a -> Ops.Binary.t -> unit
+    method visit_unop : ctx:'a -> Ops.Unary.t -> unit
+    method visit_selfop : ctx:'a -> Ops.Self.t -> unit
+    method visit_int_type : ctx:'a -> IntType.t -> unit
+    method visit_datatype_components : ctx:'a -> Datatype_component.t -> unit
+    method visit_type : ctx:'a -> Type.t -> unit
+    method visit_id : ctx:'a -> int -> unit
+    method visit_expr_value : ctx:'a -> type_:Type.t -> Expr.value -> unit
+    method visit_expr : ctx:'a -> Expr.t -> unit
+    method visit_stmt_body : ctx:'a -> Stmt.body -> unit
+    method visit_stmt : ctx:'a -> Stmt.t -> unit
+  end
 
-  class ['a] map :
-    object
-      method visit_binop : ctx:'a -> Ops.Binary.t -> Ops.Binary.t
+  class ['a] map : object
+    method visit_binop : ctx:'a -> Ops.Binary.t -> Ops.Binary.t
 
-      method visit_datatype_components :
-        ctx:'a -> Datatype_component.t -> Datatype_component.t
+    method visit_datatype_components :
+      ctx:'a -> Datatype_component.t -> Datatype_component.t
 
-      method visit_expr : ctx:'a -> Expr.t -> Expr.t
-
-      method visit_expr_value :
-        ctx:'a -> type_:Type.t -> Expr.value -> Expr.value
-
-      method visit_int_type : ctx:'a -> IntType.t -> IntType.t
-      method visit_location : ctx:'a -> Location.t -> Location.t
-      method visit_selfop : ctx:'a -> Ops.Self.t -> Ops.Self.t
-      method visit_stmt : ctx:'a -> Stmt.t -> Stmt.t
-      method visit_stmt_body : ctx:'a -> Stmt.body -> Stmt.body
-      method visit_type : ctx:'a -> Type.t -> Type.t
-      method visit_id : ctx:'a -> int -> int
-      method visit_unop : ctx:'a -> Ops.Unary.t -> Ops.Unary.t
-    end
+    method visit_expr : ctx:'a -> Expr.t -> Expr.t
+    method visit_expr_value : ctx:'a -> type_:Type.t -> Expr.value -> Expr.value
+    method visit_int_type : ctx:'a -> IntType.t -> IntType.t
+    method visit_location : ctx:'a -> Location.t -> Location.t
+    method visit_selfop : ctx:'a -> Ops.Self.t -> Ops.Self.t
+    method visit_stmt : ctx:'a -> Stmt.t -> Stmt.t
+    method visit_stmt_body : ctx:'a -> Stmt.body -> Stmt.body
+    method visit_type : ctx:'a -> Type.t -> Type.t
+    method visit_id : ctx:'a -> int -> int
+    method visit_unop : ctx:'a -> Ops.Unary.t -> Ops.Unary.t
+  end
 end

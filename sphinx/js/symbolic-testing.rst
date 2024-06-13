@@ -67,10 +67,10 @@ This example is already in the repository (with ``f`` instantiated to ``n1 + n2`
 
 .. code-block:: bash
 
-   esy
-   esy init:env
+   dune build
+   make js-init-env
    cd JaVerT/environment
-   esy x gillian-js wpst Examples/Cosette/simple_example.js -s
+   dune exec -- gillian-js wpst Examples/Cosette/simple_example.js -s
 
 Since the assertion in the end does hold, there will be no output from Cosette, meaning that the test has passed. If however, you change ``n1 + n2`` to ``n1 * n2`` and re-run the example, you will be faced with the following error message and counter-model:
 
@@ -144,8 +144,8 @@ Starting from the ``Gillian`` folder, execute the following:
 
 .. code-block:: bash
 
-   esy
-   esy init:env
+   dune build
+   make js-init-env
    cd Gillian-JS/environment
 
 Then, to reproduce the results for a specific folder from the first column of the above table, execute the following:
@@ -249,8 +249,8 @@ Starting from the ``Gillian`` folder, execute the following:
 
 .. code-block:: bash
 
-   esy
-   esy init:env
+   dune build
+   make js-init-env
    cd Gillian-JS/environment
 
 :doc:`../publications/cosette` Multi-Dictionary Bug

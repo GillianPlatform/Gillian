@@ -172,7 +172,7 @@ module TargetLangOptions = struct
           in
           c_files @ get_c_paths rest
     in
-    Config.include_dirs := include_dirs;
+    Config.include_dirs := include_dirs @ !Config.include_dirs;
     Config.source_paths := get_c_paths source_dirs;
     Config.burn_csm := burn_csm;
     Config.hide_genv := hide_genv;
@@ -304,12 +304,9 @@ let write_dependencies_file c_path =
   Preprocessor.restore_options prev_options
 
 let parse_and_compile_file path exec_mode =
-  let () = Fmt.pr "A\n" in
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
-  let () = Fmt.pr "B\n" in
   let () = write_dependencies_file path in
-  let () = Fmt.pr "C\n" in
   let c_prog = Frontend.parse_c_file path pathi in
   let clight = get_or_print_and_die (SimplExpr.transl_program c_prog) in
   let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
@@ -322,7 +319,6 @@ let parse_and_compile_file path exec_mode =
       let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
       close_out oc
   in
-  let () = Fmt.pr "D\n" in
   let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in
   let prog, compilation_data =
@@ -493,7 +489,7 @@ let parse_and_compile_files paths =
   Ok (create_compilation_result all_progs genv)
 
 let other_imports = []
-let env_var_import_path = Some CConstants.Imports.env_path_var
+let default_import_paths = Some Runtime_sites.Sites.runtime
 
 let init_compcert () =
   Frontend.init ();

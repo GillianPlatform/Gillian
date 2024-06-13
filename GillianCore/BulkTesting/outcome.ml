@@ -36,7 +36,8 @@ end
 module Make
     (ValP : Val.S)
     (ESubstP : ESubst.S with type vt = ValP.t and type t = ValP.et)
-    (StoreP : Store.S with type vt = ValP.t) (StateP : sig
+    (StoreP : Store.S with type vt = ValP.t)
+    (StateP : sig
       include
         State.S
           with type vt = ValP.t

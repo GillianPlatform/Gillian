@@ -13,6 +13,11 @@
   compcert
   printbox-text
   gillian.ppx_sat.runtime
-  ppx_deriving_yojson.runtime)
+  ppx_deriving_yojson.runtime
+  dune-site)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat)))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-c))

@@ -29,4 +29,5 @@ end
 
 (** @canonical Gillian.Symbolic.Subst *)
 and SESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)
+
 and SSubst : (Subst.S with type vt = M.t) = Subst.Make (M)

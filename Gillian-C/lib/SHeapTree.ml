@@ -368,7 +368,7 @@ module Node = struct
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
         DR.ok
           (if Chunk.phy_equal m_chunk chunk then (value, exact_perm)
-          else (SUndefined, exact_perm))
+           else (SUndefined, exact_perm))
     | MemVal
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }
       when Chunk.equal chunk Mint16unsigned ->
@@ -467,7 +467,7 @@ module Node = struct
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
         DR.ok
           (if Chunk.equal m_chunk chunk then (SVArr.singleton value, exact_perm)
-          else (AllUndef, exact_perm))
+           else (AllUndef, exact_perm))
     | MemVal
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }
       when Chunk.equal chunk Mint64
@@ -1067,7 +1067,7 @@ module Tree = struct
         let types =
           List.map
             (let open Formula.Infix in
-            fun (x, t) -> Asrt.Pure (Expr.typeof x) #== (Expr.type_ t))
+             fun (x, t) -> Asrt.Pure (Expr.typeof x) #== (Expr.type_ t))
             types
         in
         CoreP.single ~loc ~ofs:low ~chunk ~sval ~perm :: types

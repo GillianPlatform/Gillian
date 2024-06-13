@@ -1,4 +1,8 @@
 (library
  (name js2jsil_lib)
  (flags :standard -open Gillian.Utils)
- (libraries jsil_syntax jslogic parsing javert_utils str))
+ (libraries jsil_syntax jslogic parsing javert_utils str dune-site))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-js))

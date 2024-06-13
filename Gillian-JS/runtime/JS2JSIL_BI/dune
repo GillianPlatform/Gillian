@@ -1,4 +1,7 @@
 (install
+ (section
+  (site
+   (gillian-js runtime)))
  (files
   BiArray.jsil
   BiBoolean.jsil
@@ -15,5 +18,4 @@
   BiObject.jsil
   BiRegExp.jsil
   BiString.jsil)
- (section share)
  (package gillian-js))

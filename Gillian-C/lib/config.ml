@@ -1,4 +1,4 @@
-let include_dirs = ref ([] : string list)
+let include_dirs = ref Runtime_sites.Sites.c_includes
 let source_paths = ref ([] : string list)
 let burn_csm = ref false
 let hide_genv = ref false

@@ -9,7 +9,7 @@ let initialize _ =
     (fun kstats_file -> at_exit (fun () -> Stats.report kstats_file))
     !Kconfig.kstats_file
 
-let env_var_import_path = Some Kanillian_compiler.Imports.env_path_var
+let default_import_paths = Some Runtime_sites.Sites.runtime
 let other_imports = []
 
 type init_data = unit

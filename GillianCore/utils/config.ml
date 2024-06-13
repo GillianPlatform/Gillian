@@ -76,12 +76,10 @@ let bulk_print_all_failures = ref true
 
 let set_runtime_paths, get_runtime_paths =
   let runtime_paths : string list ref = ref [] in
-  let set ?env_var ls =
+  let set ?default_folders ls =
     let new_runtime_paths =
-      match (ls, env_var) with
-      | [], Some v ->
-          Option.fold ~none:[] ~some:(String.split_on_char ':')
-            (Sys.getenv_opt v)
+      match (ls, default_folders) with
+      | [], Some fs -> fs
       | l, _ -> l
     in
     runtime_paths := new_runtime_paths

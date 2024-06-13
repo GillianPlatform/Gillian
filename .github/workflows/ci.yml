@@ -20,46 +20,37 @@ jobs:
         operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - name: Installing esy
-        run: sudo npm install -g esy@0.7.2 --unsafe-perm
+      - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Installing Python prerequisites
         run: sudo pip install sphinx furo
-      - name: Linking thing for Apple Silicon?
-        if: runner.os == 'macos'
-        run: |
-          sudo ln -s $(which pkg-config) pkg-config
-          sudo ln -s $(which python3.10) python3.10
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v3
+        env:
+            cache-name: cache-ocaml
         with:
-          path: _export
-          key: ${{ runner.os }}-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
+          path: _opam
+          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}-${{ hashFiles('**/*.opam.locked') }}
           restore-keys: |
-            ${{ runner.os }}-esy-0.7.2-
+            ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
+            ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0
 
-      - name: Esy install
-        run: "esy install"
-      - name: Import Cache
-        run: |
-          esy import-dependencies _export
-          rm -rf _export
-      - name: Esy build
-        run: "esy build"
-        id: esy-build
-      - name: Basic checks
-        run: "esy test"
+      - name: Install dependencies
+        run: make init-dev
+      - name: Build Gillian
+        run: opam exec -- dune build @all
+      - name: Basic tests
+        run: opam exec -- dune test
       - name: Wisl checks
         run: "./wisl/scripts/quicktests.sh"
       - name: Format checking
-        run: "esy format-check"
+        run: dune fmt
       - name: Building release
         run: "esy release"
       - name: Sending artifact for next jobs
@@ -77,9 +68,7 @@ jobs:
           path: _docs
         if: runner.os == 'Linux'
       - name: Setting dependency cache
-        run: |
-          esy cleanup .
-          esy export-dependencies
+        run: opam clean
         if: steps.restore-cache.outputs.cache-hit != 'true'
 
   gillian_c_tests:
