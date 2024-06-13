@@ -62,6 +62,7 @@
  (sites
   (share runtime))
  (depends
+  dune-site
   flow_parser
   (gillian
    (= :version)))
@@ -76,6 +77,7 @@
  (depends
   (gillian
    (= :version))
+  dune-site
   printbox-text))
 
 (package
@@ -86,6 +88,7 @@
  (depends
   (gillian
    (= :version))
+  dune-site
   printbox-text))
 
 (package
@@ -93,6 +96,7 @@
  (sites
   (share runtime))
  (depends
+  dune-site
   (gillian
    (= :version)))
  (synopsis

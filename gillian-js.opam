@@ -8,6 +8,7 @@ homepage: "https://github.com/GillianPlatform/Gillian"
 bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
 depends: [
   "dune" {>= "2.8"}
+  "dune-site"
   "flow_parser"
   "gillian" {= version}
   "odoc" {with-doc}
