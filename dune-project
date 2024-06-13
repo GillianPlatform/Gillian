@@ -64,6 +64,7 @@
  (depends
   dune-site
   flow_parser
+  fpath
   (gillian
    (= :version)))
  (synopsis "Gillian instantiation for JavaScript"))
@@ -77,6 +78,7 @@
  (depends
   (gillian
    (= :version))
+  compcert
   dune-site
   printbox-text))
 
