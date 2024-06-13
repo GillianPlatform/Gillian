@@ -6,6 +6,7 @@
  (modules annot_lexer))
 
 (library
+ (package gillian-c)
  (name cgil_lib)
  (libraries
   gillian
