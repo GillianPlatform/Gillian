@@ -61,6 +61,10 @@
  (name gillian-js)
  (sites
   (share runtime))
+ (depends
+  flow
+  (gillian
+   (= :version)))
  (synopsis "Gillian instantiation for JavaScript"))
 
 (package
@@ -69,18 +73,27 @@
   (share runtime)
   (share c_includes))
  (synopsis "Gillian instantiation for C")
- (depends gillian printbox-text))
+ (depends
+  (gillian
+   (= :version))
+  printbox-text))
 
 (package
  (name kanillian)
  (sites
   (share runtime))
  (synopsis "Gillian instantiation for C based on CBMC as front-end")
- (depends gillian printbox-text))
+ (depends
+  (gillian
+   (= :version))
+  printbox-text))
 
 (package
  (name wisl)
  (sites
   (share runtime))
+ (depends
+  (gillian
+   (= :version)))
  (synopsis
   "Gillian instantiation for Wisl, a small toy language for teaching and experimentation"))
