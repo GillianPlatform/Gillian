@@ -62,7 +62,7 @@
  (sites
   (share runtime))
  (depends
-  flow
+  flow_parser
   (gillian
    (= :version)))
  (synopsis "Gillian instantiation for JavaScript"))
