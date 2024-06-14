@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN sudo apt-get update
 
-RUN sudo apt-get install libgmp-dev pkg-config python3 -y
+RUN sudo apt-get install libgmp-dev pkg-config libsqlite3-dev python3 -y
 
 RUN mkdir /home/opam/app
 
