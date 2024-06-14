@@ -30,5 +30,5 @@ build: [
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
 pin-depends: [
-  "compcert.~dev" "git+https://github.com/GillianPlatform/CompCert.git#a44b9c00a3dd5ffabb06250d084759f85d175701"
+  "compcert.~dev" "git+https://github.com/GillianPlatform/CompCert.git#bfbc5335cb86e4388dd65f2801ac360b39c4fedb"
 ]
