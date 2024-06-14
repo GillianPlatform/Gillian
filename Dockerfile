@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN sudo apt-get update
 
-RUN sudo apt install software-properties-common
+RUN sudo apt install software-properties-common -y
 
 RUN sudo add-apt-repository ppa:deadsnakes/ppa
 
