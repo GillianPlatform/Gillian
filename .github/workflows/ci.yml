@@ -50,16 +50,14 @@ jobs:
       - name: Wisl checks
         run: "./wisl/scripts/quicktests.sh"
       - name: Format checking
-        run: dune fmt
-      - name: Building release
-        run: "esy release"
-      - name: Sending artifact for next jobs
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ runner.os }}-release
-          path: _release
+        run: opam exec -- dune fmt
+      # - name: Sending artifact for next jobs
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: ${{ runner.os }}-release
+      #     path: _release
       - name: Building docs
-        run: "esy docs"
+        run: make docs
         if: runner.os == 'Linux'
       - name: Sending docs artifact
         uses: actions/upload-artifact@v3

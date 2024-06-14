@@ -7,12 +7,12 @@ build:
 	dune build @all
 
 init-dev:
-	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only --locked
+	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only
 	opam exec -- ./githooks/install.ml
 	
 init-ci:
-	opam install . -y --locked
-	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y --locked
+	opam install . -y
+	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
 	
 	
 docs:
