@@ -12,7 +12,7 @@ init-dev:
 	
 init-ci:
 	opam install . -y --locked
-	opam install ${BUILD_PACKAGES} -y --locked
+	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y --locked
 	
 	
 docs:
