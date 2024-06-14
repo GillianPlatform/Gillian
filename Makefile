@@ -11,8 +11,10 @@ init-dev:
 	opam exec -- ./githooks/install.ml
 	
 init-ci:
-	opam install . -y
-	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
+	opam install . $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y --deps-only
+	
+uninstall:
+	opam remove gillian gillian-c gillian-js wisl kanillian -y
 	
 	
 docs:

@@ -4,6 +4,10 @@ LABEL maintaner "Sacha \"Giltho\" Ayoun"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+RUN sudo apt-get update
+
+RUN sudo apt-get install libgmp-dev pkg-config python3.9 -y
+
 RUN mkdir /home/opam/app
 
 WORKDIR /home/opam/app
