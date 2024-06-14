@@ -36,9 +36,8 @@ jobs:
             cache-name: cache-ocaml
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}-${{ hashFiles('**/*.opam.locked') }}
+          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
             ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0
 
       - name: Install dependencies
@@ -271,11 +270,13 @@ jobs:
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v3
+        env:
+            cache-name: cache-ocaml
         with:
-          path: _export
-          key: docker-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
+          path: _opam
+          key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            docker-esy-0.7.2-
+            docker-${{ env.cache-name }}-ocaml-5.2.0
       - name: build and export docker image
         uses: docker/build-push-action@v4
         with:
@@ -283,14 +284,14 @@ jobs:
           load: true
           tags: ${{ env.DOCKER_TEST_TAG }}
       - name: test
-        run: docker run --rm ${{ env.DOCKER_TEST_TAG }} esy test
-      - name: extract dependencies from docker
-        run: |
-          rm -rf _export
-          docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "esy cleanup . && esy export-dependencies"
-          docker cp deps:/app/Gillian/_export ./
-          docker rm deps
+        run: docker run --rm ${{ env.DOCKER_TEST_TAG }} opam exec -- dune test
+      - name: extract cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: /
+          rm -rf _opam
+          docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "opam clean"
+          docker cp deps:/home/opam/app/_opam ./
+          docker rm deps
 
   deploy-docs:
     if: github.ref == 'refs/heads/master'
@@ -298,6 +299,8 @@ jobs:
     needs: [build]
     strategy:
       fail-fast: false
+      matrix:
+        operating-system: [ubuntu-latest]
     steps:
       - name: Download built docs
         uses: actions/download-artifact@v3
