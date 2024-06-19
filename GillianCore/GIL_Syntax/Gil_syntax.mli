@@ -77,6 +77,8 @@ module Type : sig
     | SetType  (** Type of sets *)
   [@@deriving yojson, eq, show]
 
+  val all : t list
+
   (** Printer *)
   val str : t -> string
 

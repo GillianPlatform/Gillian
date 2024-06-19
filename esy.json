@@ -87,14 +87,16 @@
     "@opam/memtrace": "0.2.3",
     "@opam/menhir": "20231231",
     "@opam/ppx_deriving_yojson": "*",
+    "@opam/ppx_enumerate": "*",
     "@opam/ppxlib": ">=0.18.0",
     "@opam/printbox-text": "^0.6.1",
+    "@opam/simple_smt" : "NatKarmios/simple-smt-ocaml:simple_smt.opam#5166796af3684825b09b1f5bdac64ccaed3e55f7",
     "@opam/sqlite3": "5.0.2",
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
     "@opam/z3": "GillianPlatform/esy-z3#e8b2ce266d5d8bd67c54bd226c6301f7b180bb09",
-    "compcert": "GillianPlatform/CompCert#c20a63da768c2c59e114e074ae63cb60610d714b",
+    "compcert": "GillianPlatform/CompCert#130765535348549ee613a93364bb2092f24aa6d4",
     "ocaml": "5.1.x"
   },
   "devDependencies": {

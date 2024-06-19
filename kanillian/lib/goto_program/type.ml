@@ -19,6 +19,8 @@ type t = Typedefs__.type_ =
 
 let show t = Typedefs__.show_type_ t
 
+let all : t list = failwith "TODO"
+
 let show_simple = function
   | Array _ -> "Array"
   | Bool -> "Bool"
