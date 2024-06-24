@@ -29,4 +29,3 @@ val substitution_in_place : ?subst_all:bool -> SVal.SESubst.t -> t -> unit
 val is_well_formed : t -> bool
 val bindings : t -> (Var.t * vt) list
 val to_ssubst : t -> SVal.SESubst.t
-val is_in : t -> Expr.t -> bool

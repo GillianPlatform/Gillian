@@ -227,8 +227,3 @@ let to_assertions (preds : t) : Asrt.t list =
   let preds = to_list preds in
   let pred_to_assert (n, args) = Asrt.Pred (n, args) in
   List.sort Asrt.compare (List.map pred_to_assert preds)
-
-let is_in (preds : t) (ue : Expr.t) : bool =
-  List.exists
-    (fun (_, vs) -> List.exists (fun v -> Expr.sub_expr ue v) vs)
-    !preds
