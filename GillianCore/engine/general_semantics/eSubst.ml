@@ -407,19 +407,32 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             Val.to_expr (Option.get (get self_subst this))
         | _ -> super#visit_UnOp () this unop e
 
-      method! visit_ForAll () this bt form =
-        let binders, _ = List.split bt in
-        let binders_substs =
-          List.filter_map
-            (fun x ->
-              Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
-            binders
+      method! visit_Exists () this bt e =
+        let binders = List.to_seq bt |> Seq.map fst in
+        let binder_substs =
+          binders
+          |> Seq.filter_map (fun x ->
+                 Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
         in
-        List.iter
+        Seq.iter
+          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
+          binders;
+        let new_expr = self#visit_expr () e in
+        Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
+        if new_expr == e then this else Exists (bt, new_expr)
+
+      method! visit_ForAll () this bt form =
+        let binders = List.to_seq bt |> Seq.map fst in
+        let binders_substs =
+          binders
+          |> Seq.filter_map (fun x ->
+                 Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
+        in
+        Seq.iter
           (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
           binders;
         let new_formula = self#visit_formula () form in
-        List.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binders_substs;
+        Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binders_substs;
         if new_formula == form then this else ForAll (bt, new_formula)
     end
 

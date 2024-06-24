@@ -124,8 +124,9 @@ module Infer_types_to_gamma = struct
       (new_gamma : Type_env.t)
       (le : Expr.t)
       (tt : Type.t) : bool =
+    let f' = f flag in
     let f = f flag gamma new_gamma in
-
+    let ( = ) = Type.equal in
     match le with
     (* Literals are always typable *)
     | Lit lit -> Literal.type_of lit = tt
@@ -153,6 +154,29 @@ module Infer_types_to_gamma = struct
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
+    | Exists (bt, le) ->
+        if not (tt = BooleanType) then false
+        else
+          let gamma_copy = Type_env.copy gamma in
+          let new_gamma_copy = Type_env.copy new_gamma in
+          let () =
+            List.iter
+              (fun (x, t) ->
+                let () =
+                  match t with
+                  | Some t -> Type_env.update gamma_copy x t
+                  | None -> Type_env.remove gamma_copy x
+                in
+                Type_env.remove new_gamma_copy x)
+              bt
+          in
+          let ret = f' gamma_copy new_gamma_copy le BooleanType in
+          (* We've updated our new_gamma_copy with a bunch of things.
+             We need to import everything except the quantified variables to the new_gamma *)
+          Type_env.iter new_gamma_copy (fun x t ->
+              if not (List.exists (fun (y, _) -> String.equal x y) bt) then
+                Type_env.update new_gamma x t);
+          ret
 end
 
 let infer_types_to_gamma = Infer_types_to_gamma.f
@@ -250,8 +274,6 @@ let rec infer_types_formula (gamma : Type_env.t) (a : Formula.t) : unit =
 (*****************)
 
 module Type_lexpr = struct
-  type f = Expr.t -> Type.t option * bool * Formula.t list
-
   let def_pos (ot : Type.t option) = (ot, true, [])
   let def_neg = (None, false, [])
 
@@ -262,64 +284,6 @@ module Type_lexpr = struct
         Type_env.extend gamma new_gamma;
         (Some tt, true, constraints))
       ~none:def_neg outcome
-
-  let typable_list (f : f) gamma ?(target_type : Type.t option) les =
-    List.fold_left
-      (fun (ac, ac_constraints) elem ->
-        if not ac then (false, [])
-        else
-          let t, ite, constraints =
-            let t, ite, constraints = f elem in
-            match t with
-            | Some _ -> (t, ite, constraints)
-            | None -> (
-                match target_type with
-                | None -> (t, ite, constraints)
-                | Some tt -> infer_type gamma elem tt constraints)
-          in
-          let correct_type = target_type = None || t = target_type in
-          (ac && correct_type && ite, constraints @ ac_constraints))
-      (true, []) les
-
-  let type_unop (f : f) gamma le (op : UnOp.t) e =
-    let _, ite, constraints = f e in
-    match ite with
-    | false -> def_neg
-    | true ->
-        let (tt : Type.t), new_constraints =
-          match op with
-          | TypeOf -> (TypeType, [])
-          | UNot | M_isNaN -> (BooleanType, [])
-          | ToStringOp -> (StringType, [])
-          | Car | Cdr ->
-              (ListType, [ Formula.ILessEq (Expr.one_i, UnOp (LstLen, e)) ])
-          | LstRev | SetToList -> (ListType, [])
-          | IUnaryMinus | LstLen | NumToInt -> (IntType, [])
-          | BitwiseNot
-          | FUnaryMinus
-          | M_abs
-          | M_acos
-          | M_asin
-          | M_atan
-          | M_ceil
-          | M_cos
-          | M_exp
-          | M_floor
-          | M_log
-          | M_round
-          | M_sgn
-          | M_sin
-          | M_sqrt
-          | M_tan
-          | ToIntOp
-          | ToUint16Op
-          | ToUint32Op
-          | ToInt32Op
-          | ToNumberOp
-          | IntToNum
-          | StrLen -> (NumberType, [])
-        in
-        infer_type gamma le tt (new_constraints @ constraints)
 
   (* List-nth is typable with constraints *)
   let type_lstnth gamma e1 e2 constraints =
@@ -349,7 +313,67 @@ module Type_lexpr = struct
             let new_constraint2 : Formula.t = FLess (e2, UnOp (StrLen, e1)) in
             (None, true, new_constraint1 :: new_constraint2 :: constraints))
 
-  let type_binop (f : f) gamma le (op : BinOp.t) e1 e2 =
+  let rec typable_list gamma ?(target_type : Type.t option) les =
+    let f = f gamma in
+    List.fold_left
+      (fun (ac, ac_constraints) elem ->
+        if not ac then (false, [])
+        else
+          let t, ite, constraints =
+            let t, ite, constraints = f elem in
+            match t with
+            | Some _ -> (t, ite, constraints)
+            | None -> (
+                match target_type with
+                | None -> (t, ite, constraints)
+                | Some tt -> infer_type gamma elem tt constraints)
+          in
+          let correct_type = target_type = None || t = target_type in
+          (ac && correct_type && ite, constraints @ ac_constraints))
+      (true, []) les
+
+  and type_unop gamma le (op : UnOp.t) e =
+    let f = f gamma in
+    let _, ite, constraints = f e in
+    if not ite then def_neg
+    else
+      let (tt : Type.t), new_constraints =
+        match op with
+        | TypeOf -> (TypeType, [])
+        | UNot | M_isNaN -> (BooleanType, [])
+        | ToStringOp -> (StringType, [])
+        | Car | Cdr ->
+            (ListType, [ Formula.ILessEq (Expr.one_i, UnOp (LstLen, e)) ])
+        | LstRev | SetToList -> (ListType, [])
+        | IUnaryMinus | LstLen | NumToInt -> (IntType, [])
+        | BitwiseNot
+        | FUnaryMinus
+        | M_abs
+        | M_acos
+        | M_asin
+        | M_atan
+        | M_ceil
+        | M_cos
+        | M_exp
+        | M_floor
+        | M_log
+        | M_round
+        | M_sgn
+        | M_sin
+        | M_sqrt
+        | M_tan
+        | ToIntOp
+        | ToUint16Op
+        | ToUint32Op
+        | ToInt32Op
+        | ToNumberOp
+        | IntToNum
+        | StrLen -> (NumberType, [])
+      in
+      infer_type gamma le tt (new_constraints @ constraints)
+
+  and type_binop gamma le (op : BinOp.t) e1 e2 =
+    let f = f gamma in
     let infer_type = infer_type gamma in
     let _, ite1, constraints1 = f e1 in
     let _, ite2, constraints2 = f e2 in
@@ -409,7 +433,8 @@ module Type_lexpr = struct
             (* | _ -> infer_type le NumberType constraints *))
     | _, _ -> def_neg
 
-  let type_lstsub (f : f) gamma le1 le2 le3 =
+  and type_lstsub gamma le1 le2 le3 =
+    let f = f gamma in
     let infer_type = infer_type gamma in
     let _, ite1, constraints1 = f le1 in
     let _, ite2, constraints2 = f le2 in
@@ -435,10 +460,27 @@ module Type_lexpr = struct
          let new_constraint2 : Formula.t = (Less (e2, UnOp (LstLen, e1))) in
          (None, true, (new_constraint1 :: (new_constraint2 :: constraints)) ) *)
 
-  let rec f (gamma : Type_env.t) (le : Expr.t) :
+  and type_exists gamma le bt e =
+    let gamma_copy = Type_env.copy gamma in
+    let () =
+      List.iter
+        (fun (x, t) ->
+          match t with
+          | Some ty -> Type_env.update gamma_copy x ty
+          | None -> Type_env.remove gamma_copy x)
+        bt
+    in
+    let _, ite, constraints = f gamma_copy e in
+    if not ite then def_neg else infer_type gamma le BooleanType constraints
+
+  (** This function returns a triple [(t_opt, b, fs)] where
+      - [t_opt] is the type of [le] if we can find one
+      - [b] indicates if the thing is typable
+      - [fs] indicates the constraints that must be satisfied for [le] to be typable
+  *)
+  and f (gamma : Type_env.t) (le : Expr.t) :
       Type.t option * bool * Formula.t list =
-    let f = f gamma in
-    let typable_list = typable_list f gamma in
+    let typable_list = typable_list gamma in
 
     let result =
       match le with
@@ -449,11 +491,12 @@ module Type_lexpr = struct
       (* Abstract locations are always typable, by construction *)
       | ALoc _ -> def_pos (Some ObjectType)
       (* Lists are always typable *)
-      | EList _ -> (Some ListType, true, [])
+      | EList _ -> def_pos (Some ListType)
       (* Sets are always typable *)
-      | ESet _ -> (Some SetType, true, [])
-      | UnOp (op, e) -> type_unop f gamma le op e
-      | BinOp (e1, op, e2) -> type_binop f gamma le op e1 e2
+      | ESet _ -> def_pos (Some SetType)
+      | Exists (bt, e) -> type_exists gamma le bt e
+      | UnOp (op, e) -> type_unop gamma le op e
+      | BinOp (e1, op, e2) -> type_binop gamma le op e1 e2
       | NOp (SetUnion, les) | NOp (SetInter, les) ->
           let all_typable, constraints =
             typable_list ?target_type:(Some SetType) les
@@ -464,7 +507,7 @@ module Type_lexpr = struct
             typable_list ?target_type:(Some ListType) les
           in
           if all_typable then (Some ListType, true, constraints) else def_neg
-      | LstSub (le1, le2, le3) -> type_lstsub f gamma le1 le2 le3
+      | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
     in
 
     result

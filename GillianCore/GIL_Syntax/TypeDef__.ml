@@ -140,6 +140,7 @@ and expr =
   | NOp of nop * expr list
   | EList of expr list
   | ESet of expr list
+  | Exists of (string * typ option) list * expr
 
 and formula =
   | True

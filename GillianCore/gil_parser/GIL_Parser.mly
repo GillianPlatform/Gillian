@@ -123,6 +123,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token NUMTOINT
 (* Expression keywords *)
 %token TYPEOF
+%token EXISTS
+(* Logic command keywords *)
 %token ASSUME
 %token ASSERT
 %token SEPASSERT
@@ -428,6 +430,8 @@ expr_target:
 (* Ignore variable *)
   | UNDERSCORE
     { Expr.LVar (LVar.alloc ()) }
+  | EXISTS; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
+    { Expr.Exists (vars, e) }
 ;
 
 top_level_expr_target:

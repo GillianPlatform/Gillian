@@ -69,6 +69,7 @@
 
         (* Expression keywords *)
         "typeOf", GIL_Parser.TYPEOF;
+        "exists", GIL_Parser.EXISTS;
 
 
         (* Command keywords *)

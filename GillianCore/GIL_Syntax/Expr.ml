@@ -12,6 +12,8 @@ type t = TypeDef__.expr =
   | NOp of NOp.t * t list  (** n-ary operators         *)
   | EList of t list  (** Lists of expressions    *)
   | ESet of t list  (** Sets of expressions     *)
+  | Exists of (string * Type.t option) list * t
+      (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -311,11 +313,20 @@ let rec map_opt
         | NOp (op, les) -> aux les (fun les -> NOp (op, les))
         | EList les -> aux les (fun les -> EList les)
         | ESet les -> aux les (fun les -> ESet les)
+        | Exists (bt, e) -> (
+            match map_e e with
+            | Some e' -> Some (Exists (bt, e'))
+            | _ -> None)
       in
       Option.map f_after mapped_expr
 
 (** Printer *)
 let rec pp fmt e =
+  let pp_var_with_type fmt (x, t_opt) =
+    Fmt.pf fmt "%s%a" x
+      (Fmt.option (fun fm t -> Fmt.pf fm " : %s" (Type.str t)))
+      t_opt
+  in
   match e with
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
@@ -334,6 +345,10 @@ let rec pp fmt e =
       Fmt.pf fmt "%s %a" (NOp.str op)
         (Fmt.parens (Fmt.list ~sep:Fmt.comma pp))
         le
+  | Exists (bt, e) ->
+      Fmt.pf fmt "(exists %a . %a)"
+        (Fmt.list ~sep:Fmt.comma pp_var_with_type)
+        bt pp e
 
 let rec full_pp fmt e =
   match e with
@@ -394,7 +409,7 @@ let rec is_concrete (le : t) : bool =
 
   match le with
   | Lit _ | PVar _ -> true
-  | LVar _ | ALoc _ -> false
+  | LVar _ | ALoc _ | Exists _ -> false
   | UnOp (_, e) -> loop [ e ]
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
@@ -495,14 +510,3 @@ let rec pvars_to_lvars (e : t) : t =
   | EList les -> EList (List.map f les)
   | ESet les -> ESet (List.map f les)
   | _ -> e
-
-let rec sub_expr ue e =
-  let f = sub_expr ue in
-  equal ue e
-  ||
-  match e with
-  | Lit _ | PVar _ | LVar _ | ALoc _ -> false
-  | UnOp (_, e) -> f e
-  | BinOp (e1, _, e2) -> f e1 || f e2
-  | LstSub (e1, e2, e3) -> f e1 || f e2 || f e3
-  | NOp (_, les) | EList les | ESet les -> List.exists f les

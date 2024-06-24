@@ -594,10 +594,15 @@ let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
   let open Encoding in
   let res =
     match (p1.kind, p2.kind) with
-    | Native t1, Native t2 when Type.equal t1 t2 -> mk_eq p1.expr p2.expr
+    | Native t1, Native t2 when Type.equal t1 t2 ->
+        if Type.equal t1 BooleanType then
+          if Boolean.is_true p1.expr then p2.expr
+          else if Boolean.is_true p2.expr then p1.expr
+          else mk_eq p1.expr p2.expr
+        else mk_eq p1.expr p2.expr
     | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
         mk_eq p1.expr p2.expr
-    | Native _, Native _ -> failwith "incompatible equality!"
+    | Native _, Native _ -> failwith "incompatible equality, type error!"
     | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
         mk_eq (simple_wrap p1) (simple_wrap p2)
     | Extended_wrapped, _ | _, Extended_wrapped ->
@@ -744,7 +749,47 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       flush stdout;
       raise (Failure msg)
 
-let rec encode_logical_expression
+let rec encode_exists ~gamma ~llen_lvars quantified_vars assertion =
+  let open Encoding in
+  match quantified_vars with
+  | [] ->
+      (* A quantified assertion with no quantified variables is just the assertion *)
+      encode_logical_expression ~gamma ~llen_lvars assertion
+  | _ ->
+      (* Start by updating gamma with the information provided by quantifier types.
+         There's very few foralls, so it's ok to copy the gamma entirely *)
+      let gamma = Hashtbl.copy gamma in
+      List.iter
+        (fun (x, ty) ->
+          match ty with
+          | None -> Hashtbl.remove gamma x
+          | Some ty -> Hashtbl.replace gamma x ty)
+        quantified_vars;
+      (* Not the same gamma now!*)
+      let encoded_assertion =
+        match encode_logical_expression ~gamma ~llen_lvars assertion with
+        | { kind = Native BooleanType; expr } -> expr
+        | _ -> failwith "the thing inside exists is not boolean!"
+      in
+      let quantified_vars =
+        List.map
+          (fun (x, t) ->
+            let sort =
+              match t with
+              | None -> extended_literal_sort
+              | Some ty -> Encoding.native_sort_of_type ty
+            in
+            ZExpr.mk_const_s ctx x sort)
+          quantified_vars
+      in
+      let quantifier =
+        Quantifier.mk_exists_const ctx quantified_vars encoded_assertion None []
+          [] None None
+      in
+      let quantifier_expr = Quantifier.expr_of_quantifier quantifier in
+      ZExpr.simplify quantifier_expr None >- BooleanType
+
+and encode_logical_expression
     ~(gamma : tyenv)
     ~(llen_lvars : SS.t)
     (le : Expr.t) : Encoding.t =
@@ -784,6 +829,7 @@ let rec encode_logical_expression
       let start = get_int (f start) in
       let len = get_int (f len) in
       Z3.Seq.mk_seq_extract ctx lst start len >- ListType
+  | Exists (bt, e) -> encode_exists ~gamma ~llen_lvars bt e
 
 let rec encode_forall ~gamma ~llen_lvars quantified_vars assertion =
   let open Encoding in

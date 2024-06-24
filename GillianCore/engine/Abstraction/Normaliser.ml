@@ -181,6 +181,7 @@ module Make (SPState : PState.S) = struct
                            "normalise_lexpr: program variable in normalised \
                             expression")
                   | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
+                  | Exists _ -> Lit (Type BooleanType)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
                   | NOp (_, _) | ESet _ -> Lit (Type SetType))
               | _ -> UnOp (uop, nle1)))
@@ -216,7 +217,22 @@ module Make (SPState : PState.S) = struct
           | _, Lit (Num _), Lit (Num _) ->
               raise (Failure "Sublist indexes non-integer")
           | _, _, _ -> LstSub (nle1, nle2, nle3))
+      | Exists (bt, e) -> (
+          let new_gamma = Type_env.copy gamma in
+          List.iter
+            (fun (x, t) ->
+              match t with
+              | Some t -> Type_env.update new_gamma x t
+              | None -> Type_env.remove new_gamma x)
+            bt;
+          let ne = normalise_lexpr ~no_types ~store ~subst new_gamma e in
+          let lvars = Expr.lvars ne in
+          let bt = List.filter (fun (x, _) -> SS.mem x lvars) bt in
+          match bt with
+          | [] -> ne
+          | _ -> Exists (bt, ne))
     in
+
     if not no_types then Typing.infer_types_expr gamma result;
     result
 
