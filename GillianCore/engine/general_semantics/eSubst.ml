@@ -456,13 +456,19 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param le Target expression
     @return Expression resulting from the substitution. No fresh locations are created.
   *)
-  let subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
+  let rec subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
     let f_before (le : Expr.t) =
       match (le : Expr.t) with
       | LVar _ | ALoc _ | PVar _ ->
           (Option.map Val.to_expr (get subst le), false)
       | (UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _)) when mem subst le ->
           (Option.map Val.to_expr (get subst le), false)
+      | Exists (bt, e) ->
+          let subst' = copy subst in
+          List.iter (fun (x, _) -> Hashtbl.remove subst' (LVar x)) bt;
+          let e' = subst_in_expr_opt subst' e in
+          let result = Option.map (fun e' -> Expr.Exists (bt, e')) e' in
+          (result, false)
       | _ -> (Some le, true)
     in
     Expr.map_opt f_before None le
