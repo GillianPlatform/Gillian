@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.10"
       - name: Installing esy
-        run: sudo npm install -g @esy-nightly/esy@0.7.2-169-g9f515ce0 --unsafe-perm
+        run: sudo npm install -g @esy-nightly/esy@0.7.2-177-g496796ae --unsafe-perm
       - name: Installing Python prerequisites
         run: sudo pip install sphinx furo
       - name: Linking thing for Apple Silicon?
@@ -41,9 +41,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: _export
-          key: ${{ runner.os }}-esy-nightly-0.7.2-169-g9f515ce0-${{ hashFiles('esy.lock/index.json') }}
+          key: ${{ runner.os }}-esy-nightly-0.7.2-177-g496796ae-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            ${{ runner.os }}-esy-nightly-0.7.2-169-g9f515ce0-
+            ${{ runner.os }}-esy-nightly-0.7.2-177-g496796ae-
 
       - name: Esy install
         run: "esy install"
@@ -286,9 +286,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: _export
-          key: docker-esy-nightly-0.7.2-169-g9f515ce0-${{ hashFiles('esy.lock/index.json') }}
+          key: docker-esy-nightly-0.7.2-177-g496796ae-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            docker-esy-nightly-0.7.2-169-g9f515ce0-
+            docker-esy-nightly-0.7.2-177-g496796ae-
       - name: build and export docker image
         uses: docker/build-push-action@v4
         with:
