@@ -367,23 +367,6 @@ let to_literal = function
   | Lit lit -> Some lit
   | _ -> None
 
-(** Fold *)
-let rec fold
-    (f_ac : t -> 'b -> 'b -> 'a list -> 'a)
-    (f_state : (t -> 'b -> 'b) option)
-    (state : 'b)
-    (expr : t) : 'a =
-  let new_state = (Option.value ~default:(fun _ x -> x) f_state) expr state in
-  let fold_e = fold f_ac f_state new_state in
-  let f_ac = f_ac expr new_state state in
-
-  match expr with
-  | Lit _ | LVar _ | ALoc _ | PVar _ -> f_ac []
-  | UnOp (_, e) -> f_ac [ fold_e e ]
-  | BinOp (e1, _, e2) -> f_ac [ fold_e e1; fold_e e2 ]
-  | LstSub (e1, e2, e3) -> f_ac [ fold_e e1; fold_e e2; fold_e e3 ]
-  | NOp (_, les) | EList les | ESet les -> f_ac (List.map fold_e les)
-
 (** Get all the logical variables in --e-- *)
 let lvars (le : t) : SS.t =
   Visitors.Collectors.lvar_collector#visit_expr SS.empty le
