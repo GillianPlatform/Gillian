@@ -465,7 +465,13 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           (Option.map Val.to_expr (get subst le), false)
       | Exists (bt, e) ->
           let subst' = copy subst in
-          List.iter (fun (x, _) -> Hashtbl.remove subst' (LVar x)) bt;
+          (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
+          List.iter
+            (fun (x, _) ->
+              let lvar = Expr.LVar x in
+              let lvar_e = Option.get (Val.from_expr lvar) in
+              Hashtbl.add subst' lvar lvar_e)
+            bt;
           let e' = subst_in_expr_opt subst' e in
           let result = Option.map (fun e' -> Expr.Exists (bt, e')) e' in
           (result, false)
