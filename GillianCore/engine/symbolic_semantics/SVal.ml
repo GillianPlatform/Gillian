@@ -24,7 +24,6 @@ struct
   let from_list = Expr.from_list
   let from_lvar_name x = Expr.LVar x
   let to_list = Expr.to_list
-  let is_concrete = Expr.is_concrete
 end
 
 (** @canonical Gillian.Symbolic.Subst *)

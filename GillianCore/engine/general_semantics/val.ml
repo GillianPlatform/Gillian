@@ -41,7 +41,4 @@ module type S = sig
 
   (** Convert a value to a list of values, if possible *)
   val to_list : t -> t list option
-
-  (** Is the value concrete? *)
-  val is_concrete : t -> bool
 end

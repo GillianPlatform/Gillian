@@ -25,7 +25,6 @@ struct
     failwith "Cannot create a concrete value from a logical variable"
 
   let to_list = Literal.to_list
-  let is_concrete (_ : t) = true
 end
 
 (** @canonical Gillian.Concrete.Subst *)
