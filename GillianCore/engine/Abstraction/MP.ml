@@ -314,23 +314,29 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
       learned @ learn_expr_list new_kb not_learned
 
 let simple_ins_expr_collector =
-  object
+  object (self)
     inherit [_] Visitors.reduce as super
     method zero = (KB.empty, KB.empty)
     method plus (a, c) (b, d) = (KB.union a b, KB.union c d)
 
-    method! visit_expr () e =
+    method! visit_expr exclude e =
       match e with
-      | LVar _ | PVar _ | ALoc _ -> (KB.empty, KB.singleton e)
+      | (LVar s | PVar s | ALoc s) when not (SS.mem s exclude) ->
+          (KB.empty, KB.singleton e)
       | UnOp (LstLen, ((PVar _ | LVar _) as v)) -> (KB.singleton v, KB.empty)
-      | _ -> super#visit_expr () e
+      | Exists (bt, e) ->
+          let exclude =
+            List.fold_left (fun acc (x, _) -> SS.add x acc) exclude bt
+          in
+          self#visit_expr exclude e
+      | _ -> super#visit_expr exclude e
   end
 
 (** [simple_ins_expr e] returns the list of possible ins
     for a given expression [e] *)
 let simple_ins_expr (e : Expr.t) : KB.t list =
   let open Expr in
-  let llens, others = simple_ins_expr_collector#visit_expr () e in
+  let llens, others = simple_ins_expr_collector#visit_expr SS.empty e in
   (* List lengths whose variables do not appear elsewhere *)
   let llens = Set.elements (Set.diff llens others) in
   (* Those we can learn by knowing the variable or the list length *)
