@@ -323,7 +323,8 @@ let simple_ins_expr_collector =
       match e with
       | (LVar s | PVar s | ALoc s) when not (SS.mem s exclude) ->
           (KB.empty, KB.singleton e)
-      | UnOp (LstLen, ((PVar _ | LVar _) as v)) -> (KB.singleton v, KB.empty)
+      | UnOp (LstLen, ((PVar s | LVar s) as v)) when not (SS.mem s exclude) ->
+          (KB.singleton v, KB.empty)
       | Exists (bt, e) ->
           let exclude =
             List.fold_left (fun acc (x, _) -> SS.add x acc) exclude bt
