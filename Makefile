@@ -11,9 +11,11 @@ init-dev:
 	opam exec -- ./githooks/install.ml
 	
 init-ci:
-	opam install . $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y --deps-only
+	opam install . -y --deps-only
+	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
 
 dist:
+	opam exec -- dune build @install
 	rm -rf _dist
 	mkdir _dist _dist/bin _dist/lib
 	cp -r _opam/share _dist/
