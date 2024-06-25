@@ -247,7 +247,7 @@ module Make (SPState : PState.S) = struct
             let x_type = Type_env.get gamma x in
             match x_type with
             | None ->
-                let le_type, _, _ = Typing.type_lexpr gamma le in
+                let le_type, _ = Typing.type_lexpr gamma le in
                 Option.fold
                   ~some:(fun x_type -> Type_env.update gamma x x_type)
                   ~none:() le_type
@@ -587,7 +587,7 @@ module Make (SPState : PState.S) = struct
     let fe = normalise_logic_expression store gamma subst in
 
     let type_check_lexpr (le : Expr.t) (t : Type.t) : bool =
-      let le_type, success, _ = Typing.type_lexpr gamma le in
+      let le_type, success = Typing.type_lexpr gamma le in
       if not success then
         raise
           (Failure

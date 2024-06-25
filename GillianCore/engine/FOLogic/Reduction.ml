@@ -219,7 +219,7 @@ let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
 (***************************)
 
 let typable (gamma : Type_env.t) (le : Expr.t) (target_type : Type.t) : bool =
-  let t, success, _ = Typing.type_lexpr gamma le in
+  let t, success = Typing.type_lexpr gamma le in
   if success then
     Option.fold ~some:(fun t -> Type.equal t target_type) ~none:true t
   else
@@ -988,7 +988,7 @@ and reduce_lexpr_loop
         match fle with
         | Lit (Num _) -> fle
         | fle -> (
-            let tfle, how, _ = Typing.type_lexpr gamma fle in
+            let tfle, how = Typing.type_lexpr gamma fle in
             match (how, tfle) with
             | true, Some NumberType -> fle
             | _, _ -> UnOp (ToNumberOp, UnOp (ToStringOp, fle))))
@@ -1219,7 +1219,7 @@ and reduce_lexpr_loop
                 | _ -> def)
             (* The TypeOf operator *)
             | TypeOf -> (
-                let tfle, how, _ = Typing.type_lexpr gamma fle in
+                let tfle, how = Typing.type_lexpr gamma fle in
                 match how with
                 | false ->
                     let err_msg = "LTypeOf(le): expression is not typable." in
@@ -1714,8 +1714,8 @@ and reduce_lexpr_loop
                       || PFS.mem pfs (Not (Eq (fler, flel)))
                     then Lit (Bool false)
                     else
-                      let t1, _, _ = Typing.type_lexpr gamma flel in
-                      let t2, _, _ = Typing.type_lexpr gamma fler in
+                      let t1, _ = Typing.type_lexpr gamma flel in
+                      let t2, _ = Typing.type_lexpr gamma fler in
                       match (t1, t2) with
                       | Some t1, Some t2 ->
                           if Type.equal t1 t2 then def else Lit (Bool false)
@@ -2531,8 +2531,8 @@ let rec reduce_formula_loop
           let eq = re1 = re2 in
           if eq then True
           else
-            let t1, s1, _ = Typing.type_lexpr gamma re1 in
-            let t2, s2, _ = Typing.type_lexpr gamma re2 in
+            let t1, s1 = Typing.type_lexpr gamma re1 in
+            let t2, s2 = Typing.type_lexpr gamma re2 in
             if
               s1 && s2
               &&
@@ -2825,7 +2825,7 @@ let rec reduce_formula_loop
       | IsInt e -> (
           match fe e with
           | UnOp (UnOp.IntToNum, e) -> (
-              let t, _, _ = Typing.type_lexpr gamma e in
+              let t, _ = Typing.type_lexpr gamma e in
               match t with
               | Some IntType -> True
               | Some _ -> False
