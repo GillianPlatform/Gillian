@@ -50,11 +50,13 @@ jobs:
         run: "./wisl/scripts/quicktests.sh"
       - name: Format checking
         run: opam exec -- dune fmt
-      # - name: Sending artifact for next jobs
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: ${{ runner.os }}-release
-      #     path: _release
+      - name: Packing binaries & dependencies for artifact
+        run: make dist
+      - name: Sending artifact for next jobs
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ runner.os }}-dist
+          path: _dist
       - name: Building docs
         run: make docs
         if: runner.os == 'Linux'
@@ -75,19 +77,13 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
+      - name: Download release
         uses: actions/download-artifact@v3
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
+          name: ${{ runner.os }}-dist
+          path: _dist
+      - name: Add binaries to path
+        run: echo "${HOME}/_dist/bin" >> $GITHUB_PATH
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -109,19 +105,13 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
+      - name: Download release
         uses: actions/download-artifact@v3
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
+          name: ${{ runner.os }}-dist
+          path: _dist
+      - name: Add binaries to path
+        run: echo "${HOME}/_dist/bin" >> $GITHUB_PATH
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -145,19 +135,13 @@ jobs:
     steps:
       - name: install CBMC
         run: sudo apt install cbmc -y
-      - name: download release
+      - name: Download release
         uses: actions/download-artifact@v3
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
+          name: ${{ runner.os }}-dist
+          path: _dist
+      - name: Add binaries to path
+        run: echo "${HOME}/_dist/bin" >> $GITHUB_PATH
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -177,19 +161,13 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
+      - name: Download release
         uses: actions/download-artifact@v3
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
+          name: ${{ runner.os }}-dist
+          path: _dist
+      - name: Add binaries to path
+        run: echo "${HOME}/_dist/bin" >> $GITHUB_PATH
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -207,19 +185,13 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
+      - name: Download release
         uses: actions/download-artifact@v3
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
+          name: ${{ runner.os }}-dist
+          path: _dist
+      - name: Add binaries to path
+        run: echo "${HOME}/_dist/bin" >> $GITHUB_PATH
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -238,19 +210,13 @@ jobs:
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
-  #     - name: download release
+  #     - name: Download release
   #       uses: actions/download-artifact@v3
   #       with:
-  #         name: ${{ runner.os }}-release
-  #         path: release
-  #     - name: setting up node
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #     - name: install release
-  #       run: |
-  #         yarn global add file://$(pwd)/release
-  #         echo "$(yarn global bin)" >> $GITHUB_PATH
+  #        name: ${{ runner.os }}-dist
+  #        path: _dist
+  #     - name: Add binaries to path
+  #       run: echo "${HOME}/_dist/bin" >> $GITHUB_PATH
   #     - name: checkout project
   #       uses: actions/checkout@v3
   #       with:
