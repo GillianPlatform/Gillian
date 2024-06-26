@@ -53,7 +53,7 @@ jobs:
       - name: Packing binaries & dependencies for artifact
         run: |
           pwd
-          find _opam
+          opam exec -- which wisl
           make dist
       - name: Sending artifact for next jobs
         uses: actions/upload-artifact@v3
