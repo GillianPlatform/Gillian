@@ -11,6 +11,7 @@ on:
 env:
   NODE_VERSION: 18
   DOCKER_TEST_TAG: gillian:test
+  LD_LIBRARY_PATH: ${{ github.workspace }}/_dist/lib/stublibs
 
 jobs:
   build:
