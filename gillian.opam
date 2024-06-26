@@ -8,7 +8,7 @@ license: "BSD-3-Clause"
 homepage: "https://github.com/GillianPlatform/Gillian"
 bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
 depends: [
-  "dune" {>= "2.9"}
+  "dune" {>= "3.16"}
   "ocaml" {>= "5.1.0"}
   "alcotest" {= "1.0.1"}
   "cmdliner" {>= "1.1.1"}

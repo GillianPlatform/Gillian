@@ -7,7 +7,7 @@ license: "BSD-3-Clause"
 homepage: "https://github.com/GillianPlatform/Gillian"
 bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
 depends: [
-  "dune" {>= "2.9"}
+  "dune" {>= "3.16"}
   "gillian" {= version}
   "dune-site"
   "printbox-text"

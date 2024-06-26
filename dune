@@ -13,4 +13,4 @@
    (:standard -O3)))
  (_
   (flags
-   (:standard -w -70))))
+   (:standard -w -67 -w -69 -w -70))))
