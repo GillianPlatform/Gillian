@@ -16,12 +16,7 @@ init-ci:
 
 dist:
 	opam exec -- dune build @install
-	opam install . -y
-	rm -rf _dist
-	mkdir _dist _dist/bin _dist/lib
-	cp -r _opam/share _dist/
-	cp -r _opam/lib/stublibs _dist/lib/
-	cp _opam/bin/wisl _opam/bin/gillian-c _opam/bin/gillian-js _opam/bin/kanillian _dist/bin/
+	opam exec -- dune install --relocatable --prefix _dist
 
 uninstall:
 	opam remove gillian gillian-c gillian-js wisl kanillian -y
