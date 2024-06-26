@@ -16,6 +16,7 @@ init-ci:
 
 dist:
 	opam exec -- dune build @install
+	opam install . -y
 	rm -rf _dist
 	mkdir _dist _dist/bin _dist/lib
 	cp -r _opam/share _dist/

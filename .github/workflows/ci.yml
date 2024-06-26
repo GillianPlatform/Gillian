@@ -51,10 +51,7 @@ jobs:
       - name: Format checking
         run: opam exec -- dune fmt
       - name: Packing binaries & dependencies for artifact
-        run: |
-          pwd
-          opam exec -- which wisl
-          make dist
+        run: make dist
       - name: Sending artifact for next jobs
         uses: actions/upload-artifact@v3
         with:
