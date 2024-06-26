@@ -8,7 +8,7 @@ set -e
 # printf "\n\n"
 
 echo "--- verifying BST ---"
-opam exec -- dune exec -- gillian-c verify -l disabled multifile/verification/sll_a.c multifile/verification/sll_b.c
+gillian-c verify -l disabled multifile/verification/sll_a.c multifile/verification/sll_b.c
 printf "\n\n"
 
 # echo "--- bi-abducing BST ---"

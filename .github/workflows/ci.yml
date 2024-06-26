@@ -47,7 +47,7 @@ jobs:
       - name: Basic tests
         run: opam exec -- dune test
       - name: Wisl checks
-        run: "./wisl/scripts/quicktests.sh"
+        run: "opam exec -- dune exec -- sh ./wisl/scripts/quicktests.sh"
       - name: Format checking
         run: opam exec -- dune fmt
       - name: Packing binaries & dependencies for artifact

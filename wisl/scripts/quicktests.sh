@@ -2,7 +2,7 @@ set -e
 
 verify () {
   echo "\nVerifying: $1\n"
-  opam exec -- dune exec -- wisl verify $1
+  wisl verify $1
 }
 
 echo "--- WISL: OX VERIFICATION ---"
