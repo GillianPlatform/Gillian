@@ -82,8 +82,10 @@ jobs:
         with:
           name: ${{ runner.os }}-dist
           path: _dist
-      - name: Add binaries to path
-        run: echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+      - name: Set up binaries
+        run: |
+          echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+          chmod +x _dist/bin/*
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -110,8 +112,10 @@ jobs:
         with:
           name: ${{ runner.os }}-dist
           path: _dist
-      - name: Add binaries to path
-        run: echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+      - name: Set up binaries
+        run: |
+          echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+          chmod +x _dist/bin/*
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -140,8 +144,10 @@ jobs:
         with:
           name: ${{ runner.os }}-dist
           path: _dist
-      - name: Add binaries to path
-        run: echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+      - name: Set up binaries
+        run: |
+          echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+          chmod +x _dist/bin/*
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -166,8 +172,10 @@ jobs:
         with:
           name: ${{ runner.os }}-dist
           path: _dist
-      - name: Add binaries to path
-        run: echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+      - name: Set up binaries
+        run: |
+          echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+          chmod +x _dist/bin/*
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -190,8 +198,10 @@ jobs:
         with:
           name: ${{ runner.os }}-dist
           path: _dist
-      - name: Add binaries to path
-        run: echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+      - name: Set up binaries
+        run: |
+          echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+          chmod +x _dist/bin/*
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -215,8 +225,10 @@ jobs:
   #       with:
   #        name: ${{ runner.os }}-dist
   #        path: _dist
-  #     - name: Add binaries to path
-  #       run: echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+  #     - name: Set up binaries
+  #       run: |
+  #         echo "$(pwd)/_dist/bin" >> $GITHUB_PATH
+  #         chmod +x _dist/bin/*
   #     - name: checkout project
   #       uses: actions/checkout@v3
   #       with:
