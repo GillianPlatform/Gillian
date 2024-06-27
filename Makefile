@@ -14,11 +14,6 @@ init-ci:
 	opam install . -y --deps-only
 	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
 
-dist:
-	opam exec -- dune build @install
-	opam exec -- dune install --relocatable --prefix _dist
-	cp -r _opam/lib/stublibs _dist/lib/
-
 uninstall:
 	opam remove gillian gillian-c gillian-js wisl kanillian -y
 	

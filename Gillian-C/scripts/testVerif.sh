@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERIFY="time gillian-c verify"
+VERIFY="time opam exec -- gillian-c verify"
 
 echo "--- verifying SLL ---"
 $VERIFY verification/sll.c -l disabled

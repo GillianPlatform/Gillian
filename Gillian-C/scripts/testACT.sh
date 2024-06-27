@@ -2,7 +2,7 @@
 
 set -e
 
-ACT="gillian-c act"
+ACT="opam exec -- gillian-c act"
 
 echo "--- bi-abducing SLL ---"
 time $ACT act/sll.c -l disabled

@@ -1,7 +1,7 @@
 ifdef GITHUB_ACTIONS
 	VERIFY=gillian-c verify
 else
-	VERIFY=gillian-c verify
+	VERIFY=opam exec -- gillian-c verify
 endif
 
 default:
