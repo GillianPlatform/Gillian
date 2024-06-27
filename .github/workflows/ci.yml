@@ -55,7 +55,7 @@ jobs:
           opam exec -- dune build @install
           opam install . -y
       - name: Sending artifact for next jobs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-opam
           path: _opam
@@ -63,7 +63,7 @@ jobs:
         run: make docs
         if: runner.os == 'Linux'
       - name: Sending docs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-docs
           path: _docs
@@ -80,12 +80,14 @@ jobs:
     needs: build
     steps:
       - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
           path: Gillian
       - name: Download release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-opam
           path: _opam
@@ -107,12 +109,14 @@ jobs:
     needs: build
     steps:
       - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
           path: Gillian
       - name: Download release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-opam
           path: _opam
@@ -134,6 +138,8 @@ jobs:
     needs: build
     steps:
       - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: install CBMC
         run: sudo apt install cbmc -y
       - name: Checkout project
@@ -141,7 +147,7 @@ jobs:
         with:
           path: Gillian
       - name: Download release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-opam
           path: _opam
@@ -161,6 +167,8 @@ jobs:
     needs: build
     steps:
       - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -168,7 +176,7 @@ jobs:
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
       - name: Download release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-opam
           path: _opam
@@ -184,6 +192,8 @@ jobs:
     needs: build
     steps:
       - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -191,7 +201,7 @@ jobs:
           path: collections-c
           ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
       - name: Download release
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-opam
           path: _opam
@@ -208,12 +218,14 @@ jobs:
   #   needs: build
   #   steps:
   #     - uses: ocaml/setup-ocaml@v2
+  #       with:
+  #         ocaml-compiler: "ocaml-variants.5.2.0+options"
   #     - name: Checkout project
   #       uses: actions/checkout@v3
   #       with:
   #         path: Gillian
   #     - name: Download release
-  #       uses: actions/download-artifact@v3
+  #       uses: actions/download-artifact@v4
   #       with:
   #        name: ${{ runner.os }}-opam
   #        path: _opam
@@ -266,7 +278,7 @@ jobs:
         operating-system: [ubuntu-latest]
     steps:
       - name: Download built docs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-docs
           path: docs
