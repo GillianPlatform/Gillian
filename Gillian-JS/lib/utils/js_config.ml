@@ -23,5 +23,6 @@ let amazon = ref false
 let env_var_import_path = "GILLIAN_JS_RUNTIME_PATH"
 
 let import_paths =
-  Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH"
-  |> Option.value ~default:"" |> String.split_on_char ':'
+  (Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH"
+  |> Option.value ~default:"" |> String.split_on_char ':')
+  @ Runtime_sites.Sites.runtime
