@@ -47,7 +47,7 @@ jobs:
       - name: Basic tests
         run: opam exec -- dune test
       - name: Wisl checks
-        run: "opam exec -- dune exec -- sh ./wisl/scripts/quicktests.sh"
+        run: "opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh"
       - name: Format checking
         run: opam exec -- dune fmt
       - name: Installing to opam switch
@@ -134,7 +134,7 @@ jobs:
         run: "Gillian-JS/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test JaVerT
-        run: "opam exec -- sh ./testJaVerT.sh"
+        run: "opam exec -- bash ./testJaVerT.sh"
         working-directory: "Gillian/Gillian-JS/environment/"
       # - name: Test Amazon
       #   run: "make"
@@ -169,7 +169,7 @@ jobs:
         run: "kanillian/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test All
-        run: "./testAll.sh"
+        run: "opam exec -- bash ./testAll.sh"
         working-directory: "Gillian/kanillian/environment/"
 
   test262:
@@ -228,7 +228,7 @@ jobs:
           tar xzf opam/opam.tar.gz
           rm -rf opam
       - name: Symbolic Testing Collections-C
-        run: "opam exec -- sh ./runGillianTests.sh"
+        run: "opam exec -- bash ./scripts/gillian-compcert/runTests.sh"
         working-directory: collections-c
 
   # test-Buckets:
