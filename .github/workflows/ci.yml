@@ -134,7 +134,7 @@ jobs:
         run: "Gillian-JS/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test JaVerT
-        run: "./testJaVerT.sh"
+        run: "opam exec -- sh ./testJaVerT.sh"
         working-directory: "Gillian/Gillian-JS/environment/"
       # - name: Test Amazon
       #   run: "make"
@@ -199,7 +199,7 @@ jobs:
           tar xzf opam/opam.tar.gz
           rm -rf opam
       - name: Test262
-        run: "gillian-js test262 test262/test --ci"
+        run: "opam exec -- gillian-js test262 test262/test --ci"
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
@@ -228,7 +228,7 @@ jobs:
           tar xzf opam/opam.tar.gz
           rm -rf opam
       - name: Symbolic Testing Collections-C
-        run: "./runGillianTests.sh"
+        run: "opam exec -- sh ./runGillianTests.sh"
         working-directory: collections-c
 
   # test-Buckets:
