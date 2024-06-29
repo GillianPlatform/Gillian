@@ -261,9 +261,9 @@ jobs:
   build-docker:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v3
-      - name: set up docker buildx
+      - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2
         with:
           driver: docker
@@ -277,7 +277,7 @@ jobs:
           key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
             docker-${{ env.cache-name }}-ocaml-5.2.0
-      - name: build and export docker image
+      - name: Build and export docker image
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -285,9 +285,9 @@ jobs:
           tags: ${{ env.DOCKER_TEST_TAG }}
       - name: test
         run: docker run --rm ${{ env.DOCKER_TEST_TAG }} opam exec -- dune test
-      - name: extract cache
+      - name: Extract cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: /
+        run: |
           rm -rf _opam
           docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "opam clean"
           docker cp deps:/home/opam/app/_opam ./
