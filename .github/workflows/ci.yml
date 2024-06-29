@@ -290,7 +290,7 @@ jobs:
         run: |
           rm -rf _opam
           docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "opam clean"
-          docker cp deps:/home/opam/app/_opam ./
+          docker cp deps:/home/opam/app/Gillian/_opam ./
           docker rm deps
 
   deploy-docs:
