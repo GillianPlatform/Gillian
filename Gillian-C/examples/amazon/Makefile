@@ -1,8 +1,4 @@
-ifdef GITHUB_ACTIONS
-	VERIFY=gillian-c verify
-else
-	VERIFY=esy x gillian-c verify
-endif
+VERIFY=opam exec -- gillian-c verify
 
 default:
 	${VERIFY} \

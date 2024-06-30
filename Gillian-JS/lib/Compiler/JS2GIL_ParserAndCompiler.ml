@@ -110,7 +110,7 @@ let parse_and_compile_files paths =
 
 let other_imports = [ ("jsil", parse_and_compile_jsil) ]
 let import_paths = Javert_utils.Js_config.import_paths
-let env_var_import_path = Some "GILLIAN_JS_RUNTIME_PATH"
+let default_import_paths = Some Runtime_sites.Sites.runtime
 
 let initialize exec_mode =
   let open Exec_mode in

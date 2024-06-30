@@ -20,66 +20,58 @@ jobs:
         operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - name: Installing esy
-        run: sudo npm install -g esy@0.7.2 --unsafe-perm
+      - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Installing Python prerequisites
         run: sudo pip install sphinx furo
-      - name: Linking thing for Apple Silicon?
-        if: runner.os == 'macos'
-        run: |
-          sudo ln -s $(which pkg-config) pkg-config
-          sudo ln -s $(which python3.10) python3.10
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v3
+        env:
+            cache-name: cache-ocaml
         with:
-          path: _export
-          key: ${{ runner.os }}-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
+          path: _opam
+          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            ${{ runner.os }}-esy-0.7.2-
+            ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0
 
-      - name: Esy install
-        run: "esy install"
-      - name: Import Cache
-        run: |
-          esy import-dependencies _export
-          rm -rf _export
-      - name: Esy build
-        run: "esy build"
-        id: esy-build
-      - name: Basic checks
-        run: "esy test"
+      - name: Install dependencies
+        run: make init-ci
+      - name: Build Gillian
+        run: opam exec -- dune build @all
+      - name: Basic tests
+        run: opam exec -- dune test
       - name: Wisl checks
-        run: "./wisl/scripts/quicktests.sh"
+        run: "opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh"
       - name: Format checking
-        run: "esy format-check"
-      - name: Building release
-        run: "esy release"
+        run: opam exec -- dune fmt
+      - name: Installing to opam switch
+        run: |
+          opam exec -- dune build @install
+          opam install . -y
+      - name: Compressing artifact
+        run: tar czf opam.tar.gz _opam
       - name: Sending artifact for next jobs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-release
-          path: _release
+          name: ${{ runner.os }}-opam
+          path: opam.tar.gz
       - name: Building docs
-        run: "esy docs"
+        run: make docs
         if: runner.os == 'Linux'
       - name: Sending docs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-docs
           path: _docs
         if: runner.os == 'Linux'
       - name: Setting dependency cache
-        run: |
-          esy cleanup .
-          esy export-dependencies
+        run: opam clean
         if: steps.restore-cache.outputs.cache-hit != 'true'
 
   gillian_c_tests:
@@ -89,23 +81,22 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
-        uses: actions/download-artifact@v3
+      - uses: ocaml/setup-ocaml@v2
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
+      - name: Checkout project
         uses: actions/checkout@v3
         with:
           path: Gillian
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os }}-opam
+          path: opam
+      - name: Extract release
+        run: |
+          tar xzf opam/opam.tar.gz
+          rm -rf opam
       - name: init env
         run: "Gillian-C/scripts/setup_environment.sh"
         working-directory: "Gillian"
@@ -123,28 +114,27 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
-        uses: actions/download-artifact@v3
+      - uses: ocaml/setup-ocaml@v2
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
+      - name: Checkout project
         uses: actions/checkout@v3
         with:
           path: Gillian
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os }}-opam
+          path: opam
+      - name: Extract release
+        run: |
+          tar xzf opam/opam.tar.gz
+          rm opam -rf
       - name: init env
         run: "Gillian-JS/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test JaVerT
-        run: "./testJaVerT.sh"
+        run: "opam exec -- bash ./testJaVerT.sh"
         working-directory: "Gillian/Gillian-JS/environment/"
       # - name: Test Amazon
       #   run: "make"
@@ -157,30 +147,29 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
+      - uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: install CBMC
         run: sudo apt install cbmc -y
-      - name: download release
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
+      - name: Checkout project
         uses: actions/checkout@v3
         with:
           path: Gillian
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os }}-opam
+          path: opam
+      - name: Extract release
+        run: |
+          tar xzf opam/opam.tar.gz
+          rm -rf opam
       - name: init env
         run: "kanillian/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test All
-        run: "./testAll.sh"
+        run: "opam exec -- bash ./testAll.sh"
         working-directory: "Gillian/kanillian/environment/"
 
   test262:
@@ -191,27 +180,26 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
-        uses: actions/download-artifact@v3
+      - uses: ocaml/setup-ocaml@v2
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
+      - name: Checkout project
         uses: actions/checkout@v3
         with:
           repository: GillianPlatform/javert-test262
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os }}-opam
+          path: opam
+      - name: Extract release
+        run: |
+          tar xzf opam/opam.tar.gz
+          rm -rf opam
       - name: Test262
-        run: "gillian-js test262 test262/test --ci"
+        run: "opam exec -- gillian-js test262 test262/test --ci"
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
@@ -221,27 +209,26 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: download release
-        uses: actions/download-artifact@v3
+      - uses: ocaml/setup-ocaml@v2
         with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
+          ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: checkout project
         uses: actions/checkout@v3
         with:
           repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
           ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os }}-opam
+          path: opam
+      - name: Extract release
+        run: |
+          tar xzf opam/opam.tar.gz
+          rm -rf opam
       - name: Symbolic Testing Collections-C
-        run: "./runGillianTests.sh"
+        run: "opam exec -- bash ./scripts/gillian-compcert/runTests.sh"
         working-directory: collections-c
 
   # test-Buckets:
@@ -252,58 +239,59 @@ jobs:
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
-  #     - name: download release
-  #       uses: actions/download-artifact@v3
+  #     - uses: ocaml/setup-ocaml@v2
   #       with:
-  #         name: ${{ runner.os }}-release
-  #         path: release
-  #     - name: setting up node
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #     - name: install release
-  #       run: |
-  #         yarn global add file://$(pwd)/release
-  #         echo "$(yarn global bin)" >> $GITHUB_PATH
-  #     - name: checkout project
+  #         ocaml-compiler: "ocaml-variants.5.2.0+options"
+  #     - name: Checkout project
   #       uses: actions/checkout@v3
   #       with:
   #         path: Gillian
+  #     - name: Download release
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #        name: ${{ runner.os }}-opam
+  #        path: opam
+  #     - name: Extract release
+  #       run: |
+  #         tar xzf opam/opam.tar.gz
+  #         rm -rf opam
   #     - name: Symbolic Testing Buckets.js
-  #       run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
+  #       run: "opam exec -- gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
   build-docker:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v3
-      - name: set up docker buildx
+      - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2
         with:
           driver: docker
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v3
+        env:
+            cache-name: cache-ocaml
         with:
-          path: _export
-          key: docker-esy-0.7.2-${{ hashFiles('esy.lock/index.json') }}
+          path: _opam
+          key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            docker-esy-0.7.2-
-      - name: build and export docker image
+            docker-${{ env.cache-name }}-ocaml-5.2.0
+      - name: Build and export docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           load: true
           tags: ${{ env.DOCKER_TEST_TAG }}
-      - name: test
-        run: docker run --rm ${{ env.DOCKER_TEST_TAG }} esy test
-      - name: extract dependencies from docker
-        run: |
-          rm -rf _export
-          docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "esy cleanup . && esy export-dependencies"
-          docker cp deps:/app/Gillian/_export ./
-          docker rm deps
+      - name: Dune test
+        run: docker run --rm ${{ env.DOCKER_TEST_TAG }} opam exec -- dune test
+      - name: Extract cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          rm -rf _opam
+          docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "opam clean"
+          docker cp deps:/home/opam/.opam/5.2 ./
+          docker rm deps
 
   deploy-docs:
     if: github.ref == 'refs/heads/master'
@@ -311,9 +299,11 @@ jobs:
     needs: [build]
     strategy:
       fail-fast: false
+      matrix:
+        operating-system: [ubuntu-latest]
     steps:
       - name: Download built docs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ runner.os }}-docs
           path: docs

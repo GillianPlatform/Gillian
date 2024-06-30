@@ -54,7 +54,7 @@ let parse_and_compile_files files =
 
 let other_imports = []
 let initialize _ = ()
-let env_var_import_path = Some WConfig.import_env_var
+let default_import_paths = Some Runtime_sites.Sites.runtime
 
 module TargetLangOptions =
   Gillian.Command_line.ParserAndCompiler.Dummy.TargetLangOptions

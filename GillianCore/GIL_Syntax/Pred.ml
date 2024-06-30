@@ -244,8 +244,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
         match t_x with
         | None -> new_facts
         | Some t_x ->
-            Gil_syntax__.Formula.Eq (UnOp (TypeOf, PVar x), Lit (Type t_x))
-            :: new_facts)
+            Formula.Eq (UnOp (TypeOf, PVar x), Lit (Type t_x)) :: new_facts)
       pred.pred_params []
   in
   {

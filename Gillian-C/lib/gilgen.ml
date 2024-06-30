@@ -867,8 +867,8 @@ let intern_impl_of_extern_function ext_f =
   match ext_f with
   | EF_malloc ->
       ( (if !Config.alloc_can_fail then
-         CConstants.Internal_Functions.malloc_can_fail
-        else CConstants.Internal_Functions.malloc),
+           CConstants.Internal_Functions.malloc_can_fail
+         else CConstants.Internal_Functions.malloc),
         false )
   | EF_free -> (CConstants.Internal_Functions.free, false)
   | EF_memcpy _ -> (CConstants.Internal_Functions.memcpy, false)

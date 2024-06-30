@@ -1,4 +1,7 @@
 (install
+ (section
+  (site
+   (gillian-js runtime)))
  (files
   bi_javert_predicates.jsil
   internal_functions_full.jsil
@@ -10,5 +13,4 @@
   Uint8Array.jsil
   ArrayLogic.jsil
   ByteLogic.gil)
- (section share)
  (package gillian-js))

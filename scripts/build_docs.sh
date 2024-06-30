@@ -1,7 +1,7 @@
 #!/bin/sh
 
 echo "===== BUILDING ODOC =====" && \
-esy odoc && \
+ odoc && \
 echo && \
 echo "===== BUILDING SPHINX =====" && \
 esy sphinx

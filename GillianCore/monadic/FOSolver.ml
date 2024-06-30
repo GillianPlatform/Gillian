@@ -27,16 +27,7 @@ let sat ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
 
   Logging.tmi (fun m -> m "WITH PFS : %a" PFS.pp pfs);
-  match
-    Engine.Reduction.reduce_formula ~matching:pc.matching ~pfs ~gamma formula
-  with
-  | True ->
-      Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
-      true
-  | False ->
-      Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
-      false
-  | formula -> FOSolver.sat ~matching:pc.matching ~pfs ~gamma formula
+  FOSolver.sat ~matching:pc.matching ~pfs ~gamma formula
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in

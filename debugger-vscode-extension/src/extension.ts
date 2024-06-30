@@ -28,8 +28,7 @@ function expandPath(s: string): string {
 }
 
 class DebugAdapterExecutableFactory
-  implements vscode.DebugAdapterDescriptorFactory
-{
+  implements vscode.DebugAdapterDescriptorFactory {
   // The following use of a DebugAdapter factory shows how to control what debug adapter executable is used.
   // Since the code implements the default behavior, it is absolutely not neccessary and we show it here only for educational purpose.
 
@@ -101,8 +100,8 @@ class DebugAdapterExecutableFactory
         throw 'Please specify the location of Gillian source code';
       sourceDirectory = expandPath(sourceDirectory);
       cwd = sourceDirectory;
-      cmd = 'esy';
-      args = ['x', langCmd].concat(args);
+      cmd = 'opam';
+      args = ['exec', '--', 'dune', 'exec', '--', langCmd].concat(args);
     }
 
     console.log('Starting debugger...', { cmd, args, cwd });

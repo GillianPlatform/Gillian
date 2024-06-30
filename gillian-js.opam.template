@@ -1,0 +1,3 @@
+pin-depends: [
+  "flow_parser.~dev" "git+https://github.com/GillianPlatform/flow.git#ee5e34df0a271828f4eda6e85bf9f610286f0039"
+]

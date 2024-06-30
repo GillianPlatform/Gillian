@@ -16,7 +16,7 @@ let parse start lexbuf =
           unexpected_token loc_start.pos_lnum (col loc_start) loc_end.pos_lnum
           (col loc_end)
           (if String.equal loc_start.pos_fname "" then "a string"
-          else loc_start.pos_fname)
+           else loc_start.pos_fname)
       in
       failwith ("Parser Error, " ^ message)
 

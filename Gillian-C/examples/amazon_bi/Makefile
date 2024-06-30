@@ -1,7 +1,7 @@
 ifdef GITHUB_ACTIONS
 	ACT=gillian-c act
 else
-	ACT=esy x gillian-c act
+	ACT=dune exec -- gillian-c act
 endif
 
 default:

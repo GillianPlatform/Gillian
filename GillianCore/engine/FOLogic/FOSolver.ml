@@ -92,8 +92,12 @@ let check_satisfiability
 let sat ~matching ~pfs ~gamma formula : bool =
   let formula = Reduction.reduce_formula ~matching ~pfs ~gamma formula in
   match formula with
-  | True -> true
-  | False -> false
+  | True ->
+      Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
+      true
+  | False ->
+      Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
+      false
   | _ ->
       let relevant_info =
         (Formula.pvars formula, Formula.lvars formula, Formula.locs formula)

@@ -4,10 +4,9 @@ Installation
 Linux / macOS
 -------------
 
-.. admonition:: Sandboxing
+.. admonition:: Opam switch
 
-    We use esy for dependency management, which sandboxes dependencies. Apart from a few external dependencies (i.e. esy itself), installing Gillian **will not** affect your environment (including your opam switches)
-    
+    We use opam for dependency management, and advise using a local opam switch that will not affect your global environment.
     It should be perfectly safe (and recommended) to install the development environment directly on your machine.
 
 #. Install prerequisites
@@ -27,11 +26,11 @@ Linux / macOS
 
    ...then make sure your development tools are up to date.
 
-#. Install esy
+#. Install opam
 
    .. code-block:: bash
 
-    npm install -g esy
+    sudo apt install opam
 
 #. Clone the source repository
 
@@ -48,9 +47,11 @@ Linux / macOS
    .. code-block:: bash
 
     cd Gillian
-    esy
+    make init-dev
+    eval $(opam env)
+    dune build
 
-   This may take a while, as esy will install and build sandboxed versions of every dependency, including OCaml and Z3.
+   This may take a while, as opam will build and install every dependency, including OCaml and Z3.
 
    .. image:: _static/img/xkz3.png
       :alt: The #1 programmer excuse for legitimately slacking off: "I'm building Z3"
@@ -96,7 +97,7 @@ Gillian-JS
 
 .. code-block:: bash
 
-    esy x gillian-js verify Gillian-JS/Examples/JaVerT/BST.js --silent
+    dune exec -- gillian-js verify Gillian-JS/Examples/JaVerT/BST.js -l disabled
 
 ..
 
@@ -119,7 +120,7 @@ Gillian-C
 
 .. code-block:: bash
 
-    esy x gillian-c bulk-exec Gillian-C/examples/concrete
+    dune exec -- gillian-c bulk-exec Gillian-C/examples/concrete
 
 ..
 

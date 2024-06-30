@@ -4,15 +4,18 @@ module type S = sig
   val run_all : test_suite_path:string -> incremental:bool -> unit
 end
 
-module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
-  Backend.S with type category = Suite.category)
-(Outcome : Outcome.S)
-(Suite : Suite.S)
-(Expectations : Expectations.S
-                  with type info = Suite.info
-                   and type category = Suite.category
-                   and type matcher = Backend(Outcome)(Suite).matcher
-                   and type outcome = Outcome.t) : S = struct
+module Make
+    (Backend : functor
+      (Outcome : Outcome.S)
+      (Suite : Suite.S)
+      -> Backend.S with type category = Suite.category)
+    (Outcome : Outcome.S)
+    (Suite : Suite.S)
+    (Expectations : Expectations.S
+                      with type info = Suite.info
+                       and type category = Suite.category
+                       and type matcher = Backend(Outcome)(Suite).matcher
+                       and type outcome = Outcome.t) : S = struct
   module Backend = Backend (Outcome) (Suite)
   module PC = Outcome.ParserAndCompiler
 

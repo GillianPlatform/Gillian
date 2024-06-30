@@ -1,4 +1,7 @@
 (install
+ (section
+  (site
+   (kanillian runtime)))
  (files
   archi32_constants.gil
   archi64_constants.gil
@@ -11,5 +14,4 @@
   internals_act.gil
   rust_allocation_internals.gil
   string.gil)
- (section share)
  (package kanillian))

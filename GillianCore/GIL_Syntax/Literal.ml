@@ -8,7 +8,7 @@ type t = TypeDef__.literal =
   | Empty  (** The literal [empty] *)
   | Constant of Constant.t  (** GIL constants ({!type:GIL_constant}) *)
   | Bool of bool  (** GIL booleans: [true] and [false] *)
-  | Int of Z.t  (** GIL integers: TODO: understand size *)
+  | Int of Z.t  (** GIL integers *)
   | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
   | String of string  (** GIL strings *)
   | Loc of string  (** GIL object locations *)

@@ -30,7 +30,8 @@ module Basic () = struct
 end
 
 module Make_with_prefix
-    (A : S_with_stringify) (P : sig
+    (A : S_with_stringify)
+    (P : sig
       val prefix : string
     end) : S with type t = string = struct
   type t = string [@@deriving yojson, eq, ord]

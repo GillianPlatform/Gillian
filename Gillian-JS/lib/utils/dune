@@ -1,3 +1,7 @@
 (library
  (name javert_utils)
- (libraries gillian))
+ (libraries gillian dune-site))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-js))

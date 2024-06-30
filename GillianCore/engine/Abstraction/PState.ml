@@ -422,10 +422,10 @@ module Make (State : SState.S) :
     let pvars_diff = SS.diff pvars_a pvars_store in
     L.verbose (fun m -> m "%s" (String.concat ", " (SS.elements pvars_diff)));
     (if not (SS.is_empty pvars_diff) then
-     let pvars_errs : err_t list =
-       List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
-     in
-     raise (Internal_State_Error (pvars_errs, astate)));
+       let pvars_errs : err_t list =
+         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+       in
+       raise (Internal_State_Error (pvars_errs, astate)));
     let lvar_binders, pvar_binders =
       List.partition Names.is_lvar_name binders
     in
@@ -754,10 +754,10 @@ module Make (State : SState.S) :
           L.verbose (fun m ->
               m "%s" (String.concat ", " (SS.elements pvars_diff)));
           (if not (SS.is_empty pvars_diff) then
-           let pvars_errs : err_t list =
-             List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
-           in
-           raise (Internal_State_Error (pvars_errs, astate)));
+             let pvars_errs : err_t list =
+               List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+             in
+             raise (Internal_State_Error (pvars_errs, astate)));
           let store_subst = SStore.to_ssubst store in
           let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
           (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)

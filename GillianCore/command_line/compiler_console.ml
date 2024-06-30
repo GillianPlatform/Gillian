@@ -34,7 +34,8 @@ module Make (PC : ParserAndCompiler.S) : Console.S = struct
     let () = PC.initialize mode in
     let () = Config.current_exec_mode := mode in
     let () =
-      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
+      Config.set_runtime_paths ?default_folders:PC.default_import_paths
+        runtime_path
     in
     process_files files
 

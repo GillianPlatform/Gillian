@@ -57,7 +57,7 @@ module type S = sig
     (string * (string -> ((Annot.t, string) Prog.t, err) result)) list
 
   (** Contains the name of the environment variable which contains the path to where the runtime is stored. *)
-  val env_var_import_path : string option
+  val default_import_paths : string list option
 
   (** Function that will be executed at initialisation. It will be passed the current execution mode as parameter *)
   val initialize : Exec_mode.t -> unit
@@ -91,6 +91,6 @@ struct
        flag or test suites"
 
   let other_imports = []
-  let env_var_import_path = None
+  let default_import_paths = None
   let initialize _ = ()
 end

@@ -84,7 +84,7 @@ From the Gillian folder run:
 
 .. code-block:: bash
 
-   esy x gillian-c bulk-wpst ../collections-c/for-gillian
+   dune exec -- gillian-c bulk-wpst ../collections-c/for-gillian
 
 You will see every test suites executing one by one. Two tests will fail, this is intended. They represent two of the bugs we've found and are explained `here <#bug-tests>`_.
 
