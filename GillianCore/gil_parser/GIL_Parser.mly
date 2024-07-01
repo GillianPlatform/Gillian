@@ -433,6 +433,8 @@ expr_target:
     { Expr.LVar (LVar.alloc ()) }
   | EXISTS; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.Exists (vars, e) }
+  | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
+    { Expr.EForall (vars, e) }
 ;
 
 top_level_expr_target:

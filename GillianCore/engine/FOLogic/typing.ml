@@ -177,6 +177,29 @@ module Infer_types_to_gamma = struct
               if not (List.exists (fun (y, _) -> String.equal x y) bt) then
                 Type_env.update new_gamma x t);
           ret
+    | EForall (bt, le) ->
+        if not (tt = BooleanType) then false
+        else
+          let gamma_copy = Type_env.copy gamma in
+          let new_gamma_copy = Type_env.copy new_gamma in
+          let () =
+            List.iter
+              (fun (x, t) ->
+                let () =
+                  match t with
+                  | Some t -> Type_env.update gamma_copy x t
+                  | None -> Type_env.remove gamma_copy x
+                in
+                Type_env.remove new_gamma_copy x)
+              bt
+          in
+          let ret = f' gamma_copy new_gamma_copy le BooleanType in
+          (* We've updated our new_gamma_copy with a bunch of things.
+             We need to import everything except the quantified variables to the new_gamma *)
+          Type_env.iter new_gamma_copy (fun x t ->
+              if not (List.exists (fun (y, _) -> String.equal x y) bt) then
+                Type_env.update new_gamma x t);
+          ret
 end
 
 let infer_types_to_gamma = Infer_types_to_gamma.f
@@ -439,7 +462,8 @@ module Type_lexpr = struct
       else def_neg
     else def_neg
 
-  and type_exists gamma le bt e =
+  (** Typing quantified expr is independant on the kind of quantifier *)
+  and type_quantified_expr gamma le bt e =
     let gamma_copy = Type_env.copy gamma in
     let () =
       List.iter
@@ -472,7 +496,7 @@ module Type_lexpr = struct
       | EList _ -> def_pos (Some ListType)
       (* Sets are always typable *)
       | ESet _ -> def_pos (Some SetType)
-      | Exists (bt, e) -> type_exists gamma le bt e
+      | Exists (bt, e) | EForall (bt, e) -> type_quantified_expr gamma le bt e
       | UnOp (op, e) -> type_unop gamma le op e
       | BinOp (e1, op, e2) -> type_binop gamma le op e1 e2
       | NOp (SetUnion, les) | NOp (SetInter, les) ->

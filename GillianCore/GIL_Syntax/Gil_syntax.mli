@@ -260,6 +260,7 @@ module Expr : sig
     | ESet of t list  (** Sets of expressions *)
     | Exists of (string * Type.t option) list * t
         (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
+    | EForall of (string * Type.t option) list * t
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -1315,6 +1316,8 @@ module Visitors : sig
          ; visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
          ; visit_Exists :
              'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+         ; visit_EForall :
+             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
          ; visit_Emp : 'c -> Asrt.t -> Asrt.t
          ; visit_Empty : 'c -> Literal.t -> Literal.t
          ; visit_EmptyType : 'c -> Type.t -> Type.t
@@ -1576,6 +1579,9 @@ module Visitors : sig
     method visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
 
     method visit_Exists :
+      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+
+    method visit_EForall :
       'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
 
     method visit_Emp : 'c -> Asrt.t -> Asrt.t
@@ -1872,6 +1878,7 @@ module Visitors : sig
          ; visit_EList : 'c -> Expr.t list -> 'f
          ; visit_ESet : 'c -> Expr.t list -> 'f
          ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> 'f
          ; visit_Emp : 'c -> 'f
          ; visit_Empty : 'c -> 'f
          ; visit_EmptyType : 'c -> 'f
@@ -2104,6 +2111,7 @@ module Visitors : sig
     method visit_EList : 'c -> Expr.t list -> 'f
     method visit_ESet : 'c -> Expr.t list -> 'f
     method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> 'f
     method visit_Emp : 'c -> 'f
     method visit_Empty : 'c -> 'f
     method visit_EmptyType : 'c -> 'f
@@ -2332,6 +2340,7 @@ module Visitors : sig
          ; visit_EList : 'c -> Expr.t list -> unit
          ; visit_ESet : 'c -> Expr.t list -> unit
          ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
+         ; visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> unit
          ; visit_Emp : 'c -> unit
          ; visit_Empty : 'c -> unit
          ; visit_EmptyType : 'c -> unit
@@ -2565,6 +2574,7 @@ module Visitors : sig
     method visit_EList : 'c -> Expr.t list -> unit
     method visit_ESet : 'c -> Expr.t list -> unit
     method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
+    method visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> unit
     method visit_Emp : 'c -> unit
     method visit_Empty : 'c -> unit
     method visit_EmptyType : 'c -> unit
