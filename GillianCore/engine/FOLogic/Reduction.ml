@@ -1679,8 +1679,25 @@ and reduce_lexpr_loop
             LstSub (fle1, fle2, fle3))
     (* CHECK: FTimes and Div are the same, how does the 'when' scope? *)
     | BinOp (lel, op, ler) -> (
-        let flel = f lel in
-        let fler = f ler in
+        let op_is_or_and () =
+          match op with
+          | BOr | BAnd -> true
+          | _ -> false
+        in
+        let flel, fler =
+          (* If we're reducing A || B or A && B and either side have a reduction exception, it must be false *)
+          let flel =
+            try f lel with
+            | ReductionException _ when op_is_or_and () -> Expr.bool false
+            | exn -> raise exn
+          in
+          let fler =
+            try f ler with
+            | ReductionException _ when op_is_or_and () -> Expr.bool false
+            | exn -> raise exn
+          in
+          (flel, fler)
+        in
         let def = Expr.BinOp (flel, op, fler) in
         match (flel, fler) with
         | Lit ll, Lit lr -> (
