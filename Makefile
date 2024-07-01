@@ -8,6 +8,10 @@ deps:
 build:
 	dune build @all
 
+deps:
+	dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam kanillian.opam
+	opam install . -y --deps-only
+
 init-dev:
 	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only
 	opam exec -- ./githooks/install.ml

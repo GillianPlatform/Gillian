@@ -1,0 +1,5 @@
+(library
+ (name smt)
+ (public_name gillian.smt)
+ (libraries gil_syntax utils)
+ (flags :standard -open Utils.Prelude))
