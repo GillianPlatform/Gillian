@@ -421,6 +421,20 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
         if new_expr == e then this else Exists (bt, new_expr)
 
+      method! visit_EForall () this bt e =
+        let binders = List.to_seq bt |> Seq.map fst in
+        let binder_substs =
+          binders
+          |> Seq.filter_map (fun x ->
+                 Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
+        in
+        Seq.iter
+          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
+          binders;
+        let new_expr = self#visit_expr () e in
+        Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
+        if new_expr == e then this else EForall (bt, new_expr)
+
       method! visit_ForAll () this bt form =
         let binders = List.to_seq bt |> Seq.map fst in
         let binders_substs =
@@ -474,6 +488,18 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           let e' = subst_in_expr_opt subst e in
           List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
           let result = Option.map (fun e' -> Expr.Exists (bt, e')) e' in
+          (result, false)
+      | EForall (bt, e) ->
+          (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
+          List.iter
+            (fun (x, _) ->
+              let lvar = Expr.LVar x in
+              let lvar_e = Option.get (Val.from_expr lvar) in
+              Hashtbl.add subst lvar lvar_e)
+            bt;
+          let e' = subst_in_expr_opt subst e in
+          List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
+          let result = Option.map (fun e' -> Expr.EForall (bt, e')) e' in
           (result, false)
       | _ -> (Some le, true)
     in

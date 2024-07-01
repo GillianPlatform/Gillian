@@ -141,6 +141,7 @@ and expr =
   | EList of expr list
   | ESet of expr list
   | Exists of (string * typ option) list * expr
+  | EForall of (string * typ option) list * expr
 
 and formula =
   | True

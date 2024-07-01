@@ -148,7 +148,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
               Fmt.(brackets (list ~sep:semi kb_pp))
               result);
         result
-    | Exists (bt, e) ->
+    | Exists (bt, e) | EForall (bt, e) ->
         let kb' =
           KB.add_seq (List.to_seq bt |> Seq.map (fun (x, _) -> Expr.LVar x)) kb
         in
@@ -286,7 +286,7 @@ let rec learn_expr
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
   (* Can we learn anything from Exists? *)
-  | Exists _ -> []
+  | Exists _ | EForall _ -> []
 
 and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* L.(verbose (fun m -> m "Entering learn_expr_list: \nKB: %a\nList: %a" kb_pp kb Fmt.(brackets (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))) le)); *)
@@ -325,7 +325,7 @@ let simple_ins_expr_collector =
           (KB.empty, KB.singleton e)
       | UnOp (LstLen, ((PVar s | LVar s) as v)) when not (SS.mem s exclude) ->
           (KB.singleton v, KB.empty)
-      | Exists (bt, e) ->
+      | Exists (bt, e) | EForall (bt, e) ->
           let exclude =
             List.fold_left (fun acc (x, _) -> SS.add x acc) exclude bt
           in

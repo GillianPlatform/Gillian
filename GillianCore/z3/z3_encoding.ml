@@ -749,7 +749,12 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       flush stdout;
       raise (Failure msg)
 
-let rec encode_exists ~gamma ~llen_lvars quantified_vars assertion =
+let rec encode_quantified_expr
+    ~mk_quant
+    ~gamma
+    ~llen_lvars
+    quantified_vars
+    assertion =
   let open Encoding in
   match quantified_vars with
   | [] ->
@@ -783,8 +788,7 @@ let rec encode_exists ~gamma ~llen_lvars quantified_vars assertion =
           quantified_vars
       in
       let quantifier =
-        Quantifier.mk_exists_const ctx quantified_vars encoded_assertion None []
-          [] None None
+        mk_quant ctx quantified_vars encoded_assertion None [] [] None None
       in
       let quantifier_expr = Quantifier.expr_of_quantifier quantifier in
       ZExpr.simplify quantifier_expr None >- BooleanType
@@ -829,7 +833,12 @@ and encode_logical_expression
       let start = get_int (f start) in
       let len = get_int (f len) in
       Z3.Seq.mk_seq_extract ctx lst start len >- ListType
-  | Exists (bt, e) -> encode_exists ~gamma ~llen_lvars bt e
+  | Exists (bt, e) ->
+      encode_quantified_expr ~mk_quant:Quantifier.mk_exists_const ~gamma
+        ~llen_lvars bt e
+  | EForall (bt, e) ->
+      encode_quantified_expr ~mk_quant:Quantifier.mk_forall_const ~gamma
+        ~llen_lvars bt e
 
 let rec encode_forall ~gamma ~llen_lvars quantified_vars assertion =
   let open Encoding in

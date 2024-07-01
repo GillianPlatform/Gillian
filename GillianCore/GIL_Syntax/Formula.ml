@@ -244,6 +244,7 @@ let pp = pp_parametric Expr.pp
 let full_pp = pp_parametric Expr.full_pp
 
 let rec lift_logic_expr (e : Expr.t) : (t * t) option =
+  let open Syntaxes.Option in
   let f = lift_logic_expr in
   match e with
   | LVar _ | PVar _ -> Some (Eq (e, Lit (Bool true)), Eq (e, Lit (Bool false)))
@@ -273,16 +274,27 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
   | BinOp (e1, BSetSub, e2) ->
       let a = SetSub (e1, e2) in
       Some (a, Not a)
-  | BinOp (e1, BAnd, e2) -> (
-      match (f e1, f e2) with
-      | Some (a1, na1), Some (a2, na2) -> Some (And (a1, a2), Or (na1, na2))
-      | _ -> None)
-  | BinOp (e1, BOr, e2) -> (
-      match (f e1, f e2) with
-      | Some (a1, na1), Some (a2, na2) -> Some (Or (a1, a2), And (na1, na2))
-      | _ -> None)
-  | UnOp (UNot, e') -> Option.map (fun (a, na) -> (na, a)) (f e')
-  | Exists _ as e -> Some (Eq (e, Expr.bool true), Eq (e, Expr.bool false))
+  | BinOp (e1, BAnd, e2) ->
+      let* a1, na1 = f e1 in
+      let+ a2, na2 = f e2 in
+      (And (a1, a2), Or (na1, na2))
+  | BinOp (e1, BOr, e2) ->
+      let* a1, na1 = f e1 in
+      let+ a2, na2 = f e2 in
+      (Or (a1, a2), And (na1, na2))
+  | UnOp (UNot, e') ->
+      let+ a, na = f e' in
+      (na, a)
+  | Exists (bt, inner) as e ->
+      let+ _, inner_neg = f inner in
+      let neg = ForAll (bt, inner_neg) in
+      (Eq (e, Expr.bool true), neg)
+  | EForall (bt, e) ->
+      let+ inner, _ = f e in
+      let pos = ForAll (bt, inner) in
+      let inner_neg = Expr.Infix.not e in
+      let neg = Expr.Exists (bt, inner_neg) in
+      (pos, Eq (neg, Expr.bool true))
   | _ -> None
 
 let rec to_expr (a : t) : Expr.t option =

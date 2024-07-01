@@ -14,6 +14,7 @@ type t = TypeDef__.expr =
   | ESet of t list  (** Sets of expressions     *)
   | Exists of (string * Type.t option) list * t
       (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
+  | EForall of (string * Type.t option) list * t
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -317,6 +318,10 @@ let rec map_opt
             match map_e e with
             | Some e' -> Some (Exists (bt, e'))
             | _ -> None)
+        | EForall (bt, e) -> (
+            match map_e e with
+            | Some e' -> Some (EForall (bt, e'))
+            | _ -> None)
       in
       Option.map f_after mapped_expr
 
@@ -347,6 +352,10 @@ let rec pp fmt e =
         le
   | Exists (bt, e) ->
       Fmt.pf fmt "(exists %a . %a)"
+        (Fmt.list ~sep:Fmt.comma pp_var_with_type)
+        bt pp e
+  | EForall (bt, e) ->
+      Fmt.pf fmt "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
 
@@ -409,7 +418,7 @@ let rec is_concrete (le : t) : bool =
 
   match le with
   | Lit _ | PVar _ -> true
-  | LVar _ | ALoc _ | Exists _ -> false
+  | LVar _ | ALoc _ | Exists _ | EForall _ -> false
   | UnOp (_, e) -> loop [ e ]
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]

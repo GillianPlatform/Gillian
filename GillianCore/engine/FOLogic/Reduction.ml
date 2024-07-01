@@ -135,6 +135,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | ESet lst -> ESet (List.map f lst)
     | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
     | Exists (bt, le) -> Exists (bt, f le)
+    | EForall (bt, le) -> EForall (bt, f le)
     (*
     | LstSub(le1, le2, le3) ->
       (match f le1, f le2, f le3 with
@@ -2000,6 +2001,43 @@ and reduce_lexpr_loop
         match bt with
         | [] -> re
         | _ -> Exists (bt, re))
+    | EForall (bt, e) -> (
+        (* We create a new pfs and gamma where:
+           - All shadowed variables are substituted with a fresh variable
+           - The gamma has been updated with the types given in the binder *)
+        let new_gamma = Type_env.copy gamma in
+        let new_pfs = PFS.copy pfs in
+        let subst_bindings = List.map (fun (x, _) -> (x, LVar.alloc ())) bt in
+        let subst =
+          SVal.SESubst.init
+            (List.map (fun (x, y) -> (Expr.LVar x, Expr.LVar y)) subst_bindings)
+        in
+        let () =
+          List.iter
+            (fun (x, t) ->
+              let () =
+                match Type_env.get new_gamma x with
+                | Some t ->
+                    let new_var = List.assoc x subst_bindings in
+                    Type_env.update new_gamma new_var t
+                | None -> ()
+              in
+              match t with
+              | Some t -> Type_env.update new_gamma x t
+              | None -> Type_env.remove new_gamma x)
+            bt
+        in
+        let () = PFS.substitution subst new_pfs in
+        (* We reduce using our new pfs and gamma *)
+        let re =
+          reduce_lexpr_loop ~matching ~reduce_lvars new_pfs new_gamma e
+        in
+        let vars = Expr.lvars re in
+        let bt = List.filter (fun (b, _) -> Containers.SS.mem b vars) bt in
+        (* We remove all quantifiers that aren't used anymore *)
+        match bt with
+        | [] -> re
+        | _ -> EForall (bt, re))
     (* The remaining cases cannot be reduced *)
     | _ -> le
   in
