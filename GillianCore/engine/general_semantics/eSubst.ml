@@ -407,19 +407,32 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             Val.to_expr (Option.get (get self_subst this))
         | _ -> super#visit_UnOp () this unop e
 
-      method! visit_ForAll () this bt form =
-        let binders, _ = List.split bt in
-        let binders_substs =
-          List.filter_map
-            (fun x ->
-              Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
-            binders
+      method! visit_Exists () this bt e =
+        let binders = List.to_seq bt |> Seq.map fst in
+        let binder_substs =
+          binders
+          |> Seq.filter_map (fun x ->
+                 Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
         in
-        List.iter
+        Seq.iter
+          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
+          binders;
+        let new_expr = self#visit_expr () e in
+        Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
+        if new_expr == e then this else Exists (bt, new_expr)
+
+      method! visit_ForAll () this bt form =
+        let binders = List.to_seq bt |> Seq.map fst in
+        let binders_substs =
+          binders
+          |> Seq.filter_map (fun x ->
+                 Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
+        in
+        Seq.iter
           (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
           binders;
         let new_formula = self#visit_formula () form in
-        List.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binders_substs;
+        Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binders_substs;
         if new_formula == form then this else ForAll (bt, new_formula)
     end
 
@@ -443,13 +456,25 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param le Target expression
     @return Expression resulting from the substitution. No fresh locations are created.
   *)
-  let subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
+  let rec subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
     let f_before (le : Expr.t) =
       match (le : Expr.t) with
       | LVar _ | ALoc _ | PVar _ ->
           (Option.map Val.to_expr (get subst le), false)
       | (UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _)) when mem subst le ->
           (Option.map Val.to_expr (get subst le), false)
+      | Exists (bt, e) ->
+          (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
+          List.iter
+            (fun (x, _) ->
+              let lvar = Expr.LVar x in
+              let lvar_e = Option.get (Val.from_expr lvar) in
+              Hashtbl.add subst lvar lvar_e)
+            bt;
+          let e' = subst_in_expr_opt subst e in
+          List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
+          let result = Option.map (fun e' -> Expr.Exists (bt, e')) e' in
+          (result, false)
       | _ -> (Some le, true)
     in
     Expr.map_opt f_before None le

@@ -257,6 +257,8 @@ module Make (SMemory : SMemory.S) :
         | ESet es -> ESet (List.map f es)
         | NOp (op, es) -> NOp (op, List.map f es)
         | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)
+        (* Exists. We can just evaluate pvars because they cannot be quantified *)
+        | Exists (bt, e) -> Exists (bt, f e)
         | Lit _ | LVar _ | ALoc _ -> expr
       in
       (* Perform reduction *)
@@ -373,7 +375,7 @@ module Make (SMemory : SMemory.S) :
 
   let get_type ({ pfs; gamma; _ } : t) (le : vt) : Type.t option =
     let le = Reduction.reduce_lexpr ~gamma ~pfs le in
-    let t, _, _ = Typing.type_lexpr gamma le in
+    let t, _ = Typing.type_lexpr gamma le in
     t
 
   let simplify

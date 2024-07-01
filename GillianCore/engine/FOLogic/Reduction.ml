@@ -134,6 +134,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | EList lst -> EList (List.map f lst)
     | ESet lst -> ESet (List.map f lst)
     | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
+    | Exists (bt, le) -> Exists (bt, f le)
     (*
     | LstSub(le1, le2, le3) ->
       (match f le1, f le2, f le3 with
@@ -218,7 +219,7 @@ let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
 (***************************)
 
 let typable (gamma : Type_env.t) (le : Expr.t) (target_type : Type.t) : bool =
-  let t, success, _ = Typing.type_lexpr gamma le in
+  let t, success = Typing.type_lexpr gamma le in
   if success then
     Option.fold ~some:(fun t -> Type.equal t target_type) ~none:true t
   else
@@ -987,7 +988,7 @@ and reduce_lexpr_loop
         match fle with
         | Lit (Num _) -> fle
         | fle -> (
-            let tfle, how, _ = Typing.type_lexpr gamma fle in
+            let tfle, how = Typing.type_lexpr gamma fle in
             match (how, tfle) with
             | true, Some NumberType -> fle
             | _, _ -> UnOp (ToNumberOp, UnOp (ToStringOp, fle))))
@@ -1218,7 +1219,7 @@ and reduce_lexpr_loop
                 | _ -> def)
             (* The TypeOf operator *)
             | TypeOf -> (
-                let tfle, how, _ = Typing.type_lexpr gamma fle in
+                let tfle, how = Typing.type_lexpr gamma fle in
                 match how with
                 | false ->
                     let err_msg = "LTypeOf(le): expression is not typable." in
@@ -1713,8 +1714,8 @@ and reduce_lexpr_loop
                       || PFS.mem pfs (Not (Eq (fler, flel)))
                     then Lit (Bool false)
                     else
-                      let t1, _, _ = Typing.type_lexpr gamma flel in
-                      let t2, _, _ = Typing.type_lexpr gamma fler in
+                      let t1, _ = Typing.type_lexpr gamma flel in
+                      let t2, _ = Typing.type_lexpr gamma fler in
                       match (t1, t2) with
                       | Some t1, Some t2 ->
                           if Type.equal t1 t2 then def else Lit (Bool false)
@@ -1962,6 +1963,43 @@ and reduce_lexpr_loop
                       | Some x -> Lit (Bool x)
                       | None -> def)
                 | _ -> def)))
+    | Exists (bt, e) -> (
+        (* We create a new pfs and gamma where:
+           - All shadowed variables are substituted with a fresh variable
+           - The gamma has been updated with the types given in the binder *)
+        let new_gamma = Type_env.copy gamma in
+        let new_pfs = PFS.copy pfs in
+        let subst_bindings = List.map (fun (x, _) -> (x, LVar.alloc ())) bt in
+        let subst =
+          SVal.SESubst.init
+            (List.map (fun (x, y) -> (Expr.LVar x, Expr.LVar y)) subst_bindings)
+        in
+        let () =
+          List.iter
+            (fun (x, t) ->
+              let () =
+                match Type_env.get new_gamma x with
+                | Some t ->
+                    let new_var = List.assoc x subst_bindings in
+                    Type_env.update new_gamma new_var t
+                | None -> ()
+              in
+              match t with
+              | Some t -> Type_env.update new_gamma x t
+              | None -> Type_env.remove new_gamma x)
+            bt
+        in
+        let () = PFS.substitution subst new_pfs in
+        (* We reduce using our new pfs and gamma *)
+        let re =
+          reduce_lexpr_loop ~matching ~reduce_lvars new_pfs new_gamma e
+        in
+        let vars = Expr.lvars re in
+        let bt = List.filter (fun (b, _) -> Containers.SS.mem b vars) bt in
+        (* We remove all quantifiers that aren't used anymore *)
+        match bt with
+        | [] -> re
+        | _ -> Exists (bt, re))
     (* The remaining cases cannot be reduced *)
     | _ -> le
   in
@@ -2493,8 +2531,8 @@ let rec reduce_formula_loop
           let eq = re1 = re2 in
           if eq then True
           else
-            let t1, s1, _ = Typing.type_lexpr gamma re1 in
-            let t2, s2, _ = Typing.type_lexpr gamma re2 in
+            let t1, s1 = Typing.type_lexpr gamma re1 in
+            let t2, s2 = Typing.type_lexpr gamma re2 in
             if
               s1 && s2
               &&
@@ -2787,7 +2825,7 @@ let rec reduce_formula_loop
       | IsInt e -> (
           match fe e with
           | UnOp (UnOp.IntToNum, e) -> (
-              let t, _, _ = Typing.type_lexpr gamma e in
+              let t, _ = Typing.type_lexpr gamma e in
               match t with
               | Some IntType -> True
               | Some _ -> False
@@ -2827,29 +2865,43 @@ let rec reduce_formula_loop
           in
           List.map (fun x -> Formula.Infix.(x #== k)) l
           |> List.fold_left Formula.Infix.( #&& ) Formula.True
-      | ForAll (bt, a) ->
-          (* Think about quantifier instantiation *)
-          (* Collect binders that are in gamma *)
-          let binders_in_gamma =
-            List.map (fun (b, _) -> (b, Type_env.get gamma b)) bt
+      | ForAll (bt, a) -> (
+          (* We create a new pfs and gamma where:
+             - All shadowed variables are substituted with a fresh variable
+             - The gamma has been updated with the types given in the binder *)
+          let new_gamma = Type_env.copy gamma in
+          let new_pfs = PFS.copy pfs in
+          let subst_bindings = List.map (fun (x, _) -> (x, LVar.alloc ())) bt in
+          let subst =
+            SVal.SESubst.init
+              (List.map
+                 (fun (x, y) -> (Expr.LVar x, Expr.LVar y))
+                 subst_bindings)
           in
-          let ra = f a in
-          let vars = Formula.lvars a in
+          let () =
+            List.iter
+              (fun (x, t) ->
+                let () =
+                  match Type_env.get new_gamma x with
+                  | Some t ->
+                      let new_var = List.assoc x subst_bindings in
+                      Type_env.update new_gamma new_var t
+                  | None -> ()
+                in
+                match t with
+                | Some t -> Type_env.update new_gamma x t
+                | None -> Type_env.remove new_gamma x)
+              bt
+          in
+          let () = PFS.substitution subst new_pfs in
+          (* We reduce using our new pfs and gamma *)
+          let ra = reduce_formula_loop ~rpfs matching new_pfs new_gamma a in
+          let vars = Formula.lvars ra in
           let bt = List.filter (fun (b, _) -> Containers.SS.mem b vars) bt in
-          let result =
-            match bt with
-            | [] -> ra
-            | _ -> ForAll (bt, ra)
-          in
-
-          (* Reinstate binders *)
-          List.iter
-            (fun (b, t) ->
-              match t with
-              | None -> Type_env.remove gamma b
-              | Some t -> Type_env.update gamma b t)
-            binders_in_gamma;
-          result
+          (* We remove all quantifiers that aren't used anymore *)
+          match bt with
+          | [] -> ra
+          | _ -> ForAll (bt, ra))
       | _ -> a
     in
 

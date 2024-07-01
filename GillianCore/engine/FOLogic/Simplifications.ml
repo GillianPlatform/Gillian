@@ -410,8 +410,8 @@ let simplify_pfs_and_gamma
         | False -> stop_explain "False in pure formulae"
         (* Inequality of things with different types *)
         | Not (Eq (le1, le2)) -> (
-            let te1, _, _ = Typing.type_lexpr gamma le1 in
-            let te2, _, _ = Typing.type_lexpr gamma le2 in
+            let te1, _ = Typing.type_lexpr gamma le1 in
+            let te2, _ = Typing.type_lexpr gamma le2 in
             match (te1, te2) with
             | Some te1, Some te2 when te1 <> te2 -> `Filter
             | Some te1, Some te2
@@ -513,8 +513,8 @@ let simplify_pfs_and_gamma
             extend_with len_sl;
             `Replace lst_eq
         | Eq (le1, le2) -> (
-            let te1, _, _ = Typing.type_lexpr gamma le1 in
-            let te2, _, _ = Typing.type_lexpr gamma le2 in
+            let te1, _ = Typing.type_lexpr gamma le1 in
+            let te2, _ = Typing.type_lexpr gamma le2 in
             match (te1, te2) with
             | Some te1, Some te2 when te1 <> te2 ->
                 stop_explain
@@ -593,8 +593,8 @@ let simplify_pfs_and_gamma
                     | false -> (
                         let ( let* ) = Result.bind in
                         let res : (unit, string) result =
-                          let tv, _, _ = Typing.type_lexpr gamma (LVar v) in
-                          let tle, _, _ = Typing.type_lexpr gamma le in
+                          let tv, _ = Typing.type_lexpr gamma (LVar v) in
+                          let tle, _ = Typing.type_lexpr gamma le in
                           match (tv, tle) with
                           | Some tv, Some tle when tv <> tle ->
                               Error "Type mismatch"
@@ -645,7 +645,7 @@ let simplify_pfs_and_gamma
                               let* () =
                                 match save_all || SS.mem v vars_to_save with
                                 | true -> (
-                                    let le_type, _, _ =
+                                    let le_type, _ =
                                       Typing.type_lexpr gamma le
                                     in
                                     match le_type with

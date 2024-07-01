@@ -41,5 +41,3 @@ val substitution_in_place : SVal.SESubst.t -> t -> unit
 
 (** Turns a predicate set into a list of assertions *)
 val to_assertions : t -> Asrt.t list
-
-val is_in : t -> Expr.t -> bool

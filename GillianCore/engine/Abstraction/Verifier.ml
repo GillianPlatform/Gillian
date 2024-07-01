@@ -367,9 +367,10 @@ struct
     let tests_and_specs =
       List.concat_map
         (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
+          let to_verify = Option.is_some lemma.lemma_proof in
           testify ~init_data lemma.lemma_name preds pred_ins lemma.lemma_name
             lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant None
-            None true)
+            None to_verify)
         lemma.lemma_specs
     in
     let tests, specs =

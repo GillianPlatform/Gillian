@@ -77,9 +77,14 @@ module Collectors = struct
 
       method! visit_ForAll exclude binders f =
         (* Quantified variables need to be excluded *)
-        let univ_quant, _ = List.split binders in
-        let exclude = Containers.SS.add_seq (List.to_seq univ_quant) exclude in
+        let univ_quant = List.to_seq binders |> Seq.map fst in
+        let exclude = Containers.SS.add_seq univ_quant exclude in
         self#visit_formula exclude f
+
+      method! visit_Exists exclude binders e =
+        let exist_quants = List.to_seq binders |> Seq.map fst in
+        let exclude = Containers.SS.add_seq exist_quants exclude in
+        self#visit_expr exclude e
 
       method! visit_LVar exclude x =
         if not (Containers.SS.mem x exclude) then Containers.SS.singleton x

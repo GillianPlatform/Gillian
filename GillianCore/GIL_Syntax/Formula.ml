@@ -282,6 +282,7 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
       | Some (a1, na1), Some (a2, na2) -> Some (Or (a1, a2), And (na1, na2))
       | _ -> None)
   | UnOp (UNot, e') -> Option.map (fun (a, na) -> (na, a)) (f e')
+  | Exists _ as e -> Some (Eq (e, Expr.bool true), Eq (e, Expr.bool false))
   | _ -> None
 
 let rec to_expr (a : t) : Expr.t option =

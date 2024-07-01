@@ -68,5 +68,5 @@ let resolve_type ~(pc : Pc.t) expr =
   (* TODO: I don't know what that how parameter means.
      I'm copying what Reduction does.
      Typing is not documented - ask Petar. *)
-  let t, how, _ = Typing.type_lexpr pc.gamma expr in
+  let t, how = Typing.type_lexpr pc.gamma expr in
   if how then t else None

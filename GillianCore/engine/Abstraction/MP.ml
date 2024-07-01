@@ -99,6 +99,7 @@ let minimise_matchables (kb : KB.t) : KB.t =
     base [kb]. The expression is required to have previously been
     fully reduced. *)
 let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
+  let f' = missing_expr in
   let f = missing_expr kb in
   let join (le : Expr.t list) =
     let mle = List.map f le in
@@ -110,45 +111,48 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     in
     if umle = [] || List.mem KB.empty umle then [ KB.empty ] else umle
   in
-  match KB.mem e kb with
-  | true -> [ KB.empty ]
-  | false -> (
-      match e with
-      (* Literals are always known *)
-      | Lit _ -> [ KB.empty ]
-      (* Program variables, logical variables, and abstract locations
-         are known if and only if they are in the knowledge base *)
-      | PVar _ | LVar _ | ALoc _ -> [ KB.singleton e ]
-      | UnOp (LstLen, e1) -> (
-          (* If a LstLen exists, then it must be of a program or a logical variable.
-             All other cases (literal list, expression list, list concat, sub-list)
-             must have been taken care of by reduction *)
-          match e1 with
-          | EList _ -> [ KB.empty ]
-          | _ -> (
-              let () =
-                if not (is_var e1) then
-                  raise
-                    (Failure
-                       (Format.asprintf
-                          "missing_expr: Should have been reduced: %a" Expr.pp
-                          e1))
-              in
-              match KB.mem e1 kb with
-              | true -> [ KB.empty ]
-              (* List lengths are matchables *)
-              | false -> [ KB.singleton e1; KB.singleton e ]))
-      (* The remaining cases proceed recursively *)
-      | UnOp (_, e) -> f e
-      | BinOp (e1, _, e2) -> join [ e1; e2 ]
-      | NOp (_, le) | EList le | ESet le -> join le
-      | LstSub (e1, e2, e3) ->
-          let result = join [ e1; e2; e3 ] in
-          L.verbose (fun fmt ->
-              fmt "Missing for %a: %a" Expr.full_pp e
-                Fmt.(brackets (list ~sep:semi kb_pp))
-                result);
-          result)
+  if KB.mem e kb then [ KB.empty ]
+  else
+    match e with
+    (* Literals are always known *)
+    | Lit _ -> [ KB.empty ]
+    (* Program variables, logical variables, and abstract locations
+       are known if and only if they are in the knowledge base *)
+    | PVar _ | LVar _ | ALoc _ -> [ KB.singleton e ]
+    | UnOp (LstLen, e1) -> (
+        (* If a LstLen exists, then it must be of a program or a logical variable.
+           All other cases (literal list, expression list, list concat, sub-list)
+           must have been taken care of by reduction *)
+        match e1 with
+        | EList _ -> [ KB.empty ]
+        | _ -> (
+            let () =
+              if not (is_var e1) then
+                raise
+                  (Failure
+                     (Format.asprintf
+                        "missing_expr: Should have been reduced: %a" Expr.pp e1))
+            in
+            match KB.mem e1 kb with
+            | true -> [ KB.empty ]
+            (* List lengths are matchables *)
+            | false -> [ KB.singleton e1; KB.singleton e ]))
+    (* The remaining cases proceed recursively *)
+    | UnOp (_, e) -> f e
+    | BinOp (e1, _, e2) -> join [ e1; e2 ]
+    | NOp (_, le) | EList le | ESet le -> join le
+    | LstSub (e1, e2, e3) ->
+        let result = join [ e1; e2; e3 ] in
+        L.verbose (fun fmt ->
+            fmt "Missing for %a: %a" Expr.full_pp e
+              Fmt.(brackets (list ~sep:semi kb_pp))
+              result);
+        result
+    | Exists (bt, e) ->
+        let kb' =
+          KB.add_seq (List.to_seq bt |> Seq.map (fun (x, _) -> Expr.LVar x)) kb
+        in
+        f' kb' e
 
 (** [is_known kb e] returns true if the expression [e] is known
     under knowledge base [kb], and false otherwise *)
@@ -281,6 +285,8 @@ let rec learn_expr
       | false, true -> f (BinOp (base_expr, IDiv, e2)) e1)
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
+  (* Can we learn anything from Exists? *)
+  | Exists _ -> []
 
 and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* L.(verbose (fun m -> m "Entering learn_expr_list: \nKB: %a\nList: %a" kb_pp kb Fmt.(brackets (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))) le)); *)
@@ -308,23 +314,30 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
       learned @ learn_expr_list new_kb not_learned
 
 let simple_ins_expr_collector =
-  object
+  object (self)
     inherit [_] Visitors.reduce as super
     method zero = (KB.empty, KB.empty)
     method plus (a, c) (b, d) = (KB.union a b, KB.union c d)
 
-    method! visit_expr () e =
+    method! visit_expr exclude e =
       match e with
-      | LVar _ | PVar _ | ALoc _ -> (KB.empty, KB.singleton e)
-      | UnOp (LstLen, ((PVar _ | LVar _) as v)) -> (KB.singleton v, KB.empty)
-      | _ -> super#visit_expr () e
+      | (LVar s | PVar s | ALoc s) when not (SS.mem s exclude) ->
+          (KB.empty, KB.singleton e)
+      | UnOp (LstLen, ((PVar s | LVar s) as v)) when not (SS.mem s exclude) ->
+          (KB.singleton v, KB.empty)
+      | Exists (bt, e) ->
+          let exclude =
+            List.fold_left (fun acc (x, _) -> SS.add x acc) exclude bt
+          in
+          self#visit_expr exclude e
+      | _ -> super#visit_expr exclude e
   end
 
 (** [simple_ins_expr e] returns the list of possible ins
     for a given expression [e] *)
 let simple_ins_expr (e : Expr.t) : KB.t list =
   let open Expr in
-  let llens, others = simple_ins_expr_collector#visit_expr () e in
+  let llens, others = simple_ins_expr_collector#visit_expr SS.empty e in
   (* List lengths whose variables do not appear elsewhere *)
   let llens = Set.elements (Set.diff llens others) in
   (* Those we can learn by knowing the variable or the list length *)
