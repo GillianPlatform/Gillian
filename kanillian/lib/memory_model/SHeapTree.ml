@@ -716,10 +716,12 @@ module Tree = struct
                 let* extracted, left_opt = extract left lower_range in
                 let* right = add_to_the_left right extracted in
                 let* new_self =
-                  match left_opt with
-                  | Some left -> of_children_s ~left ~right
-                  | None -> Delayed.return right
+                  of_children_s ~left:(Option.get left_opt) ~right
                 in
+                (* match left_opt with
+                     | Some left -> of_children_s ~left ~right
+                     | None -> Delayed.return right
+                   in *)
                 frame_inside ~replace_node ~rebuild_parent new_self range
               else
                 let** _, right =
@@ -729,10 +731,12 @@ module Tree = struct
                 let* extracted, right_opt = extract right upper_range in
                 let* left = add_to_the_right left extracted in
                 let* new_self =
-                  match right_opt with
-                  | Some right -> of_children_s ~left ~right
-                  | None -> Delayed.return left
+                  of_children_s ~left ~right:(Option.get right_opt)
                 in
+                (* match right_opt with
+                     | Some right -> of_children_s ~left ~right
+                     | None -> Delayed.return left
+                   in *)
                 frame_inside ~replace_node ~rebuild_parent new_self range
             else
               if%sat
