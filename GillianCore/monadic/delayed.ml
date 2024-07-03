@@ -30,6 +30,9 @@ let bind (x : 'a t) (f : 'a -> 'b t) ~curr_pc =
     (fun b -> f ~curr_pc:(Branch.pc b) (Branch.value b))
     (x ~curr_pc)
 
+let branches (x : 'a t list) : 'a t =
+ fun ~curr_pc -> List.concat_map (fun (b : 'a t) -> b ~curr_pc) x
+
 let branch_on
     (guard : Formula.t)
     ~(then_ : unit -> 'a t)
