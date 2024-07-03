@@ -13,6 +13,7 @@ val entails : Formula.t list -> Formula.t -> bool t
 val check_sat : Formula.t -> bool t
 val bind : 'a t -> ('a -> 'b t) -> 'b t
 val map : 'a t -> ('a -> 'b) -> 'b t
+val branches : 'a t list -> 'a t
 val all : 'a t list -> 'a list t
 val vanish : unit -> 'a t
 val if_sure : Formula.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
