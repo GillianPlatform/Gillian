@@ -673,8 +673,8 @@ module Tree = struct
       match t.children with
       | None -> of_children_s ~left:addition ~right:t
       | Some (left, right) ->
-          let* new_right = add_to_the_left left addition in
-          of_children_s ~left ~right:new_right
+          let* new_left = add_to_the_left left addition in
+          of_children_s ~left:new_left ~right
     in
     let rec frame_inside
         ~(replace_node : t -> (t, err) DR.t)
