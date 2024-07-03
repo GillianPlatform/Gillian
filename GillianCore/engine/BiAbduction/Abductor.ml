@@ -336,20 +336,25 @@ module Make
       (succ_specs : Spec.t list)
       (error_specs : Spec.t list)
       (bug_specs : Spec.t list) =
+    let sort_specs =
+      List.sort
+        (fun Spec.{ spec_name = name1; _ } Spec.{ spec_name = name2; _ } ->
+          String.compare name1 name2)
+    in
     let bug_specs_txt =
       Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
         Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        bug_specs
+        (sort_specs bug_specs)
     in
     let error_specs_txt =
       Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
         Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        error_specs
+        (sort_specs error_specs)
     in
     let normal_specs_txt =
       Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
         Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        succ_specs
+        (sort_specs succ_specs)
     in
 
     if !Config.specs_to_stdout then (
