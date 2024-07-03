@@ -324,7 +324,8 @@ module Make
     in
     let result = run_tests_aux tests [] [] [] 1 in
     Fmt.pr "\nTest results:\nProc, GIL Commands, Tests, Succs, Bugs, Time\n";
-    !stats |> List.rev
+    !stats
+    |> List.sort (fun (name1, _) (name2, _) -> String.compare name1 name2)
     |> List.iter (fun (name, stats) ->
            Fmt.pr "%s, %a\n" name pp_proc_stats stats);
     Fmt.pr "@?";
