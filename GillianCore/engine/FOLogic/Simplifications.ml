@@ -448,7 +448,7 @@ let simplify_pfs_and_gamma
             rec_call (Eq (le, EList []))
         | Eq (UnOp (LstLen, le), Lit (Int len))
         | Eq (Lit (Int len), UnOp (LstLen, le))
-          when not matching ->
+          when (not matching) && Z.leq len (Z.of_int 100) ->
             let len = Z.to_int len in
             if len >= 0 then (
               let le_vars = List.init len (fun _ -> LVar.alloc ()) in
