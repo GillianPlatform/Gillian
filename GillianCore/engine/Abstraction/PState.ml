@@ -176,7 +176,9 @@ module Make (State : SState.S) :
     | false, _ -> [ astate' ]
     | true, _ -> (
         let unfold_vals = Expr.base_elements v in
-        match SMatcher.unfold_with_vals astate' unfold_vals with
+        match
+          SMatcher.unfold_with_vals ~auto_level:`Low astate' unfold_vals
+        with
         | None -> [ astate' ]
         | Some next_states ->
             let* _, astate = next_states in

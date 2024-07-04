@@ -102,7 +102,11 @@ module type S = sig
   (** Tries to unfold the given predicate in the state.
       If it manages, it returns the new set of states and corresponding
       substitutions, otherwise, it returns None. *)
-  val unfold_with_vals : t -> Expr.t list -> (SVal.SESubst.t * t) list option
+  val unfold_with_vals :
+    auto_level:[ `High | `Low ] ->
+    t ->
+    Expr.t list ->
+    (SVal.SESubst.t * t) list option
 
   (** Unfolds 1 predicate for which all arguments are concrete.
       - If it finds one:

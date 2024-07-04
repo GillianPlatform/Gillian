@@ -92,7 +92,13 @@ module type S = sig
 
   val unfold_all : t -> string -> (t, err_t) Res_list.t
   val try_recovering : t -> Expr.t Recovery_tactic.t -> (t list, string) result
-  val unfold_with_vals : t -> Expr.t list -> (SVal.SESubst.t * t) list option
+
+  val unfold_with_vals :
+    auto_level:[ `High | `Low ] ->
+    t ->
+    Expr.t list ->
+    (SVal.SESubst.t * t) list option
+
   val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
   val match_assertion :
@@ -503,7 +509,10 @@ module Make (State : SState.S) :
       SS.cardinal inter
   end
 
-  let consume_pred_with_vs (astate : t) (values : Expr.t list) : abs_t option =
+  let consume_pred_with_vs
+      ~(auto_level : [ `Low | `High ])
+      (astate : t)
+      (values : Expr.t list) : abs_t option =
     let { state; preds; pred_defs; _ } = astate in
 
     let wrap_strategy f (name, args) =
@@ -517,12 +526,15 @@ module Make (State : SState.S) :
     in
     let open Predicate_selection_strategies in
     let strategies =
-      [
-        strategy_1 ~state ~values ~pred_defs;
-        strategy_2 ~pred_defs;
-        strategy_3 ~pred_defs ~values;
-        strategy_4 ~state;
-      ]
+      match auto_level with
+      | `High ->
+          [
+            strategy_1 ~state ~values ~pred_defs;
+            strategy_2 ~pred_defs;
+            strategy_3 ~pred_defs ~values;
+            strategy_4 ~state;
+          ]
+      | `Low -> [ strategy_1 ~state ~values ~pred_defs; strategy_2 ~pred_defs ]
     in
     let strategies = List.map wrap_strategy strategies in
     apply_strategies strategies
@@ -929,8 +941,10 @@ module Make (State : SState.S) :
           L.verbose (fun m -> m "No predicate found to fold!");
           Res_list.error_with "No predicate found to fold!"
 
-  and unfold_with_vals (astate : t) (vs : Expr.t list) :
-      (SVal.SESubst.t * t) list option =
+  and unfold_with_vals
+      ~(auto_level : [ `High | `Low ])
+      (astate : t)
+      (vs : Expr.t list) : (SVal.SESubst.t * t) list option =
     L.verbose (fun m ->
         m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n%a.@\n"
           Fmt.(list ~sep:comma Expr.pp)
@@ -938,7 +952,7 @@ module Make (State : SState.S) :
 
     if !Config.manual_proof then None
     else
-      match consume_pred_with_vs astate vs with
+      match consume_pred_with_vs ~auto_level astate vs with
       | Some (pname, v_args) -> (
           L.verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname);
           let rets = unfold (copy_astate astate) pname v_args in
@@ -1797,7 +1811,7 @@ module Make (State : SState.S) :
     let- unfold_error =
       (* This matches the legacy behaviour *)
       let unfold_values = Option.value ~default:[] tactic.try_unfold in
-      match unfold_with_vals astate unfold_values with
+      match unfold_with_vals ~auto_level:`High astate unfold_values with
       | None -> Error "Automatic unfold failed"
       | Some next_states ->
           Ok (List.map (fun (_, astate) -> astate) next_states)
@@ -2146,7 +2160,9 @@ module Make (State : SState.S) :
                   (Recovery_tactic.pp Expr.pp)
                   tactics);
             let unfold_values = Option.value ~default:[] tactics.try_unfold in
-            match unfold_with_vals current_state unfold_values with
+            match
+              unfold_with_vals ~auto_level:`High current_state unfold_values
+            with
             | None -> Error []
             | Some current_states ->
                 L.verbose (fun m -> m "Successfully unfolded! Let's continue!");
