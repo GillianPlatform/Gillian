@@ -1453,8 +1453,6 @@ and reduce_lexpr_loop
                let first =
                  List.find_map
                    (fun e ->
-                     (* Returns a list of which the length is greater than n, but
-                        computation is made slightly more efficient *)
                      match e with
                      | Expr.EList les
                        when List.compare_length_with les (Z.to_int n) >= 0 ->
@@ -1484,8 +1482,6 @@ and reduce_lexpr_loop
             let first =
               List.find_map
                 (fun e ->
-                  (* Returns a list of which the length is greater than n, but
-                     computation is made slightly more efficient *)
                   match e with
                   | Expr.EList les
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
@@ -1506,6 +1502,8 @@ and reduce_lexpr_loop
               Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
                 ~size:(Expr.int_z n)
             in
+            Logging.tmi (fun m ->
+                m "Case 5:\nRes: %a\nOriginal: %a" Expr.pp res Expr.pp le);
             f res
         | le, Lit (Int z), Lit (Int n)
           when Z.equal z Z.zero
