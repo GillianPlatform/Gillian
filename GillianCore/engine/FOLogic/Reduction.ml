@@ -3041,7 +3041,7 @@ let relate_llen
 
   (* Auxiliary function *)
   let relate_llen_aux (e : Expr.t) (llen : Cint.t) (lcat : Expr.t list) =
-    L.verbose (fun fmt ->
+    L.tmi (fun fmt ->
         fmt "Relate llen aux: %a: %a, %a" Expr.pp e Expr.pp (Cint.to_expr llen)
           Fmt.(brackets (list ~sep:semi Expr.pp))
           lcat);
@@ -3069,7 +3069,7 @@ let relate_llen
       (relate_llen_loop llen [] lcat)
   in
 
-  L.verbose (fun fmt ->
+  L.tmi (fun fmt ->
       fmt "Relate llen: %a, %a" Expr.pp e
         Fmt.(brackets (list ~sep:semi Expr.pp))
         lcat);
@@ -3085,7 +3085,7 @@ let understand_lstcat
     (gamma : Type_env.t)
     (lcat : Expr.t list)
     (rcat : Expr.t list) : (Formula.t * Containers.SS.t) option =
-  L.verbose (fun fmt ->
+  L.tmi (fun fmt ->
       fmt "Understanding LstCat: %a, %a"
         Fmt.(brackets (list ~sep:semi Expr.pp))
         lcat
