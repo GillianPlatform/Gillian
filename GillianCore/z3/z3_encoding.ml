@@ -989,6 +989,7 @@ let dump_smt =
     ret
   in
   fun fs gamma status ->
+    Logging.verbose (fun m -> m "Dumping query %d to file" !counter);
     let path = Filename.concat (folder ()) (file ()) in
     let c = open_out path in
     Fmt.pf

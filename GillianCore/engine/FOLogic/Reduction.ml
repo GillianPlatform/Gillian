@@ -85,6 +85,9 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
             | Right sz ->
                 (* The element isn't in the first list, so we cut that part, and we got the size *)
                 BinOp (NOp (LstCat, tl), LstNth, Expr.int (n - sz)))
+        | NOp (LstCat, LstSub (_lst, z, n) :: tl), n'
+          when Expr.is_concrete_zero_i z && Expr.equal n n' ->
+            Expr.list_nth (NOp (LstCat, tl)) 0
         | _, Lit (Num _) -> raise (exn "LstNth with float")
         | le, n -> BinOp (le, LstNth, n))
     | BinOp (le1, op, le2) -> BinOp (f le1, op, f le2)
@@ -335,11 +338,11 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
       | _ -> None)
   | LstSub _ -> None
   | NOp (LstCat, lel :: ler) ->
-      Option.bind (get_length_of_list lel) (fun llen ->
-          let lst, idx =
-            if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
-          in
-          f lst idx)
+      Option.bind (get_length_of_list lel) @@ fun llen ->
+      let lst, idx =
+        if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
+      in
+      f lst idx
   | Expr.BinOp (x, LstRepeat, _) -> Some x
   | _ -> None
 
@@ -2455,6 +2458,13 @@ let rec reduce_formula_loop
     (gamma : Type_env.t)
     ?(previous = Formula.True)
     (a : Formula.t) : Formula.t =
+  Logging.tmi (fun m ->
+      m "Reduce formula: %a -> %a"
+        (fun ft f ->
+          match f with
+          | Formula.True -> Fmt.string ft "STARTING TO REDUCE"
+          | _ -> Formula.pp ft f)
+        previous Formula.pp a);
   if Formula.equal a previous then a
   else
     let f = reduce_formula_loop ~rpfs matching pfs gamma in
