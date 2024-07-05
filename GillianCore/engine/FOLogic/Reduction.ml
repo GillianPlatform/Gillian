@@ -14,14 +14,13 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
       fmt "inside normalise cat: %a" Expr.pp (NOp (LstCat, les))); *)
   (* Recursively process each catted list and destroy inner LstCats *)
   let nles =
-    List.concat
-      (List.map
-         (fun x ->
-           let fx = f x in
-           match fx with
-           | NOp (LstCat, les) -> les
-           | _ -> [ fx ])
-         les)
+    List.concat_map
+      (fun x ->
+        let fx = f x in
+        match fx with
+        | NOp (LstCat, les) -> les
+        | _ -> [ fx ])
+      les
   in
   (* L.verbose (fun fmt -> fmt "nles, v1: %a" Expr.pp (NOp (LstCat, nles))); *)
   (* Bring lists of literals together, part 1 *)
@@ -1451,19 +1450,35 @@ and reduce_lexpr_loop
           when Z.equal z Z.zero
                &&
                let eqs = get_equal_expressions pfs flx in
-               List.exists
-                 (function
-                   (* Length of the list is greater than n, but efficiently computed *)
-                   | Expr.EList les ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | Lit (LList les) ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | NOp (LstCat, EList les :: _) ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | NOp (LstCat, Lit (LList les) :: _) ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | _ -> false)
-                 eqs ->
+               let first =
+                 List.find_map
+                   (fun e ->
+                     (* Returns a list of which the length is greater than n, but
+                        computation is made slightly more efficient *)
+                     match e with
+                     | Expr.EList les
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | Lit (LList les)
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | NOp (LstCat, (EList les as e) :: _)
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | NOp (LstCat, (Lit (LList les) as e) :: _)
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | _ -> None)
+                   eqs
+               in
+               match first with
+               | None -> false
+               | Some first ->
+                   let res =
+                     Expr.list_sub ~lst:first ~start:(Expr.int 0)
+                       ~size:(Expr.int_z n)
+                   in
+                   not (Expr.equal res le) ->
             L.tmi (fun fmt -> fmt "Case 5");
             let eqs = get_equal_expressions pfs flx in
             let first =
@@ -1487,9 +1502,11 @@ and reduce_lexpr_loop
                   | _ -> None)
                 eqs
             in
-            f
-              (Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
-                 ~size:(Expr.int_z n))
+            let res =
+              Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
+                ~size:(Expr.int_z n)
+            in
+            f res
         | le, Lit (Int z), Lit (Int n)
           when Z.equal z Z.zero
                && (match le with
