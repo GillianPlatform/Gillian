@@ -1125,7 +1125,8 @@ module Make (State : SState.S) :
         consume_pred ~no_auto_fold ?fold_outs_info ~in_matching folded pname vs
     | _ ->
         let values = List.filter_map Fun.id vs in
-        Res_list.error_with (StateErr.EAsrt (values, True, []))
+        (* The `False` as second parameter is required for the fixing mechanism to trigger *)
+        Res_list.error_with (StateErr.EAsrt (values, False, []))
 
   and match_ins_outs_lists
       (state : State.t)
