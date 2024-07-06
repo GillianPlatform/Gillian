@@ -1123,7 +1123,9 @@ module Make (State : SState.S) :
            if the fold worked, then consume_pred should not take this branch on the next try.
            We should still be keeping an eye on this in case something loops indefinitely. *)
         consume_pred ~no_auto_fold ?fold_outs_info ~in_matching folded pname vs
-    | _ -> Res_list.error_with (StateErr.EPure False)
+    | _ ->
+        let values = List.filter_map Fun.id vs in
+        Res_list.error_with (StateErr.EAsrt (values, True, []))
 
   and match_ins_outs_lists
       (state : State.t)
