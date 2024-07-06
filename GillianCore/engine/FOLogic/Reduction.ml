@@ -2496,7 +2496,11 @@ let rec reduce_formula_loop
           | Formula.True -> Fmt.string ft "STARTING TO REDUCE"
           | _ -> Formula.pp ft f)
         previous Formula.pp a);
-  if Formula.equal a previous then a
+  if Formula.equal a previous then
+    let () =
+      Logging.tmi (fun m -> m "Finished reducing, obtained: %a" Formula.pp a)
+    in
+    a
   else
     let f = reduce_formula_loop ~rpfs matching pfs gamma in
     let fe = reduce_lexpr_loop ~matching pfs gamma in
