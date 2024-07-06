@@ -63,6 +63,7 @@ and binop =
   | SLessThan
   | BAnd
   | BOr
+  | BImpl
   | BitwiseAnd
   | BitwiseOr
   | BitwiseXor

@@ -196,6 +196,7 @@ module BinOp : sig
     | SLessThan  (** Less or equal for strings *)
     | BAnd  (** Boolean conjunction *)
     | BOr  (** Boolean disjunction *)
+    | BImpl  (** Boolean implication *)
     | BitwiseAnd  (** Bitwise conjunction *)
     | BitwiseOr  (** Bitwise disjunction *)
     | BitwiseXor  (** Bitwise exclusive disjunction *)
@@ -1275,6 +1276,7 @@ module Visitors : sig
          ; visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
          ; visit_BAnd : 'c -> BinOp.t -> BinOp.t
          ; visit_BOr : 'c -> BinOp.t -> BinOp.t
+         ; visit_BImpl : 'c -> BinOp.t -> BinOp.t
          ; visit_BSetMem : 'c -> BinOp.t -> BinOp.t
          ; visit_BSetSub : 'c -> BinOp.t -> BinOp.t
          ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
@@ -1540,6 +1542,7 @@ module Visitors : sig
     method visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
     method visit_BAnd : 'c -> BinOp.t -> BinOp.t
     method visit_BOr : 'c -> BinOp.t -> BinOp.t
+    method visit_BImpl : 'c -> BinOp.t -> BinOp.t
     method visit_BSetMem : 'c -> BinOp.t -> BinOp.t
     method visit_BSetSub : 'c -> BinOp.t -> BinOp.t
     method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
@@ -1843,6 +1846,7 @@ module Visitors : sig
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
          ; visit_BAnd : 'c -> 'f
          ; visit_BOr : 'c -> 'f
+         ; visit_BImpl : 'c -> 'f
          ; visit_BSetMem : 'c -> 'f
          ; visit_BSetSub : 'c -> 'f
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
@@ -2072,6 +2076,7 @@ module Visitors : sig
     method visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
     method visit_BAnd : 'c -> 'f
     method visit_BOr : 'c -> 'f
+    method visit_BImpl : 'c -> 'f
     method visit_BSetMem : 'c -> 'f
     method visit_BSetSub : 'c -> 'f
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
@@ -2307,6 +2312,7 @@ module Visitors : sig
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
          ; visit_BAnd : 'c -> unit
          ; visit_BOr : 'c -> unit
+         ; visit_BImpl : 'c -> unit
          ; visit_BSetMem : 'c -> unit
          ; visit_BSetSub : 'c -> unit
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
@@ -2537,6 +2543,7 @@ module Visitors : sig
     method visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
     method visit_BAnd : 'c -> unit
     method visit_BOr : 'c -> unit
+    method visit_BImpl : 'c -> unit
     method visit_BSetMem : 'c -> unit
     method visit_BSetSub : 'c -> unit
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit

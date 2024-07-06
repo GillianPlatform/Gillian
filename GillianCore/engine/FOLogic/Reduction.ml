@@ -923,6 +923,23 @@ and reduce_lexpr_loop
     | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> f y
     | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> f x
     | BinOp (Lit (LList ll), Equal, Lit (LList lr)) -> Lit (Bool (ll = lr))
+    | BinOp (left, BImpl, right) -> (
+        let left = f left in
+        match Formula.lift_logic_expr left with
+        | None -> BinOp (left, BImpl, f right)
+        | Some (True, _) -> f right
+        | Some (False, _) -> Lit (Bool true)
+        | Some (left_f, _) ->
+            let pfs_with_left =
+              let copy = PFS.copy pfs in
+              let () = PFS.extend copy left_f in
+              copy
+            in
+            let right =
+              reduce_lexpr_loop ~matching ~reduce_lvars pfs_with_left gamma
+                right
+            in
+            BinOp (left, BImpl, right))
     | BinOp (EList le, Equal, Lit (LList ll))
     | BinOp (Lit (LList ll), Equal, EList le) ->
         if List.length ll <> List.length le then Lit (Bool false)

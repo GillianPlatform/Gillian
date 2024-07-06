@@ -1132,6 +1132,7 @@ binop_target:
   | SLT                 { BinOp.SLessThan }
   | AND                 { BinOp.BAnd }
   | OR                  { BinOp.BOr }
+  | LIMPLIES            { BinOp.BImpl }
   | BITWISEAND          { BinOp.BitwiseAnd }
   | BITWISEOR           { BinOp.BitwiseOr}
   | BITWISEXOR          { BinOp.BitwiseXor }

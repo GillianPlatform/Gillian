@@ -635,6 +635,7 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | FLessThanEqual -> mk_le (get_num p1) (get_num p2) >- BooleanType
   | Equal -> encode_equality p1 p2
   | BOr -> mk_or (get_bool p1) (get_bool p2) >- BooleanType
+  | BImpl -> Boolean.mk_implies ctx (get_bool p1) (get_bool p2) >- BooleanType
   | BAnd -> mk_and (get_bool p1) (get_bool p2) >- BooleanType
   | BSetMem ->
       (* p2 has to be already wrapped *)
