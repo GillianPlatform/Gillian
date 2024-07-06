@@ -2592,9 +2592,12 @@ let rec reduce_formula_loop
              | _ -> false)
              &&
              match
-               f (Eq (Expr.list_length left_list, Expr.list_length right_list))
+               fe
+                 (Expr.Infix.( - )
+                    (Expr.list_length left_list)
+                    (Expr.list_length right_list))
              with
-             | False -> true
+             | Expr.Lit (Int k) when not (Z.equal k Z.zero) -> true
              | _ -> false ->
           (* If we have two lists but can reduce the equality of their lengths to false,
              then we know the lists cannot be equal*)
