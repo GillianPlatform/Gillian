@@ -21,6 +21,7 @@ type t = TypeDef__.binop =
   (* Boolean *)
   | BAnd  (** Boolean conjunction *)
   | BOr  (** Boolean disjunction *)
+  | BImpl  (** Boolean implication *)
   (* Bitwise *)
   | BitwiseAnd  (** Bitwise conjunction *)
   | BitwiseOr  (** Bitwise disjunction *)
@@ -79,6 +80,7 @@ let str (x : t) =
   | SLessThan -> "s<"
   | BAnd -> "and"
   | BOr -> "or"
+  | BImpl -> "==>"
   | BitwiseAnd -> "&"
   | BitwiseOr -> "|"
   | BitwiseXor -> "^"

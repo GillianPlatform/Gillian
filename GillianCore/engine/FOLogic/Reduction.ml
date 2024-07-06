@@ -14,14 +14,13 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
       fmt "inside normalise cat: %a" Expr.pp (NOp (LstCat, les))); *)
   (* Recursively process each catted list and destroy inner LstCats *)
   let nles =
-    List.concat
-      (List.map
-         (fun x ->
-           let fx = f x in
-           match fx with
-           | NOp (LstCat, les) -> les
-           | _ -> [ fx ])
-         les)
+    List.concat_map
+      (fun x ->
+        let fx = f x in
+        match fx with
+        | NOp (LstCat, les) -> les
+        | _ -> [ fx ])
+      les
   in
   (* L.verbose (fun fmt -> fmt "nles, v1: %a" Expr.pp (NOp (LstCat, nles))); *)
   (* Bring lists of literals together, part 1 *)
@@ -85,6 +84,8 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
             | Right sz ->
                 (* The element isn't in the first list, so we cut that part, and we got the size *)
                 BinOp (NOp (LstCat, tl), LstNth, Expr.int (n - sz)))
+        | NOp (LstCat, LstSub (_lst, _start, len) :: tl), idx
+          when Expr.equal len idx -> Expr.list_nth (NOp (LstCat, tl)) 0
         | _, Lit (Num _) -> raise (exn "LstNth with float")
         | le, n -> BinOp (le, LstNth, n))
     | BinOp (le1, op, le2) -> BinOp (f le1, op, f le2)
@@ -335,11 +336,11 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
       | _ -> None)
   | LstSub _ -> None
   | NOp (LstCat, lel :: ler) ->
-      Option.bind (get_length_of_list lel) (fun llen ->
-          let lst, idx =
-            if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
-          in
-          f lst idx)
+      Option.bind (get_length_of_list lel) @@ fun llen ->
+      let lst, idx =
+        if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
+      in
+      f lst idx
   | Expr.BinOp (x, LstRepeat, _) -> Some x
   | _ -> None
 
@@ -922,6 +923,23 @@ and reduce_lexpr_loop
     | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> f y
     | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> f x
     | BinOp (Lit (LList ll), Equal, Lit (LList lr)) -> Lit (Bool (ll = lr))
+    | BinOp (left, BImpl, right) -> (
+        let left = f left in
+        match Formula.lift_logic_expr left with
+        | None -> BinOp (left, BImpl, f right)
+        | Some (True, _) -> f right
+        | Some (False, _) -> Lit (Bool true)
+        | Some (left_f, _) ->
+            let pfs_with_left =
+              let copy = PFS.copy pfs in
+              let () = PFS.extend copy left_f in
+              copy
+            in
+            let right =
+              reduce_lexpr_loop ~matching ~reduce_lvars pfs_with_left gamma
+                right
+            in
+            BinOp (left, BImpl, right))
     | BinOp (EList le, Equal, Lit (LList ll))
     | BinOp (Lit (LList ll), Equal, EList le) ->
         if List.length ll <> List.length le then Lit (Bool false)
@@ -1448,26 +1466,38 @@ and reduce_lexpr_loop
           when Z.equal z Z.zero
                &&
                let eqs = get_equal_expressions pfs flx in
-               List.exists
-                 (function
-                   (* Length of the list is greater than n, but efficiently computed *)
-                   | Expr.EList les ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | Lit (LList les) ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | NOp (LstCat, EList les :: _) ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | NOp (LstCat, Lit (LList les) :: _) ->
-                       List.compare_length_with les (Z.to_int n) >= 0
-                   | _ -> false)
-                 eqs ->
+               let first =
+                 List.find_map
+                   (fun e ->
+                     match e with
+                     | Expr.EList les
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | Lit (LList les)
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | NOp (LstCat, (EList les as e) :: _)
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | NOp (LstCat, (Lit (LList les) as e) :: _)
+                       when List.compare_length_with les (Z.to_int n) >= 0 ->
+                         Some e
+                     | _ -> None)
+                   eqs
+               in
+               match first with
+               | None -> false
+               | Some first ->
+                   let res =
+                     Expr.list_sub ~lst:first ~start:(Expr.int 0)
+                       ~size:(Expr.int_z n)
+                   in
+                   not (Expr.equal res le) ->
             L.tmi (fun fmt -> fmt "Case 5");
             let eqs = get_equal_expressions pfs flx in
             let first =
               List.find_map
                 (fun e ->
-                  (* Returns a list of which the length is greater than n, but
-                     computation is made slightly more efficient *)
                   match e with
                   | Expr.EList les
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
@@ -1484,9 +1514,13 @@ and reduce_lexpr_loop
                   | _ -> None)
                 eqs
             in
-            f
-              (Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
-                 ~size:(Expr.int_z n))
+            let res =
+              Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
+                ~size:(Expr.int_z n)
+            in
+            Logging.tmi (fun m ->
+                m "Case 5:\nRes: %a\nOriginal: %a" Expr.pp res Expr.pp le);
+            f res
         | le, Lit (Int z), Lit (Int n)
           when Z.equal z Z.zero
                && (match le with
@@ -2455,7 +2489,19 @@ let rec reduce_formula_loop
     (gamma : Type_env.t)
     ?(previous = Formula.True)
     (a : Formula.t) : Formula.t =
-  if Formula.equal a previous then a
+  Logging.tmi (fun m ->
+      m "Reduce formula: %a -> %a"
+        (fun ft f ->
+          match f with
+          | Formula.True ->
+              Fmt.pf ft "STARTING TO REDUCE: matching %b, rpfs %b" matching rpfs
+          | _ -> Formula.pp ft f)
+        previous Formula.pp a);
+  if Formula.equal a previous then
+    let () =
+      Logging.tmi (fun m -> m "Finished reducing, obtained: %a" Formula.pp a)
+    in
+    a
   else
     let f = reduce_formula_loop ~rpfs matching pfs gamma in
     let fe = reduce_lexpr_loop ~matching pfs gamma in
@@ -2537,6 +2583,25 @@ let rec reduce_formula_loop
                 (List.hd eqs) (List.tl eqs)
             in
             conj
+      | Eq (left_list, right_list)
+        when (match
+                ( Typing.type_lexpr gamma left_list,
+                  Typing.type_lexpr gamma right_list )
+              with
+             | (Some Type.ListType, _), (Some Type.ListType, _) -> true
+             | _ -> false)
+             &&
+             match
+               fe
+                 (Expr.Infix.( - )
+                    (Expr.list_length left_list)
+                    (Expr.list_length right_list))
+             with
+             | Expr.Lit (Int k) when not (Z.equal k Z.zero) -> true
+             | _ -> false ->
+          (* If we have two lists but can reduce the equality of their lengths to false,
+             then we know the lists cannot be equal*)
+          False
       | Eq (NOp (LstCat, les), LVar x)
         when List.mem (Expr.LVar x) les
              && List.exists
@@ -3031,7 +3096,7 @@ let relate_llen
 
   (* Auxiliary function *)
   let relate_llen_aux (e : Expr.t) (llen : Cint.t) (lcat : Expr.t list) =
-    L.verbose (fun fmt ->
+    L.tmi (fun fmt ->
         fmt "Relate llen aux: %a: %a, %a" Expr.pp e Expr.pp (Cint.to_expr llen)
           Fmt.(brackets (list ~sep:semi Expr.pp))
           lcat);
@@ -3059,7 +3124,7 @@ let relate_llen
       (relate_llen_loop llen [] lcat)
   in
 
-  L.verbose (fun fmt ->
+  L.tmi (fun fmt ->
       fmt "Relate llen: %a, %a" Expr.pp e
         Fmt.(brackets (list ~sep:semi Expr.pp))
         lcat);
@@ -3075,7 +3140,7 @@ let understand_lstcat
     (gamma : Type_env.t)
     (lcat : Expr.t list)
     (rcat : Expr.t list) : (Formula.t * Containers.SS.t) option =
-  L.verbose (fun fmt ->
+  L.tmi (fun fmt ->
       fmt "Understanding LstCat: %a, %a"
         Fmt.(brackets (list ~sep:semi Expr.pp))
         lcat

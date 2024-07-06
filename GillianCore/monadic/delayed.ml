@@ -102,6 +102,7 @@ let delayed_eval2 f x y ~curr_pc =
   [ Branch.make ~pc:curr_pc ~value:(f ~pc:curr_pc x y) ]
 
 let reduce = delayed_eval FOSolver.reduce_expr
+let reduce_formula = delayed_eval FOSolver.reduce_formula
 let resolve_loc = delayed_eval FOSolver.resolve_loc_name
 
 let entails =

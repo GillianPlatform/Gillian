@@ -268,6 +268,7 @@ let rec evaluate_binop
   let ee = evaluate_expr store in
   let lit1 = ee e1 in
   match op with
+  | BImpl -> ee (BinOp (UnOp (UNot, Expr.Lit lit1), BOr, e2))
   | BAnd -> (
       match lit1 with
       | Bool false -> Bool false
@@ -306,7 +307,7 @@ let rec evaluate_binop
       match op with
       | SetDiff | BSetMem | BSetSub ->
           raise (Exceptions.Unsupported "eval_binop concrete: set operator")
-      | BOr | BAnd ->
+      | BOr | BAnd | BImpl ->
           raise (Exceptions.Impossible "eval_binop concrete: by construction")
       | Equal -> (
           match (lit1, lit2) with

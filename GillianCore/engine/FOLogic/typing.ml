@@ -71,8 +71,8 @@ module Infer_types_to_gamma = struct
       | FLessThan | FLessThanEqual ->
           (Some NumberType, Some NumberType, Some BooleanType)
       | SLessThan -> (Some StringType, Some StringType, Some BooleanType)
-      | BAnd -> (Some BooleanType, Some BooleanType, Some BooleanType)
-      | BOr -> (Some BooleanType, Some BooleanType, Some BooleanType)
+      | BAnd | BOr | BImpl ->
+          (Some BooleanType, Some BooleanType, Some BooleanType)
       | StrCat -> (Some StringType, Some StringType, Some StringType)
       | BSetMem -> (None, Some SetType, Some BooleanType)
       | SetDiff -> (Some SetType, Some SetType, Some SetType)
@@ -409,6 +409,7 @@ module Type_lexpr = struct
         | SLessThan
         | BAnd
         | BOr
+        | BImpl
         | BSetMem
         | BSetSub -> infer_type le BooleanType
         | SetDiff -> infer_type le SetType

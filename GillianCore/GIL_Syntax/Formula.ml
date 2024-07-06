@@ -282,6 +282,10 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
       let* a1, na1 = f e1 in
       let+ a2, na2 = f e2 in
       (Or (a1, a2), And (na1, na2))
+  | BinOp (e1, BImpl, e2) ->
+      let* a1, _ = f e1 in
+      let+ a2, na2 = f e2 in
+      (Impl (a1, a2), And (a1, na2))
   | UnOp (UNot, e') ->
       let+ a, na = f e' in
       (na, a)
