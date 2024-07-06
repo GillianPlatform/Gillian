@@ -429,6 +429,11 @@ let is_concrete_zero_i (le : t) : bool =
   | Lit (Int z) -> Z.equal Z.zero z
   | _ -> false
 
+let is_concrete_one_i (le : t) : bool =
+  match le with
+  | Lit (Int z) -> Z.equal Z.one z
+  | _ -> false
+
 (** Get all the variables in --e-- *)
 let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le
 

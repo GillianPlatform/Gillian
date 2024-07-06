@@ -983,6 +983,9 @@ and reduce_lexpr_loop
                  "reduce_lexpr: LVar x when reducing lvars: guaranteed by \
                   match/filter"))
     (* Base lists *)
+    | EList [ BinOp (x, LstNth, z) ]
+      when Expr.is_concrete_zero_i z
+           && Expr.is_concrete_one_i (f (Expr.list_length x)) -> x
     | EList les -> (
         let fles = List.map f les in
         let all_literals =
