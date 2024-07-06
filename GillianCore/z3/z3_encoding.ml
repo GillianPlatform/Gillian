@@ -795,6 +795,7 @@ let rec encode_quantified_expr
       ZExpr.simplify quantifier_expr None >- BooleanType
 
 and encode_logical_expression
+    ?(within_list = false)
     ~(gamma : tyenv)
     ~(llen_lvars : SS.t)
     (le : Expr.t) : Encoding.t =
@@ -806,7 +807,10 @@ and encode_logical_expression
   | LVar var -> (
       match Hashtbl.find_opt gamma var with
       | None ->
-          ZExpr.mk_const_s ctx var extended_literal_sort |> extended_wrapped
+          if within_list then
+            ZExpr.mk_const_s ctx var z3_gil_literal_sort |> simply_wrapped
+          else
+            ZExpr.mk_const_s ctx var extended_literal_sort |> extended_wrapped
       | Some ty ->
           let sort = native_sort_of_type ty in
           ZExpr.mk_const_s ctx var sort >- ty)
@@ -824,7 +828,9 @@ and encode_logical_expression
       let les = List.map (fun le -> get_list (f le)) les in
       Z3.Seq.mk_seq_concat ctx les >- ListType
   | EList les ->
-      let args = List.map (fun le -> simple_wrap (f le)) les in
+      let args =
+        List.map (fun le -> simple_wrap (f ~within_list:true le)) les
+      in
       mk_z3_list args >- ListType
   | ESet les ->
       let args = List.map (fun le -> simple_wrap (f le)) les in
