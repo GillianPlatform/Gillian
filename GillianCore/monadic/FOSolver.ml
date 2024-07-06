@@ -64,6 +64,10 @@ let reduce_expr ~pc expr =
   Reduction.reduce_lexpr ~matching:pc.Pc.matching ~pfs:(build_full_pfs pc)
     ~gamma:(build_full_gamma pc) expr
 
+let reduce_formula ~pc formula =
+  Reduction.reduce_formula ~matching:pc.Pc.matching ~pfs:(build_full_pfs pc)
+    ~gamma:(build_full_gamma pc) formula
+
 let resolve_type ~(pc : Pc.t) expr =
   (* TODO: I don't know what that how parameter means.
      I'm copying what Reduction does.
