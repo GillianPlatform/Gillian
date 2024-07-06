@@ -38,6 +38,7 @@ let sat_cache : (Formula.Set.t, bool) Hashtbl.t =
 let cfg =
   [
     ("model", "true");
+    ("model_validate", "true");
     ("proof", "false");
     ("unsat_core", "false");
     ("auto_config", "true");
