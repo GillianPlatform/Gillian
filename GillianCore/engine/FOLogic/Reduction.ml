@@ -84,9 +84,8 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
             | Right sz ->
                 (* The element isn't in the first list, so we cut that part, and we got the size *)
                 BinOp (NOp (LstCat, tl), LstNth, Expr.int (n - sz)))
-        | NOp (LstCat, LstSub (_lst, z, n) :: tl), n'
-          when Expr.is_concrete_zero_i z && Expr.equal n n' ->
-            Expr.list_nth (NOp (LstCat, tl)) 0
+        | NOp (LstCat, LstSub (_lst, _start, len) :: tl), idx
+          when Expr.equal len idx -> Expr.list_nth (NOp (LstCat, tl)) 0
         | _, Lit (Num _) -> raise (exn "LstNth with float")
         | le, n -> BinOp (le, LstNth, n))
     | BinOp (le1, op, le2) -> BinOp (f le1, op, f le2)

@@ -988,22 +988,17 @@ let dump_smt =
     let () = incr counter in
     ret
   in
-  fun fs gamma status ->
+  fun fs gamma assertions ->
     Logging.verbose (fun m -> m "Dumping query %d to file" !counter);
     let path = Filename.concat (folder ()) (file ()) in
     let c = open_out path in
     Fmt.pf
       (Format.formatter_of_out_channel c)
-      "GIL query:\n\
-       FS: %a\n\
-       GAMMA: %a\n\
-       Resulted in Status: %s\n\n\
-       Encoded as Z3 Query:\n\
-       %s"
+      "GIL query:\nFS: %a\nGAMMA: %a\nEncoded as Z3 Query:\n%a"
       (Fmt.iter ~sep:Fmt.comma Formula.Set.iter Formula.pp)
       fs pp_tyenv gamma
-      (Solver.string_of_status status)
-      (Solver.to_string master_solver)
+      Fmt.(vbox (list ~sep:sp (of_to_string Z3.Expr.to_string)))
+      assertions
 
 let reset_solver () =
   Solver.pop master_solver 1;
@@ -1019,6 +1014,8 @@ let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =
   (* Step 1: Reset the solver and add the encoded formulae *)
   let encoded_assertions = encode_assertions fs gamma in
 
+  if !Utils.Config.dump_smt then dump_smt fs gamma encoded_assertions;
+
   (* Step 2: Reset the solver and add the encoded formulae *)
   Solver.add master_solver encoded_assertions;
   (* L.(
@@ -1032,8 +1029,6 @@ let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =
   (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
     verbose (fun m -> m "The solver returned: %s" (Solver.string_of_status ret)));
-
-  if !Utils.Config.dump_smt then dump_smt fs gamma ret;
 
   let ret_value =
     match ret with
