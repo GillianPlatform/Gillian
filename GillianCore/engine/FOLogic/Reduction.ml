@@ -2493,7 +2493,8 @@ let rec reduce_formula_loop
       m "Reduce formula: %a -> %a"
         (fun ft f ->
           match f with
-          | Formula.True -> Fmt.string ft "STARTING TO REDUCE"
+          | Formula.True ->
+              Fmt.pf ft "STARTING TO REDUCE: matching %b, rpfs %b" matching rpfs
           | _ -> Formula.pp ft f)
         previous Formula.pp a);
   if Formula.equal a previous then
@@ -2582,6 +2583,22 @@ let rec reduce_formula_loop
                 (List.hd eqs) (List.tl eqs)
             in
             conj
+      | Eq (left_list, right_list)
+        when (match
+                ( Typing.type_lexpr gamma left_list,
+                  Typing.type_lexpr gamma right_list )
+              with
+             | (Some Type.ListType, _), (Some Type.ListType, _) -> true
+             | _ -> false)
+             &&
+             match
+               f (Eq (Expr.list_length left_list, Expr.list_length right_list))
+             with
+             | False -> true
+             | _ -> false ->
+          (* If we have two lists but can reduce the equality of their lengths to false,
+             then we know the lists cannot be equal*)
+          False
       | Eq (NOp (LstCat, les), LVar x)
         when List.mem (Expr.LVar x) les
              && List.exists
