@@ -2322,9 +2322,11 @@ and substitute_in_int_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le :
                       let c = Option.get c in
                       let () =
                         if not (Z.equal (c mod s) Z.zero) then
-                          failwith
-                            "Reduction.substitute_in_int_expr, scaling with \
-                             invalid number"
+                          raise
+                            (ReductionException
+                               ( le,
+                                 "Reduction.substitute_in_int_expr, scaling \
+                                  with invalid number" ))
                       in
                       c / s)
                     coeffs c_le_tf_symb
@@ -3034,7 +3036,14 @@ let reduce_formula
     ?(pfs : PFS.t = PFS.init ())
     ?(gamma = Type_env.init ())
     (a : Formula.t) : Formula.t =
-  reduce_formula_loop ~top_level:true ~rpfs matching pfs gamma a
+  try reduce_formula_loop ~top_level:true ~rpfs matching pfs gamma a
+  with ReductionException (e, msg) ->
+    Logging.normal (fun m ->
+        m
+          "WARNING: Reduction of formula %a failed while reducing %a with \
+           message %s. Not reducing this formula."
+          Formula.pp a Expr.pp e msg);
+    a
 
 let relate_llen
     (pfs : PFS.t)
