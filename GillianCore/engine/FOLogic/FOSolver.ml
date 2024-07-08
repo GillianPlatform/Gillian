@@ -152,8 +152,7 @@ let check_entailment
   in
   let gamma_right = Type_env.filter gamma (fun v -> SS.mem v existentials) in
 
-  (* If left side is false, return false *)
-  if List.mem Formula.False (left_fs @ right_fs) then false
+  if List.mem Formula.False left_fs then true
   else
     (* Check satisfiability of left side *)
     let left_sat =
