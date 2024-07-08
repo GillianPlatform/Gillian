@@ -139,7 +139,6 @@ end
 
 module Make (State : SState.S) :
   S with type state_t = State.t and type err_t = State.err_t = struct
-  open Literal
   open Containers
   module L = Logging
 
@@ -1727,7 +1726,7 @@ module Make (State : SState.S) :
 
     let is_unfoldable_lit lit =
       match lit with
-      | Loc _ | LList _ -> false
+      | Literal.Loc _ | LList _ -> false
       | _ -> true
     in
 
@@ -2105,6 +2104,8 @@ module Make (State : SState.S) :
         in
         [ { lhs_state = new_lhs_state; current_state; subst } ]
       in
+      (* Importantly, we must *never* unfold anything on the lhs
+         without checking that it yields a unique state, as to avoid unsoundness. *)
       (* If it fails, we try splitting the step and we try again *)
       let- split_errs =
         let split_option =
@@ -2245,36 +2246,17 @@ module Make (State : SState.S) :
         let in_bindings = Pred.in_args rpred.pred all_bindings in
         SVal.SESubst.init in_bindings
       in
-      let start_states =
+      let start_state =
         match lhs_states with
-        | [] -> failwith "wand lhs is False!"
-        | first :: rest ->
-            let rest_pack_states =
-              List.map
-                (fun lhs_state ->
-                  {
-                    lhs_state;
-                    current_state = copy_astate astate;
-                    subst = SVal.SESubst.copy subst;
-                  })
-                rest
-            in
-            let first_pack_state =
-              { lhs_state = first; current_state = astate; subst }
-            in
-            first_pack_state :: rest_pack_states
+        | [] -> Fmt.kstr L.fail "wand lhs is False!"
+        | [ lhs_state ] -> { lhs_state; current_state = astate; subst }
+        | _ :: _ ->
+            Fmt.kstr L.fail "Wand lhs produced %d states!@\n%a"
+              (List.length lhs_states)
+              (Fmt.list ~sep:(Fmt.any "@\n@\n@\nNEXT STATE@\n@\n@\n") pp_astate)
+              lhs_states
       in
-      L.verbose (fun m ->
-          m "About to start consuming rhs of wand. Currently %d search states"
-            (List.length start_states));
-      let final_states =
-        List.fold_left
-          (fun acc state ->
-            let* acc = acc in
-            let+ case = package_mp rhs_mp state in
-            case @ acc)
-          (Ok []) start_states
-      in
+      let final_states = package_mp rhs_mp start_state in
       let* states = final_states in
       let all_res =
         List.map
