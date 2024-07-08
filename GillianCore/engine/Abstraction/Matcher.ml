@@ -756,6 +756,15 @@ module Make (State : SState.S) :
     | None -> other_state_err "final state non admissible"
     | Some state -> Res_list.return { state; preds; pred_defs; wands; variants }
 
+  let production_priority (a : Asrt.t) : int =
+    match a with
+    | Emp -> 0
+    | Types _ -> 0
+    | Pure _ -> 1
+    | Pred _ | Wand _ -> 2
+    | GA _ -> 3
+    | Star _ -> failwith "unreachable"
+
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
       (t, err_t) Res_list.t =
     L.verbose (fun m ->
@@ -764,6 +773,11 @@ module Make (State : SState.S) :
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
     let sas = MP.collect_simple_asrts a in
+    let sas =
+      List.sort
+        (fun a1 a2 -> compare (production_priority a1) (production_priority a2))
+        sas
+    in
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
