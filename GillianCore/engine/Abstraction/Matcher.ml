@@ -1582,6 +1582,11 @@ module Make (State : SState.S) :
                     :: rest_search_states,
                     errs_so_far )
             | false, states, [] -> (
+                L.verbose (fun m ->
+                    m
+                      "!!!CONSUMER YIELDED MULTIPLE BRANCHES IN OX MODE: %d \
+                       branches!!!"
+                      (List.length states));
                 (* We have obtained several branches. So there is a disjunction in the PFS.
                    All branches need to successfuly unify against this *)
                 let all_next =
