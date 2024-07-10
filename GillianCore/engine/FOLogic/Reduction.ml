@@ -1415,14 +1415,17 @@ and reduce_lexpr_loop
            let eqs = get_equal_expressions pfs l in
            List.exists
              (function
-               | Expr.NOp (LstCat, EList les :: _) ->
+               | Expr.NOp (LstCat, EList les :: r) ->
                    Int.equal (List.compare_length_with les (Z.to_int n)) 0
+                   && not (List.length r == 1 && Expr.equal (List.hd r) le)
                (* return (List.length les == n), but efficiently *)
-               | NOp (LstCat, Lit (LList les) :: _) ->
+               | NOp (LstCat, Lit (LList les) :: r) ->
                    (* return (List.length les == n), but efficiently *)
                    Int.equal (List.compare_length_with les (Z.to_int n)) 0
+                   && not (List.length r == 1 && Expr.equal (List.hd r) le)
                | _ -> false)
              eqs ->
+        Logging.tmi (fun m -> m "REDUCTION: Case l-sub(l, n, (l-len l) - n)");
         let eqs = get_equal_expressions pfs l in
         let cat =
           List.filter_map
