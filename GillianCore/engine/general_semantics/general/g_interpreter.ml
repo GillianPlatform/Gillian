@@ -1719,7 +1719,7 @@ struct
   let evaluate_cmd = Evaluate_cmd.eval_cmd
 
   let simplify state =
-    snd (State.simplify ~save:true ~kill_new_lvars:true state)
+    snd (State.simplify ~kill_new_lvars:true state)
 
   let protected_evaluate_cmd
       (prog : annot MP.prog)
