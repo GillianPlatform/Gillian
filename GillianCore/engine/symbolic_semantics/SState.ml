@@ -322,8 +322,9 @@ module Make (SMemory : SMemory.S) :
                (ps @ PFS.to_list pfs)
                gamma
         then (
-          List.iter (PFS.extend pfs) ps;
-          Some state)
+          let ps = List.concat_map Formula.split_conjunct_formulae ps in
+            List.iter (PFS.extend pfs) ps;
+            Some state)
         else (
           Logging.verbose (fun m ->
               m "assume_a: Couldn't assume %a" (Fmt.Dump.list Formula.pp) ps);
