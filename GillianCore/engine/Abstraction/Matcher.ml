@@ -1561,7 +1561,6 @@ module Make (State : SState.S) :
                 L.fail "ERROR: IMPOSSIBLE! MATCHING ERRORS IN UX MODE!!!!"
             | false, [], [] ->
                 L.fail "OX MATCHING VANISHED??? MEDOOOOOOOO!!!!!!!!!"
-            | false, _ :: _ :: _, [] -> L.fail "DEATH. OX MATCHING BRANCHED"
             | true, [], _ ->
                 (* Vanished in UX *)
                 explore_next_states (rest_search_states, errs_so_far)
@@ -1582,6 +1581,25 @@ module Make (State : SState.S) :
                   ( ((state, subst, rest_mp), case_depth, false)
                     :: rest_search_states,
                     errs_so_far )
+            | false, states, [] -> (
+                (* We have obtained several branches. So there is a disjunction in the PFS.
+                   All branches need to successfuly unify against this *)
+                let all_next =
+                  List.map
+                    (fun state ->
+                      let state = copy_astate state in
+                      let subst = SVal.SESubst.copy subst in
+                      explore_next_states
+                        ( [ ((state, subst, rest_mp), case_depth, false) ],
+                          errs_so_far ))
+                    states
+                in
+                let res = List_res.flat all_next in
+                match res with
+                | Ok res -> Ok res
+                | Error errs ->
+                    explore_next_states (rest_search_states, errs @ errs_so_far)
+                )
             | true, first :: rem, [] ->
                 let rem =
                   List.map
