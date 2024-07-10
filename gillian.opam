@@ -18,6 +18,7 @@ depends: [
   "menhir" {= "20231231"}
   "ppx_deriving_yojson"
   "ppxlib" {>= "0.18.0"}
+  "simple_smt"
   "sqlite3" {= "5.0.2"}
   "visitors" {>= "2.3"}
   "yojson" {>= "1.7.0"}
@@ -42,3 +43,6 @@ build: [
   ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
+pin-depends: [
+  "simple_smt.~dev" "git+https://github.com/NatKarmios/simple-smt-ocaml#b88c4b0685f6ec989e8b4c911e296c4087768db8"
+]
