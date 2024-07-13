@@ -2,16 +2,18 @@ open Containers
 open Literal
 module L = Logging
 
+type 'a _t = { procs : SS.t; state : 'a; af_state : 'a } [@@deriving yojson]
+
 module Make (State : SState.S) = struct
   type heap_t = State.heap_t
-  type state_t = State.t
+  type state_t = State.t [@@deriving yojson]
   type st = SVal.SESubst.t
   type vt = Expr.t [@@deriving show, yojson]
-  type t = { procs : SS.t; state : state_t; af_state : state_t }
+  type t = state_t _t [@@deriving yojson]
   type store_t = SStore.t
-  type err_t = State.err_t [@@deriving yojson, show]
+  type m_err_t = t * State.m_err_t
+  type err_t = (m_err_t, vt) StateErr.t
   type fix_t = State.fix_t
-  type m_err_t = State.m_err_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = State.init_data
 
@@ -23,11 +25,29 @@ module Make (State : SState.S) = struct
       =
     { procs; state; af_state = State.init init_data }
 
+  let lift_error st : State.err_t -> err_t = function
+    | StateErr.EMem e -> StateErr.EMem (st, e)
+    | StateErr.EType (v, t, t') -> StateErr.EType (v, t, t')
+    | StateErr.EPure f -> StateErr.EPure f
+    | StateErr.EVar v -> StateErr.EVar v
+    | StateErr.EAsrt (v, f, a) -> StateErr.EAsrt (v, f, a)
+    | StateErr.EOther s -> StateErr.EOther s
+
+  let unlift_error : err_t -> State.err_t = function
+    | StateErr.EMem (_, e) -> StateErr.EMem e
+    | StateErr.EType (v, t, t') -> StateErr.EType (v, t, t')
+    | StateErr.EPure f -> StateErr.EPure f
+    | StateErr.EVar v -> StateErr.EVar v
+    | StateErr.EAsrt (v, f, a) -> StateErr.EAsrt (v, f, a)
+    | StateErr.EOther s -> StateErr.EOther s
+
+  let lift_errors st = List.map (lift_error st)
+
   let eval_expr (bi_state : t) (e : Expr.t) =
     let { state; _ } = bi_state in
     try State.eval_expr state e
     with State.Internal_State_Error (errs, _) ->
-      raise (Internal_State_Error (errs, bi_state))
+      raise (Internal_State_Error (lift_errors bi_state errs, bi_state))
 
   let get_store (bi_state : t) : SStore.t =
     let { state; _ } = bi_state in
@@ -137,10 +157,12 @@ module Make (State : SState.S) = struct
 
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
       (t, err_t) Res_list.t =
-    let open Res_list.Syntax in
+    let open Syntaxes.List in
     let { state; _ } = bi_state in
-    let++ state' = State.evaluate_slcmd prog lcmd state in
-    { bi_state with state = state' }
+    let+ res = State.evaluate_slcmd prog lcmd state in
+    match res with
+    | Ok state' -> Ok { bi_state with state = state' }
+    | Error err -> Error (lift_error bi_state err)
 
   let match_invariant _ _ _ _ _ =
     raise (Failure "ERROR: match_invariant called for bi-abductive execution")
@@ -422,10 +444,10 @@ module Make (State : SState.S) = struct
     State.mem_constraints state
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
-  let pp_err = State.pp_err
+  let pp_err f e = State.pp_err f (unlift_error e)
   let pp_fix = State.pp_fix
-  let get_failing_constraint = State.get_failing_constraint
-  let can_fix = State.can_fix
+  let get_failing_constraint e = State.get_failing_constraint (unlift_error e)
+  let can_fix e = State.can_fix (unlift_error e)
 
   let rec execute_action
       (action : string)
@@ -435,7 +457,8 @@ module Make (State : SState.S) = struct
     let* ret = State.execute_action action state args in
     match ret with
     | Ok (state', outs) -> [ Ok ({ procs; state = state'; af_state }, outs) ]
-    | Error err when not (State.can_fix err) -> [ Error err ]
+    | Error err when not (State.can_fix err) ->
+        [ Error (lift_error { procs; state; af_state } err) ]
     | Error err -> (
         match State.get_fixes state err with
         | [] -> [] (* No fix, we stop *)
@@ -452,11 +475,32 @@ module Make (State : SState.S) = struct
   let get_equal_values { state; _ } = State.get_equal_values state
   let get_heap { state; _ } = State.get_heap state
 
-  let of_yojson _ =
-    failwith
-      "Please implement of_yojson to enable logging this type to a database"
+  (* Sadly need to hand-implement this, because m_err_t doesn't expose a yojson interface *)
+  let err_t_to_yojson : err_t -> Yojson.Safe.t = function
+    | StateErr.EMem (s, _) as e ->
+        let s' = to_yojson s in
+        let e' = State.err_t_to_yojson (unlift_error e) in
+        `List [ `String "BSEMem"; s'; e' ]
+    | e -> State.err_t_to_yojson (unlift_error e)
 
-  let to_yojson _ =
-    failwith
-      "Please implement to_yojson to enable logging this type to a database"
+  let err_t_of_yojson :
+      Yojson.Safe.t -> err_t Ppx_deriving_yojson_runtime.error_or =
+    let open Syntaxes.Result in
+    function
+    | `List [ `String "BSEMem"; s; e ] ->
+        let* s = of_yojson s in
+        let+ e = State.err_t_of_yojson e in
+        lift_error s e
+    | e -> (
+        let* err = State.err_t_of_yojson e in
+        match err with
+        | StateErr.EMem _ -> Error "Expected a list with two elements"
+        | StateErr.EType (v, t, t') -> Ok (StateErr.EType (v, t, t'))
+        | StateErr.EPure f -> Ok (StateErr.EPure f)
+        | StateErr.EVar v -> Ok (StateErr.EVar v)
+        | StateErr.EAsrt (v, f, a) -> Ok (StateErr.EAsrt (v, f, a))
+        | StateErr.EOther s -> Ok (StateErr.EOther s))
+
+  let pp_err_t f err = State.pp_err_t f (unlift_error err)
+  let show_err_t err = State.show_err_t (unlift_error err)
 end
