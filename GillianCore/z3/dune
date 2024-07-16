@@ -1,5 +1,0 @@
-(library
- (name z3_encoding)
- (public_name gillian.z3_encoding)
- (libraries z3 gil_syntax logging utils)
- (flags :standard -open Utils.Prelude))

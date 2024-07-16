@@ -54,8 +54,6 @@
    (>= 1.7.0))
   (zarith
    (>= 1.12))
-  (z3
-   (>= 4.13.0))
   (odoc :with-doc)))
 
 (package
