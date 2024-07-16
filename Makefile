@@ -6,7 +6,7 @@ build:
 	dune build @all
 
 deps:
-	dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam kanillian.opam
+	opam exec -- dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam kanillian.opam
 	opam install . -y --deps-only
 
 init-dev:
