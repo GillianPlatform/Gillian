@@ -63,7 +63,7 @@ let bi_unroll_depth = ref 1
 let bi_no_spec_depth = ref 0
 let delay_entailment = ref true
 
-(* If true, will dump a folder containing all the smt queries made to z3 *)
+(* If true, will dump a folder containing all smt queries made to the solver *)
 let dump_smt = ref false
 
 (** {2 Bulk testing} *)

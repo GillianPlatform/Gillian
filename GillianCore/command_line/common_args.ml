@@ -134,7 +134,7 @@ module Make (PC : ParserAndCompiler.S) = struct
     Arg.(value & flag & info [ "pbn"; "print-by-need" ] ~doc)
 
   let dump_smt =
-    let doc = "Dump every smt query sent to z3" in
+    let doc = "Dump every smt query sent to the solver" in
     Arg.(value & flag & info [ "dump-smt" ] ~doc)
 
   let use (term : (unit -> unit) Term.t) : unit Term.t =
