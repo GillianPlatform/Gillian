@@ -1,5 +1,7 @@
 open Gil_syntax
 
+exception SMT_unknown
+
 val exec_sat :
   Formula.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
 
@@ -14,3 +16,5 @@ val lift_model :
   (string -> Expr.t -> unit) ->
   Expr.Set.t ->
   unit
+
+val pp_sexp : Sexplib.Sexp.t Fmt.t
