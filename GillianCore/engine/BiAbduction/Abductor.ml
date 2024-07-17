@@ -229,7 +229,21 @@ module Make
           (Format.asprintf "When trying to build an MP for %s, I died!" name)
     in
     match result with
-    | RFail { error_state; _ } ->
+    | RFail { error_state; errors; _ } ->
+        (* Because of fixes, the state may have changed since between the start of execution
+           and the failure: the anti-frame might have been modified before immediately erroring.
+           BiState thus returns, with every error, the state immeditaly before the error happens
+           with any applied fixes - this is the state that should be used to ensure fixes
+           don't get lost. *)
+        let rec find_error_state (aux : SBAInterpreter.err_t list) =
+          match aux with
+          | [] -> error_state
+          | e :: errs -> (
+              match e with
+              | EState (EMem (s, _)) -> s
+              | _ -> find_error_state errs)
+        in
+        let error_state = find_error_state errors in
         let+ spec = process_spec name params state_i error_state Flag.Bug in
         add_spec spec;
         (spec, Flag.Bug)
