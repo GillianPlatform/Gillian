@@ -45,6 +45,7 @@
   ppx_deriving_yojson
   (ppxlib
    (>= 0.18.0))
+  sexplib
   simple_smt
   (sqlite3
    (= 5.0.2))
