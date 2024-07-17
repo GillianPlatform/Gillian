@@ -67,7 +67,7 @@ module Make (State : SState.S) :
   type state_t = State.t
   type err_t = State.err_t [@@deriving yojson, show]
   type fix_t = State.fix_t
-  type m_err_t = State.m_err_t
+  type m_err_t = State.m_err_t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
   exception Preprocessing_Error of MP.err list

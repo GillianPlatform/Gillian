@@ -11,8 +11,8 @@ module Make (State : SState.S) = struct
   type vt = Expr.t [@@deriving show, yojson]
   type t = state_t _t [@@deriving yojson]
   type store_t = SStore.t
-  type m_err_t = t * State.m_err_t
-  type err_t = (m_err_t, vt) StateErr.t
+  type m_err_t = t * State.m_err_t [@@deriving yojson]
+  type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson]
   type fix_t = State.fix_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = State.init_data
@@ -474,33 +474,6 @@ module Make (State : SState.S) = struct
 
   let get_equal_values { state; _ } = State.get_equal_values state
   let get_heap { state; _ } = State.get_heap state
-
-  (* Sadly need to hand-implement this, because m_err_t doesn't expose a yojson interface *)
-  let err_t_to_yojson : err_t -> Yojson.Safe.t = function
-    | StateErr.EMem (s, _) as e ->
-        let s' = to_yojson s in
-        let e' = State.err_t_to_yojson (unlift_error e) in
-        `List [ `String "BSEMem"; s'; e' ]
-    | e -> State.err_t_to_yojson (unlift_error e)
-
-  let err_t_of_yojson :
-      Yojson.Safe.t -> err_t Ppx_deriving_yojson_runtime.error_or =
-    let open Syntaxes.Result in
-    function
-    | `List [ `String "BSEMem"; s; e ] ->
-        let* s = of_yojson s in
-        let+ e = State.err_t_of_yojson e in
-        lift_error s e
-    | e -> (
-        let* err = State.err_t_of_yojson e in
-        match err with
-        | StateErr.EMem _ -> Error "Expected a list with two elements"
-        | StateErr.EType (v, t, t') -> Ok (StateErr.EType (v, t, t'))
-        | StateErr.EPure f -> Ok (StateErr.EPure f)
-        | StateErr.EVar v -> Ok (StateErr.EVar v)
-        | StateErr.EAsrt (v, f, a) -> Ok (StateErr.EAsrt (v, f, a))
-        | StateErr.EOther s -> Ok (StateErr.EOther s))
-
   let pp_err_t f err = State.pp_err_t f (unlift_error err)
   let show_err_t err = State.show_err_t (unlift_error err)
 end

@@ -13,7 +13,7 @@ module M : Memory_S with type init_data = unit = struct
   type st = Subst.t
 
   (** Errors *)
-  type err_t = unit [@@deriving show]
+  type err_t = unit [@@deriving yojson, show]
 
   type action_ret = (t * vt list, err_t) result
 

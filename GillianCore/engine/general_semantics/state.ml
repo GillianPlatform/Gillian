@@ -1,7 +1,7 @@
 (** @canonical Gillian.General.State
 
   Interface for GIL General States.
-  
+
   They are considered to be mutable. *)
 
 (** @canonical Gillian.General.State.S *)
@@ -21,7 +21,7 @@ module type S = sig
   type heap_t
 
   (** Errors *)
-  type m_err_t
+  type m_err_t [@@deriving yojson]
 
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type fix_t
