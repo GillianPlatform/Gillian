@@ -14,7 +14,7 @@ init-dev:
 	opam exec -- ./githooks/install.ml
 
 init-ci:
-	make deps
+	opam install . -y --deps-only
 	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
 
 uninstall:
