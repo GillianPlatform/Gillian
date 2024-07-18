@@ -232,8 +232,8 @@ let t_gil_literal = Lit_operations.t_gil_literal
 let t_gil_literal_list = t_seq t_gil_literal
 let t_gil_literal_set = t_set t_gil_literal
 
-let seq_of = function
-  | [] -> atom "seq.empty"
+let seq_of ~typ = function
+  | [] -> as_type (atom "seq.empty") typ
   | xs -> xs |> List.map seq_unit |> seq_concat
 
 let set_of xs =
@@ -749,7 +749,7 @@ let rec encode_logical_expression
       les |> List.map get_list |> seq_concat >- ListType
   | EList les ->
       let>-- args = List.map f les in
-      args |> List.map simple_wrap |> seq_of >- ListType
+      args |> List.map simple_wrap |> seq_of ~typ:t_gil_literal_list >- ListType
   | ESet les ->
       let>-- args = List.map f les in
       args |> List.map simple_wrap |> set_of >- SetType
@@ -975,7 +975,7 @@ let reset_solver () =
   let () = cmd (push 1) in
   ()
 
-let exec_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
+let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
@@ -1021,6 +1021,13 @@ let exec_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   in
   let () = reset_solver () in
   ret
+
+let exec_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
+  try exec_sat' fs gamma
+  with UnexpectedSolverResponse _ as e ->
+    let msg = Fmt.str "SMT failure!\n%s\n" (Printexc.to_string e ^ "\n") in
+    let () = L.print_to_all msg in
+    exit 1
 
 let check_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   match Hashtbl.find_opt sat_cache fs with
