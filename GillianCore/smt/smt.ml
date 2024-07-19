@@ -868,18 +868,18 @@ let lvars_as_list_elements (assertions : Formula.Set.t) : SS.t =
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.ss_monoid
 
-      method! visit_ForAll exclude binders f =
+      method! visit_ForAll (exclude, is_in_list) binders f =
         (* Quantified variables need to be excluded *)
         let univ_quant = List.to_seq binders |> Seq.map fst in
         let exclude = Containers.SS.add_seq univ_quant exclude in
-        self#visit_formula exclude f
+        self#visit_formula (exclude, is_in_list) f
 
-      method! visit_Exists exclude binders e =
+      method! visit_Exists (exclude, is_in_list) binders e =
         let exist_quants = List.to_seq binders |> Seq.map fst in
         let exclude = Containers.SS.add_seq exist_quants exclude in
-        self#visit_expr exclude e
+        self#visit_expr (exclude, is_in_list) e
 
-      method! visit_EList exclude es =
+      method! visit_EList (exclude, _) es =
         List.fold_left
           (fun acc e ->
             match e with
@@ -888,12 +888,13 @@ let lvars_as_list_elements (assertions : Formula.Set.t) : SS.t =
                   Containers.SS.add x acc
                 else acc
             | _ ->
-                let inner = self#visit_expr exclude e in
+                let inner = self#visit_expr (exclude, true) e in
                 Containers.SS.union acc inner)
           Containers.SS.empty es
 
-      method! visit_LVar exclude x =
-        if not (Containers.SS.mem x exclude) then Containers.SS.singleton x
+      method! visit_LVar (exclude, is_in_list) x =
+        if is_in_list && not (Containers.SS.mem x exclude) then
+          Containers.SS.singleton x
         else Containers.SS.empty
 
       method! visit_'label _ (_ : int) = self#zero
@@ -902,7 +903,7 @@ let lvars_as_list_elements (assertions : Formula.Set.t) : SS.t =
   in
   Formula.Set.fold
     (fun f acc ->
-      let new_lvars = collector#visit_formula SS.empty f in
+      let new_lvars = collector#visit_formula (SS.empty, false) f in
       SS.union new_lvars acc)
     assertions SS.empty
 
