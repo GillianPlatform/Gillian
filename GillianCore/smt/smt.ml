@@ -53,13 +53,17 @@ let quant q (vars : (sexp * sexp) list) (s : sexp) : sexp =
 let forall' = quant "forall"
 
 let forall (vars : (string * sexp) list) (s : sexp) : sexp =
-  let vars = vars |> List.map (fun (v, t) -> (atom v, t)) in
+  let vars =
+    vars |> List.map (fun (v, t) -> (atom (sanitize_identifier v), t))
+  in
   forall' vars s
 
 let exists' = quant "exists"
 
 let exists (vars : (string * sexp) list) (s : sexp) : sexp =
-  let vars = vars |> List.map (fun (v, t) -> (atom v, t)) in
+  let vars =
+    vars |> List.map (fun (v, t) -> (atom (sanitize_identifier v), t))
+  in
   exists' vars s
 
 let t_seq t = list [ atom "Seq"; t ]
