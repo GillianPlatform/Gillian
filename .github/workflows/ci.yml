@@ -149,7 +149,7 @@ jobs:
         run: "Gillian-JS/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test JaVerT
-        run: "opam exec -- bash ./testJaVerT.sh"
+        run: "./testJaVerT.sh"
         working-directory: "Gillian/Gillian-JS/environment/"
       # - name: Test Amazon
       #   run: "make"
