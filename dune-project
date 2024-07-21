@@ -45,6 +45,8 @@
   ppx_deriving_yojson
   (ppxlib
    (>= 0.18.0))
+  sexplib
+  simple_smt
   (sqlite3
    (= 5.0.2))
   (visitors
@@ -53,8 +55,6 @@
    (>= 1.7.0))
   (zarith
    (>= 1.12))
-  (z3
-   (>= 4.13.0))
   (odoc :with-doc)))
 
 (package
