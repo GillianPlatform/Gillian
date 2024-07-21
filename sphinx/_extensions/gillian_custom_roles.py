@@ -27,27 +27,26 @@ def setup(app):
     app.add_role('opam', opam_role)
     app.add_role('src', src_role)
     global OPAM_CACHE
-    if OPAM_CACHE is not None:
-        raise ValueError('package_role: opam cache already set!!!')
-    OPAM_CACHE = {}
-    for path, _, files in os.walk('.'):
-        if re.match("^./_opam/", path):
-            continue
-        for file in files:
-            parts = re.match("^([^/]*)[.]opam$", file)
-            if parts:
-                name = parts.group(1)
-                if name in OPAM_CACHE:
-                    print(
-                        "package_role: ignoring package ",
-                        name,
-                        " at ",
-                        path,
-                        ", already found at ",
-                        OPAM_CACHE[name],
-                    )
-                OPAM_CACHE[name] = path.lstrip('../')
-    print("package_role: cached", len(OPAM_CACHE), "opam packages")
+    if OPAM_CACHE is None:
+        OPAM_CACHE = {}
+        for path, _, files in os.walk('.'):
+            if re.match("^./_opam/", path):
+                continue
+            for file in files:
+                parts = re.match("^([^/]*)[.]opam$", file)
+                if parts:
+                    name = parts.group(1)
+                    if name in OPAM_CACHE:
+                        print(
+                            "package_role: ignoring package ",
+                            name,
+                            " at ",
+                            path,
+                            ", already found at ",
+                            OPAM_CACHE[name],
+                        )
+                    OPAM_CACHE[name] = path.lstrip('../')
+        print("package_role: cached", len(OPAM_CACHE), "opam packages")
     return {'parallel_read_safe': True}
 
 

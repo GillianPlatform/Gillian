@@ -20,14 +20,6 @@ init-ci:
 uninstall:
 	opam remove gillian gillian-c gillian-js wisl kanillian -y
 
-docs:
-	@echo "===== BUILDING ODOC ====="
-	opam exec -- dune build @doc
-	mkdir -p _docs
-	rsync -auv --delete _build/default/_doc/_html/. _docs/odoc/
-	@echo "===== BUILDING SPHINX ====="
-	sphinx-build sphinx _docs/sphinx
-
 watch:
 	opam exec -- dune build --watch
 
@@ -40,5 +32,28 @@ wisl-init-env:
 js-init-env:
 	./Gillian-JS/scripts/setup_environment.sh
 
+docs:
+	@echo "===== BUILDING ODOC ====="
+	make odoc
+	@echo "===== BUILDING SPHINX ====="
+	make sphinx
+
+docs-watch:
+	./scripts/watch_docs.sh
+
+odoc:
+	opam exec -- dune build @doc
+	mkdir -p _docs
+	rsync -auv --delete _build/default/_doc/_html/. _docs/odoc/
+
+odoc-watch:
+	./scripts/watch_odoc.sh > /dev/null &
+	opam exec -- dune build @doc --watch --terminal-persistence=preserve
+
+sphinx:
+	sphinx-build sphinx _docs/sphinx
+
+sphinx-watch:
+	sphinx-autobuild sphinx _docs/sphinx/
 
 .PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs

@@ -4,9 +4,9 @@ Installation
 Linux / macOS
 -------------
 
-.. admonition:: Opam switch
+.. admonition:: Developing with opam
 
-    We use opam for dependency management, and advise using a local opam switch that will not affect your global environment.
+    Gillian uses opam for dependency management. We advise using a local opam switch, so your global environment remains untouched.
     It should be perfectly safe (and recommended) to install the development environment directly on your machine.
 
 #. Install prerequisites
@@ -16,7 +16,7 @@ Linux / macOS
    .. code-block:: bash
 
      sudo apt install git curl npm build-essential pkg-config \
-         m4 python3-distutils python3-apt
+         m4 python3-distutils python3-apt z3
 
    On macOS, make sure you have the XCode command line tools installed:
 
@@ -50,12 +50,6 @@ Linux / macOS
     make init-dev
     eval $(opam env)
     dune build
-
-   This may take a while, as opam will build and install every dependency, including OCaml and Z3.
-
-   .. image:: _static/img/xkz3.png
-      :alt: The #1 programmer excuse for legitimately slacking off: "I'm building Z3"
-      :align: center
 
 Windows
 -------
