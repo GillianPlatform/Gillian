@@ -3,7 +3,7 @@ import { NodeProps } from 'react-flow-renderer';
 import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import { AssertionData, MatchResult } from '../../../types';
 import NodeWrap from '../TreeMapView/NodeWrap';
-import type { Dims } from '../TreeMapView/TreeMapView';
+import type { NodeData } from '../TreeMapView/TreeMapView';
 
 import './MatchMapNode.css';
 
@@ -31,7 +31,7 @@ export type MatchMapNodeData =
       type: 'Missing';
     };
 
-const MatchMapNode = ({ data }: NodeProps<MatchMapNodeData & Dims>) => {
+const MatchMapNode = ({ data }: NodeProps<MatchMapNodeData & NodeData>) => {
   const { type, width, height } = data;
   if (type === 'Root') {
     const { title, subtitle } = data;

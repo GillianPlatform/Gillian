@@ -30,8 +30,7 @@ const MatchView = () => {
 
   const matchMapView = (() => {
     const matchId = path[0];
-    const matching = matches[matchId];
-    if (matching === undefined) {
+    if (!(matchId in matches)) {
       const load = () => {
         requestMatching(matchId);
       };
@@ -41,7 +40,7 @@ const MatchView = () => {
     return (
       <MatchMapView
         {...{
-          matching,
+          matchId,
           selectStep,
           expandedNodes,
           matches,

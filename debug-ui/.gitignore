@@ -9,4 +9,4 @@ mock-debug.txt
 *.vsix
 .snowpack
 yarn-error.log
-sampleWorkspace/.vscode/settings.json
+debug-ui/.vscode/settings.json

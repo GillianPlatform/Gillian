@@ -12,13 +12,13 @@ The Gillian debugger provides a custom interface for visualising symbolic execut
 Setup
 -----
 
-The debugger is used via a custom VSCode extension, found under the ``debugger-vscode-extension/`` directory in the repo.
+The debugger is used via a custom VSCode extension, found under the ``debug-ui/`` directory in the repo.
 
 To try out the debugger, follow these steps:
 
 * Install `the base Gillian extension <https://marketplace.visualstudio.com/items?itemName=gillian.code-gillian>`_
 * Make sure Gillian is built (see :doc:`install`)
-* cd into ``debugger-vscode-extension/``
+* cd into ``debug-ui/``
 * Run ``yarn`` to set up dependencies
 * Run ``yarn build`` to build the extension (or ``yarn watch`` to rebuild automatically)
 * In the *Run and debug* tab of VSCode, make sure *Debugger Extension* is selected from the dropdown, and click the green play button to start the extension
@@ -27,7 +27,7 @@ To try out the debugger, follow these steps:
     :width: 175px
     :align: center
 
-* A new VSCode window should open in ``debugger-vscode-extension/sampleWorkspace/``, with the extension installed
+* A new VSCode window should open in ``debug-ui/examples/``, with the extension installed
 * In this window, open the workspace settings, and under the *Extensions > Gillian Debugger* section:
 
   * Make sure *Run mode* is set to ``source``
