@@ -7,7 +7,7 @@
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}/debugger-vscode-extension",
-				"${workspaceFolder}/debugger-vscode-extension/sampleWorkspace"
+				"${workspaceFolder}/debug-ui/examples"
 			],
 			"outFiles": [
 				"${workspaceFolder}/debugger-vscode-extension/out/**/*.js"

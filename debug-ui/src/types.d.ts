@@ -1,10 +1,10 @@
 // #region ExecMap
 
-export type BranchCase = [string, any];
+export type BranchCase = NonNullable<unknown>;
 
 type Submap =
   | readonly ['NoSubmap']
-  | readonly ['Submap', ExecMap]
+  | readonly ['Submap', number]
   | readonly ['Proc', string];
 
 type Matching = {
@@ -22,14 +22,28 @@ export type CmdData = {
   readonly submap: Submap;
 };
 
-export type ExecMap =
-  | readonly ['Nothing']
-  | readonly ['Cmd', { data: CmdData; next: ExecMap }]
-  | readonly [
-      'BranchCmd',
-      { data: CmdData; nexts: [BranchCase, [null, ExecMap]][] }
-    ]
-  | readonly ['FinalCmd', { data: CmdData }];
+export type ExecMapNext =
+  | ['Single', [number | null, string]]
+  | ['Branch', readonly [BranchCase, [number | null, string]][]];
+
+export type ExecMapNode = {
+  readonly data: CmdData;
+  readonly next: ExecMapNext | null;
+};
+
+export type ExecMapEntry =
+  | readonly ['Node', ExecMapNode]
+  | readonly ['Alias', number];
+
+export type ExecMap = {
+  readonly root: number | null;
+  readonly entries: [number, ExecMapEntry][];
+};
+
+export type SafeExecMap = {
+  readonly root: number | null;
+  readonly entries: Record<number, ExecMapEntry>;
+};
 
 // #endregion
 
