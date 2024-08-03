@@ -55,7 +55,7 @@ struct
 
     let consoles : (module Console.S) list =
       [
-        (module Compiler_console.Make (PC));
+        (module Compiler_console.Make (ID) (PC));
         (module C_interpreter_console.Make (ID) (PC) (CState) (C_interpreter)
                   (Gil_parsing));
         (module S_interpreter_console.Make (ID) (PC) (SState) (S_interpreter)
