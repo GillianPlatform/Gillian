@@ -5,7 +5,7 @@ import {
   VSCodeDivider,
 } from '@vscode/webview-ui-toolkit/react';
 import { CmdData } from '../../../types';
-import type { Dims } from '../TreeMapView/TreeMapView';
+import type { NodeData } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import { NodeProps } from 'react-flow-renderer';
 import { Code } from '../util';
@@ -34,7 +34,7 @@ export type ExecMapNodeData = { isActive: boolean } & (
     }
 );
 
-const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
+const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & NodeData>) => {
   const { type, isActive, width, height } = data;
   if (type === 'Empty') {
     return (

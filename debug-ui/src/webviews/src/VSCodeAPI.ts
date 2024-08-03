@@ -33,7 +33,7 @@ class VSCodeWrapper {
   }
 }
 
-export const execSpecific = (prevId: number, branchCase: BranchCase) => {
+export const execSpecific = (prevId: number, branchCase: BranchCase | null) => {
   VSCodeAPI.postMessage({
     type: 'request_exec_specific',
     prevId,
