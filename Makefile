@@ -56,4 +56,4 @@ sphinx:
 sphinx-watch:
 	sphinx-autobuild sphinx _docs/sphinx/
 
-.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs
+.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs odoc sphinx
