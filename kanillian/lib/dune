@@ -10,6 +10,15 @@
   dune-site)
  (flags :standard -open Goto_lib))
 
+(rule
+ (target cbmc_version.ml)
+ (deps
+  (file ../CBMC_VERSION))
+ (action
+  (with-stdout-to
+   %{target}
+   (bash "echo let expected = \\\"$(cat %{deps})\\\""))))
+
 (generate_sites_module
  (module runtime_sites)
  (sites kanillian))
