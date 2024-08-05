@@ -88,7 +88,35 @@ let create_compilation_result path goto_prog gil_prog =
     init_data = ();
   }
 
+let cbmc_version_checked = ref false
+
+let check_cbmc_version () =
+  if not !cbmc_version_checked then
+    let () = cbmc_version_checked := true in
+    let expected_cbmc_version = Cbmc_version.expected in
+    let cbmc_version =
+      let inp = Unix.open_process_in "cbmc --version" in
+      let r = In_channel.input_all inp in
+      let () =
+        match Unix.close_process_in inp with
+        | Unix.WEXITED 0 -> ()
+        | _ ->
+            failwith
+              "Failed to check CBMC version! Make sure CBMC is installed."
+      in
+      r |> String.trim |> String.split_on_char ' ' |> List.hd
+    in
+    if cbmc_version <> expected_cbmc_version then
+      let msg =
+        Fmt.str
+          "WARNING: expected CBMC version %s, but found %s. There may be \
+           consequences!"
+          expected_cbmc_version cbmc_version
+      in
+      Logging.print_to_all msg
+
 let compile_c_to_symtab c_file =
+  let () = check_cbmc_version () in
   let symtab_file = c_file ^ ".symtab.json" in
   let status =
     Sys.command
