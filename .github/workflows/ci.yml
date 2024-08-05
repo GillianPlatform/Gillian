@@ -351,5 +351,5 @@ jobs:
           rm * -rf
           cp -r ../docs/* .
           git add -A
-          git commit -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
+          git commit --allow-empty -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
           git push --force
