@@ -1,7 +1,7 @@
 [{pc:
    {pfs: [(! (x == 1i))];
     gamma: (x: Int);
-    learned: [(1i i<=# x); (2i i<=# x)];
+    learned: [(0i i<# x); (1i i<# x); (1i i<=# x); (2i i<=# x)];
     learned_types: []};
   value: 12},
  {pc:

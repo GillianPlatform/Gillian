@@ -525,7 +525,10 @@ let execute_prod_single heap params =
   ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let* sval = SVal.of_gil_expr_exn sval_e in
+      let* sval =
+        try SVal.of_gil_expr_exn sval_e
+        with SVal.NotACompCertValue _ -> Delayed.vanish ()
+      in
       let++ mem = Mem.prod_single heap.mem loc ofs chunk sval perm in
       { heap with mem }
   | _ -> fail_ungracefully "set_single" params
