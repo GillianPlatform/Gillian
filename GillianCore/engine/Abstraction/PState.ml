@@ -412,6 +412,170 @@ module Make (State : SState.S) :
       preds_list;
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
+  let consume ~(prog : 'a MP.prog) astate a binders =
+    if not (List.for_all Names.is_lvar_name binders) then
+      failwith "Binding of pure variables in *-assert.";
+    let store = State.get_store astate.state in
+    let pvars_store = SStore.domain store in
+    let pvars_a = Asrt.pvars a in
+    let pvars_diff = SS.diff pvars_a pvars_store in
+    (if not (SS.is_empty pvars_diff) then
+       let pvars_errs : err_t list =
+         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+       in
+       raise (Internal_State_Error (pvars_errs, astate)));
+    let store_subst = SStore.to_ssubst store in
+    let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
+    (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
+    let state_lvars = State.get_lvars astate.state in
+    let known_lvars =
+      SS.elements
+        (SS.diff (SS.inter state_lvars (Asrt.lvars a)) (SS.of_list binders))
+    in
+    let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
+    let asrt_alocs =
+      List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+    in
+    let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
+
+    let pred_ins =
+      Hashtbl.fold
+        (fun name (pred : Pred.t) pred_ins ->
+          Hashtbl.add pred_ins name pred.pred_ins;
+          pred_ins)
+        prog.prog.preds
+        (Hashtbl.create Config.medium_tbl_size)
+    in
+
+    let mp =
+      MP.init known_matchables Expr.Set.empty pred_ins [ (a, (None, None)) ]
+    in
+    let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
+    if not (SS.is_empty vars_to_forget) then (
+      let oblivion_subst = fresh_subst vars_to_forget in
+      L.verbose (fun m ->
+          m "Forget @[%a@] with subst: %a"
+            Fmt.(iter ~sep:comma SS.iter string)
+            vars_to_forget SVal.SESubst.pp oblivion_subst);
+
+      (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+      let subst_in_place = substitution_in_place oblivion_subst astate in
+      assert (List.length subst_in_place = 1);
+      let astate = List.hd subst_in_place in
+
+      L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate));
+    let mp =
+      match mp with
+      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Ok mp -> mp
+    in
+    let bindings =
+      List.map
+        (fun (e : Expr.t) ->
+          let id =
+            match e with
+            | LVar _ | ALoc _ -> e
+            | _ ->
+                raise (Failure "Impossible: matchable not an lvar or an aloc")
+          in
+          (id, e))
+        (Expr.Set.elements known_matchables)
+    in
+    (* let old_astate = copy astate in *)
+    let subst = SVal.SESubst.init bindings in
+    let open Syntaxes.List in
+    let* matching_result = SMatcher.match_ astate subst mp LogicCommand in
+    match matching_result with
+    | Ok (new_state, subst', _) ->
+        (* Successful matching *)
+        let lbinders = List.map (fun x -> Expr.LVar x) binders in
+        let new_bindings =
+          List.map (fun e -> (e, SVal.SESubst.get subst' e)) lbinders
+        in
+        let success = List.for_all (fun (_, x_v) -> x_v <> None) new_bindings in
+        if not success then
+          raise (Failure "Assert failed - binders not captured");
+        let additional_bindings =
+          List.filter
+            (fun (e, v) -> (not (List.mem e lbinders)) && not (Expr.equal e v))
+            (SVal.SESubst.to_list subst')
+        in
+        let new_bindings =
+          List.map (fun (x, y) -> (x, Option.get y)) new_bindings
+          @ additional_bindings
+        in
+        let new_bindings =
+          List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v))) new_bindings
+        in
+        let a_new_bindings = Asrt.star new_bindings in
+        let full_subst = make_id_subst a in
+        let a_produce = a_new_bindings in
+        let open Res_list.Syntax in
+        let result =
+          let** new_astate = SMatcher.produce new_state full_subst a_produce in
+          let new_state' =
+            State.add_spec_vars new_astate.state (SS.of_list binders)
+          in
+          let subst, new_states =
+            State.simplify ~kill_new_lvars:true new_state'
+          in
+          let () = Preds.substitution_in_place subst new_astate.preds in
+          let () = Wands.substitution_in_place subst new_astate.wands in
+          let+ new_state = new_states in
+          Ok (copy_with_state new_astate new_state)
+        in
+        Res_list.map_error
+          (fun _ ->
+            let msg =
+              Fmt.str
+                "Assert failed with argument %a. unable to produce variable \
+                 bindings."
+                Asrt.pp a
+            in
+            StateErr.EOther msg)
+          result
+    | Error err ->
+        let fail_pfs : Formula.t = State.get_failing_constraint err in
+
+        let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
+        let msg =
+          Fmt.str
+            "Assert failed with argument @[<h>%a@]. matching failed.@\n\
+             @[<v 2>Errors:@\n\
+             %a.@]@\n\
+             @[<v 2>Failing Model:@\n\
+             %a@]@\n"
+            Asrt.pp a State.pp_err err
+            Fmt.(option ~none:(any "CANNOT CREATE MODEL") SVal.SESubst.pp)
+            failing_model
+        in
+        L.print_to_all msg;
+        Res_list.error_with (StateErr.EPure fail_pfs)
+
+  let produce astate a =
+    let store = State.get_store astate.state in
+    let pvars_store = SStore.domain store in
+    let pvars_a = Asrt.pvars a in
+    let pvars_diff = SS.diff pvars_a pvars_store in
+    (if not (SS.is_empty pvars_diff) then
+       let pvars_errs : err_t list =
+         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+       in
+       raise (Internal_State_Error (pvars_errs, astate)));
+    let store_subst = SStore.to_ssubst store in
+    let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
+    let open Syntaxes.List in
+    let open Res_list.Syntax in
+    let full_subst = make_id_subst a in
+    let** new_astate = SMatcher.produce astate full_subst a in
+    let subst, new_states =
+      State.simplify ~kill_new_lvars:true new_astate.state
+    in
+    let () = Preds.substitution_in_place subst new_astate.preds in
+    let () = Wands.substitution_in_place subst new_astate.wands in
+    let+ new_state = new_states in
+    Ok (copy_with_state new_astate new_state)
+
   let match_invariant
       (prog : 'a MP.prog)
       (revisited : bool)
@@ -902,6 +1066,8 @@ module Make (State : SState.S) :
               in
               L.print_to_all msg;
               Res_list.error_with (StateErr.EPure fail_pfs))
+      | Consume (asrt, binders) -> consume ~prog astate asrt binders
+      | Produce asrt -> produce astate asrt
       | ApplyLem (lname, args, binders) ->
           if not (List.for_all Names.is_lvar_name binders) then
             failwith "Binding of pure variables in lemma application.";

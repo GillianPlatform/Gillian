@@ -111,6 +111,8 @@
         "else",         GIL_Parser.LELSE;
         "macro",        GIL_Parser.MACRO;
         "invariant",    GIL_Parser.INVARIANT;
+        "consume",      GIL_Parser.CONSUME;
+        "produce",      GIL_Parser.PRODUCE;
         "assert",       GIL_Parser.ASSERT;
         "assume",       GIL_Parser.ASSUME;
         "assume_type",  GIL_Parser.ASSUME_TYPE;

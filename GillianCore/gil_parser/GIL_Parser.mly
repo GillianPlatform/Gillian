@@ -129,6 +129,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token ASSERT
 %token SEPASSERT
 %token INVARIANT
+%token CONSUME 
+%token PRODUCE
 %token ASSUME_TYPE
 %token LSTNTH
 %token LSTREPEAT
@@ -763,6 +765,12 @@ g_logic_cmd_target:
 (* invariant (a) [existentials: x, y, z] *)
   | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
     { LCmd.SL (Invariant (a, Option.value ~default:[ ] binders)) }
+  
+  | CONSUME; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
+    { LCmd.SL (Consume (a, Option.value ~default:[ ] binders)) }
+    
+  | PRODUCE; LBRACE; a = g_assertion_target; RBRACE;
+    { LCmd.SL (Produce a) }
 
 (* assert_* (a) [bind: x, y, z] *)
   | SEPASSERT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)

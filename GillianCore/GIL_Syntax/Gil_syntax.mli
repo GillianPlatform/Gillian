@@ -671,6 +671,8 @@ module SLCmd : sig
     | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
     | SepAssert of Asrt.t * string list  (** Assert *)
     | Invariant of Asrt.t * string list  (** Invariant *)
+    | Consume of Asrt.t * string list
+    | Produce of Asrt.t
     | SymbExec
 
   (** @deprecated Use {!Visitors.endo} instead *)
@@ -1374,6 +1376,8 @@ module Visitors : sig
          ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
          ; visit_IntType : 'c -> Type.t -> Type.t
          ; visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+         ; visit_Consume : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+         ; visit_Produce : 'c -> SLCmd.t -> Asrt.t -> SLCmd.t
          ; visit_LAction :
              'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
          ; visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
@@ -1640,6 +1644,8 @@ module Visitors : sig
     method visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
     method visit_IntType : 'c -> Type.t -> Type.t
     method visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+    method visit_Consume : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+    method visit_Produce : 'c -> SLCmd.t -> Asrt.t -> SLCmd.t
 
     method visit_LAction :
       'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
@@ -1906,6 +1912,8 @@ module Visitors : sig
          ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
          ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
          ; visit_Invariant : 'c -> Asrt.t -> string list -> 'f
+         ; visit_Consume : 'c -> Asrt.t -> string list -> 'f
+         ; visit_Produce : 'c -> Asrt.t -> 'f
          ; visit_LAction : 'c -> string -> string -> Expr.t list -> 'f
          ; visit_LList : 'c -> Literal.t list -> 'f
          ; visit_LVar : 'c -> LVar.t -> 'f
@@ -2142,6 +2150,8 @@ module Visitors : sig
     method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
     method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
     method visit_Invariant : 'c -> Asrt.t -> string list -> 'f
+    method visit_Consume : 'c -> Asrt.t -> string list -> 'f
+    method visit_Produce : 'c -> Asrt.t -> 'f
     method visit_LAction : 'c -> string -> string -> Expr.t list -> 'f
     method visit_LList : 'c -> Literal.t list -> 'f
     method visit_LVar : 'c -> LVar.t -> 'f
@@ -2390,6 +2400,8 @@ module Visitors : sig
          ; visit_Int : 'c -> Z.t -> unit
          ; visit_IntType : 'c -> unit
          ; visit_Invariant : 'c -> Asrt.t -> string list -> unit
+         ; visit_Consume : 'c -> Asrt.t -> string list -> unit
+         ; visit_Produce : 'c -> Asrt.t -> unit
          ; visit_LAction : 'c -> string -> string -> Expr.t list -> unit
          ; visit_LList : 'c -> Literal.t list -> unit
          ; visit_LVar : 'c -> string -> unit
@@ -2630,6 +2642,8 @@ module Visitors : sig
     method visit_Int : 'c -> Z.t -> unit
     method visit_IntType : 'c -> unit
     method visit_Invariant : 'c -> Asrt.t -> string list -> unit
+    method visit_Consume : 'c -> Asrt.t -> string list -> unit
+    method visit_Produce : 'c -> Asrt.t -> unit
     method visit_LAction : 'c -> string -> string -> Expr.t list -> unit
     method visit_LList : 'c -> Literal.t list -> unit
     method visit_LVar : 'c -> string -> unit

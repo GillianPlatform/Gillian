@@ -182,6 +182,8 @@ and slcmd =
   | ApplyLem of string * expr list * string list
   | SepAssert of assertion * string list
   | Invariant of assertion * string list
+  | Consume of assertion * string list
+  | Produce of assertion
   | SymbExec
 
 and lcmd =

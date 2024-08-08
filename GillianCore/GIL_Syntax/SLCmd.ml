@@ -19,6 +19,10 @@ type t = TypeDef__.slcmd =
   | ApplyLem of string * Expr.t list * string list  (** Apply lemma      *)
   | SepAssert of Asrt.t * string list  (** Assert           *)
   | Invariant of Asrt.t * string list  (** Invariant        *)
+  | Consume of
+      Asrt.t
+      * string list (* Consumes an assertion. Warning, not frame-preserving *)
+  | Produce of Asrt.t (* Produces an assertion. Warning, not frame-preserving *)
   | SymbExec
 [@@deriving yojson]
 
@@ -47,6 +51,8 @@ let map
   | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map map_e l, existentials)
   | SepAssert (a, binders) -> SepAssert (map_a a, binders)
   | Invariant (a, existentials) -> Invariant (map_a a, existentials)
+  | Consume (a, binders) -> Consume (map_a a, binders)
+  | Produce a -> Produce (map_a a)
   | SymbExec -> SymbExec
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
       Package
@@ -64,7 +70,8 @@ let pvars (slcmd : t) : SS.t =
   | GUnfold _ -> SS.empty
   | Package { lhs = _, les1; rhs = _, les2 } ->
       SS.union (pvars_es les1) (pvars_es les2)
-  | SepAssert (a, _) | Invariant (a, _) -> Asrt.pvars a
+  | SepAssert (a, _) | Invariant (a, _) | Consume (a, _) | Produce a ->
+      Asrt.pvars a
   | SymbExec -> SS.empty
 
 let lvars (slcmd : t) : SS.t =
@@ -84,8 +91,9 @@ let lvars (slcmd : t) : SS.t =
       SS.union (lvars_es les1) (lvars_es les2)
   | ApplyLem (_, es, _) -> lvars_es es
   | GUnfold _ -> SS.empty
-  | SepAssert (a, binders) -> SS.union (Asrt.lvars a) (SS.of_list binders)
-  | Invariant (a, _) -> Asrt.lvars a
+  | SepAssert (a, binders) | Consume (a, binders) ->
+      SS.union (Asrt.lvars a) (SS.of_list binders)
+  | Invariant (a, _) | Produce a -> Asrt.lvars a
   | SymbExec -> SS.empty
 
 let locs (slcmd : t) : SS.t =
@@ -105,7 +113,8 @@ let locs (slcmd : t) : SS.t =
       SS.union (locs_es les1) (locs_es les2)
   | ApplyLem (_, es, _) -> locs_es es
   | GUnfold _ -> SS.empty
-  | SepAssert (a, _) | Invariant (a, _) -> Asrt.locs a
+  | SepAssert (a, _) | Invariant (a, _) | Consume (a, _) | Produce a ->
+      Asrt.locs a
   | SymbExec -> SS.empty
 
 let pp_folding_info =
@@ -149,6 +158,9 @@ let pp fmt lcmd =
   | SepAssert (a, binders) ->
       Fmt.pf fmt "@[sep_assert %a %a@]" (Fmt.parens Asrt.pp) a pp_binders
         binders
+  | Consume (a, binders) ->
+      Fmt.pf fmt "@[consume %a %a@]" (Fmt.parens Asrt.pp) a pp_binders binders
+  | Produce a -> Fmt.pf fmt "@[produce %a@]" (Fmt.parens Asrt.pp) a
   | Invariant (a, existentials) ->
       let pp_exs f exs =
         match exs with
