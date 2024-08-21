@@ -314,15 +314,16 @@ struct
 
     let process_files = Process_files.f
 
-    let has_hit_breakpoint dbg =
-      match dbg.frames with
-      | [] -> false
-      | frame :: _ ->
-          if Hashtbl.mem dbg.breakpoints frame.source_path then
-            let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
-            (* Currently only one breakpoint per line is supported *)
-            Breakpoints.mem frame.start_line breakpoints
-          else false
+    (* Currently only one breakpoint per line is supported *)
+    let is_breakpoint ~file ~lines proc =
+      match Hashtbl.find_opt proc.breakpoints file with
+      | None -> false
+      | Some breakpoints ->
+          let rec aux = function
+            | [] -> false
+            | line :: ls -> Breakpoints.mem line breakpoints || aux ls
+          in
+          aux lines
 
     let rec call_stack_to_frames call_stack next_proc_body_idx prog =
       match call_stack with
@@ -613,8 +614,9 @@ struct
         exec_data
 
       let with_lifter_effects f proc_state state =
-        let open Effect.Deep in
+        let open Lift in
         let open Lifter in
+        let open Effect.Deep in
         try_with f ()
           {
             effc =
@@ -626,7 +628,11 @@ struct
                         let step_result =
                           handle_step_effect id case path proc_state state
                         in
-                        Effect.Deep.continue k step_result)
+                        continue k step_result)
+                | IsBreakpoint (file, lines) ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        is_breakpoint ~file ~lines proc_state |> continue k)
                 | _ ->
                     let s = Printexc.to_string (Effect.Unhandled eff) in
                     Fmt.failwith "HORROR: effect leak!\n%s" s);

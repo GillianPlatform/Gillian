@@ -24,6 +24,8 @@ module Types = struct
     | Stop of Logging.Report_id.t option
     | ExecNext of (Logging.Report_id.t option * Branch_case.t option)
   [@@deriving yojson]
+
+  type _ Effect.t += IsBreakpoint : (string * int list) -> bool Effect.t
 end
 
 include Types
