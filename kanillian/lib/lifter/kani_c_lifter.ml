@@ -60,6 +60,7 @@ struct
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
+    loc : (string * int) option;
   }
   [@@deriving yojson]
 
@@ -76,6 +77,7 @@ struct
       callers : id list;
       stack_direction : stack_direction option;
       nest_kind : nest_kind option;
+      loc : (string * int) option;
     }
     [@@deriving to_yojson]
 
@@ -111,6 +113,7 @@ struct
       next_kind : (Branch_case.t, branch_data) next_kind;
       callers : id list;
       stack_direction : stack_direction option;
+      loc : (string * int) option;
     }
     [@@deriving yojson]
 
@@ -170,7 +173,7 @@ struct
             : partial_data) =
         partial
       in
-      let** { id; display; callers; stack_direction; nest_kind } =
+      let** { id; display; callers; stack_direction; nest_kind; loc } =
         Result_utils.of_option
           ~none:"Trying to finish partial with no canonical data!"
           canonical_data
@@ -202,6 +205,7 @@ struct
           next_kind;
           callers;
           stack_direction;
+          loc;
         }
 
     let init () = Hashtbl.create 0
@@ -336,6 +340,7 @@ struct
               callers;
               stack_direction;
               nest_kind = None;
+              loc = None;
             };
         Ok ()
 
@@ -366,8 +371,15 @@ struct
               get_stack_info ~partial exec_data
             in
             let Annot.{ nest_kind; _ } = annot in
+            let loc =
+              let+ loc =
+                annot.origin_loc
+                |> Option.map Debugger_utils.location_to_display_location
+              in
+              (loc.loc_source, loc.loc_start.pos_line)
+            in
             partial.canonical_data <-
-              Some { id; display; callers; stack_direction; nest_kind };
+              Some { id; display; callers; stack_direction; nest_kind; loc };
             Ok ()
         | _ -> Ok ()
 
@@ -548,6 +560,7 @@ struct
               prev;
               next_kind;
               callers;
+              loc;
               _;
             } =
         finished_partial
@@ -563,6 +576,7 @@ struct
           prev;
           callers;
           func_return_label;
+          loc;
         }
       in
       let next =
@@ -861,7 +875,18 @@ struct
     | Either.Left next -> next
     | Either.Right (id, case) -> request_next state id case
 
-  let step_all state id case =
+  let is_breakpoint ~start ~current =
+    let b =
+      let+ file, line = current.data.loc in
+      let- () =
+        let* file', line' = start.data.loc in
+        if file = file' && line = line' then Some false else None
+      in
+      Effect.perform (IsBreakpoint (file, [ line ]))
+    in
+    Option.value b ~default:false
+
+  let step_all ~start state id case =
     let cmd = get_exn state.map id in
     let stack_depth = List.length cmd.data.callers in
     let rec aux ends = function
@@ -870,6 +895,11 @@ struct
           let next_id = step state id case in
           let node = get_exn state.map next_id in
           let ends, nexts =
+            let- () =
+              if is_breakpoint ~start ~current:node then
+                Some (node :: ends, rest)
+              else None
+            in
             match node.next with
             | Some (Single _) -> (ends, (next_id, None) :: rest)
             | Some (Branch nexts) ->
@@ -920,7 +950,7 @@ struct
         | NoSubmap | Proc _ -> None
         | Submap m -> Some m
       in
-      let _ = step_all state submap_id None in
+      let _ = step_all ~start:node state submap_id None in
       ()
     in
     let stop_id = step state id None in
@@ -946,10 +976,11 @@ struct
     (id, Debugger_utils.Step)
 
   let continue state id =
+    let start = get_exn state.map id in
     let rec aux ends = function
       | [] -> ends
       | (id, case) :: rest ->
-          let ends' = step_all state id case in
+          let ends' = step_all ~start state id case in
           let ends', nexts =
             ends'
             |> List.partition_map (fun { data; _ } ->
@@ -968,12 +999,11 @@ struct
     | [] -> continue state id
     | caller_id :: _ -> step_over state caller_id
 
-  let is_breakpoint _ = false (* TODO *)
-
   let continue_back state id =
+    let start = get_exn state.map id in
     let rec aux node =
       let { id; callers; _ } = node.data in
-      if is_breakpoint node then (id, Debugger_utils.Breakpoint)
+      if is_breakpoint ~start ~current:node then (id, Debugger_utils.Breakpoint)
       else
         match previous_step id state with
         | None -> (
@@ -982,7 +1012,7 @@ struct
             | caller_id :: _ -> aux (get_exn state.map caller_id))
         | Some (id, _) -> aux (get_exn state.map id)
     in
-    aux (get_exn state.map id)
+    aux start
 
   let init ~proc_name ~all_procs:_ tl_ast prog =
     let gil_state = Gil.get_state () in
