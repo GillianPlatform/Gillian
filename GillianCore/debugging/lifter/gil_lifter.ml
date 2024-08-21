@@ -244,24 +244,22 @@ functor
       Option.get case
 
     let find_next state id case =
-      let next =
-        match (get_exn state.map id).next with
-        | None -> failwith "HORROR - tried to step from FinalCmd!"
-        | Some next -> next
-      in
-      match (next, case) with
-      | Single _, Some _ ->
+      let node = get_exn state.map id in
+      match (node.next, case) with
+      | (None | Some (Single _)), Some _ ->
           failwith "HORROR - tried to step case for non-branch cmd"
-      | Single (None, _), None -> Either.Right None
-      | Single (Some next, _), None -> Either.Left (get_exn state.map next)
-      | Branch nexts, None ->
+      | Some (Single (None, _)), None -> Either.Right None
+      | Some (Single (Some next, _)), None ->
+          Either.Left (get_exn state.map next)
+      | Some (Branch nexts), None ->
           let case = select_case nexts in
           Either.Right (Some case)
-      | Branch nexts, Some case -> (
+      | Some (Branch nexts), Some case -> (
           match List.assoc_opt case nexts with
           | None -> failwith "case not found"
           | Some (None, _) -> Either.Right (Some case)
           | Some (Some next, _) -> Either.Left (get_exn state.map next))
+      | None, None -> Either.Left node
 
     let request_next state id case =
       let path = path_of_id id state in
