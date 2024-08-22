@@ -1,6 +1,7 @@
 module L = Logging
 module DL = Debugger_log
 open Lifter_intf
+open Syntaxes.Option
 include Gil_lifter_intf
 
 type id = L.Report_id.t [@@deriving yojson]
@@ -27,6 +28,7 @@ functor
       submap : id submap;
       branch_path : branch_path;
       parent : (id * branch_case option) option;
+      loc : (string * int) option;
     }
     [@@deriving to_yojson]
 
@@ -73,8 +75,16 @@ functor
         }
         () =
       let display = Fmt.to_to_string Cmd.pp_indexed cmd_report.cmd in
+      let loc =
+        let annot = cmd_report.annot in
+        let+ loc =
+          Annot.get_origin_loc annot
+          |> Option.map Debugger_utils.location_to_display_location
+        in
+        (loc.loc_source, loc.loc_start.pos_line)
+      in
       let data =
-        { id; display; matches; errors; submap; branch_path; parent }
+        { id; display; matches; errors; submap; branch_path; parent; loc }
       in
       let next =
         match next_kind with
@@ -244,24 +254,22 @@ functor
       Option.get case
 
     let find_next state id case =
-      let next =
-        match (get_exn state.map id).next with
-        | None -> failwith "HORROR - tried to step from FinalCmd!"
-        | Some next -> next
-      in
-      match (next, case) with
-      | Single _, Some _ ->
+      let node = get_exn state.map id in
+      match (node.next, case) with
+      | (None | Some (Single _)), Some _ ->
           failwith "HORROR - tried to step case for non-branch cmd"
-      | Single (None, _), None -> Either.Right None
-      | Single (Some next, _), None -> Either.Left (get_exn state.map next)
-      | Branch nexts, None ->
+      | Some (Single (None, _)), None -> Either.Right None
+      | Some (Single (Some next, _)), None ->
+          Either.Left (get_exn state.map next)
+      | Some (Branch nexts), None ->
           let case = select_case nexts in
           Either.Right (Some case)
-      | Branch nexts, Some case -> (
+      | Some (Branch nexts), Some case -> (
           match List.assoc_opt case nexts with
           | None -> failwith "case not found"
           | Some (None, _) -> Either.Right (Some case)
           | Some (Some next, _) -> Either.Left (get_exn state.map next))
+      | None, None -> Either.Left node
 
     let request_next state id case =
       let path = path_of_id id state in
@@ -305,15 +313,23 @@ functor
       in
       (stop_id, Debugger_utils.Step)
 
+    let is_breakpoint node =
+      match node.data.loc with
+      | None -> false
+      | Some (file, line) -> Effect.perform (IsBreakpoint (file, [ line ]))
+
     let continue state id =
       let open Utils.Syntaxes.Option in
-      let rec aux stack ends =
+      let rec aux ?(first = false) stack ends =
         match stack with
         | [] -> List.rev ends
         | (id, case) :: rest -> (
-            match step state id case with
-            | Either.Left nexts -> aux (nexts @ rest) ends
-            | Either.Right end_id -> aux rest (end_id :: ends))
+            let node = get_exn state.map id in
+            if (not first) && is_breakpoint node then aux rest (id :: ends)
+            else
+              match step state id case with
+              | Either.Left nexts -> aux (nexts @ rest) ends
+              | Either.Right end_id -> aux rest (end_id :: ends))
       in
       let end_ =
         let end_, stack =
@@ -327,7 +343,7 @@ functor
               (None, stack)
         in
         let- () = end_ in
-        let ends = aux stack [] in
+        let ends = aux ~first:true stack [] in
         List.hd ends
       in
       (end_, Debugger_utils.Step)
@@ -335,7 +351,17 @@ functor
     let step_out = continue
 
     (* TODO: breakpoints *)
-    let continue_back t _ = (Option.get t.map.root, Debugger_utils.Step)
+    let continue_back t id =
+      let rec aux id = function
+        | None -> (id, Debugger_utils.Step)
+        | Some (id, _) ->
+            let node = get_exn t.map id in
+            if is_breakpoint node then (id, Breakpoint)
+            else aux id node.data.parent
+      in
+      let node = get_exn t.map id in
+      aux id node.data.parent
+    (* (Option.get t.map.root, Debugger_utils.Step) *)
 
     let init_manual proc_name all_procs =
       let map = Exec_map.make () in

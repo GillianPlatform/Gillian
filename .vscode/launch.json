@@ -6,11 +6,11 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}/debugger-vscode-extension",
+				"--extensionDevelopmentPath=${workspaceFolder}/debug-ui",
 				"${workspaceFolder}/debug-ui/examples"
 			],
 			"outFiles": [
-				"${workspaceFolder}/debugger-vscode-extension/out/**/*.js"
+				"${workspaceFolder}/debug-ui/out/**/*.js"
 			]
 		},
 	]

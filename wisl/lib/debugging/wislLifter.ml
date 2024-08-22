@@ -82,7 +82,7 @@ struct
     matches : matching list;
     errors : string list;
     mutable submap : id submap;
-    (* branch_path : Branch_case.t list; *)
+    loc : string * int;
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
@@ -98,16 +98,22 @@ struct
   module Partial_cmds = struct
     type prev = id * Branch_case.t option * id list [@@deriving yojson]
 
+    type canonical_cmd_data = {
+      id : id;
+      display : string;
+      stack_info : id list * stack_direction option;
+      is_loop_end : bool;
+      loc : string * int;
+    }
+    [@@deriving to_yojson]
+
     type partial_data = {
       prev : prev option;
       all_ids : (id * (Branch_case.kind option * Branch_case.case)) Ext_list.t;
       unexplored_paths : (id * Gil_branch_case.t option) Stack.t;
       ends : (Branch_case.case * branch_data) Ext_list.t;
-      mutable id : id option;
-      mutable display : string option;
-      mutable stack_info : (id list * stack_direction option) option;
+      mutable canonical_data : canonical_cmd_data option;
       mutable nest_kind : nest_kind option;
-      mutable is_loop_end : bool;
       matches : matching Ext_list.t;
       errors : string Ext_list.t;
     }
@@ -121,11 +127,8 @@ struct
         all_ids = Ext_list.make ();
         unexplored_paths = Stack.create ();
         ends = Ext_list.make ();
-        id = None;
-        display = None;
-        stack_info = None;
+        canonical_data = None;
         nest_kind = None;
-        is_loop_end = false;
         matches = Ext_list.make ();
         errors = Ext_list.make ();
       }
@@ -143,6 +146,7 @@ struct
       submap : id submap;
       callers : id list;
       stack_direction : stack_direction option;
+      loc : string * int;
     }
     [@@deriving yojson]
 
@@ -194,19 +198,7 @@ struct
       is_loop_func && get_fun_call_name exec_data = Some proc_name
 
     let finish ~exec_data partial =
-      let ({
-             prev;
-             all_ids;
-             id;
-             display;
-             stack_info;
-             ends;
-             nest_kind;
-             matches;
-             errors;
-             is_loop_end;
-             _;
-           }
+      let ({ prev; all_ids; ends; nest_kind; matches; errors; _ }
             : partial_data) =
         partial
       in
@@ -214,17 +206,12 @@ struct
         let+ id, branch, _ = prev in
         (id, branch)
       in
-      let** id =
-        id |> Option.to_result ~none:"Trying to finish partial with no id!"
+      let** { id; display; stack_info; loc; is_loop_end } =
+        partial.canonical_data
+        |> Option.to_result
+             ~none:"Trying to finish partial with no canonical data!"
       in
-      let** display =
-        display
-        |> Option.to_result ~none:"Trying to finish partial with no display!"
-      in
-      let** callers, stack_direction =
-        stack_info
-        |> Option.to_result ~none:"Trying to finish partial with no stack info!"
-      in
+      let callers, stack_direction = stack_info in
       let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
       let matches = matches |> Ext_list.to_list in
       let errors = errors |> Ext_list.to_list in
@@ -252,6 +239,7 @@ struct
           display;
           callers;
           stack_direction;
+          loc;
           matches;
           errors;
           submap;
@@ -338,21 +326,24 @@ struct
           ~proc_name
           ~exec_data
           (partial : partial_data) =
-        match (partial.display, annot.stmt_kind, annot.origin_id) with
+        match (partial.canonical_data, annot.stmt_kind, annot.origin_id) with
         | None, (Normal _ | Return _), Some origin_id ->
-            let** display =
+            let** display, is_loop_end =
               match get_origin_node_str tl_ast (Some origin_id) with
-              | Some display -> Ok display
+              | Some display -> Ok (display, false)
               | None ->
                   if is_loop_end ~is_loop_func ~proc_name exec_data then
-                    let () = partial.is_loop_end <- true in
-                    Ok "<end of loop>"
+                    Ok ("<end of loop>", true)
                   else Error "Couldn't get display!"
             in
             let** stack_info = get_stack_info ~partial exec_data in
-            partial.id <- Some id;
-            partial.display <- Some display;
-            partial.stack_info <- Some stack_info;
+            let loc =
+              annot.origin_loc |> Option.get
+              |> Debugger_utils.location_to_display_location
+            in
+            let loc = (loc.loc_source, loc.loc_start.pos_line) in
+            partial.canonical_data <-
+              Some { id; display; stack_info; is_loop_end; loc };
             Ok ()
         | _ -> Ok ()
 
@@ -563,6 +554,7 @@ struct
               prev;
               callers;
               next_kind;
+              loc;
               _;
             } =
         finished_partial
@@ -578,6 +570,7 @@ struct
           prev;
           callers;
           func_return_label;
+          loc;
         }
       in
       let next =
@@ -1011,7 +1004,15 @@ struct
     | Either.Left next -> next
     | Either.Right (id, case) -> request_next state id case
 
-  let step_all state id case =
+  let is_breakpoint ~start ~current =
+    let file, line = current.data.loc in
+    let- () =
+      let file', line' = start.data.loc in
+      if file = file' && line = line' then Some false else None
+    in
+    Effect.perform (IsBreakpoint (file, [ line ]))
+
+  let step_all ~start state id case =
     let cmd = get_exn state.map id in
     let stack_depth = List.length cmd.data.callers in
     let rec aux ends = function
@@ -1020,6 +1021,11 @@ struct
           let next_id = step state id case in
           let node = get_exn state.map next_id in
           let ends, nexts =
+            let- () =
+              if is_breakpoint ~start ~current:node then
+                Some (node :: ends, rest)
+              else None
+            in
             match node.next with
             | Some (Single _) -> (ends, (next_id, None) :: rest)
             | Some (Branch nexts) ->
@@ -1070,7 +1076,7 @@ struct
         | NoSubmap | Proc _ -> None
         | Submap m -> Some m
       in
-      let _ = step_all state submap_id None in
+      let _ = step_all ~start:node state submap_id None in
       ()
     in
     let stop_id = step state id None in
@@ -1096,18 +1102,19 @@ struct
     (id, Debugger_utils.Step)
 
   let continue state id =
+    let start = get_exn state.map id in
     let rec aux ends = function
       | [] -> ends
       | (id, case) :: rest ->
-          let ends' = step_all state id case in
-          let ends', nexts =
-            ends'
+          let new_ends, nexts =
+            let new_ends = step_all ~start state id case in
+            new_ends
             |> List.partition_map (fun { data; _ } ->
                    match get_next_from_end state data with
                    | Some (id, case) -> Either.Right (id, case)
                    | None -> Either.Left data.id)
           in
-          aux (ends @ ends') (nexts @ rest)
+          aux (ends @ new_ends) (nexts @ rest)
     in
     let ends = aux [] [ (id, None) ] in
     let id = List.hd ends in
@@ -1118,12 +1125,11 @@ struct
     | [] -> continue state id
     | caller_id :: _ -> step_over state caller_id
 
-  let is_breakpoint _ = false (* TODO *)
-
   let continue_back state id =
+    let start = get_exn state.map id in
     let rec aux node =
       let { id; callers; _ } = node.data in
-      if is_breakpoint node then (id, Debugger_utils.Breakpoint)
+      if is_breakpoint ~start ~current:node then (id, Debugger_utils.Breakpoint)
       else
         match previous_step id state with
         | None -> (
@@ -1132,7 +1138,7 @@ struct
             | caller_id :: _ -> aux (get_exn state.map caller_id))
         | Some (id, _) -> aux (get_exn state.map id)
     in
-    aux (get_exn state.map id)
+    aux start
 
   let init ~proc_name ~all_procs:_ tl_ast prog =
     let gil_state = Gil.get_state () in
