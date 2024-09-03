@@ -15,6 +15,6 @@ node_modules
 tailwind.config.json
 webpack.config.js
 screenshots
-sampleWorkspace
+examples
 **/*.config.js
 tsconfig-webview.json

@@ -9,7 +9,7 @@ module type S = sig
   type st = CVal.CSubst.t
 
   (** Errors *)
-  type err_t [@@deriving show]
+  type err_t [@@deriving yojson, show]
 
   (** Type of GIL general states *)
   type t

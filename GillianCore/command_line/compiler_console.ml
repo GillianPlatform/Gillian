@@ -1,6 +1,9 @@
 open Cmdliner
+open Command_line_utils
 
-module Make (PC : ParserAndCompiler.S) : Console.S = struct
+module Make
+    (ID : Init_data.S)
+    (PC : ParserAndCompiler.S with type init_data = ID.t) : Console.S = struct
   open Common_args.Make (PC)
 
   let mode =
@@ -24,8 +27,10 @@ module Make (PC : ParserAndCompiler.S) : Console.S = struct
       ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
         (PC.parse_and_compile_files files)
     in
-    List.iter
-      (fun (path, prog) -> Io_utils.save_file_pp path Prog.pp_labeled prog)
+    List.iteri
+      (fun i (path, prog) ->
+        let init_data = if i = 0 then ID.to_yojson progs.init_data else `Null in
+        burn_gil ~init_data ~pp_prog:Prog.pp_labeled prog (Some path))
       progs.gil_progs
 
   let compile files mode runtime_path ci tl_opts =

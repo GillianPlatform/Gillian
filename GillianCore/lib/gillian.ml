@@ -105,6 +105,9 @@ module Logging = struct
     Use this when you need a pretty printer,
     but don't expect it to actually be seen anywhere *)
   let dummy_pp = dummy_pp
+
+  (** Prints a message to all available reporters, and stdout if applicable. *)
+  let print_to_all = print_to_all
 end
 
 module IncrementalAnalysis = IncrementalAnalysis

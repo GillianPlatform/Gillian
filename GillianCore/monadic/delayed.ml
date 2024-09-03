@@ -56,7 +56,7 @@ let branch_on
             in
             then_branches @ else_branches
           else then_branches
-      with Z3_encoding.Z3Unknown ->
+      with Smt.SMT_unknown ->
         Fmt.pr "TIMED OUT ON: %a" Formula.pp guard;
         vanish () ~curr_pc)
 

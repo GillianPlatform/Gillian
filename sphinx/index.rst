@@ -14,6 +14,7 @@ Welcome to Gillian
 
    c/index
    js/index
+   kanillian/index
 
 .. toctree::
    :titlesonly:

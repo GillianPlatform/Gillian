@@ -20,6 +20,11 @@ jobs:
         operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
@@ -81,6 +86,11 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
@@ -114,6 +124,11 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
@@ -134,7 +149,7 @@ jobs:
         run: "Gillian-JS/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test JaVerT
-        run: "opam exec -- bash ./testJaVerT.sh"
+        run: "./testJaVerT.sh"
         working-directory: "Gillian/Gillian-JS/environment/"
       # - name: Test Amazon
       #   run: "make"
@@ -147,6 +162,11 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
@@ -180,6 +200,11 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
@@ -209,6 +234,11 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
@@ -239,6 +269,11 @@ jobs:
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
+  #     - name: Setup Z3
+  #       id: z3
+  #       uses: cda-tum/setup-z3@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #     - uses: ocaml/setup-ocaml@v2
   #       with:
   #         ocaml-compiler: "ocaml-variants.5.2.0+options"
@@ -316,5 +351,5 @@ jobs:
           rm * -rf
           cp -r ../docs/* .
           git add -A
-          git commit -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
+          git commit --allow-empty -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
           git push --force

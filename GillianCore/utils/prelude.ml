@@ -20,6 +20,11 @@ let of_yojson_string of_yojson s =
 module Hashtbl = struct
   include Hashtbl
 
+  let singleton k v =
+    let tbl = create 1 in
+    add tbl k v;
+    tbl
+
   let find_or_else_add tbl k f =
     match find_opt tbl k with
     | Some x -> x

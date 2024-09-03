@@ -11,7 +11,7 @@ module Types = struct
 
   type 'cmd_report executed_cmd_data = {
     is_breakpoint : bool;
-    kind : (Branch_case.t, unit) Exec_map.cmd_kind;
+    next_kind : (Branch_case.t, unit) Exec_map.next_kind;
     id : Logging.Report_id.t;
     cmd_report : 'cmd_report;
     matches : Exec_map.matching list;
@@ -24,6 +24,8 @@ module Types = struct
     | Stop of Logging.Report_id.t option
     | ExecNext of (Logging.Report_id.t option * Branch_case.t option)
   [@@deriving yojson]
+
+  type _ Effect.t += IsBreakpoint : (string * int list) -> bool Effect.t
 end
 
 include Types
@@ -100,9 +102,6 @@ module type S = sig
   (** Gives a list of matches that occurred at the specified command. *)
   val get_matches_at_id : Logging.Report_id.t -> t -> Exec_map.matching list
 
-  (** Gives the id of the root (first) command in the execution map. *)
-  val get_root_id : t -> Logging.Report_id.t option
-
   val memory_error_to_exception_info :
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
 
@@ -126,7 +125,7 @@ module type Intf = sig
 
   val make_executed_cmd_data :
     ?is_breakpoint:bool ->
-    (Branch_case.t, unit) Exec_map.cmd_kind ->
+    (Branch_case.t, unit) Exec_map.next_kind ->
     Logging.Report_id.t ->
     'cmd_report ->
     ?matches:Exec_map.matching list ->

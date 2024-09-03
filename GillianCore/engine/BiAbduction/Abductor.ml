@@ -229,7 +229,21 @@ module Make
           (Format.asprintf "When trying to build an MP for %s, I died!" name)
     in
     match result with
-    | RFail { error_state; _ } ->
+    | RFail { error_state; errors; _ } ->
+        (* Because of fixes, the state may have changed since between the start of execution
+           and the failure: the anti-frame might have been modified before immediately erroring.
+           BiState thus returns, with every error, the state immeditaly before the error happens
+           with any applied fixes - this is the state that should be used to ensure fixes
+           don't get lost. *)
+        let rec find_error_state (aux : SBAInterpreter.err_t list) =
+          match aux with
+          | [] -> error_state
+          | e :: errs -> (
+              match e with
+              | EState (EMem (s, _)) -> s
+              | _ -> find_error_state errs)
+        in
+        let error_state = find_error_state errors in
         let+ spec = process_spec name params state_i error_state Flag.Bug in
         add_spec spec;
         (spec, Flag.Bug)
@@ -310,7 +324,8 @@ module Make
     in
     let result = run_tests_aux tests [] [] [] 1 in
     Fmt.pr "\nTest results:\nProc, GIL Commands, Tests, Succs, Bugs, Time\n";
-    !stats |> List.rev
+    !stats
+    |> List.sort (fun (name1, _) (name2, _) -> String.compare name1 name2)
     |> List.iter (fun (name, stats) ->
            Fmt.pr "%s, %a\n" name pp_proc_stats stats);
     Fmt.pr "@?";
@@ -321,20 +336,25 @@ module Make
       (succ_specs : Spec.t list)
       (error_specs : Spec.t list)
       (bug_specs : Spec.t list) =
+    let sort_specs =
+      List.sort
+        (fun Spec.{ spec_name = name1; _ } Spec.{ spec_name = name2; _ } ->
+          String.compare name1 name2)
+    in
     let bug_specs_txt =
       Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
         Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        bug_specs
+        (sort_specs bug_specs)
     in
     let error_specs_txt =
       Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
         Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        error_specs
+        (sort_specs error_specs)
     in
     let normal_specs_txt =
       Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
         Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        succ_specs
+        (sort_specs succ_specs)
     in
 
     if !Config.specs_to_stdout then (

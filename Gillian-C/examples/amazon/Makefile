@@ -1,4 +1,8 @@
-VERIFY=opam exec -- gillian-c verify
+ifdef GITHUB_ACTIONS
+	VERIFY=opam exec -- gillian-c verify
+else
+	VERIFY=dune exec -- gillian-c verify
+endif
 
 default:
 	${VERIFY} \
@@ -43,3 +47,10 @@ bugs: string-bug header-bug byte-cursor-ub
 
 clean:
 	rm -rf *.i *.deps
+
+t:
+	${VERIFY} \
+		header.c edk.c array_list.c ec.c byte_buf.c \
+		hash_table.c string.c allocator.c \
+		error.c base.c \
+		--fstruct-passing --no-lemma-proof --proc aws_cryptosdk_hdr_parse -l disabled --dump-smt

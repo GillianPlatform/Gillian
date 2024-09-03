@@ -314,15 +314,16 @@ struct
 
     let process_files = Process_files.f
 
-    let has_hit_breakpoint dbg =
-      match dbg.frames with
-      | [] -> false
-      | frame :: _ ->
-          if Hashtbl.mem dbg.breakpoints frame.source_path then
-            let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
-            (* Currently only one breakpoint per line is supported *)
-            Breakpoints.mem frame.start_line breakpoints
-          else false
+    (* Currently only one breakpoint per line is supported *)
+    let is_breakpoint ~file ~lines proc =
+      match Hashtbl.find_opt proc.breakpoints file with
+      | None -> false
+      | Some breakpoints ->
+          let rec aux = function
+            | [] -> false
+            | line :: ls -> Breakpoints.mem line breakpoints || aux ls
+          in
+          aux lines
 
     let rec call_stack_to_frames call_stack next_proc_body_idx prog =
       match call_stack with
@@ -462,28 +463,15 @@ struct
 
     let build_final_cmd_data content result prev_id branch_path debug_state =
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
-      let proc_name = (List.hd cmd.callstack).pid in
-      let errors = show_result_errors result in
-      let matches = match_final_cmd prev_id ~proc_name result debug_state in
       let exec_data =
-        Lift.make_executed_cmd_data Exec_map.Final prev_id cmd ~matches ~errors
+        let proc_name = (List.hd cmd.callstack).pid in
+        let errors = show_result_errors result in
+        let matches = match_final_cmd prev_id ~proc_name result debug_state in
+        let next_kind = Exec_map.Zero in
+        Lift.make_executed_cmd_data next_kind prev_id cmd ~matches ~errors
           branch_path
       in
       (exec_data, cmd)
-
-    let jump_to_start (state : t) =
-      let { debug_state; _ } = state in
-      let proc_state = get_proc_state_exn state in
-      let result =
-        let** root_id =
-          proc_state.lifter_state |> Lifter.get_root_id
-          |> Option.to_result ~none:"Debugger.jump_to_start: No root id found!"
-        in
-        jump_state_to_id root_id debug_state proc_state
-      in
-      match result with
-      | Error msg -> failwith msg
-      | Ok () -> ()
 
     module Step = struct
       open Verification.SAInterpreter.Logging
@@ -626,8 +614,9 @@ struct
         exec_data
 
       let with_lifter_effects f proc_state state =
-        let open Effect.Deep in
+        let open Lift in
         let open Lifter in
+        let open Effect.Deep in
         try_with f ()
           {
             effc =
@@ -639,7 +628,11 @@ struct
                         let step_result =
                           handle_step_effect id case path proc_state state
                         in
-                        Effect.Deep.continue k step_result)
+                        continue k step_result)
+                | IsBreakpoint (file, lines) ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        is_breakpoint ~file ~lines proc_state |> continue k)
                 | _ ->
                     let s = Printexc.to_string (Effect.Unhandled eff) in
                     Fmt.failwith "HORROR: effect leak!\n%s" s);

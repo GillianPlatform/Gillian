@@ -39,7 +39,7 @@ let simplify_pfs_and_gamma
 let check_satisfiability_with_model (fs : Formula.t list) (gamma : Type_env.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Z3_encoding.check_sat_core fs (Type_env.as_hashtbl gamma) in
+  let model = Smt.check_sat fs (Type_env.as_hashtbl gamma) in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -50,22 +50,20 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : Type_env.t) :
       Expr.Set.empty
       (List.map Formula.lvars (Formula.Set.elements fs))
   in
-  let z3_vars = Expr.Set.diff lvars (SESubst.domain subst None) in
+  let smt_vars = Expr.Set.diff lvars (SESubst.domain subst None) in
   L.(
     verbose (fun m ->
         m "OBTAINED VARS: %s\n"
           (String.concat ", "
              (List.map
                 (fun e -> Format.asprintf "%a" Expr.pp e)
-                (Expr.Set.elements z3_vars)))));
+                (Expr.Set.elements smt_vars)))));
   let update x e = SESubst.put subst (LVar x) e in
   match model with
   | None -> None
   | Some model -> (
       try
-        Z3_encoding.lift_z3_model model
-          (Type_env.as_hashtbl gamma)
-          update z3_vars;
+        Smt.lift_model model (Type_env.as_hashtbl gamma) update smt_vars;
         Some subst
       with _ -> None)
 
@@ -83,7 +81,7 @@ let check_satisfiability
   if Formula.Set.is_empty fs then true
   else if Formula.Set.mem False fs then false
   else
-    let result = Z3_encoding.check_sat fs (Type_env.as_hashtbl gamma) in
+    let result = Smt.is_sat fs (Type_env.as_hashtbl gamma) in
     (* if time <> "" then
        Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
          (Sys.time () -. t); *)
@@ -197,20 +195,21 @@ let check_entailment
       let formulae = PFS.of_list (right_f :: (left_fs @ [] (* axioms *))) in
       let _ = Simplifications.simplify_pfs_and_gamma formulae gamma_left in
 
-      let ret, model =
-        Z3_encoding.check_sat_with_model
+      let model =
+        Smt.check_sat
           (Formula.Set.of_list (PFS.to_list formulae))
           (Type_env.as_hashtbl gamma_left)
       in
-      L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
-      if ret then
-        L.tmi (fun m ->
-            m "Here's the model: %a"
-              (Fmt.Dump.option (Fmt.of_to_string Z3.Model.to_string))
-              model);
+      let ret = Option.is_none model in
+      L.(verbose (fun m -> m "Entailment returned %b" ret));
+      let () =
+        model
+        |> Option.iter (fun model ->
+               L.tmi (fun m -> m "Here's the model:\n%a" Smt.pp_sexp model))
+      in
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
          (Sys.time () -. t); *)
-      not ret
+      ret
 
 let is_equal ~pfs ~gamma e1 e2 =
   (* let t = Sys.time () in *)

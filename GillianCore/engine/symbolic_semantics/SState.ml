@@ -424,59 +424,67 @@ module Make (SMemory : SMemory.S) :
         subst
       |> SSubst.init
     in
-    Logging.verbose (fun fmt ->
-        fmt "Filtered and fixed subst, to be applied to memory:\n%a" SSubst.pp
-          subst);
-    SStore.substitution_in_place subst store;
+    let subst = SSubst.filter subst (fun x y -> not (Expr.equal x y)) in
+    if SSubst.is_empty subst then (
+      Logging.verbose (fun fmt ->
+          fmt "No simplifications were made, state unchanged.");
+      (subst, [ state ]))
+    else (
+      Logging.verbose (fun fmt ->
+          fmt "Filtered and fixed subst, to be applied to memory:\n%a" SSubst.pp
+            subst);
+      SStore.substitution_in_place subst store;
 
-    let memories = SMemory.substitution_in_place ~pfs ~gamma subst heap in
+      let memories = SMemory.substitution_in_place ~pfs ~gamma subst heap in
 
-    let states =
-      match memories with
-      | [] -> failwith "Impossible: memory substitution returned []"
-      | [ (mem, lpfs, lgamma) ] ->
-          let () = Formula.Set.iter (PFS.extend pfs) lpfs in
-          let () = List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma in
-          if not kill_new_lvars then
-            Typing.naively_infer_type_information pfs gamma;
-          [ { heap = mem; store; pfs; gamma; spec_vars } ]
-      | multi_mems ->
-          List.map
-            (fun (mem, lpfs, lgamma) ->
-              let bpfs = PFS.copy pfs in
-              let bgamma = Type_env.copy gamma in
-              let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
-              let () =
-                List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
-              in
-              if not kill_new_lvars then
-                Typing.naively_infer_type_information bpfs bgamma;
-              {
-                heap = mem;
-                store = SStore.copy store;
-                pfs = bpfs;
-                gamma = bgamma;
-                spec_vars;
-              })
-            multi_mems
-    in
+      let states =
+        match memories with
+        | [] -> failwith "Impossible: memory substitution returned []"
+        | [ (mem, lpfs, lgamma) ] ->
+            let () = Formula.Set.iter (PFS.extend pfs) lpfs in
+            let () =
+              List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma
+            in
+            if not kill_new_lvars then
+              Typing.naively_infer_type_information pfs gamma;
+            [ { heap = mem; store; pfs; gamma; spec_vars } ]
+        | multi_mems ->
+            List.map
+              (fun (mem, lpfs, lgamma) ->
+                let bpfs = PFS.copy pfs in
+                let bgamma = Type_env.copy gamma in
+                let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
+                let () =
+                  List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
+                in
+                if not kill_new_lvars then
+                  Typing.naively_infer_type_information bpfs bgamma;
+                {
+                  heap = mem;
+                  store = SStore.copy store;
+                  pfs = bpfs;
+                  gamma = bgamma;
+                  spec_vars;
+                })
+              multi_mems
+      in
 
-    L.verbose (fun m ->
-        m "Substitution results in %d results: " (List.length states));
-    List.iter
-      (fun state ->
-        L.verbose (fun m ->
-            m
-              "-----------------------------------\n\
-               STATE AFTER SIMPLIFICATIONS:@\n\
-               @[%a@]@\n\
-               @\n\
-               @[<v 2>with substitution:@\n\
-               @[%a@]@\n\
-               -----------------------------------"
-              pp state SSubst.pp subst))
-      states;
-    (subst, states)
+      L.verbose (fun m ->
+          m "Substitution results in %d results: " (List.length states));
+      List.iter
+        (fun state ->
+          L.verbose (fun m ->
+              m
+                "-----------------------------------\n\
+                 STATE AFTER SIMPLIFICATIONS:@\n\
+                 @[%a@]@\n\
+                 @\n\
+                 @[<v 2>with substitution:@\n\
+                 @[%a@]@\n\
+                 -----------------------------------"
+                pp state SSubst.pp subst))
+        states;
+      (subst, states))
 
   let simplify_val ({ pfs; gamma; _ } : t) (v : vt) : vt =
     Reduction.reduce_lexpr ~gamma ~pfs v
@@ -572,33 +580,36 @@ module Make (SMemory : SMemory.S) :
 
   let substitution_in_place ?(subst_all = false) (subst : st) (state : t) :
       t list =
-    let { heap; store; pfs; gamma; spec_vars } = state in
-    SStore.substitution_in_place ~subst_all subst store;
-    PFS.substitution subst pfs;
-    Typing.substitution_in_place subst gamma;
-    match SMemory.substitution_in_place ~pfs ~gamma subst heap with
-    | [] -> failwith "IMPOSSIBLE: SMemory always returns at least one memory"
-    | [ (mem, lpfs, lgamma) ] ->
-        let () = Formula.Set.iter (PFS.extend pfs) lpfs in
-        let () = List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma in
-        [ { heap = mem; store; pfs; gamma; spec_vars } ]
-    | multi_mems ->
-        List.map
-          (fun (mem, lpfs, lgamma) ->
-            let bpfs = PFS.copy pfs in
-            let bgamma = Type_env.copy gamma in
-            let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
-            let () =
-              List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
-            in
-            {
-              heap = mem;
-              store = SStore.copy store;
-              pfs = bpfs;
-              gamma = bgamma;
-              spec_vars;
-            })
-          multi_mems
+    let subst = SSubst.filter subst (fun x y -> not (Expr.equal x y)) in
+    if SSubst.is_empty subst then [ state ]
+    else
+      let { heap; store; pfs; gamma; spec_vars } = state in
+      SStore.substitution_in_place ~subst_all subst store;
+      PFS.substitution subst pfs;
+      Typing.substitution_in_place subst gamma;
+      match SMemory.substitution_in_place ~pfs ~gamma subst heap with
+      | [] -> failwith "IMPOSSIBLE: SMemory always returns at least one memory"
+      | [ (mem, lpfs, lgamma) ] ->
+          let () = Formula.Set.iter (PFS.extend pfs) lpfs in
+          let () = List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma in
+          [ { heap = mem; store; pfs; gamma; spec_vars } ]
+      | multi_mems ->
+          List.map
+            (fun (mem, lpfs, lgamma) ->
+              let bpfs = PFS.copy pfs in
+              let bgamma = Type_env.copy gamma in
+              let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
+              let () =
+                List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
+              in
+              {
+                heap = mem;
+                store = SStore.copy store;
+                pfs = bpfs;
+                gamma = bgamma;
+                spec_vars;
+              })
+            multi_mems
 
   let match_assertion (_ : t) (_ : st) (_ : MP.step) : (t, err_t) Res_list.t =
     raise (Failure "Match assertion from non-abstract symbolic state.")

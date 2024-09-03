@@ -1,0 +1,7 @@
+(library
+ (name smt)
+ (public_name gillian.smt)
+ (libraries gil_syntax utils simple_smt sexplib)
+ (preprocess
+  (pps ppx_deriving.std))
+ (flags :standard -open Utils.Prelude))

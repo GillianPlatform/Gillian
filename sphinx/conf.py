@@ -92,6 +92,13 @@ highlight_language = 'ocaml'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+cbmc_version = None
+with open("../kanillian/CBMC_VERSION", "r") as f:
+    cbmc_version = f.read().strip()
+# https://stackoverflow.com/a/39214302
+rst_epilog = f"""
+.. |cbmc_version| replace:: {cbmc_version}
+"""
 
 # -- Options for HTML output ----------------------------------------------
 

@@ -65,11 +65,6 @@ functor
       | Some tl -> tl |> TLLifter.get_matches_at_id id
       | None -> gil |> Gil_lifter.get_matches_at_id id
 
-    let get_root_id { gil; tl; _ } =
-      match tl with
-      | Some tl -> tl |> TLLifter.get_root_id
-      | None -> gil |> Gil_lifter.get_root_id
-
     let memory_error_to_exception_info = TLLifter.memory_error_to_exception_info
     let add_variables = TLLifter.add_variables
 
