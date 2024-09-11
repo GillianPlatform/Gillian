@@ -2458,8 +2458,8 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
           subst_for_each_lvar);
     let found_substs =
       List.fold_left
-        (fun l1 l2 -> List_utils.cross_product l1 l2 ( @ ))
-        subst_for_each_lvar []
+        (fun l1 l2 -> List_utils.cross_product l1 l2 (fun l x -> x :: l))
+        [ [] ] subst_for_each_lvar
     in
     L.tmi (fun m ->
         m "found_substs: %a"
