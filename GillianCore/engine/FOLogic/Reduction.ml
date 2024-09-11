@@ -2452,11 +2452,19 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
           (e, e) :: with_eq)
         all_lvars
     in
+    L.tmi (fun m ->
+        m "subst_for_each_lvar: %a"
+          (Fmt.Dump.list (Fmt.Dump.list (Fmt.Dump.pair Expr.pp Expr.pp)))
+          subst_for_each_lvar);
     let found_substs =
       List.fold_left
         (fun l1 l2 -> List_utils.cross_product l1 l2 ( @ ))
         subst_for_each_lvar []
     in
+    L.tmi (fun m ->
+        m "found_substs: %a"
+          (Fmt.Dump.list (Fmt.Dump.list (Fmt.Dump.pair Expr.pp Expr.pp)))
+          found_substs);
     (* lvar and substs is a list [ (ei, esi) ] where for each ei, esi is a list of equal expressions.
        We are going to build the product of each esi to obtain *)
     let subst_es =
@@ -2468,6 +2476,7 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
             e found_subst)
         found_substs
     in
+    L.tmi (fun m -> m "subst_es: %a" (Fmt.Dump.list Expr.pp) subst_es);
     let subst_es = List.map (reduce_lexpr ~pfs ~gamma) subst_es in
     let/ () = List.find_map loc_name subst_es in
     let new_tried = Expr.Set.add e tried in
