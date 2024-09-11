@@ -265,6 +265,4 @@ let num_is_less_or_equal ~pfs ~gamma e1 e2 =
 
 let resolve_loc_name ~pfs ~gamma loc =
   Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
-  match Reduction.reduce_lexpr ~pfs ~gamma loc with
-  | Lit (Loc loc) | ALoc loc -> Some loc
-  | loc' -> Reduction.resolve_expr_to_location pfs gamma loc'
+  Reduction.resolve_expr_to_location pfs gamma loc
