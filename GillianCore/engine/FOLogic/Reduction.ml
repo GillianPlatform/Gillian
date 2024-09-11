@@ -2426,6 +2426,7 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
       (tried : Expr.Set.t)
       (to_try : Expr.t list) : string option =
     let open Syntaxes.Option in
+    L.tmi (fun m -> m "to_try: %a" Fmt.(list ~sep:comma Expr.pp) to_try);
     let* () = if fuel <= 0 then None else Some () in
     let f = resolve_expr_to_location_aux (fuel - 1) in
     let* e, rest =
@@ -2437,6 +2438,7 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     let/ () = loc_name e in
     let equal_e = get_equal_expressions pfs e in
     let equal_e = equal_e @ List.map (reduce_lexpr ~pfs ~gamma) equal_e in
+    L.tmi (fun m -> m "equal_e: %a" Fmt.(list ~sep:comma Expr.pp) equal_e);
     (* If we find a loc in there, we return it *)
     let/ () = List.find_map loc_name equal_e in
     let found_subst =
@@ -2446,13 +2448,19 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
           List.map (fun es -> (e, es)) (get_equal_expressions pfs e))
         (Containers.SS.elements (Expr.lvars e))
     in
+    L.tmi (fun m ->
+        m "found_subst: (%a, %a)" Expr.pp e
+          Fmt.(list ~sep:comma (pair Expr.pp Expr.pp))
+          found_subst);
     let subst_e =
       List.fold_left
         (fun (e : Expr.t) (e_to, e_with) ->
           Expr.subst_expr_for_expr ~to_subst:e_to ~subst_with:e_with e)
         e found_subst
     in
+    L.tmi (fun m -> m "subst_e: %a" Expr.pp subst_e);
     let subst_e = reduce_lexpr ~pfs ~gamma subst_e in
+    L.tmi (fun m -> m "reduced subst_e: %a" Expr.pp subst_e);
     let/ () = loc_name subst_e in
     let new_tried = Expr.Set.add e tried in
     let new_to_try = rest @ equal_e @ [ subst_e ] in
