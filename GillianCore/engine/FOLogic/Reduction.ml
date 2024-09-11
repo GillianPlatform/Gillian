@@ -2414,7 +2414,7 @@ and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
 
 let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     string option =
-  let max_fuel = 5 in
+  let max_fuel = 10 in
 
   let loc_name = function
     | Expr.ALoc loc | Lit (Loc loc) -> Some loc
@@ -2438,32 +2438,40 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     let/ () = loc_name e in
     let equal_e = get_equal_expressions pfs e in
     let equal_e = equal_e @ List.map (reduce_lexpr ~pfs ~gamma) equal_e in
-    L.tmi (fun m -> m "equal_e: %a" (Fmt.Dump.list Expr.pp) equal_e);
     (* If we find a loc in there, we return it *)
     let/ () = List.find_map loc_name equal_e in
-    let found_subst =
-      List.concat_map
+    (* We actually want to try all possible substs! *)
+    let all_lvars = Containers.SS.elements (Expr.lvars e) in
+    let subst_for_each_lvar =
+      List.map
         (fun x ->
           let e = Expr.LVar x in
-          List.map (fun es -> (e, es)) (get_equal_expressions pfs e))
-        (Containers.SS.elements (Expr.lvars e))
+          let with_eq =
+            List.map (fun eq -> (e, eq)) (get_equal_expressions pfs e)
+          in
+          (e, e) :: with_eq)
+        all_lvars
     in
-    L.tmi (fun m ->
-        m "found_subst: (%a, %a)" Expr.pp e
-          Fmt.(Dump.list (pair Expr.pp Expr.pp))
-          found_subst);
-    let subst_e =
+    let found_substs =
       List.fold_left
-        (fun (e : Expr.t) (e_to, e_with) ->
-          Expr.subst_expr_for_expr ~to_subst:e_to ~subst_with:e_with e)
-        e found_subst
+        (fun l1 l2 -> List_utils.cross_product l1 l2 ( @ ))
+        subst_for_each_lvar []
     in
-    L.tmi (fun m -> m "subst_e: %a" Expr.pp subst_e);
-    let subst_e = reduce_lexpr ~pfs ~gamma subst_e in
-    L.tmi (fun m -> m "reduced subst_e: %a" Expr.pp subst_e);
-    let/ () = loc_name subst_e in
+    (* lvar and substs is a list [ (ei, esi) ] where for each ei, esi is a list of equal expressions.
+       We are going to build the product of each esi to obtain *)
+    let subst_es =
+      List.map
+        (fun found_subst ->
+          List.fold_left
+            (fun (e : Expr.t) (e_to, e_with) ->
+              Expr.subst_expr_for_expr ~to_subst:e_to ~subst_with:e_with e)
+            e found_subst)
+        found_substs
+    in
+    let subst_es = List.map (reduce_lexpr ~pfs ~gamma) subst_es in
+    let/ () = List.find_map loc_name subst_es in
     let new_tried = Expr.Set.add e tried in
-    let new_to_try = rest @ equal_e @ [ subst_e ] in
+    let new_to_try = rest @ equal_e @ subst_es in
     let new_to_try =
       List.filter (fun e -> not (Expr.Set.mem e new_tried)) new_to_try
     in
