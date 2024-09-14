@@ -903,7 +903,6 @@ let get_fixes err =
           let new_var_e1 = Expr.LVar new_var1 in
           let new_var2 = LVar.alloc () in
           let new_var_e2 = Expr.LVar new_var2 in
-          let set = SS.add new_var2 (SS.singleton new_var1) in
           let value = Expr.EList [ new_var_e1; new_var_e2 ] in
           let null_typ =
             if Compcert.Archi.ptr64 then Expr.string long_type
@@ -911,13 +910,12 @@ let get_fixes err =
           in
           let null_ptr = Expr.EList [ null_typ; Expr.int 0 ] in
           [
-            ( [
-                single ~loc ~ofs ~chunk ~sval:value ~perm;
-                Asrt.Types
-                  [ (new_var_e1, Type.ObjectType); (new_var_e2, Type.IntType) ];
-              ],
-              set );
-            ([ single ~loc ~ofs ~chunk ~sval:null_ptr ~perm ], SS.empty);
+            [
+              single ~loc ~ofs ~chunk ~sval:value ~perm;
+              Asrt.Types
+                [ (new_var_e1, Type.ObjectType); (new_var_e2, Type.IntType) ];
+            ];
+            [ single ~loc ~ofs ~chunk ~sval:null_ptr ~perm ];
           ]
       | _ ->
           let type_str, type_gil =
@@ -928,23 +926,19 @@ let get_fixes err =
             | _ -> (int_type, Type.IntType)
           in
           let new_var = LVar.alloc () in
-          let set = SS.singleton new_var in
           let new_var_e = Expr.LVar new_var in
           let value = Expr.EList [ Expr.string type_str; new_var_e ] in
           [
-            ( [
-                single ~loc ~ofs ~chunk ~sval:value ~perm;
-                Asrt.Types [ (new_var_e, type_gil) ];
-              ],
-              set );
+            [
+              single ~loc ~ofs ~chunk ~sval:value ~perm;
+              Asrt.Types [ (new_var_e, type_gil) ];
+            ];
           ]
     in
     (* Additional fix for store operation to handle case of unitialized memory *)
     let fixes =
       if is_store then
-        ( [ hole ~loc ~low:ofs ~high:(offset_by_chunk ofs chunk) ~perm ],
-          SS.empty )
-        :: fixes
+        [ hole ~loc ~low:ofs ~high:(offset_by_chunk ofs chunk) ~perm ] :: fixes
       else fixes
     in
     fixes
@@ -961,7 +955,7 @@ let get_fixes err =
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([ Asrt.Pure (Eq (new_expr, loc)) ], SS.empty) ]
+      [ [ Asrt.Pure (Eq (new_expr, loc)) ] ]
   | SHeapTreeErr
       {
         at_locations;

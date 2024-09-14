@@ -65,7 +65,7 @@ module type S = sig
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
   val can_fix : err_t -> bool
-  val get_fixes : err_t -> (Asrt.t list * Containers.SS.t) list
+  val get_fixes : err_t -> Asrt.t list list
   val sure_is_nonempty : t -> bool
 end
 

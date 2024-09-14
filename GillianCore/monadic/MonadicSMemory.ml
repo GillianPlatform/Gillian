@@ -47,7 +47,7 @@ module type S = sig
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
-  val get_fixes : err_t -> (Asrt.t list * Containers.SS.t) list
+  val get_fixes : err_t -> Asrt.t list list
   val can_fix : err_t -> bool
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t

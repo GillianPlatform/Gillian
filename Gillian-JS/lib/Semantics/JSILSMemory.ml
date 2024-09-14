@@ -597,7 +597,7 @@ module M = struct
   let prop_abduce_none_in_js = [ "@call" ]
   let prop_abduce_both_in_js = [ "hasOwnProperty" ]
 
-  type fix_result = Asrt.t list * Containers.SS.t
+  type fix_result = Asrt.t list
 
   let complete_fix_js (i_fix : i_fix_t) : fix_result list =
     match i_fix with
@@ -607,11 +607,10 @@ module M = struct
            however it only seemed to add the binding without creating any state, so did it really
            "do" anything? Bi-abduction is broken for Gillian-JS anyways. *)
         let al = ALoc.alloc () in
-        [ ([ Asrt.Pure (Eq (ALoc al, v)) ], Containers.SS.empty) ]
+        [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
     | FCell (l, p) -> (
         let none_fix () =
-          ( [ Asrt.GA (JSILNames.aCell, [ l; p ], [ Lit Nono ]) ],
-            Containers.SS.empty )
+          [ Asrt.GA (JSILNames.aCell, [ l; p ], [ Lit Nono ]) ]
         in
 
         let some_fix () =
@@ -632,13 +631,12 @@ module M = struct
                 Lit (Bool true);
               ]
           in
-          ( [
-              Asrt.GA (JSILNames.aCell, [ l; p ], [ descriptor ]);
-              Asrt.Pure asrt_empty;
-              Asrt.Pure asrt_none;
-              Asrt.Pure asrt_list;
-            ],
-            Containers.SS.singleton vvar )
+          [
+            Asrt.GA (JSILNames.aCell, [ l; p ], [ descriptor ]);
+            Asrt.Pure asrt_empty;
+            Asrt.Pure asrt_none;
+            Asrt.Pure asrt_list;
+          ]
         in
 
         match p with
@@ -651,26 +649,25 @@ module M = struct
         let al = ALoc.alloc () in
         let mloc = Expr.ALoc al in
         [
-          ( [
-              Asrt.Pure (Eq (ALoc al, l));
-              Asrt.GA (JSILNames.aMetadata, [ l ], [ mloc ]);
-              Asrt.GA (JSILNames.aMetadata, [ mloc ], [ Lit Null ]);
-              Asrt.GA
-                ( JSILNames.aCell,
-                  [ mloc; Lit (String "@class") ],
-                  [ Lit (String "Object") ] );
-              Asrt.GA
-                ( JSILNames.aCell,
-                  [ mloc; Lit (String "@extensible") ],
-                  [ Lit (Bool true) ] );
-              Asrt.GA
-                ( JSILNames.aCell,
-                  [ mloc; Lit (String "@proto") ],
-                  [ Lit (Loc JS2JSIL_Helpers.locObjPrototype) ] );
-            ],
-            Containers.SS.empty );
+          [
+            Asrt.Pure (Eq (ALoc al, l));
+            Asrt.GA (JSILNames.aMetadata, [ l ], [ mloc ]);
+            Asrt.GA (JSILNames.aMetadata, [ mloc ], [ Lit Null ]);
+            Asrt.GA
+              ( JSILNames.aCell,
+                [ mloc; Lit (String "@class") ],
+                [ Lit (String "Object") ] );
+            Asrt.GA
+              ( JSILNames.aCell,
+                [ mloc; Lit (String "@extensible") ],
+                [ Lit (Bool true) ] );
+            Asrt.GA
+              ( JSILNames.aCell,
+                [ mloc; Lit (String "@proto") ],
+                [ Lit (Loc JS2JSIL_Helpers.locObjPrototype) ] );
+          ];
         ]
-    | FPure f -> [ ([ Asrt.Pure f ], Containers.SS.empty) ]
+    | FPure f -> [ [ Asrt.Pure f ] ]
 
   (* Fix completion: simple *)
   let complete_fix_jsil (i_fix : i_fix_t) : fix_result list =
@@ -678,37 +675,27 @@ module M = struct
     | FLoc v ->
         (* Get a fresh location *)
         let al = ALoc.alloc () in
-        [ ([ Asrt.Pure (Eq (ALoc al, v)) ], Containers.SS.empty) ]
+        [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
     | FCell (l, p) ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
         (* Value is not none - we always bi-abduce presence *)
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-        [
-          ( [ Asrt.GA (JSILNames.aCell, [ l; p ], [ v ]); Asrt.Pure not_none ],
-            Containers.SS.singleton vvar );
-        ]
+        [ [ Asrt.GA (JSILNames.aCell, [ l; p ], [ v ]); Asrt.Pure not_none ] ]
     | FMetadata l ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-        [
-          ( [ Asrt.GA (JSILNames.aMetadata, [ l ], [ v ]); Asrt.Pure not_none ],
-            Containers.SS.singleton vvar );
-        ]
-    | FPure f -> [ ([ Asrt.Pure f ], Containers.SS.empty) ]
+        [ [ Asrt.GA (JSILNames.aMetadata, [ l ], [ v ]); Asrt.Pure not_none ] ]
+    | FPure f -> [ [ Asrt.Pure f ] ]
 
   (* An error can have multiple fixes *)
   let get_fixes (err : err_t) : fix_result list =
     let pp_fix_result ft res =
       let open Fmt in
-      let fixes, svars = res in
-      pf ft "@[<v 2>@[<h>[[ %a ]]@]@\n@[<h>spec vars: %a@]@]"
-        (list ~sep:comma Asrt.pp) fixes
-        (iter ~sep:comma Containers.SS.iter string)
-        svars
+      pf ft "@[<v 2>@[<h>[[ %a ]]@]@\n@]" (list ~sep:comma Asrt.pp) res
     in
     let _, fixes, _ = err in
     L.verbose (fun m ->
@@ -727,11 +714,7 @@ module M = struct
       let completed_ifixes = List_utils.list_product completed_ifixes in
       let completed_ifixes : fix_result list =
         List.map
-          (fun fixes ->
-            List.fold_right
-              (fun (fix, svars) (fix', svars') ->
-                (fix @ fix', Containers.SS.union svars svars'))
-              fixes ([], Containers.SS.empty))
+          (fun fixes -> List.fold_right List.append fixes [])
           completed_ifixes
       in
 

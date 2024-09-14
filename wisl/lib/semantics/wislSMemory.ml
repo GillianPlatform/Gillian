@@ -309,14 +309,13 @@ let get_fixes (err : err_t) =
   | MissingResource (Cell, loc, Some ofs) ->
       let new_var = LVar.alloc () in
       let value = Expr.LVar new_var in
-      let set = SS.singleton new_var in
       let loc = Expr.loc_from_loc_name loc in
       let ga = WislLActions.str_ga WislLActions.Cell in
-      [ ([ Asrt.GA (ga, [ loc; ofs ], [ value ]) ], set) ]
+      [ [ Asrt.GA (ga, [ loc; ofs ], [ value ]) ] ]
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([ Asrt.Pure (Eq (new_expr, loc)) ], SS.empty) ]
+      [ [ Asrt.Pure (Eq (new_expr, loc)) ] ]
   | _ -> []
 
 let can_fix = function
