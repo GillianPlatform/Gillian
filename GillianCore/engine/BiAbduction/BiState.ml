@@ -85,10 +85,8 @@ module Make (State : SState.S) = struct
     | None -> None
 
   let assume_t (bi_state : t) (v : Expr.t) (t : Type.t) : t option =
-    let { state; _ } = bi_state in
-    match State.assume_t state v t with
-    | Some state -> Some { bi_state with state }
-    | None -> None
+    State.assume_t bi_state.state v t
+    |> Option.map (fun state -> { bi_state with state })
 
   let sat_check ({ state; _ } : t) (v : Expr.t) : bool = State.sat_check state v
 

@@ -196,9 +196,8 @@ module Make (State : SState.S) :
     | None -> None
 
   let assume_t (astate : t) (v : Expr.t) (t : Type.t) : t option =
-    match State.assume_t astate.state v t with
-    | Some state -> Some { astate with state }
-    | None -> None
+    State.assume_t astate.state v t
+    |> Option.map (fun state -> { astate with state })
 
   let sat_check (astate : t) (v : Expr.t) : bool =
     State.sat_check astate.state v
