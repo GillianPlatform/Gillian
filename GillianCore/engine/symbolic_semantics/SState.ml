@@ -54,7 +54,6 @@ module Make (SMemory : SMemory.S) :
 
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = SMemory.init_data
-  type fix_t = Asrt.t
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
 
@@ -330,8 +329,7 @@ module Make (SMemory : SMemory.S) :
             Expr.pp e msg (Fmt.Dump.list Formula.pp) ps);
       None
 
-  let assume_t (state : t) (v : vt) (t : Type.t) : t option =
-    let { gamma; _ } = state in
+  let assume_t ({ gamma; _ } as state : t) (v : vt) (t : Type.t) : t option =
     match Typing.reverse_type_lexpr true gamma [ (v, t) ] with
     | None -> None
     | Some gamma' ->
@@ -677,8 +675,6 @@ module Make (SMemory : SMemory.S) :
   let mem_constraints ({ heap; _ } : t) : Formula.t list =
     SMemory.mem_constraints heap
 
-  let pp_fix = Asrt.pp
-
   let get_recovery_tactic (state : t) (errs : err_t list) : vt Recovery_tactic.t
       =
     let { heap; pfs; _ } = state in
@@ -716,47 +712,13 @@ module Make (SMemory : SMemory.S) :
   let get_failing_constraint (err : err_t) : Formula.t =
     StateErr.get_failing_constraint err SMemory.get_failing_constraint
 
-  let normalise_fix (pfs : PFS.t) (gamma : Type_env.t) (fix : fix_t list) :
-      fix_t list option =
-    let gafixes, pfs', types =
-      List.fold_right
-        (fun fix (mfix, pfs, types) ->
-          match fix with
-          | Asrt.Emp | Pure True -> (mfix, pfs, types)
-          | GA _ as ga -> (ga :: mfix, pfs, types)
-          | Types ts -> (mfix, pfs, ts @ types)
-          | Pure pf' -> (mfix, pf' :: pfs, types)
-          | Pred _ | Wand _ | Star _ ->
-              raise
-                (Exceptions.Impossible
-                   "Invalid fix type: Pred, Wand or Star found"))
-        fix ([], [], [])
-    in
-
-    (* Check SAT for some notion of checking SAT *)
-    let gamma' = Type_env.copy gamma in
-    let gamma' = Typing.reverse_type_lexpr true gamma' types in
-    match gamma' with
-    | None ->
-        L.verbose (fun m -> m "Warning: invalid fix, types are inconsistent.");
-        None
-    | Some gamma'
-      when FOSolver.check_satisfiability (PFS.to_list pfs @ pfs') gamma' ->
-        let pfixes = List.map (fun pfix -> Asrt.Pure pfix) pfs' in
-        let ftys = if types = [] then [] else [ Asrt.Types types ] in
-        Some (ftys @ pfixes @ gafixes)
-    | Some _ ->
-        L.verbose (fun m -> m "Warning: invalid fix.");
-        None
-
   (* get_fixes returns a list of possible fixes.
-     Each "fix" is actually a list of fix_t, each of which have to be applied to the same state *)
-  let get_fixes (state : t) (err : err_t) : fix_t list list =
+     Each "fix" is actually a list of assertions, each of which have to be applied to the same state *)
+  let get_fixes (err : err_t) : Asrt.t list list =
     let pp_fixes fmt fixes =
-      Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
+      Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") Asrt.pp) fixes
     in
-    let { pfs; gamma; _ } = state in
-    let one_step_fixes : fix_t list list =
+    let one_step_fixes : Asrt.t list list =
       match err with
       | EMem err -> SMemory.get_fixes err
       | EPure f ->
@@ -787,68 +749,13 @@ module Make (SMemory : SMemory.S) :
 
     L.tmi (fun m ->
         m "All fixes before normalisation: %a"
-          Fmt.Dump.(list @@ list @@ pp_fix)
+          Fmt.Dump.(list @@ list @@ Asrt.pp)
           one_step_fixes);
-    (* Cartesian product of the fixes *)
-    let result =
-      List.filter_map
-        (fun fix ->
-          match normalise_fix pfs gamma fix with
-          | None | Some [] -> None
-          | other -> other)
-        one_step_fixes
-    in
-    L.(verbose (fun m -> m "Normalised fixes: %i" (List.length result)));
-    L.verbose (fun m ->
-        m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") (Fmt.Dump.list pp_fix)) result);
-    result
-
-  (**
-   @param state The state on which to apply the fixes
-   @param fixes A list of fixes to apply
-
-   @return The state resulting from applying the fixes
-
-   [apply_fixes state fixes] applies the fixes [fixes] to the state [state],
-   and returns the resulting state, if successful.
-   *)
-  let apply_fixes (state : t) (fixes : fix_t list) : t list =
-    L.verbose (fun m -> m "SState: apply_fixes");
-    let apply_fix (states : t list) (fix : fix_t) : t list =
-      L.verbose (fun m -> m "applying fix: %a" pp_fix fix);
-      let open Syntaxes.List in
-      let* this_state = states in
-      let { heap; store; pfs; gamma; spec_vars } = this_state in
-      match fix with
-      (* Apply fix in memory - this may change the pfs and gamma *)
-      | Asrt.Emp -> [ this_state ]
-      | GA (name, ins, outs) ->
-          L.verbose (fun m -> m "SState: before applying fixes %a" pp state);
-          let pc = Gpc.make ~matching:false ~pfs ~gamma () in
-          let+ Gbranch.{ value = heap; pc } =
-            SMemory.produce name heap pc (ins @ outs)
-          in
-          { heap; store; pfs = pc.pfs; gamma = pc.gamma; spec_vars }
-      | Pure f ->
-          PFS.extend pfs f;
-          [ this_state ]
-      | Types types -> (
-          let gamma' = Typing.reverse_type_lexpr true gamma types in
-          match gamma' with
-          | None -> []
-          | Some gamma' ->
-              Type_env.extend gamma gamma';
-              [ this_state ])
-      | Star _ | Wand _ | Pred _ ->
-          raise
-            (Failure "DEATH: apply_fixes: Star, Wand, and Pred not implemented.")
-    in
-
-    let result = List.fold_left apply_fix [ state ] fixes in
-
-    L.verbose (fun m ->
-        m "SState: after applying fixes %a" (Fmt.Dump.list pp) result);
-    result
+    List.map
+      (fun fixes ->
+        let pure, unpure = List.partition Asrt.is_pure_asrt fixes in
+        pure @ unpure)
+      one_step_fixes
 
   let get_equal_values state les =
     let { pfs; _ } = state in

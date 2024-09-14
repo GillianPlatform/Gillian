@@ -13,7 +13,6 @@ module Make (State : SState.S) = struct
   type store_t = SStore.t
   type m_err_t = t * State.m_err_t [@@deriving yojson]
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson]
-  type fix_t = State.fix_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = State.init_data
 
@@ -194,6 +193,31 @@ module Make (State : SState.S) = struct
     in
     SVal.SESubst.init bindings
 
+  let fix_list_apply s =
+    let open Syntaxes.List in
+    List.fold_left
+      (fun acc a ->
+        let* this_state = acc in
+        match a with
+        | Asrt.Emp -> [ this_state ]
+        | Pure f ->
+            State.assume_a ~matching:true this_state [ f ] |> Option.to_list
+        | Types types ->
+            types
+            |> List.fold_left
+                 (fun ac (e, t) ->
+                   match ac with
+                   | None -> None
+                   | Some s -> State.assume_t s e t)
+                 (Some this_state)
+            |> Option.to_list
+        | GA (corepred, ins, outs) ->
+            State.produce_core_pred corepred this_state (ins @ outs)
+        | Star _ -> raise (Failure "DEATH. fix_list_apply star")
+        | Wand _ -> raise (Failure "DEATH. fix_list_apply wand")
+        | Pred _ -> raise (Failure "DEATH. fix_list_apply pred"))
+      [ s ]
+
   type post_res = (Flag.t * Asrt.t list) option
 
   let match_
@@ -238,12 +262,12 @@ module Make (State : SState.S) = struct
                 [])
               else (
                 L.verbose (fun m -> m "May be able to fix!!!");
-                let* fixes = State.get_fixes state err in
+                let* fixes = State.get_fixes err in
                 (* TODO: a better implementation here might be to say that apply_fix returns a list of fixed states, possibly empty *)
                 let state' = State.copy state in
                 let af_state' = State.copy af_state in
-                let* state' = State.apply_fixes state' fixes in
-                let* af_state' = State.apply_fixes af_state' fixes in
+                let* state' = fix_list_apply state' fixes in
+                let* af_state' = fix_list_apply af_state' fixes in
                 L.verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!");
                 let new_subst, states = State.simplify state' in
                 let state' =
@@ -422,11 +446,8 @@ module Make (State : SState.S) = struct
 
   (* to throw errors: *)
 
-  let get_fixes (_ : t) (_ : err_t) : fix_t list list =
+  let get_fixes (_ : err_t) : Asrt.t list list =
     raise (Failure "get_fixes not implemented in MakeBiState")
-
-  let apply_fixes (_ : t) (_ : fix_t list) : t list =
-    raise (Failure "apply_fixes not implemented in MakeBiState")
 
   let get_recovery_tactic (_ : t) (_ : err_t list) =
     raise (Failure "get_recovery_tactic not implemented in MakeBiState")
@@ -443,7 +464,6 @@ module Make (State : SState.S) = struct
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
   let pp_err f e = State.pp_err f (unlift_error e)
-  let pp_fix = State.pp_fix
   let get_failing_constraint e = State.get_failing_constraint (unlift_error e)
   let can_fix e = State.can_fix (unlift_error e)
 
@@ -458,14 +478,14 @@ module Make (State : SState.S) = struct
     | Error err when not (State.can_fix err) ->
         [ Error (lift_error { procs; state; af_state } err) ]
     | Error err -> (
-        match State.get_fixes state err with
+        match State.get_fixes err with
         | [] -> [] (* No fix, we stop *)
         | fixes ->
             let* fix = fixes in
             let state' = State.copy state in
             let af_state' = State.copy af_state in
-            let* state' = State.apply_fixes state' fix in
-            let* af_state' = State.apply_fixes af_state' fix in
+            let* state' = fix_list_apply state' fix in
+            let* af_state' = fix_list_apply af_state' fix in
             execute_action action
               { procs; state = state'; af_state = af_state' }
               args)
