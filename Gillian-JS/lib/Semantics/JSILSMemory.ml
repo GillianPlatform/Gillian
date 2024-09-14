@@ -603,6 +603,9 @@ module M = struct
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
+        (* This is dodgy, as the old instantiation does a bit more than this for this fix,
+           however it only seemed to add the binding without creating any state, so did it really
+           "do" anything? Bi-abduction is broken for Gillian-JS anyways. *)
         let al = ALoc.alloc () in
         [ ([ Asrt.Pure (Eq (ALoc al, v)) ], Containers.SS.empty) ]
     | FCell (l, p) -> (
