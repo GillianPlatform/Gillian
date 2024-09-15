@@ -162,15 +162,15 @@ and formula =
   | ForAll of (string * typ option) list * formula
   | IsInt of expr
 
-and assertion =
+and assertion_simple =
   | Emp
-  | Star of assertion * assertion
   | Pred of string * expr list
   | Pure of formula
   | Types of (expr * typ) list
-  | GA of string * expr list * expr list
+  | CorePred of string * expr list * expr list
   | Wand of { lhs : string * expr list; rhs : string * expr list }
 
+and assertion = assertion_simple list
 and bindings = string * (string * expr) list
 
 and slcmd =

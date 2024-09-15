@@ -50,8 +50,8 @@ let pp fmt lemma =
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
   (* copied from spec - needs refactoring *)
   let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after a : Asrt.t =
-      match (a : Asrt.t) with
+    let f_a_after (a : Asrt.simple) : Asrt.t =
+      match a with
       | Pred (name, les) ->
           let pred =
             try Hashtbl.find preds name
@@ -74,10 +74,10 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
                with Invalid_argument _ ->
                  Fmt.failwith
                    "Invalid number of arguments: %a.\nInside of lemma: %s"
-                   Asrt.pp a lemma.lemma_name)
+                   Asrt.simple_pp a lemma.lemma_name)
           in
-          Star (Types ac_types, a)
-      | _ -> a
+          [ Types ac_types; a ]
+      | _ -> [ a ]
     in
     Asrt.map None (Some f_a_after) None None a
   in
@@ -99,8 +99,5 @@ let add_param_bindings (lemma : t) =
       (fun pv lv -> Asrt.Pure (Eq (PVar pv, LVar lv)))
       params lvar_params
   in
-  let param_eqs = Asrt.star param_eqs in
-  let add_to_spec spec =
-    { spec with lemma_hyp = Asrt.Star (param_eqs, spec.lemma_hyp) }
-  in
+  let add_to_spec spec = { spec with lemma_hyp = param_eqs @ spec.lemma_hyp } in
   { lemma with lemma_specs = List.map add_to_spec lemma.lemma_specs }

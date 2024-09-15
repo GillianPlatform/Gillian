@@ -77,8 +77,8 @@ let pp fmt spec =
 
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
   let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after a : Asrt.t =
-      match (a : Asrt.t) with
+    let f_a_after (a : Asrt.simple) : Asrt.t =
+      match a with
       | Pred (name, les) ->
           let pred =
             try Hashtbl.find preds name
@@ -110,8 +110,8 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
                 | Some t_x -> (le, t_x) :: ac_types)
               [] combined_params
           in
-          Star (Types ac_types, a)
-      | _ -> a
+          [ Types ac_types; a ]
+      | _ -> [ a ]
     in
     Asrt.map None (Some f_a_after) None None a
   in

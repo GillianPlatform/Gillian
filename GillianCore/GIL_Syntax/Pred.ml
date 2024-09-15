@@ -183,8 +183,8 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   *)
 let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
   let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after a : Asrt.t =
-      match (a : Asrt.t) with
+    let f_a_after (a : Asrt.simple) : Asrt.t =
+      match a with
       | Pred (name, les) ->
           let pred =
             try Hashtbl.find preds name
@@ -219,8 +219,8 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
                 | Some t_x -> (le, t_x) :: ac_types)
               [] combined
           in
-          Star (Types ac_types, a)
-      | _ -> a
+          [ Types ac_types; a ]
+      | _ -> [ a ]
     in
     Asrt.map None (Some f_a_after) None None a
   in
@@ -235,7 +235,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
   in
   let new_defs =
     List.map
-      (fun (oid, a) -> (oid, pt_asrt (Asrt.star (a :: new_asrts))))
+      (fun (oid, a) -> (oid, pt_asrt (a @ new_asrts)))
       pred.pred_definitions
   in
   let new_facts =
@@ -326,7 +326,7 @@ let close_token_call (pred : t) : Asrt.t =
   let args =
     in_args pred pred.pred_params |> List.map (fun (x, _t) -> Expr.PVar x)
   in
-  Asrt.Pred (name, args)
+  [ Asrt.Pred (name, args) ]
 
 (* Given a name, if it's a close_token name, returns the name of the corresponding predicate,
    otherwise return None. *)
