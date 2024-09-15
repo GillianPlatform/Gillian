@@ -997,11 +997,7 @@ let admissible_assertion (a : Asrt.t) : bool =
 
   let a = Asrt.pvars_to_lvars a in
 
-  let rec separate (a : Asrt.t) =
-    match a with
-    | Star (a1, a2) ->
-        separate a1;
-        separate a2
+  let separate : Asrt.simple -> unit = function
     | Pure f -> PFS.extend pfs f
     | Types ets ->
         List.iter
@@ -1013,7 +1009,7 @@ let admissible_assertion (a : Asrt.t) : bool =
     | _ -> ()
   in
   try
-    separate a;
+    List.iter separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
     let res = not (PFS.mem pfs Formula.False) in
     if res then L.tmi (fun m -> m "Admissible !!")

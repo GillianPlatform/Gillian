@@ -167,7 +167,7 @@ let make_pure (a : t) : Formula.t =
   |> Formula.conjunct
 
 (** GIL logic assertions *)
-let _simple_pp ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
+let _pp_simple ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
   function
   | Emp -> Fmt.string fmt "emp"
   | Pred (name, params) ->
@@ -191,10 +191,10 @@ let _simple_pp ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
 
 let _pp ~(e_pp : Format.formatter -> Expr.t -> unit) (fmt : Format.formatter) :
     t -> unit =
-  Fmt.list ~sep:(Fmt.any " *@ ") (_simple_pp ~e_pp) fmt
+  Fmt.list ~sep:(Fmt.any " *@ ") (_pp_simple ~e_pp) fmt
 
-let simple_pp = _simple_pp ~e_pp:Expr.pp
-let simple_full_pp = _simple_pp ~e_pp:Expr.full_pp
+let pp_simple = _pp_simple ~e_pp:Expr.pp
+let pp_simple_full = _pp_simple ~e_pp:Expr.full_pp
 let pp = _pp ~e_pp:Expr.pp
 let full_pp = _pp ~e_pp:Expr.full_pp
 

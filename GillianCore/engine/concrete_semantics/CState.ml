@@ -141,7 +141,7 @@ end = struct
   let get_lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
 
-  let to_assertions ?to_keep:_ (_ : t) : Asrt.t list =
+  let to_assertions ?to_keep:_ (_ : t) : Asrt.t =
     raise (Failure "ERROR: to_assertions called for concrete executions")
 
   let run_spec
@@ -209,7 +209,7 @@ end = struct
   let can_fix (_ : err_t) : bool = false
   let get_failing_constraint (_ : err_t) : Formula.t = True
 
-  let get_fixes (_ : err_t) : Asrt.t list list =
+  let get_fixes (_ : err_t) : Asrt.t list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
 
   let get_equal_values _ vs = vs

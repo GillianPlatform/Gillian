@@ -74,7 +74,7 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
                with Invalid_argument _ ->
                  Fmt.failwith
                    "Invalid number of arguments: %a.\nInside of lemma: %s"
-                   Asrt.simple_pp a lemma.lemma_name)
+                   Asrt.pp_simple_full a lemma.lemma_name)
           in
           [ Types ac_types; a ]
       | _ -> [ a ]

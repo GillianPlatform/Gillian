@@ -56,7 +56,7 @@ val substitution_in_place :
   * (string * Gillian.Gil_syntax.Type.t) list)
   list
 
-val assertions : t -> Gillian.Gil_syntax.Asrt.t list
+val assertions : t -> Gillian.Gil_syntax.Asrt.t
 
 val add_debugger_variables :
   store:(string * Gillian.Gil_syntax.Expr.t) list ->

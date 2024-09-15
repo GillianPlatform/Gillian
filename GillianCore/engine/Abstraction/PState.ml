@@ -262,7 +262,7 @@ module Make (State : SState.S) :
     |> SS.union (Preds.get_lvars preds)
     |> SS.union (Wands.get_lvars wands)
 
-  let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t list =
+  let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
     let { state; preds; wands; _ } = astate in
     let s_asrts = State.to_assertions ?to_keep state in
     let p_asrts = Preds.to_assertions preds in
@@ -410,7 +410,7 @@ module Make (State : SState.S) :
       preds_list;
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
-  let consume ~(prog : 'a MP.prog) astate a binders =
+  let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
       failwith "Binding of pure variables in *-assert.";
     let store = State.get_store astate.state in
@@ -505,9 +505,8 @@ module Make (State : SState.S) :
         let new_bindings =
           List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v))) new_bindings
         in
-        let a_new_bindings = Asrt.star new_bindings in
         let full_subst = make_id_subst a in
-        let a_produce = a_new_bindings in
+        let a_produce = new_bindings in
         let open Res_list.Syntax in
         let result =
           let** new_astate = SMatcher.produce new_state full_subst a_produce in
@@ -723,8 +722,7 @@ module Make (State : SState.S) :
                | _ -> true)
         |> List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v)))
       in
-      let a_bindings = Asrt.star bindings in
-      let subst_bindings = make_id_subst a_bindings in
+      let subst_bindings = make_id_subst bindings in
       let pvar_subst_list_known =
         List.map
           (fun x ->
@@ -749,7 +747,7 @@ module Make (State : SState.S) :
       in
       L.verbose (fun fmt -> fmt "Invariant v2: %a" Asrt.pp a_substed);
       let a_produce =
-        Reduction.reduce_assertion (Asrt.star [ a_bindings; a_substed ])
+        Reduction.reduce_assertion (Asrt.star [ bindings; a_substed ])
       in
       L.verbose (fun fmt -> fmt "Invariant v3: %a" Asrt.pp a_produce);
       (* Create empty state *)
@@ -803,7 +801,7 @@ module Make (State : SState.S) :
       (fun astates (id, frame) ->
         let** astate = astates in
         let** astate =
-          let frame_asrt = Asrt.star (to_assertions frame) in
+          let frame_asrt = to_assertions frame in
           let full_subst = make_id_subst frame_asrt in
           let+ produced = SMatcher.produce astate full_subst frame_asrt in
           match produced with
@@ -1013,7 +1011,7 @@ module Make (State : SState.S) :
               let new_bindings =
                 List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v))) new_bindings
               in
-              let a_new_bindings = Asrt.star new_bindings in
+              let a_new_bindings = new_bindings in
               let subst_bindings = make_id_subst a_new_bindings in
               let full_subst = make_id_subst a in
               let _ = SVal.SESubst.merge_left full_subst subst_bindings in

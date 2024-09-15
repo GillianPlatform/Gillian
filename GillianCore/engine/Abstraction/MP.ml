@@ -12,9 +12,9 @@ let outs_pp =
 (** The [mp_step] type represents a matching plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.t * outs [@@deriving yojson, eq]
+type step = Asrt.simple * outs [@@deriving yojson, eq]
 
-let pp_step = Fmt.pair ~sep:(Fmt.any ", ") Asrt.pp outs_pp
+let pp_step = Fmt.pair ~sep:(Fmt.any ", ") Asrt.pp_simple_full outs_pp
 let pp_step_list = Fmt.Dump.list pp_step
 
 type label = string * SS.t [@@deriving eq, yojson]
@@ -25,7 +25,7 @@ let pp_label ft (lab, ss) =
 type post = Flag.t * Asrt.t list [@@deriving eq, yojson]
 
 let pp_post ft (flag, asrts) =
-  Fmt.pf ft "%a: %a" Flag.pp flag Asrt.pp (Asrt.star asrts)
+  Fmt.pf ft "%a: %a" Flag.pp flag Fmt.(list ~sep:comma Asrt.pp) asrts
 
 (** At a high level, a matching plan is a tree of assertions.
      *)
@@ -68,11 +68,11 @@ let kb_pp = Fmt.(braces (iter ~sep:comma KB.iter Expr.full_pp))
 type preds_tbl_t = (string, pred) Hashtbl.t
 
 type err =
-  | MPSpec of string * Asrt.t list list
-  | MPPred of string * Asrt.t list list
-  | MPLemma of string * Asrt.t list list
-  | MPAssert of Asrt.t * Asrt.t list list
-  | MPInvariant of Asrt.t * Asrt.t list list
+  | MPSpec of string * Asrt.t list
+  | MPPred of string * Asrt.t list
+  | MPLemma of string * Asrt.t list
+  | MPAssert of Asrt.t * Asrt.t list
+  | MPInvariant of Asrt.t * Asrt.t list
 [@@deriving show]
 
 exception MPError of err
@@ -499,15 +499,15 @@ let ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
 let ins_outs_assertion
     (pred_ins : (string, int list) Hashtbl.t)
     (kb : KB.t)
-    (asrt : Asrt.t) : (KB.t * outs) list =
+    (asrt : Asrt.simple) : (KB.t * outs) list =
   let get_pred_ins name =
     match Hashtbl.find_opt pred_ins name with
     | None -> raise (Failure ("ins_outs_assertion. Unknown Predicate: " ^ name))
     | Some ins -> ins
   in
-  match (asrt : Asrt.t) with
+  match (asrt : Asrt.simple) with
   | Pure form -> ins_outs_formula kb form
-  | GA (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
+  | CorePred (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
   | Pred (p_name, args) ->
       let p_ins = get_pred_ins p_name in
       let _, lie, loe =
@@ -536,19 +536,18 @@ let ins_outs_assertion
       raise (Failure "Impossible: non-simple assertion in ins_outs_assertion.")
 
 let collect_simple_asrts a =
-  let rec aux (a : Asrt.t) : Asrt.t Seq.t =
+  let rec aux (a : Asrt.simple) : Asrt.simple list =
     match a with
-    | Pure True | Emp -> Seq.empty
-    | Pure (And (f1, f2)) -> Seq.append (aux (Pure f1)) (aux (Pure f2))
-    | Pure _ | Pred _ | GA _ | Wand _ -> Seq.return a
+    | Pure True | Emp -> []
+    | Pure (And (f1, f2)) -> aux (Pure f1) @ aux (Pure f2)
+    | Pure _ | Pred _ | CorePred _ | Wand _ -> [ a ]
     | Types _ -> (
-        let a = Reduction.reduce_assertion a in
+        let a = Reduction.reduce_assertion [ a ] in
         match a with
-        | Types les -> Seq.map (fun e -> Asrt.Types [ e ]) (List.to_seq les)
-        | _ -> aux a)
-    | Star (a1, a2) -> Seq.append (aux a1) (aux a2)
+        | [ Types les ] -> List.map (fun e -> Asrt.Types [ e ]) les
+        | _ -> List.concat_map aux a)
   in
-  List.of_seq (aux a)
+  List.concat_map aux a
 
 let collect_and_simplify_atoms a =
   let atoms = collect_simple_asrts a in
@@ -558,7 +557,7 @@ let collect_and_simplify_atoms a =
   let separating, overlapping =
     List.partition
       (function
-        | Asrt.Pred _ | Asrt.GA _ | Asrt.Wand _ -> true
+        | Asrt.Pred _ | Asrt.CorePred _ | Asrt.Wand _ -> true
         | _ -> false)
       atoms
   in
@@ -575,7 +574,7 @@ let s_init_atoms ~preds kb atoms =
     L.verbose (fun m ->
         m "KNOWN: @[%a@].@\n@[<v 2>CUR MP:@\n%a@]@\nTO VISIT: @[%a@]" kb_pp kb
           pp_step_list current
-          (Fmt.list ~sep:(Fmt.any "@\n") Asrt.full_pp)
+          (Fmt.list ~sep:(Fmt.any "@\n") Asrt.pp_simple_full)
           rest);
     match rest with
     | [] ->
@@ -595,7 +594,7 @@ let s_init_atoms ~preds kb atoms =
   search [] kb atoms
 
 let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
-    (step list, Asrt.t list) result =
+    (step list, Asrt.t) result =
   L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
   let atoms = collect_and_simplify_atoms a in
   s_init_atoms ~preds kb atoms
@@ -659,7 +658,7 @@ let init
     (preds : (string, int list) Hashtbl.t)
     (asrts_posts :
       (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
-    : (t, Asrt.t list list) result =
+    : (t, Asrt.simple list list) result =
   let known_matchables =
     match use_params with
     | None -> known_matchables
@@ -908,32 +907,32 @@ let get_lemma (prog : 'a prog) (name : string) : (lemma, unit) result =
   | Some lemma -> Ok lemma
   | None -> Error ()
 
-let rec pp_asrt
+let pp_asrt
     ?(preds_printer : (Format.formatter -> string * Expr.t list -> unit) option)
     ~(preds : preds_tbl_t)
     (fmt : Format.formatter)
     (a : Asrt.t) =
-  let pp_asrt = pp_asrt ?preds_printer ~preds in
-  match a with
-  | Star (a1, a2) -> Fmt.pf fmt "%a *@ %a" pp_asrt a1 pp_asrt a2
-  | Pred (name, args) -> (
-      match preds_printer with
-      | Some pp_pred -> (Fmt.hbox pp_pred) fmt (name, args)
-      | None -> (
-          try
-            let pred = get_pred_def preds name in
-            let out_params = Pred.out_params pred.pred in
-            let out_args = Pred.out_args pred.pred args in
-            let in_args = Pred.in_args pred.pred args in
-            let out_params_args = List.combine out_params out_args in
-            let pp_out_params_args fmt (x, e) =
-              Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e
-            in
-            Fmt.pf fmt "%s(@[<h>%a@])" name
-              (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
-              (in_args, out_params_args)
-          with _ -> Asrt.pp fmt a))
-  | a -> Asrt.pp fmt a
+  let pp_simple_asrt fmt = function
+    | Asrt.Pred (name, args) -> (
+        match preds_printer with
+        | Some pp_pred -> (Fmt.hbox pp_pred) fmt (name, args)
+        | None -> (
+            try
+              let pred = get_pred_def preds name in
+              let out_params = Pred.out_params pred.pred in
+              let out_args = Pred.out_args pred.pred args in
+              let in_args = Pred.in_args pred.pred args in
+              let out_params_args = List.combine out_params out_args in
+              let pp_out_params_args fmt (x, e) =
+                Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e
+              in
+              Fmt.pf fmt "%s(@[<h>%a@])" name
+                (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
+                (in_args, out_params_args)
+            with _ -> Asrt.pp fmt a))
+    | a -> Asrt.pp_simple_full fmt a
+  in
+  Fmt.list ~sep:(Fmt.any " *@ ") pp_simple_asrt fmt a
 
 let pp_sspec
     ?(preds_printer : (Format.formatter -> string * Expr.t list -> unit) option)

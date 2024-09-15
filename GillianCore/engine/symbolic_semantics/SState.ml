@@ -507,7 +507,7 @@ module Make (SMemory : SMemory.S) :
     |> SS.union (Type_env.lvars gamma)
     |> SS.union spec_vars
 
-  let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
+  let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t =
     let { heap; store; pfs; gamma; _ } = state in
     let store' =
       Option.fold
@@ -714,18 +714,16 @@ module Make (SMemory : SMemory.S) :
 
   (* get_fixes returns a list of possible fixes.
      Each "fix" is actually a list of assertions, each of which have to be applied to the same state *)
-  let get_fixes (err : err_t) : Asrt.t list list =
-    let pp_fixes fmt fixes =
-      Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") Asrt.pp) fixes
-    in
-    let one_step_fixes : Asrt.t list list =
+  let get_fixes (err : err_t) : Asrt.t list =
+    let pp_fix fmt fix = Fmt.pf fmt "[[ %a ]]" Asrt.pp fix in
+    let one_step_fixes : Asrt.t list =
       match err with
       | EMem err -> SMemory.get_fixes err
       | EPure f ->
           let result = [ [ Asrt.Pure f ] ] in
           L.verbose (fun m ->
               m "@[<v 2>Memory: Fixes found:@\n%a@]"
-                (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
+                (Fmt.list ~sep:(Fmt.any "@\n") pp_fix)
                 result);
           result
       | EAsrt (_, _, fixes) ->
@@ -741,7 +739,7 @@ module Make (SMemory : SMemory.S) :
           in
           L.verbose (fun m ->
               m "@[<v 2>Memory: Fixes found:@\n%a@]"
-                (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
+                (Fmt.list ~sep:(Fmt.any "@\n") pp_fix)
                 result);
           result
       | _ -> raise (Failure "DEATH: get_fixes: error cannot be fixed.")
@@ -749,7 +747,7 @@ module Make (SMemory : SMemory.S) :
 
     L.tmi (fun m ->
         m "All fixes before normalisation: %a"
-          Fmt.Dump.(list @@ list @@ Asrt.pp)
+          Fmt.Dump.(list @@ Asrt.pp)
           one_step_fixes);
     List.map
       (fun fixes ->

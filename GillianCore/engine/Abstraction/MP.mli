@@ -7,7 +7,7 @@ val outs_pp : outs Fmt.t
 (** The [step] type represents a matching plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.t * outs [@@deriving yojson]
+type step = Asrt.simple * outs [@@deriving yojson]
 
 type label = string * SS.t [@@deriving yojson]
 type post = Flag.t * Asrt.t list [@@deriving yojson]
@@ -40,11 +40,11 @@ type 'annot prog = {
 type preds_tbl_t = (string, pred) Hashtbl.t
 
 type err =
-  | MPSpec of string * Asrt.t list list
-  | MPPred of string * Asrt.t list list
-  | MPLemma of string * Asrt.t list list
-  | MPAssert of Asrt.t * Asrt.t list list
-  | MPInvariant of Asrt.t * Asrt.t list list
+  | MPSpec of string * Asrt.t list
+  | MPPred of string * Asrt.t list
+  | MPLemma of string * Asrt.t list
+  | MPAssert of Asrt.t * Asrt.t list
+  | MPInvariant of Asrt.t * Asrt.t list
 [@@deriving show]
 
 module KB = Expr.Set
@@ -53,13 +53,13 @@ val learn_expr :
   ?top_level:bool -> KB.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> outs
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
-val collect_simple_asrts : Asrt.t -> Asrt.t list
+val collect_simple_asrts : Asrt.t -> Asrt.simple list
 
 val s_init_atoms :
   preds:(string, int list) Hashtbl.t ->
   KB.t ->
-  Asrt.t list ->
-  (step list, Asrt.t list) result
+  Asrt.t ->
+  (step list, Asrt.t) result
 
 val of_step_list : ?post:post -> ?label:label -> step list -> t
 
@@ -69,7 +69,7 @@ val init :
   KB.t ->
   (string, int list) Hashtbl.t ->
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
-  (t, Asrt.t list list) result
+  (t, Asrt.t list) result
 
 val init_prog :
   ?preds_tbl:(string, pred) Hashtbl.t ->

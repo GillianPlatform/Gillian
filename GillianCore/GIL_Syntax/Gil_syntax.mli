@@ -636,8 +636,12 @@ module Asrt : sig
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
 
+  val pp_simple : Format.formatter -> simple -> unit
+
   (** Full pretty-printer *)
   val full_pp : Format.formatter -> t -> unit
+
+  val pp_simple_full : Format.formatter -> simple -> unit
 
   (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
   val star : t list -> t

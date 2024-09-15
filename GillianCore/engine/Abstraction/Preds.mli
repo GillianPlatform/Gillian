@@ -40,4 +40,4 @@ val get_all : maintain:bool -> (abs_t -> bool) -> t -> abs_t list
 val substitution_in_place : SVal.SESubst.t -> t -> unit
 
 (** Turns a predicate set into a list of assertions *)
-val to_assertions : t -> Asrt.t list
+val to_assertions : t -> Asrt.t

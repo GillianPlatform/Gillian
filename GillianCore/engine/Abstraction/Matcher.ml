@@ -76,7 +76,9 @@ module type S = sig
 
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
+  val produce_assertion :
+    t -> SVal.SESubst.t -> Asrt.simple -> (t, err_t) Res_list.t
+
   val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
   val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
 
@@ -568,8 +570,10 @@ module Make (State : SState.S) :
         in
         Some (actual_pred, args)
 
-  let rec produce_assertion (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
-      (t, err_t) Res_list.t =
+  let rec produce_assertion
+      (astate : t)
+      (subst : SVal.SESubst.t)
+      (a : Asrt.simple) : (t, err_t) Res_list.t =
     let open Res_list.Syntax in
     let { state; preds; pred_defs; variants; wands } = astate in
     let other_state_err msg = [ Error (StateErr.EOther msg) ] in
@@ -580,12 +584,12 @@ module Make (State : SState.S) :
            Produce simple assertion: @[<h>%a@]@\n\
            With subst: %a\n\
           \           -------------------------@\n"
-          Asrt.pp a SVal.SESubst.pp subst);
+          Asrt.pp_simple a SVal.SESubst.pp subst);
 
     L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
-    match a with
-    | GA (a_id, ins, outs) ->
+    match (a : Asrt.simple) with
+    | CorePred (a_id, ins, outs) ->
         L.verbose (fun fmt -> fmt "Memory producer.");
 
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
@@ -714,10 +718,8 @@ module Make (State : SState.S) :
               { state = state'; preds; wands; pred_defs; variants })
     | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
-  and produce_asrt_list
-      (astate : t)
-      (subst : SVal.SESubst.t)
-      (sas : Asrt.t list) : (t, err_t) Res_list.t =
+  and produce_asrt_list (astate : t) (subst : SVal.SESubst.t) (sas : Asrt.t) :
+      (t, err_t) Res_list.t =
     let open Res_list.Syntax in
     let other_state_err msg = Res_list.error_with (StateErr.EOther msg) in
     let () =
@@ -1214,7 +1216,7 @@ module Make (State : SState.S) :
           (let a = fst step in
            (* Get pvars, lvars, locs from the assertion *)
            let a_pvars, a_lvars, a_locs =
-             (Asrt.pvars a, Asrt.lvars a, Asrt.locs a)
+             (Asrt.pvars [ a ], Asrt.lvars [ a ], Asrt.locs [ a ])
            in
            let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
 
@@ -1269,12 +1271,12 @@ module Make (State : SState.S) :
       L.Logging_constants.Content_type.assertion (fun () ->
         let p, outs = step in
         let open Res_list.Syntax in
-        match (p : Asrt.t) with
-        | GA (a_id, e_ins, e_outs) -> (
+        match (p : Asrt.simple) with
+        | CorePred (a_id, e_ins, e_outs) -> (
             let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
             let failure = List.exists (fun x -> x = None) vs_ins in
             if failure then (
-              Fmt.pr "I don't know all ins for %a????" Asrt.pp p;
+              Fmt.pr "I don't know all ins for %a????" Asrt.pp_simple p;
               if !Config.under_approximation then [] else resource_fail)
             else
               let vs_ins = List.map Option.get vs_ins in
@@ -1437,7 +1439,7 @@ module Make (State : SState.S) :
                     StateErr.EAsrt (les, Not conjunct, [ [ Pure conjunct ] ])
                   in
                   Res_list.error_with error)
-        (* LTrue, LFalse, LEmp, LStar *)
+        (* LTrue, LFalse, LEmp *)
         | _ -> raise (Failure "Illegal Assertion in Matching Plan"))
 
   and match_assertion_safely ?(no_auto_fold = false) state subst step =
@@ -1463,7 +1465,7 @@ module Make (State : SState.S) :
             let other_error =
               StateErr.EOther
                 (Fmt.str "Uncaught exception while matching assertions %a"
-                   Asrt.pp (fst step))
+                   Asrt.pp_simple (fst step))
             in
             Res_list.error_with other_error)
 
@@ -1862,7 +1864,7 @@ module Make (State : SState.S) :
 
     let get_defs (pred : Pred.t) largs =
       if pred.pred_abstract || Option.is_some pred.pred_guard then
-        [ Asrt.Pred (pred.pred_name, largs) ]
+        [ [ Asrt.Pred (pred.pred_name, largs) ] ]
       else
         let unfolded_pred =
           Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
@@ -1970,7 +1972,7 @@ module Make (State : SState.S) :
               init_subst;
               fold_outs_info = (subst, step, out_params, out_args);
             }
-      | (GA (core_pred, ins, outs), _), [ err ] ->
+      | (CorePred (core_pred, ins, outs), _), [ err ] ->
           (* What we do here is simulate the idea that the core predicate is actually a folded core-predicate *)
           let kb =
             List.to_seq ins
@@ -2017,7 +2019,7 @@ module Make (State : SState.S) :
                   List.init out_amount (fun o_i ->
                       all_new_outs.((cp_i * out_amount) + o_i))
                 in
-                Asrt.GA (core_pred, ins, outs))
+                Asrt.CorePred (core_pred, ins, outs))
               new_ins_l
           in
           let learning_equalities =
@@ -2091,11 +2093,12 @@ module Make (State : SState.S) :
               ])
         (Ok state) obtained expected
 
-    let rec package_case_step { lhs_state; current_state; subst } step :
-        (package_state list, err_t list) Result.t =
+    let rec package_case_step
+        { lhs_state; current_state; subst }
+        (step : MP.step) : (package_state list, err_t list) Result.t =
       let open Syntaxes.Result in
       L.verbose (fun m ->
-          m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
+          m "Wand about to consume RHS step: %a" Asrt.pp_simple (fst step));
       (* States are modified in place unfortunately.. so we have to copy them just in case *)
       (* First we try to consume from the lhs_state *)
       let- lhs_errs =
