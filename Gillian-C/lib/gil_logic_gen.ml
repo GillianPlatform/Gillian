@@ -640,7 +640,7 @@ let rec trans_asrt ~fname ~ann asrt =
   | Pred (p, cel) ->
       let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
       Pred (p, gel) :: Asrt.star ap
-  | Emp -> []
+  | Emp -> [ Asrt.Emp ]
   | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
 
 let rec trans_lcmd ~fname ~ann lcmd =

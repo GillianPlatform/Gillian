@@ -3226,8 +3226,8 @@ let reduce_assertion_loop
             List.fold_right
               (fun (e, t) ac ->
                 match (e : Expr.t) with
-                | Lit lit ->
-                    if t <> Literal.type_of lit then raise WrongType else ac
+                | Lit lit when t <> Literal.type_of lit -> raise WrongType
+                | Lit _ -> ac
                 | _ -> (e, t) :: ac)
               lvt []
           in

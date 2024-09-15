@@ -272,15 +272,15 @@ let unfold_spec
     (preds : (string, Pred.t) Hashtbl.t)
     (rec_info : (string, bool) Hashtbl.t)
     (spec : Spec.t) : Spec.t =
-  let aux spec_name (sspec : Spec.st) : Spec.st list =
+  let aux (sspec : Spec.st) : Spec.st list =
     let pres : Asrt.t list = auto_unfold preds rec_info sspec.ss_pre in
-    L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec_name);
+    L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec.spec_name);
     let pres = List.filter Simplifications.admissible_assertion pres in
     let posts : Asrt.t list =
       List.concat_map (auto_unfold preds rec_info) sspec.ss_posts
     in
     let posts = List.map Reduction.reduce_assertion posts in
-    L.verbose (fun fmt -> fmt "Post admissibility: %s" spec_name);
+    L.verbose (fun fmt -> fmt "Post admissibility: %s" spec.spec_name);
     L.tmi (fun fmt ->
         fmt "@[<hov 2>Testing admissibility for assertions:@.%a@]"
           (Fmt.list Asrt.pp) posts);
@@ -289,14 +289,12 @@ let unfold_spec
       Fmt.failwith
         "Unfolding: Postcondition of %s seems invalid, it has been reduced to \
          no postcondition"
-        spec_name;
+        spec.spec_name;
     List.map
       (fun pre -> Spec.{ sspec with ss_pre = pre; ss_posts = posts })
       pres
   in
-  let spec_sspecs =
-    List.concat (List.map (aux spec.spec_name) spec.spec_sspecs)
-  in
+  let spec_sspecs = List.concat_map aux spec.spec_sspecs in
   match spec_sspecs with
   | [] -> Fmt.failwith "unfolding in spec at preprocessing led to no spec!"
   | _ ->
@@ -415,6 +413,7 @@ let unfold_proc
     (preds : (string, Pred.t) Hashtbl.t)
     (rec_info : (string, bool) Hashtbl.t)
     (proc : ('a, int) Proc.t) : ('a, int) Proc.t =
+  Logging.normal (fun f -> f "UNFOLD_PROC ! %a" Proc.pp_indexed proc);
   let new_spec = Option.map (unfold_spec preds rec_info) proc.proc_spec in
   let new_body =
     Array.map

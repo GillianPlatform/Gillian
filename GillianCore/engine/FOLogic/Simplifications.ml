@@ -1012,8 +1012,7 @@ let admissible_assertion (a : Asrt.t) : bool =
     List.iter separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
     let res = not (PFS.mem pfs Formula.False) in
-    if res then L.tmi (fun m -> m "Admissible !!")
-    else L.tmi (fun m -> m "Not admissible !!");
+    L.tmi (fun m -> m "Admissible? %b" res);
     res
   with e ->
     L.tmi (fun m ->

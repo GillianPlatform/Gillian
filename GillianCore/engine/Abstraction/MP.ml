@@ -930,7 +930,7 @@ let pp_asrt
                 (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
                 (in_args, out_params_args)
             with _ -> Asrt.pp fmt a))
-    | a -> Asrt.pp_simple_full fmt a
+    | a -> Asrt.pp_simple fmt a
   in
   Fmt.list ~sep:(Fmt.any " *@ ") pp_simple_asrt fmt a
 
