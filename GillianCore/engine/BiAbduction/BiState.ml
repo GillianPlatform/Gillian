@@ -198,6 +198,8 @@ module Make (State : SState.S) = struct
     List.fold_left
       (fun acc a ->
         let* this_state = acc in
+        let lvars = Asrt.lvars a in
+        let this_state = State.add_spec_vars this_state lvars in
         match a with
         | Asrt.Emp -> [ this_state ]
         | Pure f ->
