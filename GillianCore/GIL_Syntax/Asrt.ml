@@ -69,34 +69,19 @@ end
 module Set = Set.Make (MyAssertion)
 
 (** Deprecated, use {!Visitors.endo} instead. *)
-let map
-    (f_a_before : (simple -> t) option)
-    (f_a_after : (simple -> t) option)
-    (f_e : (Expr.t -> Expr.t) option)
-    (f_p : (Formula.t -> Formula.t) option)
-    (a : t) : t =
-  (* Map recursively to assertions and expressions *)
-  let map_e = Option.value ~default:(fun x -> x) f_e in
-  let map_p = Option.value ~default:(Formula.map None None (Some map_e)) f_p in
-  let f_a_before = Option.value ~default:(fun x -> [ x ]) f_a_before in
-  let f_a_after = Option.value ~default:(fun x -> [ x ]) f_a_after in
-  let a' = List.concat_map f_a_before a in
-
-  a'
-  |> List.map (function
-       | Emp -> Emp
-       | Pred (s, le) -> Pred (s, List.map map_e le)
-       | Pure form -> Pure (map_p form)
-       | Types lt -> Types (List.map (fun (exp, typ) -> (map_e exp, typ)) lt)
-       | CorePred (x, es1, es2) ->
-           CorePred (x, List.map map_e es1, List.map map_e es2)
-       | Wand { lhs = lhs_pred, lhs_args; rhs = rhs_pred, rhs_args } ->
-           Wand
-             {
-               lhs = (lhs_pred, List.map map_e lhs_args);
-               rhs = (rhs_pred, List.map map_e rhs_args);
-             })
-  |> List.concat_map f_a_after
+let map (f_e : Expr.t -> Expr.t) (f_p : Formula.t -> Formula.t) : t -> t =
+  List.map (function
+    | Emp -> Emp
+    | Pred (s, le) -> Pred (s, List.map f_e le)
+    | Pure form -> Pure (f_p form)
+    | Types lt -> Types (List.map (fun (exp, typ) -> (f_e exp, typ)) lt)
+    | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2)
+    | Wand { lhs = lhs_pred, lhs_args; rhs = rhs_pred, rhs_args } ->
+        Wand
+          {
+            lhs = (lhs_pred, List.map f_e lhs_args);
+            rhs = (rhs_pred, List.map f_e rhs_args);
+          })
 
 (* Get all the logical expressions of --a-- that denote a list
    and are not logical variables *)
@@ -141,19 +126,10 @@ let pure_asrts : t -> Formula.t list =
   in
   collector#visit_assertion ()
 
-(* Returns a list with the simple assertions that occur in --a-- *)
-(* TODO: remove *)
-let simple_asrts : t -> t = List.filter (fun x -> x <> Emp)
-
 (* Check if --a-- is a pure assertion *)
 let is_pure_asrt : simple -> bool = function
   | Pred _ | CorePred _ | Wand _ -> false
   | _ -> true
-
-(* Check if --a-- is a pure assertion & non-recursive assertion.
-   It assumes that only pure assertions are universally quantified *)
-(* TODO: remove *)
-let is_pure_non_rec_asrt : simple -> bool = is_pure_asrt
 
 (* Eliminate LStar and LTypes assertions.
    LTypes disappears. LStar is replaced by LAnd.
@@ -199,17 +175,11 @@ let pp = _pp ~e_pp:Expr.pp
 let full_pp = _pp ~e_pp:Expr.full_pp
 
 let subst_clocs (subst : string -> Expr.t) : t -> t =
-  map None None
-    (Some (Expr.subst_clocs subst))
-    (Some (Formula.subst_clocs subst))
+  map (Expr.subst_clocs subst) (Formula.subst_clocs subst)
 
 let subst_expr_for_expr ~(to_subst : Expr.t) ~(subst_with : Expr.t) : t -> t =
-  map None None
-    (Some (Expr.subst_expr_for_expr ~to_subst ~subst_with))
-    (Some (Formula.subst_expr_for_expr ~to_subst ~subst_with))
+  map
+    (Expr.subst_expr_for_expr ~to_subst ~subst_with)
+    (Formula.subst_expr_for_expr ~to_subst ~subst_with)
 
-let pvars_to_lvars : t -> t =
-  map None None (Some Expr.pvars_to_lvars) (Some Formula.pvars_to_lvars)
-
-(* TODO: remove *)
-let star : t list -> t = List.concat
+let pvars_to_lvars : t -> t = map Expr.pvars_to_lvars Formula.pvars_to_lvars

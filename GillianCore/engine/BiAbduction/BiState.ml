@@ -193,12 +193,12 @@ module Make (State : SState.S) = struct
     in
     SVal.SESubst.init bindings
 
-  let fix_list_apply s =
+  let fix_list_apply (s : state_t) (asrt : Asrt.t) =
     let open Syntaxes.List in
     List.fold_left
       (fun acc a ->
         let* this_state = acc in
-        let lvars = Asrt.lvars a in
+        let lvars = Asrt.lvars [ a ] in
         let this_state = State.add_spec_vars this_state lvars in
         match a with
         | Asrt.Emp -> [ this_state ]
@@ -217,7 +217,7 @@ module Make (State : SState.S) = struct
             State.produce_core_pred corepred this_state (ins @ outs)
         | Wand _ -> raise (Failure "DEATH. fix_list_apply wand")
         | Pred _ -> raise (Failure "DEATH. fix_list_apply pred"))
-      [ s ]
+      [ s ] asrt
 
   type post_res = (Flag.t * Asrt.t list) option
 

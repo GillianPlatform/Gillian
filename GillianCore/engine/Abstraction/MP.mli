@@ -53,7 +53,7 @@ val learn_expr :
   ?top_level:bool -> KB.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> outs
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
-val collect_simple_asrts : Asrt.t -> Asrt.simple list
+val simplify_asrts : Asrt.t -> Asrt.t
 
 val s_init_atoms :
   preds:(string, int list) Hashtbl.t ->

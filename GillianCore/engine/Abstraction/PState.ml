@@ -746,9 +746,7 @@ module Make (State : SState.S) :
           (SVal.SESubst.substitute_asrt subst_bindings ~partial:true a)
       in
       L.verbose (fun fmt -> fmt "Invariant v2: %a" Asrt.pp a_substed);
-      let a_produce =
-        Reduction.reduce_assertion (Asrt.star [ bindings; a_substed ])
-      in
+      let a_produce = Reduction.reduce_assertion (bindings @ a_substed) in
       L.verbose (fun fmt -> fmt "Invariant v3: %a" Asrt.pp a_produce);
       (* Create empty state *)
       let invariant_state : t = clear_resource new_state in
@@ -1018,7 +1016,7 @@ module Make (State : SState.S) :
               let a_substed =
                 SVal.SESubst.substitute_asrt subst_bindings ~partial:true a
               in
-              let a_produce = Asrt.star [ a_new_bindings; a_substed ] in
+              let a_produce = a_new_bindings @ a_substed in
               let result =
                 let** new_astate =
                   SMatcher.produce new_state full_subst a_produce

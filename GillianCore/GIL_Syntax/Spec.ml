@@ -76,51 +76,12 @@ let pp fmt spec =
     spec.spec_sspecs
 
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
-  let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after (a : Asrt.simple) : Asrt.t =
-      match a with
-      | Pred (name, les) ->
-          let pred =
-            try Hashtbl.find preds name
-            with _ ->
-              raise
-                (Failure
-                   ("DEATH. parameter_types: predicate " ^ name
-                  ^ " does not exist."))
-          in
-          (* Printf.printf "Pred: %s\n\tParams1: %s\n\tParams2: %s\n" name
-             (String.concat ", " (let x, _ = List.split pred.params in x)) (String.concat ", " (List.map (Fmt.to_to_string Expr.pp) les)); *)
-          let combined_params =
-            try List.combine pred.pred_params les
-            with Invalid_argument _ ->
-              let message =
-                Fmt.str
-                  "Predicate %s is expecting %i arguments but is used with the \
-                   following %i arguments : %a"
-                  pred.pred_name pred.pred_num_params (List.length les)
-                  (Fmt.Dump.list Expr.pp) les
-              in
-              raise (Invalid_argument message)
-          in
-          let ac_types =
-            List.fold_left
-              (fun ac_types ((_, t_x), le) ->
-                match t_x with
-                | None -> ac_types
-                | Some t_x -> (le, t_x) :: ac_types)
-              [] combined_params
-          in
-          [ Types ac_types; a ]
-      | _ -> [ a ]
-    in
-    Asrt.map None (Some f_a_after) None None a
-  in
-
+  let map_asrts = Pred.extend_asrt_pred_types preds in
   let pt_sspec (sspec : st) : st =
     {
       sspec with
-      ss_pre = pt_asrt sspec.ss_pre;
-      ss_posts = List.map pt_asrt sspec.ss_posts;
+      ss_pre = map_asrts sspec.ss_pre;
+      ss_posts = List.map map_asrts sspec.ss_posts;
     }
   in
   { spec with spec_sspecs = List.map pt_sspec spec.spec_sspecs }

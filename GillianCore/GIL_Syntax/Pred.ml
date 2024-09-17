@@ -177,54 +177,48 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
 
   Hashtbl.iter check_pred_pvars predicates
 
+let extend_asrt_pred_types (preds : (string, t) Hashtbl.t) : Asrt.t -> Asrt.t =
+  List.concat_map @@ function
+  | Asrt.Pred (name, les) as a ->
+      let pred =
+        try Hashtbl.find preds name
+        with _ ->
+          raise
+            (Failure
+               ("DEATH. parameter_types: predicate " ^ name ^ " does not exist."))
+      in
+      Logging.tmi (fun fmt ->
+          fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
+            (List.length pred.pred_params)
+            (List.length les));
+      let combined =
+        try List.combine pred.pred_params les
+        with Invalid_argument _ ->
+          let message =
+            Fmt.str
+              "Invalid number of parameters for predicate %s which requires %i \
+               parameters and was used with the following %i parameters: %a"
+              pred.pred_name pred.pred_num_params (List.length les)
+              (Fmt.Dump.list Expr.pp) les
+          in
+          raise (Invalid_argument message)
+      in
+      let ac_types =
+        List.fold_left
+          (fun ac_types ((_, t_x), le) ->
+            match t_x with
+            | None -> ac_types
+            | Some t_x -> (le, t_x) :: ac_types)
+          [] combined
+      in
+      [ Asrt.Types ac_types; a ]
+  | a -> [ a ]
+
 (**
    GIL Predicates can have non-pvar parameters - to say that a given parameter
    always has a certain value...
   *)
 let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
-  let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after (a : Asrt.simple) : Asrt.t =
-      match a with
-      | Pred (name, les) ->
-          let pred =
-            try Hashtbl.find preds name
-            with _ ->
-              raise
-                (Failure
-                   ("DEATH. parameter_types: predicate " ^ name
-                  ^ " does not exist."))
-          in
-          Logging.tmi (fun fmt ->
-              fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
-                (List.length pred.pred_params)
-                (List.length les));
-          let combined =
-            try List.combine pred.pred_params les
-            with Invalid_argument _ ->
-              let message =
-                Fmt.str
-                  "Invalid number of parameters for predicate %s which \
-                   requires %i parameters and was used with the following %i \
-                   parameters: %a"
-                  pred.pred_name pred.pred_num_params (List.length les)
-                  (Fmt.Dump.list Expr.pp) les
-              in
-              raise (Invalid_argument message)
-          in
-          let ac_types =
-            List.fold_left
-              (fun ac_types ((_, t_x), le) ->
-                match t_x with
-                | None -> ac_types
-                | Some t_x -> (le, t_x) :: ac_types)
-              [] combined
-          in
-          [ Types ac_types; a ]
-      | _ -> [ a ]
-    in
-    Asrt.map None (Some f_a_after) None None a
-  in
-
   let new_asrts =
     List.fold_right
       (fun (x, t_x) new_asrts ->
@@ -235,7 +229,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
   in
   let new_defs =
     List.map
-      (fun (oid, a) -> (oid, pt_asrt (a @ new_asrts)))
+      (fun (oid, a) -> (oid, extend_asrt_pred_types preds (a @ new_asrts)))
       pred.pred_definitions
   in
   let new_facts =

@@ -535,7 +535,7 @@ let ins_outs_assertion
   | _ ->
       raise (Failure "Impossible: non-simple assertion in ins_outs_assertion.")
 
-let collect_simple_asrts a =
+let simplify_asrts a =
   let rec aux (a : Asrt.simple) : Asrt.simple list =
     match a with
     | Pure True | Emp -> []
@@ -547,22 +547,12 @@ let collect_simple_asrts a =
         | [ Types les ] -> List.map (fun e -> Asrt.Types [ e ]) les
         | _ -> List.concat_map aux a)
   in
-  List.concat_map aux a
-
-let collect_and_simplify_atoms a =
-  let atoms = collect_simple_asrts a in
-  let atoms =
-    if List.mem (Asrt.Pure False) atoms then [ Asrt.Pure False ] else atoms
-  in
-  let separating, overlapping =
-    List.partition
-      (function
-        | Asrt.Pred _ | Asrt.CorePred _ | Asrt.Wand _ -> true
-        | _ -> false)
-      atoms
-  in
-  let overlapping = List.sort_uniq Stdlib.compare overlapping in
-  List.sort Asrt.prioritise (separating @ overlapping)
+  let atoms = List.concat_map aux a in
+  if List.mem (Asrt.Pure False) atoms then [ Asrt.Pure False ]
+  else
+    let overlapping, separating = List.partition Asrt.is_pure_asrt atoms in
+    let overlapping = List.sort_uniq Stdlib.compare overlapping in
+    List.sort Asrt.prioritise (separating @ overlapping)
 
 let s_init_atoms ~preds kb atoms =
   let step_of_atom ~kb atom =
@@ -596,7 +586,7 @@ let s_init_atoms ~preds kb atoms =
 let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
     (step list, Asrt.t) result =
   L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
-  let atoms = collect_and_simplify_atoms a in
+  let atoms = simplify_asrts a in
   s_init_atoms ~preds kb atoms
 
 let of_step_list ?post ?label (steps : step list) : t =

@@ -585,13 +585,7 @@ module Asrt : sig
   module Set : Set.S with type elt := t
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (simple -> t) option ->
-    (simple -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    (Formula.t -> Formula.t) option ->
-    t ->
-    t
+  val map : (Expr.t -> Expr.t) -> (Formula.t -> Formula.t) -> t -> t
 
   (** Get all the logical expressions of [a] that denote a list
    and are not logical variables *)
@@ -618,15 +612,8 @@ module Asrt : sig
   (** Returns a list with the pure assertions that occur in [a] *)
   val pure_asrts : t -> Formula.t list
 
-  (** Returns a list with the pure assertions that occur in [a] *)
-  val simple_asrts : t -> t
-
   (** Check if [a] is a pure assertion *)
   val is_pure_asrt : simple -> bool
-
-  (** Check if [a] is a pure assertion & non-recursive assertion.
-   It assumes that only pure assertions are universally quantified *)
-  val is_pure_non_rec_asrt : simple -> bool
 
   (** Eliminate LStar and LTypes assertions.
    LTypes disappears. LStar is replaced by LAnd.
@@ -642,9 +629,6 @@ module Asrt : sig
   val full_pp : Format.formatter -> t -> unit
 
   val pp_simple_full : Format.formatter -> simple -> unit
-
-  (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
-  val star : t list -> t
 
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
   val subst_clocs : (string -> Expr.t) -> t -> t
@@ -676,12 +660,7 @@ module SLCmd : sig
     | SymbExec
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t) option ->
-    (Asrt.t -> Asrt.t) option ->
-    (Expr.t -> Expr.t) option ->
-    t ->
-    t
+  val map : (Asrt.t -> Asrt.t) -> (Expr.t -> Expr.t) -> t -> t
 
   (** Pretty-printer of folding info *)
   val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
@@ -708,10 +687,9 @@ module LCmd : sig
 
   (** @deprecated Use {!Visitors.endo} instead *)
   val map :
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    (Formula.t -> Formula.t) option ->
-    (SLCmd.t -> SLCmd.t) option ->
+    (Expr.t -> Expr.t) ->
+    (Formula.t -> Formula.t) ->
+    (SLCmd.t -> SLCmd.t) ->
     t ->
     t
 

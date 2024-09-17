@@ -48,43 +48,11 @@ let pp fmt lemma =
     lemma.lemma_specs (Fmt.option pp_proof) lemma.lemma_proof
 
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
-  (* copied from spec - needs refactoring *)
-  let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after (a : Asrt.simple) : Asrt.t =
-      match a with
-      | Pred (name, les) ->
-          let pred =
-            try Hashtbl.find preds name
-            with _ ->
-              raise
-                (Failure
-                   ("DEATH. parameter_types: predicate " ^ name
-                  ^ " does not exist."))
-          in
-          (* Printf.printf "Pred: %s\n\tParams1: %s\n\tParams2: %s\n" name
-             (String.concat ", " (let x, _ = List.split pred.params in x)) (String.concat ", " (List.map (Fmt.to_to_string Expr.pp) les)); *)
-          let ac_types =
-            List.fold_left
-              (fun ac_types ((_, t_x), le) ->
-                match t_x with
-                | None -> ac_types
-                | Some t_x -> (le, t_x) :: ac_types)
-              []
-              (try List.combine pred.pred_params les
-               with Invalid_argument _ ->
-                 Fmt.failwith
-                   "Invalid number of arguments: %a.\nInside of lemma: %s"
-                   Asrt.pp_simple_full a lemma.lemma_name)
-          in
-          [ Types ac_types; a ]
-      | _ -> [ a ]
-    in
-    Asrt.map None (Some f_a_after) None None a
-  in
+  let map_asrts = Pred.extend_asrt_pred_types preds in
   let pt_spec { lemma_hyp; lemma_concs; lemma_spec_variant } =
     {
-      lemma_hyp = pt_asrt lemma_hyp;
-      lemma_concs = List.map pt_asrt lemma_concs;
+      lemma_hyp = map_asrts lemma_hyp;
+      lemma_concs = List.map map_asrts lemma_concs;
       lemma_spec_variant;
     }
   in

@@ -30,7 +30,7 @@ let rec split3_expr_comp = function
   | [] -> ([], [], [])
   | (x, y, z) :: l ->
       let rx, ry, rz = split3_expr_comp l in
-      (x :: rx, y @ ry, z :: rz)
+      (x @ rx, y @ ry, z :: rz)
 
 let ( ++ ) = Expr.Infix.( + )
 
@@ -380,12 +380,10 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
   | CExpr.SExpr se -> ([], [], trans_simpl_expr se)
   | SVal sv -> trans_sval sv
   | EList el ->
-      let asrts, vars, elp = split3_expr_comp (List.map trans_expr el) in
-      let asrt = Asrt.star asrts in
+      let asrt, vars, elp = split3_expr_comp (List.map trans_expr el) in
       (asrt, vars, Expr.EList elp)
   | ESet es ->
-      let asrts, vars, elp = split3_expr_comp (List.map trans_expr es) in
-      let asrt = Asrt.star asrts in
+      let asrt, vars, elp = split3_expr_comp (List.map trans_expr es) in
       (asrt, vars, Expr.ESet elp)
   | BinOp (e1, LstCat, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
@@ -415,8 +413,7 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
       let a, v, eg = trans_expr e in
       (a, v, UnOp (trans_unop u, eg))
   | NOp (nop, el) ->
-      let asrts, vs, elp = split3_expr_comp (List.map trans_expr el) in
-      let asrt = Asrt.star asrts in
+      let asrt, vs, elp = split3_expr_comp (List.map trans_expr el) in
       let gnop = trans_nop nop in
       (asrt, vs, Expr.NOp (gnop, elp))
   | LstSub (lst, start, len) ->
@@ -598,8 +595,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         split3_expr_comp (List.map trans_expr el)
       in
       let pr =
-        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields)
-        :: Asrt.star more_asrt
+        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields) :: more_asrt
       in
       [ malloc_chunk siz ] @ pr @ to_assert
 
@@ -639,7 +635,7 @@ let rec trans_asrt ~fname ~ann asrt =
       Pure fp :: ma
   | Pred (p, cel) ->
       let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
-      Pred (p, gel) :: Asrt.star ap
+      Pred (p, gel) :: ap
   | Emp -> [ Asrt.Emp ]
   | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
 
@@ -653,17 +649,14 @@ let rec trans_lcmd ~fname ~ann lcmd =
   match lcmd with
   | CLCmd.Apply (pn, el) ->
       let aps, bindings, gel = split3_expr_comp (List.map trans_expr el) in
-      let to_assert = Asrt.star aps in
-      `Normal (make_assert ~bindings to_assert @ [ SL (ApplyLem (pn, gel, [])) ])
+      `Normal (make_assert ~bindings aps @ [ SL (ApplyLem (pn, gel, [])) ])
   | CLCmd.Fold (pn, el) ->
       let aps, bindings, gel = split3_expr_comp (List.map trans_expr el) in
-      let to_assert = Asrt.star aps in
-      `Normal (make_assert ~bindings to_assert @ [ SL (Fold (pn, gel, None)) ])
+      `Normal (make_assert ~bindings aps @ [ SL (Fold (pn, gel, None)) ])
   | Unfold { pred; params; bindings; recursive } ->
       let ap, vs, gel = split3_expr_comp (List.map trans_expr params) in
-      let to_assert = Asrt.star ap in
       `Normal
-        (make_assert ~bindings:vs to_assert
+        (make_assert ~bindings:vs ap
         @ [ SL (Unfold (pred, gel, bindings, recursive)) ])
   | Unfold_all pred_name -> `Normal [ SL (GUnfold pred_name) ]
   | Assert (a, ex) -> `Normal [ SL (SepAssert (trans_asrt a, ex)) ]

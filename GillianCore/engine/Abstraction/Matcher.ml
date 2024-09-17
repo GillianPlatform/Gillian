@@ -766,7 +766,7 @@ module Make (State : SState.S) :
           "@[-----------------@\n\
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
-    let sas = MP.collect_simple_asrts a in
+    let sas = MP.simplify_asrts a in
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
