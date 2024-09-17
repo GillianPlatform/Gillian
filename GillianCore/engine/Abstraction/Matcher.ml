@@ -767,7 +767,6 @@ module Make (State : SState.S) :
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
     let sas = MP.simplify_asrts a in
-    L.verbose (fun m -> m "COLLECTED ATOMS: %a" Asrt.pp sas);
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
