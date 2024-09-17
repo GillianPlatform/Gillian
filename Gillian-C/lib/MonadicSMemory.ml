@@ -256,7 +256,7 @@ module Mem = struct
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
-    let** loc_name = resolve_loc_result loc in
+    let* loc_name = resolve_or_create_loc_name loc in
     let* tree = get_or_create_tree map loc_name in
     let++ tree_set =
       SHeapTree.prod_bounds tree bounds |> DR.of_result |> map_lift_err loc_name
