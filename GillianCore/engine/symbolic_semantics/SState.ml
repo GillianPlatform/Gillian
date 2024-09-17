@@ -747,7 +747,7 @@ module Make (SMemory : SMemory.S) :
 
     L.tmi (fun m ->
         m "All fixes before normalisation: %a"
-          Fmt.Dump.(list @@ Asrt.pp)
+          Fmt.Dump.(list Asrt.pp)
           one_step_fixes);
     List.map
       (fun fixes ->

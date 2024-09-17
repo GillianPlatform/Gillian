@@ -767,6 +767,7 @@ module Make (State : SState.S) :
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
     let sas = MP.simplify_asrts a in
+    L.verbose (fun m -> m "COLLECTED ATOMS: %a" Asrt.pp sas);
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
@@ -1869,9 +1870,8 @@ module Make (State : SState.S) :
         let unfolded_pred =
           Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
         in
-        match unfolded_pred with
-        | Some pred -> List.map snd pred.pred_definitions
-        | None -> List.map snd pred.pred_definitions
+        let pred = Option.value ~default:pred unfolded_pred in
+        List.map snd pred.pred_definitions
 
     let make_lhs_states ~pred_defs ~empty_state (lname, largs) =
       let open Syntaxes.List in

@@ -315,12 +315,12 @@ let close_token_name (pred : t) : string =
     failwith "close_token_name called on non-guarded predicate";
   pred.pred_name ^ close_suffix
 
-let close_token_call (pred : t) : Asrt.t =
+let close_token_call (pred : t) : Asrt.simple =
   let name = close_token_name pred in
   let args =
     in_args pred pred.pred_params |> List.map (fun (x, _t) -> Expr.PVar x)
   in
-  [ Asrt.Pred (name, args) ]
+  Asrt.Pred (name, args)
 
 (* Given a name, if it's a close_token name, returns the name of the corresponding predicate,
    otherwise return None. *)

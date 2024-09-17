@@ -823,7 +823,7 @@ module Pred : sig
 
   (** Given a guarded predicate, return a "call" to its close token.
       The arguments given are PVars with the same name as the ins of the predicate. *)
-  val close_token_call : t -> Asrt.t
+  val close_token_call : t -> Asrt.simple
 
   (** Given a name, if it's a close_token name, returns the name of the corresponding predicate,
    otherwise return None. *)

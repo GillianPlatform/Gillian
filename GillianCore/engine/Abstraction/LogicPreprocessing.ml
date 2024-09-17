@@ -585,7 +585,7 @@ let add_closing_tokens preds =
            pred with
            pred_definitions =
              List.map
-               (fun (x, def) -> (x, def @ Pred.close_token_call pred))
+               (fun (x, def) -> (x, Pred.close_token_call pred :: def))
                pred.pred_definitions;
          })
   |> Seq.iter (fun (pred : Pred.t) -> Hashtbl.replace preds pred.pred_name pred);

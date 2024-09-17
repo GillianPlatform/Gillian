@@ -134,85 +134,65 @@ let assert_of_member cenv members id typ =
         Fmt.failwith "Invalid member offset : %a@?" Driveraux.print_error e
   in
   (* The following bit of code should be refactored to be made cleaner ... *)
-  if
-    match typ with
-    | Tstruct _ -> true
-    | _ -> false
-  then
-    let struct_name, struct_id =
-      match typ with
-      | Tstruct (id, _) -> (true_name id, id)
-      | _ -> failwith "impossible"
-    in
-    let pred_name = pred_name_of_struct struct_name in
-    let arg_number =
-      List.length (Option.get (Maps.PTree.get struct_id cenv)).co_members
-    in
-    let args_without_ins =
-      List.init arg_number (fun k ->
-          Expr.LVar ("#i__" ^ field_name ^ "_" ^ string_of_int k))
-    in
-    let list_is_components =
-      let open Formula.Infix in
-      Asrt.Pure pvmember #== (Expr.list args_without_ins)
-    in
-    let ofs =
-      let open Expr.Infix in
-      pvofs + fo
-    in
-    let args = pvloc :: ofs :: args_without_ins in
-    let pred_call = Asrt.Pred (pred_name, args) in
-    [ list_is_components; pred_call ]
-  else if
-    match typ with
-    | Tarray _ -> true
-    | _ -> false
-  then
-    let ty, n =
-      match typ with
-      | Tarray (ty, n, _) -> (ty, n)
-      | _ -> failwith "impossible"
-    in
-    let n = ValueTranslation.int_of_z n in
-    let n_e = Expr.int_z n in
-    let chunk =
-      match access_mode_by_value ty with
-      | Some chunk -> chunk
-      | _ -> failwith "Array in a structure containing complicated types"
-    in
-    [
-      Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
-        ~sval_arr:pvmember ~perm:(Some Freeable);
-    ]
-  else
-    let mk t v = Expr.list [ Expr.string t; v ] in
-    let field_val_name = "#i__" ^ field_name ^ "_v" in
-    let lvval = Expr.LVar field_val_name in
-    let e_to_use, getter_or_type_pred =
-      let open Internal_Predicates in
-      let open VTypes in
-      match typ with
-      | Tint _ -> (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ]))
-      | Tlong _ ->
-          (mk long_type lvval, Asrt.Pred (long_get, [ pvmember; lvval ]))
-      | Tfloat _ ->
-          (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
-      | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
-      | _ ->
-          failwith
-            (Printf.sprintf "unhandled struct field type for now : %s"
-               (PrintCsyntax.name_cdecl field_name typ))
-    in
-    let chunk =
-      match access_mode_by_value typ with
-      | Some chunk -> chunk
-      | _ -> failwith "Invalid access mode for some type"
-    in
-    let ga_asrt =
-      CoreP.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
-        ~perm:(Some Freeable)
-    in
-    [ getter_or_type_pred; ga_asrt ]
+  match typ with
+  | Tstruct (struct_id, _) ->
+      let struct_name = true_name struct_id in
+      let pred_name = pred_name_of_struct struct_name in
+      let arg_number =
+        List.length (Option.get (Maps.PTree.get struct_id cenv)).co_members
+      in
+      let args_without_ins =
+        List.init arg_number (fun k ->
+            Expr.LVar ("#i__" ^ field_name ^ "_" ^ string_of_int k))
+      in
+      let list_is_components =
+        Formula.Infix.(Asrt.Pure pvmember #== (Expr.list args_without_ins))
+      in
+      let ofs = Expr.Infix.(pvofs + fo) in
+      let args = pvloc :: ofs :: args_without_ins in
+      let pred_call = Asrt.Pred (pred_name, args) in
+      [ list_is_components; pred_call ]
+  | Tarray (ty, n, _) ->
+      let n = ValueTranslation.int_of_z n in
+      let n_e = Expr.int_z n in
+      let chunk =
+        match access_mode_by_value ty with
+        | Some chunk -> chunk
+        | _ -> failwith "Array in a structure containing complicated types"
+      in
+      [
+        Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
+          ~sval_arr:pvmember ~perm:(Some Freeable);
+      ]
+  | _ ->
+      let mk t v = Expr.list [ Expr.string t; v ] in
+      let field_val_name = "#i__" ^ field_name ^ "_v" in
+      let lvval = Expr.LVar field_val_name in
+      let e_to_use, getter_or_type_pred =
+        let open Internal_Predicates in
+        let open VTypes in
+        match typ with
+        | Tint _ -> (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ]))
+        | Tlong _ ->
+            (mk long_type lvval, Asrt.Pred (long_get, [ pvmember; lvval ]))
+        | Tfloat _ ->
+            (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
+        | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
+        | _ ->
+            failwith
+              (Printf.sprintf "unhandled struct field type for now : %s"
+                 (PrintCsyntax.name_cdecl field_name typ))
+      in
+      let chunk =
+        match access_mode_by_value typ with
+        | Some chunk -> chunk
+        | _ -> failwith "Invalid access mode for some type"
+      in
+      let ga_asrt =
+        CoreP.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
+          ~perm:(Some Freeable)
+      in
+      [ getter_or_type_pred; ga_asrt ]
 
 let assert_of_hole (low, high) =
   let pvloc = Expr.PVar loc_param_name in
@@ -245,22 +225,18 @@ let gen_pred_of_struct cenv ann struct_name =
     ]
   in
   let struct_params =
-    List.map
-      (function
-        | Member_plain (i, _) -> (true_name i, Some Type.ListType)
-        | Member_bitfield _ -> failwith "Unsupported bitfield members")
-      comp.co_members
+    comp.co_members
+    |> List.map @@ function
+       | Member_plain (i, _) -> (true_name i, Some Type.ListType)
+       | Member_bitfield _ -> failwith "Unsupported bitfield members"
   in
   let pred_params = first_params @ struct_params in
   let pred_num_params = List.length pred_params in
   let def_without_holes =
-    List.fold_left
-      (fun asrt member ->
-        match member with
-        | Member_plain (id, typ) ->
-            asrt @ assert_of_member cenv comp.co_members id typ
-        | Member_bitfield _ -> failwith "Unsupported bitfield members")
-      [] comp.co_members
+    comp.co_members
+    |> List.concat_map @@ function
+       | Member_plain (id, typ) -> assert_of_member cenv comp.co_members id typ
+       | Member_bitfield _ -> failwith "Unsupported bitfield members"
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
@@ -402,7 +378,7 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
       | ptr ->
           let res_lvar = fresh_lvar () in
           let res = Expr.LVar res_lvar in
-          ( [ Constr.Others.ptr_add ~ptr ~to_add ~res ] @ a1 @ a2,
+          ( (Constr.Others.ptr_add ~ptr ~to_add ~res :: a1) @ a2,
             res_lvar :: (v1 @ v2),
             res ))
   | BinOp (e1, b, e2) ->
@@ -524,50 +500,33 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   let mk str v = Expr.list [ Expr.string str; v ] in
   let mk_ptr l o = Expr.list [ l; o ] in
   match c with
-  | CConstructor.ConsExpr (SVal (Sint se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mint32 in
-      let sv = mk int_type e in
-      let siz = sz (Sint se) in
-      let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+  | CConstructor.ConsExpr (SVal (Sint v as se))
+  | ConsExpr (SVal (Sfloat v as se))
+  | ConsExpr (SVal (Ssingle v as se))
+  | ConsExpr (SVal (Slong v as se)) ->
+      let chunk, typ, asrtfn =
+        match se with
+        | Sint _ -> (Chunk.Mint32, int_type, tint)
+        | Sfloat _ -> (Chunk.Mfloat32, float_type, tnum)
+        | Ssingle _ -> (Chunk.Mfloat32, single_type, tnum)
+        | Slong _ -> (Chunk.Mint64, long_type, tint)
+        | _ -> failwith "Impossible"
       in
-      [ ga; tint e; malloc_chunk siz ] @ to_assert
-  | ConsExpr (SVal (Sfloat se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mfloat32 in
-      let siz = sz (Sfloat se) in
-      let sv = mk float_type e in
+      let e = cse v in
+      let sval = mk typ e in
+      let siz = sz se in
       let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval ~perm:(Some Freeable)
       in
-      [ ga; tnum e; malloc_chunk siz ] @ to_assert
-  | ConsExpr (SVal (Ssingle se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mfloat32 in
-      let siz = sz (Ssingle se) in
-      let sv = mk single_type e in
-      let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
-      in
-      [ ga; tnum e; malloc_chunk siz ] @ to_assert
-  | ConsExpr (SVal (Slong se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mint64 in
-      let siz = sz (Slong se) in
-      let sv = mk long_type e in
-      let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
-      in
-      [ ga; tint e; malloc_chunk siz ] @ to_assert
+      [ ga; asrtfn e; malloc_chunk siz ] @ to_assert
   | ConsExpr (SVal (Sptr (sl, so))) ->
       let l = cse sl in
       let o = cse so in
       let chunk = Chunk.ptr in
       let siz = sz (Sptr (sl, so)) in
-      let sv = mk_ptr l o in
+      let sval = mk_ptr l o in
       let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval ~perm:(Some Freeable)
       in
       [ ga; tloc l; tint o; malloc_chunk siz ] @ to_assert
   | ConsExpr (SVal (Sfunptr fname)) ->
@@ -682,16 +641,14 @@ let rec trans_lcmd ~fname ~ann lcmd =
 let trans_asrt_annot da =
   let { label; existentials } = da in
   let exs, typsb =
-    List.split
-      (List.map
-         (fun (ex, topt) ->
-           match topt with
-           | None -> (ex, Asrt.Emp)
-           | Some t -> (ex, types t (Expr.LVar ex)))
-         existentials)
+    existentials
+    |> ( List.map @@ fun (ex, topt) ->
+         match topt with
+         | None -> (ex, Asrt.Emp)
+         | Some t -> (ex, types t (Expr.LVar ex)) )
+    |> List.split
   in
-  let a = typsb in
-  (a, (label, exs))
+  (typsb, (label, exs))
 
 let trans_abs_pred ~filepath cl_pred =
   let CAbsPred.
