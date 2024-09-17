@@ -378,7 +378,7 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
       | ptr ->
           let res_lvar = fresh_lvar () in
           let res = Expr.LVar res_lvar in
-          ( (Constr.Others.ptr_add ~ptr ~to_add ~res :: a1) @ a2,
+          ( a1 @ a2 @ [ Constr.Others.ptr_add ~ptr ~to_add ~res ],
             res_lvar :: (v1 @ v2),
             res ))
   | BinOp (e1, b, e2) ->
@@ -556,53 +556,58 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
       let pr =
         Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields) :: more_asrt
       in
-      [ malloc_chunk siz ] @ pr @ to_assert
+      pr @ to_assert @ [ malloc_chunk siz ]
 
 let rec trans_asrt ~fname ~ann asrt =
-  match asrt with
-  | CAssert.Star (a1, a2) ->
-      trans_asrt ~fname ~ann a1 @ trans_asrt ~fname ~ann a2
-  | Array { ptr; chunk; size; content; malloced } ->
-      let a1, _, ptr = trans_expr ptr in
-      let a2, _, size = trans_expr size in
-      let a3, _, content = trans_expr content in
-      let malloc_p =
-        if malloced then
-          let open Expr.Infix in
-          let csize = Expr.int (Chunk.size chunk) in
-          let total_size = size * csize in
-          [ Constr.Others.malloced_abst ~ptr ~total_size ]
-        else []
-      in
-      a1 @ a2 @ a3
-      @ [ Constr.Others.array_ptr ~ptr ~chunk ~size ~content ]
-      @ malloc_p
-  | Malloced (e1, e2) ->
-      let a1, _, ce1 = trans_expr e1 in
-      let a2, _, ce2 = trans_expr e2 in
-      a1 @ a2 @ [ Constr.Others.malloced_abst ~ptr:ce1 ~total_size:ce2 ]
-  | Zeros (e1, e2) ->
-      let a1, _, ce1 = trans_expr e1 in
-      let a2, _, ce2 = trans_expr e2 in
-      a1 @ a2 @ [ Constr.Others.zeros_ptr_size ~ptr:ce1 ~size:ce2 ]
-  | Undefs (e1, e2) ->
-      let a1, _, ce1 = trans_expr e1 in
-      let a2, _, ce2 = trans_expr e2 in
-      a1 @ a2 @ [ Constr.Others.undefs_ptr_size ~ptr:ce1 ~size:ce2 ]
-  | Pure f ->
-      let ma, _, fp = trans_form f in
-      Pure fp :: ma
-  | Pred (p, cel) ->
-      let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
-      Pred (p, gel) :: ap
-  | Emp -> [ Asrt.Emp ]
-  | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
+  let a =
+    match asrt with
+    | CAssert.Star (a1, a2) ->
+        trans_asrt ~fname ~ann a1 @ trans_asrt ~fname ~ann a2
+    | Array { ptr; chunk; size; content; malloced } ->
+        let a1, _, ptr = trans_expr ptr in
+        let a2, _, size = trans_expr size in
+        let a3, _, content = trans_expr content in
+        let malloc_p =
+          if malloced then
+            let open Expr.Infix in
+            let csize = Expr.int (Chunk.size chunk) in
+            let total_size = size * csize in
+            [ Constr.Others.malloced_abst ~ptr ~total_size ]
+          else []
+        in
+        a1 @ a2 @ a3
+        @ [ Constr.Others.array_ptr ~ptr ~chunk ~size ~content ]
+        @ malloc_p
+    | Malloced (e1, e2) ->
+        let a1, _, ce1 = trans_expr e1 in
+        let a2, _, ce2 = trans_expr e2 in
+        a1 @ a2 @ [ Constr.Others.malloced_abst ~ptr:ce1 ~total_size:ce2 ]
+    | Zeros (e1, e2) ->
+        let a1, _, ce1 = trans_expr e1 in
+        let a2, _, ce2 = trans_expr e2 in
+        a1 @ a2 @ [ Constr.Others.zeros_ptr_size ~ptr:ce1 ~size:ce2 ]
+    | Undefs (e1, e2) ->
+        let a1, _, ce1 = trans_expr e1 in
+        let a2, _, ce2 = trans_expr e2 in
+        a1 @ a2 @ [ Constr.Others.undefs_ptr_size ~ptr:ce1 ~size:ce2 ]
+    | Pure f ->
+        let ma, _, fp = trans_form f in
+        Pure fp :: ma
+    | Pred (p, cel) ->
+        let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
+        Pred (p, gel) :: ap
+    | Emp -> [ Asrt.Emp ]
+    | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
+  in
+  match List.filter (fun x -> x <> Asrt.Emp) a with
+  | [] -> [ Asrt.Emp ]
+  | a -> a
 
 let rec trans_lcmd ~fname ~ann lcmd =
   let trans_lcmd = trans_lcmd ~fname ~ann in
   let trans_asrt = trans_asrt ~fname ~ann in
   let make_assert ~bindings = function
-    | [] -> []
+    | [] | [ Asrt.Emp ] -> []
     | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
   in
   match lcmd with

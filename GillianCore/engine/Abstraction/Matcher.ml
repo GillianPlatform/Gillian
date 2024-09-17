@@ -589,6 +589,9 @@ module Make (State : SState.S) :
     L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
     match (a : Asrt.simple) with
+    | Emp ->
+        L.verbose (fun fmt -> fmt "Emp assertion.");
+        [ Ok astate ]
     | CorePred (a_id, ins, outs) ->
         L.verbose (fun fmt -> fmt "Memory producer.");
 
@@ -716,7 +719,6 @@ module Make (State : SState.S) :
         | Some state' ->
             Res_list.return
               { state = state'; preds; wands; pred_defs; variants })
-    | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
   and produce_asrt_list (astate : t) (subst : SVal.SESubst.t) (sas : Asrt.t) :
       (t, err_t) Res_list.t =
