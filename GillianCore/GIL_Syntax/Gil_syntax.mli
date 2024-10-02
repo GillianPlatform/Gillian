@@ -186,6 +186,7 @@ module BinOp : sig
     | ITimes  (** Integer multiplication *)
     | IDiv  (** Integer division *)
     | IMod  (** Integer modulus *)
+    | BPlus
     | FLessThan  (** Less for floats *)
     | FLessThanEqual  (** Less or equal for floats *)
     | FPlus  (** Float addition *)
@@ -1371,6 +1372,7 @@ module Visitors : sig
          ; visit_IPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_ITimes : 'c -> BinOp.t -> BinOp.t
          ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
+         ; visit_BPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_If :
              'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
          ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
@@ -1637,6 +1639,7 @@ module Visitors : sig
     method visit_IPlus : 'c -> BinOp.t -> BinOp.t
     method visit_ITimes : 'c -> BinOp.t -> BinOp.t
     method visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
+    method visit_BPlus : 'c -> BinOp.t -> BinOp.t
 
     method visit_If :
       'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
@@ -1984,6 +1987,7 @@ module Visitors : sig
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
+         ; visit_BPlus : 'c -> 'f
          ; visit_Pred : 'c -> string -> Expr.t list -> 'f
          ; visit_Pure : 'c -> Formula.t -> 'f
          ; visit_Random : 'c -> 'f
@@ -2221,6 +2225,7 @@ module Visitors : sig
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
+    method visit_BPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
     method visit_Pred : 'c -> string -> Expr.t list -> 'f
     method visit_Pure : 'c -> Formula.t -> 'f
@@ -2394,6 +2399,7 @@ module Visitors : sig
          ; visit_IMinus : 'c -> unit
          ; visit_IMod : 'c -> unit
          ; visit_IPlus : 'c -> unit
+         ; visit_BPlus : 'c -> unit
          ; visit_ITimes : 'c -> unit
          ; visit_IUnaryMinus : 'c -> unit
          ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
@@ -2636,6 +2642,7 @@ module Visitors : sig
     method visit_IMinus : 'c -> unit
     method visit_IMod : 'c -> unit
     method visit_IPlus : 'c -> unit
+    method visit_BPlus : 'c -> unit
     method visit_ITimes : 'c -> unit
     method visit_IUnaryMinus : 'c -> unit
     method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit

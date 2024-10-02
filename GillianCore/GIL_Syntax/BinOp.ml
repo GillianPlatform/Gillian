@@ -10,6 +10,7 @@ type t = TypeDef__.binop =
   | ITimes  (** Integer multiplication *)
   | IDiv  (** Integer division *)
   | IMod  (** Integer modulus *)
+  | BPlus (* BV addition *)
   | FLessThan  (** Less for floats *)
   | FLessThanEqual  (** Less or equal for floats *)
   | FPlus  (** Float addition *)
@@ -70,6 +71,7 @@ let str (x : t) =
   | ITimes -> "i*"
   | IDiv -> "i/"
   | IMod -> "i%"
+  | BPlus -> "b+"
   | FLessThan -> "<"
   | FLessThanEqual -> "<="
   | FPlus -> "+"
