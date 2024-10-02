@@ -196,6 +196,8 @@ rule read = parse
   | "i*"                 { GIL_Parser.ITIMES }
   | "i/"                 { GIL_Parser.IDIV   }
   | "i%"                 { GIL_Parser.IMOD   }
+  (* BVs *)
+  | "b+"                 { GIL_Parser.BPLUS }
 
   | "<#"
   | "<"                  { GIL_Parser.FLT    }

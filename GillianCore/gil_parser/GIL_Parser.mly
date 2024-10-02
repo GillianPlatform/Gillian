@@ -71,6 +71,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token IDIV
 %token IMOD
 
+%token BPLUS
+
 %token SLT
 %token AND
 %token OR
@@ -247,7 +249,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %nonassoc FLT FLE FGT FGE ILT ILE IGT IGE SLT
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
 %left BITWISEOR BITWISEXOR BITWISEAND BITWISEXORL BITWISEORL BITWISEANDL
-%left FPLUS FMINUS IPLUS IMINUS
+%left FPLUS FMINUS IPLUS IMINUS BPLUS
 %left FTIMES FDIV FMOD ITIMES IDIV IMOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 %nonassoc SETMEM SETSUB
@@ -1163,6 +1165,47 @@ nop_target:
   | SETUNION { NOp.SetUnion }
   | SETINTER { NOp.SetInter }
   | LSTCAT   { NOp.LstCat   }
+;
+
+binop_target:
+  | EQ                  { BinOp.Equal }
+  | ILT                 { BinOp.ILessThan }
+  | ILE                 { BinOp.ILessThanEqual }
+  | IPLUS               { BinOp.IPlus }
+  | IMINUS              { BinOp.IMinus }
+  | ITIMES              { BinOp.ITimes }
+  | IDIV                { BinOp.IDiv }
+  | IMOD                { BinOp.IMod }
+  | BPLUS               { BinOp.BPLUS}
+  | FLT                 { BinOp.FLessThan }
+  | FLE                 { BinOp.FLessThanEqual }
+  | FPLUS               { BinOp.FPlus }
+  | FMINUS              { BinOp.FMinus }
+  | FTIMES              { BinOp.FTimes }
+  | FDIV                { BinOp.FDiv }
+  | FMOD                { BinOp.FMod }
+  | SLT                 { BinOp.SLessThan }
+  | AND                 { BinOp.BAnd }
+  | OR                  { BinOp.BOr }
+  | LIMPLIES            { BinOp.BImpl }
+  | BITWISEAND          { BinOp.BitwiseAnd }
+  | BITWISEOR           { BinOp.BitwiseOr}
+  | BITWISEXOR          { BinOp.BitwiseXor }
+  | LEFTSHIFT           { BinOp.LeftShift }
+  | SIGNEDRIGHTSHIFT    { BinOp.SignedRightShift }
+  | UNSIGNEDRIGHTSHIFT  { BinOp.UnsignedRightShift }
+  | BITWISEANDL         { BinOp.BitwiseAndL }
+  | BITWISEORL          { BinOp.BitwiseOrL }
+  | BITWISEXORL         { BinOp.BitwiseXorL }
+  | LEFTSHIFTL          { BinOp.LeftShiftL }
+  | SIGNEDRIGHTSHIFTL   { BinOp.SignedRightShiftL }
+  | UNSIGNEDRIGHTSHIFTL { BinOp.UnsignedRightShiftL }
+  | M_ATAN2             { BinOp.M_atan2 }
+  | M_POW               { BinOp.M_pow }
+  | STRCAT              { BinOp.StrCat }
+  | SETDIFF             { BinOp.SetDiff }
+  | SETMEM              { BinOp.BSetMem }
+  | SETSUB              { BinOp.BSetSub }
 ;
 
 unop_target:

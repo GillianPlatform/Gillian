@@ -53,6 +53,7 @@ and binop =
   | ITimes
   | IDiv
   | IMod
+  | BPlus
   | FLessThan
   | FLessThanEqual
   | FPlus
