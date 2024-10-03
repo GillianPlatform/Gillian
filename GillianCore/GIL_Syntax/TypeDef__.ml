@@ -53,7 +53,6 @@ and binop =
   | ITimes
   | IDiv
   | IMod
-  | BPlus
   | FLessThan
   | FLessThanEqual
   | FPlus
@@ -131,12 +130,14 @@ and unop =
   | IsInt
 
 and nop = LstCat | SetUnion | SetInter
+and bvop = BVPlus
 
 and expr =
   | Lit of literal
   | PVar of string
   | LVar of string
   | ALoc of string
+  | BVIntrinsic of bvop * expr list * int
   | UnOp of unop * expr
   | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr

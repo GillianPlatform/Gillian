@@ -71,8 +71,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token IDIV
 %token IMOD
 
-%token BPLUS
-
 %token SLT
 %token AND
 %token OR
@@ -249,7 +247,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %nonassoc FLT FLE FGT FGE ILT ILE IGT IGE SLT
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
 %left BITWISEOR BITWISEXOR BITWISEAND BITWISEXORL BITWISEORL BITWISEANDL
-%left FPLUS FMINUS IPLUS IMINUS BPLUS
+%left FPLUS FMINUS IPLUS IMINUS
 %left FTIMES FDIV FMOD ITIMES IDIV IMOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 %nonassoc SETMEM SETSUB
@@ -1176,7 +1174,6 @@ binop_target:
   | ITIMES              { BinOp.ITimes }
   | IDIV                { BinOp.IDiv }
   | IMOD                { BinOp.IMod }
-  | BPLUS               { BinOp.BPLUS}
   | FLT                 { BinOp.FLessThan }
   | FLE                 { BinOp.FLessThanEqual }
   | FPLUS               { BinOp.FPlus }
