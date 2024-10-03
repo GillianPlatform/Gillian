@@ -75,6 +75,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
+    | BvType of int
   [@@deriving yojson, eq, show]
 
   (** Printer *)

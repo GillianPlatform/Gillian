@@ -15,6 +15,7 @@ type t = TypeDef__.typ =
   | ListType  (** Type of lists          *)
   | TypeType  (** Type of types          *)
   | SetType  (** Type of sets           *)
+  | BvType of int
 [@@deriving yojson, eq, ord, show]
 
 (** Print *)
@@ -32,6 +33,7 @@ let str (x : t) =
   | ListType -> "List"
   | TypeType -> "Type"
   | SetType -> "Set"
+  | BvType w -> "BvType_" ^ Int.to_string w
 
 module Set = Set.Make (struct
   type nonrec t = t

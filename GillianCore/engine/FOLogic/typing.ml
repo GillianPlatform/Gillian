@@ -118,6 +118,35 @@ module Infer_types_to_gamma = struct
     | None -> true
     | Some rt -> tt = rt
 
+  and infer_bv_intrinsic
+      (flag : bool)
+      (gamma : Type_env.t)
+      (new_gamma : Type_env.t)
+      (op : BVOps.t)
+      (es : Expr.t list)
+      (width : int)
+      (tt : Type.t) : bool =
+    let f = f flag gamma new_gamma in
+    let param_tys, res_tys =
+      match op with
+      | BVOps.BVPlus -> ([ BvType width; BvType width ], Some (BvType width))
+    in
+    if List.length param_tys = List.length es then
+      let params_typed =
+        Utils.List_utils.zip param_tys es
+        |> List.map (fun (expected_ty, expr) -> f expr expected_ty)
+        |> List.for_all (fun x -> x)
+      in
+      let rets_tped =
+        Option.fold ~some:(fun rty -> Type.equal rty tt) ~none:true res_tys
+      in
+      rets_tped && params_typed
+    else
+      raise
+        (Failure
+           ("Unexpected arity passed to intrinsic "
+           ^ (List.length param_tys |> Int.to_string)))
+
   and f
       (flag : bool)
       (gamma : Type_env.t)
@@ -153,6 +182,8 @@ module Infer_types_to_gamma = struct
     | LstSub (le1, le2, le3) ->
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
+    | BVIntrinsic (op, es, width) ->
+        infer_bv_intrinsic flag gamma new_gamma op es width tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
     | Exists (bt, le) ->
         if not (tt = BooleanType) then false
@@ -449,6 +480,30 @@ module Type_lexpr = struct
             (* | _ -> infer_type le NumberType constraints *))
     | _, _ -> def_neg
 
+  and type_bv_intrinsic gamma le (op : BVOps.t) (es : Expr.t list) (width : int)
+      =
+    let f = f gamma in
+    let infer_type = infer_type gamma in
+    let arity =
+      match op with
+      | BVOps.BVPlus -> 2
+    in
+    let nwidth =
+      match op with
+      | BVOps.BVPlus -> width
+    in
+    let pars =
+      List.map
+        (fun e ->
+          let _, b = f e in
+          b)
+        es
+      |> List.for_all (fun x -> x)
+    in
+    if pars && arity = List.length es then infer_type le (Type.BvType nwidth)
+    else (None, false)
+  (* Both expressions must be typable *)
+
   and type_lstsub gamma le1 le2 le3 =
     let f = f gamma in
     let infer_type = infer_type gamma in
@@ -500,6 +555,7 @@ module Type_lexpr = struct
       | Exists (bt, e) | EForall (bt, e) -> type_quantified_expr gamma le bt e
       | UnOp (op, e) -> type_unop gamma le op e
       | BinOp (e1, op, e2) -> type_binop gamma le op e1 e2
+      | BVIntrinsic (op, es, width) -> type_bv_intrinsic gamma le op es width
       | NOp (SetUnion, les) | NOp (SetInter, les) ->
           let all_typable = typable_list ?target_type:(Some SetType) les in
           if all_typable then (Some SetType, true) else def_neg

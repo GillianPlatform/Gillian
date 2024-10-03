@@ -21,6 +21,7 @@ and typ =
   | ListType
   | TypeType
   | SetType
+  | BvType of int
 
 and literal =
   | Undefined
