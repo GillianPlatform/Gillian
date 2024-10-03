@@ -23,5 +23,6 @@ module SLCmd = SLCmd
 module Spec = Spec
 module Type = Type
 module UnOp = UnOp
+module BVOps = BVOps
 module Var = Var
 module Visitors = Visitors

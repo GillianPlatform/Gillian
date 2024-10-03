@@ -173,6 +173,16 @@ module UnOp : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.UnOp *)
+module BVOps : sig
+  (** GIL Unary Operators *)
+
+  type t = BVPlus [@@deriving yojson, eq]
+
+  (** Printer *)
+  val str : t -> string
+end
+
 (** @canonical Gillian.Gil_syntax.BinOp *)
 module BinOp : sig
   (** GIL Binary Operators *)
