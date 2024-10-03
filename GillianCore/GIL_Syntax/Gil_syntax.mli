@@ -186,7 +186,6 @@ module BinOp : sig
     | ITimes  (** Integer multiplication *)
     | IDiv  (** Integer division *)
     | IMod  (** Integer modulus *)
-    | BPlus
     | FLessThan  (** Less for floats *)
     | FLessThanEqual  (** Less or equal for floats *)
     | FPlus  (** Float addition *)
@@ -254,6 +253,7 @@ module Expr : sig
     | PVar of string  (** GIL program variables *)
     | LVar of string  (** GIL logical variables (interpreted symbols) *)
     | ALoc of string  (** GIL abstract locations (uninterpreted symbols) *)
+    | BVIntrinsic of BVOps.t * t list * int
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)
@@ -1282,6 +1282,8 @@ module Visitors : sig
          ; visit_BImpl : 'c -> BinOp.t -> BinOp.t
          ; visit_BSetMem : 'c -> BinOp.t -> BinOp.t
          ; visit_BSetSub : 'c -> BinOp.t -> BinOp.t
+         ; visit_BVIntrinsic :
+             'c -> Expr.t -> BVOps.t -> Expr.t list -> int -> Expr.t
          ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
          ; visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
          ; visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
@@ -1370,9 +1372,9 @@ module Visitors : sig
          ; visit_IMinus : 'c -> BinOp.t -> BinOp.t
          ; visit_IMod : 'c -> BinOp.t -> BinOp.t
          ; visit_IPlus : 'c -> BinOp.t -> BinOp.t
+         ; visit_BVPlus : 'c -> BVOps.t -> BVOps.t
          ; visit_ITimes : 'c -> BinOp.t -> BinOp.t
          ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
-         ; visit_BPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_If :
              'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
          ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
@@ -1526,6 +1528,7 @@ module Visitors : sig
          ; visit_slcmd : 'c -> SLCmd.t -> SLCmd.t
          ; visit_spec : 'c -> Spec.t -> Spec.t
          ; visit_typ : 'c -> Type.t -> Type.t
+         ; visit_bvop : 'c -> BVOps.t -> BVOps.t
          ; visit_unop : 'c -> UnOp.t -> UnOp.t
          ; .. >
 
@@ -1551,6 +1554,10 @@ module Visitors : sig
     method visit_BImpl : 'c -> BinOp.t -> BinOp.t
     method visit_BSetMem : 'c -> BinOp.t -> BinOp.t
     method visit_BSetSub : 'c -> BinOp.t -> BinOp.t
+
+    method visit_BVIntrinsic :
+      'c -> Expr.t -> BVOps.t -> Expr.t list -> int -> Expr.t
+
     method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
     method visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
     method visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
@@ -1637,9 +1644,9 @@ module Visitors : sig
     method visit_IMinus : 'c -> BinOp.t -> BinOp.t
     method visit_IMod : 'c -> BinOp.t -> BinOp.t
     method visit_IPlus : 'c -> BinOp.t -> BinOp.t
+    method visit_BVPlus : 'c -> BVOps.t -> BVOps.t
     method visit_ITimes : 'c -> BinOp.t -> BinOp.t
     method visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
-    method visit_BPlus : 'c -> BinOp.t -> BinOp.t
 
     method visit_If :
       'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
@@ -1836,6 +1843,7 @@ module Visitors : sig
     method private visit_string : 'env. 'env -> string -> string
     method visit_typ : 'c -> Type.t -> Type.t
     method private visit_unit : 'env. 'env -> unit -> unit
+    method visit_bvop : 'c -> BVOps.t -> BVOps.t
     method visit_unop : 'c -> UnOp.t -> UnOp.t
   end
 
@@ -1859,6 +1867,7 @@ module Visitors : sig
          ; visit_BSetMem : 'c -> 'f
          ; visit_BSetSub : 'c -> 'f
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
+         ; visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int -> 'f
          ; visit_BitwiseAnd : 'c -> 'f
          ; visit_BitwiseAndL : 'c -> 'f
          ; visit_BitwiseAndF : 'c -> 'f
@@ -1986,8 +1995,8 @@ module Visitors : sig
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
+         ; visit_BVPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
-         ; visit_BPlus : 'c -> 'f
          ; visit_Pred : 'c -> string -> Expr.t list -> 'f
          ; visit_Pure : 'c -> Formula.t -> 'f
          ; visit_Random : 'c -> 'f
@@ -2070,6 +2079,7 @@ module Visitors : sig
          ; visit_slcmd : 'c -> SLCmd.t -> 'f
          ; visit_spec : 'c -> Spec.t -> 'f
          ; visit_typ : 'c -> Type.t -> 'f
+         ; visit_bvop : 'c -> BVOps.t -> 'f
          ; visit_unop : 'c -> UnOp.t -> 'f
          ; .. >
 
@@ -2091,6 +2101,7 @@ module Visitors : sig
     method visit_BImpl : 'c -> 'f
     method visit_BSetMem : 'c -> 'f
     method visit_BSetSub : 'c -> 'f
+    method visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int -> 'f
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
     method visit_BitwiseAnd : 'c -> 'f
     method visit_BitwiseAndL : 'c -> 'f
@@ -2225,7 +2236,7 @@ module Visitors : sig
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
-    method visit_BPlus : 'c -> 'f
+    method visit_BVPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
     method visit_Pred : 'c -> string -> Expr.t list -> 'f
     method visit_Pure : 'c -> Formula.t -> 'f
@@ -2307,6 +2318,7 @@ module Visitors : sig
     method visit_slcmd : 'c -> SLCmd.t -> 'f
     method visit_spec : 'c -> Spec.t -> 'f
     method visit_typ : 'c -> Type.t -> 'f
+    method visit_bvop : 'c -> BVOps.t -> 'f
     method visit_unop : 'c -> UnOp.t -> 'f
     method virtual private zero : 'f
   end
@@ -2330,6 +2342,7 @@ module Visitors : sig
          ; visit_BImpl : 'c -> unit
          ; visit_BSetMem : 'c -> unit
          ; visit_BSetSub : 'c -> unit
+         ; visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int -> unit
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
          ; visit_BitwiseAnd : 'c -> unit
          ; visit_BitwiseAndL : 'c -> unit
@@ -2399,7 +2412,7 @@ module Visitors : sig
          ; visit_IMinus : 'c -> unit
          ; visit_IMod : 'c -> unit
          ; visit_IPlus : 'c -> unit
-         ; visit_BPlus : 'c -> unit
+         ; visit_BVPlus : 'c -> unit
          ; visit_ITimes : 'c -> unit
          ; visit_IUnaryMinus : 'c -> unit
          ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
@@ -2544,6 +2557,7 @@ module Visitors : sig
          ; visit_slcmd : 'c -> SLCmd.t -> unit
          ; visit_spec : 'c -> Spec.t -> unit
          ; visit_typ : 'c -> Type.t -> unit
+         ; visit_bvop : 'c -> BVOps.t -> unit
          ; visit_unop : 'c -> UnOp.t -> unit
          ; .. >
 
@@ -2564,6 +2578,7 @@ module Visitors : sig
     method visit_BImpl : 'c -> unit
     method visit_BSetMem : 'c -> unit
     method visit_BSetSub : 'c -> unit
+    method visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int -> unit
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
     method visit_BitwiseAnd : 'c -> unit
     method visit_BitwiseAndL : 'c -> unit
@@ -2641,8 +2656,8 @@ module Visitors : sig
     method visit_ILessThanEqual : 'c -> unit
     method visit_IMinus : 'c -> unit
     method visit_IMod : 'c -> unit
+    method visit_BVPlus : 'c -> unit
     method visit_IPlus : 'c -> unit
-    method visit_BPlus : 'c -> unit
     method visit_ITimes : 'c -> unit
     method visit_IUnaryMinus : 'c -> unit
     method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
@@ -2828,6 +2843,7 @@ module Visitors : sig
     method private visit_string : 'env. 'env -> string -> unit
     method visit_typ : 'c -> Type.t -> unit
     method private visit_unit : 'env. 'env -> unit -> unit
+    method visit_bvop : 'c -> BVOps.t -> unit
     method visit_unop : 'c -> UnOp.t -> unit
   end
 
