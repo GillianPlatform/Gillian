@@ -419,6 +419,9 @@ module Encoding = struct
   let get_bool = get_native ~accessor:Lit_operations.Bool.access
   let get_list = get_native ~accessor:Lit_operations.List.access
 
+  let get_bv (_width : int) (_s : t) : sexp =
+    raise (Failure "havent implemented full bv variants yet")
+
   let get_set { kind; expr; _ } =
     match kind with
     | Native SetType -> expr
@@ -721,6 +724,9 @@ let encode_quantified_expr
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
+let encode_bvop (_op : BVOps.t) (_bvs : sexp list) : Encoding.t =
+  raise (Failure "no encoding")
+
 let rec encode_logical_expression
     ~(gamma : typenv)
     ~(llen_lvars : SS.t)
@@ -744,6 +750,9 @@ let rec encode_logical_expression
   | PVar _ -> failwith "HORROR: Program variable in pure formula"
   | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
+  | BVIntrinsic (op, es, width) ->
+      let>-- les = List.map f es in
+      les |> List.map (fun x -> get_bv width x) |> encode_bvop op
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
       les |> List.map get_set |> set_union' Z3 >- SetType
