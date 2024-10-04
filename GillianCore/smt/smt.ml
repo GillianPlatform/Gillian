@@ -141,7 +141,7 @@ let declare_recognizer ~name ~constructor ~typ =
     t_bool
     (list [ atom "_"; atom "is"; atom constructor ] <| atom "x")
 
-let mk_datatype name type_params (variants : (module Variant.S) list) =
+let create_datatype name type_params (variants : (module Variant.S) list) =
   let constructors, recognizer_defs =
     variants
     |> List.map (fun v ->
@@ -155,6 +155,10 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
     |> List.split
   in
   let decl = declare_datatype name type_params constructors in
+  (decl, recognizer_defs)
+
+let mk_datatype name type_params (variants : (module Variant.S) list) =
+  let decl, recognizer_defs = create_datatype name type_params variants in
   let () = init_decls := recognizer_defs @ (decl :: !init_decls) in
   atom name
 
@@ -215,7 +219,7 @@ module BvLiteral = struct
           (module S : Variant.S))
         (!defined_bv_variants |> List.sort_uniq Int.compare)
     in
-    mk_datatype lit_name [] mods
+    create_datatype lit_name [] mods
 end
 
 module Lit_operations = struct
@@ -1159,7 +1163,9 @@ let lift_model
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
 
-let () =
+let perform_decls _ =
+  let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
   let decls = List.rev !init_decls in
-  let () = decls |> List.iter (fun decl -> cmd decl) in
-  cmd (push 1)
+  (bv_decl :: bv_recogs) @ decls |> List.iter (fun decl -> cmd decl)
+
+let () = cmd (push 1)
