@@ -969,7 +969,13 @@ let reset_solver () =
   let () = cmd (push 1) in
   ()
 
+let perform_decls _ =
+  let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
+  let decls = List.rev !init_decls in
+  (bv_decl :: bv_recogs) @ decls |> List.iter (fun decl -> cmd decl)
+
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
+  let () = perform_decls () in
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
@@ -1112,10 +1118,5 @@ let lift_model
                m "SMT binding for %s: %s\n" x binding)
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
-
-let perform_decls _ =
-  let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
-  let decls = List.rev !init_decls in
-  (bv_decl :: bv_recogs) @ decls |> List.iter cmd
 
 let () = cmd (push 1)
