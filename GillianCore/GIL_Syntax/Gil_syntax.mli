@@ -1308,6 +1308,7 @@ module Visitors : sig
          ; visit_BitwiseXorF : 'c -> BinOp.t -> BinOp.t
          ; visit_Bool : 'c -> Literal.t -> bool -> Literal.t
          ; visit_BooleanType : 'c -> Type.t -> Type.t
+         ; visit_BvType : 'c -> Type.t -> int -> Type.t
          ; visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
          ; visit_Bug : 'c -> Flag.t -> Flag.t
          ; visit_Call :
@@ -1582,6 +1583,7 @@ module Visitors : sig
     method visit_BitwiseXorF : 'c -> BinOp.t -> BinOp.t
     method visit_Bool : 'c -> Literal.t -> bool -> Literal.t
     method visit_BooleanType : 'c -> Type.t -> Type.t
+    method visit_BvType : 'c -> Type.t -> int -> Type.t
     method visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
     method visit_Bug : 'c -> Flag.t -> Flag.t
 
@@ -1891,6 +1893,7 @@ module Visitors : sig
          ; visit_BitwiseXorF : 'c -> 'f
          ; visit_Bool : 'c -> bool -> 'f
          ; visit_BooleanType : 'c -> 'f
+         ; visit_BvType : 'c -> int -> 'f
          ; visit_Branch : 'c -> Formula.t -> 'f
          ; visit_Bug : 'c -> 'f
          ; visit_Call :
@@ -2126,6 +2129,7 @@ module Visitors : sig
     method visit_BitwiseXorF : 'c -> 'f
     method visit_Bool : 'c -> bool -> 'f
     method visit_BooleanType : 'c -> 'f
+    method visit_BvType : 'c -> int -> 'f
     method visit_Branch : 'c -> Formula.t -> 'f
     method visit_Bug : 'c -> 'f
 
@@ -2367,6 +2371,7 @@ module Visitors : sig
          ; visit_BitwiseXorF : 'c -> unit
          ; visit_Bool : 'c -> bool -> unit
          ; visit_BooleanType : 'c -> unit
+         ; visit_BvType : 'c -> int -> unit
          ; visit_Branch : 'c -> Formula.t -> unit
          ; visit_Bug : 'c -> unit
          ; visit_Call :
@@ -2603,6 +2608,7 @@ module Visitors : sig
     method visit_BitwiseXorF : 'c -> unit
     method visit_Bool : 'c -> bool -> unit
     method visit_BooleanType : 'c -> unit
+    method visit_BvType : 'c -> int -> unit
     method visit_Branch : 'c -> Formula.t -> unit
     method visit_Bug : 'c -> unit
 

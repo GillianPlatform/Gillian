@@ -548,6 +548,10 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
         | Some v -> v)
+    | BVIntrinsic (_, _, _) ->
+        raise
+          (Failure
+             "Bitvector intrinsics currently unsupported in concrete semantics")
     | BinOp (e1, bop, e2) -> evaluate_binop store bop e1 e2
     | UnOp (unop, e) -> evaluate_unop unop (ee e)
     | NOp (nop, le) -> evaluate_nop nop (List.map ee le)
