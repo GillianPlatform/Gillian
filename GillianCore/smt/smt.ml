@@ -24,6 +24,7 @@ exception SMT_unknown
 let pp_sexp = Sexplib.Sexp.pp_hum
 let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
+let defined_bv_variants : int list ref = ref []
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -177,6 +178,7 @@ module Type_operations = struct
   module List = (val nul "ListType" : Nullary)
   module Type = (val nul "TypeType" : Nullary)
   module Set = (val nul "SetType" : Nullary)
+  module Bv = (val un "BvType" "bvWidth" t_int : Unary)
 
   let t_gil_type =
     mk_datatype "GIL_Type" []
@@ -193,10 +195,29 @@ module Type_operations = struct
         (module List : Variant.S);
         (module Type : Variant.S);
         (module Set : Variant.S);
+        (module Bv : Variant.S);
       ]
 end
 
 let t_gil_type = Type_operations.t_gil_type
+
+module BvLiteral = struct
+  let lit_name = "GIL_BVLiteral"
+  let t_lit_name = atom lit_name
+  let name (width : int) = Printf.sprintf "Bv_%d" width
+  let accessor = "bv_under_value"
+  let make_mod (width : int) = Variant.un (name width) accessor (t_bits width)
+
+  let decl_data_type _ =
+    let mods =
+      List.map
+        (fun x ->
+          let module S = (val make_mod x) in
+          (module S : Variant.S))
+        (!defined_bv_variants |> List.sort_uniq Int.compare)
+    in
+    mk_datatype lit_name [] mods
+end
 
 module Lit_operations = struct
   open Variant
@@ -214,6 +235,7 @@ module Lit_operations = struct
   module Loc = (val un "Loc" "locValue" t_int : Unary)
   module Type = (val un "Type" "tValue" t_gil_type : Unary)
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
+  module Bv = (val un "Bv" "bv_value" BvLiteral.t_lit_name : Unary)
   module None = (val nul "None" : Nullary)
 
   let _ =
@@ -230,6 +252,7 @@ module Lit_operations = struct
         (module Type : Variant.S);
         (module List : Variant.S);
         (module None : Variant.S);
+        (module Bv : Variant.S);
       ]
 end
 
@@ -303,6 +326,7 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
+    | BvType w -> Type_operations.Bv.construct (nat_k w)
   with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
@@ -322,6 +346,7 @@ module Encoding = struct
     | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
     | SetType -> t_gil_literal_set
     | TypeType -> t_gil_type
+    | BvType width -> t_bits width
 
   type t = {
     consts : (string * sexp) Hashset.t; [@default Hashset.empty ()]
@@ -347,7 +372,12 @@ module Encoding = struct
   let null_encoding = make ~kind:Simple_wrapped Lit_operations.Null.construct
   let empty_encoding = make ~kind:Simple_wrapped Lit_operations.Empty.construct
   let none_encoding = make ~kind:Simple_wrapped Lit_operations.None.construct
-  let native typ = make ~kind:(Native typ)
+
+  let native typ =
+    (match typ with
+    | Type.BvType width -> defined_bv_variants := width :: !defined_bv_variants
+    | _ -> ());
+    make ~kind:(Native typ)
 
   let make_const ?extra_asrts ~typ kind const =
     let const = sanitize_identifier const in
@@ -401,6 +431,9 @@ module Encoding = struct
           | TypeType -> Type.construct
           | BooleanType -> Bool.construct
           | ListType -> List.construct
+          | BvType w ->
+              let module M = (val BvLiteral.make_mod w) in
+              M.construct
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
