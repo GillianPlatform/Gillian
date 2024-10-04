@@ -219,7 +219,12 @@ module BvLiteral = struct
           (module S : Variant.S))
         (!defined_bv_variants |> List.sort_uniq Int.compare)
     in
-    create_datatype lit_name [] mods
+    let mods_with_nop_constructor =
+      let module M = (val Variant.nul "BVNoop") in
+      (module M : Variant.S) :: mods
+    in
+
+    create_datatype lit_name [] mods_with_nop_constructor
 end
 
 module Lit_operations = struct
@@ -1032,7 +1037,9 @@ let perform_decls _ =
   (bv_decl :: bv_recogs) @ decls |> List.iter (fun decl -> cmd decl)
 
 let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
+  let () = print_endline "in solver" in
   let () = perform_decls () in
+  let () = print_endline "after decling" in
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
@@ -1040,7 +1047,8 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
           fs pp_typenv gamma)
   in
   let encoded_assertions = encode_assertions fs gamma in
-  let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
+  let () = print_endline "in solver" in
+  let () = if true then Dump.dump fs gamma encoded_assertions in
   let () = encoded_assertions |> List.iter (fun a -> cmd a) in
   L.verbose (fun fmt -> fmt "Reached SMT.");
   let result = check solver in
