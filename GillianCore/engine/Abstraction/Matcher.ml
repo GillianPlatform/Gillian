@@ -960,26 +960,13 @@ module Make (State : SState.S) :
       | Some (pname, v_args) -> (
           L.verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname);
           let rets = unfold (copy_astate astate) pname v_args in
-          let only_errors =
-            List.filter_map
-              (function
-                | Error e -> Some e
-                | _ -> None)
-              rets
-          in
+          let only_successes, only_errors = Res_list.split rets in
           match only_errors with
           | [] ->
               L.verbose (fun m ->
                   m "Unfold complete: %s(@[<h>%a@]): %d" pname
                     Fmt.(list ~sep:comma Expr.pp)
                     v_args (List.length rets));
-              let only_successes =
-                List.filter_map
-                  (function
-                    | Ok x -> Some x
-                    | _ -> None)
-                  rets
-              in
               Some only_successes
           | _ :: _ ->
               L.verbose (fun m ->
