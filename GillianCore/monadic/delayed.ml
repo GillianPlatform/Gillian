@@ -44,11 +44,12 @@ let branch_on
   | guard -> (
       try
         let guard_sat = FOSolver.sat ~pc:curr_pc guard in
-        if not guard_sat then (* [Not guard)] has to be sat *)
-          else_ () ~curr_pc
+        let not_guard = Formula.Infix.fnot guard in
+        if not guard_sat then
+          (* [Not guard] has to be sat *)
+          else_ () ~curr_pc:(Pc.extend curr_pc [ not_guard ])
         else
           let then_branches = then_ () ~curr_pc:(Pc.extend curr_pc [ guard ]) in
-          let not_guard = Formula.Infix.fnot guard in
           if FOSolver.sat ~pc:curr_pc not_guard then
             let else_branches =
               else_ () ~curr_pc:(Pc.extend curr_pc [ not_guard ])
