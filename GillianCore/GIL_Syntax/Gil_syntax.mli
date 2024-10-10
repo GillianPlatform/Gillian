@@ -563,34 +563,29 @@ end
 module Asrt : sig
   (** GIL Assertions *)
 
-  type t =
+  type simple =
     | Emp  (** Empty heap *)
-    | Star of t * t  (** Separating conjunction *)
     | Pred of string * Expr.t list  (** Predicates *)
     | Pure of Formula.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
-    | GA of string * Expr.t list * Expr.t list  (** Core assertion *)
+    | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
     | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand of the form [P(...) -* Q(...)] *)
   [@@deriving yojson, eq]
 
+  type t = simple list [@@deriving yojson, eq]
+
   (** Comparison of assertions *)
-  val compare : t -> t -> int
+  val compare : simple -> simple -> int
 
   (** Sorting of assertions *)
-  val prioritise : t -> t -> int
+  val prioritise : simple -> simple -> int
 
   (** Sets of assertions *)
   module Set : Set.S with type elt := t
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t * bool) option ->
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    (Formula.t -> Formula.t) option ->
-    t ->
-    t
+  val map : (Expr.t -> Expr.t) -> (Formula.t -> Formula.t) -> t -> t
 
   (** Get all the logical expressions of [a] that denote a list
    and are not logical variables *)
@@ -617,15 +612,8 @@ module Asrt : sig
   (** Returns a list with the pure assertions that occur in [a] *)
   val pure_asrts : t -> Formula.t list
 
-  (** Returns a list with the pure assertions that occur in [a] *)
-  val simple_asrts : t -> t list
-
   (** Check if [a] is a pure assertion *)
-  val is_pure_asrt : t -> bool
-
-  (** Check if [a] is a pure assertion & non-recursive assertion.
-   It assumes that only pure assertions are universally quantified *)
-  val is_pure_non_rec_asrt : t -> bool
+  val is_pure_asrt : simple -> bool
 
   (** Eliminate LStar and LTypes assertions.
    LTypes disappears. LStar is replaced by LAnd.
@@ -635,11 +623,12 @@ module Asrt : sig
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
 
+  val pp_simple : Format.formatter -> simple -> unit
+
   (** Full pretty-printer *)
   val full_pp : Format.formatter -> t -> unit
 
-  (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
-  val star : t list -> t
+  val pp_simple_full : Format.formatter -> simple -> unit
 
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
   val subst_clocs : (string -> Expr.t) -> t -> t
@@ -649,11 +638,6 @@ module Asrt : sig
 
   (** Move pvars to lvars *)
   val pvars_to_lvars : t -> t
-
-  module Infix : sig
-    (** Star constructor *)
-    val ( ** ) : t -> t -> t
-  end
 end
 
 (** @canonical Gillian.Gil_syntax.SLCmd *)
@@ -676,12 +660,7 @@ module SLCmd : sig
     | SymbExec
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t) option ->
-    (Asrt.t -> Asrt.t) option ->
-    (Expr.t -> Expr.t) option ->
-    t ->
-    t
+  val map : (Asrt.t -> Asrt.t) -> (Expr.t -> Expr.t) -> t -> t
 
   (** Pretty-printer of folding info *)
   val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
@@ -708,10 +687,9 @@ module LCmd : sig
 
   (** @deprecated Use {!Visitors.endo} instead *)
   val map :
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    (Formula.t -> Formula.t) option ->
-    (SLCmd.t -> SLCmd.t) option ->
+    (Expr.t -> Expr.t) ->
+    (Formula.t -> Formula.t) ->
+    (SLCmd.t -> SLCmd.t) ->
     t ->
     t
 
@@ -845,7 +823,7 @@ module Pred : sig
 
   (** Given a guarded predicate, return a "call" to its close token.
       The arguments given are PVars with the same name as the ins of the predicate. *)
-  val close_token_call : t -> Asrt.t
+  val close_token_call : t -> Asrt.simple
 
   (** Given a name, if it's a close_token name, returns the name of the corresponding predicate,
    otherwise return None. *)
@@ -1322,7 +1300,7 @@ module Visitors : sig
              'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
          ; visit_EForall :
              'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
-         ; visit_Emp : 'c -> Asrt.t -> Asrt.t
+         ; visit_Emp : 'c -> Asrt.simple -> Asrt.simple
          ; visit_Empty : 'c -> Literal.t -> Literal.t
          ; visit_EmptyType : 'c -> Type.t -> Type.t
          ; visit_Epsilon : 'c -> Constant.t -> Constant.t
@@ -1352,14 +1330,19 @@ module Visitors : sig
              (string * Type.t option) list ->
              Formula.t ->
              Formula.t
-         ; visit_GA :
-             'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+         ; visit_CorePred :
+             'c ->
+             Asrt.simple ->
+             string ->
+             Expr.t list ->
+             Expr.t list ->
+             Asrt.simple
          ; visit_Wand :
              'c ->
-             Asrt.t ->
+             Asrt.simple ->
              string * Expr.t list ->
              string * Expr.t list ->
-             Asrt.t
+             Asrt.simple
          ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
          ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
          ; visit_GuardedGoto : 'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
@@ -1437,8 +1420,9 @@ module Visitors : sig
          ; visit_PhiAssignment :
              'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
          ; visit_Pi : 'c -> Constant.t -> Constant.t
-         ; visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
-         ; visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
+         ; visit_Pred :
+             'c -> Asrt.simple -> string -> Expr.t list -> Asrt.simple
+         ; visit_Pure : 'c -> Asrt.simple -> Formula.t -> Asrt.simple
          ; visit_Random : 'c -> Constant.t -> Constant.t
          ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1457,7 +1441,6 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
-         ; visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
          ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
          ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
          ; visit_NumToInt : 'c -> UnOp.t -> UnOp.t
@@ -1477,7 +1460,8 @@ module Visitors : sig
          ; visit_Type : 'c -> Literal.t -> Type.t -> Literal.t
          ; visit_TypeOf : 'c -> UnOp.t -> UnOp.t
          ; visit_TypeType : 'c -> Type.t -> Type.t
-         ; visit_Types : 'c -> Asrt.t -> (Expr.t * Type.t) list -> Asrt.t
+         ; visit_Types :
+             'c -> Asrt.simple -> (Expr.t * Type.t) list -> Asrt.simple
          ; visit_UNot : 'c -> UnOp.t -> UnOp.t
          ; visit_UTCTime : 'c -> Constant.t -> Constant.t
          ; visit_UnOp : 'c -> Expr.t -> UnOp.t -> Expr.t -> Expr.t
@@ -1500,6 +1484,7 @@ module Visitors : sig
          ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
          ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
+         ; visit_assertion_simple : 'c -> Asrt.simple -> Asrt.simple
          ; visit_assertion : 'c -> Asrt.t -> Asrt.t
          ; visit_bindings :
              'c ->
@@ -1591,7 +1576,7 @@ module Visitors : sig
     method visit_EForall :
       'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
 
-    method visit_Emp : 'c -> Asrt.t -> Asrt.t
+    method visit_Emp : 'c -> Asrt.simple -> Asrt.simple
     method visit_Empty : 'c -> Literal.t -> Literal.t
     method visit_EmptyType : 'c -> Type.t -> Type.t
     method visit_Epsilon : 'c -> Constant.t -> Constant.t
@@ -1620,11 +1605,15 @@ module Visitors : sig
     method visit_ForAll :
       'c -> Formula.t -> (string * Type.t option) list -> Formula.t -> Formula.t
 
-    method visit_GA :
-      'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+    method visit_CorePred :
+      'c -> Asrt.simple -> string -> Expr.t list -> Expr.t list -> Asrt.simple
 
     method visit_Wand :
-      'c -> Asrt.t -> string * Expr.t list -> string * Expr.t list -> Asrt.t
+      'c ->
+      Asrt.simple ->
+      string * Expr.t list ->
+      string * Expr.t list ->
+      Asrt.simple
 
     method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
     method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
@@ -1709,8 +1698,11 @@ module Visitors : sig
       'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
 
     method visit_Pi : 'c -> Constant.t -> Constant.t
-    method visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
-    method visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
+
+    method visit_Pred :
+      'c -> Asrt.simple -> string -> Expr.t list -> Asrt.simple
+
+    method visit_Pure : 'c -> Asrt.simple -> Formula.t -> Asrt.simple
     method visit_Random : 'c -> Constant.t -> Constant.t
     method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1729,7 +1721,6 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
     method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
-    method visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
     method visit_StrCat : 'c -> BinOp.t -> BinOp.t
     method visit_StrLen : 'c -> UnOp.t -> UnOp.t
     method visit_IntToNum : 'c -> UnOp.t -> UnOp.t
@@ -1749,7 +1740,10 @@ module Visitors : sig
     method visit_Type : 'c -> Literal.t -> Type.t -> Literal.t
     method visit_TypeOf : 'c -> UnOp.t -> UnOp.t
     method visit_TypeType : 'c -> Type.t -> Type.t
-    method visit_Types : 'c -> Asrt.t -> (Expr.t * Type.t) list -> Asrt.t
+
+    method visit_Types :
+      'c -> Asrt.simple -> (Expr.t * Type.t) list -> Asrt.simple
+
     method visit_UNot : 'c -> UnOp.t -> UnOp.t
     method visit_UTCTime : 'c -> Constant.t -> Constant.t
     method visit_UnOp : 'c -> Expr.t -> UnOp.t -> Expr.t -> Expr.t
@@ -1775,6 +1769,7 @@ module Visitors : sig
     method private visit_array :
       'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a array -> 'a array
 
+    method visit_assertion_simple : 'c -> Asrt.simple -> Asrt.simple
     method visit_assertion : 'c -> Asrt.t -> Asrt.t
 
     method visit_bindings :
@@ -1905,7 +1900,7 @@ module Visitors : sig
              (string * (string * Expr.t) list) option ->
              'f
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Formula.t -> 'f
-         ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+         ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
          ; visit_Goto : 'c -> 'g -> 'f
@@ -2003,7 +1998,6 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> 'f
          ; visit_Skip : 'c -> 'f
          ; visit_FreshSVar : 'c -> string -> 'f
-         ; visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
          ; visit_StrCat : 'c -> 'f
          ; visit_StrLen : 'c -> 'f
          ; visit_IntToNum : 'c -> 'f
@@ -2045,6 +2039,7 @@ module Visitors : sig
          ; visit_UnsignedRightShift : 'c -> 'f
          ; visit_UnsignedRightShiftL : 'c -> 'f
          ; visit_UnsignedRightShiftF : 'c -> 'f
+         ; visit_assertion_simple : 'c -> Asrt.simple -> 'f
          ; visit_assertion : 'c -> Asrt.t -> 'f
          ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
          ; visit_binop : 'c -> BinOp.t -> 'f
@@ -2143,7 +2138,7 @@ module Visitors : sig
       'f
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Formula.t -> 'f
-    method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+    method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
     method visit_Goto : 'c -> 'g -> 'f
@@ -2241,7 +2236,6 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> 'f
     method visit_Skip : 'c -> 'f
     method visit_FreshSVar : 'c -> string -> 'f
-    method visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
     method visit_StrCat : 'c -> 'f
     method visit_StrLen : 'c -> 'f
     method visit_IntToNum : 'c -> 'f
@@ -2281,6 +2275,7 @@ module Visitors : sig
     method visit_UnsignedRightShift : 'c -> 'f
     method visit_UnsignedRightShiftL : 'c -> 'f
     method visit_UnsignedRightShiftF : 'c -> 'f
+    method visit_assertion_simple : 'c -> Asrt.simple -> 'f
     method visit_assertion : 'c -> Asrt.t -> 'f
     method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
     method visit_binop : 'c -> BinOp.t -> 'f
@@ -2382,7 +2377,7 @@ module Visitors : sig
              unit
          ; visit_ForAll :
              'c -> (string * Type.t option) list -> Formula.t -> unit
-         ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+         ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_Wand :
              'c -> string * Expr.t list -> string * Expr.t list -> unit
          ; visit_GUnfold : 'c -> string -> unit
@@ -2479,7 +2474,6 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> unit
          ; visit_Skip : 'c -> unit
          ; visit_FreshSVar : 'c -> string -> unit
-         ; visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
          ; visit_StrCat : 'c -> unit
          ; visit_StrLen : 'c -> unit
          ; visit_IntToNum : 'c -> unit
@@ -2517,6 +2511,7 @@ module Visitors : sig
          ; visit_UnsignedRightShift : 'c -> unit
          ; visit_UnsignedRightShiftL : 'c -> unit
          ; visit_UnsignedRightShiftF : 'c -> unit
+         ; visit_assertion_simple : 'c -> Asrt.simple -> unit
          ; visit_assertion : 'c -> Asrt.t -> unit
          ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
          ; visit_binop : 'c -> BinOp.t -> unit
@@ -2622,7 +2617,7 @@ module Visitors : sig
     method visit_ForAll :
       'c -> (string * Type.t option) list -> Formula.t -> unit
 
-    method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+    method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
 
     method visit_Wand :
       'c -> string * Expr.t list -> string * Expr.t list -> unit
@@ -2721,7 +2716,6 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> unit
     method visit_Skip : 'c -> unit
     method visit_FreshSVar : 'c -> string -> unit
-    method visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
     method visit_StrCat : 'c -> unit
     method visit_StrLen : 'c -> unit
     method visit_IntToNum : 'c -> unit
@@ -2766,6 +2760,7 @@ module Visitors : sig
     method private visit_array :
       'env 'a. ('env -> 'a -> unit) -> 'env -> 'a array -> unit
 
+    method visit_assertion_simple : 'c -> Asrt.simple -> unit
     method visit_assertion : 'c -> Asrt.t -> unit
     method visit_bindings : 'c -> string * (string * Expr.t) list -> unit
     method visit_binop : 'c -> BinOp.t -> unit

@@ -14,30 +14,19 @@ type t = TypeDef__.lcmd =
 [@@deriving yojson]
 
 let rec map
-    (f_l : (t -> t) option)
-    (f_e : (Expr.t -> Expr.t) option)
-    (f_p : (Formula.t -> Formula.t) option)
-    (f_sl : (SLCmd.t -> SLCmd.t) option)
-    (lcmd : t) : t =
-  (* Functions to map over formulas, expressions, and sl-commands *)
-  let f = map f_l f_e f_p f_sl in
-  let map_e = Option.value ~default:(fun x -> x) f_e in
-  let map_p = Option.value ~default:(fun x -> x) f_p in
-  let map_sl = Option.value ~default:(fun x -> x) f_sl in
-
-  (* Apply the given function to the logical command *)
-  let mapped_lcmd = Option.fold ~some:(fun f -> f lcmd) ~none:lcmd f_l in
-
-  (* Map over the elements of the command *)
-  match mapped_lcmd with
-  | Branch a -> Branch (map_p a)
-  | If (e, l1, l2) -> If (map_e e, List.map f l1, List.map f l2)
-  | Macro (s, l) -> Macro (s, List.map map_e l)
-  | Assume a -> Assume (map_p a)
-  | Assert a -> Assert (map_p a)
-  | AssumeType (e, t) -> AssumeType (map_e e, t)
-  | FreshSVar _ -> mapped_lcmd
-  | SL sl_cmd -> SL (map_sl sl_cmd)
+    (f_e : Expr.t -> Expr.t)
+    (f_p : Formula.t -> Formula.t)
+    (f_sl : SLCmd.t -> SLCmd.t) =
+  let f = map f_e f_p f_sl in
+  function
+  | Branch a -> Branch (f_p a)
+  | If (e, l1, l2) -> If (f_e e, List.map f l1, List.map f l2)
+  | Macro (s, l) -> Macro (s, List.map f_e l)
+  | Assume a -> Assume (f_p a)
+  | Assert a -> Assert (f_p a)
+  | AssumeType (e, t) -> AssumeType (f_e e, t)
+  | FreshSVar _ as lcmd -> lcmd
+  | SL sl_cmd -> SL (f_sl sl_cmd)
 
 let fold = List.fold_left SS.union SS.empty
 

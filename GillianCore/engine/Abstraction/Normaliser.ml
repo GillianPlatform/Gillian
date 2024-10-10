@@ -20,7 +20,7 @@ module Make (SPState : PState.S) = struct
     (* 1 - Find the lists for which we know the length *)
     let find_list_exprs_to_concretize (a : Asrt.t) :
         (Expr.t, Expr.t list) Hashtbl.t =
-      let rec collect_concretizable_lists = function
+      let collect_concretizable_lists = function
         | Asrt.Pure (Eq (EList _, EList _)) -> []
         | Pure (Eq (le, EList les)) | Pure (Eq (EList les, le)) -> [ (le, les) ]
         | Pure (Eq (UnOp (LstLen, le), Lit (Int i)))
@@ -29,13 +29,9 @@ module Make (SPState : PState.S) = struct
               List.init (Z.to_int i) (fun _ -> Expr.LVar (LVar.alloc ()))
             in
             [ (le, les) ]
-        | Star (a1, a2) ->
-            List.rev_append
-              (collect_concretizable_lists a1)
-              (collect_concretizable_lists a2)
         | _ -> []
       in
-      let lst_exprs = collect_concretizable_lists a in
+      let lst_exprs = List.concat_map collect_concretizable_lists a in
       let lists_tbl = Hashtbl.create 1 in
       List.iter
         (fun (le, les) ->
@@ -77,12 +73,9 @@ module Make (SPState : PState.S) = struct
     let make_new_list_as
         (a : Asrt.t)
         (new_lists : (Expr.t, Expr.t list) Hashtbl.t) : Asrt.t =
-      let new_list_as =
-        Hashtbl.fold
-          (fun le les (ac : Asrt.t list) -> Pure (Eq (le, EList les)) :: ac)
-          new_lists [ a ]
-      in
-      Asrt.star new_list_as
+      Hashtbl.fold
+        (fun le les (ac : Asrt.t) -> Pure (Eq (le, EList les)) :: ac)
+        new_lists a
     in
 
     (* Doing IT *)
@@ -561,29 +554,25 @@ module Make (SPState : PState.S) = struct
     result
 
   (** Separate an assertion into:  core_asrts, pure, typing and predicates *)
-  let rec separate_assertion (a : Asrt.t) :
+  let separate_assertion (a : Asrt.t) :
       (string * Expr.t list * Expr.t list) list
       * Formula.t list
       * (Expr.t * Type.t) list
       * (string * Expr.t list) list
       * Wands.wand list =
-    let f = separate_assertion in
-
-    match a with
-    | Star (al, ar) ->
-        let core_asrts_l, pure_l, types_l, preds_l, wands_l = f al in
-        let core_asrts_r, pure_r, types_r, preds_r, wands_r = f ar in
-        ( core_asrts_l @ core_asrts_r,
-          pure_l @ pure_r,
-          types_l @ types_r,
-          preds_l @ preds_r,
-          wands_l @ wands_r )
-    | GA (a, es1, es2) -> ([ (a, es1, es2) ], [], [], [], [])
-    | Wand { lhs; rhs } -> ([], [], [], [], [ { lhs; rhs } ])
-    | Emp -> ([], [], [], [], [])
-    | Types lst -> ([], [], lst, [], [])
-    | Pred (name, params) -> ([], [], [], [ (name, params) ], [])
-    | Pure f -> ([], [ f ], [], [], [])
+    List.fold_left
+      (fun (core_asrts, pure, types, preds, wands) (a : Asrt.simple) ->
+        match a with
+        | CorePred (a, es1, es2) ->
+            ((a, es1, es2) :: core_asrts, pure, types, preds, wands)
+        | Wand { lhs; rhs } ->
+            (core_asrts, pure, types, preds, Wands.{ lhs; rhs } :: wands)
+        | Emp -> (core_asrts, pure, types, preds, wands)
+        | Types lst -> (core_asrts, pure, lst @ types, preds, wands)
+        | Pred (name, params) ->
+            (core_asrts, pure, types, (name, params) :: preds, wands)
+        | Pure f -> (core_asrts, f :: pure, types, preds, wands))
+      ([], [], [], [], []) a
 
   (** Normalise type assertions (Intialise type environment *)
   let normalise_types
@@ -844,7 +833,7 @@ module Make (SPState : PState.S) = struct
          (fun current_states (a, ins, outs) ->
            let open Syntaxes.List in
            let* current_state = current_states in
-           SPState.produce current_state subst (Asrt.GA (a, ins, outs))
+           SPState.produce current_state subst [ Asrt.CorePred (a, ins, outs) ]
            |> (* If some production fails, we ignore *)
            List.filter_map (function
              | Ok x -> Some x
@@ -852,8 +841,9 @@ module Make (SPState : PState.S) = struct
                  L.verbose (fun m ->
                      m
                        "One branch of produce GA failed for: %a!\n\
-                        with Message: %a. Might have lost some paths ?" Asrt.pp
-                       (Asrt.GA (a, ins, outs))
+                        with Message: %a. Might have lost some paths ?"
+                       Asrt.pp_simple
+                       (Asrt.CorePred (a, ins, outs))
                        SPState.pp_err msg);
                  None))
          [ astate ]
@@ -883,12 +873,8 @@ module Make (SPState : PState.S) = struct
     let a = Reduction.reduce_assertion a in
     let subst = SESubst.init [] in
 
-    let rec find_spec_var_eqs (a : Asrt.t) =
-      let f = find_spec_var_eqs in
+    let find_spec_var_eqs (a : Asrt.simple) =
       match a with
-      | Star (al, ar) ->
-          f al;
-          f ar
       | Pure (Eq (LVar x, LVar y))
         when is_spec_var_name x && not (is_spec_var_name y) ->
           SESubst.put subst (LVar y) (LVar x)
@@ -897,7 +883,7 @@ module Make (SPState : PState.S) = struct
           SESubst.put subst (LVar x) (LVar y)
       | _ -> ()
     in
-    find_spec_var_eqs a;
+    List.iter find_spec_var_eqs a;
     SESubst.substitute_asrt subst ~partial:true a
 
   (** Given an assertion creates a symbolic state and a substitution *)

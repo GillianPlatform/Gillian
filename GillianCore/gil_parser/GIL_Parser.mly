@@ -129,7 +129,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token ASSERT
 %token SEPASSERT
 %token INVARIANT
-%token CONSUME 
+%token CONSUME
 %token PRODUCE
 %token ASSUME_TYPE
 %token LSTNTH
@@ -699,30 +699,30 @@ g_assertion_target:
 (* P * Q *)
 (* The precedence of the separating conjunction is not the same as the arithmetic product *)
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
-    { Asrt.Star (left_ass, right_ass) } %prec separating_conjunction
+    { left_ass @ right_ass } %prec separating_conjunction
   | lhs = predicate_call; WAND; rhs = predicate_call
-    { Asrt.Wand {lhs; rhs } } %prec magic_wand
-(* <GA>(es; es) *)
+    { [ Asrt.Wand {lhs; rhs } ] } %prec magic_wand
+(* <CorePred>(es; es) *)
   | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
-    { Asrt.GA (v, es1, es2) }
+    { [ Asrt.CorePred (v, es1, es2) ] }
 (* emp *)
   | LEMP;
-    { Asrt.Emp }
+    { [ Asrt.Emp ] }
 (* x(e1, ..., en) *)
   | pcall = predicate_call
-    { 
+    {
       let (name, params) = pcall in
-      Asrt.Pred (name, params)
+      [ Asrt.Pred (name, params) ]
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
-    { Asrt.Types type_pairs }
+    { [ Asrt.Types type_pairs ] }
 (* (P) *)
   | LBRACE; g_assertion_target; RBRACE
     { $2 }
 (* pure *)
   | pure_assertion_target
-    { Asrt.Pure $1 }
+    { [ Asrt.Pure $1 ] }
 ;
 
 g_macro_target:
@@ -752,7 +752,7 @@ g_logic_cmd_target:
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | RECUNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
-  
+
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
     { LCmd.SL (Package { lhs; rhs })}
 
@@ -765,10 +765,10 @@ g_logic_cmd_target:
 (* invariant (a) [existentials: x, y, z] *)
   | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
     { LCmd.SL (Invariant (a, Option.value ~default:[ ] binders)) }
-  
+
   | CONSUME; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
     { LCmd.SL (Consume (a, Option.value ~default:[ ] binders)) }
-    
+
   | PRODUCE; LBRACE; a = g_assertion_target; RBRACE;
     { LCmd.SL (Produce a) }
 
