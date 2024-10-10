@@ -11,7 +11,6 @@ module type S = sig
   (** Type of GIL substitutions *)
   type st = SVal.SESubst.t
 
-  type c_fix_t
   type err_t [@@deriving show, yojson]
 
   (** Type of GIL general states *)
@@ -45,21 +44,11 @@ module type S = sig
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
-  val pp_c_fix : Format.formatter -> c_fix_t -> unit
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
-
-  val get_fixes :
-    t ->
-    PFS.t ->
-    Type_env.t ->
-    err_t ->
-    (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
-    list
-
+  val get_fixes : err_t -> Asrt.t list list
   val can_fix : err_t -> bool
-  val apply_fix : t -> c_fix_t -> (t, err_t) result Delayed.t
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
   val sure_is_nonempty : t -> bool
@@ -103,20 +92,6 @@ module Lift (MSM : S) :
     let+ Branch.{ pc; value } = Delayed.resolve ~curr_pc process in
     let gpc = Pc.to_gpc pc in
     Gbranch.{ pc = gpc; value }
-
-  let apply_fix heap pfs gamma fix =
-    Logging.verbose (fun m -> m "Bi-abduction trying to apply fix");
-    let res = apply_fix heap fix in
-    let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
-    let results = Delayed.resolve ~curr_pc res in
-
-    List.filter_map
-      (function
-        | Branch.{ pc; value = Ok x } ->
-            let gpc = Pc.to_gpc pc in
-            Some Gbranch.{ pc = gpc; value = x }
-        | _ -> None)
-      results
 
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Formula.Set.t * (string * Type.t) list) list =

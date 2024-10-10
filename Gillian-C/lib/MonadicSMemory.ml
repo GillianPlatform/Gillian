@@ -656,27 +656,7 @@ let execute_genvgetdef heap params =
 
 (* Complete fixes  *)
 
-(* type c_fix_t *)
-type c_fix_t =
-  | AddSingle of { loc : string; ofs : Expr.t; value : Expr.t; chunk : Chunk.t }
-  | AddUnitialized of {
-      loc : string;
-      low : Expr.t;
-      high : Expr.t;
-      chunk : Chunk.t;
-    }
-
 (* Pretty printing utils *)
-
-let pp_c_fix fmt c_fix =
-  match c_fix with
-  | AddSingle { loc : string; ofs : Expr.t; value : Expr.t; chunk : Chunk.t } ->
-      Fmt.pf fmt "AddSingle(%s, %a, %a, %a)" loc Expr.pp ofs Expr.pp value
-        Chunk.pp chunk
-  | AddUnitialized
-      { loc : string; low : Expr.t; high : Expr.t; chunk : Chunk.t } ->
-      Fmt.pf fmt "AddUnitialized(%s, %a, %a, %a)" loc Expr.pp low Expr.pp high
-        Chunk.pp chunk
 
 let pp_err fmt (e : err_t) =
   match e with
@@ -909,74 +889,56 @@ let can_fix err =
   | SHeapTreeErr { sheaptree_err = MissingResource _; _ } -> true
   | _ -> false
 
-let get_fixes _heap _pfs _gamma err =
+let get_fixes err =
+  let open Constr.Core in
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   let get_fixes_h is_store loc ofs chunk =
     let open CConstants.VTypes in
+    let perm = Some Perm.Freeable in
+
     let fixes =
       match chunk with
-      | Chunk.Mfloat32 ->
-          let new_var = LVar.alloc () in
-          let set = SS.singleton new_var in
-          let new_var_e = Expr.LVar new_var in
-          let value = Expr.EList [ Expr.string single_type; new_var_e ] in
-          let vtypes = [ (new_var, Type.NumberType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
-      | Mfloat64 ->
-          let new_var = LVar.alloc () in
-          let set = SS.singleton new_var in
-          let new_var_e = Expr.LVar new_var in
-          let value = Expr.EList [ Expr.string float_type; new_var_e ] in
-          let vtypes = [ (new_var, Type.NumberType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
-      | Mint64 ->
-          let new_var = LVar.alloc () in
-          let set = SS.singleton new_var in
-          let new_var_e = Expr.LVar new_var in
-          let value = Expr.EList [ Expr.string long_type; new_var_e ] in
-          let vtypes = [ (new_var, Type.IntType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
-      | Mptr ->
+      | Chunk.Mptr ->
           let new_var1 = LVar.alloc () in
           let new_var_e1 = Expr.LVar new_var1 in
           let new_var2 = LVar.alloc () in
           let new_var_e2 = Expr.LVar new_var2 in
-          let set = SS.add new_var2 (SS.singleton new_var1) in
           let value = Expr.EList [ new_var_e1; new_var_e2 ] in
           let null_typ =
             if Compcert.Archi.ptr64 then Expr.string long_type
             else Expr.string int_type
           in
           let null_ptr = Expr.EList [ null_typ; Expr.int 0 ] in
-          let vtypes =
-            [ (new_var1, Type.ObjectType); (new_var2, Type.IntType) ]
-          in
           [
-            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set);
-            ( [ AddSingle { loc; ofs; value = null_ptr; chunk } ],
-              [],
-              [],
-              SS.empty );
+            [
+              single ~loc ~ofs ~chunk ~sval:value ~perm;
+              Asrt.Types
+                [ (new_var_e1, Type.ObjectType); (new_var_e2, Type.IntType) ];
+            ];
+            [ single ~loc ~ofs ~chunk ~sval:null_ptr ~perm ];
           ]
       | _ ->
+          let type_str, type_gil =
+            match chunk with
+            | Chunk.Mfloat32 -> (single_type, Type.NumberType)
+            | Chunk.Mfloat64 -> (float_type, Type.NumberType)
+            | Chunk.Mint64 -> (long_type, Type.IntType)
+            | _ -> (int_type, Type.IntType)
+          in
           let new_var = LVar.alloc () in
-          let set = SS.singleton new_var in
           let new_var_e = Expr.LVar new_var in
-          let value = Expr.EList [ Expr.string int_type; new_var_e ] in
-          let vtypes = [ (new_var, Type.IntType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
+          let value = Expr.EList [ Expr.string type_str; new_var_e ] in
+          [
+            [
+              single ~loc ~ofs ~chunk ~sval:value ~perm;
+              Asrt.Types [ (new_var_e, type_gil) ];
+            ];
+          ]
     in
     (* Additional fix for store operation to handle case of unitialized memory *)
     let fixes =
       if is_store then
-        ( [
-            AddUnitialized
-              { loc; low = ofs; high = offset_by_chunk ofs chunk; chunk };
-          ],
-          [],
-          [],
-          SS.empty )
-        :: fixes
+        [ hole ~loc ~low:ofs ~high:(offset_by_chunk ofs chunk) ~perm ] :: fixes
       else fixes
     in
     fixes
@@ -989,53 +951,22 @@ let get_fixes _heap _pfs _gamma err =
         loc_name;
         ofs_opt = Some ofs;
         chunk_opt = Some chunk;
-      } -> get_fixes_h is_store loc_name ofs chunk
+      } -> get_fixes_h is_store (Expr.loc_from_loc_name loc_name) ofs chunk
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty) ]
+      [ [ Asrt.Pure (Eq (new_expr, loc)) ] ]
   | SHeapTreeErr
       {
         at_locations;
         sheaptree_err = MissingResource (Fixable { is_store; low; chunk });
       } -> (
       match at_locations with
-      | [ loc ] -> get_fixes_h is_store loc low chunk
+      | [ loc ] -> get_fixes_h is_store (Expr.loc_from_loc_name loc) low chunk
       | _ ->
           Logging.verbose (fun m ->
               m "SHeapTreeErr: Unsupported for more than 1 location");
           [])
   | _ -> []
-
-let apply_fix heap fix =
-  let open DR.Syntax in
-  match fix with
-  | AddSingle { loc; ofs; value; chunk } ->
-      Logging.verbose (fun m ->
-          m
-            "Applying AddSingle fix for error\n\
-            \ * location: '%s'\n\
-            \ * core_pred: %a\n\
-            \ * value: %a \n\
-            \ * chunk: %a \n"
-            loc Expr.pp ofs Expr.pp value Chunk.pp chunk);
-      let loc = Expr.loc_from_loc_name loc in
-      let* sval = SVal.of_gil_expr_exn value in
-      let perm = Perm.Freeable in
-      let++ mem = Mem.prod_single heap.mem loc ofs chunk sval perm in
-      { heap with mem }
-  | AddUnitialized { loc; low; high; chunk } ->
-      Logging.verbose (fun m ->
-          m
-            "Applying AddUnitialized fix for error\n\
-            \ * location: '%s'\n\
-            \ * low: %a\n\
-            \ * high: %a \n\
-            \ * chunk: %a \n"
-            loc Expr.pp low Expr.pp high Chunk.pp chunk);
-      let loc = Expr.loc_from_loc_name loc in
-      let perm = Perm.Freeable in
-      let++ mem = Mem.prod_hole heap.mem loc low high perm in
-      { heap with mem }
 
 let split_further _ _ _ _ = None

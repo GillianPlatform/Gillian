@@ -10,7 +10,6 @@ type init_data = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = WislSHeap.err [@@deriving yojson, show]
-type c_fix_t = AddCell of { loc : string; ofs : Expr.t; value : Expr.t }
 type t = WislSHeap.t [@@deriving yojson]
 
 type action_ret =
@@ -285,11 +284,6 @@ let pp_err fmt t =
       Fmt.pf fmt "Invalid Location: '%a' cannot be resolved as a location"
         Expr.pp loc
 
-let pp_c_fix fmt c_fix =
-  match c_fix with
-  | AddCell { loc : string; ofs : Expr.t; value : Expr.t } ->
-      Fmt.pf fmt "AddCell(%s, %a, %a)" loc Expr.pp ofs Expr.pp value
-
 let get_recovery_tactic _ e =
   match e with
   | WislSHeap.MissingResource (_, loc, ofs) ->
@@ -309,25 +303,19 @@ let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
 
-let apply_fix m pfs gamma fix =
-  Logging.verbose (fun m -> m "Applying fixes for error");
-  match fix with
-  | AddCell { loc; ofs; value } ->
-      WislSHeap.set_cell ~pfs ~gamma m loc ofs value |> Result.get_ok;
-      [ m ]
-
-let get_fixes _ _ _ (err : err_t) =
+let get_fixes (err : err_t) =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   match err with
   | MissingResource (Cell, loc, Some ofs) ->
       let new_var = LVar.alloc () in
       let value = Expr.LVar new_var in
-      let set = SS.singleton new_var in
-      [ ([ AddCell { loc; ofs; value } ], [], [], set) ]
+      let loc = Expr.loc_from_loc_name loc in
+      let ga = WislLActions.str_ga WislLActions.Cell in
+      [ [ Asrt.GA (ga, [ loc; ofs ], [ value ]) ] ]
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty) ]
+      [ [ Asrt.Pure (Eq (new_expr, loc)) ] ]
   | _ -> []
 
 let can_fix = function

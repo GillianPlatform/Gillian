@@ -66,7 +66,6 @@ module Make (State : SState.S) :
   type abs_t = Preds.abs_t
   type state_t = State.t
   type err_t = State.err_t [@@deriving yojson, show]
-  type fix_t = State.fix_t
   type m_err_t = State.m_err_t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
@@ -196,9 +195,8 @@ module Make (State : SState.S) :
     | None -> None
 
   let assume_t (astate : t) (v : Expr.t) (t : Type.t) : t option =
-    match State.assume_t astate.state v t with
-    | Some state -> Some { astate with state }
-    | None -> None
+    State.assume_t astate.state v t
+    |> Option.map (fun state -> { astate with state })
 
   let sat_check (astate : t) (v : Expr.t) : bool =
     State.sat_check astate.state v
@@ -1187,7 +1185,6 @@ module Make (State : SState.S) :
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
   let pp_err = State.pp_err
-  let pp_fix = State.pp_fix
   let get_recovery_tactic astate vs = State.get_recovery_tactic astate.state vs
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
@@ -1197,15 +1194,9 @@ module Make (State : SState.S) :
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
 
-  let get_fixes (astate : t) (errs : err_t) : fix_t list list =
+  let get_fixes (errs : err_t) =
     L.verbose (fun m -> m "AState: get_fixes");
-    State.get_fixes astate.state errs
-
-  let apply_fixes (astate : t) (fixes : fix_t list) : t list =
-    L.verbose (fun m -> m "AState: apply_fixes");
-    match State.apply_fixes astate.state fixes with
-    | [ state ] -> [ { astate with state } ]
-    | states -> List.map (copy_with_state astate) states
+    State.get_fixes errs
 
   let get_equal_values astate = State.get_equal_values astate.state
   let get_heap astate = State.get_heap astate.state

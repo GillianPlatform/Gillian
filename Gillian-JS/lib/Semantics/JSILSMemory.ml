@@ -31,11 +31,6 @@ module M = struct
     | FPure of Formula.t
   [@@deriving yojson, show]
 
-  type c_fix_t =
-    | CFLoc of string
-    | CFCell of vt * vt * vt
-    | CFMetadata of vt * vt
-
   type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson, show]
 
   type action_ret =
@@ -51,15 +46,6 @@ module M = struct
         pf ft "@[<h>MIFCell(%a, %a)@]" SVal.pp loc SVal.pp prop
     | FMetadata loc -> pf ft "@[<h>MIFMetadata(%a)@]" SVal.pp loc
     | FPure f -> pf ft "@[<h>MIFPure(%a)@]" Formula.pp f
-
-  let pp_c_fix ft (c_fix : c_fix_t) : unit =
-    let open Fmt in
-    match c_fix with
-    | CFLoc loc_name -> pf ft "@[<h>MCFLoc(%s)@]" loc_name
-    | CFCell (loc, prop, v) ->
-        pf ft "@[<h>MCFCell(%a, %a, %a)@]" SVal.pp loc SVal.pp prop SVal.pp v
-    | CFMetadata (loc, v) ->
-        pf ft "@[<h>MCFMetadata(%a, %a)@]" SVal.pp loc SVal.pp v
 
   let get_failing_constraint (err : err_t) : Formula.t =
     let _, _, f = err in
@@ -611,20 +597,20 @@ module M = struct
   let prop_abduce_none_in_js = [ "@call" ]
   let prop_abduce_both_in_js = [ "hasOwnProperty" ]
 
-  type fix_result =
-    c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t
+  type fix_result = Asrt.t list
 
-  let complete_fix_js (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t) :
-      fix_result list =
+  let complete_fix_js (i_fix : i_fix_t) : fix_result list =
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
-        let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
-        (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
-        [ ([ CFLoc loc_name ], new_pfs, [], Containers.SS.empty) ]
+        (* This is dodgy, as the old instantiation does a bit more than this for this fix,
+           however it only seemed to add the binding without creating any state, so did it really
+           "do" anything? Bi-abduction is broken for Gillian-JS anyways. *)
+        let al = ALoc.alloc () in
+        [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
     | FCell (l, p) -> (
         let none_fix () =
-          ([ CFCell (l, p, Lit Nono) ], [], [], Containers.SS.empty)
+          [ Asrt.GA (JSILNames.aCell, [ l; p ], [ Lit Nono ]) ]
         in
 
         let some_fix () =
@@ -645,10 +631,12 @@ module M = struct
                 Lit (Bool true);
               ]
           in
-          ( [ CFCell (l, p, descriptor) ],
-            [ asrt_empty; asrt_none; asrt_list ],
-            [],
-            Containers.SS.singleton vvar )
+          [
+            Asrt.GA (JSILNames.aCell, [ l; p ], [ descriptor ]);
+            Asrt.Pure asrt_empty;
+            Asrt.Pure asrt_none;
+            Asrt.Pure asrt_list;
+          ]
         in
 
         match p with
@@ -658,70 +646,56 @@ module M = struct
             [ none_fix (); some_fix () ]
         | _ -> [ some_fix () ])
     | FMetadata l ->
-        let mloc_name, mloc, _ = fresh_loc pfs gamma in
+        let al = ALoc.alloc () in
+        let mloc = Expr.ALoc al in
         [
-          ( [
-              CFLoc mloc_name;
-              CFMetadata (l, mloc);
-              CFMetadata (mloc, Lit Null);
-              CFCell (mloc, Lit (String "@class"), Lit (String "Object"));
-              CFCell (mloc, Lit (String "@extensible"), Lit (Bool true));
-              CFCell
-                ( mloc,
-                  Lit (String "@proto"),
-                  Lit (Loc JS2JSIL_Helpers.locObjPrototype) );
-            ],
-            [],
-            [],
-            Containers.SS.empty );
+          [
+            Asrt.Pure (Eq (ALoc al, l));
+            Asrt.GA (JSILNames.aMetadata, [ l ], [ mloc ]);
+            Asrt.GA (JSILNames.aMetadata, [ mloc ], [ Lit Null ]);
+            Asrt.GA
+              ( JSILNames.aCell,
+                [ mloc; Lit (String "@class") ],
+                [ Lit (String "Object") ] );
+            Asrt.GA
+              ( JSILNames.aCell,
+                [ mloc; Lit (String "@extensible") ],
+                [ Lit (Bool true) ] );
+            Asrt.GA
+              ( JSILNames.aCell,
+                [ mloc; Lit (String "@proto") ],
+                [ Lit (Loc JS2JSIL_Helpers.locObjPrototype) ] );
+          ];
         ]
-    | FPure f -> [ ([], [ f ], [], Containers.SS.empty) ]
+    | FPure f -> [ [ Asrt.Pure f ] ]
 
   (* Fix completion: simple *)
-  let complete_fix_jsil (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t) :
-      fix_result list =
+  let complete_fix_jsil (i_fix : i_fix_t) : fix_result list =
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
-        let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
-        (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
-        [ ([ CFLoc loc_name ], new_pfs, [], Containers.SS.empty) ]
+        let al = ALoc.alloc () in
+        [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
     | FCell (l, p) ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
         (* Value is not none - we always bi-abduce presence *)
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-        [
-          ([ CFCell (l, p, v) ], [ not_none ], [], Containers.SS.singleton vvar);
-        ]
+        [ [ Asrt.GA (JSILNames.aCell, [ l; p ], [ v ]); Asrt.Pure not_none ] ]
     | FMetadata l ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-        [
-          ([ CFMetadata (l, v) ], [ not_none ], [], Containers.SS.singleton vvar);
-        ]
-    | FPure f -> [ ([], [ f ], [], Containers.SS.empty) ]
+        [ [ Asrt.GA (JSILNames.aMetadata, [ l ], [ v ]); Asrt.Pure not_none ] ]
+    | FPure f -> [ [ Asrt.Pure f ] ]
 
   (* An error can have multiple fixes *)
-  let get_fixes (_ : t) (pfs : PFS.t) (gamma : Type_env.t) (err : err_t) :
-      fix_result list =
+  let get_fixes (err : err_t) : fix_result list =
     let pp_fix_result ft res =
       let open Fmt in
-      let fixes, pfs, tys, svars = res in
-      pf ft
-        "@[<v 2>@[<h>[[ %a ]]@]@\n\
-         @[<h>with PFS:%a@]@\n\
-         @[<h>with Types:%a@]@\n\
-         @[<h>spec vars: %a@]@]" (list ~sep:comma pp_c_fix) fixes
-        (list ~sep:comma Formula.pp)
-        pfs
-        (list ~sep:comma (pair ~sep:Fmt.(any ": ") string Type.pp))
-        tys
-        (iter ~sep:comma Containers.SS.iter string)
-        svars
+      pf ft "@[<v 2>@[<h>[[ %a ]]@]@\n@]" (list ~sep:comma Asrt.pp) res
     in
     let _, fixes, _ = err in
     L.verbose (fun m ->
@@ -736,19 +710,11 @@ module M = struct
     in
 
     let complete_ifixes (ifixes : i_fix_t list) : fix_result list =
-      let completed_ifixes = List.map (complete pfs gamma) ifixes in
+      let completed_ifixes = List.map complete ifixes in
       let completed_ifixes = List_utils.list_product completed_ifixes in
       let completed_ifixes : fix_result list =
         List.map
-          (fun fixes ->
-            List.fold_right
-              (fun (mfix, pfs, tys, svars) (mfix', pfs', tys', svars') ->
-                ( mfix @ mfix',
-                  pfs @ pfs',
-                  tys @ tys',
-                  Containers.SS.union svars svars' ))
-              fixes
-              ([], [], [], Containers.SS.empty))
+          (fun fixes -> List.fold_right List.append fixes [])
           completed_ifixes
       in
 
@@ -767,37 +733,6 @@ module M = struct
     completed_fixes
 
   let can_fix _ = true
-
-  let apply_fix (mem : t) (pfs : PFS.t) (gamma : Type_env.t) (fix : c_fix_t) :
-      t list =
-    let res =
-      match fix with
-      (* Missing metadata: create new, no new variables *)
-      | CFMetadata (l, v) -> (
-          match set_metadata mem pfs gamma l v with
-          | Ok [ (mem, [], new_pfs, []) ] ->
-              List.iter (fun f -> PFS.extend pfs f) new_pfs;
-              mem
-          | _ -> raise (Failure "Bi-abduction: cannot fix metadata."))
-      (* Missing location: create new *)
-      | CFLoc loc_name -> (
-          L.verbose (fun m -> m "CFLoc: %s" loc_name);
-          let loc : vt =
-            if Names.is_aloc_name loc_name then ALoc loc_name
-            else Lit (Loc loc_name)
-          in
-          match alloc mem pfs (Some loc) ~is_empty:true None with
-          | Ok [ (mem, [ loc' ], [], []) ] when loc' = loc -> mem
-          | _ -> raise (Failure "Bi-abduction: cannot fix missing location."))
-      (* Missing cell: create new *)
-      | CFCell (l, p, v) -> (
-          match set_cell mem pfs gamma l p v with
-          | Ok [ (mem, [], new_pfs, []) ] ->
-              List.iter (fun f -> PFS.extend pfs f) new_pfs;
-              mem
-          | _ -> raise (Failure "Bi-abduction: cannot fix cell."))
-    in
-    [ res ]
 
   let sorted_locs_with_vals (smemory : t) =
     let sorted_locs = Containers.SS.elements (SHeap.domain smemory) in

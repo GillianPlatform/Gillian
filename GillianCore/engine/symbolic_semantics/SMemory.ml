@@ -9,7 +9,6 @@ module type S = sig
   (** Type of GIL substitutions *)
   type st = SVal.SESubst.t
 
-  type c_fix_t
   type err_t [@@deriving yojson, show]
 
   (** Type of GIL general states *)
@@ -57,28 +56,18 @@ module type S = sig
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
-  val pp_c_fix : Format.formatter -> c_fix_t -> unit
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
-
-  val get_fixes :
-    t ->
-    PFS.t ->
-    Type_env.t ->
-    err_t ->
-    (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
-    list
-
+  val get_fixes : err_t -> Asrt.t list list
   val can_fix : err_t -> bool
-  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t Gbranch.t list
   val sure_is_nonempty : t -> bool
 
   (** [split_further core_pred ins err] returns a way to split further a core_predicate if consuming it failed with error, if there is one.
       In that case, it returns a pair containing
       - a list of new ins. Each element is the list of ins for each sub-component of the core predicate;
       - new way of learning the outs, as explained under.
-      
+
       For example let's say the core predicate [(x, []) ↦ [a, b]] (with 2 ins and 1 out) can be split into
       - [(x, [0]) ↦ [a]]
       - [(x, [1]) ↦ [b]]
@@ -86,7 +75,7 @@ module type S = sig
       Then this function, given the appropriate error, should a pair of two elements:
       - the new ins: [ [ [x, [0]], [x, [1]] ] ]
       - the new way of learning the outs: [ [  {{ l-nth(PVar("0:0"), 0), l-nth(PVar("1:0"), 0) }}   ] ]
-      
+
       {b Important}: it is always sound for this function to return [None], it will just reduce the amount of automation.
       *)
   val split_further :
@@ -97,7 +86,6 @@ module Dummy : S with type init_data = unit = struct
   type init_data = unit
   type vt = SVal.M.t
   type st = SVal.SESubst.t
-  type c_fix_t = unit
   type err_t = unit [@@deriving yojson, show]
   type t = unit [@@deriving yojson]
 
@@ -118,12 +106,10 @@ module Dummy : S with type init_data = unit = struct
   let alocs _ = failwith "Please implement SMemory"
   let assertions ?to_keep:_ _ = failwith "Please implement SMemory"
   let mem_constraints _ = failwith "Please implement SMemory"
-  let pp_c_fix _ _ = ()
   let get_recovery_tactic _ _ = failwith "Please implement SMemory"
   let pp_err _ _ = ()
   let get_failing_constraint _ = failwith "Please implement SMemory"
-  let get_fixes _ _ _ _ = failwith "Please implement SMemory"
-  let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+  let get_fixes _ = failwith "Please implement SMemory"
   let can_fix _ = failwith "Please implement SMemory"
   let sure_is_nonempty _ = failwith "Please implement SMemory"
   let split_further _ _ _ = failwith "Please implement SMemory"

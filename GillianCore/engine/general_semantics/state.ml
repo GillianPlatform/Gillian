@@ -24,7 +24,6 @@ module type S = sig
   type m_err_t [@@deriving yojson]
 
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
-  type fix_t
 
   exception Internal_State_Error of err_t list * t
 
@@ -93,7 +92,6 @@ module type S = sig
     unit
 
   val pp_err : Format.formatter -> err_t -> unit
-  val pp_fix : Format.formatter -> fix_t -> unit
   val get_recovery_tactic : t -> err_t list -> vt Recovery_tactic.t
 
   (** State Copy *)
@@ -146,8 +144,7 @@ module type S = sig
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t -> bool
   val get_failing_constraint : err_t -> Formula.t
-  val get_fixes : t -> err_t -> fix_t list list
-  val apply_fixes : t -> fix_t list -> t list
+  val get_fixes : err_t -> Asrt.t list list
   val get_equal_values : t -> vt list -> vt list
   val get_heap : t -> heap_t
 end

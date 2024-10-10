@@ -32,7 +32,6 @@ end = struct
   type store_t = CStore.t
   type heap_t = CMemory.t
   type t = CMemory.t * CStore.t * vt list
-  type fix_t
   type m_err_t = CMemory.err_t [@@deriving yojson, show]
   type err_t = (m_err_t, vt) StateErr.t [@@deriving show]
   type init_data = CMemory.init_data
@@ -187,8 +186,6 @@ end = struct
   let mem_constraints (_ : t) : Formula.t list =
     raise (Failure "DEATH. mem_constraints")
 
-  let pp_fix _ _ = raise (Failure "str_of_fix from non-symbolic state.")
-
   let get_recovery_tactic _ =
     raise (Failure "get_recovery_tactic from non-symbolic state.")
 
@@ -212,11 +209,8 @@ end = struct
   let can_fix (_ : err_t) : bool = false
   let get_failing_constraint (_ : err_t) : Formula.t = True
 
-  let get_fixes (_ : t) (_ : err_t) : fix_t list list =
+  let get_fixes (_ : err_t) : Asrt.t list list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
-
-  let apply_fixes (_ : t) (_ : fix_t list) : t list =
-    raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
 
   let get_equal_values _ vs = vs
 

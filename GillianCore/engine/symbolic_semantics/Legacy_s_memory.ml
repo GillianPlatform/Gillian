@@ -9,7 +9,6 @@ module type S = sig
   (** Type of GIL substitutions *)
   type st = SVal.SESubst.t
 
-  type c_fix_t
   type err_t [@@deriving yojson, show]
 
   (** Type of GIL general states *)
@@ -62,21 +61,11 @@ module type S = sig
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
-  val pp_c_fix : Format.formatter -> c_fix_t -> unit
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
   val can_fix : err_t -> bool
-
-  val get_fixes :
-    t ->
-    PFS.t ->
-    Type_env.t ->
-    err_t ->
-    (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
-    list
-
-  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t list
+  val get_fixes : err_t -> Asrt.t list list
   val sure_is_nonempty : t -> bool
 end
 
@@ -84,7 +73,6 @@ module Dummy : S with type init_data = unit = struct
   type init_data = unit
   type vt = SVal.M.t
   type st = SVal.SESubst.t
-  type c_fix_t = unit
   type err_t = unit [@@deriving yojson, show]
   type t = unit [@@deriving yojson]
 
@@ -111,12 +99,10 @@ module Dummy : S with type init_data = unit = struct
   let alocs _ = failwith "Please implement SMemory"
   let assertions ?to_keep:_ _ = failwith "Please implement SMemory"
   let mem_constraints _ = failwith "Please implement SMemory"
-  let pp_c_fix _ _ = ()
   let get_recovery_tactic _ _ = failwith "Please implement SMemory"
   let pp_err _ _ = ()
   let get_failing_constraint _ = failwith "Please implement SMemory"
-  let get_fixes _ _ _ _ = failwith "Please implement SMemory"
-  let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+  let get_fixes _ = failwith "Please implement SMemory"
   let can_fix _ = failwith "Please implement SMemory"
   let sure_is_nonempty _ = failwith "Please implement SMemory"
 end
@@ -166,12 +152,6 @@ module Modernize (Old_memory : S) = struct
     | Error _ ->
         [] (* It's ok for failing producers to vanish, no unsoundness *)
     | Ok (heap', _) -> [ { set_res with value = heap' } ]
-
-  let apply_fix heap pfs gamma fix =
-    let open Syntaxes.List in
-    let+ heap = apply_fix heap pfs gamma fix in
-    let pc = Gpc.make ~matching:true ~pfs ~gamma () in
-    Gbranch.{ pc; value = heap }
 
   let split_further _ _ _ _ = None
 end
