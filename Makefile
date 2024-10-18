@@ -3,7 +3,7 @@ DEV_PACKAGES=ocaml-lsp-server,feather,fileutils
 BUILD_PACKAGES=ocamlformat.0.26.2,odoc
 
 build:
-	dune build @all
+	opam exec -- dune build @all
 
 deps:
 	opam exec -- dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam kanillian.opam
