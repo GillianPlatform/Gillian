@@ -1,0 +1,239 @@
+import "archi64_constants.gil", "internals.gil",
+       "global_environment_common.gil", "internal_casts.gil",
+       "internal_binops.gil", "internal_unops.gil", "internal_stdlib.gil",
+       "rust_allocation_internals.gil", "string.gil";
+
+
+@nopath
+@internal
+proc "__CPROVER_initialize"() {
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := "i__storev"("i32", {{ loc, 0i }}, 2i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_failure_mode_assert_then_assume",
+                          loc);
+    u := [genv_setdef](loc, {{ "variable",
+                       "m____CPROVER_malloc_failure_mode_assert_then_assume" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_next_thread_id", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_next_thread_id" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_object", loc);
+    u := [genv_setdef](loc, {{ "variable", "m____CPROVER_malloc_object" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_thread_id", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_thread_id" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_alloca_object", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_alloca_object" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_dead_object", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_dead_object" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_size", loc);
+    u := [genv_setdef](loc, {{ "variable", "m____CPROVER_malloc_size" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("return'", loc);
+    u := [genv_setdef](loc, {{ "variable", "return'" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_deallocated", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_deallocated" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := "i__storev"("i32", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_rounding_mode", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_rounding_mode" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := "i__storev"("i32", {{ loc, 0i }}, 1i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_failure_mode_return_null", loc);
+    u := [genv_setdef](loc, {{ "variable",
+                       "m____CPROVER_malloc_failure_mode_return_null" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    temp__0 := "i__cast_unsign_int_same_size"(0i, 2147483647i, 4294967296i);
+    u := "i__storev"("u32", {{ loc, 0i }}, temp__0);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_pipe_count", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_pipe_count" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_constant_infinity_uint", loc);
+    u := [genv_setdef](loc, {{ "variable",
+                       "__CPROVER_constant_infinity_uint" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_next_thread_key", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_next_thread_key" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    temp__1 := "i__cast_unsign_int_same_size"(36028797018963968i,
+                                              9223372036854775807i,
+                                              18446744073709551616i);
+    u := "i__storev"("u64", {{ loc, 0i }}, temp__1);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_max_malloc_size", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_max_malloc_size" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_memory_leak", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_memory_leak" }});
+    u := "i__glob_set_fun"("main", "main");
+    u := "i__glob_set_fun"("__CPROVER__start", "__CPROVER__start");
+    u := "i__glob_set_fun"("malloc", "i__malloc");
+    u := "i__glob_set_fun"("build_list", "build_list");
+    u := "i__glob_set_fun"("llen", "llen");
+    u := "i__glob_set_fun"("__CPROVER_assert", "__CPROVER_assert");
+    u := "i__glob_set_fun"("__CPROVER_assume", "__CPROVER_assume");
+    u := "i__glob_set_fun"("m____nondet_int", "m____nondet_int");
+    ret := null;
+    return
+};
+
+
+proc "__CPROVER__start"() {
+  __CPROVER_HIDE: skip;
+                  temp__0 := "__CPROVER_initialize"();
+                  temp__1 := "main"();
+                  temp__2 := [genv_getsymbol]("return'");
+                  temp__3 := {{ l-nth(temp__2, 1i), 0i }};
+                  temp__4 := "i__storev"("i32", temp__3, temp__1);
+                  skip;
+                  ret := undefined;
+  ret:            return
+};
+
+
+proc main() {
+       temp__0 := "m____nondet_int"();
+       main__1__x := temp__0;
+       assume ((! (main__1__x i<# 2i)));
+       assume ((main__1__x i<=# 3i));
+       temp__1 := "build_list"(main__1__x);
+       main__1__l := temp__1;
+       temp__2 := "llen"(main__1__l);
+       main__1__size := temp__2;
+       assert ((main__1__size == 3i));
+       ret := undefined;
+  ret: return
+};
+
+
+proc build_list(build_list__size) {
+       build_list__1__l := 0i;
+       build_list__1__1__i := 0i;
+  cc0: skip;
+       goto [(build_list__1__1__i i< build_list__size)] cc2 cc1;
+  cc2: temp__0 := "i__malloc"(16i);
+       build_list__1__1__1__t := temp__0;
+       assert (((-2147483648i i<=# (build_list__size i- build_list__1__1__i)) /\
+               ((build_list__size i- build_list__1__1__i) i<=# 2147483647i)));
+       temp__1 := "i__storev"("i32", {{ l-nth(build_list__1__1__1__t, 0i),
+                              l-nth(build_list__1__1__1__t, 1i) }},
+                              (build_list__size i- build_list__1__1__i));
+       temp__2 := "i__storev"("u64", {{ l-nth(build_list__1__1__1__t, 0i),
+                              (l-nth(build_list__1__1__1__t, 1i) i+ 8i) }},
+                              build_list__1__l);
+       build_list__1__l := build_list__1__1__1__t;
+       assert (((-2147483648i i<=# (build_list__1__1__i i+ 1i)) /\
+               ((build_list__1__1__i i+ 1i) i<=# 2147483647i)));
+       build_list__1__1__i := (build_list__1__1__i i+ 1i);
+       goto cc0;
+  cc1: skip;
+       ret := build_list__1__l;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc llen(llen__l) {
+       temp__0 := "i__binop_equal_maybe_ptr"(llen__l, 0i);
+       goto [temp__0] cc4 cc5;
+  cc4: ret := 0i;
+       goto ret;
+  cc5: temp__1 := "i__loadv"("u64", {{ l-nth(llen__l, 0i),
+                             (l-nth(llen__l, 1i) i+ 8i) }});
+       llen__1__2__t := temp__1;
+       temp__2 := "llen"(llen__1__2__t);
+       assert (((-2147483648i i<=# (1i i+ temp__2)) /\
+               ((1i i+ temp__2) i<=# 2147483647i)));
+       ret := (1i i+ temp__2);
+       goto ret;
+  cc3: skip;
+       ret := undefined;
+  ret: return
+};
+
+
+proc "__CPROVER_assert"(i__empty, i__empty) {
+       ret := null;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc "__CPROVER_assume"(i__empty) {
+       ret := null;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc m____nondet_int() {
+       temp__0 := fresh_svar();
+       assume_type (temp__0, Int);
+       assume (((-2147483648i i<=# temp__0) /\ (temp__0 i<=# 2147483647i)));
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
