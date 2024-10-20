@@ -305,7 +305,10 @@ struct
         let other_imports =
           Command_line_utils.convert_other_imports PC.other_imports
         in
-        let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
+        let prog =
+          Gil_parsing.eprog_to_prog ?prog_path:(List_utils.hd_opt files)
+            ~other_imports e_prog
+        in
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog);
         let prog = Debugger_impl.preprocess_prog ~no_unfold prog in

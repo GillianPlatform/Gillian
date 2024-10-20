@@ -21,6 +21,7 @@ module type S = sig
       [parse_and_compile_jsil_file] is a function that takes a file path, parses
       the file as a JSIL program, and compiles this to a GIL program. *)
   val eprog_to_prog :
+    ?prog_path:string ->
     other_imports:(string * (string -> (annot, string) Prog.t)) list ->
     (annot, string) Prog.t ->
     (annot, int) Prog.t
