@@ -88,13 +88,11 @@ class DebugAdapterExecutableFactory
     let cwd: string;
 
     if (config.runMode === 'installed') {
-      cwd = expandPath(config.outputDirectory || '~/.gillian');
-      let binDirectory = config.binDirectory;
-      if (!binDirectory)
-        throw 'Please specify the location of Gillian binaries';
-      binDirectory = expandPath(binDirectory);
+      cwd = expandPath(config.outputDirectory ||'./.gillian');
+      const binDirectory = config.binDirectory;
+      const path = binDirectory ? expandPath(binDirectory)+'/' : '';
       vscode.workspace.fs.createDirectory(vscode.Uri.file(cwd));
-      cmd = `${binDirectory}/${langCmd}`;
+      cmd = `${path}${langCmd}`;
     } else {
       let sourceDirectory = config.sourceDirectory;
       if (!sourceDirectory)
