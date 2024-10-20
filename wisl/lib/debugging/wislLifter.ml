@@ -81,12 +81,15 @@ struct
     display : string;
     matches : matching list;
     errors : string list;
-    mutable submap : id submap;
+    submap : id submap;
     loc : string * int;
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
   }
+  [@@deriving yojson]
+
+  type node = (id, Branch_case.t, cmd_data, branch_data) Exec_map.node
   [@@deriving yojson]
 
   type map = (id, Branch_case.t, cmd_data, branch_data) Exec_map.map
@@ -1065,17 +1068,23 @@ struct
     let node = get_exn state.map id in
     let () =
       let () =
-        match node.next with
-        | Some (Branch nexts) ->
+        DL.log (fun m -> m ~json:[ ("node", node_to_yojson node) ] "A")
+      in
+      let () =
+        match (node.next, node.data.submap) with
+        | Some (Branch nexts), (NoSubmap | Proc _) ->
             if List.mem_assoc FuncExitPlaceholder nexts then
               step state id (Some FuncExitPlaceholder) |> ignore
         | _ -> ()
       in
+      let () = DL.log (fun m -> m "B") in
+      let node = get_exn state.map id in
       let> submap_id =
         match node.data.submap with
         | NoSubmap | Proc _ -> None
         | Submap m -> Some m
       in
+      let () = DL.log (fun m -> m "C") in
       let _ = step_all ~start:node state submap_id None in
       ()
     in

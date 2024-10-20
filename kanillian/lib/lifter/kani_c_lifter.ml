@@ -56,7 +56,7 @@ struct
     display : string;
     matches : matching list;
     errors : string list;
-    mutable submap : id submap;
+    submap : id submap;
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
@@ -939,12 +939,13 @@ struct
     let node = get_exn state.map id in
     let () =
       let () =
-        match node.next with
-        | Some (Branch nexts) ->
+        match (node.next, node.data.submap) with
+        | Some (Branch nexts), (NoSubmap | Proc _) ->
             if List.mem_assoc Func_exit_placeholder nexts then
               step state id (Some Func_exit_placeholder) |> ignore
         | _ -> ()
       in
+      let node = get_exn state.map id in
       let> submap_id =
         match node.data.submap with
         | NoSubmap | Proc _ -> None
