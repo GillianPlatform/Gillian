@@ -1,6 +1,8 @@
 {
   "name": "gillian-debugger",
+  "publisher": "gillianplatform",
   "displayName": "Gillian Debugger",
+  "icon": "gillian-debugging.png",
   "version": "0.0.1",
   "description": "Debugger for Gillian.",
   "author": {
@@ -36,7 +38,7 @@
     "clean": "rm -rf out dist",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write **/*.ts **/*.tsx",
-    "vscode:prepublish": "run-s clean compile"
+    "vscode:prepublish": "run-s clean build"
   },
   "devDependencies": {
     "@babel/core": "^7.13.14",
