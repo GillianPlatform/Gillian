@@ -1033,7 +1033,7 @@ struct
               let b_counter, branch_case =
                 match rest_rets with
                 | [] -> (b_counter, None)
-                | _ -> (b_counter + 1, Some (LAction 1))
+                | _ -> (b_counter + 1, Some (LAction 0))
               in
               make_confcont ~state:state'' ~callstack:cs
                 ~invariant_frames:iframes ?branch_case ~prev_idx:i ~loop_ids
@@ -1065,6 +1065,12 @@ struct
                 in
                 let recovery_states : (State.t list, string) result =
                   State.try_recovering state recovery_vals
+                in
+                (* FIXME: why does this happen? *)
+                let recovery_states =
+                  match recovery_states with
+                  | Ok [] -> Error "UNKNOWN REASON!!!"
+                  | _ -> recovery_states
                 in
                 match recovery_states with
                 | Ok recovery_states ->
@@ -1962,6 +1968,15 @@ struct
       match List.find_map pred results with
       | Some result -> Ok result
       | None ->
+          let () =
+            DL.log (fun m ->
+                let json =
+                  results
+                  |> List.map (fun (a, b, _) -> (a, b))
+                  |> list_to_yojson [%to_yojson: L.Report_id.t option * path]
+                in
+                m ~json:[ ("results", json) ] "All results")
+          in
           Fmt.error "No result for selector (%a)!"
             (pp_option pp_conf_selector)
             selector
