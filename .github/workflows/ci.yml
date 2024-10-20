@@ -318,6 +318,7 @@ jobs:
           context: .
           load: true
           tags: ${{ env.DOCKER_TEST_TAG }}
+          target: test
       - name: Dune test
         run: docker run --rm ${{ env.DOCKER_TEST_TAG }} opam exec -- dune test
       - name: Extract cache
