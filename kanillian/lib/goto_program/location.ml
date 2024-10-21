@@ -11,6 +11,17 @@ type t = {
 }
 [@@deriving show { with_path = false }]
 
+let pp_short fmt { source; line; col; _ } =
+  match (source, line) with
+  | Some source, Some line ->
+      let col =
+        match col with
+        | Some col -> ":" ^ string_of_int col
+        | None -> ""
+      in
+      Fmt.pf fmt "%s %d%s" (Filename.basename source) line col
+  | _ -> Fmt.pf fmt "?"
+
 (* Right now, this is a bit of a hack, the origin_id should be kept separately for every node.
    That would entail more granularity, but that would also mean modifying the whole AST and that's
    not a priority right now. *)

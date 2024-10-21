@@ -429,7 +429,7 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       in
       let assume_range = Cmd.Logic (Assume condition) in
       Cs.return ~app:[ assume_int; assume_range ] ()
-  | CInteger _ | Signedbv _ | Unsignedbv _ ->
+  | CInteger _ | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
       let assume_int = Cmd.Logic (AssumeType (expr, IntType)) in
       let bounds =
         Option.bind (Memory.chunk_for_type ~ctx type_) Chunk.bounds
@@ -1167,7 +1167,9 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
     Cs.return ~app:[ b cmd ] v
   in
   let log_type t =
-    Debugger_log.to_file (Fmt.str "COMPILING %s EXPR  (%s)" t default_display)
+    Debugger_log.to_file
+      (Fmt.str "COMPILING %s EXPR  (%s)  [%a]" t default_display
+         Goto_lib.Location.pp_short expr.location)
   in
   match expr.value with
   | Symbol _ | Dereference _ | Index _ | Member _ ->
@@ -1442,7 +1444,11 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   in
   let set_first_label label stmts = set_first_label_opt (Some label) stmts in
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in
-  let log_kind kind = Debugger_log.to_file ("COMPILING " ^ kind ^ " STMT") in
+  let log_kind kind =
+    Debugger_log.to_file
+      (Fmt.str "COMPILING %s STMT [%a]" kind Goto_lib.Location.pp_short
+         stmt.stmt_location)
+  in
   match stmt.body with
   | Skip ->
       let () = log_kind "Skip" in

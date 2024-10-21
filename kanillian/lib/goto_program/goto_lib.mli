@@ -79,7 +79,9 @@ module Location : sig
     col : int option;
     comment : string option;
   }
+  [@@deriving show]
 
+  val pp_short : t Fmt.t
   val of_irep : Irep.t -> t
 end
 
