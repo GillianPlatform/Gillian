@@ -1,4 +1,5 @@
-#include "array.h"
+#include "array.c"
+#include "common.c"
 
 static Array *v1;
 static Array *v2;
