@@ -17,13 +17,14 @@ open Branch_case
 
 type id = Gillian.Logging.Report_id.t [@@deriving yojson, show]
 
-let rec int_to_letters = function
+let rec int_to_letters ?(acc = "") = function
   | 0 -> ""
   | i ->
       let i = i - 1 in
       let remainder = i mod 26 in
       let char = Char.chr (65 + remainder) |> Char.escaped in
-      char ^ int_to_letters (i / 26)
+      let acc = acc ^ char in
+      int_to_letters ~acc (i / 26)
 
 let ( let++ ) f o = Result.map o f
 let ( let** ) o f = Result.bind o f
@@ -942,6 +943,14 @@ struct
     let case =
       let+ json = case in
       json |> Branch_case.of_yojson |> Result.get_ok
+    in
+    let cmd = get_exn state.map id in
+    (* Bodge: step in if on func exit placeholder *)
+    let- () =
+      match (case, cmd.data.submap) with
+      | Some Func_exit_placeholder, Submap submap_id ->
+          Some (submap_id, Debugger_utils.Step)
+      | _ -> None
     in
     let next_id = step state id case in
     (next_id, Debugger_utils.Step)
