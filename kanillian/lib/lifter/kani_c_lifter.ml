@@ -87,6 +87,9 @@ struct
     type partial_end = Branch_case.case * (id * Gil_branch_case.t option)
     [@@deriving to_yojson]
 
+    type funcall_kind = Evaluated_funcall | Unevaluated_funcall
+    [@@deriving to_yojson]
+
     type partial_data = {
       prev : (id * Branch_case.t option * id list) option;
           (** Where to put the finished cmd in the map. *)
@@ -100,7 +103,7 @@ struct
           (** Unifications contained in this command *)
       errors : string Ext_list.t;  (** Errors occurring during this command *)
       mutable canonical_data : canonical_cmd_data option;
-      mutable is_unevaluated_funcall : bool;
+      mutable funcall_kind : funcall_kind option;
     }
     [@@deriving to_yojson]
 
@@ -132,6 +135,9 @@ struct
       let open Annot in
       let open Branch_case in
       let- () =
+        let () =
+          if is_unevaluated_funcall then Debugger_log.log (fun m -> m "UNEVAL!")
+        in
         match (nest_kind, ends) with
         | Some (Fun_call _), [ (Unknown, bdata) ] ->
             if is_unevaluated_funcall then None
@@ -168,7 +174,7 @@ struct
              canonical_data;
              all_ids;
              ends;
-             is_unevaluated_funcall;
+             funcall_kind;
              matches;
              errors;
              _;
@@ -190,6 +196,11 @@ struct
       let errors = Ext_list.to_list errors in
       let ends = Ext_list.to_list ends in
       let++ next_kind =
+        let is_unevaluated_funcall =
+          match funcall_kind with
+          | Some Unevaluated_funcall -> true
+          | _ -> false
+        in
         let++ cases = ends_to_cases ~is_unevaluated_funcall ~nest_kind ends in
         match cases with
         | [] -> Zero
@@ -222,7 +233,7 @@ struct
         matches = Ext_list.make ();
         errors = Ext_list.make ();
         canonical_data = None;
-        is_unevaluated_funcall = false;
+        funcall_kind = None;
       }
 
     module Update = struct
@@ -312,31 +323,32 @@ struct
                   (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
                   callers)
 
-      let update_unevaluated_funcall
+      let update_funcall_kind
           ~(prog : Program.t)
           ~(exec_data : exec_data)
           ~annot
           (partial : partial_data) =
         let cmd_report = exec_data.cmd_report in
         let> () =
-          match (partial.is_unevaluated_funcall, annot.cmd_kind) with
-          | true, _ | _, (Harness | Unknown | Hidden | Internal) -> None
+          match (partial.funcall_kind, annot.cmd_kind) with
+          | Some Evaluated_funcall, _
+          | _, (Harness | Unknown | Hidden | Internal) -> None
           | _ -> Some ()
         in
         let> pid =
-          match
-            (partial.is_unevaluated_funcall, CmdReport.(cmd_report.cmd))
-          with
-          | false, Call (_, Lit (String pid), _, _, _)
-          | false, ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
+          match CmdReport.(cmd_report.cmd) with
+          | Call (_, Lit (String pid), _, _, _)
+          | ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
           | _ -> None
         in
-        let () =
+        let kind =
           if
             Hashset.mem Program.(prog.unevaluated_funcs) pid
             || List.mem pid Constants.Internal_functions.names
-          then partial.is_unevaluated_funcall <- true
+          then Unevaluated_funcall
+          else Evaluated_funcall
         in
+        let () = partial.funcall_kind <- Some kind in
         ()
 
       let update_return_cmd_info
@@ -433,7 +445,7 @@ struct
             partial
         in
         let** () = update_canonical_data ~id ~annot ~exec_data partial in
-        let () = update_unevaluated_funcall ~prog ~exec_data ~annot partial in
+        let () = update_funcall_kind ~prog ~exec_data ~annot partial in
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
@@ -468,7 +480,10 @@ struct
       DL.log (fun m ->
           let report = exec_data.cmd_report in
           let cmd = CmdReport.(report.cmd) in
-          m "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
+          let annot = K_annot.to_yojson report.annot in
+          m
+            ~json:[ ("annot", annot) ]
+            "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
       let partial =
         find_or_init ~partials ~get_prev prev_id
         |> Result_utils.or_else (fun e -> failwith ~exec_data ~partials e)
