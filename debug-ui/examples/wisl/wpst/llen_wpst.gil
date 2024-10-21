@@ -3,6 +3,7 @@ import "wisl_pointer_arith.gil", "wisl_core.gil";
 
 proc main() {
     x := fresh_svar();
+    assume_type (x, Int);
     gvar0 := "i__geq"(x, 2i);
     assume ((gvar0 == true));
     gvar1 := "i__leq"(x, 3i);
