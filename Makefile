@@ -5,6 +5,9 @@ BUILD_PACKAGES=ocamlformat.0.26.2,odoc
 build:
 	opam exec -- dune build @all
 
+fmt:
+	opam exec -- dune fmt
+
 deps:
 	opam exec -- dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam kanillian.opam
 	opam install . -y --deps-only
