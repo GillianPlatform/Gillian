@@ -18,7 +18,7 @@ open Branch_case
 type id = Gillian.Logging.Report_id.t [@@deriving yojson, show]
 
 let rec int_to_letters ?(acc = "") = function
-  | 0 -> ""
+  | 0 -> acc
   | i ->
       let i = i - 1 in
       let remainder = i mod 26 in
@@ -168,6 +168,29 @@ struct
              (Case (kind, ix), branch_data))
       |> Result.ok
 
+    let make_canonical_data_if_error
+        ~(canonical_data : canonical_cmd_data option)
+        ~ends
+        ~errors
+        ~all_ids
+        ~prev : (canonical_cmd_data * partial_end list) option =
+      let/ () = canonical_data |> Option.map (fun c -> (c, ends)) in
+      match errors with
+      | [] -> None
+      | _ ->
+          let _, _, callers = Option.get prev in
+          let c =
+            {
+              id = all_ids |> List.rev |> List.hd;
+              display = "<error>";
+              callers;
+              stack_direction = None;
+              nest_kind = None;
+              loc = None;
+            }
+          in
+          Some (c, [])
+
     let finish partial =
       let ({
              prev;
@@ -182,7 +205,14 @@ struct
             : partial_data) =
         partial
       in
-      let** { id; display; callers; stack_direction; nest_kind; loc } =
+      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
+      let errors = Ext_list.to_list errors in
+      let ends = Ext_list.to_list ends in
+      let canonical_data =
+        make_canonical_data_if_error ~canonical_data ~ends ~errors ~all_ids
+          ~prev
+      in
+      let** { id; display; callers; stack_direction; nest_kind; loc }, ends =
         Result_utils.of_option
           ~none:"Trying to finish partial with no canonical data!"
           canonical_data
@@ -191,10 +221,7 @@ struct
         let+ id, branch, _ = prev in
         (id, branch)
       in
-      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
       let matches = Ext_list.to_list matches in
-      let errors = Ext_list.to_list errors in
-      let ends = Ext_list.to_list ends in
       let++ next_kind =
         let is_unevaluated_funcall =
           match funcall_kind with

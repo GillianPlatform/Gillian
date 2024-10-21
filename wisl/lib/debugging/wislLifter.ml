@@ -17,7 +17,7 @@ open Debugger.Lifter
 type id = L.Report_id.t [@@deriving yojson, show]
 
 let rec int_to_letters ?(acc = "") = function
-  | 0 -> ""
+  | 0 -> acc
   | i ->
       let i = i - 1 in
       let remainder = i mod 26 in
