@@ -20,8 +20,16 @@ RUN git clone https://github.com/GillianPlatform/collections-c-for-gillian.git c
 WORKDIR /home/opam/app/Gillian
 CMD [ "bash" ]
 
-FROM build AS run
+FROM build AS install
 RUN opam install .
 WORKDIR /home/opam/app
-RUN sudo rm -rf Gillian
+RUN opam clean -y
+RUN sudo rm -rf Gillian ~/opam-repository ~/.opam/5.2/.opam-switch/sources/*
+CMD [ "bash" ]
+
+FROM scratch AS run
+LABEL maintainer "Nat Karmios"
+COPY --from=install / /
+USER opam
+WORKDIR /home/opam/app
 CMD [ "bash" ]
