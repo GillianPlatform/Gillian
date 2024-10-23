@@ -23,8 +23,10 @@ CMD [ "bash" ]
 FROM build AS install
 RUN opam install .
 WORKDIR /home/opam/app
+ADD https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb cbmc.deb
+RUN sudo dpkg -i cbmc.deb
 RUN opam clean -y
-RUN sudo rm -rf Gillian ~/opam-repository ~/.opam/5.2/.opam-switch/sources/*
+RUN sudo rm -rf cbmc.deb Gillian ~/opam-repository ~/.opam/5.2/.opam-switch/sources/*
 CMD [ "bash" ]
 
 FROM scratch AS run
