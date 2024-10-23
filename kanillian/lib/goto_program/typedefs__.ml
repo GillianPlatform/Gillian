@@ -13,6 +13,8 @@ type type_ =
   | StructTag of string
   | Union of { components : datatype_component list; tag : string }
   | UnionTag of string
+  | Enum of { components : enum_component list; tag : string }
+  | EnumTag of string
   | Constructor
   | Empty
   | Vector of { type_ : type_; size : int }
@@ -28,4 +30,6 @@ and param = {
 and datatype_component =
   | Field of { name : string; type_ : type_ }
   | Padding of { name : string; bits : int }
+
+and enum_component = { name : string; value : int }
 [@@deriving show { with_path = false }, eq]

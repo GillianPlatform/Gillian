@@ -10,3 +10,5 @@ module Make
      and type memory = WislSMemory.t
      and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
      and type annot = WParserAndCompiler.Annot.t
+     and type init_data = WParserAndCompiler.init_data
+     and type pc_err = WParserAndCompiler.err

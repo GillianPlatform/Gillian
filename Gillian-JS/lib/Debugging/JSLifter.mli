@@ -9,3 +9,5 @@ module Make
      and type tl_ast = tl_ast
      and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
      and type annot = Gil_syntax.Annot.Basic.t
+     and type init_data = unit
+     and type pc_err = err

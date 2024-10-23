@@ -19,7 +19,12 @@ type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
 
 let get_params proc = proc.proc_params
 
-let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
+let pp
+    ~(show_labels : bool)
+    ~(pp_label : 'a Fmt.t)
+    ?(pp_annot : 'b Fmt.t option)
+    fmt
+    labproc =
   let {
     proc_name = name;
     proc_source_path = path;
@@ -42,16 +47,28 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
       Fmt.pf fmt " "
     done
   in
-  let pp_cmd_triple fmt (_, lab, cmd) =
+  let pp_annot =
+    match (pp_annot, !Config.dump_annots) with
+    | Some pp_annot, true ->
+        fun fmt annot ->
+          let annot_s =
+            Fmt.str "%a" pp_annot annot
+            |> Str.(global_replace (regexp_string "*)") "* )")
+          in
+          Fmt.pf fmt "    (* %s *)" annot_s
+    | _ -> fun fmt -> Fmt.nop fmt
+  in
+  let pp_cmd_triple fmt (annot, lab, cmd) =
     if show_labels then
       match lab with
       | None ->
-          Fmt.pf fmt "%a%a" pp_white (max_size_lab + 2) (Cmd.pp ~pp_label) cmd
+          Fmt.pf fmt "%a%a%a" pp_white (max_size_lab + 2) (Cmd.pp ~pp_label) cmd
+            pp_annot annot
       | Some l ->
-          Fmt.pf fmt "%a:%a%a" pp_label l pp_white
+          Fmt.pf fmt "%a:%a%a%a" pp_label l pp_white
             (max_size_lab - len_lab l + 1)
-            (Cmd.pp ~pp_label) cmd
-    else Fmt.pf fmt "%a" (Cmd.pp ~pp_label) cmd
+            (Cmd.pp ~pp_label) cmd pp_annot annot
+    else Fmt.pf fmt "%a%a" (Cmd.pp ~pp_label) cmd pp_annot annot
   in
   let pp_spec_opt fmt = function
     | None -> ()
@@ -72,8 +89,11 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
     (Fmt.array ~sep:(Fmt.any ";@\n") pp_cmd_triple)
     body
 
-let pp_labeled fmt c = pp ~show_labels:true ~pp_label:Fmt.string fmt c
-let pp_indexed fmt c = pp ~show_labels:false ~pp_label:Fmt.int fmt c
+let pp_labeled fmt ?pp_annot c =
+  pp ~show_labels:true ~pp_label:Fmt.string ?pp_annot fmt c
+
+let pp_indexed fmt ?pp_annot c =
+  pp ~show_labels:false ~pp_label:Fmt.int ?pp_annot fmt c
 
 let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
   let no_of_cmds = Array.length lproc.proc_body in

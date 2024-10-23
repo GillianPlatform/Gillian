@@ -1,6 +1,27 @@
 (library
  (name kanillian_compiler)
- (libraries gillian yojson irep_lib kutils goto_lib kcommons memory_model)
+ (libraries
+  gillian
+  yojson
+  irep_lib
+  kutils
+  goto_lib
+  kcommons
+  memory_model
+  dune-site)
  (flags :standard -open Goto_lib -open Kcommons)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson)))
+
+(rule
+ (target cbmc_version.ml)
+ (deps
+  (file ../../CBMC_VERSION))
+ (action
+  (with-stdout-to
+   %{target}
+   (bash "echo let expected = \\\"$(cat %{deps})\\\""))))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites kanillian))

@@ -20,5 +20,4 @@ let pp_list
   | [] -> Format.fprintf f "%(%)" empty
   | _ :: _ as l -> Format.fprintf f "%(%)%a%(%)" pre aux l suf
 
-let to_str pp = function
-  | v -> Format.asprintf "%a" pp v
+let to_str pp v = Format.asprintf "%a" pp v

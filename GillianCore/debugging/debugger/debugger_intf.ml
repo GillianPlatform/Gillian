@@ -40,7 +40,9 @@ module type Make = functor
                and type memory_error = V.SPState.m_err_t
                and type tl_ast = PC.tl_ast
                and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-               and type annot = PC.Annot.t)
+               and type annot = PC.Annot.t
+               and type init_data = PC.init_data
+               and type pc_err = PC.err)
   -> S
 
 module type Intf = sig

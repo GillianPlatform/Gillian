@@ -1,0 +1,57 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+proc main() {
+    x := fresh_svar();
+    assume_type (x, Int);
+    gvar0 := "i__geq"(x, 2i);
+    assume ((gvar0 == true));
+    gvar1 := "i__leq"(x, 3i);
+    assume ((gvar1 == true));
+    l := "build_list"(x);
+    size := "llen"(l);
+    assert (((size = 2i) == true));
+    ret := null;
+    return
+};
+
+
+proc build_list(size) {
+          i := 0i;
+          l := null;
+  loop0:  skip;
+          gvar0 := "i__lt"(i, size);
+          goto [gvar0] lbody0 end0;
+  lbody0: n := [alloc](2i);
+          gvar1 := "i__minus"(size, i);
+          gvar2 := [getcell](l-nth(n, 0i), l-nth(n, 1i));
+          gvar3 := [setcell](l-nth(gvar2, 0i), l-nth(gvar2, 1i), gvar1);
+          gvar4 := "i__add"(n, 1i);
+          gvar5 := [getcell](l-nth(gvar4, 0i), l-nth(gvar4, 1i));
+          gvar6 := [setcell](l-nth(gvar5, 0i), l-nth(gvar5, 1i), l);
+          l := n;
+          gvar7 := "i__add"(i, 1i);
+          i := gvar7;
+          goto loop0;
+  end0:   skip;
+          ret := l;
+          return
+};
+
+
+proc llen(x) {
+             goto [(x = null)] then0 else0;
+  then0:     n := 0i;
+             goto endif0;
+  else0:     gvar0 := "i__add"(x, 1i);
+             goto [((typeOf gvar0) = List)] continue0 fail0;
+  fail0:     fail [InvalidPointer]();
+  continue0: gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+             t := l-nth(gvar1, 2i);
+             n := "llen"(t);
+             gvar2 := "i__add"(n, 1i);
+             n := gvar2;
+  endif0:    skip;
+             ret := n;
+             return
+};

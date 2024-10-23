@@ -75,8 +75,14 @@ struct
       parse_eprog files already_compiled
     in
     let () =
-      burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data)
-        e_prog outfile_opt
+      let pp_annot fmt annot =
+        Fmt.pf fmt "%a"
+          (Yojson.Safe.pretty_print ?std:None)
+          (PC.Annot.to_yojson annot)
+      in
+      burn_gil
+        ~pp_prog:(Prog.pp_labeled ~pp_annot)
+        ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
     in
     (* Prog.perform_syntax_checks e_prog; *)
     Fmt.pr "Preprocessing...\n@?";
@@ -87,12 +93,16 @@ struct
     in
     let () =
       L.verbose (fun m ->
-          m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog)
+          m "@\nProgram as parsed:@\n%a@\n"
+            (Prog.pp_indexed ?pp_annot:None)
+            prog)
     in
     let prog = LogicPreprocessing.preprocess prog (not no_unfold) in
     let () =
       L.verbose (fun m ->
-          m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed prog)
+          m "@\nProgram after logic preprocessing:@\n%a@\n"
+            (Prog.pp_indexed ?pp_annot:None)
+            prog)
     in
     Verification.verify_prog ~init_data prog incremental source_files_opt
 

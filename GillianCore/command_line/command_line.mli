@@ -19,7 +19,9 @@ module Make
          and type memory_error = SMemory.err_t
          and type tl_ast = PC.tl_ast
          and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-         and type annot = PC.Annot.t) : sig
+         and type annot = PC.Annot.t
+         and type init_data = ID.t
+         and type pc_err = PC.err) : sig
   (** Parses command-line arguments and starts the requested Gillian execution *)
   val main : unit -> unit
 end

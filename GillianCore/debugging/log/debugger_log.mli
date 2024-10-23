@@ -16,6 +16,7 @@ module Public : sig
     - The message is sent asynchronously; it may, for example, arrive after an error is raised, despite being called before.
     - The message is also logged to the debugger log file (see {!to_file}), though without the JSON - if JSON is provided, the message is suffixed with [(+)]. *)
   val log :
+    ?v:bool ->
     ((?json:JsonMap.t -> ('a, Format.formatter, unit) format -> 'a) -> unit) ->
     unit
 
@@ -24,7 +25,7 @@ module Public : sig
   val to_file : string -> unit
 
   (** Logs a message (as with {!log}), but attaches the type and (parsed) content of the specified report. *)
-  val show_report : Logging.Report_id.t -> string -> unit
+  val show_report : ?v:bool -> Logging.Report_id.t -> string -> unit
 
   (** Raises an exception with a string message and attached JSON.
 

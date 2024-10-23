@@ -5,6 +5,6 @@ int main() {
   if (x < 0) {
     x = x * x;
   }
-  __CPROVER_assert(x >= 0, "nice");
+  __CPROVER_assert(x >= 0, "x >= 0");
   return 0;
 }

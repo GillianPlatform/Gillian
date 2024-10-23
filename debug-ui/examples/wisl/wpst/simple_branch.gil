@@ -1,0 +1,22 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+proc main() {
+          x := fresh_svar();
+          assume_type (x, Int);
+          gvar1 := "i__minus"(0i, 100i);
+          gvar0 := "i__gt"(x, gvar1);
+          assume ((gvar0 == true));
+          gvar2 := "i__lt"(x, 100i);
+          assume ((gvar2 == true));
+          gvar3 := "i__lt"(x, 0i);
+          goto [gvar3] then0 else0;
+  then0:  x := (x i* x);
+          goto endif0;
+  else0:  skip;
+  endif0: skip;
+          gvar4 := "i__geq"(x, 0i);
+          assert ((gvar4 == true));
+          ret := null;
+          return
+};

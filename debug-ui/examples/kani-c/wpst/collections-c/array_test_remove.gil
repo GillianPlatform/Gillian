@@ -1,0 +1,2234 @@
+import "archi64_constants.gil", "internals.gil",
+       "global_environment_common.gil", "internal_casts.gil",
+       "internal_binops.gil", "internal_unops.gil", "internal_stdlib.gil",
+       "rust_allocation_internals.gil", "string.gil";
+
+
+proc array_new(array_new__out) {
+       temp__1 := [mem_alloc](0i, 40i);
+       array_new__1__c := {{ l-nth(temp__1, 0i), 0i }};
+       skip;
+       temp__2 := "array_conf_init"(array_new__1__c);
+       temp__3 := "array_new_conf"(array_new__1__c, array_new__out);
+       ret := temp__3;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(array_new__1__c, 0i), 0i, 40i);
+       return
+};
+
+
+proc array_remove_at(array_remove_at__ar, array_remove_at__index, array_remove_at__out) {
+        temp__2 := [mem_alloc](0i, 8i);
+        temp__3 := "i__storev"("u64", {{ l-nth(temp__2, 0i), 0i }},
+                               array_remove_at__ar);
+        array_remove_at__ar := {{ l-nth(temp__2, 0i), 0i }};
+        temp__4 := [mem_alloc](0i, 8i);
+        temp__5 := "i__storev"("u64", {{ l-nth(temp__4, 0i), 0i }},
+                               array_remove_at__index);
+        array_remove_at__index := {{ l-nth(temp__4, 0i), 0i }};
+        temp__6 := "i__loadv"("u64", array_remove_at__index);
+        temp__7 := "i__loadv"("u64", array_remove_at__ar);
+        temp__8 := "i__loadv"("u64", {{ l-nth(temp__7, 0i),
+                              l-nth(temp__7, 1i) }});
+        temp__9 := "i__binop_greatereq_maybe_ptr"(temp__6, temp__8);
+        goto [temp__9] cc86 cc85;
+  cc86: ret := 8i;
+        goto ret;
+  cc85: skip;
+        temp__10 := "i__binop_notequal_maybe_ptr"(array_remove_at__out, 0i);
+        goto [temp__10] cc88 cc87;
+  cc88: temp__11 := "i__loadv"("u64", array_remove_at__ar);
+        temp__12 := "i__loadv"("u64", {{ l-nth(temp__11, 0i),
+                               (l-nth(temp__11, 1i) i+ 24i) }});
+        temp__13 := "i__loadv"("u64", array_remove_at__index);
+        temp__14 := "i__binop_add_maybe_ptr"(temp__12, (temp__13 i* 8i));
+        temp__15 := "i__loadv"("u64", temp__14);
+        temp__16 := "i__storev"("u64", array_remove_at__out, temp__15);
+  cc87: skip;
+        temp__17 := "i__loadv"("u64", array_remove_at__index);
+        temp__18 := "i__loadv"("u64", array_remove_at__ar);
+        temp__19 := "i__loadv"("u64", {{ l-nth(temp__18, 0i),
+                               l-nth(temp__18, 1i) }});
+        temp__20 := "i__binop_sub_maybe_ptr"(temp__19, 1i);
+        temp__21 := "i__binop_notequal_maybe_ptr"(temp__17, temp__20);
+        goto [temp__21] cc90 cc89;
+  cc90: temp__22 := "i__loadv"("u64", array_remove_at__ar);
+        temp__23 := "i__loadv"("u64", {{ l-nth(temp__22, 0i),
+                               l-nth(temp__22, 1i) }});
+        temp__24 := "i__binop_sub_maybe_ptr"(temp__23, 1i);
+        temp__25 := "i__loadv"("u64", array_remove_at__index);
+        temp__26 := "i__binop_sub_maybe_ptr"(temp__24, temp__25);
+        assert (((0i i<=# (temp__26 i* 8i)) /\
+                ((temp__26 i* 8i) i<=# 18446744073709551615i)));
+        array_remove_at__1__1__block_size := (temp__26 i* 8i);
+        temp__27 := "i__loadv"("u64", array_remove_at__ar);
+        temp__28 := "i__loadv"("u64", {{ l-nth(temp__27, 0i),
+                               (l-nth(temp__27, 1i) i+ 24i) }});
+        temp__29 := "i__loadv"("u64", array_remove_at__index);
+        temp__30 := "i__binop_add_maybe_ptr"(temp__28, (temp__29 i* 8i));
+        temp__31 := "i__loadv"("u64", temp__30);
+        temp__32 := "i__loadv"("u64", array_remove_at__ar);
+        temp__33 := "i__loadv"("u64", {{ l-nth(temp__32, 0i),
+                               (l-nth(temp__32, 1i) i+ 24i) }});
+        temp__34 := "i__loadv"("u64", array_remove_at__index);
+        temp__35 := "i__binop_add_maybe_ptr"(temp__34, 1i);
+        temp__36 := "i__binop_add_maybe_ptr"(temp__33, (temp__35 i* 8i));
+        temp__37 := "i__loadv"("u64", temp__36);
+        temp__38 := "i__memmove"(temp__30, temp__36,
+                                 array_remove_at__1__1__block_size);
+  cc89: skip;
+        temp__39 := "i__loadv"("u64", array_remove_at__ar);
+        temp__40 := "i__loadv"("u64", {{ l-nth(temp__39, 0i),
+                               l-nth(temp__39, 1i) }});
+        temp__41 := "i__binop_sub_maybe_ptr"(temp__40, 1i);
+        temp__42 := "i__loadv"("u64", array_remove_at__ar);
+        temp__43 := "i__storev"("u64", {{ l-nth(temp__42, 0i),
+                                l-nth(temp__42, 1i) }}, temp__41);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  temp__0 := [mem_free](l-nth(array_remove_at__ar, 0i), 0i, 8i);
+        temp__1 := [mem_free](l-nth(array_remove_at__index, 0i), 0i, 8i);
+        return
+};
+
+
+proc array_size(array_size__ar) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_size__ar, 0i),
+                             l-nth(array_size__ar, 1i) }});
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_add_at(array_add_at__ar, array_add_at__element, array_add_at__index) {
+       temp__2 := [mem_alloc](0i, 8i);
+       temp__3 := "i__storev"("u64", {{ l-nth(temp__2, 0i), 0i }},
+                              array_add_at__ar);
+       array_add_at__ar := {{ l-nth(temp__2, 0i), 0i }};
+       temp__4 := [mem_alloc](0i, 8i);
+       temp__5 := "i__storev"("u64", {{ l-nth(temp__4, 0i), 0i }},
+                              array_add_at__index);
+       array_add_at__index := {{ l-nth(temp__4, 0i), 0i }};
+       temp__6 := "i__loadv"("u64", array_add_at__index);
+       temp__7 := "i__loadv"("u64", array_add_at__ar);
+       temp__8 := "i__loadv"("u64", {{ l-nth(temp__7, 0i),
+                             l-nth(temp__7, 1i) }});
+       temp__9 := "i__binop_equal_maybe_ptr"(temp__6, temp__8);
+       goto [temp__9] cc1 cc0;
+  cc1: temp__10 := "i__loadv"("u64", array_add_at__ar);
+       temp__11 := "array_add"(temp__10, array_add_at__element);
+       ret := temp__11;
+       goto ret;
+  cc0: skip;
+       temp__12 := "i__loadv"("u64", array_add_at__ar);
+       temp__13 := "i__loadv"("u64", {{ l-nth(temp__12, 0i),
+                              l-nth(temp__12, 1i) }});
+       temp__14 := "i__binop_equal_maybe_ptr"(temp__13, 0i);
+       temp__15 := "i__loadv"("u64", array_add_at__index);
+       temp__16 := "i__binop_notequal_maybe_ptr"(temp__15, 0i);
+       temp__17 := "i__loadv"("u64", array_add_at__index);
+       temp__18 := "i__loadv"("u64", array_add_at__ar);
+       temp__19 := "i__loadv"("u64", {{ l-nth(temp__18, 0i),
+                              l-nth(temp__18, 1i) }});
+       temp__20 := "i__binop_sub_maybe_ptr"(temp__19, 1i);
+       temp__21 := "i__binop_greaterthan_maybe_ptr"(temp__17, temp__20);
+       goto [((temp__14 and temp__16) or temp__21)] cc3 cc2;
+  cc3: ret := 8i;
+       goto ret;
+  cc2: skip;
+       temp__22 := "i__loadv"("u64", array_add_at__ar);
+       temp__23 := "i__loadv"("u64", {{ l-nth(temp__22, 0i),
+                              l-nth(temp__22, 1i) }});
+       temp__24 := "i__loadv"("u64", array_add_at__ar);
+       temp__25 := "i__loadv"("u64", {{ l-nth(temp__24, 0i),
+                              (l-nth(temp__24, 1i) i+ 8i) }});
+       temp__26 := "i__binop_greatereq_maybe_ptr"(temp__23, temp__25);
+       goto [temp__26] cc7 cc6;
+  cc7: temp__27 := "i__loadv"("u64", array_add_at__ar);
+       temp__28 := "expand_capacity"(temp__27);
+       array_add_at__1__1__status := temp__28;
+       goto [(not (array_add_at__1__1__status = 0i))] cc5 cc4;
+  cc5: ret := array_add_at__1__1__status;
+       goto ret;
+  cc4: skip;
+  cc6: skip;
+       temp__29 := "i__loadv"("u64", array_add_at__ar);
+       temp__30 := "i__loadv"("u64", {{ l-nth(temp__29, 0i),
+                              l-nth(temp__29, 1i) }});
+       temp__31 := "i__loadv"("u64", array_add_at__index);
+       temp__32 := "i__binop_sub_maybe_ptr"(temp__30, temp__31);
+       assert (((0i i<=# (temp__32 i* 8i)) /\
+               ((temp__32 i* 8i) i<=# 18446744073709551615i)));
+       array_add_at__1__shift := (temp__32 i* 8i);
+       temp__33 := "i__loadv"("u64", array_add_at__ar);
+       temp__34 := "i__loadv"("u64", {{ l-nth(temp__33, 0i),
+                              (l-nth(temp__33, 1i) i+ 24i) }});
+       temp__35 := "i__loadv"("u64", array_add_at__index);
+       temp__36 := "i__binop_add_maybe_ptr"(temp__35, 1i);
+       temp__37 := "i__binop_add_maybe_ptr"(temp__34, (temp__36 i* 8i));
+       temp__38 := "i__loadv"("u64", temp__37);
+       temp__39 := "i__loadv"("u64", array_add_at__ar);
+       temp__40 := "i__loadv"("u64", {{ l-nth(temp__39, 0i),
+                              (l-nth(temp__39, 1i) i+ 24i) }});
+       temp__41 := "i__loadv"("u64", array_add_at__index);
+       temp__42 := "i__binop_add_maybe_ptr"(temp__40, (temp__41 i* 8i));
+       temp__43 := "i__loadv"("u64", temp__42);
+       temp__44 := "i__memmove"(temp__37, temp__42, array_add_at__1__shift);
+       temp__45 := "i__loadv"("u64", array_add_at__ar);
+       temp__46 := "i__loadv"("u64", {{ l-nth(temp__45, 0i),
+                              (l-nth(temp__45, 1i) i+ 24i) }});
+       temp__47 := "i__loadv"("u64", array_add_at__index);
+       temp__48 := "i__binop_add_maybe_ptr"(temp__46, (temp__47 i* 8i));
+       temp__49 := "i__storev"("u64", temp__48, array_add_at__element);
+       temp__50 := "i__loadv"("u64", array_add_at__ar);
+       temp__51 := "i__loadv"("u64", {{ l-nth(temp__50, 0i),
+                              l-nth(temp__50, 1i) }});
+       temp__52 := "i__binop_add_maybe_ptr"(temp__51, 1i);
+       temp__53 := "i__loadv"("u64", array_add_at__ar);
+       temp__54 := "i__storev"("u64", {{ l-nth(temp__53, 0i),
+                               l-nth(temp__53, 1i) }}, temp__52);
+       ret := 0i;
+       goto ret;
+       ret := undefined;
+  ret: temp__0 := [mem_free](l-nth(array_add_at__ar, 0i), 0i, 8i);
+       temp__1 := [mem_free](l-nth(array_add_at__index, 0i), 0i, 8i);
+       return
+};
+
+
+proc array_capacity(array_capacity__ar) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_capacity__ar, 0i),
+                             (l-nth(array_capacity__ar, 1i) i+ 8i) }});
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_new_conf(array_new_conf__conf, array_new_conf__out) {
+        array_new_conf__1__ex := undefined;
+        temp__0 := "i__loadv"("f32", {{ l-nth(array_new_conf__conf, 0i),
+                              (l-nth(array_new_conf__conf, 1i) i+ 8i) }});
+        goto [(temp__0 <= (as_num 1i))] cc17 cc18;
+  cc17: array_new_conf__1__ex := (as_num 2i);
+  cc18: temp__1 := "i__loadv"("f32", {{ l-nth(array_new_conf__conf, 0i),
+                              (l-nth(array_new_conf__conf, 1i) i+ 8i) }});
+        array_new_conf__1__ex := temp__1;
+  cc16: skip;
+        temp__2 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                              l-nth(array_new_conf__conf, 1i) }});
+        temp__3 := "i__binop_notequal_maybe_ptr"(temp__2, 0i);
+        temp__4 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                              l-nth(array_new_conf__conf, 1i) }});
+        assert (((0i i<=# (16777216i i/ temp__4)) /\
+                ((16777216i i/ temp__4) i<=# 18446744073709551615i)));
+        goto [((not temp__3) or (not (array_new_conf__1__ex < (as_num (16777216i i/ temp__4)))))] cc20 cc19;
+  cc20: ret := 2i;
+        goto ret;
+  cc19: skip;
+        temp__5 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                              (l-nth(array_new_conf__conf, 1i) i+ 24i) }});
+        temp__6 := "i__get_function_name"(temp__5);
+        temp__7 := temp__6(1i, 56i);
+        array_new_conf__1__ar := temp__7;
+        temp__8 := "i__binop_notequal_maybe_ptr"(array_new_conf__1__ar, 0i);
+        goto [(not temp__8)] cc22 cc21;
+  cc22: ret := 1i;
+        goto ret;
+  cc21: skip;
+        temp__9 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                              (l-nth(array_new_conf__conf, 1i) i+ 16i) }});
+        temp__10 := "i__get_function_name"(temp__9);
+        temp__11 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                               l-nth(array_new_conf__conf, 1i) }});
+        assert (((0i i<=# (temp__11 i* 8i)) /\
+                ((temp__11 i* 8i) i<=# 18446744073709551615i)));
+        temp__12 := temp__10((temp__11 i* 8i));
+        array_new_conf__1__buff := temp__12;
+        temp__13 := "i__binop_notequal_maybe_ptr"(array_new_conf__1__buff, 0i);
+        goto [(not temp__13)] cc24 cc23;
+  cc24: temp__14 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                               (l-nth(array_new_conf__conf, 1i) i+ 32i) }});
+        temp__15 := "i__get_function_name"(temp__14);
+        temp__16 := temp__15(array_new_conf__1__ar);
+        ret := 1i;
+        goto ret;
+  cc23: skip;
+        temp__17 := "i__storev"("u64", {{ l-nth(array_new_conf__1__ar, 0i),
+                                (l-nth(array_new_conf__1__ar, 1i) i+ 24i) }},
+                                array_new_conf__1__buff);
+        temp__18 := "i__storev"("f32", {{ l-nth(array_new_conf__1__ar, 0i),
+                                (l-nth(array_new_conf__1__ar, 1i) i+ 16i) }},
+                                array_new_conf__1__ex);
+        temp__19 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                               l-nth(array_new_conf__conf, 1i) }});
+        temp__20 := "i__storev"("u64", {{ l-nth(array_new_conf__1__ar, 0i),
+                                (l-nth(array_new_conf__1__ar, 1i) i+ 8i) }},
+                                temp__19);
+        temp__21 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                               (l-nth(array_new_conf__conf, 1i) i+ 16i) }});
+        temp__22 := "i__storev"("u64", {{ l-nth(array_new_conf__1__ar, 0i),
+                                (l-nth(array_new_conf__1__ar, 1i) i+ 32i) }},
+                                temp__21);
+        temp__23 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                               (l-nth(array_new_conf__conf, 1i) i+ 24i) }});
+        temp__24 := "i__storev"("u64", {{ l-nth(array_new_conf__1__ar, 0i),
+                                (l-nth(array_new_conf__1__ar, 1i) i+ 40i) }},
+                                temp__23);
+        temp__25 := "i__loadv"("u64", {{ l-nth(array_new_conf__conf, 0i),
+                               (l-nth(array_new_conf__conf, 1i) i+ 32i) }});
+        temp__26 := "i__storev"("u64", {{ l-nth(array_new_conf__1__ar, 0i),
+                                (l-nth(array_new_conf__1__ar, 1i) i+ 48i) }},
+                                temp__25);
+        temp__27 := "i__storev"("u64", array_new_conf__out,
+                                array_new_conf__1__ar);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_index_of(array_index_of__ar, array_index_of__element, array_index_of__index) {
+        array_index_of__1__i := undefined;
+        array_index_of__1__i := 0i;
+  cc11: temp__0 := "i__loadv"("u64", {{ l-nth(array_index_of__ar, 0i),
+                              l-nth(array_index_of__ar, 1i) }});
+        temp__1 := "i__binop_lowerthan_maybe_ptr"(array_index_of__1__i,
+                                                  temp__0);
+        goto [temp__1] cc15 cc12;
+  cc15: temp__2 := "i__loadv"("u64", {{ l-nth(array_index_of__ar, 0i),
+                              (l-nth(array_index_of__ar, 1i) i+ 24i) }});
+        temp__3 := "i__binop_add_maybe_ptr"(temp__2,
+                                            (array_index_of__1__i i* 8i));
+        temp__4 := "i__loadv"("u64", temp__3);
+        temp__5 := "i__binop_equal_maybe_ptr"(temp__4,
+                                              array_index_of__element);
+        goto [temp__5] cc14 cc13;
+  cc14: temp__6 := "i__storev"("u64", array_index_of__index,
+                               array_index_of__1__i);
+        ret := 0i;
+        goto ret;
+  cc13: skip;
+        temp__7 := "i__binop_add_maybe_ptr"(array_index_of__1__i, 1i);
+        array_index_of__1__i := temp__7;
+        goto cc11;
+  cc12: skip;
+        ret := 8i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_destroy_cb(array_destroy_cb__ar, array_destroy_cb__cb) {
+        array_destroy_cb__1__i := undefined;
+        array_destroy_cb__1__i := 0i;
+  cc8:  temp__0 := "i__loadv"("u64", {{ l-nth(array_destroy_cb__ar, 0i),
+                              l-nth(array_destroy_cb__ar, 1i) }});
+        temp__1 := "i__binop_lowerthan_maybe_ptr"(array_destroy_cb__1__i,
+                                                  temp__0);
+        goto [temp__1] cc10 cc9;
+  cc10: temp__2 := "i__get_function_name"(array_destroy_cb__cb);
+        temp__3 := "i__loadv"("u64", {{ l-nth(array_destroy_cb__ar, 0i),
+                              (l-nth(array_destroy_cb__ar, 1i) i+ 24i) }});
+        temp__4 := "i__binop_add_maybe_ptr"(temp__3,
+                                            (array_destroy_cb__1__i i* 8i));
+        temp__5 := "i__loadv"("u64", temp__4);
+        temp__6 := temp__2(temp__5);
+        temp__7 := "i__binop_add_maybe_ptr"(array_destroy_cb__1__i, 1i);
+        array_destroy_cb__1__i := temp__7;
+        goto cc8;
+  cc9:  skip;
+        temp__8 := "array_destroy"(array_destroy_cb__ar);
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_remove_all_free(array_remove_all_free__ar) {
+        array_remove_all_free__1__i := undefined;
+        array_remove_all_free__1__i := 0i;
+  cc91: temp__0 := "i__loadv"("u64", {{ l-nth(array_remove_all_free__ar, 0i),
+                              l-nth(array_remove_all_free__ar, 1i) }});
+        temp__1 := "i__binop_lowerthan_maybe_ptr"(array_remove_all_free__1__i,
+                                                  temp__0);
+        goto [temp__1] cc93 cc92;
+  cc93: temp__2 := "i__loadv"("u64", {{ l-nth(array_remove_all_free__ar, 0i),
+                              (l-nth(array_remove_all_free__ar, 1i) i+ 24i) }});
+        temp__3 := "i__binop_add_maybe_ptr"(temp__2,
+                                            (array_remove_all_free__1__i i* 8i));
+        temp__4 := "i__loadv"("u64", temp__3);
+        temp__5 := "free"(temp__4);
+        temp__6 := "i__binop_add_maybe_ptr"(array_remove_all_free__1__i, 1i);
+        array_remove_all_free__1__i := temp__6;
+        goto cc91;
+  cc92: skip;
+        temp__7 := "array_remove_all"(array_remove_all_free__ar);
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_filter(array_filter__ar, array_filter__pred, array_filter__out) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                               l-nth(array_filter__ar, 1i) }});
+         temp__1 := "i__binop_equal_maybe_ptr"(temp__0, 0i);
+         goto [temp__1] cc103 cc102;
+  cc103: ret := 8i;
+         goto ret;
+  cc102: skip;
+         temp__2 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                               (l-nth(array_filter__ar, 1i) i+ 32i) }});
+         temp__3 := "i__get_function_name"(temp__2);
+         temp__4 := temp__3(56i);
+         array_filter__1__filtered := temp__4;
+         temp__5 := "i__binop_notequal_maybe_ptr"(array_filter__1__filtered,
+                                                  0i);
+         goto [(not temp__5)] cc105 cc104;
+  cc105: ret := 1i;
+         goto ret;
+  cc104: skip;
+         temp__6 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                               (l-nth(array_filter__ar, 1i) i+ 40i) }});
+         temp__7 := "i__get_function_name"(temp__6);
+         temp__8 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                               (l-nth(array_filter__ar, 1i) i+ 8i) }});
+         temp__9 := temp__7(temp__8, 8i);
+         temp__10 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 (l-nth(array_filter__1__filtered, 1i) i+ 24i) }},
+                                 temp__9);
+         temp__11 := "i__binop_notequal_maybe_ptr"(temp__9, 0i);
+         goto [(not temp__11)] cc107 cc106;
+  cc107: temp__12 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 48i) }});
+         temp__13 := "i__get_function_name"(temp__12);
+         temp__14 := temp__13(array_filter__1__filtered);
+         ret := 1i;
+         goto ret;
+  cc106: skip;
+         temp__15 := "i__loadv"("f32", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 16i) }});
+         temp__16 := "i__storev"("f32",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 (l-nth(array_filter__1__filtered, 1i) i+ 16i) }},
+                                 temp__15);
+         temp__17 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 l-nth(array_filter__1__filtered, 1i) }}, 0i);
+         temp__18 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 8i) }});
+         temp__19 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 (l-nth(array_filter__1__filtered, 1i) i+ 8i) }},
+                                 temp__18);
+         temp__20 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 32i) }});
+         temp__21 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 (l-nth(array_filter__1__filtered, 1i) i+ 32i) }},
+                                 temp__20);
+         temp__22 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 40i) }});
+         temp__23 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 (l-nth(array_filter__1__filtered, 1i) i+ 40i) }},
+                                 temp__22);
+         temp__24 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 48i) }});
+         temp__25 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 (l-nth(array_filter__1__filtered, 1i) i+ 48i) }},
+                                 temp__24);
+         array_filter__1__f := 0i;
+         array_filter__1__2__i := 0i;
+  cc108: temp__26 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                l-nth(array_filter__ar, 1i) }});
+         temp__27 := "i__binop_lowerthan_maybe_ptr"(array_filter__1__2__i,
+                                                    temp__26);
+         goto [temp__27] cc112 cc109;
+  cc112: temp__28 := "i__get_function_name"(array_filter__pred);
+         temp__29 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 24i) }});
+         temp__30 := "i__binop_add_maybe_ptr"(temp__29,
+                                              (array_filter__1__2__i i* 8i));
+         temp__31 := "i__loadv"("u64", temp__30);
+         temp__32 := temp__28(temp__31);
+         goto [(not (temp__32 = 0i))] cc111 cc110;
+  cc111: temp__33 := "i__loadv"("u64", {{ l-nth(array_filter__ar, 0i),
+                                (l-nth(array_filter__ar, 1i) i+ 24i) }});
+         temp__34 := "i__binop_add_maybe_ptr"(temp__33,
+                                              (array_filter__1__2__i i* 8i));
+         temp__35 := "i__loadv"("u64", temp__34);
+         temp__36 := "i__loadv"("u64",
+                                {{ l-nth(array_filter__1__filtered, 0i),
+                                (l-nth(array_filter__1__filtered, 1i) i+ 24i) }});
+         temp__37 := "i__binop_add_maybe_ptr"(array_filter__1__f, 1i);
+         array_filter__1__f := temp__37;
+         temp__38 := "i__binop_add_maybe_ptr"(temp__36,
+                                              (array_filter__1__f i* 8i));
+         temp__39 := "i__storev"("u64", temp__38, temp__35);
+         temp__40 := "i__loadv"("u64",
+                                {{ l-nth(array_filter__1__filtered, 0i),
+                                l-nth(array_filter__1__filtered, 1i) }});
+         temp__41 := "i__binop_add_maybe_ptr"(temp__40, 1i);
+         temp__42 := "i__storev"("u64",
+                                 {{ l-nth(array_filter__1__filtered, 0i),
+                                 l-nth(array_filter__1__filtered, 1i) }},
+                                 temp__41);
+  cc110: skip;
+         temp__43 := "i__binop_add_maybe_ptr"(array_filter__1__2__i, 1i);
+         array_filter__1__2__i := temp__43;
+         goto cc108;
+  cc109: skip;
+         temp__44 := "i__storev"("u64", array_filter__out,
+                                 array_filter__1__filtered);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_swap_at(array_swap_at__ar, array_swap_at__index1, array_swap_at__index2) {
+         array_swap_at__1__tmp := undefined;
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_swap_at__ar, 0i),
+                               l-nth(array_swap_at__ar, 1i) }});
+         temp__1 := "i__binop_greatereq_maybe_ptr"(array_swap_at__index1,
+                                                   temp__0);
+         temp__2 := "i__loadv"("u64", {{ l-nth(array_swap_at__ar, 0i),
+                               l-nth(array_swap_at__ar, 1i) }});
+         temp__3 := "i__binop_greatereq_maybe_ptr"(array_swap_at__index2,
+                                                   temp__2);
+         goto [(temp__1 or temp__3)] cc101 cc100;
+  cc101: ret := 8i;
+         goto ret;
+  cc100: skip;
+         temp__4 := "i__loadv"("u64", {{ l-nth(array_swap_at__ar, 0i),
+                               (l-nth(array_swap_at__ar, 1i) i+ 24i) }});
+         temp__5 := "i__binop_add_maybe_ptr"(temp__4,
+                                             (array_swap_at__index1 i* 8i));
+         temp__6 := "i__loadv"("u64", temp__5);
+         array_swap_at__1__tmp := temp__6;
+         temp__7 := "i__loadv"("u64", {{ l-nth(array_swap_at__ar, 0i),
+                               (l-nth(array_swap_at__ar, 1i) i+ 24i) }});
+         temp__8 := "i__binop_add_maybe_ptr"(temp__7,
+                                             (array_swap_at__index2 i* 8i));
+         temp__9 := "i__loadv"("u64", temp__8);
+         temp__10 := "i__loadv"("u64", {{ l-nth(array_swap_at__ar, 0i),
+                                (l-nth(array_swap_at__ar, 1i) i+ 24i) }});
+         temp__11 := "i__binop_add_maybe_ptr"(temp__10,
+                                              (array_swap_at__index1 i* 8i));
+         temp__12 := "i__storev"("u64", temp__11, temp__9);
+         temp__13 := "i__loadv"("u64", {{ l-nth(array_swap_at__ar, 0i),
+                                (l-nth(array_swap_at__ar, 1i) i+ 24i) }});
+         temp__14 := "i__binop_add_maybe_ptr"(temp__13,
+                                              (array_swap_at__index2 i* 8i));
+         temp__15 := "i__storev"("u64", temp__14, array_swap_at__1__tmp);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_remove(array_remove__ar, array_remove__element, array_remove__out) {
+        temp__2 := [mem_alloc](0i, 8i);
+        temp__3 := "i__storev"("u64", {{ l-nth(temp__2, 0i), 0i }},
+                               array_remove__ar);
+        array_remove__ar := {{ l-nth(temp__2, 0i), 0i }};
+        temp__4 := [mem_alloc](0i, 8i);
+        array_remove__1__index := {{ l-nth(temp__4, 0i), 0i }};
+        skip;
+        temp__5 := "i__loadv"("u64", array_remove__ar);
+        temp__6 := "array_index_of"(temp__5, array_remove__element,
+                                    array_remove__1__index);
+        array_remove__1__status := temp__6;
+        goto [(array_remove__1__status = 8i)] cc95 cc94;
+  cc95: ret := 7i;
+        goto ret;
+  cc94: skip;
+        temp__7 := "i__loadv"("u64", array_remove__1__index);
+        temp__8 := "i__loadv"("u64", array_remove__ar);
+        temp__9 := "i__loadv"("u64", {{ l-nth(temp__8, 0i),
+                              l-nth(temp__8, 1i) }});
+        temp__10 := "i__binop_sub_maybe_ptr"(temp__9, 1i);
+        temp__11 := "i__binop_notequal_maybe_ptr"(temp__7, temp__10);
+        goto [temp__11] cc97 cc96;
+  cc97: temp__12 := "i__loadv"("u64", array_remove__ar);
+        temp__13 := "i__loadv"("u64", {{ l-nth(temp__12, 0i),
+                               l-nth(temp__12, 1i) }});
+        temp__14 := "i__loadv"("u64", array_remove__1__index);
+        temp__15 := "i__binop_sub_maybe_ptr"(temp__13, temp__14);
+        assert (((0i i<=# (temp__15 i* 8i)) /\
+                ((temp__15 i* 8i) i<=# 18446744073709551615i)));
+        array_remove__1__1__block_size := (temp__15 i* 8i);
+        temp__16 := "i__loadv"("u64", array_remove__ar);
+        temp__17 := "i__loadv"("u64", {{ l-nth(temp__16, 0i),
+                               (l-nth(temp__16, 1i) i+ 24i) }});
+        temp__18 := "i__loadv"("u64", array_remove__1__index);
+        temp__19 := "i__binop_add_maybe_ptr"(temp__17, (temp__18 i* 8i));
+        temp__20 := "i__loadv"("u64", temp__19);
+        temp__21 := "i__loadv"("u64", array_remove__ar);
+        temp__22 := "i__loadv"("u64", {{ l-nth(temp__21, 0i),
+                               (l-nth(temp__21, 1i) i+ 24i) }});
+        temp__23 := "i__loadv"("u64", array_remove__1__index);
+        temp__24 := "i__binop_add_maybe_ptr"(temp__23, 1i);
+        temp__25 := "i__binop_add_maybe_ptr"(temp__22, (temp__24 i* 8i));
+        temp__26 := "i__loadv"("u64", temp__25);
+        temp__27 := "i__memmove"(temp__19, temp__25,
+                                 array_remove__1__1__block_size);
+  cc96: skip;
+        temp__28 := "i__loadv"("u64", array_remove__ar);
+        temp__29 := "i__loadv"("u64", {{ l-nth(temp__28, 0i),
+                               l-nth(temp__28, 1i) }});
+        temp__30 := "i__binop_sub_maybe_ptr"(temp__29, 1i);
+        temp__31 := "i__loadv"("u64", array_remove__ar);
+        temp__32 := "i__storev"("u64", {{ l-nth(temp__31, 0i),
+                                l-nth(temp__31, 1i) }}, temp__30);
+        temp__33 := "i__binop_notequal_maybe_ptr"(array_remove__out, 0i);
+        goto [temp__33] cc99 cc98;
+  cc99: temp__34 := "i__storev"("u64", array_remove__out,
+                                array_remove__element);
+  cc98: skip;
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  temp__0 := [mem_free](l-nth(array_remove__1__index, 0i), 0i, 8i);
+        temp__1 := [mem_free](l-nth(array_remove__ar, 0i), 0i, 8i);
+        return
+};
+
+
+proc array_filter_mut(array_filter_mut__ar, array_filter_mut__pred) {
+        temp__3 := [mem_alloc](0i, 8i);
+        temp__4 := "i__storev"("u64", {{ l-nth(temp__3, 0i), 0i }},
+                               array_filter_mut__ar);
+        array_filter_mut__ar := {{ l-nth(temp__3, 0i), 0i }};
+        temp__5 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__6 := "i__loadv"("u64", {{ l-nth(temp__5, 0i),
+                              l-nth(temp__5, 1i) }});
+        temp__7 := "i__binop_equal_maybe_ptr"(temp__6, 0i);
+        goto [temp__7] cc26 cc25;
+  cc26: ret := 8i;
+        goto ret;
+  cc25: skip;
+        temp__8 := [mem_alloc](0i, 8i);
+        array_filter_mut__1__rm := {{ l-nth(temp__8, 0i), 0i }};
+        temp__9 := "i__storev"("u64", array_filter_mut__1__rm, 0i);
+        skip;
+        array_filter_mut__1__keep := 0i;
+        temp__11 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__12 := "i__loadv"("u64", {{ l-nth(temp__11, 0i),
+                               l-nth(temp__11, 1i) }});
+        temp__13 := "i__binop_sub_maybe_ptr"(temp__12, 1i);
+        temp__10 := [mem_alloc](0i, 8i);
+        array_filter_mut__1__1__i := {{ l-nth(temp__10, 0i), 0i }};
+        temp__14 := "i__storev"("u64", array_filter_mut__1__1__i, temp__13);
+        skip;
+  cc27: temp__15 := "i__loadv"("u64", array_filter_mut__1__1__i);
+        temp__16 := "i__binop_notequal_maybe_ptr"(temp__15, (i- 1i));
+        goto [temp__16] cc35 cc28;
+  cc35: temp__17 := "i__get_function_name"(array_filter_mut__pred);
+        temp__18 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__19 := "i__loadv"("u64", {{ l-nth(temp__18, 0i),
+                               (l-nth(temp__18, 1i) i+ 24i) }});
+        temp__20 := "i__loadv"("u64", array_filter_mut__1__1__i);
+        temp__21 := "i__binop_add_maybe_ptr"(temp__19, (temp__20 i* 8i));
+        temp__22 := "i__loadv"("u64", temp__21);
+        temp__23 := temp__17(temp__22);
+        goto [(not (not (temp__23 = 0i)))] cc30 cc29;
+  cc30: temp__24 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__25 := "i__binop_add_maybe_ptr"(temp__24, 1i);
+        temp__26 := "i__storev"("u64", array_filter_mut__1__rm, temp__25);
+        goto cc27;
+  cc29: skip;
+        temp__27 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__28 := "i__binop_greaterthan_maybe_ptr"(temp__27, 0i);
+        goto [temp__28] cc34 cc33;
+  cc34: temp__29 := "i__binop_greaterthan_maybe_ptr"(array_filter_mut__1__keep,
+                                                     0i);
+        goto [temp__29] cc32 cc31;
+  cc32: assert (((0i i<=# (array_filter_mut__1__keep i* 8i)) /\
+                ((array_filter_mut__1__keep i* 8i) i<=# 18446744073709551615i)));
+        array_filter_mut__1__1__1__2__1__block_size := (array_filter_mut__1__keep i* 8i);
+        temp__30 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__31 := "i__loadv"("u64", {{ l-nth(temp__30, 0i),
+                               (l-nth(temp__30, 1i) i+ 24i) }});
+        temp__32 := "i__loadv"("u64", array_filter_mut__1__1__i);
+        temp__33 := "i__binop_add_maybe_ptr"(temp__32, 1i);
+        temp__34 := "i__binop_add_maybe_ptr"(temp__31, (temp__33 i* 8i));
+        temp__35 := "i__loadv"("u64", temp__34);
+        temp__36 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__37 := "i__loadv"("u64", {{ l-nth(temp__36, 0i),
+                               (l-nth(temp__36, 1i) i+ 24i) }});
+        temp__38 := "i__loadv"("u64", array_filter_mut__1__1__i);
+        temp__39 := "i__binop_add_maybe_ptr"(temp__38, 1i);
+        temp__40 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__41 := "i__binop_add_maybe_ptr"(temp__39, temp__40);
+        temp__42 := "i__binop_add_maybe_ptr"(temp__37, (temp__41 i* 8i));
+        temp__43 := "i__loadv"("u64", temp__42);
+        temp__44 := "i__memmove"(temp__34, temp__42,
+                                 array_filter_mut__1__1__1__2__1__block_size);
+  cc31: skip;
+        temp__45 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__46 := "i__loadv"("u64", {{ l-nth(temp__45, 0i),
+                               l-nth(temp__45, 1i) }});
+        temp__47 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__48 := "i__binop_sub_maybe_ptr"(temp__46, temp__47);
+        temp__49 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__50 := "i__storev"("u64", {{ l-nth(temp__49, 0i),
+                                l-nth(temp__49, 1i) }}, temp__48);
+        temp__51 := "i__storev"("u64", array_filter_mut__1__rm, 0i);
+  cc33: skip;
+        temp__52 := "i__binop_add_maybe_ptr"(array_filter_mut__1__keep, 1i);
+        array_filter_mut__1__keep := temp__52;
+        temp__53 := "i__loadv"("u64", array_filter_mut__1__1__i);
+        temp__54 := "i__binop_sub_maybe_ptr"(temp__53, 1i);
+        temp__55 := "i__storev"("u64", array_filter_mut__1__1__i, temp__54);
+        goto cc27;
+  cc28: skip;
+        temp__56 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__57 := "i__binop_greaterthan_maybe_ptr"(temp__56, 0i);
+        goto [temp__57] cc37 cc36;
+  cc37: assert (((0i i<=# (array_filter_mut__1__keep i* 8i)) /\
+                ((array_filter_mut__1__keep i* 8i) i<=# 18446744073709551615i)));
+        array_filter_mut__1__2__block_size := (array_filter_mut__1__keep i* 8i);
+        temp__58 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__59 := "i__loadv"("u64", {{ l-nth(temp__58, 0i),
+                               (l-nth(temp__58, 1i) i+ 24i) }});
+        temp__60 := "i__binop_add_maybe_ptr"(temp__59, 0i);
+        temp__61 := "i__loadv"("u64", temp__60);
+        temp__62 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__63 := "i__loadv"("u64", {{ l-nth(temp__62, 0i),
+                               (l-nth(temp__62, 1i) i+ 24i) }});
+        temp__64 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__65 := "i__binop_add_maybe_ptr"(temp__63, (temp__64 i* 8i));
+        temp__66 := "i__loadv"("u64", temp__65);
+        temp__67 := "i__memmove"(temp__60, temp__65,
+                                 array_filter_mut__1__2__block_size);
+        temp__68 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__69 := "i__loadv"("u64", {{ l-nth(temp__68, 0i),
+                               l-nth(temp__68, 1i) }});
+        temp__70 := "i__loadv"("u64", array_filter_mut__1__rm);
+        temp__71 := "i__binop_sub_maybe_ptr"(temp__69, temp__70);
+        temp__72 := "i__loadv"("u64", array_filter_mut__ar);
+        temp__73 := "i__storev"("u64", {{ l-nth(temp__72, 0i),
+                                l-nth(temp__72, 1i) }}, temp__71);
+  cc36: skip;
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  temp__0 := [mem_free](l-nth(array_filter_mut__ar, 0i), 0i, 8i);
+        temp__1 := [mem_free](l-nth(array_filter_mut__1__1__i, 0i), 0i, 8i);
+        temp__2 := [mem_free](l-nth(array_filter_mut__1__rm, 0i), 0i, 8i);
+        return
+};
+
+
+proc expand_capacity(expand_capacity__ar) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                               (l-nth(expand_capacity__ar, 1i) i+ 8i) }});
+         temp__1 := "i__binop_equal_maybe_ptr"(temp__0, 16777216i);
+         goto [temp__1] cc121 cc120;
+  cc121: ret := 4i;
+         goto ret;
+  cc120: skip;
+         temp__2 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                               (l-nth(expand_capacity__ar, 1i) i+ 8i) }});
+         temp__3 := "i__loadv"("f32", {{ l-nth(expand_capacity__ar, 0i),
+                               (l-nth(expand_capacity__ar, 1i) i+ 16i) }});
+         expand_capacity__1__new_capacity := (as_int ((as_num temp__2) * temp__3));
+         temp__4 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                               (l-nth(expand_capacity__ar, 1i) i+ 8i) }});
+         temp__5 := "i__binop_lesseq_maybe_ptr"(expand_capacity__1__new_capacity,
+                                                temp__4);
+         goto [temp__5] cc123 cc124;
+  cc123: temp__6 := "i__storev"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                (l-nth(expand_capacity__ar, 1i) i+ 8i) }},
+                                16777216i);
+  cc124: temp__7 := "i__storev"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                (l-nth(expand_capacity__ar, 1i) i+ 8i) }},
+                                expand_capacity__1__new_capacity);
+  cc122: skip;
+         temp__8 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                               (l-nth(expand_capacity__ar, 1i) i+ 32i) }});
+         temp__9 := "i__get_function_name"(temp__8);
+         assert (((0i i<=# (expand_capacity__1__new_capacity i* 8i)) /\
+                 ((expand_capacity__1__new_capacity i* 8i) i<=# 18446744073709551615i)));
+         temp__10 := temp__9((expand_capacity__1__new_capacity i* 8i));
+         expand_capacity__1__new_buff := temp__10;
+         temp__11 := "i__binop_notequal_maybe_ptr"(expand_capacity__1__new_buff,
+                                                   0i);
+         goto [(not temp__11)] cc126 cc125;
+  cc126: ret := 1i;
+         goto ret;
+  cc125: skip;
+         temp__12 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                (l-nth(expand_capacity__ar, 1i) i+ 24i) }});
+         temp__13 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                l-nth(expand_capacity__ar, 1i) }});
+         assert (((0i i<=# (temp__13 i* 8i)) /\
+                 ((temp__13 i* 8i) i<=# 18446744073709551615i)));
+         temp__14 := "i__memcpy"(expand_capacity__1__new_buff, temp__12,
+                                 (temp__13 i* 8i));
+         temp__15 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                (l-nth(expand_capacity__ar, 1i) i+ 48i) }});
+         temp__16 := "i__get_function_name"(temp__15);
+         temp__17 := "i__loadv"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                (l-nth(expand_capacity__ar, 1i) i+ 24i) }});
+         temp__18 := temp__16(temp__17);
+         temp__19 := "i__storev"("u64", {{ l-nth(expand_capacity__ar, 0i),
+                                 (l-nth(expand_capacity__ar, 1i) i+ 24i) }},
+                                 expand_capacity__1__new_buff);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_reduce(array_reduce__ar, array_reduce__fn, array_reduce__result) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                               l-nth(array_reduce__ar, 1i) }});
+         temp__1 := "i__binop_equal_maybe_ptr"(temp__0, 1i);
+         goto [temp__1] cc114 cc113;
+  cc114: temp__2 := "i__get_function_name"(array_reduce__fn);
+         temp__3 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                               (l-nth(array_reduce__ar, 1i) i+ 24i) }});
+         temp__4 := "i__binop_add_maybe_ptr"(temp__3, 0i);
+         temp__5 := "i__loadv"("u64", temp__4);
+         temp__6 := temp__2(temp__5, 0i, array_reduce__result);
+         ret := undefined;
+         goto ret;
+  cc113: skip;
+         temp__7 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                               l-nth(array_reduce__ar, 1i) }});
+         temp__8 := "i__binop_greaterthan_maybe_ptr"(temp__7, 1i);
+         goto [temp__8] cc116 cc115;
+  cc116: temp__9 := "i__get_function_name"(array_reduce__fn);
+         temp__10 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                                (l-nth(array_reduce__ar, 1i) i+ 24i) }});
+         temp__11 := "i__binop_add_maybe_ptr"(temp__10, 0i);
+         temp__12 := "i__loadv"("u64", temp__11);
+         temp__13 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                                (l-nth(array_reduce__ar, 1i) i+ 24i) }});
+         temp__14 := "i__binop_add_maybe_ptr"(temp__13, 8i);
+         temp__15 := "i__loadv"("u64", temp__14);
+         temp__16 := temp__9(temp__12, temp__15, array_reduce__result);
+  cc115: skip;
+         array_reduce__1__2__i := 2i;
+  cc117: temp__17 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                                l-nth(array_reduce__ar, 1i) }});
+         temp__18 := "i__binop_lowerthan_maybe_ptr"(array_reduce__1__2__i,
+                                                    temp__17);
+         goto [temp__18] cc119 cc118;
+  cc119: temp__19 := "i__get_function_name"(array_reduce__fn);
+         temp__20 := "i__loadv"("u64", {{ l-nth(array_reduce__ar, 0i),
+                                (l-nth(array_reduce__ar, 1i) i+ 24i) }});
+         temp__21 := "i__binop_add_maybe_ptr"(temp__20,
+                                              (array_reduce__1__2__i i* 8i));
+         temp__22 := "i__loadv"("u64", temp__21);
+         temp__23 := temp__19(array_reduce__result, temp__22,
+                              array_reduce__result);
+         temp__24 := "i__binop_add_maybe_ptr"(array_reduce__1__2__i, 1i);
+         array_reduce__1__2__i := temp__24;
+         goto cc117;
+  cc118: skip;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_iter_index(array_iter_index__iter) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_iter_index__iter, 0i),
+                             (l-nth(array_iter_index__iter, 1i) i+ 8i) }});
+       temp__1 := "i__binop_sub_maybe_ptr"(temp__0, 1i);
+       ret := temp__1;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc cc_common_cmp_ptr(cc_common_cmp_ptr__ptr1, cc_common_cmp_ptr__ptr2) {
+        temp__0 := "i__binop_lowerthan_maybe_ptr"(cc_common_cmp_ptr__ptr1,
+                                                  cc_common_cmp_ptr__ptr2);
+        goto [temp__0] cc41 cc42;
+  cc41: ret := (i- 1i);
+        goto ret;
+  cc42: temp__1 := "i__binop_greaterthan_maybe_ptr"(cc_common_cmp_ptr__ptr1,
+                                                    cc_common_cmp_ptr__ptr2);
+        goto [temp__1] cc39 cc38;
+  cc39: ret := 1i;
+        goto ret;
+  cc38: skip;
+  cc40: skip;
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_trim_capacity(array_trim_capacity__ar) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                               l-nth(array_trim_capacity__ar, 1i) }});
+         temp__1 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                               (l-nth(array_trim_capacity__ar, 1i) i+ 8i) }});
+         temp__2 := "i__binop_equal_maybe_ptr"(temp__0, temp__1);
+         goto [temp__2] cc132 cc131;
+  cc132: ret := 0i;
+         goto ret;
+  cc131: skip;
+         temp__3 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                               (l-nth(array_trim_capacity__ar, 1i) i+ 40i) }});
+         temp__4 := "i__get_function_name"(temp__3);
+         temp__5 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                               l-nth(array_trim_capacity__ar, 1i) }});
+         temp__6 := temp__4(temp__5, 8i);
+         array_trim_capacity__1__new_buff := temp__6;
+         temp__7 := "i__binop_notequal_maybe_ptr"(array_trim_capacity__1__new_buff,
+                                                  0i);
+         goto [(not temp__7)] cc134 cc133;
+  cc134: ret := 1i;
+         goto ret;
+  cc133: skip;
+         temp__8 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                               l-nth(array_trim_capacity__ar, 1i) }});
+         temp__9 := "i__binop_lowerthan_maybe_ptr"(temp__8, 1i);
+         goto [temp__9] cc135 cc136;
+  cc135: temp__10 := 1i;
+         goto cc137;
+  cc136: temp__11 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                                l-nth(array_trim_capacity__ar, 1i) }});
+         temp__10 := temp__11;
+  cc137: skip;
+         array_trim_capacity__1__size := temp__10;
+         temp__12 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                                (l-nth(array_trim_capacity__ar, 1i) i+ 24i) }});
+         assert (((0i i<=# (array_trim_capacity__1__size i* 8i)) /\
+                 ((array_trim_capacity__1__size i* 8i) i<=# 18446744073709551615i)));
+         temp__13 := "i__memcpy"(array_trim_capacity__1__new_buff, temp__12,
+                                 (array_trim_capacity__1__size i* 8i));
+         temp__14 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                                (l-nth(array_trim_capacity__ar, 1i) i+ 48i) }});
+         temp__15 := "i__get_function_name"(temp__14);
+         temp__16 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                                (l-nth(array_trim_capacity__ar, 1i) i+ 24i) }});
+         temp__17 := temp__15(temp__16);
+         temp__18 := "i__storev"("u64",
+                                 {{ l-nth(array_trim_capacity__ar, 0i),
+                                 (l-nth(array_trim_capacity__ar, 1i) i+ 24i) }},
+                                 array_trim_capacity__1__new_buff);
+         temp__19 := "i__loadv"("u64", {{ l-nth(array_trim_capacity__ar, 0i),
+                                l-nth(array_trim_capacity__ar, 1i) }});
+         temp__20 := "i__storev"("u64",
+                                 {{ l-nth(array_trim_capacity__ar, 0i),
+                                 (l-nth(array_trim_capacity__ar, 1i) i+ 8i) }},
+                                 temp__19);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_iter_remove(array_iter_remove__iter, array_iter_remove__out) {
+         array_iter_remove__1__status := 7i;
+         temp__0 := "i__loadv"("u8", {{ l-nth(array_iter_remove__iter, 0i),
+                               (l-nth(array_iter_remove__iter, 1i) i+ 16i) }});
+         goto [(not (not (temp__0 = 0i)))] cc130 cc129;
+  cc130: temp__1 := "i__loadv"("u64", {{ l-nth(array_iter_remove__iter, 0i),
+                               l-nth(array_iter_remove__iter, 1i) }});
+         temp__2 := "i__loadv"("u64", {{ l-nth(array_iter_remove__iter, 0i),
+                               (l-nth(array_iter_remove__iter, 1i) i+ 8i) }});
+         temp__3 := "i__binop_sub_maybe_ptr"(temp__2, 1i);
+         temp__4 := "array_remove_at"(temp__1, temp__3,
+                                      array_iter_remove__out);
+         array_iter_remove__1__status := temp__4;
+         goto [(array_iter_remove__1__status = 0i)] cc128 cc127;
+  cc128: fail [unhandled]("Cast::CInteger::I_int::CInteger::I_bool");
+         temp__5 := "i__storev"("u8", {{ l-nth(array_iter_remove__iter, 0i),
+                                (l-nth(array_iter_remove__iter, 1i) i+ 16i) }},
+                                none);
+  cc127: skip;
+  cc129: skip;
+         ret := array_iter_remove__1__status;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc "__CPROVER_assert"(i__empty, i__empty) {
+       ret := null;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc qsort(i__empty, i__empty, i__empty, i__empty) {
+       ret := null;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_destroy(array_destroy__ar) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_destroy__ar, 0i),
+                             (l-nth(array_destroy__ar, 1i) i+ 48i) }});
+       temp__1 := "i__get_function_name"(temp__0);
+       temp__2 := "i__loadv"("u64", {{ l-nth(array_destroy__ar, 0i),
+                             (l-nth(array_destroy__ar, 1i) i+ 24i) }});
+       temp__3 := temp__1(temp__2);
+       temp__4 := "i__loadv"("u64", {{ l-nth(array_destroy__ar, 0i),
+                             (l-nth(array_destroy__ar, 1i) i+ 48i) }});
+       temp__5 := "i__get_function_name"(temp__4);
+       temp__6 := temp__5(array_destroy__ar);
+       ret := undefined;
+  ret: return
+};
+
+
+proc free(i__empty) {
+       ret := null;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_iter_replace(array_iter_replace__iter, array_iter_replace__element, array_iter_replace__out) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_iter_replace__iter, 0i),
+                             l-nth(array_iter_replace__iter, 1i) }});
+       temp__1 := "i__loadv"("u64", {{ l-nth(array_iter_replace__iter, 0i),
+                             (l-nth(array_iter_replace__iter, 1i) i+ 8i) }});
+       temp__2 := "i__binop_sub_maybe_ptr"(temp__1, 1i);
+       temp__3 := "array_replace_at"(temp__0, array_iter_replace__element,
+                                     temp__2, array_iter_replace__out);
+       ret := temp__3;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_replace_at(array_replace_at__ar, array_replace_at__element, array_replace_at__index, array_replace_at__out) {
+        temp__0 := "i__loadv"("u64", {{ l-nth(array_replace_at__ar, 0i),
+                              l-nth(array_replace_at__ar, 1i) }});
+        temp__1 := "i__binop_greatereq_maybe_ptr"(array_replace_at__index,
+                                                  temp__0);
+        goto [temp__1] cc44 cc43;
+  cc44: ret := 8i;
+        goto ret;
+  cc43: skip;
+        temp__2 := "i__binop_notequal_maybe_ptr"(array_replace_at__out, 0i);
+        goto [temp__2] cc46 cc45;
+  cc46: temp__3 := "i__loadv"("u64", {{ l-nth(array_replace_at__ar, 0i),
+                              (l-nth(array_replace_at__ar, 1i) i+ 24i) }});
+        temp__4 := "i__binop_add_maybe_ptr"(temp__3,
+                                            (array_replace_at__index i* 8i));
+        temp__5 := "i__loadv"("u64", temp__4);
+        temp__6 := "i__storev"("u64", array_replace_at__out, temp__5);
+  cc45: skip;
+        temp__7 := "i__loadv"("u64", {{ l-nth(array_replace_at__ar, 0i),
+                              (l-nth(array_replace_at__ar, 1i) i+ 24i) }});
+        temp__8 := "i__binop_add_maybe_ptr"(temp__7,
+                                            (array_replace_at__index i* 8i));
+        temp__9 := "i__storev"("u64", temp__8, array_replace_at__element);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_sort(array_sort__ar, array_sort__cmp) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_sort__ar, 0i),
+                             (l-nth(array_sort__ar, 1i) i+ 24i) }});
+       temp__1 := "i__loadv"("u64", {{ l-nth(array_sort__ar, 0i),
+                             l-nth(array_sort__ar, 1i) }});
+       temp__2 := "qsort"(temp__0, temp__1, 8i, array_sort__cmp);
+       ret := undefined;
+  ret: return
+};
+
+
+proc m____nondet_int() {
+       temp__0 := fresh_svar();
+       assume_type (temp__0, Int);
+       assume (((-2147483648i i<=# temp__0) /\ (temp__0 i<=# 2147483647i)));
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+@nopath
+@internal
+proc "__CPROVER_initialize"() {
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_next_thread_id", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_next_thread_id" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_object", loc);
+    u := [genv_setdef](loc, {{ "variable", "m____CPROVER_malloc_object" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("v1", loc);
+    u := [genv_setdef](loc, {{ "variable", "v1" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_thread_id", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_thread_id" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("return'", loc);
+    u := [genv_setdef](loc, {{ "variable", "return'" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_deallocated", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_deallocated" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := "i__storev"("i32", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_rounding_mode", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_rounding_mode" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_next_thread_key", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_next_thread_key" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("stat", loc);
+    u := [genv_setdef](loc, {{ "variable", "stat" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := "i__storev"("i32", {{ loc, 0i }}, 2i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_failure_mode_assert_then_assume",
+                          loc);
+    u := [genv_setdef](loc, {{ "variable",
+                       "m____CPROVER_malloc_failure_mode_assert_then_assume" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_alloca_object", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_alloca_object" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_dead_object", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_dead_object" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_size", loc);
+    u := [genv_setdef](loc, {{ "variable", "m____CPROVER_malloc_size" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := "i__storev"("i32", {{ loc, 0i }}, 1i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("m____CPROVER_malloc_failure_mode_return_null", loc);
+    u := [genv_setdef](loc, {{ "variable",
+                       "m____CPROVER_malloc_failure_mode_return_null" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    temp__0 := "i__cast_unsign_int_same_size"(0i, 2147483647i, 4294967296i);
+    u := "i__storev"("u32", {{ loc, 0i }}, temp__0);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_pipe_count", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_pipe_count" }});
+    ll := [mem_alloc](0i, 4i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 4i);
+    u := [mem_dropperm](loc, 0i, 4i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_constant_infinity_uint", loc);
+    u := [genv_setdef](loc, {{ "variable",
+                       "__CPROVER_constant_infinity_uint" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    temp__1 := "i__cast_unsign_int_same_size"(36028797018963968i,
+                                              9223372036854775807i,
+                                              18446744073709551616i);
+    u := "i__storev"("u64", {{ loc, 0i }}, temp__1);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_max_malloc_size", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_max_malloc_size" }});
+    ll := [mem_alloc](0i, 8i);
+    loc := l-nth(ll, 0i);
+    u := "i__store_zeros"(loc, 8i);
+    u := "i__storev"("u64", {{ loc, 0i }}, 0i);
+    u := [mem_dropperm](loc, 0i, 8i, "Writable");
+    u := [genv_setsymbol]("__CPROVER_memory_leak", loc);
+    u := [genv_setdef](loc, {{ "variable", "__CPROVER_memory_leak" }});
+    u := "i__glob_set_fun"("memmove", "i__memmove");
+    u := "i__glob_set_fun"("array_capacity", "array_capacity");
+    u := "i__glob_set_fun"("array_add_at", "array_add_at");
+    u := "i__glob_set_fun"("array_destroy_cb", "array_destroy_cb");
+    u := "i__glob_set_fun"("array_index_of", "array_index_of");
+    u := "i__glob_set_fun"("array_new_conf", "array_new_conf");
+    u := "i__glob_set_fun"("array_filter_mut", "array_filter_mut");
+    u := "i__glob_set_fun"("array_iter_index", "array_iter_index");
+    u := "i__glob_set_fun"("cc_common_cmp_ptr", "cc_common_cmp_ptr");
+    u := "i__glob_set_fun"("__CPROVER_assert", "__CPROVER_assert");
+    u := "i__glob_set_fun"("array_replace_at", "array_replace_at");
+    u := "i__glob_set_fun"("array_iter_replace", "array_iter_replace");
+    u := "i__glob_set_fun"("m____nondet_int", "m____nondet_int");
+    u := "i__glob_set_fun"("main", "main");
+    u := "i__glob_set_fun"("array_zip_iter_replace", "array_zip_iter_replace");
+    u := "i__glob_set_fun"("array_remove_last", "array_remove_last");
+    u := "i__glob_set_fun"("array_map", "array_map");
+    u := "i__glob_set_fun"("array_get_buffer", "array_get_buffer");
+    u := "i__glob_set_fun"("array_zip_iter_remove", "array_zip_iter_remove");
+    u := "i__glob_set_fun"("array_copy_shallow", "array_copy_shallow");
+    u := "i__glob_set_fun"("array_get_at", "array_get_at");
+    u := "i__glob_set_fun"("array_iter_init", "array_iter_init");
+    u := "i__glob_set_fun"("array_conf_init", "array_conf_init");
+    u := "i__glob_set_fun"("array_iter_next", "array_iter_next");
+    u := "i__glob_set_fun"("array_reverse", "array_reverse");
+    u := "i__glob_set_fun"("array_remove_all", "array_remove_all");
+    u := "i__glob_set_fun"("array_add", "array_add");
+    u := "i__glob_set_fun"("array_contains_value", "array_contains_value");
+    u := "i__glob_set_fun"("array_contains", "array_contains");
+    u := "i__glob_set_fun"("__CPROVER_assume", "__CPROVER_assume");
+    u := "i__glob_set_fun"("array_zip_iter_index", "array_zip_iter_index");
+    u := "i__glob_set_fun"("cc_common_cmp_str", "cc_common_cmp_str");
+    u := "i__glob_set_fun"("array_subarray", "array_subarray");
+    u := "i__glob_set_fun"("malloc", "i__malloc");
+    u := "i__glob_set_fun"("array_new", "array_new");
+    u := "i__glob_set_fun"("array_remove_at", "array_remove_at");
+    u := "i__glob_set_fun"("array_size", "array_size");
+    u := "i__glob_set_fun"("array_remove_all_free", "array_remove_all_free");
+    u := "i__glob_set_fun"("array_remove", "array_remove");
+    u := "i__glob_set_fun"("array_swap_at", "array_swap_at");
+    u := "i__glob_set_fun"("array_filter", "array_filter");
+    u := "i__glob_set_fun"("array_reduce", "array_reduce");
+    u := "i__glob_set_fun"("expand_capacity", "expand_capacity");
+    u := "i__glob_set_fun"("memcpy", "i__memcpy");
+    u := "i__glob_set_fun"("array_iter_remove", "array_iter_remove");
+    u := "i__glob_set_fun"("array_trim_capacity", "array_trim_capacity");
+    u := "i__glob_set_fun"("array_destroy", "array_destroy");
+    u := "i__glob_set_fun"("qsort", "qsort");
+    u := "i__glob_set_fun"("free", "free");
+    u := "i__glob_set_fun"("array_sort", "array_sort");
+    u := "i__glob_set_fun"("array_zip_iter_init", "array_zip_iter_init");
+    u := "i__glob_set_fun"("__CPROVER__start", "__CPROVER__start");
+    u := "i__glob_set_fun"("array_get_last", "array_get_last");
+    u := "i__glob_set_fun"("array_zip_iter_add", "array_zip_iter_add");
+    u := "i__glob_set_fun"("array_zip_iter_next", "array_zip_iter_next");
+    u := "i__glob_set_fun"("array_iter_add", "array_iter_add");
+    u := "i__glob_set_fun"("calloc", "i__calloc");
+    u := "i__glob_set_fun"("array_copy_deep", "array_copy_deep");
+    u := "i__glob_set_fun"("strcmp", "strcmp");
+    ret := null;
+    return
+};
+
+
+proc array_get_last(array_get_last__ar, array_get_last__out) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_get_last__ar, 0i),
+                               l-nth(array_get_last__ar, 1i) }});
+         temp__1 := "i__binop_equal_maybe_ptr"(temp__0, 0i);
+         goto [temp__1] cc139 cc138;
+  cc139: ret := 7i;
+         goto ret;
+  cc138: skip;
+         temp__2 := "i__loadv"("u64", {{ l-nth(array_get_last__ar, 0i),
+                               l-nth(array_get_last__ar, 1i) }});
+         temp__3 := "i__binop_sub_maybe_ptr"(temp__2, 1i);
+         temp__4 := "array_get_at"(array_get_last__ar, temp__3,
+                                   array_get_last__out);
+         ret := temp__4;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc "__CPROVER__start"() {
+  __CPROVER_HIDE: skip;
+                  temp__0 := "__CPROVER_initialize"();
+                  temp__1 := "main"();
+                  temp__2 := [genv_getsymbol]("return'");
+                  temp__3 := {{ l-nth(temp__2, 1i), 0i }};
+                  temp__4 := "i__storev"("i32", temp__3, temp__1);
+                  skip;
+                  ret := undefined;
+  ret:            return
+};
+
+
+proc array_zip_iter_init(array_zip_iter_init__iter, array_zip_iter_init__ar1, array_zip_iter_init__ar2) {
+       temp__0 := "i__storev"("u64", {{ l-nth(array_zip_iter_init__iter, 0i),
+                              l-nth(array_zip_iter_init__iter, 1i) }},
+                              array_zip_iter_init__ar1);
+       temp__1 := "i__storev"("u64", {{ l-nth(array_zip_iter_init__iter, 0i),
+                              (l-nth(array_zip_iter_init__iter, 1i) i+ 8i) }},
+                              array_zip_iter_init__ar2);
+       temp__2 := "i__storev"("u64", {{ l-nth(array_zip_iter_init__iter, 0i),
+                              (l-nth(array_zip_iter_init__iter, 1i) i+ 16i) }},
+                              0i);
+       fail [unhandled]("Cast::CInteger::I_int::CInteger::I_bool");
+       temp__3 := "i__storev"("u8", {{ l-nth(array_zip_iter_init__iter, 0i),
+                              (l-nth(array_zip_iter_init__iter, 1i) i+ 24i) }},
+                              none);
+       ret := undefined;
+  ret: return
+};
+
+
+proc main() {
+        temp__0 := [genv_getsymbol]("v1");
+        temp__1 := {{ l-nth(temp__0, 1i), 0i }};
+        temp__2 := "array_new"(temp__1);
+        temp__3 := [genv_getsymbol]("stat");
+        temp__4 := {{ l-nth(temp__3, 1i), 0i }};
+        temp__5 := "i__storev"("i32", temp__4, temp__2);
+        temp__6 := "m____nondet_int"();
+        main__1__n := temp__6;
+        assume (((! (main__1__n i<=# 2i)) /\ (main__1__n i<# 16i)));
+        main__1__last := undefined;
+        main__1__next_to_last := undefined;
+        main__1__1__i := 0i;
+  cc47: skip;
+        goto [(main__1__1__i i< main__1__n)] cc49 cc48;
+  cc49: temp__7 := "i__malloc"(4i);
+        main__1__1__1__a := temp__7;
+        temp__8 := [genv_getsymbol]("v1");
+        temp__9 := {{ l-nth(temp__8, 1i), 0i }};
+        temp__10 := "i__loadv"("u64", temp__9);
+        temp__11 := "array_add"(temp__10, main__1__1__1__a);
+        main__1__next_to_last := main__1__last;
+        main__1__last := main__1__1__1__a;
+        assert (((-2147483648i i<=# (main__1__1__i i+ 1i)) /\
+                ((main__1__1__i i+ 1i) i<=# 2147483647i)));
+        main__1__1__i := (main__1__1__i i+ 1i);
+        goto cc47;
+  cc48: skip;
+        temp__12 := [genv_getsymbol]("v1");
+        temp__13 := {{ l-nth(temp__12, 1i), 0i }};
+        temp__14 := "i__loadv"("u64", temp__13);
+        temp__15 := "array_remove"(temp__14, main__1__next_to_last, 0i);
+        temp__16 := [genv_getsymbol]("v1");
+        temp__17 := {{ l-nth(temp__16, 1i), 0i }};
+        temp__18 := "i__loadv"("u64", temp__17);
+        temp__19 := "array_size"(temp__18);
+        temp__20 := "i__binop_lowerthan_maybe_ptr"(temp__19, main__1__n);
+        assert ((temp__20 == true));
+        temp__21 := [genv_getsymbol]("v1");
+        temp__22 := {{ l-nth(temp__21, 1i), 0i }};
+        temp__23 := "i__loadv"("u64", temp__22);
+        temp__24 := "array_destroy"(temp__23);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_zip_iter_add(array_zip_iter_add__iter, array_zip_iter_add__e1, array_zip_iter_add__e2) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_zip_iter_add__iter, 0i),
+                               (l-nth(array_zip_iter_add__iter, 1i) i+ 16i) }});
+         temp__1 := "i__binop_add_maybe_ptr"(temp__0, 1i);
+         temp__2 := "i__storev"("u64",
+                                {{ l-nth(array_zip_iter_add__iter, 0i),
+                                (l-nth(array_zip_iter_add__iter, 1i) i+ 16i) }},
+                                temp__1);
+         array_zip_iter_add__1__index := temp__0;
+         temp__3 := "i__loadv"("u64", {{ l-nth(array_zip_iter_add__iter, 0i),
+                               l-nth(array_zip_iter_add__iter, 1i) }});
+         array_zip_iter_add__1__ar1 := temp__3;
+         temp__4 := "i__loadv"("u64", {{ l-nth(array_zip_iter_add__iter, 0i),
+                               (l-nth(array_zip_iter_add__iter, 1i) i+ 8i) }});
+         array_zip_iter_add__1__ar2 := temp__4;
+         temp__5 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_add__1__ar1, 0i),
+                               l-nth(array_zip_iter_add__1__ar1, 1i) }});
+         temp__6 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_add__1__ar1, 0i),
+                               (l-nth(array_zip_iter_add__1__ar1, 1i) i+ 8i) }});
+         temp__7 := "i__binop_equal_maybe_ptr"(temp__5, temp__6);
+         temp__8 := "expand_capacity"(array_zip_iter_add__1__ar1);
+         temp__9 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_add__1__ar2, 0i),
+                               l-nth(array_zip_iter_add__1__ar2, 1i) }});
+         temp__10 := "i__loadv"("u64",
+                                {{ l-nth(array_zip_iter_add__1__ar2, 0i),
+                                (l-nth(array_zip_iter_add__1__ar2, 1i) i+ 8i) }});
+         temp__11 := "i__binop_equal_maybe_ptr"(temp__9, temp__10);
+         temp__12 := "expand_capacity"(array_zip_iter_add__1__ar2);
+         goto [((temp__7 and (not (temp__8 = 0i))) or (temp__11 and (not (temp__12 = 0i))))] cc141 cc140;
+  cc141: ret := 1i;
+         goto ret;
+  cc140: skip;
+         temp__13 := "array_add_at"(array_zip_iter_add__1__ar1,
+                                    array_zip_iter_add__e1,
+                                    array_zip_iter_add__1__index);
+         temp__14 := "array_add_at"(array_zip_iter_add__1__ar2,
+                                    array_zip_iter_add__e2,
+                                    array_zip_iter_add__1__index);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_zip_iter_replace(array_zip_iter_replace__iter, array_zip_iter_replace__e1, array_zip_iter_replace__e2, array_zip_iter_replace__out1, array_zip_iter_replace__out2) {
+        temp__0 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_replace__iter, 0i),
+                              (l-nth(array_zip_iter_replace__iter, 1i) i+ 16i) }});
+        temp__1 := "i__binop_sub_maybe_ptr"(temp__0, 1i);
+        temp__2 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_replace__iter, 0i),
+                              l-nth(array_zip_iter_replace__iter, 1i) }});
+        temp__3 := "i__loadv"("u64", {{ l-nth(temp__2, 0i),
+                              l-nth(temp__2, 1i) }});
+        temp__4 := "i__binop_greatereq_maybe_ptr"(temp__1, temp__3);
+        temp__5 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_replace__iter, 0i),
+                              (l-nth(array_zip_iter_replace__iter, 1i) i+ 16i) }});
+        temp__6 := "i__binop_sub_maybe_ptr"(temp__5, 1i);
+        temp__7 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_replace__iter, 0i),
+                              (l-nth(array_zip_iter_replace__iter, 1i) i+ 8i) }});
+        temp__8 := "i__loadv"("u64", {{ l-nth(temp__7, 0i),
+                              l-nth(temp__7, 1i) }});
+        temp__9 := "i__binop_greatereq_maybe_ptr"(temp__6, temp__8);
+        goto [(temp__4 or temp__9)] cc51 cc50;
+  cc51: ret := 8i;
+        goto ret;
+  cc50: skip;
+        temp__10 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_replace__iter, 0i),
+                               l-nth(array_zip_iter_replace__iter, 1i) }});
+        temp__11 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_replace__iter, 0i),
+                               (l-nth(array_zip_iter_replace__iter, 1i) i+ 16i) }});
+        temp__12 := "i__binop_sub_maybe_ptr"(temp__11, 1i);
+        temp__13 := "array_replace_at"(temp__10, array_zip_iter_replace__e1,
+                                       temp__12, array_zip_iter_replace__out1);
+        temp__14 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_replace__iter, 0i),
+                               (l-nth(array_zip_iter_replace__iter, 1i) i+ 8i) }});
+        temp__15 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_replace__iter, 0i),
+                               (l-nth(array_zip_iter_replace__iter, 1i) i+ 16i) }});
+        temp__16 := "i__binop_sub_maybe_ptr"(temp__15, 1i);
+        temp__17 := "array_replace_at"(temp__14, array_zip_iter_replace__e2,
+                                       temp__16, array_zip_iter_replace__out2);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_zip_iter_next(array_zip_iter_next__iter, array_zip_iter_next__out1, array_zip_iter_next__out2) {
+         temp__0 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_next__iter, 0i),
+                               (l-nth(array_zip_iter_next__iter, 1i) i+ 16i) }});
+         temp__1 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_next__iter, 0i),
+                               l-nth(array_zip_iter_next__iter, 1i) }});
+         temp__2 := "i__loadv"("u64", {{ l-nth(temp__1, 0i),
+                               l-nth(temp__1, 1i) }});
+         temp__3 := "i__binop_greatereq_maybe_ptr"(temp__0, temp__2);
+         temp__4 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_next__iter, 0i),
+                               (l-nth(array_zip_iter_next__iter, 1i) i+ 16i) }});
+         temp__5 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_next__iter, 0i),
+                               (l-nth(array_zip_iter_next__iter, 1i) i+ 8i) }});
+         temp__6 := "i__loadv"("u64", {{ l-nth(temp__5, 0i),
+                               l-nth(temp__5, 1i) }});
+         temp__7 := "i__binop_greatereq_maybe_ptr"(temp__4, temp__6);
+         goto [(temp__3 or temp__7)] cc143 cc142;
+  cc143: ret := 9i;
+         goto ret;
+  cc142: skip;
+         temp__8 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_next__iter, 0i),
+                               l-nth(array_zip_iter_next__iter, 1i) }});
+         temp__9 := "i__loadv"("u64", {{ l-nth(temp__8, 0i),
+                               (l-nth(temp__8, 1i) i+ 24i) }});
+         temp__10 := "i__loadv"("u64",
+                                {{ l-nth(array_zip_iter_next__iter, 0i),
+                                (l-nth(array_zip_iter_next__iter, 1i) i+ 16i) }});
+         temp__11 := "i__binop_add_maybe_ptr"(temp__9, (temp__10 i* 8i));
+         temp__12 := "i__loadv"("u64", temp__11);
+         temp__13 := "i__storev"("u64", array_zip_iter_next__out1, temp__12);
+         temp__14 := "i__loadv"("u64",
+                                {{ l-nth(array_zip_iter_next__iter, 0i),
+                                (l-nth(array_zip_iter_next__iter, 1i) i+ 8i) }});
+         temp__15 := "i__loadv"("u64", {{ l-nth(temp__14, 0i),
+                                (l-nth(temp__14, 1i) i+ 24i) }});
+         temp__16 := "i__loadv"("u64",
+                                {{ l-nth(array_zip_iter_next__iter, 0i),
+                                (l-nth(array_zip_iter_next__iter, 1i) i+ 16i) }});
+         temp__17 := "i__binop_add_maybe_ptr"(temp__15, (temp__16 i* 8i));
+         temp__18 := "i__loadv"("u64", temp__17);
+         temp__19 := "i__storev"("u64", array_zip_iter_next__out2, temp__18);
+         temp__20 := "i__loadv"("u64",
+                                {{ l-nth(array_zip_iter_next__iter, 0i),
+                                (l-nth(array_zip_iter_next__iter, 1i) i+ 16i) }});
+         temp__21 := "i__binop_add_maybe_ptr"(temp__20, 1i);
+         temp__22 := "i__storev"("u64",
+                                 {{ l-nth(array_zip_iter_next__iter, 0i),
+                                 (l-nth(array_zip_iter_next__iter, 1i) i+ 16i) }},
+                                 temp__21);
+         fail [unhandled]("Cast::CInteger::I_int::CInteger::I_bool");
+         temp__23 := "i__storev"("u8",
+                                 {{ l-nth(array_zip_iter_next__iter, 0i),
+                                 (l-nth(array_zip_iter_next__iter, 1i) i+ 24i) }},
+                                 none);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc array_map(array_map__ar, array_map__fn) {
+        array_map__1__i := undefined;
+        array_map__1__i := 0i;
+  cc52: temp__0 := "i__loadv"("u64", {{ l-nth(array_map__ar, 0i),
+                              l-nth(array_map__ar, 1i) }});
+        temp__1 := "i__binop_lowerthan_maybe_ptr"(array_map__1__i, temp__0);
+        goto [temp__1] cc54 cc53;
+  cc54: temp__2 := "i__get_function_name"(array_map__fn);
+        temp__3 := "i__loadv"("u64", {{ l-nth(array_map__ar, 0i),
+                              (l-nth(array_map__ar, 1i) i+ 24i) }});
+        temp__4 := "i__binop_add_maybe_ptr"(temp__3, (array_map__1__i i* 8i));
+        temp__5 := "i__loadv"("u64", temp__4);
+        temp__6 := temp__2(temp__5);
+        temp__7 := "i__binop_add_maybe_ptr"(array_map__1__i, 1i);
+        array_map__1__i := temp__7;
+        goto cc52;
+  cc53: skip;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_remove_last(array_remove_last__ar, array_remove_last__out) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_remove_last__ar, 0i),
+                             l-nth(array_remove_last__ar, 1i) }});
+       temp__1 := "i__binop_sub_maybe_ptr"(temp__0, 1i);
+       temp__2 := "array_remove_at"(array_remove_last__ar, temp__1,
+                                    array_remove_last__out);
+       ret := temp__2;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_copy_shallow(array_copy_shallow__ar, array_copy_shallow__out) {
+        temp__0 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                              (l-nth(array_copy_shallow__ar, 1i) i+ 32i) }});
+        temp__1 := "i__get_function_name"(temp__0);
+        temp__2 := temp__1(56i);
+        array_copy_shallow__1__copy := temp__2;
+        temp__3 := "i__binop_notequal_maybe_ptr"(array_copy_shallow__1__copy,
+                                                 0i);
+        goto [(not temp__3)] cc60 cc59;
+  cc60: ret := 1i;
+        goto ret;
+  cc59: skip;
+        temp__4 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                              (l-nth(array_copy_shallow__ar, 1i) i+ 40i) }});
+        temp__5 := "i__get_function_name"(temp__4);
+        temp__6 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                              (l-nth(array_copy_shallow__ar, 1i) i+ 8i) }});
+        temp__7 := temp__5(temp__6, 8i);
+        temp__8 := "i__storev"("u64",
+                               {{ l-nth(array_copy_shallow__1__copy, 0i),
+                               (l-nth(array_copy_shallow__1__copy, 1i) i+ 24i) }},
+                               temp__7);
+        temp__9 := "i__binop_notequal_maybe_ptr"(temp__7, 0i);
+        goto [(not temp__9)] cc62 cc61;
+  cc62: temp__10 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 48i) }});
+        temp__11 := "i__get_function_name"(temp__10);
+        temp__12 := temp__11(array_copy_shallow__1__copy);
+        ret := 1i;
+        goto ret;
+  cc61: skip;
+        temp__13 := "i__loadv"("f32", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 16i) }});
+        temp__14 := "i__storev"("f32",
+                                {{ l-nth(array_copy_shallow__1__copy, 0i),
+                                (l-nth(array_copy_shallow__1__copy, 1i) i+ 16i) }},
+                                temp__13);
+        temp__15 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               l-nth(array_copy_shallow__ar, 1i) }});
+        temp__16 := "i__storev"("u64",
+                                {{ l-nth(array_copy_shallow__1__copy, 0i),
+                                l-nth(array_copy_shallow__1__copy, 1i) }},
+                                temp__15);
+        temp__17 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 8i) }});
+        temp__18 := "i__storev"("u64",
+                                {{ l-nth(array_copy_shallow__1__copy, 0i),
+                                (l-nth(array_copy_shallow__1__copy, 1i) i+ 8i) }},
+                                temp__17);
+        temp__19 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 32i) }});
+        temp__20 := "i__storev"("u64",
+                                {{ l-nth(array_copy_shallow__1__copy, 0i),
+                                (l-nth(array_copy_shallow__1__copy, 1i) i+ 32i) }},
+                                temp__19);
+        temp__21 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 40i) }});
+        temp__22 := "i__storev"("u64",
+                                {{ l-nth(array_copy_shallow__1__copy, 0i),
+                                (l-nth(array_copy_shallow__1__copy, 1i) i+ 40i) }},
+                                temp__21);
+        temp__23 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 48i) }});
+        temp__24 := "i__storev"("u64",
+                                {{ l-nth(array_copy_shallow__1__copy, 0i),
+                                (l-nth(array_copy_shallow__1__copy, 1i) i+ 48i) }},
+                                temp__23);
+        temp__25 := "i__loadv"("u64",
+                               {{ l-nth(array_copy_shallow__1__copy, 0i),
+                               (l-nth(array_copy_shallow__1__copy, 1i) i+ 24i) }});
+        temp__26 := "i__loadv"("u64", {{ l-nth(array_copy_shallow__ar, 0i),
+                               (l-nth(array_copy_shallow__ar, 1i) i+ 24i) }});
+        temp__27 := "i__loadv"("u64",
+                               {{ l-nth(array_copy_shallow__1__copy, 0i),
+                               l-nth(array_copy_shallow__1__copy, 1i) }});
+        assert (((0i i<=# (temp__27 i* 8i)) /\
+                ((temp__27 i* 8i) i<=# 18446744073709551615i)));
+        temp__28 := "i__memcpy"(temp__25, temp__26, (temp__27 i* 8i));
+        temp__29 := "i__storev"("u64", array_copy_shallow__out,
+                                array_copy_shallow__1__copy);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_zip_iter_remove(array_zip_iter_remove__iter, array_zip_iter_remove__out1, array_zip_iter_remove__out2) {
+        temp__0 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_remove__iter, 0i),
+                              (l-nth(array_zip_iter_remove__iter, 1i) i+ 16i) }});
+        temp__1 := "i__binop_sub_maybe_ptr"(temp__0, 1i);
+        temp__2 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_remove__iter, 0i),
+                              l-nth(array_zip_iter_remove__iter, 1i) }});
+        temp__3 := "i__loadv"("u64", {{ l-nth(temp__2, 0i),
+                              l-nth(temp__2, 1i) }});
+        temp__4 := "i__binop_greatereq_maybe_ptr"(temp__1, temp__3);
+        temp__5 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_remove__iter, 0i),
+                              (l-nth(array_zip_iter_remove__iter, 1i) i+ 16i) }});
+        temp__6 := "i__binop_sub_maybe_ptr"(temp__5, 1i);
+        temp__7 := "i__loadv"("u64",
+                              {{ l-nth(array_zip_iter_remove__iter, 0i),
+                              (l-nth(array_zip_iter_remove__iter, 1i) i+ 8i) }});
+        temp__8 := "i__loadv"("u64", {{ l-nth(temp__7, 0i),
+                              l-nth(temp__7, 1i) }});
+        temp__9 := "i__binop_greatereq_maybe_ptr"(temp__6, temp__8);
+        goto [(temp__4 or temp__9)] cc56 cc55;
+  cc56: ret := 8i;
+        goto ret;
+  cc55: skip;
+        temp__10 := "i__loadv"("u8",
+                               {{ l-nth(array_zip_iter_remove__iter, 0i),
+                               (l-nth(array_zip_iter_remove__iter, 1i) i+ 24i) }});
+        goto [(not (not (temp__10 = 0i)))] cc58 cc57;
+  cc58: temp__11 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_remove__iter, 0i),
+                               l-nth(array_zip_iter_remove__iter, 1i) }});
+        temp__12 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_remove__iter, 0i),
+                               (l-nth(array_zip_iter_remove__iter, 1i) i+ 16i) }});
+        temp__13 := "i__binop_sub_maybe_ptr"(temp__12, 1i);
+        temp__14 := "array_remove_at"(temp__11, temp__13,
+                                      array_zip_iter_remove__out1);
+        temp__15 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_remove__iter, 0i),
+                               (l-nth(array_zip_iter_remove__iter, 1i) i+ 8i) }});
+        temp__16 := "i__loadv"("u64",
+                               {{ l-nth(array_zip_iter_remove__iter, 0i),
+                               (l-nth(array_zip_iter_remove__iter, 1i) i+ 16i) }});
+        temp__17 := "i__binop_sub_maybe_ptr"(temp__16, 1i);
+        temp__18 := "array_remove_at"(temp__15, temp__17,
+                                      array_zip_iter_remove__out2);
+        fail [unhandled]("Cast::CInteger::I_int::CInteger::I_bool");
+        temp__19 := "i__storev"("u8",
+                                {{ l-nth(array_zip_iter_remove__iter, 0i),
+                                (l-nth(array_zip_iter_remove__iter, 1i) i+ 24i) }},
+                                none);
+        ret := 0i;
+        goto ret;
+  cc57: skip;
+        ret := 7i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_get_buffer(array_get_buffer__ar) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_get_buffer__ar, 0i),
+                             (l-nth(array_get_buffer__ar, 1i) i+ 24i) }});
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_get_at(array_get_at__ar, array_get_at__index, array_get_at__out) {
+        temp__0 := "i__loadv"("u64", {{ l-nth(array_get_at__ar, 0i),
+                              l-nth(array_get_at__ar, 1i) }});
+        temp__1 := "i__binop_greatereq_maybe_ptr"(array_get_at__index,
+                                                  temp__0);
+        goto [temp__1] cc64 cc63;
+  cc64: ret := 8i;
+        goto ret;
+  cc63: skip;
+        temp__2 := "i__loadv"("u64", {{ l-nth(array_get_at__ar, 0i),
+                              (l-nth(array_get_at__ar, 1i) i+ 24i) }});
+        temp__3 := "i__binop_add_maybe_ptr"(temp__2,
+                                            (array_get_at__index i* 8i));
+        temp__4 := "i__loadv"("u64", temp__3);
+        temp__5 := "i__storev"("u64", array_get_at__out, temp__4);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_iter_init(array_iter_init__iter, array_iter_init__ar) {
+       temp__0 := "i__storev"("u64", {{ l-nth(array_iter_init__iter, 0i),
+                              l-nth(array_iter_init__iter, 1i) }},
+                              array_iter_init__ar);
+       temp__1 := "i__storev"("u64", {{ l-nth(array_iter_init__iter, 0i),
+                              (l-nth(array_iter_init__iter, 1i) i+ 8i) }}, 0i);
+       fail [unhandled]("Cast::CInteger::I_int::CInteger::I_bool");
+       temp__2 := "i__storev"("u8", {{ l-nth(array_iter_init__iter, 0i),
+                              (l-nth(array_iter_init__iter, 1i) i+ 16i) }},
+                              none);
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_conf_init(array_conf_init__conf) {
+       temp__0 := "i__storev"("f32", {{ l-nth(array_conf_init__conf, 0i),
+                              (l-nth(array_conf_init__conf, 1i) i+ 8i) }},
+                              (as_num 2i));
+       temp__1 := "i__storev"("u64", {{ l-nth(array_conf_init__conf, 0i),
+                              l-nth(array_conf_init__conf, 1i) }}, 8i);
+       temp__2 := [genv_getsymbol]("malloc");
+       temp__3 := {{ l-nth(temp__2, 1i), 0i }};
+       temp__4 := "i__storev"("u64", {{ l-nth(array_conf_init__conf, 0i),
+                              (l-nth(array_conf_init__conf, 1i) i+ 16i) }},
+                              temp__3);
+       temp__5 := [genv_getsymbol]("calloc");
+       temp__6 := {{ l-nth(temp__5, 1i), 0i }};
+       temp__7 := "i__storev"("u64", {{ l-nth(array_conf_init__conf, 0i),
+                              (l-nth(array_conf_init__conf, 1i) i+ 24i) }},
+                              temp__6);
+       temp__8 := [genv_getsymbol]("free");
+       temp__9 := {{ l-nth(temp__8, 1i), 0i }};
+       temp__10 := "i__storev"("u64", {{ l-nth(array_conf_init__conf, 0i),
+                               (l-nth(array_conf_init__conf, 1i) i+ 32i) }},
+                               temp__9);
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_iter_next(array_iter_next__iter, array_iter_next__out) {
+        temp__0 := "i__loadv"("u64", {{ l-nth(array_iter_next__iter, 0i),
+                              (l-nth(array_iter_next__iter, 1i) i+ 8i) }});
+        temp__1 := "i__loadv"("u64", {{ l-nth(array_iter_next__iter, 0i),
+                              l-nth(array_iter_next__iter, 1i) }});
+        temp__2 := "i__loadv"("u64", {{ l-nth(temp__1, 0i),
+                              l-nth(temp__1, 1i) }});
+        temp__3 := "i__binop_greatereq_maybe_ptr"(temp__0, temp__2);
+        goto [temp__3] cc66 cc65;
+  cc66: ret := 9i;
+        goto ret;
+  cc65: skip;
+        temp__4 := "i__loadv"("u64", {{ l-nth(array_iter_next__iter, 0i),
+                              l-nth(array_iter_next__iter, 1i) }});
+        temp__5 := "i__loadv"("u64", {{ l-nth(temp__4, 0i),
+                              (l-nth(temp__4, 1i) i+ 24i) }});
+        temp__6 := "i__loadv"("u64", {{ l-nth(array_iter_next__iter, 0i),
+                              (l-nth(array_iter_next__iter, 1i) i+ 8i) }});
+        temp__7 := "i__binop_add_maybe_ptr"(temp__5, (temp__6 i* 8i));
+        temp__8 := "i__loadv"("u64", temp__7);
+        temp__9 := "i__storev"("u64", array_iter_next__out, temp__8);
+        temp__10 := "i__loadv"("u64", {{ l-nth(array_iter_next__iter, 0i),
+                               (l-nth(array_iter_next__iter, 1i) i+ 8i) }});
+        temp__11 := "i__binop_add_maybe_ptr"(temp__10, 1i);
+        temp__12 := "i__storev"("u64", {{ l-nth(array_iter_next__iter, 0i),
+                                (l-nth(array_iter_next__iter, 1i) i+ 8i) }},
+                                temp__11);
+        fail [unhandled]("Cast::CInteger::I_int::CInteger::I_bool");
+        temp__13 := "i__storev"("u8", {{ l-nth(array_iter_next__iter, 0i),
+                                (l-nth(array_iter_next__iter, 1i) i+ 16i) }},
+                                none);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_iter_add(array_iter_add__iter, array_iter_add__element) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_iter_add__iter, 0i),
+                             l-nth(array_iter_add__iter, 1i) }});
+       temp__1 := "i__loadv"("u64", {{ l-nth(array_iter_add__iter, 0i),
+                             (l-nth(array_iter_add__iter, 1i) i+ 8i) }});
+       temp__2 := "i__binop_add_maybe_ptr"(temp__1, 1i);
+       temp__3 := "i__storev"("u64", {{ l-nth(array_iter_add__iter, 0i),
+                              (l-nth(array_iter_add__iter, 1i) i+ 8i) }},
+                              temp__2);
+       temp__4 := "array_add_at"(temp__0, array_iter_add__element, temp__1);
+       ret := temp__4;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_reverse(array_reverse__ar) {
+        array_reverse__1__i := undefined;
+        array_reverse__1__j := undefined;
+        array_reverse__1__i := 0i;
+        temp__0 := "i__loadv"("u64", {{ l-nth(array_reverse__ar, 0i),
+                              l-nth(array_reverse__ar, 1i) }});
+        temp__1 := "i__binop_sub_maybe_ptr"(temp__0, 1i);
+        array_reverse__1__j := temp__1;
+  cc67: temp__2 := "i__loadv"("u64", {{ l-nth(array_reverse__ar, 0i),
+                              l-nth(array_reverse__ar, 1i) }});
+        temp__3 := "i__binop_sub_maybe_ptr"(temp__2, 1i);
+        assert (((0i i<=# (temp__3 i/ 2i)) /\
+                ((temp__3 i/ 2i) i<=# 18446744073709551615i)));
+        temp__4 := "i__binop_lowerthan_maybe_ptr"(array_reverse__1__i,
+                                                  (temp__3 i/ 2i));
+        goto [temp__4] cc69 cc68;
+  cc69: temp__5 := "i__loadv"("u64", {{ l-nth(array_reverse__ar, 0i),
+                              (l-nth(array_reverse__ar, 1i) i+ 24i) }});
+        temp__6 := "i__binop_add_maybe_ptr"(temp__5,
+                                            (array_reverse__1__i i* 8i));
+        temp__7 := "i__loadv"("u64", temp__6);
+        array_reverse__1__1__1__tmp := temp__7;
+        temp__8 := "i__loadv"("u64", {{ l-nth(array_reverse__ar, 0i),
+                              (l-nth(array_reverse__ar, 1i) i+ 24i) }});
+        temp__9 := "i__binop_add_maybe_ptr"(temp__8,
+                                            (array_reverse__1__j i* 8i));
+        temp__10 := "i__loadv"("u64", temp__9);
+        temp__11 := "i__loadv"("u64", {{ l-nth(array_reverse__ar, 0i),
+                               (l-nth(array_reverse__ar, 1i) i+ 24i) }});
+        temp__12 := "i__binop_add_maybe_ptr"(temp__11,
+                                             (array_reverse__1__i i* 8i));
+        temp__13 := "i__storev"("u64", temp__12, temp__10);
+        temp__14 := "i__loadv"("u64", {{ l-nth(array_reverse__ar, 0i),
+                               (l-nth(array_reverse__ar, 1i) i+ 24i) }});
+        temp__15 := "i__binop_add_maybe_ptr"(temp__14,
+                                             (array_reverse__1__j i* 8i));
+        temp__16 := "i__storev"("u64", temp__15, array_reverse__1__1__1__tmp);
+        temp__17 := "i__binop_add_maybe_ptr"(array_reverse__1__i, 1i);
+        array_reverse__1__i := temp__17;
+        temp__18 := "i__binop_sub_maybe_ptr"(array_reverse__1__j, 1i);
+        array_reverse__1__j := temp__18;
+        goto cc67;
+  cc68: skip;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_remove_all(array_remove_all__ar) {
+       temp__0 := "i__storev"("u64", {{ l-nth(array_remove_all__ar, 0i),
+                              l-nth(array_remove_all__ar, 1i) }}, 0i);
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_add(array_add__ar, array_add__element) {
+        temp__0 := "i__loadv"("u64", {{ l-nth(array_add__ar, 0i),
+                              l-nth(array_add__ar, 1i) }});
+        temp__1 := "i__loadv"("u64", {{ l-nth(array_add__ar, 0i),
+                              (l-nth(array_add__ar, 1i) i+ 8i) }});
+        temp__2 := "i__binop_greatereq_maybe_ptr"(temp__0, temp__1);
+        goto [temp__2] cc73 cc72;
+  cc73: temp__3 := "expand_capacity"(array_add__ar);
+        array_add__1__1__status := temp__3;
+        goto [(not (array_add__1__1__status = 0i))] cc71 cc70;
+  cc71: ret := array_add__1__1__status;
+        goto ret;
+  cc70: skip;
+  cc72: skip;
+        temp__4 := "i__loadv"("u64", {{ l-nth(array_add__ar, 0i),
+                              (l-nth(array_add__ar, 1i) i+ 24i) }});
+        temp__5 := "i__loadv"("u64", {{ l-nth(array_add__ar, 0i),
+                              l-nth(array_add__ar, 1i) }});
+        temp__6 := "i__binop_add_maybe_ptr"(temp__4, (temp__5 i* 8i));
+        temp__7 := "i__storev"("u64", temp__6, array_add__element);
+        temp__8 := "i__loadv"("u64", {{ l-nth(array_add__ar, 0i),
+                              l-nth(array_add__ar, 1i) }});
+        temp__9 := "i__binop_add_maybe_ptr"(temp__8, 1i);
+        temp__10 := "i__storev"("u64", {{ l-nth(array_add__ar, 0i),
+                                l-nth(array_add__ar, 1i) }}, temp__9);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_copy_deep(array_copy_deep__ar, array_copy_deep__cp, array_copy_deep__out) {
+         temp__0 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                               (l-nth(array_copy_deep__ar, 1i) i+ 32i) }});
+         temp__1 := "i__get_function_name"(temp__0);
+         temp__2 := temp__1(56i);
+         array_copy_deep__1__copy := temp__2;
+         temp__3 := "i__binop_notequal_maybe_ptr"(array_copy_deep__1__copy,
+                                                  0i);
+         goto [(not temp__3)] cc145 cc144;
+  cc145: ret := 1i;
+         goto ret;
+  cc144: skip;
+         temp__4 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                               (l-nth(array_copy_deep__ar, 1i) i+ 40i) }});
+         temp__5 := "i__get_function_name"(temp__4);
+         temp__6 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                               (l-nth(array_copy_deep__ar, 1i) i+ 8i) }});
+         temp__7 := temp__5(temp__6, 8i);
+         temp__8 := "i__storev"("u64",
+                                {{ l-nth(array_copy_deep__1__copy, 0i),
+                                (l-nth(array_copy_deep__1__copy, 1i) i+ 24i) }},
+                                temp__7);
+         temp__9 := "i__binop_notequal_maybe_ptr"(temp__7, 0i);
+         goto [(not temp__9)] cc147 cc146;
+  cc147: temp__10 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 48i) }});
+         temp__11 := "i__get_function_name"(temp__10);
+         temp__12 := temp__11(array_copy_deep__1__copy);
+         ret := 1i;
+         goto ret;
+  cc146: skip;
+         temp__13 := "i__loadv"("f32", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 16i) }});
+         temp__14 := "i__storev"("f32",
+                                 {{ l-nth(array_copy_deep__1__copy, 0i),
+                                 (l-nth(array_copy_deep__1__copy, 1i) i+ 16i) }},
+                                 temp__13);
+         temp__15 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                l-nth(array_copy_deep__ar, 1i) }});
+         temp__16 := "i__storev"("u64",
+                                 {{ l-nth(array_copy_deep__1__copy, 0i),
+                                 l-nth(array_copy_deep__1__copy, 1i) }},
+                                 temp__15);
+         temp__17 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 8i) }});
+         temp__18 := "i__storev"("u64",
+                                 {{ l-nth(array_copy_deep__1__copy, 0i),
+                                 (l-nth(array_copy_deep__1__copy, 1i) i+ 8i) }},
+                                 temp__17);
+         temp__19 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 32i) }});
+         temp__20 := "i__storev"("u64",
+                                 {{ l-nth(array_copy_deep__1__copy, 0i),
+                                 (l-nth(array_copy_deep__1__copy, 1i) i+ 32i) }},
+                                 temp__19);
+         temp__21 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 40i) }});
+         temp__22 := "i__storev"("u64",
+                                 {{ l-nth(array_copy_deep__1__copy, 0i),
+                                 (l-nth(array_copy_deep__1__copy, 1i) i+ 40i) }},
+                                 temp__21);
+         temp__23 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 48i) }});
+         temp__24 := "i__storev"("u64",
+                                 {{ l-nth(array_copy_deep__1__copy, 0i),
+                                 (l-nth(array_copy_deep__1__copy, 1i) i+ 48i) }},
+                                 temp__23);
+         array_copy_deep__1__i := undefined;
+         array_copy_deep__1__i := 0i;
+  cc148: temp__25 := "i__loadv"("u64",
+                                {{ l-nth(array_copy_deep__1__copy, 0i),
+                                l-nth(array_copy_deep__1__copy, 1i) }});
+         temp__26 := "i__binop_lowerthan_maybe_ptr"(array_copy_deep__1__i,
+                                                    temp__25);
+         goto [temp__26] cc150 cc149;
+  cc150: temp__27 := "i__get_function_name"(array_copy_deep__cp);
+         temp__28 := "i__loadv"("u64", {{ l-nth(array_copy_deep__ar, 0i),
+                                (l-nth(array_copy_deep__ar, 1i) i+ 24i) }});
+         temp__29 := "i__binop_add_maybe_ptr"(temp__28,
+                                              (array_copy_deep__1__i i* 8i));
+         temp__30 := "i__loadv"("u64", temp__29);
+         temp__31 := temp__27(temp__30);
+         temp__32 := "i__loadv"("u64",
+                                {{ l-nth(array_copy_deep__1__copy, 0i),
+                                (l-nth(array_copy_deep__1__copy, 1i) i+ 24i) }});
+         temp__33 := "i__binop_add_maybe_ptr"(temp__32,
+                                              (array_copy_deep__1__i i* 8i));
+         temp__34 := "i__storev"("u64", temp__33, temp__31);
+         temp__35 := "i__binop_add_maybe_ptr"(array_copy_deep__1__i, 1i);
+         array_copy_deep__1__i := temp__35;
+         goto cc148;
+  cc149: skip;
+         temp__36 := "i__storev"("u64", array_copy_deep__out,
+                                 array_copy_deep__1__copy);
+         ret := 0i;
+         goto ret;
+         ret := undefined;
+  ret:   return
+};
+
+
+proc strcmp(i__empty, i__empty) {
+       temp__0 := fresh_svar();
+       assume_type (temp__0, Int);
+       assume (((-2147483648i i<=# temp__0) /\ (temp__0 i<=# 2147483647i)));
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc "__CPROVER_assume"(i__empty) {
+       ret := null;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_contains(array_contains__ar, array_contains__element) {
+       temp__0 := [genv_getsymbol]("cc_common_cmp_ptr");
+       temp__1 := {{ l-nth(temp__0, 1i), 0i }};
+       temp__2 := "array_contains_value"(array_contains__ar,
+                                         array_contains__element, temp__1);
+       ret := temp__2;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_contains_value(array_contains_value__ar, array_contains_value__element, array_contains_value__cmp) {
+        array_contains_value__1__o := 0i;
+        array_contains_value__1__i := undefined;
+        array_contains_value__1__i := 0i;
+  cc74: temp__0 := "i__loadv"("u64", {{ l-nth(array_contains_value__ar, 0i),
+                              l-nth(array_contains_value__ar, 1i) }});
+        temp__1 := "i__binop_lowerthan_maybe_ptr"(array_contains_value__1__i,
+                                                  temp__0);
+        goto [temp__1] cc78 cc75;
+  cc78: temp__2 := "i__get_function_name"(array_contains_value__cmp);
+        temp__3 := "i__loadv"("u64", {{ l-nth(array_contains_value__ar, 0i),
+                              (l-nth(array_contains_value__ar, 1i) i+ 24i) }});
+        temp__4 := "i__binop_add_maybe_ptr"(temp__3,
+                                            (array_contains_value__1__i i* 8i));
+        temp__5 := "i__loadv"("u64", temp__4);
+        temp__6 := temp__2(array_contains_value__element, temp__5);
+        goto [(temp__6 = 0i)] cc77 cc76;
+  cc77: temp__7 := "i__binop_add_maybe_ptr"(array_contains_value__1__o, 1i);
+        array_contains_value__1__o := temp__7;
+  cc76: skip;
+        temp__8 := "i__binop_add_maybe_ptr"(array_contains_value__1__i, 1i);
+        array_contains_value__1__i := temp__8;
+        goto cc74;
+  cc75: skip;
+        ret := array_contains_value__1__o;
+        goto ret;
+        ret := undefined;
+  ret:  return
+};
+
+
+proc array_subarray(array_subarray__ar, array_subarray__b, array_subarray__e, array_subarray__out) {
+        temp__2 := [mem_alloc](0i, 8i);
+        temp__3 := "i__storev"("u64", {{ l-nth(temp__2, 0i), 0i }},
+                               array_subarray__ar);
+        array_subarray__ar := {{ l-nth(temp__2, 0i), 0i }};
+        temp__4 := [mem_alloc](0i, 8i);
+        temp__5 := "i__storev"("u64", {{ l-nth(temp__4, 0i), 0i }},
+                               array_subarray__b);
+        array_subarray__b := {{ l-nth(temp__4, 0i), 0i }};
+        temp__6 := "i__loadv"("u64", array_subarray__b);
+        temp__7 := "i__binop_greaterthan_maybe_ptr"(temp__6,
+                                                    array_subarray__e);
+        temp__8 := "i__loadv"("u64", array_subarray__ar);
+        temp__9 := "i__loadv"("u64", {{ l-nth(temp__8, 0i),
+                              l-nth(temp__8, 1i) }});
+        temp__10 := "i__binop_greatereq_maybe_ptr"(array_subarray__e, temp__9);
+        goto [(temp__7 or temp__10)] cc80 cc79;
+  cc80: ret := 3i;
+        goto ret;
+  cc79: skip;
+        temp__11 := "i__loadv"("u64", array_subarray__ar);
+        temp__12 := "i__loadv"("u64", {{ l-nth(temp__11, 0i),
+                               (l-nth(temp__11, 1i) i+ 40i) }});
+        temp__13 := "i__get_function_name"(temp__12);
+        temp__14 := temp__13(1i, 56i);
+        array_subarray__1__sub_ar := temp__14;
+        temp__15 := "i__binop_notequal_maybe_ptr"(array_subarray__1__sub_ar,
+                                                  0i);
+        goto [(not temp__15)] cc82 cc81;
+  cc82: ret := 1i;
+        goto ret;
+  cc81: skip;
+        temp__16 := "i__loadv"("u64", array_subarray__ar);
+        temp__17 := "i__loadv"("u64", {{ l-nth(temp__16, 0i),
+                               (l-nth(temp__16, 1i) i+ 32i) }});
+        temp__18 := "i__get_function_name"(temp__17);
+        temp__19 := "i__loadv"("u64", array_subarray__ar);
+        temp__20 := "i__loadv"("u64", {{ l-nth(temp__19, 0i),
+                               (l-nth(temp__19, 1i) i+ 8i) }});
+        assert (((0i i<=# (temp__20 i* 8i)) /\
+                ((temp__20 i* 8i) i<=# 18446744073709551615i)));
+        temp__21 := temp__18((temp__20 i* 8i));
+        temp__22 := "i__storev"("u64",
+                                {{ l-nth(array_subarray__1__sub_ar, 0i),
+                                (l-nth(array_subarray__1__sub_ar, 1i) i+ 24i) }},
+                                temp__21);
+        temp__23 := "i__binop_notequal_maybe_ptr"(temp__21, 0i);
+        goto [(not temp__23)] cc84 cc83;
+  cc84: temp__24 := "i__loadv"("u64", array_subarray__ar);
+        temp__25 := "i__loadv"("u64", {{ l-nth(temp__24, 0i),
+                               (l-nth(temp__24, 1i) i+ 48i) }});
+        temp__26 := "i__get_function_name"(temp__25);
+        temp__27 := temp__26(array_subarray__1__sub_ar);
+        ret := 1i;
+        goto ret;
+  cc83: skip;
+        temp__28 := "i__loadv"("u64", array_subarray__ar);
+        temp__29 := "i__loadv"("u64", {{ l-nth(temp__28, 0i),
+                               (l-nth(temp__28, 1i) i+ 32i) }});
+        temp__30 := "i__storev"("u64",
+                                {{ l-nth(array_subarray__1__sub_ar, 0i),
+                                (l-nth(array_subarray__1__sub_ar, 1i) i+ 32i) }},
+                                temp__29);
+        temp__31 := "i__loadv"("u64", array_subarray__ar);
+        temp__32 := "i__loadv"("u64", {{ l-nth(temp__31, 0i),
+                               (l-nth(temp__31, 1i) i+ 40i) }});
+        temp__33 := "i__storev"("u64",
+                                {{ l-nth(array_subarray__1__sub_ar, 0i),
+                                (l-nth(array_subarray__1__sub_ar, 1i) i+ 40i) }},
+                                temp__32);
+        temp__34 := "i__loadv"("u64", array_subarray__ar);
+        temp__35 := "i__loadv"("u64", {{ l-nth(temp__34, 0i),
+                               (l-nth(temp__34, 1i) i+ 48i) }});
+        temp__36 := "i__storev"("u64",
+                                {{ l-nth(array_subarray__1__sub_ar, 0i),
+                                (l-nth(array_subarray__1__sub_ar, 1i) i+ 48i) }},
+                                temp__35);
+        temp__37 := "i__loadv"("u64", array_subarray__b);
+        temp__38 := "i__binop_sub_maybe_ptr"(array_subarray__e, temp__37);
+        temp__39 := "i__binop_add_maybe_ptr"(temp__38, 1i);
+        temp__40 := "i__storev"("u64",
+                                {{ l-nth(array_subarray__1__sub_ar, 0i),
+                                l-nth(array_subarray__1__sub_ar, 1i) }},
+                                temp__39);
+        temp__41 := "i__loadv"("u64",
+                               {{ l-nth(array_subarray__1__sub_ar, 0i),
+                               l-nth(array_subarray__1__sub_ar, 1i) }});
+        temp__42 := "i__storev"("u64",
+                                {{ l-nth(array_subarray__1__sub_ar, 0i),
+                                (l-nth(array_subarray__1__sub_ar, 1i) i+ 8i) }},
+                                temp__41);
+        temp__43 := "i__loadv"("u64",
+                               {{ l-nth(array_subarray__1__sub_ar, 0i),
+                               (l-nth(array_subarray__1__sub_ar, 1i) i+ 24i) }});
+        temp__44 := "i__loadv"("u64", array_subarray__ar);
+        temp__45 := "i__loadv"("u64", {{ l-nth(temp__44, 0i),
+                               (l-nth(temp__44, 1i) i+ 24i) }});
+        temp__46 := "i__loadv"("u64", array_subarray__b);
+        temp__47 := "i__binop_add_maybe_ptr"(temp__45, (temp__46 i* 8i));
+        temp__48 := "i__loadv"("u64", temp__47);
+        temp__49 := "i__loadv"("u64",
+                               {{ l-nth(array_subarray__1__sub_ar, 0i),
+                               l-nth(array_subarray__1__sub_ar, 1i) }});
+        assert (((0i i<=# (temp__49 i* 8i)) /\
+                ((temp__49 i* 8i) i<=# 18446744073709551615i)));
+        temp__50 := "i__memcpy"(temp__43, temp__47, (temp__49 i* 8i));
+        temp__51 := "i__storev"("u64", array_subarray__out,
+                                array_subarray__1__sub_ar);
+        ret := 0i;
+        goto ret;
+        ret := undefined;
+  ret:  temp__0 := [mem_free](l-nth(array_subarray__ar, 0i), 0i, 8i);
+        temp__1 := [mem_free](l-nth(array_subarray__b, 0i), 0i, 8i);
+        return
+};
+
+
+proc cc_common_cmp_str(cc_common_cmp_str__str1, cc_common_cmp_str__str2) {
+       temp__0 := "strcmp"(cc_common_cmp_str__str1, cc_common_cmp_str__str2);
+       ret := temp__0;
+       goto ret;
+       ret := undefined;
+  ret: return
+};
+
+
+proc array_zip_iter_index(array_zip_iter_index__iter) {
+       temp__0 := "i__loadv"("u64", {{ l-nth(array_zip_iter_index__iter, 0i),
+                             (l-nth(array_zip_iter_index__iter, 1i) i+ 16i) }});
+       temp__1 := "i__binop_sub_maybe_ptr"(temp__0, 1i);
+       ret := temp__1;
+       goto ret;
+       ret := undefined;
+  ret: return
+};

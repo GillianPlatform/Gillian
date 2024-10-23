@@ -70,7 +70,8 @@ struct
     let () = PC.initialize Concrete in
     let e_prog, init_data = parse_eprog files already_compiled in
     let () =
-      burn_gil ~init_data:(ID.to_yojson init_data) ~pp_prog:Prog.pp_labeled
+      burn_gil ~init_data:(ID.to_yojson init_data)
+        ~pp_prog:(Prog.pp_labeled ?pp_annot:None)
         e_prog outfile_opt
     in
     let prog =

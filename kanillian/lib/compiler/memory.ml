@@ -19,11 +19,12 @@ let rec chunk_for_type ~(ctx : Ctx.t) (t : GType.t) : Chunk.t option =
         Chunk.of_int_type ~signed:true ~size:ctx.machine.pointer_width
     | Signedbv { width } -> Chunk.of_int_type ~signed:true ~size:width
     | Unsignedbv { width } -> Chunk.of_int_type ~signed:false ~size:width
+    | Enum _ -> chunk_for_type ~ctx (Signedbv { width = 32 })
     | Float -> Some F32
     | Double -> Some F64
     | Pointer _ ->
         Chunk.of_int_type ~signed:false ~size:ctx.machine.pointer_width
-    | StructTag t -> chunk_for_type ~ctx (Ctx.tag_lookup ctx t)
+    | StructTag t | EnumTag t -> chunk_for_type ~ctx (Ctx.tag_lookup ctx t)
     | Struct { components; _ } ->
         Option.bind (Ctx.one_representable_field ctx components) (fun (_, ty) ->
             chunk_for_type ~ctx ty)

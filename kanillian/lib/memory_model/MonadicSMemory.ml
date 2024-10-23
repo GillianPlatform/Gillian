@@ -987,7 +987,7 @@ module Lift = struct
              SHeapTree.Lift.get_variable ~make_node ~loc tree)
       |> List.of_seq
     in
-    Debugger_log.log (fun fmt ->
+    Debugger_log.log ~v:true (fun fmt ->
         fmt "There are %d heap vars" (List.length heap_vars));
     Hashtbl.replace variables heap_id heap_vars;
     Variable.

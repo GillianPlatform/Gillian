@@ -14,7 +14,9 @@ module type Make = functor
         and type tl_ast = PC.tl_ast
         and type memory_error = SMemory.err_t
         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-        and type annot = PC.Annot.t)
+        and type annot = PC.Annot.t
+        and type init_data = PC.init_data
+        and type pc_err = PC.err)
   (V : Verifier.S with type annot = PC.Annot.t)
   ->
   Lifter.S
@@ -23,6 +25,8 @@ module type Make = functor
      and type memory_error = SMemory.err_t
      and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
      and type annot = PC.Annot.t
+     and type init_data = PC.init_data
+     and type pc_err = PC.err
 
 module type Intf = sig
   (** A {!Gil_lifter}, along with a function to get its state *)

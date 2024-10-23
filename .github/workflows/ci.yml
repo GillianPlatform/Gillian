@@ -308,7 +308,7 @@ jobs:
         env:
             cache-name: cache-ocaml
         with:
-          path: _opam
+          path: .docker_opam_cache
           key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
             docker-${{ env.cache-name }}-ocaml-5.2.0
@@ -318,14 +318,15 @@ jobs:
           context: .
           load: true
           tags: ${{ env.DOCKER_TEST_TAG }}
+          target: test
       - name: Dune test
         run: docker run --rm ${{ env.DOCKER_TEST_TAG }} opam exec -- dune test
       - name: Extract cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
-          rm -rf _opam
+          rm -rf .docker_opam_cache
           docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "opam clean"
-          docker cp deps:/home/opam/.opam/5.2 ./
+          docker cp deps:/home/opam/.opam/5.2 ./.docker_opam_cache
           docker rm deps
 
   deploy-docs:
