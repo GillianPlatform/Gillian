@@ -157,9 +157,11 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
   let () = init_decls := recognizer_defs @ (decl :: !init_decls) in
   atom name
 
-let mk_fun_decl name param_types result_type =
+let mk_fun_decl name (* param_types result_type *) =
+  (*
   let decl = declare_fun name param_types result_type in
   let () = init_decls := decl :: !init_decls in
+  *)
   atom name
 
 module Type_operations = struct
@@ -261,13 +263,13 @@ module Ext_lit_operations = struct
 end
 
 module Axiomatised_operations = struct
-  let slen = mk_fun_decl "s-len" [ t_int ] t_real
-  let llen = mk_fun_decl "l-len" [ t_gil_literal_list ] t_int
-  let num2str = mk_fun_decl "num2str" [ t_real ] t_int
-  let str2num = mk_fun_decl "str2num" [ t_int ] t_real
-  let num2int = mk_fun_decl "num2int" [ t_real ] t_real
-  let snth = mk_fun_decl "s-nth" [ t_int; t_real ] t_int
-  let lrev = mk_fun_decl "l-rev" [ t_gil_literal_list ] t_gil_literal_list
+  let slen = mk_fun_decl "s-len" (* [ t_int ] t_real *)
+  let llen = mk_fun_decl "l-len" (* [ t_gil_literal_list ] t_int *)
+  let num2str = mk_fun_decl "num2str" (* [ t_real ] t_int *)
+  let str2num = mk_fun_decl "str2num" (* [ t_int ] t_real *)
+  let num2int = mk_fun_decl "num2int" (* [ t_real ] t_real *)
+  let snth = mk_fun_decl "s-nth" (* [ t_int; t_real ] t_int *)
+  let lrev = mk_fun_decl "l-rev" (* [ t_gil_literal_list ] t_gil_literal_list *)
 end
 
 let t_gil_ext_literal = Ext_lit_operations.t_gil_ext_literal
@@ -1061,12 +1063,15 @@ let lift_model
     (gamma : typenv)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  let model_eval = (model_eval z3 model).eval [] in
+  (* let model_eval = (model_eval z3 model).eval [] in *)
+  let () = reset_solver () in
+  let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
     try
       let x = x |> sanitize_identifier |> atom in
-      model_eval (atom "get-value" <| x) |> Option.some
+      (* model_eval (atom "get-value" <| x) |> Option.some *)
+      model_eval (* (atom "get-value" <| *) x (* ) *) |> Option.some
     with UnexpectedSolverResponse _ -> None
   in
 
