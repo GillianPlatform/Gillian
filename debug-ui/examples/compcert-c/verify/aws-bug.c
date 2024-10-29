@@ -197,10 +197,10 @@ typedef int bool;
 typedef unsigned long size_t;
 
 /*@
-    import  `../logic/EncryptionHeaderLogic`,
-            `../logic/ListLogic`,
-            `../logic/Utf8Logic`,
-            `../logic/ByteLogic`;
+    import  `logic/EncryptionHeaderLogic`,
+            `logic/ListLogic`,
+            `logic/Utf8Logic`,
+            `logic/ByteLogic`;
 */
 
 /*
@@ -290,7 +290,7 @@ struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
 
 #endif // AWS_COMMON_STRING_H
 /*@
-import `../logic/StringStruct`;
+import `logic/StringStruct`;
 */
 
 /*@

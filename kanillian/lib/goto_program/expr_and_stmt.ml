@@ -15,6 +15,7 @@ module rec Expr : sig
     | ByteExtract of { e : t; offset : int }
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
+    | EOpAssign of { lhs : t; rhs : t; op : Ops.Binary.t }
     | UnOp of { op : Ops.Unary.t; e : t }
     | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
@@ -25,6 +26,7 @@ module rec Expr : sig
     | TypeCast of t
     | If of { cond : t; then_ : t; else_ : t }
     | StatementExpression of Stmt.t list
+    | Comma of t list
     | Nondet
     | EUnhandled of Id.t * string
 
@@ -52,6 +54,7 @@ end = struct
     | ByteExtract of { e : t; offset : int }
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
+    | EOpAssign of { lhs : t; rhs : t; op : Ops.Binary.t }
     | UnOp of { op : Ops.Unary.t; e : t }
     | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
@@ -62,6 +65,7 @@ end = struct
     | TypeCast of t
     | If of { cond : t; then_ : t; else_ : t }
     | StatementExpression of Stmt.t list
+    | Comma of t list
     | Nondet
     | EUnhandled of Id.t * string
 
@@ -73,6 +77,8 @@ end = struct
     match t.value with
     | Array x -> pf ft "%a" (list ~sep:comma pp) x
     | EAssign { lhs; rhs } -> pf ft "%a = %a" pp lhs pp rhs
+    | EOpAssign { lhs; rhs; op } ->
+        pf ft "%a %a= %a" pp lhs Ops.Binary.pp op pp rhs
     | IntConstant z -> pf ft "%a" Z.pp_print z
     | CBoolConstant b -> pf ft "%d" (if b then 1 else 0)
     | DoubleConstant f -> pf ft "%f" f
@@ -101,6 +107,7 @@ end = struct
     | If { cond; then_; else_ } ->
         pf ft "%a ? %a : %a" pp cond pp then_ pp else_
     | StatementExpression _ -> pf ft "STMTEXPR"
+    | Comma es -> pf ft "%a" (list ~sep:comma pp) es
     | EUnhandled (id, msg) -> (
         match msg with
         | "" -> pf ft "UNHANDLED_EXPR(%s)" (Id.to_string id)
@@ -110,11 +117,13 @@ end = struct
   let pp_full = Fmt.hbox pp
   let show = Fmt.to_to_string pp
 
-  let unhandled ~irep:_ id msg =
-    (* TODO: hide the next line behind a config flag *)
-    (* Fmt.pr "UNHANDLED_IREP: %a\n@?"
-       (Yojson.Safe.pretty_print ~std:true)
-       (Irep.to_yojson irep); *)
+  let unhandled ~irep id msg =
+    let () =
+      if !Kconfig.print_unhandled then
+        Fmt.pr "UNHANDLED EXPRESSION:\n%a\n@?"
+          (Yojson.Safe.pretty_print ?std:None)
+          (Irep.to_yojson irep)
+    in
     EUnhandled (id, msg)
 
   let as_symbol e =
@@ -137,18 +146,41 @@ end = struct
 
   and selfop_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
     let open Ops.Self in
-    let lift_selfop op = lift_selfop ~machine irep op |> Option.some in
-    let* stmt = List.assoc_opt Id.Statement irep.named_sub in
-    match stmt.id with
-    | Postincrement -> lift_selfop Postincrement
-    | Postdecrement -> lift_selfop Postdecrement
-    | Preincrement -> lift_selfop Preincrement
-    | Predecrement -> lift_selfop Predecrement
-    | _ -> None
+    let* stmt = irep $? Statement in
+    let+ op =
+      match stmt.id with
+      | Postincrement -> Some Postincrement
+      | Postdecrement -> Some Postdecrement
+      | Preincrement -> Some Preincrement
+      | Predecrement -> Some Predecrement
+      | _ -> None
+    in
+    lift_selfop ~machine irep op
+
+  and op_assign_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
+    let open Ops.Binary in
+    let* stmt = irep $? Statement in
+    let+ op =
+      match stmt.id with
+      | AssignMult -> Some Mult
+      | AssignPlus -> Some Plus
+      | AssignMinus -> Some Minus
+      | AssignMod -> Some Mod
+      | AssignShl -> Some Shl
+      | AssignShr -> Some Ashr
+      | AssignAshr -> Some Ashr
+      | AssignLshr -> Some Lshr
+      | AssignBitand -> Some Bitand
+      | AssignBitxor -> Some Bitxor
+      | AssignBitor -> Some Bitor
+      | _ -> None
+    in
+    lift_op_assign ~machine irep op
 
   and side_effecting_of_irep ~(machine : Machine_model.t) (irep : Irep.t) =
     let of_irep = of_irep ~machine in
     let- () = selfop_of_irep ~machine irep in
+    let- () = op_assign_of_irep ~machine irep in
     match (irep $ Statement).id with
     | FunctionCall ->
         let func, args =
@@ -193,6 +225,14 @@ end = struct
     | [ a ] -> SelfOp { op; e = of_irep a }
     | _ ->
         Gerror.unexpected ~irep "Self operator doesn't have exactly one operand"
+
+  and lift_op_assign
+      ~(machine : Machine_model.t)
+      (irep : Irep.t)
+      (op : Ops.Binary.t) =
+    let lhs, rhs = exactly_two irep in
+    let of_irep = of_irep ~machine in
+    EOpAssign { lhs = of_irep lhs; rhs = of_irep rhs; op }
 
   and value_of_irep
       ~(machine : Machine_model.t)
@@ -268,6 +308,7 @@ end = struct
         Symbol name
     | Dereference -> Dereference (of_irep (exactly_one irep))
     | SideEffect -> side_effecting_of_irep ~machine irep
+    | Comma -> Comma (List.map of_irep irep.sub)
     | AddressOf ->
         let pointee = exactly_one ~msg:"AddressOf" irep in
         AddressOf (of_irep pointee)
@@ -367,6 +408,7 @@ and Stmt : sig
     | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
+    | Continue
     | Skip
     | Expression of Expr.t
     | Output of { msg : Expr.t; value : Expr.t }
@@ -410,6 +452,7 @@ end = struct
     | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
+    | Continue
     | Skip
     | Expression of Expr.t
     | Output of { msg : Expr.t; value : Expr.t }
@@ -419,9 +462,13 @@ end = struct
   and switch_case = { case : Expr.t; sw_body : t }
   and t = { stmt_location : Location.t; body : body; comment : string option }
 
-  let unhandled ~irep:_ id =
-    (* TODO: hide the following line under a config flag. *)
-    (* Fmt.pr "%a\n@?" Yojson.Safe.pretty_print (Irep.to_yojson irep); *)
+  let unhandled ~irep id =
+    let () =
+      if !Kconfig.print_unhandled then
+        Fmt.pr "UNHANDLED STATEMENT:\n%a\n@?"
+          (Yojson.Safe.pretty_print ?std:None)
+          (Irep.to_yojson irep)
+    in
     SUnhandled id
 
   let pp_custom
@@ -468,6 +515,7 @@ end = struct
         pf ft "@[<v 3>output (%a, %a);@]" pp_expr msg pp_expr value
     | Switch _ -> pf ft "switch"
     | Break -> pf ft "break"
+    | Continue -> pf ft "continue"
     | Ifthenelse { guard; then_; else_ } ->
         let pp_else ft = function
           | None -> ()
@@ -568,6 +616,7 @@ end = struct
         let value = expr_of_irep value in
         Output { msg; value }
     | Break -> Break
+    | Continue -> Continue
     | Ifthenelse ->
         let guard, then_, else_ =
           match irep.sub with

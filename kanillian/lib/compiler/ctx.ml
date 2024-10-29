@@ -39,12 +39,15 @@ let rec representable_in_store ~prog ~machine (type_ : Type.t) =
   | Signedbv _
   | Unsignedbv _
   | Pointer _
+  | Enum _
   | Empty -> true
   | Struct { components; _ } ->
       is_overflow_result ~prog type_
       || Program.is_zst ~prog ~machine type_
       || Option.is_some (one_representable_field ~prog ~machine components)
   | StructTag tag ->
+      representable_in_store ~prog ~machine (Hashtbl.find prog.types tag)
+  | EnumTag tag ->
       representable_in_store ~prog ~machine (Hashtbl.find prog.types tag)
   | _ -> Program.is_zst ~prog ~machine type_
 
@@ -114,6 +117,7 @@ type t = {
   fresh_lab : unit -> string;
   harness : string option;
   break_lab : string option;
+  continue_lab : string option;
 }
 
 let make ~exec_mode ~machine ~prog ~harness () =
@@ -128,6 +132,7 @@ let make ~exec_mode ~machine ~prog ~harness () =
     fresh_lab = Generators.label ();
     harness;
     break_lab = None;
+    continue_lab = None;
   }
 
 let with_new_generators t =

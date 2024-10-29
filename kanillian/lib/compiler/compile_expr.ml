@@ -263,12 +263,14 @@ let compile_binop
         | CInteger (I_int | I_char | I_bool | I_ssize_t)
         | Unsignedbv _ | Signedbv _ -> GilBinop ILessThanEqual
         | CInteger I_size_t | Pointer _ -> Proc leq_maybe_ptr
+        | Float -> GilBinop FLessThanEqual
         | _ -> Unhandled `With_type)
     | Lt -> (
         match lty with
         | CInteger (I_int | I_char | I_bool | I_ssize_t)
         | Unsignedbv _ | Signedbv _ -> GilBinop ILessThan
         | CInteger I_size_t | Pointer _ -> Proc lt_maybe_ptr
+        | Float -> GilBinop FLessThan
         | _ -> Unhandled `With_type)
     | Gt -> (
         match lty with
@@ -276,6 +278,7 @@ let compile_binop
         | Unsignedbv _ | Signedbv _ ->
             GilBinop ILessThanEqual ||> fun e -> Expr.Infix.not e
         | CInteger I_size_t | Pointer _ -> Proc gt_maybe_ptr
+        | Float -> GilBinop FLessThanEqual ||> fun e -> Expr.Infix.not e
         | _ -> Unhandled `With_type)
     | Ge -> (
         match lty with
@@ -283,6 +286,7 @@ let compile_binop
         | Unsignedbv _ | Signedbv _ ->
             GilBinop ILessThan ||> fun e -> Expr.Infix.not e
         | CInteger I_size_t | Pointer _ -> Proc geq_maybe_ptr
+        | Float -> GilBinop FLessThan ||> fun e -> Expr.Infix.not e
         | _ -> Unhandled `With_type)
     | Plus -> (
         match (lty, rty) with
@@ -303,6 +307,7 @@ let compile_binop
         | Signedbv { width = widtha }, Signedbv { width = widthb }
           when widtha == widthb ->
             GilBinop IPlus |||> assert_int_in_bounds ~ty:lty
+        | Float, Float -> GilBinop FPlus
         | _ -> Unhandled `With_type)
     | Minus -> (
         match (lty, rty) with
@@ -318,22 +323,26 @@ let compile_binop
         | Signedbv { width = widtha }, Signedbv { width = widthb }
           when widtha == widthb ->
             GilBinop IMinus |||> assert_int_in_bounds ~ty:lty
+        | Float, Float -> GilBinop FMinus
         | _ -> Unhandled `With_type)
     | Mult -> (
         match lty with
         | Unsignedbv _ -> GilBinop ITimes ||> modulo_max ~ty:lty
         | CInteger _ | Signedbv _ ->
             GilBinop ITimes |||> assert_int_in_bounds ~ty:lty
+        | Float -> GilBinop FTimes
         | _ -> Unhandled `With_type)
     | Div -> (
         match lty with
         | CInteger _ | Unsignedbv _ | Signedbv _ ->
             GilBinop IDiv |||> assert_int_in_bounds ~ty:lty
+        | Float -> GilBinop FDiv
         | _ -> Unhandled `With_type)
     | Mod -> (
         match lty with
         | CInteger I_size_t -> Proc mod_maybe_ptr
         | CInteger _ | Unsignedbv _ | Signedbv _ -> GilBinop IMod
+        | Float -> GilBinop FMod
         | _ -> Unhandled `With_type)
     | Or -> GilBinop BinOp.BOr
     | And -> GilBinop BinOp.BAnd
@@ -420,7 +429,7 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       in
       let assume_range = Cmd.Logic (Assume condition) in
       Cs.return ~app:[ assume_int; assume_range ] ()
-  | CInteger _ | Signedbv _ | Unsignedbv _ ->
+  | CInteger _ | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
       let assume_int = Cmd.Logic (AssumeType (expr, IntType)) in
       let bounds =
         Option.bind (Memory.chunk_for_type ~ctx type_) Chunk.bounds
@@ -640,6 +649,11 @@ let compile_cast ~(ctx : Ctx.t) ~(from : GType.t) ~(into : GType.t) e :
               ( Constants.Cast_functions.unsign_int_same_size,
                 [ imax; two_power_size ] )
         | U8, I8 | U16, I16 | U32, I32 | U64, I64 | U128, I128 -> Nop
+        | ( (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128),
+            (F32 | F64) ) -> App (fun e -> Expr.UnOp (IntToNum, e))
+        | ( (F32 | F64),
+            (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) ) ->
+            App (fun e -> Expr.UnOp (NumToInt, e))
         | _ -> Unhandled)
   in
   match cast_with with
@@ -1017,9 +1031,10 @@ and compile_assign ~ctx ~annot ~lhs ~rhs =
   in
   (v, pre @ comp_assign)
 
-and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
+and compile_selfop ~ctx ~annot op (e : GExpr.t) =
   let open Ops.Self in
   let open Ops.Binary in
+  let ty = e.type_ in
   let is_pre, op =
     match op with
     | Preincrement -> (true, Plus)
@@ -1028,9 +1043,8 @@ and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
     | Postdecrement -> (false, Minus)
   in
   let e_pre, comp_expr = compile_expr ~ctx e in
-  let e_pre = Val_repr.as_value ~msg:"Selfop operand" e_pre in
   let e_post, comp_op =
-    let lhs = Val_repr.ByValue e_pre in
+    let lhs = e_pre in
     let rhs = Val_repr.ByValue (Lit (Int Z.one)) in
     compile_binop ~ctx ~lty:ty ~rty:ty op lhs rhs
   in
@@ -1040,9 +1054,41 @@ and compile_selfop ~ctx ~ty ~annot op (e : GExpr.t) =
     | Ok c -> c
     | Error (throw, msg) -> throw msg
   in
-  let v = if is_pre then e_post else e_pre in
+  let v =
+    if is_pre then e_post else Val_repr.as_value ~msg:"Selfop operand" e_pre
+  in
   let v = Val_repr.ByValue v in
   (v, comp_expr @ comp_op @ comp_assign)
+
+and compile_op_assign ~ctx ~annot ~lhs ~rhs ~op =
+  let compile_expr = compile_expr ~ctx in
+  let* lhs_vr = compile_expr lhs in
+  let* rhs_vr = compile_expr rhs in
+  let lty = lhs.type_ in
+  let rty = rhs.type_ in
+  let* e =
+    let e, comp_op = compile_binop ~ctx ~lty ~rty op lhs_vr rhs_vr in
+    let comp_op = List.map annot comp_op in
+    (e, comp_op)
+  in
+  let+ () =
+    match compile_assign_val ~ctx ~annot ~lhs ~rhs:(ByValue e) with
+    | Ok c -> ((), c)
+    | Error (throw, msg) -> ((), throw msg)
+  in
+  Val_repr.ByValue e
+
+and compile_comma ~ctx exprs =
+  let rec aux = function
+    | [] -> Error.code_error "Empty comma!"
+    | [ e ] ->
+        let+ e = compile_expr ~ctx e in
+        e
+    | e :: es ->
+        let* _ = compile_expr ~ctx e in
+        aux es
+  in
+  aux exprs
 
 and compile_symbol ~ctx ~b expr =
   if Ctx.is_zst_access ctx GExpr.(expr.type_) then by_value (Lit Null)
@@ -1120,19 +1166,40 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
     let v = Val_repr.dummy ~ctx expr.type_ in
     Cs.return ~app:[ b cmd ] v
   in
+  let log_type t =
+    Debugger_log.to_file
+      (Fmt.str "COMPILING %s EXPR  (%s)  [%a]" t default_display
+         Goto_lib.Location.pp_short expr.location)
+  in
   match expr.value with
-  | Symbol _ | Dereference _ | Index _ | Member _ -> compile_symbol ~ctx ~b expr
-  | AddressOf x -> compile_address_of ~ctx ~b expr x
-  | BoolConstant b -> by_value (Lit (Bool b))
+  | Symbol _ | Dereference _ | Index _ | Member _ ->
+      let () = log_type "Symbol-esque" in
+      let clean_annot annot =
+        K_annot.{ annot with display = None; cmd_kind = Normal false }
+      in
+      compile_symbol ~ctx ~b expr |> Cs.map_l (Body_item.map_annot clean_annot)
+  | AddressOf x ->
+      let () = log_type "AddressOf" in
+      compile_address_of ~ctx ~b expr x
+  | BoolConstant b ->
+      let () = log_type "BoolConstant" in
+      by_value (Lit (Bool b))
   | CBoolConstant b ->
+      let () = log_type "CBoolConstant" in
       let z = if b then Z.one else Z.zero in
       by_value (Lit (Int z))
   | PointerConstant b ->
+      let () = log_type "PointerConstant" in
       let z = Z.of_int b in
       by_value (Lit (Int z))
-  | IntConstant z -> by_value (Lit (Int z))
-  | DoubleConstant f | FloatConstant f -> by_value (Lit (Num f))
+  | IntConstant z ->
+      let () = log_type "IntConstant" in
+      by_value (Lit (Int z))
+  | DoubleConstant f | FloatConstant f ->
+      let () = log_type "DoubleConstant/FloatConstant" in
+      by_value (Lit (Num f))
   | BinOp { op; lhs; rhs } ->
+      let () = log_type "BinOp" in
       let* e1 = compile_expr lhs in
       let* e2 = compile_expr rhs in
       let lty = lhs.type_ in
@@ -1142,6 +1209,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       in
       Val_repr.ByValue e
   | UnOp { op; e } -> (
+      let () = log_type "UnOp" in
       let* comp_e = compile_expr e in
       let comp_e = Val_repr.as_value ~msg:"Unary operand" comp_e in
       match op with
@@ -1163,20 +1231,30 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           let cmd = b (Helpers.assert_unhandled ~feature:(UnOp op) []) in
           Cs.return ~app:[ cmd ] (Val_repr.ByValue (Lit Nono)))
   | SelfOp { op; e } ->
-      compile_selfop ~ctx ~ty:e.type_ ~annot:b op e |> Cs.set_end
+      let () = log_type "SelfOp" in
+      compile_selfop ~ctx ~annot:b op e |> Cs.set_end
   | Nondet ->
+      let () = log_type "Nondet" in
       nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_
         ~display:default_display ()
       |> Cs.set_end
   | TypeCast to_cast ->
+      let () = log_type "TypeCast" in
       let* to_cast_e = compile_expr to_cast in
       compile_cast ~ctx ~from:to_cast.type_ ~into:expr.type_ to_cast_e
       |> Cs.map_l b
-  | EAssign { lhs; rhs } -> compile_assign ~ctx ~lhs ~rhs ~annot:b |> Cs.set_end
+  | EAssign { lhs; rhs } ->
+      let () = log_type "EAssign" in
+      compile_assign ~ctx ~lhs ~rhs ~annot:b |> Cs.set_end
+  | EOpAssign { lhs; rhs; op } ->
+      let () = log_type "EOpAssign" in
+      compile_op_assign ~ctx ~annot:b ~lhs ~rhs ~op |> Cs.set_end
   | EFunctionCall { func; args } ->
+      let () = log_type "EFunctionCall" in
       let b ?nest_kind cmd = b_pre ?nest_kind cmd in
       compile_call ~ctx ~b func args |> Cs.set_end
   | If { cond; then_; else_ } ->
+      let () = log_type "If" in
       let* cond_e = compile_expr cond in
       let then_lab = Ctx.fresh_lab ctx in
       let else_lab = Ctx.fresh_lab ctx in
@@ -1209,6 +1287,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
         "if branch exprs must be equal";
       Cs.return ~app:[ b ~label:end_lab Skip ] res_then
   | ByteExtract { e; offset } ->
+      let () = log_type "ByteExtract" in
       if Ctx.is_zst_access ctx e.type_ then
         if Ctx.is_zst_access ctx expr.type_ && offset == 0 then
           Cs.return Val_repr.null
@@ -1239,6 +1318,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           by_value (PVar var)
         else by_copy new_ptr expr.type_
   | Struct elems -> (
+      let () = log_type "Struct" in
       let fields = Ctx.resolve_struct_components ctx expr.type_ in
       match Ctx.one_representable_field ctx fields with
       | Some (accesses, _) ->
@@ -1302,6 +1382,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           let writes = writes 0 fields elems in
           Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes }))
   | Array elems ->
+      let () = log_type "Array" in
       let elem_type =
         match expr.type_ with
         | Array (elem_type, _) -> elem_type
@@ -1320,6 +1401,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
       let writes = writes 0 elems in
       Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes })
   | StringConstant str ->
+      let () = log_type "StringConstant" in
       let char_type = GType.CInteger I_char in
       (* Size could be different from 1 n some architecture,
          might as well anticipate here *)
@@ -1335,8 +1417,15 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
                    } ))
       in
       Cs.return (Val_repr.ByCompositValue { type_ = expr.type_; writes })
-  | StatementExpression l -> compile_statement_list ~ctx l
-  | EUnhandled (id, msg) -> unhandled (ExprIrep (id, msg))
+  | StatementExpression l ->
+      let () = log_type "StatementExpression" in
+      compile_statement_list ~ctx l
+  | Comma exprs ->
+      let () = log_type "Comma" in
+      compile_comma ~ctx exprs
+  | EUnhandled (id, msg) ->
+      let () = log_type "Unhandled" in
+      unhandled (ExprIrep (id, msg))
 
 and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
@@ -1355,7 +1444,11 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   in
   let set_first_label label stmts = set_first_label_opt (Some label) stmts in
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in
-  let log_kind kind = Debugger_log.to_file ("COMPILING " ^ kind ^ " STMT") in
+  let log_kind kind =
+    Debugger_log.to_file
+      (Fmt.str "COMPILING %s STMT [%a]" kind Goto_lib.Location.pp_short
+         stmt.stmt_location)
+  in
   match stmt.body with
   | Skip ->
       let () = log_kind "Skip" in
@@ -1619,7 +1712,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let guard_var, comp_guard = compile_expr_c guard in
       let comp_guard = set_first_label loop_lab comp_guard in
       let guard_var = Val_repr.as_value ~msg:"for guard" guard_var in
-      let _, comp_body = compile_statement_c body in
+      let _, comp_body = compile_loop_body ~ctx ~loop_lab ~end_lab body in
       let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
       let _, comp_update = compile_expr_c update in
       let goto_guard =
@@ -1639,7 +1732,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let guard_var, comp_guard = compile_expr_c guard in
       let comp_guard = set_first_label loop_lab comp_guard in
       let guard_var = Val_repr.as_value ~msg:"while guard" guard_var in
-      let _, comp_body = compile_statement_c body in
+      let _, comp_body = compile_loop_body ~ctx ~loop_lab ~end_lab body in
       let body_lab, comp_body = Body_item.get_or_set_fresh_lab ~ctx comp_body in
       let goto_guard =
         b ~cmd_kind:(Normal true)
@@ -1652,8 +1745,14 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   | Break ->
       let () = log_kind "Break" in
       (match ctx.break_lab with
-      | None -> Error.unexpected "Break call outside of loop of switch"
+      | None -> Error.unexpected "Break call outside of loop or switch"
       | Some break_lab -> [ b (Cmd.Goto break_lab) ])
+      |> void
+  | Continue ->
+      let () = log_kind "Continue" in
+      (match ctx.continue_lab with
+      | None -> Error.unexpected "Break call outside of loop or switch"
+      | Some continue_lab -> [ b (Cmd.Goto continue_lab) ])
       |> void
   | SUnhandled id ->
       let () = log_kind "SUnhandled" in
@@ -1671,3 +1770,9 @@ and compile_statement_list ~ctx stmts : Val_repr.t Cs.with_body =
         aux (List.rev_append cstmt acc) last_v stmts
   in
   aux [] (Val_repr.ByValue (Lit Nono)) stmts
+
+and compile_loop_body ~ctx ~loop_lab ~end_lab body =
+  let ctx =
+    Ctx.{ ctx with break_lab = Some end_lab; continue_lab = Some loop_lab }
+  in
+  compile_statement ~ctx body

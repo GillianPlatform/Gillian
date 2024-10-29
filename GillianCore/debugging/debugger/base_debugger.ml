@@ -18,7 +18,9 @@ module Premake
                  and type tl_ast = PC.tl_ast
                  and type cmd_report =
                   Verification.SAInterpreter.Logging.ConfigReport.t
-                 and type annot = PC.Annot.t) =
+                 and type annot = PC.Annot.t
+                 and type init_data = PC.init_data
+                 and type pc_err = PC.err) =
 struct
   open Verification.SAInterpreter
   module Gil_parsing = Gil_parsing.Make (PC.Annot)
@@ -41,7 +43,7 @@ struct
     mutable variables : Variable.ts; [@default Hashtbl.create 0]
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
-    mutable proc_name : string option;
+    mutable proc_name : string;
     lifter_state : Lifter.t;
     report_state : L.Report_state.t;
     ext : 'ext;
@@ -129,13 +131,13 @@ struct
         match cmd_id with
         | Some cmd_id ->
             let proc_name = get_root_proc_name_of_id cmd_id in
-            debug_state.cur_proc_name <- proc_name;
             proc_name
         | None -> debug_state.cur_proc_name
       in
       match Hashtbl.find_opt procs proc_name with
       | None -> Error ("get_proc_state: couldn't find proc " ^ proc_name)
       | Some proc_state ->
+          debug_state.cur_proc_name <- proc_state.proc_name;
           if activate_report_state then
             L.Report_state.activate proc_state.report_state;
           Ok proc_state
@@ -253,23 +255,26 @@ struct
 
     module Process_files = struct
       let get_progs_or_fail = function
-        | Ok progs -> (
+        | Ok (progs, entrypoint) -> (
             match progs.ParserAndCompiler.gil_progs with
             | [] ->
                 Fmt.pr "Error: expected at least one GIL program\n";
                 exit 1
-            | _ -> progs)
+            | _ -> (progs, entrypoint))
         | Error err ->
             Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
             exit 1
 
-      let compile_tl_files files =
-        let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+      let compile_tl_files entrypoint files =
+        let progs, entrypoint =
+          get_progs_or_fail (Lifter.parse_and_compile_files ~entrypoint files)
+        in
         let e_progs = progs.gil_progs in
         let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
         let e_prog = snd (List.hd e_progs) in
         let source_files = progs.source_files in
-        (e_prog, progs.init_data, Some source_files, Some progs.tl_ast)
+        ( (e_prog, progs.init_data, Some source_files, Some progs.tl_ast),
+          entrypoint )
 
       let parse_gil_file file =
         let Gil_parsing.{ labeled_prog; init_data } =
@@ -294,22 +299,31 @@ struct
             in
             m ~json:procs_json "Got %d procs" (Hashtbl.length procs))
 
-      let f ~outfile ~no_unfold ~already_compiled files =
-        let e_prog, init_data, source_files_opt, tl_ast =
-          if already_compiled then parse_gil_file (List.hd files)
-          else compile_tl_files files
+      let f ~proc_name ~outfile ~no_unfold ~already_compiled files =
+        let (e_prog, init_data, source_files_opt, tl_ast), proc_name =
+          if already_compiled then (parse_gil_file (List.hd files), proc_name)
+          else compile_tl_files proc_name files
+        in
+        let pp_annot fmt annot =
+          Fmt.pf fmt "%a" Yojson.Safe.pp (Annot.to_yojson annot)
         in
         Command_line_utils.burn_gil ~init_data:(ID.to_yojson init_data)
-          ~pp_prog:Prog.pp_labeled e_prog outfile;
+          ~pp_prog:(Prog.pp_labeled ~pp_annot)
+          e_prog outfile;
         (* Prog.perform_syntax_checks e_prog; *)
         let other_imports =
           Command_line_utils.convert_other_imports PC.other_imports
         in
-        let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
+        let prog =
+          Gil_parsing.eprog_to_prog ?prog_path:(List_utils.hd_opt files)
+            ~other_imports e_prog
+        in
         L.verbose (fun m ->
-            m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog);
+            m "@\nProgram as parsed:@\n%a@\n"
+              (Prog.pp_indexed ?pp_annot:None)
+              prog);
         let prog = Debugger_impl.preprocess_prog ~no_unfold prog in
-        (prog, init_data, source_files_opt, tl_ast)
+        ((prog, init_data, source_files_opt, tl_ast), proc_name)
     end
 
     let process_files = Process_files.f
@@ -363,8 +377,11 @@ struct
               Fmt.failwith
                 "Debugger: don't know how to handle report of type '%s'!" type_
             else
-              DL.show_report id ("Debugger.update...: Got report type " ^ type_);
-            content |> of_yojson_string Logging.ConfigReport.of_yojson
+              let () =
+                DL.show_report ~v:true id
+                  ("Debugger.update...: Got report type " ^ type_)
+              in
+              content |> of_yojson_string Logging.ConfigReport.of_yojson
 
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
@@ -433,7 +450,7 @@ struct
 
     let jump_state_to_id id cfg state =
       try
-        DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id);
+        DL.log ~v:true (fun m -> m "Jumping to id %a" L.Report_id.pp id);
         state |> update_proc_state id cfg;
         Ok ()
       with Failure msg -> Error msg
@@ -691,18 +708,18 @@ struct
         let { proc_names; tl_ast; prog; _ } = debug_state in
         Lifter.init_exn ~proc_name ~all_procs:proc_names tl_ast prog
 
-      let f proc_name state =
+      let f proc_name ~entrypoint state =
         let { debug_state; _ } = state in
         let report_state = L.Report_state.clone debug_state.report_state_base in
         report_state
         |> L.Report_state.with_state (fun () ->
-               let** cont_func = get_cont_func proc_name debug_state in
+               let** cont_func = get_cont_func entrypoint debug_state in
                let lifter_state, init_lifter' =
                  init_lifter proc_name debug_state
                in
                let proc_state =
                  let make ext =
-                   make_base_proc_state ~cont_func ~top_level_scopes
+                   make_base_proc_state ~proc_name ~cont_func ~top_level_scopes
                      ~lifter_state ~report_state ~ext ()
                  in
                  let ext = Debugger_impl.init_proc debug_state (make ()) in
@@ -723,11 +740,12 @@ struct
         let outfile, no_unfold = (None, false) in
         (* TODO: Support debugging incremental mode *)
         (* let incremental = false in *)
-        let prog, init_data, source_files, tl_ast =
-          process_files ~outfile ~no_unfold ~already_compiled [ file_name ]
-        in
         let proc_name =
           proc_name |> Option_utils.or_else (fun () -> failwith "No proc name!")
+        in
+        let (prog, init_data, source_files, tl_ast), entrypoint =
+          process_files ~proc_name ~outfile ~no_unfold ~already_compiled
+            [ file_name ]
         in
         let proc_names =
           prog.procs |> Hashtbl.to_seq
@@ -745,7 +763,7 @@ struct
           let ext = Debugger_impl.init (make ()) in
           make ext
         in
-        cfg
+        (cfg, entrypoint)
 
       let make_state debug_state = { debug_state; procs = Hashtbl.create 0 }
 
@@ -753,12 +771,13 @@ struct
         Fmt_tty.setup_std_outputs ();
         PC.initialize !Config.current_exec_mode;
         Config.stats := false;
-        let debug_state = build_debug_state file_name proc_name in
+        let debug_state, entrypoint = build_debug_state file_name proc_name in
         let proc_name = debug_state.main_proc_name in
         let state = make_state debug_state in
-        let++ main_proc_state, _ = launch_proc proc_name state in
+        let++ main_proc_state, _ = launch_proc proc_name ~entrypoint state in
         main_proc_state.report_state |> L.Report_state.activate;
         Hashtbl.add state.procs proc_name main_proc_state;
+        Hashtbl.add state.procs entrypoint main_proc_state;
         state
     end
 
@@ -775,7 +794,9 @@ struct
 
     let start_proc proc_name state =
       let { debug_state; procs } = state in
-      let++ proc_state, stop_reason = launch_proc proc_name state in
+      let++ proc_state, stop_reason =
+        launch_proc proc_name ~entrypoint:proc_name state
+      in
       Hashtbl.add procs proc_name proc_state;
       debug_state.cur_proc_name <- proc_name;
       stop_reason

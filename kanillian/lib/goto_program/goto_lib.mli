@@ -79,7 +79,9 @@ module Location : sig
     col : int option;
     comment : string option;
   }
+  [@@deriving show]
 
+  val pp_short : t Fmt.t
   val of_irep : Irep.t -> t
 end
 
@@ -117,6 +119,8 @@ and Datatype_component : sig
 end
 
 and Type : sig
+  type enum_component = { name : string; value : int }
+
   type t =
     | Array of t * int
     | Bool
@@ -132,6 +136,8 @@ and Type : sig
     | StructTag of string
     | Union of { components : Datatype_component.t list; tag : string }
     | UnionTag of string
+    | Enum of { components : enum_component list; tag : string }
+    | EnumTag of string
     | Constructor
     | Empty
     | Vector of { type_ : t; size : int }
@@ -171,6 +177,7 @@ module rec Expr : sig
     | ByteExtract of { e : t; offset : int }
     | Dereference of t
     | EAssign of { lhs : t; rhs : t }
+    | EOpAssign of { lhs : t; rhs : t; op : Ops.Binary.t }
     | UnOp of { op : Ops.Unary.t; e : t }
     | SelfOp of { op : Ops.Self.t; e : t }
     | Struct of t list
@@ -181,6 +188,7 @@ module rec Expr : sig
     | TypeCast of t
     | If of { cond : t; then_ : t; else_ : t }
     | StatementExpression of Stmt.t list
+    | Comma of t list
     | Nondet
     | EUnhandled of Id.t * string
 
@@ -217,6 +225,7 @@ and Stmt : sig
     | For of { init : t; guard : Expr.t; update : Expr.t; body : t }
     | While of { guard : Expr.t; body : t }
     | Break
+    | Continue
     | Skip
     | Expression of Expr.t
     | Output of { msg : Expr.t; value : Expr.t }

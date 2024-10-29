@@ -53,22 +53,44 @@ let rec get_by_id id lcmd =
 
 (* TODO: write pretty_print function *)
 let pp fmt lcmd =
-  let fprintf = Format.fprintf fmt in
+  let pp_binds fmt binds =
+    match binds with
+    | [] -> ()
+    | _ ->
+        Format.fprintf fmt "{binds: %a}"
+          (WPrettyUtils.pp_list Format.pp_print_string)
+          binds
+  in
+  let pp_variant fmt variant =
+    match variant with
+    | None -> ()
+    | Some variant -> Format.fprintf fmt "variant: %a" WLExpr.pp variant
+  in
   match get lcmd with
   | Fold (pname, wlel) ->
-      fprintf "fold %s(%a)" pname (WPrettyUtils.pp_list WLExpr.pp) wlel
+      Format.fprintf fmt "fold %s(%a)" pname
+        (WPrettyUtils.pp_list WLExpr.pp)
+        wlel
   | Unfold (pname, wlel) ->
-      fprintf "unfold %s(%a)" pname (WPrettyUtils.pp_list WLExpr.pp) wlel
+      Format.fprintf fmt "unfold %s(%a)" pname
+        (WPrettyUtils.pp_list WLExpr.pp)
+        wlel
   | ApplyLem (lname, wlel, _) ->
-      fprintf "apply %s(%a)" lname (WPrettyUtils.pp_list WLExpr.pp) wlel
-  (* | Assert (a, b) -> fprintf "%a"  WLAssert.pp a
-     | Invariant (a, b) ->
-       let existentials = match b with
-         |[] -> ""
-         | _ -> Format.asprintf "{exists: %a}" (WPrettyUtils.pp_list Format.pp_print_string) b
-       in
-       fprintf "invariant %s %a" existentials WLAssert.pp a *)
-  | _ -> Format.fprintf fmt "[LOGIC COMMAND]"
+      Format.fprintf fmt "apply %s(%a)" lname
+        (WPrettyUtils.pp_list WLExpr.pp)
+        wlel
+  | Assert (asrt, binds) ->
+      Format.fprintf fmt "assert %a%a" pp_binds binds WLAssert.pp asrt
+  | Invariant (asrt, binds, variant) ->
+      Format.fprintf fmt "invariant %a%a%a" pp_binds binds WLAssert.pp asrt
+        pp_variant variant
+  | LogicIf (e, _, _) -> Format.fprintf fmt "if (%a)" WLExpr.pp e
+  | Package { lhs = lname, largs; rhs = rname, rargs } ->
+      Format.fprintf fmt "package (%s(%a) -* %s(%a))" lname
+        (WPrettyUtils.pp_list WLExpr.pp)
+        largs rname
+        (WPrettyUtils.pp_list WLExpr.pp)
+        rargs
 
 let str = Format.asprintf "%a" pp
 

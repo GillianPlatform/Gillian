@@ -46,6 +46,8 @@ class ['a] iter =
       | Unsignedbv _
       | StructTag _
       | UnionTag _
+      | Enum _
+      | EnumTag _
       | IncompleteStruct _ -> ()
 
     method visit_id ~(ctx : 'a) (_id : int) =
@@ -58,6 +60,10 @@ class ['a] iter =
       | EAssign { lhs; rhs } ->
           self#visit_expr ~ctx lhs;
           self#visit_expr ~ctx rhs
+      | EOpAssign { lhs; rhs; op } ->
+          self#visit_expr ~ctx lhs;
+          self#visit_expr ~ctx rhs;
+          self#visit_binop ~ctx op
       | EFunctionCall { func; args } ->
           self#visit_expr ~ctx func;
           List.iter (self#visit_expr ~ctx) args
@@ -82,6 +88,7 @@ class ['a] iter =
           self#visit_expr ~ctx then_;
           self#visit_expr ~ctx else_
       | StatementExpression stmts -> List.iter (self#visit_stmt ~ctx) stmts
+      | Comma exprs -> List.iter (self#visit_expr ~ctx) exprs
       | Nondet
       | Symbol _
       | IntConstant _
@@ -137,7 +144,7 @@ class ['a] iter =
       | Output { msg; value } ->
           self#visit_expr ~ctx msg;
           self#visit_expr ~ctx value
-      | Goto _ | Skip | SUnhandled _ | Break -> ()
+      | Goto _ | Skip | SUnhandled _ | Break | Continue -> ()
 
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
       self#visit_location ~ctx stmt.stmt_location;
@@ -245,6 +252,8 @@ class ['a] map =
       | Unsignedbv _
       | StructTag _
       | UnionTag _
+      | Enum _
+      | EnumTag _
       | IncompleteStruct _ -> type_
 
     method visit_id ~(ctx : 'a) (id : int) =
@@ -262,6 +271,12 @@ class ['a] map =
           let new_rhs = self#visit_expr ~ctx rhs in
           if new_lhs == lhs && new_rhs == rhs then ev
           else EAssign { lhs = new_lhs; rhs = new_rhs }
+      | EOpAssign { lhs; rhs; op } ->
+          let new_lhs = self#visit_expr ~ctx lhs in
+          let new_rhs = self#visit_expr ~ctx rhs in
+          let new_op = self#visit_binop ~ctx op in
+          if new_lhs == lhs && new_rhs == rhs && new_op == op then ev
+          else EOpAssign { lhs = new_lhs; rhs = new_rhs; op = new_op }
       | Struct l ->
           let changed = ref false in
           let new_elems = map_mark_changed ~changed (self#visit_expr ~ctx) l in
@@ -322,6 +337,12 @@ class ['a] map =
             map_mark_changed ~changed (self#visit_stmt ~ctx) stmts
           in
           if not !changed then ev else StatementExpression new_stmts
+      | Comma exprs ->
+          let changed = ref false in
+          let new_exprs =
+            map_mark_changed ~changed (self#visit_expr ~ctx) exprs
+          in
+          if not !changed then ev else Comma new_exprs
       | Nondet
       | Symbol _
       | IntConstant _
@@ -447,7 +468,7 @@ class ['a] map =
           let new_value = self#visit_expr ~ctx value in
           if new_msg == msg && new_value == value then body
           else Output { msg = new_msg; value = new_value }
-      | Goto _ | Skip | SUnhandled _ | Break -> body
+      | Goto _ | Skip | SUnhandled _ | Break | Continue -> body
 
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
       let new_body = self#visit_stmt_body ~ctx stmt.body in

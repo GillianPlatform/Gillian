@@ -16,13 +16,14 @@ open Debugger.Lifter
 
 type id = L.Report_id.t [@@deriving yojson, show]
 
-let rec int_to_letters = function
-  | 0 -> ""
+let rec int_to_letters ?(acc = "") = function
+  | 0 -> acc
   | i ->
       let i = i - 1 in
       let remainder = i mod 26 in
       let char = Char.chr (65 + remainder) |> Char.escaped in
-      char ^ int_to_letters (i / 26)
+      let acc = acc ^ char in
+      int_to_letters ~acc (i / 26)
 
 let ( let++ ) f o = Result.map o f
 let ( let** ) o f = Result.bind o f
@@ -37,6 +38,8 @@ struct
   type tl_ast = WParserAndCompiler.tl_ast
   type memory = WislSMemory.t
   type annot = Annot.t
+  type init_data = WParserAndCompiler.init_data
+  type pc_err = WParserAndCompiler.err
 
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport
   module Gil_lifter = Gil.Lifter
@@ -81,12 +84,15 @@ struct
     display : string;
     matches : matching list;
     errors : string list;
-    mutable submap : id submap;
+    submap : id submap;
     loc : string * int;
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
   }
+  [@@deriving yojson]
+
+  type node = (id, Branch_case.t, cmd_data, branch_data) Exec_map.node
   [@@deriving yojson]
 
   type map = (id, Branch_case.t, cmd_data, branch_data) Exec_map.map
@@ -112,10 +118,11 @@ struct
       all_ids : (id * (Branch_case.kind option * Branch_case.case)) Ext_list.t;
       unexplored_paths : (id * Gil_branch_case.t option) Stack.t;
       ends : (Branch_case.case * branch_data) Ext_list.t;
-      mutable canonical_data : canonical_cmd_data option;
-      mutable nest_kind : nest_kind option;
       matches : matching Ext_list.t;
       errors : string Ext_list.t;
+      mutable canonical_data : canonical_cmd_data option;
+      mutable nest_kind : nest_kind option;
+      mutable has_return : bool;
     }
     [@@deriving to_yojson]
 
@@ -127,10 +134,11 @@ struct
         all_ids = Ext_list.make ();
         unexplored_paths = Stack.create ();
         ends = Ext_list.make ();
-        canonical_data = None;
-        nest_kind = None;
         matches = Ext_list.make ();
         errors = Ext_list.make ();
+        canonical_data = None;
+        nest_kind = None;
+        has_return = false;
       }
 
     type t = (id, partial_data) Hashtbl.t [@@deriving to_yojson]
@@ -147,6 +155,7 @@ struct
       callers : id list;
       stack_direction : stack_direction option;
       loc : string * int;
+      has_return : bool;
     }
     [@@deriving yojson]
 
@@ -198,7 +207,7 @@ struct
       is_loop_func && get_fun_call_name exec_data = Some proc_name
 
     let finish ~exec_data partial =
-      let ({ prev; all_ids; ends; nest_kind; matches; errors; _ }
+      let ({ prev; all_ids; ends; nest_kind; matches; errors; has_return; _ }
             : partial_data) =
         partial
       in
@@ -244,6 +253,7 @@ struct
           errors;
           submap;
           next_kind;
+          has_return;
         }
 
     module Update = struct
@@ -274,20 +284,23 @@ struct
         let annot = CmdReport.(cmd_report.annot) in
         let { ends; unexplored_paths; _ } = partial in
         let** is_end = get_is_end annot in
-        match (is_end, next_kind) with
-        | _, Zero -> Ok ()
-        | false, One () ->
+        match (annot.stmt_kind, is_end, next_kind) with
+        | _, _, Zero -> Ok ()
+        | Return true, _, _ ->
+            let () = partial.has_return <- true in
+            Ok ()
+        | _, false, One () ->
             Stack.push (id, None) unexplored_paths;
             Ok ()
-        | false, Many cases ->
+        | _, false, Many cases ->
             cases
             |> List.iter (fun (gil_case, ()) ->
                    Stack.push (id, Some gil_case) unexplored_paths);
             Ok ()
-        | true, One () ->
+        | _, true, One () ->
             Ext_list.add (branch_case, (id, None)) ends;
             Ok ()
-        | true, Many cases ->
+        | _, true, Many cases ->
             cases
             |> List_utils.iter_results (fun (gil_case, ()) ->
                    let++ case =
@@ -527,9 +540,11 @@ struct
             caller_id
 
     let resolve_func_branches ~state finished_partial =
-      let Partial_cmds.{ all_ids; next_kind; callers; _ } = finished_partial in
-      match (next_kind, callers) with
-      | Zero, caller_id :: _ ->
+      let Partial_cmds.{ all_ids; next_kind; callers; has_return; _ } =
+        finished_partial
+      in
+      match (next_kind, has_return, callers) with
+      | Zero, true, caller_id :: _ ->
           let label, count =
             match Hashtbl.find_opt state.func_return_map caller_id with
             | Some (label, count) -> (label, count)
@@ -958,10 +973,13 @@ struct
 
   let rec find_next state id case =
     let node = get_exn state.map id in
-    match (node.next, case) with
-    | (None | Some (Single _)), Some _ ->
+    match (node.next, case, node.data.submap) with
+    | (None | Some (Single _)), Some _, _ ->
         failwith "HORROR - tried to step case for non-branch cmd"
-    | Some (Single (None, _)), None ->
+    | ( Some (Branch [ (FuncExitPlaceholder, _) ]),
+        Some FuncExitPlaceholder,
+        Submap submap_id ) -> Either.left submap_id
+    | Some (Single (None, _)), None, _ ->
         let id = List.hd (List.rev node.data.all_ids) in
         let case =
           match Gil_lifter.cases_at_id id state.gil_state with
@@ -973,14 +991,14 @@ struct
                 L.Report_id.pp id
         in
         Either.Right (id, case)
-    | Some (Single (Some next, _)), None -> Either.Left next
-    | Some (Branch nexts), None -> select_case nexts
-    | Some (Branch nexts), Some case -> (
+    | Some (Single (Some next, _)), None, _ -> Either.Left next
+    | Some (Branch nexts), None, _ -> select_case nexts
+    | Some (Branch nexts), Some case, _ -> (
         match List.assoc_opt case nexts with
         | None -> failwith "case not found"
         | Some (None, id_case) -> Either.Right id_case
         | Some (Some next, _) -> Either.Left next)
-    | None, None -> (
+    | None, None, _ -> (
         match get_next_from_end state node.data with
         | Some (id, case) -> find_next state id case
         | None -> Either.left id)
@@ -1038,8 +1056,9 @@ struct
                 if stack_depth' < stack_depth then
                   failwith "Stack depth too small!"
                 else if stack_depth' > stack_depth then
-                  let next = get_next_from_end state node.data |> Option.get in
-                  (ends, next :: rest)
+                  match get_next_from_end state node.data with
+                  | Some next -> (ends, next :: rest)
+                  | None -> (node :: ends, rest)
                 else (node :: ends, rest)
           in
           aux ends nexts
@@ -1058,29 +1077,16 @@ struct
       let+ json = case in
       json |> Branch_case.of_yojson |> Result.get_ok
     in
+    let cmd = get_exn state.map id in
+    (* Bodge: step in if on func exit placeholder *)
+    let- () =
+      match (case, cmd.data.submap) with
+      | Some FuncExitPlaceholder, Submap submap_id ->
+          Some (submap_id, Debugger_utils.Step)
+      | _ -> None
+    in
     let next_id = step state id case in
     (next_id, Debugger_utils.Step)
-
-  let step_over state id =
-    let node = get_exn state.map id in
-    let () =
-      let () =
-        match node.next with
-        | Some (Branch nexts) ->
-            if List.mem_assoc FuncExitPlaceholder nexts then
-              step state id (Some FuncExitPlaceholder) |> ignore
-        | _ -> ()
-      in
-      let> submap_id =
-        match node.data.submap with
-        | NoSubmap | Proc _ -> None
-        | Submap m -> Some m
-      in
-      let _ = step_all ~start:node state submap_id None in
-      ()
-    in
-    let stop_id = step state id None in
-    (stop_id, Debugger_utils.Step)
 
   let step_in state id =
     let cmd = get_exn state.map id in
@@ -1091,6 +1097,31 @@ struct
       | Submap submap_id -> Some (submap_id, Debugger_utils.Step)
     in
     step_branch state id None
+
+  let step_over state id =
+    let node = get_exn state.map id in
+    let () =
+      let () =
+        match (node.next, node.data.submap) with
+        | Some (Branch nexts), (NoSubmap | Proc _) ->
+            if List.mem_assoc FuncExitPlaceholder nexts then
+              step state id (Some FuncExitPlaceholder) |> ignore
+        | _ -> ()
+      in
+      let node = get_exn state.map id in
+      let> submap_id =
+        match node.data.submap with
+        | NoSubmap | Proc _ -> None
+        | Submap m -> Some m
+      in
+      let _ = step_all ~start:node state submap_id None in
+      ()
+    in
+    let node = get_exn state.map id in
+    (* Failsafe in case of error paths in submap *)
+    match node.next with
+    | Some (Branch [ (FuncExitPlaceholder, _) ]) -> (id, Debugger_utils.Step)
+    | _ -> step_branch state id None
 
   let step_back state id =
     let cmd = get_exn state.map id in
@@ -1180,4 +1211,8 @@ struct
     match init ~proc_name ~all_procs tl_ast prog with
     | None -> failwith "init: wislLifter needs a tl_ast!"
     | Some x -> x
+
+  let parse_and_compile_files ~entrypoint files =
+    WParserAndCompiler.parse_and_compile_files files
+    |> Result.map (fun r -> (r, entrypoint))
 end

@@ -30,6 +30,7 @@ module Public = struct
     close_out out
 
   let enabled () = Option.is_some !rpc_ref
+  let should_log_verbose v = !Utils.Config.debug_log_verbose || not v
   let reset () = if Sys.file_exists file_name then Sys.remove file_name else ()
 
   module Log_event = struct
@@ -43,34 +44,38 @@ module Public = struct
 
   let to_rpc msg json =
     match !rpc_ref with
-    | Some rpc ->
-        to_file
-          (match json with
-          | _ :: _ ->
-              let err_info =
-                match List.assoc_opt "backtrace" json with
-                | Some (`String bt) ->
-                    let json_s =
-                      json |> JsonMap.to_yojson |> Yojson.Safe.pretty_to_string
-                    in
-                    Fmt.str "\n%s\n%s" json_s bt
-                | _ -> ""
-              in
-              msg ^ " (+)" ^ err_info
-          | [] -> msg);
-        Debug_rpc.send_event rpc (module Log_event) { msg; json }
+    | Some rpc -> Debug_rpc.send_event rpc (module Log_event) { msg; json }
     | None -> Lwt.return_unit
 
-  let log_async f =
+  let json_msg_to_file msg json =
+    let full_msg =
+      match json with
+      | _ :: _ ->
+          let err_info =
+            match List.assoc_opt "backtrace" json with
+            | Some (`String bt) ->
+                let json_s =
+                  json |> JsonMap.to_yojson |> Yojson.Safe.pretty_to_string
+                in
+                Fmt.str "\n%s\n%s" json_s bt
+            | _ -> ""
+          in
+          msg ^ " (+)" ^ err_info
+      | [] -> msg
+    in
+    to_file full_msg
+
+  let log_async ?(v = false) f =
     if enabled () then
       let msg, json = get_fmt_with_json f in
-      to_rpc msg json
+      let () = json_msg_to_file msg json in
+      if should_log_verbose v then to_rpc msg json else Lwt.return_unit
     else Lwt.return_unit
 
-  let log f = log_async f |> ignore
+  let log ?v f = log_async ?v f |> ignore
 
-  let show_report id msg =
-    log (fun m ->
+  let show_report ?v id msg =
+    log ?v (fun m ->
         let report_json : Yojson.Safe.t =
           match L.Log_queryer.get_report id with
           | Some (content, type_) ->
@@ -116,7 +121,7 @@ let set_rpc_command_handler rpc ?name module_ f =
     in
     let%lwt () =
       match name with
-      | Some name -> log_async (fun m -> m "%s request received" name)
+      | Some name -> log_async ~v:true (fun m -> m "%s request received" name)
       | None -> Lwt.return_unit
     in
 

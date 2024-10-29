@@ -1,3 +1,5 @@
+type enum_component = Typedefs__.enum_component = { name : string; value : int }
+
 type t = Typedefs__.type_ =
   | Array of t * int
   | Bool
@@ -13,6 +15,8 @@ type t = Typedefs__.type_ =
   | StructTag of string
   | Union of { components : Typedefs__.datatype_component list; tag : string }
   | UnionTag of string
+  | Enum of { components : Typedefs__.enum_component list; tag : string }
+  | EnumTag of string
   | Constructor
   | Empty
   | Vector of { type_ : t; size : int }
@@ -34,6 +38,8 @@ let show_simple = function
   | StructTag _ -> "StructTag"
   | Union _ -> "Union"
   | UnionTag _ -> "UnionTag"
+  | Enum _ -> "Enum"
+  | EnumTag _ -> "EnumTag"
   | Constructor -> "Constructor"
   | Empty -> "Empty"
   | Vector _ -> "Vector"
@@ -132,6 +138,19 @@ let rec of_irep ~(machine : Machine_model.t) (irep : Irep.t) : t =
   | UnionTag ->
       let identifier = irep $ Identifier |> Irep.as_just_string in
       UnionTag identifier
+  | CEnum ->
+      let tag = irep $ Tag |> Irep.as_just_string in
+      let components =
+        (irep $ Body).sub
+        |> List.map (fun irep ->
+               let name = irep $ Identifier |> Irep.as_just_string in
+               let value = irep $ Value |> Irep.as_just_int in
+               { name; value })
+      in
+      Enum { tag; components }
+  | CEnumTag ->
+      let identifier = irep $ Identifier |> Irep.as_just_string in
+      EnumTag identifier
   | Constructor -> Constructor
   | Empty -> Empty
   | other -> failwith ("unhandled type: " ^ Id.to_string other)
@@ -201,13 +220,14 @@ let rec bit_size_of ~(machine : Machine_model.t) ~(tag_lookup : string -> t) t =
   | Double -> 64
   | Signedbv { width } | Unsignedbv { width } -> width
   | Empty -> 0
-  | StructTag x | UnionTag x -> bit_size_of (tag_lookup x)
+  | StructTag x | UnionTag x | EnumTag x -> bit_size_of (tag_lookup x)
   | Struct { components; _ } ->
       List.fold_left (fun x y -> x + dc_bit_size y) 0 components
   | Union { components; _ } ->
       (* I don't have to think about aligning everything on the biggest alignment,
          because Kani sends padding fields when necessary *)
       List.fold_left (fun x y -> max x (dc_bit_size y)) 0 components
+  | Enum _ -> bit_size_of (Signedbv { width = 32 })
   | Bool -> Gerror.code_error "bit_size_of Bool"
   | Code _ -> Gerror.code_error "bit_size_of Code"
   | Constructor -> Gerror.code_error "bit_size_of Constructor"

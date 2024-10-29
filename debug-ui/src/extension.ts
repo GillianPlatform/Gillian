@@ -78,9 +78,34 @@ class DebugAdapterExecutableFactory
     const config = vscode.workspace.getConfiguration('gillianDebugger');
     console.log('Configuring debugger...', { config });
 
+    let extraArgsKey: string | undefined;
+    switch (langCmd) {
+      case 'wisl':
+        extraArgsKey = 'wislArgs';
+        break;
+      case 'gillian-c':
+        extraArgsKey = 'gillianCArgs';
+        break;
+      case 'gillian-js':
+        extraArgsKey = 'gillianJsArgs';
+        break;
+      case 'kanillian':
+        extraArgsKey = 'kanillianArgs';
+        break;
+    }
+
+    let extraArgs: string[] = [];
+    if (extraArgsKey && config[extraArgsKey]) {
+      const workspaceFolder =
+        vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath || '.';
+      extraArgs = config[extraArgsKey].map((arg: string) =>
+        arg.replace('${workspaceFolder}', workspaceFolder)
+      );
+    }
+
     const mode = _session.configuration.execMode || 'debugverify';
 
-    let args = [mode, '-r', 'db'];
+    let args = [mode, '-r', 'db', ...extraArgs];
     if (config.useManualProof) {
       args.push('-m');
     }
@@ -88,13 +113,11 @@ class DebugAdapterExecutableFactory
     let cwd: string;
 
     if (config.runMode === 'installed') {
-      cwd = expandPath(config.outputDirectory || '~/.gillian');
-      let binDirectory = config.binDirectory;
-      if (!binDirectory)
-        throw 'Please specify the location of Gillian binaries';
-      binDirectory = expandPath(binDirectory);
+      cwd = expandPath(config.outputDirectory ||'./.gillian');
+      const binDirectory = config.binDirectory;
+      const path = binDirectory ? expandPath(binDirectory)+'/' : '';
       vscode.workspace.fs.createDirectory(vscode.Uri.file(cwd));
-      cmd = `${binDirectory}/${langCmd}`;
+      cmd = `${path}${langCmd}`;
     } else {
       let sourceDirectory = config.sourceDirectory;
       if (!sourceDirectory)
