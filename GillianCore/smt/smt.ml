@@ -155,6 +155,7 @@ let create_datatype name type_params (variants : (module Variant.S) list) =
     |> List.split
   in
   let decl = declare_datatype name type_params constructors in
+  print_endline (Sexplib.Sexp.to_string decl);
   (decl, recognizer_defs)
 
 let mk_datatype name type_params (variants : (module Variant.S) list) =
@@ -208,8 +209,10 @@ module BvLiteral = struct
   let lit_name = "GIL_BVLiteral"
   let t_lit_name = atom lit_name
   let name (width : int) = Printf.sprintf "Bv_%d" width
-  let accessor = "bv_under_value"
-  let make_mod (width : int) = Variant.un (name width) accessor (t_bits width)
+  let accessor (width : int) = Printf.sprintf "bv_under_value_%d" width
+
+  let make_mod (width : int) =
+    Variant.un (name width) (accessor width) (t_bits width)
 
   let decl_data_type _ =
     let mods =
@@ -382,6 +385,7 @@ module Encoding = struct
   let none_encoding = make ~kind:Simple_wrapped Lit_operations.None.construct
 
   let native typ =
+    print_endline (Type.str typ);
     (match typ with
     | Type.BvType width -> defined_bv_variants := width :: !defined_bv_variants
     | _ -> ());
@@ -465,7 +469,7 @@ module Encoding = struct
       ~accessor:(fun x ->
         let m = BvLiteral.make_mod width in
         let module M = (val m : Variant.Unary) in
-        M.access x)
+        Lit_operations.Bv.access x |> M.access)
       e
 
   let get_set { kind; expr; _ } =
@@ -1048,8 +1052,6 @@ let perform_decls _ =
 
 let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   let () = print_endline "in solver" in
-  let () = perform_decls () in
-  let () = print_endline "after decling" in
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
@@ -1057,6 +1059,8 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
           fs pp_typenv gamma)
   in
   let encoded_assertions = encode_assertions fs gamma in
+  let () = perform_decls () in
+  let () = print_endline "after decling" in
   let () = print_endline "in solver" in
   let () = if true then Dump.dump fs gamma encoded_assertions in
   let () = encoded_assertions |> List.iter (fun a -> cmd a) in
