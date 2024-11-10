@@ -21,6 +21,10 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LISTTYPELIT
 %token TYPETYPELIT
 %token SETTYPELIT
+
+(* BV intrinsics *)
+%token BV_ADD
+
 (* Constants *)
 %token MIN_FLOAT
 %token MAX_FLOAT
@@ -369,6 +373,10 @@ pred_head_target:
 (********* Expressions *********)
 (*******************************)
 
+gbvintrinsic:
+  | BV_ADD { BVOps.BVPlus }
+
+
 expr_target:
 (* literal *)
   | lit=lit_target { Expr.Lit lit }
@@ -437,6 +445,8 @@ expr_target:
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.EForall (vars, e) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, expr_target); COLON; w=INTEGER ; RBRACE
+    { Expr.BVIntrinsic(itname, es, Z.to_int w) }
 ;
 
 top_level_expr_target:
@@ -584,6 +594,7 @@ gcmd_with_annot:
       let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
+
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)
