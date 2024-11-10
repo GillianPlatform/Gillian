@@ -171,6 +171,8 @@ rule read = parse
   | "{{"                 { GIL_Parser.LSTOPEN   }
   | "}}"                 { GIL_Parser.LSTCLOSE  }
 
+  (* Bv intrinsics *)
+  | "bvadd"              {GIL_Parser.BV_ADD}
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
   | "$$max_float"        { GIL_Parser.MAX_FLOAT     }
