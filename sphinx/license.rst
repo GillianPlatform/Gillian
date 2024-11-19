@@ -1,5 +1,5 @@
 Copyright and License
 =====================
 
-.. literalinclude:: ../License
+.. literalinclude:: ../LICENSE
    :language: text
