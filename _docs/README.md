@@ -6,9 +6,9 @@
 
 This code is automatically built and pushed from the [main Gillian repository](https://github.com/GillianPlatform/Gillian/tree/master/sphinx).
 
-See the deployed docs [here](https://github.com/GillianPlatform/GillianPlatform.github.io).
+See the deployed docs [here](https://GillianPlatform.github.io).
 <br/>
-The API reference is available [here](https://GillianPlatform.github.io/api/).
+The API reference is available [here](https://GillianPlatform.github.io/odoc/).
 
 -----
 
