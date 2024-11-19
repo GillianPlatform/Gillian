@@ -23,7 +23,24 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SETTYPELIT
 
 (* BV intrinsics *)
-%token BV_ADD
+%token BVCONCAT
+%token BVEXTRACT
+%token BVNOT
+%token BVAND
+%token BVOR
+%token BVNEG
+%token BVADD
+%token BVMUL
+%token BVUDIV
+%token BVUREM
+%token BVNEGO
+%token BVUADDO
+%token BVSADDO
+%token BVUMULO
+%token BVSMULO
+%token BVSHL
+%token BVLSHR
+%token BVULT
 
 (* Constants *)
 %token MIN_FLOAT
@@ -374,7 +391,25 @@ pred_head_target:
 (*******************************)
 
 gbvintrinsic:
-  | BV_ADD { BVOps.BVPlus }
+| BVCONCAT { BVOps.BVConcat }
+| BVEXTRACT { BVOps.BVExtract }
+| BVNOT { BVOps.BVNot }
+| BVAND { BVOps.BVAnd }
+| BVOR { BVOps.BVOr }
+| BVNEG { BVOps.BVNeg }
+| BVADD { BVOps.BVPlus }
+| BVMUL { BVOps.BVMul } 
+| BVUDIV { BVOps.BVUDiv }
+| BVUREM { BVOps.BVUrem }
+| BVNEGO { BVOps.BVNegO}
+| BVUADDO { BVOps.BVUAddO }
+| BVSADDO { BVOps.BVSAddO }
+| BVUMULO { BVOps.BVUMulO } 
+| BVSMULO { BVOps.BVSMulO }
+| BVSHL { BVOps.BVShl }
+| BVLSHR { BVOps.BVLShr }
+| BVULT { BVOps.BVUlt }
+  
 
 
 expr_target:

@@ -174,11 +174,28 @@ module UnOp : sig
   val str : t -> string
 end
 
-(** @canonical Gillian.Gil_syntax.UnOp *)
+(** @canonical Gillian.Gil_syntax.BVOps *)
 module BVOps : sig
-  (** GIL Unary Operators *)
-
-  type t = BVPlus [@@deriving yojson, eq]
+  type t =
+    | BVConcat
+    | BVExtract
+    | BVNot
+    | BVAnd
+    | BVOr
+    | BVNeg
+    | BVPlus
+    | BVMul
+    | BVUDiv
+    | BVUrem
+    | BVNegO
+    | BVUAddO
+    | BVSAddO
+    | BVUMulO
+    | BVSMulO
+    | BVShl
+    | BVLShr
+    | BVUlt
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string
@@ -1384,9 +1401,24 @@ module Visitors : sig
          ; visit_IMinus : 'c -> BinOp.t -> BinOp.t
          ; visit_IMod : 'c -> BinOp.t -> BinOp.t
          ; visit_IPlus : 'c -> BinOp.t -> BinOp.t
+         ; visit_BVUrem : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVUlt : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVUMulO : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVUDiv : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVUAddO : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVShl : 'c -> BVOps.t -> BVOps.t
          ; visit_BVPlus : 'c -> BVOps.t -> BVOps.t
-         ; visit_ITimes : 'c -> BinOp.t -> BinOp.t
-         ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
+         ; visit_BVSMulO : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVSAddO : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVOr : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVNot : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVNegO : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVNeg : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVMul : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVLShr : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVExtract : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVConcat : 'c -> BVOps.t -> BVOps.t
+         ; visit_BVAnd : 'c ->BVOps.t -> BVOps.t
          ; visit_If :
              'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
          ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
@@ -1657,7 +1689,24 @@ module Visitors : sig
     method visit_IMinus : 'c -> BinOp.t -> BinOp.t
     method visit_IMod : 'c -> BinOp.t -> BinOp.t
     method visit_IPlus : 'c -> BinOp.t -> BinOp.t
+    method visit_BVUrem : 'c -> BVOps.t -> BVOps.t
+    method visit_BVUlt : 'c -> BVOps.t -> BVOps.t
+    method visit_BVUMulO : 'c -> BVOps.t -> BVOps.t
+    method visit_BVUDiv : 'c -> BVOps.t -> BVOps.t
+    method visit_BVUAddO : 'c -> BVOps.t -> BVOps.t
+    method visit_BVShl : 'c -> BVOps.t -> BVOps.t
     method visit_BVPlus : 'c -> BVOps.t -> BVOps.t
+    method visit_BVSMulO : 'c -> BVOps.t -> BVOps.t
+    method visit_BVSAddO : 'c -> BVOps.t -> BVOps.t
+    method visit_BVOr : 'c -> BVOps.t -> BVOps.t
+    method visit_BVNot : 'c -> BVOps.t -> BVOps.t
+    method visit_BVNegO : 'c -> BVOps.t -> BVOps.t
+    method visit_BVNeg : 'c -> BVOps.t -> BVOps.t
+    method visit_BVMul : 'c -> BVOps.t -> BVOps.t
+    method visit_BVLShr : 'c -> BVOps.t -> BVOps.t
+    method visit_BVExtract : 'c -> BVOps.t -> BVOps.t
+    method visit_BVConcat : 'c -> BVOps.t -> BVOps.t
+    method visit_BVAnd : 'c -> BVOps.t -> BVOps.t
     method visit_ITimes : 'c -> BinOp.t -> BinOp.t
     method visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
 
@@ -2010,6 +2059,23 @@ module Visitors : sig
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_BVPlus : 'c -> 'f
+         ; visit_BVUrem : 'c -> 'f
+         ; visit_BVUlt : 'c -> 'f
+         ; visit_BVUMulO : 'c -> 'f
+         ; visit_BVUDiv : 'c -> 'f
+         ; visit_BVUAddO : 'c -> 'f
+         ; visit_BVShl : 'c -> 'f
+         ; visit_BVSMulO : 'c -> 'f
+         ; visit_BVSAddO : 'c -> 'f
+         ; visit_BVOr : 'c -> 'f
+         ; visit_BVNot : 'c -> 'f
+         ; visit_BVNegO : 'c -> 'f
+         ; visit_BVNeg : 'c -> 'f
+         ; visit_BVMul : 'c -> 'f
+         ; visit_BVLShr : 'c -> 'f
+         ; visit_BVExtract : 'c -> 'f
+         ; visit_BVConcat : 'c -> 'f
+         ; visit_BVAnd : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
          ; visit_Pred : 'c -> string -> Expr.t list -> 'f
          ; visit_Pure : 'c -> Formula.t -> 'f
@@ -2252,6 +2318,23 @@ module Visitors : sig
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
     method visit_BVPlus : 'c -> 'f
+    method visit_BVUrem : 'c -> 'f
+    method visit_BVUlt : 'c -> 'f
+    method visit_BVUMulO : 'c -> 'f
+    method visit_BVUDiv : 'c -> 'f
+    method visit_BVUAddO : 'c -> 'f
+    method visit_BVShl : 'c -> 'f
+    method visit_BVSMulO : 'c -> 'f
+    method visit_BVSAddO : 'c -> 'f
+    method visit_BVOr : 'c -> 'f
+    method visit_BVNot : 'c -> 'f
+    method visit_BVNegO : 'c -> 'f
+    method visit_BVNeg : 'c -> 'f
+    method visit_BVMul : 'c -> 'f
+    method visit_BVLShr : 'c -> 'f
+    method visit_BVExtract : 'c -> 'f
+    method visit_BVConcat : 'c -> 'f
+    method visit_BVAnd : 'c -> 'f
     method visit_FPlus : 'c -> 'f
     method visit_Pred : 'c -> string -> Expr.t list -> 'f
     method visit_Pure : 'c -> Formula.t -> 'f
@@ -2429,6 +2512,23 @@ module Visitors : sig
          ; visit_IMod : 'c -> unit
          ; visit_IPlus : 'c -> unit
          ; visit_BVPlus : 'c -> unit
+         ; visit_BVUrem : 'c -> unit
+         ; visit_BVUlt : 'c -> unit
+         ; visit_BVUMulO : 'c -> unit
+         ; visit_BVUDiv : 'c -> unit
+         ; visit_BVUAddO : 'c -> unit
+         ; visit_BVShl : 'c -> unit
+         ; visit_BVSMulO : 'c -> unit
+         ; visit_BVSAddO : 'c -> unit
+         ; visit_BVOr : 'c -> unit
+         ; visit_BVNot : 'c -> unit
+         ; visit_BVNegO : 'c -> unit
+         ; visit_BVNeg : 'c -> unit
+         ; visit_BVMul : 'c -> unit
+         ; visit_BVLShr : 'c -> unit
+         ; visit_BVExtract : 'c -> unit
+         ; visit_BVConcat : 'c -> unit
+         ; visit_BVAnd : 'c -> unit
          ; visit_ITimes : 'c -> unit
          ; visit_IUnaryMinus : 'c -> unit
          ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
@@ -2674,6 +2774,23 @@ module Visitors : sig
     method visit_IMinus : 'c -> unit
     method visit_IMod : 'c -> unit
     method visit_BVPlus : 'c -> unit
+    method visit_BVUrem : 'c -> unit
+    method visit_BVUlt : 'c -> unit
+    method visit_BVUMulO : 'c -> unit
+    method visit_BVUDiv : 'c -> unit
+    method visit_BVUAddO : 'c -> unit
+    method visit_BVShl : 'c -> unit
+    method visit_BVSMulO : 'c -> unit
+    method visit_BVSAddO : 'c -> unit
+    method visit_BVOr : 'c -> unit
+    method visit_BVNot : 'c -> unit
+    method visit_BVNegO : 'c -> unit
+    method visit_BVNeg : 'c -> unit
+    method visit_BVMul : 'c -> unit
+    method visit_BVLShr : 'c -> unit
+    method visit_BVExtract : 'c -> unit
+    method visit_BVConcat : 'c -> unit
+    method visit_BVAnd : 'c -> unit
     method visit_IPlus : 'c -> unit
     method visit_ITimes : 'c -> unit
     method visit_IUnaryMinus : 'c -> unit
