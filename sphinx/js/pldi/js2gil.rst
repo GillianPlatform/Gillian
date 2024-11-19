@@ -17,9 +17,9 @@ Additionally, indirect ``eval`` is not supported, as it is meant to be executed 
 Correctness of JS-2-GIL
 -----------------------
 
-The JS-2-GIL compiler can be split into two compilers: JS-2-JSIL, which compiles JavaScript to JSIL, the intermediate representation that we have used in :doc:`../publications/javert` / :doc:`../publications/cosette` / :doc:`../publications/javert-2`; and JSIL-2-GIL, the compiler from JSIL to GIL, the intermediate representation of Gillian.
+The JS-2-GIL compiler can be split into two compilers: JS-2-JSIL, which compiles JavaScript to JSIL, the intermediate representation that we have used in :doc:`../../publications/javert` / :doc:`../../publications/cosette` / :doc:`../../publications/javert-2`; and JSIL-2-GIL, the compiler from JSIL to GIL, the intermediate representation of Gillian.
 
-Previously, we have tested JS-2-JSIL against Test262, the JavaScript official test suite (specifically, `this commit from 2016/05/30 <https://github.com/tc39/test262/commit/91d06f>`_). As Test262 commit targets ES6, we had to identify the subset of tests that are appropriate for JS-2-JSIL, as explained in detail in :doc:`../publications/javert`. We obtained 8797 applicable tests, of which JS-2-JSIL passes 100%.
+Previously, we have tested JS-2-JSIL against Test262, the JavaScript official test suite (specifically, `this commit from 2016/05/30 <https://github.com/tc39/test262/commit/91d06f>`_). As Test262 commit targets ES6, we had to identify the subset of tests that are appropriate for JS-2-JSIL, as explained in detail in :doc:`../../publications/javert`. We obtained 8797 applicable tests, of which JS-2-JSIL passes 100%.
 
 We have initially tested JS-2-GIL successfully on the same 8797 tests and reported this in the submitted version of the paper. However, these tests were not systematically categorised and we were not able to automate the testing process to our satisfaction using the bulk testing mechanism of Gillian. For this reason, we have chosen to work with the latest version of Test262, forked `here <https://github.com/GillianPlatform/javert-test262>`_, where each test comes with a precise description of its intended outcome. For example, a test that is supposed to fail at parsing time with a JavaScript native syntax error will contain the following in its header:
 
