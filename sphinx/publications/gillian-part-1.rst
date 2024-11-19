@@ -16,17 +16,16 @@ We introduce Gillian, a language-independent framework for the development of sy
 
 Venue
 -----
-PLDI 2020: Proceedings of the 41st ACM SIGPLAN Conference on Programming Language Design and Implementation
+Conference on Programming Language Design and Implementation (PLDI)
 
-Publication Date
-----------------
-June 2020
+Year
+----
+2020
 
-Identifiers
+DOI
 -----------
 * doi:`10.1145/3385412.3386014 <https://doi.org/10.1145/3385412.3386014>`_
 
 Notes
 -----
-
 * :doc:`gillian-part-1-diff`

@@ -17,12 +17,12 @@ We present a framework for trustworthy symbolic execution of JavaScripts program
 
 Venue
 -----
-Proceedings of the 20th International Symposium on Principles and Practice of Declarative Programming, PPDP 2018, Frankfurt am Main, Germany, September 03-05, 2018, pp. 11:1–11:14
+International Symposium on Principles and Practice of Declarative Programming (PPDP)
 
-Publication Date
-----------------
-September 2018
+Year
+----
+2018
 
-Identifiers
------------
-* doi:`10.1145/3236950.3236956 <https://dl.acm.org/doi/10.1145/3236950.3236956>`_
+DOI
+---
+* doi:`10.1145/3236950.3236956 <https://doi.org/10.1145/3236950.3236956>`_

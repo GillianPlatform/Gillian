@@ -17,12 +17,12 @@ The dynamic nature of JavaScript and its complex semantics make it a difficult t
 
 Venue
 -----
-PACMPL, vol. 2 (POPL), pp. 50:1–50:33
+Symposium on Principles of Programming Languages (POPL)
 
-Publication Date
-----------------
-2019
+Year
+----
+2018
 
-Identifiers
------------
-* doi:`10.1145/3158138 <https://dl.acm.org/doi/10.1145/3236950.3236956>`_
+DOI
+---
+* doi:`10.1145/3158138 <https://doi.org/10.1145/3158138>`_
