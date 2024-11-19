@@ -25,4 +25,5 @@ Gillian is a multi-language analysis platform supporting, e.g., verification and
 
    API reference </odoc#http://>
    publications/index
+   other-publications/index
    license
