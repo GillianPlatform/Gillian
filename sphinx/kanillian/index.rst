@@ -1,4 +1,4 @@
-Kanillian (alternative C instantiation)
+Kanillian (Alternative C Instantiation)
 =======================================
 
 .. danger::
