@@ -131,7 +131,26 @@ and unop =
   | IsInt
 
 and nop = LstCat | SetUnion | SetInter
-and bvop = BVPlus
+
+and bvop =
+  | BVConcat
+  | BVExtract
+  | BVNot
+  | BVAnd
+  | BVOr
+  | BVNeg
+  | BVPlus
+  | BVMul
+  | BVUDiv
+  | BVUrem
+  | BVNegO
+  | BVUAddO
+  | BVSAddO
+  | BVUMulO
+  | BVSMulO
+  | BVShl
+  | BVLShr
+  | BVUlt
 
 and expr =
   | Lit of literal
