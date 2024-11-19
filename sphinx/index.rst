@@ -1,7 +1,7 @@
 Welcome to Gillian
 ====================
 
-Gillian is a multi-language analysis platform supporting, e.g., verification and symbolic testing. Gillian has currently by instantiated to C, JavaScript, and Rust.
+Gillian is a multi-language analysis platform supporting, e.g., verification and symbolic testing. Gillian has currently been instantiated to C, JavaScript, and Rust.
 
 .. toctree::
    :titlesonly:
