@@ -29,7 +29,4 @@ Identifiers
 Notes
 -----
 
-.. toctree::
-  :maxdepth: 1
-  
-  gillian-part-1-diff
+* :doc:`gillian-part-1-diff`
