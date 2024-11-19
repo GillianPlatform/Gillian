@@ -131,6 +131,7 @@ html_theme_options = {
   },
 }
 html_favicon = '_static/img/favicon.ico'
+html_title = 'Gillian documentation'
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
