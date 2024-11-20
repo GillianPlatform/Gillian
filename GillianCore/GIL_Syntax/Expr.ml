@@ -1,12 +1,12 @@
 open Names
 
-(** GIL Expressions *)
+(* TypeDef__.expr = *)
 type t = TypeDef__.expr =
   | Lit of Literal.t  (** GIL literals           *)
   | PVar of string  (** GIL program variables  *)
   | LVar of LVar.t  (** GIL logical variables  *)
   | ALoc of string  (** GIL abstract locations *)
-  | BVIntrinsic of BVOps.t * t list * int
+  | BVIntrinsic of BVOps.t * bv_arg list * Type.t
   | UnOp of UnOp.t * t  (** Unary operators         *)
   | BinOp of t * BinOp.t * t  (** Binary operators        *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
@@ -17,6 +17,8 @@ type t = TypeDef__.expr =
       (** Existential quantification. *)
   | ForAll of (string * Type.t option) list * t
       (** Universal quantification. *)
+
+and bv_arg = TypeDef__.bv_arg = Literal of int | TypedExpr of (t * Type.t)
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -403,9 +405,11 @@ let rec pp fmt e =
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
   | BVIntrinsic (op, es, width) ->
-      Fmt.pf fmt "%s(%a : %d)" (BVOps.str op)
+      Fmt.pf fmt "%s(%a : %a)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp)
-        es width
+        es
+        (Fmt.list ~sep:Fmt.comma Fmt.int)
+        width
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->

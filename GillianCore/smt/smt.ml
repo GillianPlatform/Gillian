@@ -776,12 +776,17 @@ let encode_quantified_expr
   native ~consts ~extra_asrts BooleanType expr
 
 let encode_bvop (op : BVOps.t) (width : int) (bvs : sexp list) : Encoding.t =
-  let sexpr, w =
+  let binop_encode (f : sexp -> sexp -> sexp) =
+    f (List.hd bvs) (List.nth bvs 1)
+  in
+  let sexpr =
     match op with
-    | BVOps.BVPlus -> (bv_add (List.hd bvs) (List.nth bvs 1), width)
+    | BVOps.BVPlus -> binop_encode bv_add
+    | BVOps.BVAnd -> binop_encode bv_and
+    | BVConcat -> binop_encode bv_concat
     (* | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))*)
   in
-  Encoding.native (Gil_syntax.Type.BvType w) sexpr
+  Encoding.native (Gil_syntax.Type.BvType width) sexpr
 
 let rec encode_logical_expression
     ~(gamma : typenv)
@@ -808,7 +813,9 @@ let rec encode_logical_expression
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | BVIntrinsic (op, es, width) ->
       let>-- les = List.map f es in
-      les |> List.map (fun x -> get_bv width x) |> encode_bvop op width
+      List.combine les width
+      |> List.map (fun (x, w) -> get_bv w x)
+      |> encode_bvop op (List.nth width (List.length width - 1))
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
       les |> List.map get_set |> set_union' Z3 >- SetType

@@ -152,12 +152,14 @@ and bvop =
   | BVLShr
   | BVUlt
 
+and bv_arg = Literal of int | TypedExpr of (expr * typ)
+
 and expr =
   | Lit of literal
   | PVar of string
   | LVar of string
   | ALoc of string
-  | BVIntrinsic of bvop * expr list * int
+  | BVIntrinsic of bvop * bv_arg list * typ
   | UnOp of unop * expr
   | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr

@@ -21,6 +21,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LISTTYPELIT
 %token TYPETYPELIT
 %token SETTYPELIT
+%token BVTYPELIT
 
 (* BV intrinsics *)
 %token BVCONCAT
@@ -1310,4 +1311,5 @@ type_target:
   | LISTTYPELIT  { Type.ListType }
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
+  | BVTYPELIT LBRACE width=INTEGER RBRACE {Type.BvType(width)}
 ;
