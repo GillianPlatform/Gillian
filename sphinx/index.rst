@@ -9,6 +9,7 @@ Gillian is a multi-language analysis platform supporting, e.g., verification and
    install
    develop
    debugger
+   API reference </odoc#http://>
 
 .. toctree::
    :titlesonly:
@@ -23,7 +24,6 @@ Gillian is a multi-language analysis platform supporting, e.g., verification and
    :titlesonly:
    :caption: About Gillian
 
-   API reference </odoc#http://>
    publications/index
    other-publications/index
    license
