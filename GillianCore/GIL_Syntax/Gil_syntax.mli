@@ -283,7 +283,7 @@ module Expr : sig
     | PVar of string  (** GIL program variables *)
     | LVar of string  (** GIL logical variables (interpreted symbols) *)
     | ALoc of string  (** GIL abstract locations (uninterpreted symbols) *)
-    | BVIntrinsic of BVOps.t * t list * int list
+    | BVIntrinsic of BVOps.t * bv_arg list * Type.t
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)
@@ -293,7 +293,8 @@ module Expr : sig
     | Exists of (string * Type.t option) list * t
         (** Existential quantification. *)
     | ForAll of (string * Type.t option) list * t
-  [@@deriving yojson]
+
+  and bv_arg = Literal of int | BvExpr of (t * int) [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
     Operations will be optimised away if possible, e.g. [type_ (EList x)] will give [Lit (Type ListType)] directly instead of using {!UnOp.TypeOf} *)
@@ -1162,7 +1163,7 @@ module Visitors : sig
          ; visit_Assume : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
          ; visit_BVIntrinsic :
-             'c -> Expr.t -> BVOps.t -> Expr.t list -> int list -> Expr.t
+             'c -> Expr.t -> BVOps.t -> Expr.bv_arg list -> Type.t -> Expr.t
          ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
          ; visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
          ; visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
@@ -1179,6 +1180,7 @@ module Visitors : sig
          ; visit_BvType : 'c -> Type.t -> int -> Type.t
          ; visit_Branch : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_Bug : 'c -> Flag.t -> Flag.t
+         ; visit_BvExpr : 'c -> Expr.bv_arg -> Expr.t * int -> Expr.bv_arg
          ; visit_Call :
              'c ->
              'f Cmd.t ->
@@ -1285,6 +1287,7 @@ module Visitors : sig
          ; visit_ListType : 'c -> Type.t -> Type.t
          ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
          ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
+         ; visit_Literal : 'c -> Expr.bv_arg -> int -> Expr.bv_arg
          ; visit_LocalTime : 'c -> Constant.t -> Constant.t
          ; visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
          ; visit_LstCat : 'c -> NOp.t -> NOp.t
@@ -1413,6 +1416,7 @@ module Visitors : sig
          ; visit_slcmd : 'c -> SLCmd.t -> SLCmd.t
          ; visit_spec : 'c -> Spec.t -> Spec.t
          ; visit_typ : 'c -> Type.t -> Type.t
+         ; visit_bv_arg : 'c -> Expr.bv_arg -> Expr.bv_arg
          ; visit_bvop : 'c -> BVOps.t -> BVOps.t
          ; visit_unop : 'c -> UnOp.t -> UnOp.t
          ; .. >
@@ -1441,7 +1445,7 @@ module Visitors : sig
     method visit_BSetSub : 'c -> BinOp.t -> BinOp.t
 
     method visit_BVIntrinsic :
-      'c -> Expr.t -> BVOps.t -> Expr.t list -> int list -> Expr.t
+      'c -> Expr.t -> BVOps.t -> Expr.bv_arg list -> Type.t -> Expr.t
 
     method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
     method visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
@@ -1459,6 +1463,7 @@ module Visitors : sig
     method visit_BvType : 'c -> Type.t -> int -> Type.t
     method visit_Branch : 'c -> LCmd.t -> Expr.t -> LCmd.t
     method visit_Bug : 'c -> Flag.t -> Flag.t
+    method visit_BvExpr : 'c -> Expr.bv_arg -> Expr.t * int -> Expr.bv_arg
 
     method visit_Call :
       'c ->
@@ -1570,6 +1575,7 @@ module Visitors : sig
     method visit_IsInt : 'c -> UnOp.t -> UnOp.t
     method visit_ListType : 'c -> Type.t -> Type.t
     method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
+    method visit_Literal : 'c -> Expr.bv_arg -> int -> Expr.bv_arg
     method visit_Loc : 'c -> Literal.t -> string -> Literal.t
     method visit_LocalTime : 'c -> Constant.t -> Constant.t
     method visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
@@ -1738,6 +1744,7 @@ module Visitors : sig
     method private visit_string : 'env. 'env -> string -> string
     method visit_typ : 'c -> Type.t -> Type.t
     method private visit_unit : 'env. 'env -> unit -> unit
+    method visit_bv_arg : 'c -> Expr.bv_arg -> Expr.bv_arg
     method visit_bvop : 'c -> BVOps.t -> BVOps.t
     method visit_unop : 'c -> UnOp.t -> UnOp.t
   end
@@ -1757,7 +1764,7 @@ module Visitors : sig
          ; visit_Assume : 'c -> Expr.t -> 'f
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
-         ; visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int list -> 'f
+         ; visit_BVIntrinsic : 'c -> BVOps.t -> Expr.bv_arg list -> Type.t -> 'f
          ; visit_BitwiseAnd : 'c -> 'f
          ; visit_BitwiseAndL : 'c -> 'f
          ; visit_BitwiseAndF : 'c -> 'f
@@ -1772,6 +1779,7 @@ module Visitors : sig
          ; visit_BooleanType : 'c -> 'f
          ; visit_BvType : 'c -> int -> 'f
          ; visit_Branch : 'c -> Expr.t -> 'f
+         ; visit_BvExpr : 'c -> Expr.t * int -> 'f
          ; visit_Bug : 'c -> 'f
          ; visit_Call :
              'c ->
@@ -1827,6 +1835,7 @@ module Visitors : sig
          ; visit_FLessThanEqual : 'c -> 'f
          ; visit_ListType : 'c -> 'f
          ; visit_Lit : 'c -> Literal.t -> 'f
+         ; visit_Literal : 'c -> int -> 'f
          ; visit_Loc : 'c -> string -> 'f
          ; visit_LocalTime : 'c -> 'f
          ; visit_Logic : 'c -> LCmd.t -> 'f
@@ -1961,6 +1970,8 @@ module Visitors : sig
          ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
          ; visit_binop : 'c -> BinOp.t -> 'f
          ; visit_bispec : 'c -> BiSpec.t -> 'f
+         ; visit_bvop : 'c -> BVOps.t -> 'f
+         ; visit_bv_arg : 'c -> Expr.bv_arg -> 'f
          ; visit_cmd : 'c -> 'g Cmd.t -> 'f
          ; visit_constant : 'c -> Constant.t -> 'f
          ; visit_expr : 'c -> Expr.t -> 'f
@@ -1999,7 +2010,7 @@ module Visitors : sig
     method visit_BImpl : 'c -> 'f
     method visit_BSetMem : 'c -> 'f
     method visit_BSetSub : 'c -> 'f
-    method visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int list -> 'f
+    method visit_BVIntrinsic : 'c -> BVOps.t -> Expr.bv_arg list -> Type.t -> 'f
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
     method visit_BitwiseAnd : 'c -> 'f
     method visit_BitwiseAndL : 'c -> 'f
@@ -2015,6 +2026,7 @@ module Visitors : sig
     method visit_BooleanType : 'c -> 'f
     method visit_BvType : 'c -> int -> 'f
     method visit_Branch : 'c -> Expr.t -> 'f
+    method visit_BvExpr : 'c -> Expr.t * int -> 'f
     method visit_Bug : 'c -> 'f
 
     method visit_Call :
@@ -2078,6 +2090,7 @@ module Visitors : sig
     method visit_Lit : 'c -> Literal.t -> 'f
     method visit_Loc : 'c -> string -> 'f
     method visit_LocalTime : 'c -> 'f
+    method visit_Literal : 'c -> int -> 'f
     method visit_Logic : 'c -> LCmd.t -> 'f
     method visit_LstCat : 'c -> 'f
     method visit_LstLen : 'c -> 'f
@@ -2208,6 +2221,8 @@ module Visitors : sig
     method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
     method visit_binop : 'c -> BinOp.t -> 'f
     method visit_bispec : 'c -> BiSpec.t -> 'f
+    method visit_bv_arg : 'c -> Expr.bv_arg -> 'f
+    method visit_bvop : 'c -> BVOps.t -> 'f
     method visit_cmd : 'c -> 'g Cmd.t -> 'f
     method visit_constant : 'c -> Constant.t -> 'f
     method visit_expr : 'c -> Expr.t -> 'f
@@ -2248,7 +2263,8 @@ module Visitors : sig
          ; visit_BImpl : 'c -> unit
          ; visit_BSetMem : 'c -> unit
          ; visit_BSetSub : 'c -> unit
-         ; visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int list -> unit
+         ; visit_BVIntrinsic :
+             'c -> BVOps.t -> Expr.bv_arg list -> Type.t -> unit
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
          ; visit_BitwiseAnd : 'c -> unit
          ; visit_BitwiseAndL : 'c -> unit
@@ -2265,6 +2281,7 @@ module Visitors : sig
          ; visit_BvType : 'c -> int -> unit
          ; visit_Branch : 'c -> Expr.t -> unit
          ; visit_Bug : 'c -> unit
+         ; visit_BvExpr : 'c -> Expr.t * int -> unit
          ; visit_Call :
              'c ->
              string ->
@@ -2350,6 +2367,7 @@ module Visitors : sig
          ; visit_IsInt : 'c -> unit
          ; visit_ListType : 'c -> unit
          ; visit_Lit : 'c -> Literal.t -> unit
+         ; visit_Literal : 'c -> int -> unit
          ; visit_Loc : 'c -> string -> unit
          ; visit_LocalTime : 'c -> unit
          ; visit_Logic : 'c -> LCmd.t -> unit
@@ -2453,6 +2471,8 @@ module Visitors : sig
          ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
          ; visit_binop : 'c -> BinOp.t -> unit
          ; visit_bispec : 'c -> BiSpec.t -> unit
+         ; visit_bv_arg : 'c -> Expr.bv_arg -> unit
+         ; visit_bvop : 'c -> BVOps.t -> unit
          ; visit_cmd : 'c -> 'f Cmd.t -> unit
          ; visit_constant : 'c -> Constant.t -> unit
          ; visit_expr : 'c -> Expr.t -> unit
@@ -2490,7 +2510,10 @@ module Visitors : sig
     method visit_BImpl : 'c -> unit
     method visit_BSetMem : 'c -> unit
     method visit_BSetSub : 'c -> unit
-    method visit_BVIntrinsic : 'c -> BVOps.t -> Expr.t list -> int list -> unit
+
+    method visit_BVIntrinsic :
+      'c -> BVOps.t -> Expr.bv_arg list -> Type.t -> unit
+
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
     method visit_BitwiseAnd : 'c -> unit
     method visit_BitwiseAndL : 'c -> unit
@@ -2507,6 +2530,7 @@ module Visitors : sig
     method visit_BvType : 'c -> int -> unit
     method visit_Branch : 'c -> Expr.t -> unit
     method visit_Bug : 'c -> unit
+    method visit_BvExpr : 'c -> Expr.t * int -> unit
 
     method visit_Call :
       'c ->
@@ -2600,6 +2624,7 @@ module Visitors : sig
     method visit_IsInt : 'c -> unit
     method visit_ListType : 'c -> unit
     method visit_Lit : 'c -> Literal.t -> unit
+    method visit_Literal : 'c -> int -> unit
     method visit_Loc : 'c -> string -> unit
     method visit_LocalTime : 'c -> unit
     method visit_Logic : 'c -> LCmd.t -> unit
@@ -2710,6 +2735,8 @@ module Visitors : sig
     method visit_bindings : 'c -> string * (string * Expr.t) list -> unit
     method visit_binop : 'c -> BinOp.t -> unit
     method visit_bispec : 'c -> BiSpec.t -> unit
+    method visit_bv_arg : 'c -> Expr.bv_arg -> unit
+    method visit_bvop : 'c -> BVOps.t -> unit
     method private visit_bool : 'env. 'env -> bool -> unit
     method private visit_bytes : 'env. 'env -> bytes -> unit
     method private visit_char : 'env. 'env -> char -> unit
