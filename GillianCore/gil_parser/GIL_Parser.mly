@@ -411,7 +411,9 @@ gbvintrinsic:
 | BVLSHR { BVOps.BVLShr }
 | BVULT { BVOps.BVUlt }
   
-
+bv_arg_target:
+  | BVTYPELIT LBRACE e=expr_target COMMA width=INTEGER RBRACE { Expr.BvExpr(e,Z.to_int width) }
+  | n = INTEGER { Expr.Literal(Z.to_int n) }
 
 expr_target:
 (* literal *)
@@ -481,8 +483,8 @@ expr_target:
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.EForall (vars, e) }
-  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, expr_target); COLON; w=INTEGER ; RBRACE
-    { Expr.BVIntrinsic(itname, es, Z.to_int w) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; ty=type_target ; RBRACE
+    { Expr.BVIntrinsic(itname, es, ty) }
 ;
 
 top_level_expr_target:
@@ -1266,5 +1268,5 @@ type_target:
   | LISTTYPELIT  { Type.ListType }
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
-  | BVTYPELIT LBRACE width=INTEGER RBRACE {Type.BvType(width)}
+  | BVTYPELIT LBRACE width=INTEGER RBRACE {Type.BvType(Z.to_int width)}
 ;
