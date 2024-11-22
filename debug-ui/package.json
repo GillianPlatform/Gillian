@@ -120,86 +120,158 @@
     "onLanguage:c"
   ],
   "contributes": {
-    "configuration": {
-      "title": "Gillian Debugger",
-      "properties": {
-        "gillianDebugger.outputDirectory": {
-          "type": "string",
-          "default": "~/.gillian",
-          "description": "Gillian's output directory, i.e. where logs will be stored."
-        },
-        "gillianDebugger.runMode": {
-          "type": "string",
-          "enum": [
-            "installed",
-            "source"
-          ],
-          "default": "source",
-          "enumDescriptions": [
-            "Run installed Gillian binaries",
-            "Run Gillian from source, using the current opam switch."
-          ],
-          "description": "Specifies how to run Gillian."
-        },
-        "gillianDebugger.binDirectory": {
-          "type": "string",
-          "default": "",
-          "description": "The location of the Gillian binaries, if you're using installed Gillian."
-        },
-        "gillianDebugger.sourceDirectory": {
-          "type": "string",
-          "default": "",
-          "description": "The location of the Gillian source code, if you're running from source."
-        },
-        "gillianDebugger.useManualProof": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enables manual proof mode, i.e. disables automatical folding/unfolding."
-        },
-        "gillianDebugger.showVerifyLens": {
-          "type": "boolean",
-          "default": true,
-          "description": "Shows 'Verify' buttons by verifyable functions."
-        },
-        "gillianDebugger.showSymbolicDebugLens": {
-          "type": "boolean",
-          "default": true,
-          "description": "Shows 'Symbolic-debug' buttons by symbolically-debuggable functions."
-        },
-        "gillianDebugger.wislArgs": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
+    "configuration": [
+      {
+        "title": "Gillian Debugger",
+        "properties": {
+          "gillianDebugger.outputDirectory": {
+            "type": "string",
+            "default": "~/.gillian",
+            "description": "Gillian's output directory, i.e. where logs will be stored."
           },
-          "description": "Command-line arguments when invoking WISL"
-        },
-        "gillianDebugger.gillianCArgs": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
+          "gillianDebugger.runMode": {
+            "type": "string",
+            "enum": [
+              "installed",
+              "source"
+            ],
+            "default": "source",
+            "enumDescriptions": [
+              "Run installed Gillian binaries",
+              "Run Gillian from source, using the current opam switch."
+            ],
+            "description": "Specifies how to run Gillian."
           },
-          "description": "Command-line arguments when invoking Gillian-C"
-        },
-        "gillianDebugger.gillianJsArgs": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
+          "gillianDebugger.binDirectory": {
+            "type": "string",
+            "default": "",
+            "description": "The location of the Gillian binaries; only relevant if #gillianDebugger.runMode# is `installed`."
           },
-          "description": "Command-line arguments when invoking Gillian-JS"
-        },
-        "gillianDebugger.kanillianArgs": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
+          "gillianDebugger.sourceDirectory": {
+            "type": "string",
+            "default": "",
+            "description": "The location of the Gillian source code, only relevant if #gillianDebugger.runMode# is `source`."
           },
-          "description": "Command-line arguments when invoking Kanillian"
+          "gillianDebugger.useManualProof": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enables manual proof mode, i.e. disables automatical folding/unfolding."
+          }
+        }
+      },
+      {
+        "id": "gillianDebugger.wisl",
+        "title": "WISL",
+        "properties": {
+          "gillianDebugger.wisl.showVerifyButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.wisl.showSymbolicDebugButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.wisl.commandLineArguments": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            }
+          },
+          "gillianDebugger.wisl.environmentVariables": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "id": "gillianDebugger.gillian-c",
+        "title": "Gillian-C",
+        "properties": {
+          "gillianDebugger.gillian-c.showVerifyButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.gillian-c.showSymbolicDebugButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.gillian-c.commandLineArguments": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            }
+          },
+          "gillianDebugger.gillian-c.environmentVariables": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "id": "gillianDebugger.gillian-js",
+        "title": "Gillian-JS",
+        "properties": {
+          "gillianDebugger.gillian-js.showVerifyButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.gillian-js.showSymbolicDebugButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.gillian-js.commandLineArguments": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            }
+          },
+          "gillianDebugger.gillian-js.environmentVariables": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "id": "gillianDebugger.kanillian",
+        "title": "Kanillian",
+        "properties": {
+          "gillianDebugger.kanillian.showVerifyButton": {
+            "type": "boolean",
+            "default": false
+          },
+          "gillianDebugger.kanillian.showSymbolicDebugButton": {
+            "type": "boolean",
+            "default": true
+          },
+          "gillianDebugger.kanillian.commandLineArguments": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string"
+            }
+          },
+          "gillianDebugger.kanillian.environmentVariables": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
         }
       }
-    },
+    ],
     "menus": {
       "debug/toolBar": [
         {
