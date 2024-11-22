@@ -3,7 +3,7 @@
   "publisher": "gillianplatform",
   "displayName": "Gillian Debugger",
   "icon": "gillian-debugging.png",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "description": "Debugger for Gillian.",
   "author": {
     "name": "Verified Trustworthy Software Specification Group at Imperial College",
@@ -145,12 +145,12 @@
           "gillianDebugger.binDirectory": {
             "type": "string",
             "default": "",
-            "description": "The location of the Gillian binaries; only relevant if #gillianDebugger.runMode# is `installed`."
+            "markdownDescription": "The location of the Gillian binaries; only relevant if `#gillianDebugger.runMode#` is `installed`."
           },
           "gillianDebugger.sourceDirectory": {
             "type": "string",
             "default": "",
-            "description": "The location of the Gillian source code, only relevant if #gillianDebugger.runMode# is `source`."
+            "markdownDescription": "The location of the Gillian source code, only relevant if `#gillianDebugger.runMode#` is `source`."
           },
           "gillianDebugger.useManualProof": {
             "type": "boolean",
