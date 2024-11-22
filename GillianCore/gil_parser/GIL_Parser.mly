@@ -390,7 +390,9 @@ gbvintrinsic:
 | BVLSHR { BVOps.BVLShr }
 | BVULT { BVOps.BVUlt }
   
-
+bv_arg_target:
+  | BVTYPELIT LBRACE e=expr_target COMMA width=INTEGER RBRACE { Expr.BvExpr(e,Z.to_int width) }
+  | n = INTEGER { Expr.Literal(Z.to_int n) }
 atomic_expr_target:
 (* literal *)
   | lit=lit_target { Expr.Lit lit }
@@ -478,8 +480,8 @@ muldiv_expr:
     { Expr.BinOp (e1, FMod, e2) }
   | e1 = muldiv_expr; ITIMES; e2 = unary_op_expr
     { Expr.BinOp (e1, ITimes, e2) }
-  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, expr_target); COLON; w=INTEGER ; RBRACE
-    { Expr.BVIntrinsic(itname, es, Z.to_int w) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; ty=type_target ; RBRACE
+    { Expr.BVIntrinsic(itname, es, ty) }
   | e1 = muldiv_expr; IDIV; e2 = unary_op_expr
     { Expr.BinOp (e1, IDiv, e2) }
   | e1 = muldiv_expr; IMOD; e2 = unary_op_expr
@@ -1311,5 +1313,5 @@ type_target:
   | LISTTYPELIT  { Type.ListType }
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
-  | BVTYPELIT LBRACE width=INTEGER RBRACE {Type.BvType(width)}
+  | BVTYPELIT LBRACE width=INTEGER RBRACE {Type.BvType(Z.to_int width)}
 ;

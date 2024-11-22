@@ -22,7 +22,7 @@
         "List",      GIL_Parser.LISTTYPELIT;
         "Type",      GIL_Parser.TYPETYPELIT;
         "Set",       GIL_Parser.SETTYPELIT;
-        "Bitvector", GIL_Parser.BVTYPELIT
+        "Bitvector", GIL_Parser.BVTYPELIT;
 
         (* Literals *)
         "undefined", GIL_Parser.UNDEFINED;
