@@ -151,7 +151,7 @@ and bvop =
   | BVLShr
   | BVUlt
 
-and bv_arg = Literal of int | TypedExpr of (expr * typ)
+and bv_arg = Literal of int | BvExpr of (expr * int)
 
 and expr =
   | Lit of literal

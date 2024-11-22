@@ -17,8 +17,8 @@ type t = TypeDef__.expr =
       (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
   | EForall of (string * Type.t option) list * t
 
-and bv_arg = TypeDef__.bv_arg = Literal of int | TypedExpr of (t * Type.t)
-[@@deriving eq, ord]
+and bv_arg = TypeDef__.bv_arg = Literal of int | BvExpr of (t * int)
+[@@deriving eq, ord, yojson]
 
 let to_yojson = TypeDef__.expr_to_yojson
 let of_yojson = TypeDef__.expr_of_yojson
@@ -314,9 +314,14 @@ let rec map_opt
         match mapped_expr with
         | Lit _ | LVar _ | ALoc _ | PVar _ -> Some mapped_expr
         | UnOp (op, e) -> Option.map (fun e -> UnOp (op, e)) (map_e e)
-        | BVIntrinsic (op, es, width) ->
-            List.map map_e es |> sequence_opt
-            |> Option.map (fun args -> BVIntrinsic (op, args, width))
+        | BVIntrinsic (op, es, rty) ->
+            let map_bv_arg = function
+              | Literal w -> Some (Literal w)
+              | BvExpr (e, w) -> map_e e |> Option.map (fun x -> BvExpr (x, w))
+            in
+
+            List.map map_bv_arg es |> sequence_opt
+            |> Option.map (fun args -> BVIntrinsic (op, args, rty))
         | BinOp (e1, op, e2) -> (
             match (map_e e1, map_e e2) with
             | Some e1', Some e2' -> Some (BinOp (e1', op, e2'))
@@ -349,12 +354,10 @@ let rec pp fmt e =
   match e with
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
-  | BVIntrinsic (op, es, width) ->
-      Fmt.pf fmt "%s(%a : %a)" (BVOps.str op)
-        (Fmt.list ~sep:Fmt.comma pp)
-        es
-        (Fmt.list ~sep:Fmt.comma Fmt.int)
-        width
+  | BVIntrinsic (op, es, rty) ->
+      Fmt.pf fmt "%s(%a: %a)" (BVOps.str op)
+        (Fmt.list ~sep:Fmt.comma pp_bv_arg)
+        es Type.pp rty
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->
@@ -378,6 +381,11 @@ let rec pp fmt e =
       Fmt.pf fmt "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
+
+and pp_bv_arg fmt (arg : bv_arg) =
+  match arg with
+  | Literal w -> Fmt.pf fmt "lit(%d)" w
+  | BvExpr (e, w) -> Fmt.pf fmt "expr(%a, %d)" pp e w
 
 let rec full_pp fmt e =
   match e with
@@ -439,7 +447,13 @@ let rec is_concrete (le : t) : bool =
   match le with
   | Lit _ | PVar _ -> true
   | LVar _ | ALoc _ | Exists _ | EForall _ -> false
-  | BVIntrinsic (_, es, _) -> loop es
+  | BVIntrinsic (_, es, _) ->
+      loop
+        (List.filter_map
+           (function
+             | Literal _ -> None
+             | BvExpr (e, _) -> Some e)
+           es)
   | UnOp (_, e) -> loop [ e ]
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
