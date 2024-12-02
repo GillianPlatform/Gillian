@@ -14,7 +14,7 @@ lemma SLLseg_to_SLL(x)
                                   #nv, #nnext]; apply SLLseg_to_SLL(#nnext) 
       }  *]
 
-lemma SSLseg_append(x, vs, v, z)
+lemma SLLseg_append(x, vs, v, z)
   [[  emp * (x == #x) * (vs == #vs) * (v == #v) * (z == #z) *
       SLLseg(#x, #y, #vs) * <cell>(#wisl__1, 0i; #v) *
       <bound>(#wisl__1; 2i) * <cell>(#wisl__1, 1i; #z) *
@@ -26,7 +26,7 @@ lemma SSLseg_append(x, vs, v, z)
                     <cell>(#wisl__0, 1i; #nnext) * types(#wisl__0 : Obj) *
                     (#x == {{ #wisl__0, 0i }}) * SLLseg(#nnext, #y, #nvs) *
                     (#vs == l+ ({{ #nv }}, #nvs))) [bind: #wisl__0,
-        #nv, #nnext, #nvs]; apply SSLseg_append(#nnext, #nvs, #v, #z) ;
+        #nv, #nnext, #nvs]; apply SLLseg_append(#nnext, #nvs, #v, #z) ;
         fold SLLseg(#x, #z, l+ (#vs, {{ #v }}))
       } else { fold SLLseg(#y, #z, {{ #v }}) }  *]
 pred SLL(+x, vs : List) : (x == null) * (vs == {{  }}),
@@ -70,7 +70,7 @@ proc SLL_length_iter_loop0(n, x, y) {
              y := l-nth(gvar1, 2i);
              gvar2 := "i__add"(n, 1i);
              n := gvar2;
-             apply SSLseg_append(x, #nvx, #v, y) ;
+             apply SLLseg_append(x, #nvx, #v, y) ;
              loopretvar__ := "SLL_length_iter_loop0"(n, x, y);
              goto endif0;
   else0:     loopretvar__ := {{ n, x, y }};

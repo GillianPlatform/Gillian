@@ -149,14 +149,15 @@ module Make (Annot : Annot.S) = struct
       | Some rel -> Filename.dirname rel
       | None -> "."
     in
+    let runtime_paths = Config.get_runtime_paths () in
     if Filename.is_relative path then
-      let lookup_paths = rel :: Config.get_runtime_paths () in
+      let lookup_paths = rel :: runtime_paths in
       let rec find fname paths =
         match paths with
         | [] ->
             Fmt.failwith "Cannot resolve \"%s\", looked in %a and ." fname
               Fmt.(list ~sep:(any ", ") string)
-              (Config.get_runtime_paths ())
+              runtime_paths
         | path :: rest ->
             let complete_path = Filename.concat path fname in
             if Sys.file_exists complete_path then complete_path
@@ -168,7 +169,7 @@ module Make (Annot : Annot.S) = struct
       Fmt.failwith "Cannot resolve absolute path \"%s\", looked in %a and ."
         path
         Fmt.(list ~sep:(any ", ") string)
-        (Config.get_runtime_paths ())
+        runtime_paths
 
   let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
 

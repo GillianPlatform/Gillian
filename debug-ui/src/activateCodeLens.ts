@@ -35,12 +35,17 @@ export function activateCodeLens(context: ExtensionContext) {
   }
 }
 
-function getLensKinds(): [ExecMode, string][] {
-  const config = workspace.getConfiguration('gillianDebugger');
+function getLensKinds(lang: string | undefined): [ExecMode, string][] {
+  let showVerifyLens = true;
+  let showSymbolicDebugLens = true;
+  if (lang) {
+    const langConfig = workspace.getConfiguration(`gillianDebugger.${lang}`);
+    showVerifyLens = langConfig.showVerifyButton;
+    showSymbolicDebugLens = langConfig.showSymbolicDebugButton;
+  }
   const lensKinds: [ExecMode, string][] = [];
-  if (config.showVerifyLens) lensKinds.push(['debugverify', 'Verify ']);
-  if (config.showSymbolicDebugLens)
-    lensKinds.push(['debugwpst', 'Symbolic-debug ']);
+  if (showVerifyLens) lensKinds.push(['debugverify', 'Verify ']);
+  if (showSymbolicDebugLens) lensKinds.push(['debugwpst', 'Symbolic-debug ']);
   return lensKinds;
 }
 
@@ -53,18 +58,25 @@ class DebugCodeLensProvider implements CodeLensProvider {
     const procNamePattern = /(.+?)\(/g;
 
     let reProcedure: RegExp;
+    let langCmd: string | undefined = undefined;
     switch (document.languageId) {
       case 'gil':
         reProcedure = /proc /g;
         break;
       case 'javascript':
+        reProcedure = /function /g;
+        langCmd = 'gillian-js';
+        break;
       case 'wisl':
+        reProcedure = /function /g;
+        langCmd = 'wisl';
+        break;
       default:
         reProcedure = /function /g;
         break;
     }
 
-    const lensKinds = getLensKinds();
+    const lensKinds = getLensKinds(langCmd);
     const lenses: CodeLens[] = [];
     while (pattern.exec(text) !== null) {
       procNamePattern.lastIndex = pattern.lastIndex;
@@ -92,7 +104,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
   private makeCLens(document: TextDocument): CodeLens[] {
     const text = document.getText();
     const pattern = /int\s+main\s*\(\)/g;
-    const lensKinds = getLensKinds();
+    const lensKinds = getLensKinds('kanillian');
 
     const lenses: CodeLens[] = [];
     let match = pattern.exec(text);
