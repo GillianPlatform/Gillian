@@ -37,7 +37,6 @@ let check_entailment ~(pc : Pc.t) formula =
     in
     match f with
     | True -> true
-    | False -> false
     | _ ->
         FOSolver.check_entailment ~matching:pc.matching
           Utils.Containers.SS.empty pfs [ f ] gamma
