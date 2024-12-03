@@ -93,7 +93,7 @@ highlight_language = 'ocaml'
 todo_include_todos = False
 
 cbmc_version = None
-with open("../kanillian/CBMC_VERSION", "r") as f:
+with open("../Gillian-C2/CBMC_VERSION", "r") as f:
     cbmc_version = f.read().strip()
 # https://stackoverflow.com/a/39214302
 rst_epilog = f"""
