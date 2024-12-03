@@ -7,7 +7,7 @@ type ('mem_err, 'value) t =
       (** Incorrect type, depends on value *)
   | EPure of Formula.t (* Missing formula that should be true *)
   | EVar of Var.t (* Undefined variable *)
-  | EAsrt of ('value list * Formula.t * Asrt.t list list)
+  | EAsrt of ('value list * Formula.t * Asrt.t list)
   | EOther of string
     (* We want all errors to be proper errors - this is a temporary placeholder *)
 [@@deriving yojson, show]
@@ -39,9 +39,7 @@ let pp_err
   | EPure f -> Fmt.pf fmt "EPure(%a)" Formula.pp f
   | EVar x -> Fmt.pf fmt "EVar(%s)" x
   | EAsrt (vs, f, asrtss) ->
-      let pp_asrts fmt asrts =
-        Fmt.pf fmt "[%a]" (Fmt.list ~sep:(Fmt.any ", ") Asrt.pp) asrts
-      in
+      let pp_asrts fmt asrts = Fmt.pf fmt "[%a]" Asrt.pp asrts in
       Fmt.pf fmt "EAsrt(%a; %a; %a)"
         (Fmt.list ~sep:(Fmt.any ", ") pp_v)
         vs Formula.pp f

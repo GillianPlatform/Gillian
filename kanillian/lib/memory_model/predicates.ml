@@ -3,7 +3,7 @@ open Gil_syntax
 module Core = struct
   let pred ga ins outs =
     let ga_name = Interface.str_ga ga in
-    Asrt.GA (ga_name, ins, outs)
+    Asrt.CorePred (ga_name, ins, outs)
 
   let single ~loc ~ofs ~chunk ~sval ~perm =
     let chunk = Expr.Lit (String (Chunk.to_string chunk)) in

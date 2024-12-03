@@ -59,13 +59,13 @@ module type S = sig
   val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t
-  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
+  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
   val mem_constraints : t -> Formula.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
   val can_fix : err_t -> bool
-  val get_fixes : err_t -> Asrt.t list list
+  val get_fixes : err_t -> Asrt.t list
   val sure_is_nonempty : t -> bool
 end
 

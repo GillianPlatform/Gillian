@@ -76,11 +76,13 @@ module type S = sig
 
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
+  val produce_assertion :
+    t -> SVal.SESubst.t -> Asrt.simple -> (t, err_t) Res_list.t
+
   val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
   val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
 
-  (** [unfold state name args unfold_info] returns a 
+  (** [unfold state name args unfold_info] returns a
       list of pairs (subst, state), resulting from unfolding
       the predicate [name(..args..)] from the given state.
       unfold_info contains information about how to bind new variables. *)

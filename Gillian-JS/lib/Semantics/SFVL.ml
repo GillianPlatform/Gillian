@@ -75,10 +75,10 @@ let alocs (sfvl : t) : SS.t =
       SS.union ac (SS.union (Expr.alocs e_field) (Expr.alocs e_val)))
     sfvl SS.empty
 
-let assertions (loc : Expr.t) (sfvl : t) : Asrt.t list =
+let assertions (loc : Expr.t) (sfvl : t) : Asrt.t =
   List.rev
     (Expr.Map.fold
-       (fun field value (ac : Asrt.t list) ->
+       (fun field value (ac : Asrt.t) ->
          Asrt_utils.points_to ~loc ~field ~value :: ac)
        sfvl [])
 

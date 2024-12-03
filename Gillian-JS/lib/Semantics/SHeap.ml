@@ -338,7 +338,7 @@ let to_list (heap : t) : (string * s_object) list =
   SS.fold (fun loc ac -> (loc, Option.get (get heap loc)) :: ac) domain []
 
 (** converts a symbolic heap to a list of assertions *)
-let assertions (heap : t) : Asrt.t list =
+let assertions (heap : t) : Asrt.t =
   let make_loc_lexpr loc =
     if Names.is_aloc_name loc then Expr.ALoc loc else Expr.Lit (Loc loc)
   in
@@ -359,8 +359,7 @@ let assertions (heap : t) : Asrt.t list =
     fv_assertions @ domain @ metadata
   in
 
-  List.sort Asrt.compare
-    (List.concat (List.map assertions_of_object (to_list heap)))
+  List.sort Asrt.compare (List.concat_map assertions_of_object (to_list heap))
 
 let wf_assertions_of_obj (heap : t) (loc : string) : Formula.t list =
   let cfvl =

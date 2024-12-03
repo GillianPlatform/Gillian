@@ -63,7 +63,7 @@ functor
         in
         let assertion =
           let asrt, _ = asrt_report.step in
-          Fmt.str "%a" Asrt.pp asrt
+          Fmt.str "%a" Asrt.pp_simple asrt
         in
         let substitutions =
           asrt_report.subst |> Subst.to_list_pp
