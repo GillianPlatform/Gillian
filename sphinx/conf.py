@@ -99,6 +99,7 @@ with open("../Gillian-C2/CBMC_VERSION", "r") as f:
 rst_epilog = f"""
 .. |cbmc_version| replace:: {cbmc_version}
 """
+smartquotes = False
 
 # -- Options for HTML output ----------------------------------------------
 
