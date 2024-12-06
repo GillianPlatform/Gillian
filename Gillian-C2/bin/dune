@@ -1,0 +1,5 @@
+(executable
+ (name gillian_c2)
+ (public_name gillian-c2)
+ (libraries gillian_C2_compiler gillian memory_model lifter)
+ (package gillian-c2))

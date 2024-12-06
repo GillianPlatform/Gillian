@@ -244,25 +244,25 @@
         }
       },
       {
-        "id": "gillianDebugger.kanillian",
-        "title": "Kanillian",
+        "id": "gillianDebugger.gillian-c2",
+        "title": "Gillian-C2",
         "properties": {
-          "gillianDebugger.kanillian.showVerifyButton": {
+          "gillianDebugger.gillian-c2.showVerifyButton": {
             "type": "boolean",
             "default": false
           },
-          "gillianDebugger.kanillian.showSymbolicDebugButton": {
+          "gillianDebugger.gillian-c2.showSymbolicDebugButton": {
             "type": "boolean",
             "default": true
           },
-          "gillianDebugger.kanillian.commandLineArguments": {
+          "gillianDebugger.gillian-c2.commandLineArguments": {
             "type": "array",
             "default": [],
             "items": {
               "type": "string"
             }
           },
-          "gillianDebugger.kanillian.environmentVariables": {
+          "gillianDebugger.gillian-c2.environmentVariables": {
             "type": "object",
             "default": {},
             "additionalProperties": {

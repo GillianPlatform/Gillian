@@ -42,7 +42,7 @@ class DebugAdapterExecutableFactory
     // Match of the file extension first
     switch (fileExtension) {
       case 'c':
-        langCmd = 'kanillian';
+        langCmd = 'gillian-c2';
         break;
       case 'js':
         langCmd = 'gillian-js';
@@ -59,8 +59,8 @@ class DebugAdapterExecutableFactory
           case 'c':
             langCmd = 'gillian-c';
             break;
-          case 'kani':
-            langCmd = 'kanillian';
+          case 'c2':
+            langCmd = 'gillian-c2';
             break;
           case 'wisl':
           default:

@@ -23,6 +23,7 @@ exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
 let init_decls : sexp list ref = ref []
+let builtin_funcs : sexp list ref = ref []
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -159,7 +160,7 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
 
 let mk_fun_decl name param_types result_type =
   let decl = declare_fun name param_types result_type in
-  let () = init_decls := decl :: !init_decls in
+  let () = builtin_funcs := decl :: !builtin_funcs in
   atom name
 
 module Type_operations = struct
@@ -989,7 +990,8 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   in
   let encoded_assertions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
-  let () = encoded_assertions |> List.iter (fun a -> cmd a) in
+  let () = List.iter cmd !builtin_funcs in
+  let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");
   let result = check solver in
   L.verbose (fun m ->
@@ -1061,12 +1063,13 @@ let lift_model
     (gamma : typenv)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  let model_eval = (model_eval z3 model).eval [] in
+  let () = reset_solver () in
+  let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
     try
       let x = x |> sanitize_identifier |> atom in
-      model_eval (atom "get-value" <| x) |> Option.some
+      model_eval x |> Option.some
     with UnexpectedSolverResponse _ -> None
   in
 

@@ -1,0 +1,13 @@
+(library
+ (name lifter)
+ (libraries
+  yojson
+  kutils
+  gillian
+  gillian_C2_compiler
+  goto_lib
+  memory_model
+  kcommons)
+ (flags :standard -open Kcommons)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson)))

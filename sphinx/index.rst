@@ -15,8 +15,9 @@ Gillian is a multi-language analysis platform supporting, e.g., verification and
    :titlesonly:
    :caption: Instantiations
 
+   wisl/index
    c/index
-   kanillian/index
+   c2/index
    js/index
    rust/index
 

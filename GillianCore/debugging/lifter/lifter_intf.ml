@@ -117,7 +117,7 @@ module type S = sig
 
   (* A proxy for ParserAndCompiler.parse_and_compile_files; this allows specifying an entrypoint function,
      and can receive a new entrypoint function to substitute it with.
-     This is necessary for debugging harnessed programs, like with Kanillian. *)
+     This is necessary for debugging harnessed programs, like with Gillian-C2. *)
   val parse_and_compile_files :
     entrypoint:string ->
     string list ->

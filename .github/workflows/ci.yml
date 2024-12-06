@@ -155,7 +155,7 @@ jobs:
       #   run: "make"
       #   working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
 
-  kanillian_c_tests:
+  gillian_c2_tests:
     strategy:
       matrix:
         operating-system: [ubuntu-latest]
@@ -186,11 +186,11 @@ jobs:
           tar xzf opam/opam.tar.gz
           rm -rf opam
       - name: init env
-        run: "kanillian/scripts/setup_environment.sh"
+        run: "Gillian-C2/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test All
         run: "opam exec -- bash ./testAll.sh"
-        working-directory: "Gillian/kanillian/environment/"
+        working-directory: "Gillian/Gillian-C2/environment/"
 
   test262:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')

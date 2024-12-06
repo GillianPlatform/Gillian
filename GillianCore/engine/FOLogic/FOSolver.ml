@@ -65,7 +65,13 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : Type_env.t) :
       try
         Smt.lift_model model (Type_env.as_hashtbl gamma) update smt_vars;
         Some subst
-      with _ -> None)
+      with e ->
+        let () =
+          L.verbose (fun m ->
+              m "Error when attempting to get SMT model: %s"
+                (Printexc.to_string e))
+        in
+        None)
 
 let check_satisfiability
     ?(matching = false)
@@ -91,10 +97,10 @@ let sat ~matching ~pfs ~gamma formula : bool =
   let formula = Reduction.reduce_formula ~matching ~pfs ~gamma formula in
   match formula with
   | True ->
-      Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
+      Logging.verbose (fun fmt -> fmt "Discharged sat before SMT");
       true
   | False ->
-      Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
+      Logging.verbose (fun fmt -> fmt "Discharged sat before SMT");
       false
   | _ ->
       let relevant_info =
@@ -156,7 +162,7 @@ let check_entailment
     (* Check satisfiability of left side *)
     let left_sat =
       true
-      (* Z3Encoding.check_sat (Formula.Set.of_list left_fs) gamma_left *)
+      (* Smt.check_sat (Formula.Set.of_list left_fs) gamma_left *)
     in
 
     (* assert (left_sat = true); *)

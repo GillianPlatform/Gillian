@@ -83,7 +83,7 @@
   printbox-text))
 
 (package
- (name kanillian)
+ (name gillian-c2)
  (sites
   (share runtime))
  (synopsis "Gillian instantiation for C based on CBMC as front-end")
