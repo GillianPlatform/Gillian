@@ -1072,12 +1072,6 @@ struct
                 let recovery_states : (State.t list, string) result =
                   State.try_recovering state recovery_vals
                 in
-                (* FIXME: why does this happen? *)
-                let recovery_states =
-                  match recovery_states with
-                  | Ok [] -> Error "UNKNOWN REASON!!!"
-                  | _ -> recovery_states
-                in
                 match recovery_states with
                 | Ok recovery_states ->
                     let num_states = List.length recovery_states in

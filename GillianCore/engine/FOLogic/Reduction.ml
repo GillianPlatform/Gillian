@@ -2511,7 +2511,7 @@ let rec reduce_formula_loop
     let result : Formula.t =
       match a with
       | Eq (e1, e2) when Expr.equal e1 e2 -> True
-      (* DEDICATED SIMPLIFICATIONS - this should probably be handled properly by Z3... *)
+      (* DEDICATED SIMPLIFICATIONS - this should probably be handled properly by SMT... *)
       | Eq (BinOp (Lit (Num x), FPlus, LVar y), LVar z)
         when x <> 0. && String.equal y z -> False
       | Eq (BinOp (Lit (Int x), IPlus, LVar y), LVar z)

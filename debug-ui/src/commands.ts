@@ -35,13 +35,20 @@ export async function startDebugging(
   try {
     const canContinue = await checkForExistingDebugSession();
     if (!canContinue) return;
-    const validLangs = ['wisl', 'js', 'c', 'kani'];
+    const validLangs = ['wisl', 'js', 'c', 'c2'];
+    const langOptions: Record<string, string> = {
+      'WISL': 'wisl',
+      'JS': 'js',
+      'C (CompCert)': 'c',
+      'C (CBMC)': 'c2',
+    };
 
     const fileExtension = config.program.split('.').pop();
     if (fileExtension === 'gil') {
-      const targetLanguage = await window.showQuickPick(validLangs, {
+      const selected = await window.showQuickPick(validLangs, {
         title: 'Target language',
       });
+      const targetLanguage = selected ? langOptions[selected] : undefined;
       config = {
         targetLanguage: targetLanguage,
         ...config,

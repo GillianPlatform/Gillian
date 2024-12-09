@@ -104,7 +104,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
   private makeCLens(document: TextDocument): CodeLens[] {
     const text = document.getText();
     const pattern = /int\s+main\s*\(\)/g;
-    const lensKinds = getLensKinds('kanillian');
+    const lensKinds = getLensKinds('gillian-c2');
 
     const lenses: CodeLens[] = [];
     let match = pattern.exec(text);
