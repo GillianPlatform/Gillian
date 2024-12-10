@@ -1,0 +1,14 @@
+(library
+ (name prebuilt)
+ (public_name instantiation.prebuilt)
+ (libraries
+  states
+  c_states
+  gillian
+  gillian.ppx_sat.runtime
+  gillian-js-libs.js2jsil_lib
+  gillian-js-libs.semantics
+  gillian-c-libs
+  ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson)))
