@@ -9,7 +9,8 @@ module Make
     (SState : SState.S with type init_data = ID.t)
     (S_interpreter : G_interpreter.S
                        with type annot = PC.Annot.t
-                        and type state_t = SState.t)
+                        and type state_t = SState.t
+                        and type state_err_t = SState.err_t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -35,12 +36,23 @@ struct
     open ChangeTracker
 
     let counter_example res =
-      let error_state =
+      let error_state, errors =
         match res with
-        | Exec_res.RFail f -> f.error_state
+        | Exec_res.RFail { error_state; errors; _ } -> (error_state, errors)
         | _ -> failwith "Expected failure"
       in
-      let subst = SState.sat_check_f error_state [] in
+      let f =
+        errors
+        |> List.find_map (function
+             | Exec_err.EState StateErr.(EPure f) -> Some f
+             | _ -> None)
+      in
+      let fs =
+        match f with
+        | Some f -> [ Formula.Not f ]
+        | None -> []
+      in
+      let subst = SState.sat_check_f error_state fs in
       subst
 
     let run_main prog init_data =
