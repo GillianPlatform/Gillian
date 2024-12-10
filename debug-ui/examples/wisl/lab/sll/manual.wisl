@@ -231,7 +231,7 @@ predicate SLLseg(+x, y, vs) {
 //
 // Lemma: appending a given value to a given SLLseg
 //
-lemma SSLseg_append {
+lemma SLLseg_append {
   statement:
     forall x, vs, v, z.
       SLLseg(x, #y, vs) * (#y -b> v, z) |- SLLseg(x, z, vs @ [ v ])
@@ -242,7 +242,7 @@ lemma SSLseg_append {
       assert {bind: #nv, #nnext, #nvs}
         (x -b> #nv, #nnext) * SLLseg(#nnext, #y, #nvs) *
         (vs == #nv :: #nvs);
-      apply SSLseg_append(#nnext, #nvs, v, z);
+      apply SLLseg_append(#nnext, #nvs, v, z);
       fold SLLseg(x, z, vs @ [ v ])
     } else {
       fold SLLseg(#y, z, [ v ])

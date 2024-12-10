@@ -143,15 +143,21 @@ module Make (Annot : Annot.S) = struct
   let cache_labelled_progs (progs : (string * (annot, string) Prog.t) list) =
     List.iter (fun (path, prog) -> cache_gil_prog path prog) progs
 
-  let resolve_path path =
+  let resolve_path ?rel path =
+    let rel =
+      match rel with
+      | Some rel -> Filename.dirname rel
+      | None -> "."
+    in
+    let runtime_paths = Config.get_runtime_paths () in
     if Filename.is_relative path then
-      let lookup_paths = "." :: Config.get_runtime_paths () in
+      let lookup_paths = rel :: runtime_paths in
       let rec find fname paths =
         match paths with
         | [] ->
             Fmt.failwith "Cannot resolve \"%s\", looked in %a and ." fname
               Fmt.(list ~sep:(any ", ") string)
-              (Config.get_runtime_paths ())
+              runtime_paths
         | path :: rest ->
             let complete_path = Filename.concat path fname in
             if Sys.file_exists complete_path then complete_path
@@ -163,14 +169,14 @@ module Make (Annot : Annot.S) = struct
       Fmt.failwith "Cannot resolve absolute path \"%s\", looked in %a and ."
         path
         Fmt.(list ~sep:(any ", ") string)
-        (Config.get_runtime_paths ())
+        runtime_paths
 
   let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
 
-  let fetch_imported_prog path other_imports : (annot, string) Prog.t =
+  let fetch_imported_prog ?rel path other_imports : (annot, string) Prog.t =
     if Hashtbl.mem cached_progs path then Hashtbl.find cached_progs path
     else
-      let file = resolve_path path in
+      let file = resolve_path ?rel path in
       let extension = Filename.extension file in
       let prog =
         if String.equal extension ".gil" then
@@ -226,6 +232,7 @@ module Make (Annot : Annot.S) = struct
     combine prog.bi_specs other_prog.bi_specs id "bi-abduction spec"
 
   let resolve_imports
+      ?(prog_path : string option)
       (program : (annot, string) Prog.t)
       (other_imports : (string * (string -> (annot, string) Prog.t)) list) :
       unit =
@@ -234,7 +241,9 @@ module Make (Annot : Annot.S) = struct
       | [] -> ()
       | (file, should_verify) :: rest ->
           if not (SS.mem file added_imports) then
-            let imported_prog = fetch_imported_prog file other_imports in
+            let imported_prog =
+              fetch_imported_prog file ?rel:prog_path other_imports
+            in
             let () = extend_program program imported_prog should_verify in
             let new_added_imports = SS.add file added_imports in
             resolve (rest @ imported_prog.imports) new_added_imports
@@ -242,9 +251,9 @@ module Make (Annot : Annot.S) = struct
     in
     resolve program.imports SS.empty
 
-  let eprog_to_prog ~other_imports ext_program =
+  let eprog_to_prog ?prog_path ~other_imports ext_program =
     let open Prog in
-    let () = resolve_imports ext_program other_imports in
+    let () = resolve_imports ?prog_path ext_program other_imports in
     let proc_of_ext_proc (proc : (annot, string) Proc.t) :
         (annot, int) Proc.t * (string * int * int * int) list =
       let open Proc in

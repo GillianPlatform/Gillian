@@ -69,9 +69,9 @@ You can build a docker image from the source code:
 
 Once built, run Gillian with
 
-.. code-block:: bash
+.. code-block:: text
 
-    docker run -it gillian
+    docker build --target test -t gillian
 
 This will start the container and give you access through a ``zsh`` shell.
 
@@ -89,30 +89,33 @@ After installing and building (or entering the docker container), try running th
 Gillian-JS
 ^^^^^^^^^^
 
-.. code-block:: bash
+.. code-block:: text
 
-    dune exec -- gillian-js verify Gillian-JS/Examples/JaVerT/BST.js -l disabled
+    dune exec -- gillian-js verify Gillian-JS/Examples/JaVerT/BST.js
 
 ..
 
     Expected output
 
-    .. code-block:: bash
+    .. code-block:: text
 
-        Obtaining specs to verify.
-        Obtained 5 symbolic tests
-        Running symbolic tests: 0.080211
-        Verifying one spec of procedure makeNode... Success
-        Verifying one spec of procedure find... Success
-        Verifying one spec of procedure findMin... Success
-        Verifying one spec of procedure remove... Success
-        Verifying one spec of procedure insert... Success
-        All specs succeeded: [Time]
+        Parsing and compiling...
+        Preprocessing...
+        Obtaining specs to verify...
+        Obtaining lemmas to verify...
+        Obtained 5 symbolic tests in total
+        Running symbolic tests: 0.381137
+        Verifying one spec of procedure insert... s s s s Success
+        Verifying one spec of procedure remove... s s s s s s s s s Success
+        Verifying one spec of procedure findMin... s s Success
+        Verifying one spec of procedure find... s s s s Success
+        Verifying one spec of procedure makeNode... s Success
+        All specs succeeded: 2.935246
 
 Gillian-C
 ^^^^^^^^^
 
-.. code-block:: bash
+.. code-block:: text
 
     dune exec -- gillian-c bulk-exec Gillian-C/examples/concrete
 
@@ -120,12 +123,17 @@ Gillian-C
 
     Expected output
 
-    .. code-block:: bash
+    .. code-block:: text
+
 
         Registering tests...
-        Running 1 test suite
-        PASS  .
-
-        Test Suites: 0 failed, 1 passed, 1 total
-        Tests:       0 failed, 6 passed, 6 total
-        Time:        [Time]
+        Testing Running 1 test suites.
+        This run has ID `DACA1B06-6CB2-474C-AC1B-3C24CC108C2C`.
+        [OK]                _          0   Gillian-C_examples_concrete_bst_c.
+        [OK]                _          1   Gillian-C_examples_concrete_kvmap_c.
+        [OK]                _          2   Gillian-C_examples_concrete_priQ_c.
+        [OK]                _          3   Gillian-C_examples_concrete_sort_c.
+        [OK]                _          4   Gillian-C_examples_concrete_sll_c.
+        [OK]                _          5   Gillian-C_examples_concrete_dll_c.
+        The full test results are available in `/Users/...`.
+        Test Successful in 1.000s. 6 tests run.

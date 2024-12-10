@@ -1,5 +1,0 @@
-(executable
- (name kanillian)
- (public_name kanillian)
- (libraries kanillian_lib gillian memory_model lifter)
- (package kanillian))

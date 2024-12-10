@@ -91,7 +91,7 @@ predicate freed_nodes(xs) {
 //
 
 // SLLseg_vals + trailing node -> larger, non-empty SLLseg_vals
-lemma SSLseg_vals_append {
+lemma SLLseg_vals_append {
   statement:
     forall x.
       SLLseg_vals(#x, #y, #vs) * (#y -b> #v, #z) |- SLLseg_vals(#x, #z, #vs @ [ #v ])
@@ -102,7 +102,7 @@ lemma SSLseg_vals_append {
     unfold SLLseg_vals(#x, #y, #vs);
     if (not (#x = #y)) {
       assert {bind: #nnext} (#x + 1 -> #nnext);
-      apply SSLseg_vals_append(#nnext);
+      apply SLLseg_vals_append(#nnext);
       fold SLLseg_vals(#x, #z, #vs @ [ #v ])
     } else {
       fold SLLseg_vals(#y, #z, [ #v ])
@@ -143,7 +143,7 @@ lemma SLLseg_vals_to_SLL_vals {
 }
 
 // SLLseg_len + trailing node -> larger, non-empty SLLseg_len
-lemma SSLseg_len_append_lr {
+lemma SLLseg_len_append_lr {
   statement:
     forall x.
       SLLseg_len(#x, #y, #n) * (#y -b> #v, #z) |- SLLseg_len(#x, #z, #n + 1) * (0 <=# #n)
@@ -154,13 +154,13 @@ lemma SSLseg_len_append_lr {
     unfold SLLseg_len(#x, #y, #n);
     if (not (#n = 0)) {
       assert {bind: #nnext} (#x + 1 -> #nnext);
-      apply SSLseg_len_append_lr(#nnext)
+      apply SLLseg_len_append_lr(#nnext)
     };
     fold SLLseg_len(#x, #z, #n + 1)
 }
 
 // non-empty SLLseg_len -> smaller SLLseg_len + trailing node
-lemma SSLseg_len_append_rl {
+lemma SLLseg_len_append_rl {
   statement:
     forall x.
       SLLseg_len(#x, #z, #n + 1) * (0 <=# #n) |- SLLseg_len(#x, #y, #n) * (#y -b> #v, #z)
@@ -171,7 +171,7 @@ lemma SSLseg_len_append_rl {
     unfold SLLseg_len(#x, #z, #n + 1);
     assert {bind: #nnext} (#x + 1 -> #nnext);
     if (not (#n = 0)) {
-        apply SSLseg_len_append_rl(#nnext);
+        apply SLLseg_len_append_rl(#nnext);
         assert {bind: #y} SLLseg_len(#nnext, #y, #n - 1);
         fold SLLseg_len(#x, #y, #n)
     }
@@ -307,7 +307,7 @@ function SLL_length_iter(x) {
   while (not (y = null)) {
     y := [y + 1];
     n := n + 1;
-    [[ apply SSLseg_len_append_lr(x) ]]
+    [[ apply SLLseg_len_append_lr(x) ]]
   };
   [[ apply SLLseg_len_to_SLL_len(x) ]];
   return n
@@ -367,10 +367,10 @@ function SLL_concat_iter(x, y){
     while (not (next = null)) {
         prev := next;
         next := [next + 1];
-        [[ apply SSLseg_vals_append(head) ]]
+        [[ apply SLLseg_vals_append(head) ]]
     };
     [prev + 1] := y;
-    [[ apply SSLseg_vals_append(head) ]];
+    [[ apply SLLseg_vals_append(head) ]];
     [[ apply SLLseg_vals_concat_SLL_vals(head) ]]
   };
   return head
@@ -466,7 +466,7 @@ function SLL_member_iter(x, k) {
     v := [ next ];
     found := (v = k);
     next := [next + 1];
-    [[ apply SSLseg_vals_append(x) ]];
+    [[ apply SLLseg_vals_append(x) ]];
     [[ unfold list_member(#gamma, k, #rg) ]];
     [[ apply list_member_concat(#beta, [ #v ], k) ]]
   };

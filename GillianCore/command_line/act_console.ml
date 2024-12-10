@@ -55,12 +55,17 @@ struct
       in
       (labeled_prog, init_data, None)
 
+  let pp_annot fmt annot =
+    Fmt.pf fmt "%a"
+      (Yojson.Safe.pretty_print ?std:None)
+      (PC.Annot.to_yojson annot)
+
   let emit_specs e_prog prog file =
     let () = Prog.update_specs e_prog MP.(prog.prog) in
     let fname = Filename.chop_extension (Filename.basename file) in
     let dirname = Filename.dirname file in
     let out_path = Filename.concat dirname (fname ^ "_bi.gil") in
-    Io_utils.save_file_pp out_path Prog.pp_labeled e_prog
+    Io_utils.save_file_pp out_path (Prog.pp_labeled ~pp_annot) e_prog
 
   let make_callgraph (prog : ('a, 'b) Prog.t) =
     let fcalls =
@@ -97,7 +102,8 @@ struct
       parse_eprog file files already_compiled
     in
     let () =
-      burn_gil ~init_data:(ID.to_yojson init_data) ~pp_prog:Prog.pp_labeled
+      burn_gil ~init_data:(ID.to_yojson init_data)
+        ~pp_prog:(Prog.pp_labeled ~pp_annot)
         e_prog outfile_opt
     in
     let () =

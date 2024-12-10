@@ -76,7 +76,7 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'doc_gen']
+exclude_patterns = ['README.md', '_build', 'Thumbs.db', '.DS_Store', 'doc_gen']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'lovelace'
@@ -93,12 +93,13 @@ highlight_language = 'ocaml'
 todo_include_todos = False
 
 cbmc_version = None
-with open("../kanillian/CBMC_VERSION", "r") as f:
+with open("../Gillian-C2/CBMC_VERSION", "r") as f:
     cbmc_version = f.read().strip()
 # https://stackoverflow.com/a/39214302
 rst_epilog = f"""
 .. |cbmc_version| replace:: {cbmc_version}
 """
+smartquotes = False
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -131,6 +132,7 @@ html_theme_options = {
   },
 }
 html_favicon = '_static/img/favicon.ico'
+html_title = 'Gillian'
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
