@@ -23,18 +23,17 @@ module Types = struct
   }
   [@@deriving yojson]
 
-  (** A segment of matching *)
-  type match_seg =
-    | Assertion of assertion_data * match_seg  (** A single assertion *)
-    | MatchResult of Logging.Report_id.t * match_result
-        (** The end of this matching segment *)
+  type node =
+  | Assertion of assertion_data * Logging.Report_id.t list
+  | MatchResult of Logging.Report_id.t * match_result
   [@@deriving yojson]
 
-  (** A matching map.
-    matching is either a single segment in the normal case, or potentially multiple segments when folding (i.e. when a predicate has multiple cases) *)
-  type map = Direct of match_seg | Fold of match_seg list [@@deriving yojson]
-
-  type t = kind * map [@@deriving yojson]
+  type t = {
+    kind: kind;
+    roots: Logging.Report_id.t list;
+    nodes: (Logging.Report_id.t, node) Hashtbl.t;
+    result: match_result;
+  } [@@deriving yojson]
 end
 
 include Types

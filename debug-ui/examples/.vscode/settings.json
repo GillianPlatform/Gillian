@@ -1,3 +1,4 @@
 {
-  "gillianDebugger.sourceDirectory": "${workspaceFolder}/../../"
+  "gillianDebugger.sourceDirectory": "${workspaceFolder}/../../",
+  "gillianDebugger.useManualProof": true
 }
