@@ -1,3 +1,4 @@
 (library
  (name JS_Parser)
+ (public_name gillian-js-libs.JS_Parser)
  (libraries str flow_parser fpath))

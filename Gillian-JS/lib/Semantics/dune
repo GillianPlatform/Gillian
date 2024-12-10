@@ -1,5 +1,6 @@
 (library
  (name semantics)
+ (public_name gillian-js-libs.semantics)
  (libraries gillian jsil_syntax javert_utils js2jsil_lib str)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))

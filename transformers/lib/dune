@@ -1,3 +1,2 @@
 (library
- (name instantiation)
- (public_name instantiation))
+ (name transformers_lib))

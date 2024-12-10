@@ -1,4 +1,4 @@
 (executable
  (public_name transformers)
- (name main)
+ (package transformers)
  (libraries prebuilt states gillian))

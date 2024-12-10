@@ -70,6 +70,18 @@
  (synopsis "Gillian instantiation for JavaScript"))
 
 (package
+ (name gillian-js-libs)
+ (sites
+  (share runtime))
+ (depends
+  dune-site
+  flow_parser
+  fpath
+  (gillian
+   (= :version)))
+ (synopsis "Gillian instantiation for JavaScript (LIBS)"))
+
+(package
  (name gillian-c)
  (sites
   (share runtime)
@@ -103,3 +115,18 @@
    (= :version)))
  (synopsis
   "Gillian instantiation for Wisl, a small toy language for teaching and experimentation"))
+
+(package
+ (name transformers)
+ (sites
+  (share runtime))
+ (synopsis "Gillian instantiation using state model transformers, à la Iris")
+ (depends
+  (gillian
+   (= :version))
+  (gillian-js
+   (= :version))
+  (gillian-c
+   (= :version))
+  dune-site
+  printbox-text))

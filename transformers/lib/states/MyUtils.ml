@@ -164,11 +164,9 @@ end)
 
 let bind_vanish_on_err (x : ('a, 'e) result Delayed.t) (f : 'a -> 'b Delayed.t)
     : 'b Delayed.t =
-  let open Delayed.Syntax in
-  let* x = x in
-  match x with
-  | Ok x -> f x
-  | Error _ -> Delayed.vanish ()
+  Delayed.bind x (function
+    | Ok x -> f x
+    | Error _ -> Delayed.vanish ())
 
 module Syntax = struct
   let ( let*? ) = bind_vanish_on_err

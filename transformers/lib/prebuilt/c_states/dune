@@ -1,11 +1,11 @@
 (library
  (name c_states)
- (public_name instantiation.prebuilt.c_states)
+ (public_name transformers.prebuilt.c_states)
  (libraries
   states
   gillian
   gillian.ppx_sat.runtime
-  gillian-c-libs
+  cgil_lib
   compcert
   ppx_deriving_yojson.runtime
   printbox-text)

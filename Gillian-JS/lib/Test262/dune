@@ -1,5 +1,6 @@
 (library
  (name test262)
+ (public_name gillian-js-libs.test262)
  (libraries
   semantics
   javert_utils

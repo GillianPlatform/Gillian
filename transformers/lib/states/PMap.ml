@@ -559,7 +559,7 @@ end
 (**
   Type for the domain of a PMap.
   Allows configuring it to either have static or dynamic indexing:
-  - Static: indexes are created by the memory model on allocation (eg. the heap in C)
+  - Static: indexes are created by the state model on allocation (eg. the heap in C)
   - Dynamic: indexes are given by the user on allocation (eg. objects in JS)
 
   The user must provide the index on allocation in dynamic mode, and mustn't provide it in static mode.

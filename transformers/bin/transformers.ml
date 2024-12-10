@@ -1,29 +1,31 @@
 open Gillian
 open States
-(* open Prebuilt.Utils*)
+(* Uncomment to import transformer shorthands
+   open Prebuilt.Utils *)
 
-(* Select prebuilt mode (or build one!) *)
+(* Select prebuilt mode (or build one!) -- available state models are C, JS and WISL. *)
 module Prebuilt = Prebuilt.Lib.C_Base
 
-(* state model: *)
+(* State model
+   For a linear heap, for example:
+   module MyMem = OpenPMap (IntegerIndex) (Freeable (Exclusive)) *)
 module MyMem = Prebuilt.MonadicSMemory
 
-(* get modules *)
+(* Get modules *)
 module PC = Prebuilt.ParserAndCompiler
 module ExternalSemantics = Prebuilt.ExternalSemantics
 module InitData = Prebuilt.InitData
 
-(* Debug *)
+(* For debugging actions / predicates, uncomment: *)
 (* module Debug = Debug.Make (MyMem)
-
    let () = Debug.print_info () *)
 
-(* Convert custom memory model -> Gillian memory model *)
+(* Convert custom state model -> Gillian state model *)
 module PatchedMem = MyMonadicSMemory.Make (MyMem) (Prebuilt.MyInitData)
 
 (* Gillian Instantiation *)
-module SMemory =
-  PerfMeasurer.Make (Gillian.Monadic.MonadicSMemory.Lift (PatchedMem))
+(* For measuring performance, wrap this in PerfMeasurer.Make *)
+module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 
 module Lifter
     (Verifier : Gillian.Abstraction.Verifier.S

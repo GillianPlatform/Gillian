@@ -1,4 +1,5 @@
 (library
  (name debugging)
+ (public_name gillian-js-libs.debugging)
  (libraries gillian semantics js2jsil_lib)
  (flags :standard -open Gillian))
