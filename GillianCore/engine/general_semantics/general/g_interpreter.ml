@@ -533,8 +533,6 @@ struct
               Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
               failing_model
           in
-          if not (Exec_mode.is_biabduction_exec !Config.current_exec_mode) then
-            Printf.printf "%s" msg;
           L.normal (fun m -> m "%s" msg);
           Res_list.error_with err
 
