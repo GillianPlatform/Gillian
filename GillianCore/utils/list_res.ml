@@ -9,6 +9,15 @@ let pp ~ok ~err =
 let return (v : 'a) : ('a, 'b) t = Ok [ v ]
 let vanish = Ok []
 
+let flat (l : ('a, 'b) t list) : ('a, 'b) t =
+  List.fold_left
+    (fun acc x ->
+      match (acc, x) with
+      | Ok l, Ok l' -> Ok (l @ l')
+      | Error l, Error l' -> Error (l @ l')
+      | Ok _, (Error _ as err) | (Error _ as err), Ok _ -> err)
+    (Ok []) l
+
 let bind (x : ('a, 'e) t) (f : 'a -> ('b, 'e) t) : ('b, 'e) t =
   match x with
   | Error errs -> Error errs
