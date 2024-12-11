@@ -93,7 +93,7 @@ struct
         exit 0
       else
         let () =
-          Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occured!"
+          Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occurred!"
         in
         let first_error =
           List.find
@@ -103,9 +103,9 @@ struct
             all_results
         in
         let counter_example = counter_example first_error in
-        Fmt.pr "Here's a counter example: %a@\n@?"
+        Fmt.pr "Here's a counterexample: %a@\n@?"
           (Fmt.option
-             ~none:(Fmt.any "Couldn't produce counter-example")
+             ~none:(Fmt.any "Couldn't produce counterexample")
              SVal.SESubst.pp)
           counter_example;
         let () =
