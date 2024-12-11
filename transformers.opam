@@ -9,8 +9,6 @@ bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
 depends: [
   "dune" {>= "3.16"}
   "gillian" {= version}
-  "gillian-js" {= version}
-  "gillian-c" {= version}
   "dune-site"
   "printbox-text"
   "odoc" {with-doc}
