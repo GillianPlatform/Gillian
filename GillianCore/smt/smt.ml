@@ -988,6 +988,7 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
           (Fmt.iter ~sep:(Fmt.any "@\n") Formula.Set.iter Formula.pp)
           fs pp_typenv gamma)
   in
+  let () = reset_solver () in
   let encoded_assertions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
   let () = List.iter cmd !builtin_funcs in
@@ -1026,7 +1027,6 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
     | Sat -> Some (get_model solver)
     | Unsat -> None
   in
-  let () = reset_solver () in
   ret
 
 let exec_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
