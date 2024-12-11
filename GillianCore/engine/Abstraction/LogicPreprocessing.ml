@@ -413,7 +413,8 @@ let unfold_proc
     (preds : (string, Pred.t) Hashtbl.t)
     (rec_info : (string, bool) Hashtbl.t)
     (proc : ('a, int) Proc.t) : ('a, int) Proc.t =
-  Logging.normal (fun f -> f "UNFOLD_PROC ! %a" Proc.pp_indexed proc);
+  Logging.normal (fun f ->
+      f "UNFOLD_PROC ! %a" (Proc.pp_indexed ~pp_annot:Fmt.nop) proc);
   let new_spec = Option.map (unfold_spec preds rec_info) proc.proc_spec in
   let new_body =
     Array.map
