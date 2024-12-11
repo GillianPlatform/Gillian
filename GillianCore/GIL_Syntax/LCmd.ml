@@ -16,9 +16,10 @@ type t = TypeDef__.lcmd =
 let rec map
     (f_e : Expr.t -> Expr.t)
     (f_p : Formula.t -> Formula.t)
-    (f_sl : SLCmd.t -> SLCmd.t) =
+    (f_sl : SLCmd.t -> SLCmd.t)
+    (lcmd : t) =
   let f = map f_e f_p f_sl in
-  function
+  match lcmd with
   | Branch a -> Branch (f_p a)
   | If (e, l1, l2) -> If (f_e e, List.map f l1, List.map f l2)
   | Macro (s, l) -> Macro (s, List.map f_e l)

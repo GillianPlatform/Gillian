@@ -359,7 +359,7 @@ let assertions (heap : t) : Asrt.t =
     fv_assertions @ domain @ metadata
   in
 
-  List.sort Asrt.compare (List.concat_map assertions_of_object (to_list heap))
+  to_list heap |> List.concat_map assertions_of_object |> List.sort Asrt.compare
 
 let wf_assertions_of_obj (heap : t) (loc : string) : Formula.t list =
   let cfvl =
