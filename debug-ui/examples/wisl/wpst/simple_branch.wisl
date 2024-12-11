@@ -1,0 +1,13 @@
+function main() {
+  fresh x;
+  assume_type (x, Int);
+  assume (x > (0 - 100));
+  assume (x < 100);
+  if (x < 0) {
+    x := x * x
+  } else {
+    skip
+  };
+  assert (x >= 0);
+  return null
+}

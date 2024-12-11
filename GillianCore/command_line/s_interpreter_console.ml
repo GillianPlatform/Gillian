@@ -9,7 +9,8 @@ module Make
     (SState : SState.S with type init_data = ID.t)
     (S_interpreter : G_interpreter.S
                        with type annot = PC.Annot.t
-                        and type state_t = SState.t)
+                        and type state_t = SState.t
+                        and type state_err_t = SState.err_t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -35,12 +36,23 @@ struct
     open ChangeTracker
 
     let counter_example res =
-      let error_state =
+      let error_state, errors =
         match res with
-        | Exec_res.RFail f -> f.error_state
+        | Exec_res.RFail { error_state; errors; _ } -> (error_state, errors)
         | _ -> failwith "Expected failure"
       in
-      let subst = SState.sat_check_f error_state [] in
+      let f =
+        errors
+        |> List.find_map (function
+             | Exec_err.EState StateErr.(EPure f) -> Some f
+             | _ -> None)
+      in
+      let fs =
+        match f with
+        | Some f -> [ Formula.Not f ]
+        | None -> []
+      in
+      let subst = SState.sat_check_f error_state fs in
       subst
 
     let run_main prog init_data =
@@ -76,11 +88,13 @@ struct
       let total_time = Sys.time () -. !start_time in
       Printf.printf "Total time (Compilation + Symbolic testing): %fs\n"
         total_time;
-      if success then (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!";
-        exit 0)
-      else (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occured!";
+      if success then
+        let () = Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!" in
+        exit 0
+      else
+        let () =
+          Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occured!"
+        in
         let first_error =
           List.find
             (function
@@ -94,11 +108,13 @@ struct
              ~none:(Fmt.any "Couldn't produce counter-example")
              SVal.SESubst.pp)
           counter_example;
-        Fmt.pr "Here's an example of final error state: %a@\n@?"
-          (Exec_res.pp SState.pp S_interpreter.pp_state_vt
-             S_interpreter.pp_err_t)
-          first_error;
-        exit 1)
+        let () =
+          Fmt.pr "Here's an example of final error state: %a@\n@?"
+            (Exec_res.pp SState.pp S_interpreter.pp_state_vt
+               S_interpreter.pp_err_t)
+            first_error
+        in
+        exit 1
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
@@ -184,8 +200,14 @@ struct
       parse_eprog files already_compiled
     in
     let () =
-      burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data)
-        e_prog outfile_opt
+      let pp_annot fmt annot =
+        Fmt.pf fmt "%a"
+          (Yojson.Safe.pretty_print ?std:None)
+          (PC.Annot.to_yojson annot)
+      in
+      burn_gil
+        ~pp_prog:(Prog.pp_labeled ~pp_annot)
+        ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
     in
     let () = L.normal (fun m -> m "*** Stage 2: Transforming the program.\n") in
     let prog =

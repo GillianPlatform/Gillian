@@ -10,7 +10,9 @@ module Make
                  and type tl_ast = PC.tl_ast
                  and type cmd_report =
                   Verification.SAInterpreter.Logging.ConfigReport.t
-                 and type annot = PC.Annot.t) =
+                 and type annot = PC.Annot.t
+                 and type init_data = PC.init_data
+                 and type pc_err = PC.err) =
 struct
   open Base_debugger.Premake (ID) (PC) (Verification) (Lifter)
 

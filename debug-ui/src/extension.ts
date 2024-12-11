@@ -42,7 +42,7 @@ class DebugAdapterExecutableFactory
     // Match of the file extension first
     switch (fileExtension) {
       case 'c':
-        langCmd = 'kanillian';
+        langCmd = 'gillian-c2';
         break;
       case 'js':
         langCmd = 'gillian-js';
@@ -59,8 +59,8 @@ class DebugAdapterExecutableFactory
           case 'c':
             langCmd = 'gillian-c';
             break;
-          case 'kani':
-            langCmd = 'kanillian';
+          case 'c2':
+            langCmd = 'gillian-c2';
             break;
           case 'wisl':
           default:
@@ -76,11 +76,21 @@ class DebugAdapterExecutableFactory
     }
 
     const config = vscode.workspace.getConfiguration('gillianDebugger');
+    const langConfig = vscode.workspace.getConfiguration(
+      `gillianDebugger.${langCmd}`
+    );
     console.log('Configuring debugger...', { config });
+
+    const workspaceFolder =
+      vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath || '.';
+    const extraArgs: string[] = (langConfig.commandLineArguments || []).map(
+      (arg: string) => arg.replace('${workspaceFolder}', workspaceFolder)
+    );
 
     const mode = _session.configuration.execMode || 'debugverify';
 
-    let args = [mode, '-r', 'db'];
+    const env = langConfig.environmentVariables || {};
+    let args = [mode, '-r', 'db', ...extraArgs];
     if (config.useManualProof) {
       args.push('-m');
     }
@@ -88,13 +98,11 @@ class DebugAdapterExecutableFactory
     let cwd: string;
 
     if (config.runMode === 'installed') {
-      cwd = expandPath(config.outputDirectory || '~/.gillian');
-      let binDirectory = config.binDirectory;
-      if (!binDirectory)
-        throw 'Please specify the location of Gillian binaries';
-      binDirectory = expandPath(binDirectory);
+      cwd = expandPath(config.outputDirectory || './.gillian');
+      const binDirectory = config.binDirectory;
+      const path = binDirectory ? expandPath(binDirectory) + '/' : '';
       vscode.workspace.fs.createDirectory(vscode.Uri.file(cwd));
-      cmd = `${binDirectory}/${langCmd}`;
+      cmd = `${path}${langCmd}`;
     } else {
       let sourceDirectory = config.sourceDirectory;
       if (!sourceDirectory)
@@ -107,7 +115,7 @@ class DebugAdapterExecutableFactory
 
     console.log('Starting debugger...', { cmd, args, cwd });
     WebviewPanel.currentPanel?.clearState();
-    const options = { cwd };
+    const options = { cwd, env };
     executable = new vscode.DebugAdapterExecutable(cmd, args, options);
 
     // make VS Code launch the DA executable

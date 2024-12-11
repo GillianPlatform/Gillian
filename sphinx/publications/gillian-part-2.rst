@@ -16,12 +16,12 @@ We introduce verification based on separation logic to Gillian, a multi-language
 
 Venue
 -----
-CAV 2021
+International Conference on Computer Aided Verification (CAV)
 
-Publication Date
-----------------
-July 2021
+Year
+----
+2021
 
-Identifiers
------------
-* doi:`10.1007/978-3-030-81688-9_38 <https://doi.org/doi:10.1007/978-3-030-81688-9_38>`_
+DOI
+---
+* doi:`10.1007/978-3-030-81688-9_38 <https://doi.org/10.1007/978-3-030-81688-9_38>`_
