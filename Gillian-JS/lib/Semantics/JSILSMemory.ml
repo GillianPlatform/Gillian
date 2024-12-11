@@ -90,7 +90,7 @@ module M = struct
     in
     Recovery_tactic.try_unfold values
 
-  let assertions ?to_keep:_ (heap : t) : GAsrt.t list = SHeap.assertions heap
+  let assertions ?to_keep:_ (heap : t) : GAsrt.t = SHeap.assertions heap
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
   let alocs (heap : t) : Containers.SS.t = SHeap.alocs heap
 
@@ -597,9 +597,7 @@ module M = struct
   let prop_abduce_none_in_js = [ "@call" ]
   let prop_abduce_both_in_js = [ "hasOwnProperty" ]
 
-  type fix_result = Asrt.t list
-
-  let complete_fix_js (i_fix : i_fix_t) : fix_result list =
+  let complete_fix_js (i_fix : i_fix_t) : Asrt.t list =
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
@@ -610,7 +608,7 @@ module M = struct
         [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
     | FCell (l, p) -> (
         let none_fix () =
-          [ Asrt.GA (JSILNames.aCell, [ l; p ], [ Lit Nono ]) ]
+          [ Asrt.CorePred (JSILNames.aCell, [ l; p ], [ Lit Nono ]) ]
         in
 
         let some_fix () =
@@ -632,7 +630,7 @@ module M = struct
               ]
           in
           [
-            Asrt.GA (JSILNames.aCell, [ l; p ], [ descriptor ]);
+            Asrt.CorePred (JSILNames.aCell, [ l; p ], [ descriptor ]);
             Asrt.Pure asrt_empty;
             Asrt.Pure asrt_none;
             Asrt.Pure asrt_list;
@@ -651,17 +649,17 @@ module M = struct
         [
           [
             Asrt.Pure (Eq (ALoc al, l));
-            Asrt.GA (JSILNames.aMetadata, [ l ], [ mloc ]);
-            Asrt.GA (JSILNames.aMetadata, [ mloc ], [ Lit Null ]);
-            Asrt.GA
+            Asrt.CorePred (JSILNames.aMetadata, [ l ], [ mloc ]);
+            Asrt.CorePred (JSILNames.aMetadata, [ mloc ], [ Lit Null ]);
+            Asrt.CorePred
               ( JSILNames.aCell,
                 [ mloc; Lit (String "@class") ],
                 [ Lit (String "Object") ] );
-            Asrt.GA
+            Asrt.CorePred
               ( JSILNames.aCell,
                 [ mloc; Lit (String "@extensible") ],
                 [ Lit (Bool true) ] );
-            Asrt.GA
+            Asrt.CorePred
               ( JSILNames.aCell,
                 [ mloc; Lit (String "@proto") ],
                 [ Lit (Loc JS2JSIL_Helpers.locObjPrototype) ] );
@@ -670,7 +668,7 @@ module M = struct
     | FPure f -> [ [ Asrt.Pure f ] ]
 
   (* Fix completion: simple *)
-  let complete_fix_jsil (i_fix : i_fix_t) : fix_result list =
+  let complete_fix_jsil (i_fix : i_fix_t) : Asrt.t list =
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
@@ -682,20 +680,29 @@ module M = struct
         let v : vt = LVar vvar in
         (* Value is not none - we always bi-abduce presence *)
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-        [ [ Asrt.GA (JSILNames.aCell, [ l; p ], [ v ]); Asrt.Pure not_none ] ]
+        [
+          [
+            Asrt.CorePred (JSILNames.aCell, [ l; p ], [ v ]); Asrt.Pure not_none;
+          ];
+        ]
     | FMetadata l ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-        [ [ Asrt.GA (JSILNames.aMetadata, [ l ], [ v ]); Asrt.Pure not_none ] ]
+        [
+          [
+            Asrt.CorePred (JSILNames.aMetadata, [ l ], [ v ]);
+            Asrt.Pure not_none;
+          ];
+        ]
     | FPure f -> [ [ Asrt.Pure f ] ]
 
   (* An error can have multiple fixes *)
-  let get_fixes (err : err_t) : fix_result list =
-    let pp_fix_result ft res =
+  let get_fixes (err : err_t) : Asrt.t list =
+    let pp_fix ft res =
       let open Fmt in
-      pf ft "@[<v 2>@[<h>[[ %a ]]@]@\n@]" (list ~sep:comma Asrt.pp) res
+      pf ft "@[<v 2>@[<h>[[ %a ]]@]@\n@]" Asrt.pp res
     in
     let _, fixes, _ = err in
     L.verbose (fun m ->
@@ -709,10 +716,10 @@ module M = struct
       if !Js_config.js then complete_fix_js else complete_fix_jsil
     in
 
-    let complete_ifixes (ifixes : i_fix_t list) : fix_result list =
+    let complete_ifixes (ifixes : i_fix_t list) : Asrt.t list =
       let completed_ifixes = List.map complete ifixes in
       let completed_ifixes = List_utils.list_product completed_ifixes in
-      let completed_ifixes : fix_result list =
+      let completed_ifixes : Asrt.t list =
         List.map
           (fun fixes -> List.fold_right List.append fixes [])
           completed_ifixes
@@ -721,16 +728,14 @@ module M = struct
       L.verbose (fun m ->
           m "@[<v 2>Memory: i-fixes completed: %d@\n%a"
             (List.length completed_ifixes)
-            Fmt.(list ~sep:(any "@\n") pp_fix_result)
+            Fmt.(list ~sep:(any "@\n") pp_fix)
             completed_ifixes);
 
       completed_ifixes
     in
 
     (* Fixes hold lists of lists of i_fixes, *)
-    let completed_fixes = List.concat (List.map complete_ifixes fixes) in
-
-    completed_fixes
+    List.concat_map complete_ifixes fixes
 
   let can_fix _ = true
 

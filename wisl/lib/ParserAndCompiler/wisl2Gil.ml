@@ -150,7 +150,7 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
     compiles a WLExpr into an output expression and a list of Global Assertions.
     the string list contains the name of the variables that are generated. They are existentials. *)
 let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
-    string list * Asrt.t list * Expr.t =
+    string list * Asrt.t * Expr.t =
   let gen_str = Generators.gen_str fname in
   let compile_lexpr = compile_lexpr ~fname in
   let expr_pname_of_binop b =
@@ -237,7 +237,7 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
 
 (* TODO: compile_lformula should return also the list of created existentials *)
-let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
+let rec compile_lformula ?(fname = "main") formula : Asrt.t * Formula.t =
   let gen_str = Generators.gen_str fname in
   let compile_lformula = compile_lformula ~fname in
   let compile_lexpr = compile_lexpr ~fname in
@@ -295,7 +295,6 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let gen_str = Generators.gen_str fname in
   let compile_lexpr = compile_lexpr ~fname in
   let compile_lformula = compile_lformula ~fname in
-  let concat_star = List.fold_left (fun a1 a2 -> Asrt.Star (a1, a2)) in
   let gil_add e k =
     (* builds GIL expression that is e + k *)
     let k_e = Expr.int k in
@@ -362,9 +361,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     | [ le ] ->
         let exs2, la2, e2 = compile_lexpr le in
         ( exs1 @ exs2,
-          concat_star
-            (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
-            (bound @ la1 @ la2) )
+          Asrt.CorePred (cell, [ eloc; eoffs ], [ e2 ]) :: (bound @ la1 @ la2)
+        )
     | le :: r ->
         let exs2, la2, e2 = compile_lexpr le in
         let exs3, la3 =
@@ -373,47 +371,42 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             le1 r ~curr:(curr + 1)
         in
         ( exs1 @ exs2 @ exs3,
-          concat_star
-            (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
-            (bound @ (la3 :: (la1 @ la2))) )
+          Asrt.CorePred (cell, [ eloc; eoffs ], [ e2 ])
+          :: (bound @ la1 @ la2 @ la3) )
   in
   WLAssert.(
     match get asser with
-    | LEmp -> ([], Asrt.Emp)
+    | LEmp -> ([], [])
     | LStar (la1, la2) ->
         let exs1, cla1 = compile_lassert la1 in
         let exs2, cla2 = compile_lassert la2 in
-        (exs1 @ exs2, Asrt.Star (cla1, cla2))
+        (exs1 @ exs2, cla1 @ cla2)
     | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
     | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
     | LPred (pr, lel) ->
         let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
         let exs = List.concat exsl in
         let al = List.concat all in
-        (exs, concat_star (Asrt.Pred (pr, el)) al)
+        (exs, Asrt.Pred (pr, el) :: al)
     | LWand { lhs = lname, largs; rhs = rname, rargs } ->
         let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
         let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
         let exs = List.concat (exs1 @ exs2) in
         let al = List.concat (al1 @ al2) in
-        ( exs,
-          concat_star (Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) }) al
-        )
+        (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
     | LPure lf ->
         let al, f = compile_lformula lf in
-        ([], concat_star (Asrt.Pure f) al))
+        ([], Asrt.Pure f :: al))
 
 let rec compile_lcmd ?(fname = "main") lcmd =
   let compile_lassert = compile_lassert ~fname in
   let compile_lcmd = compile_lcmd ~fname in
   let compile_lexpr = compile_lexpr ~fname in
-  let concat_star = List.fold_left (fun a1 a2 -> Asrt.Star (a1, a2)) in
   let build_assert existentials lasrts =
     match lasrts with
     | [] -> None
-    | a :: r ->
-        let to_assert = concat_star a r in
-        let cmd = LCmd.SL (SLCmd.SepAssert (to_assert, existentials)) in
+    | _ ->
+        let cmd = LCmd.SL (SLCmd.SepAssert (lasrts, existentials)) in
         (* assert (assertions) {existentials: gvars} *)
         Some cmd
   in
@@ -1174,8 +1167,8 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
           List.map
             (fun var -> Asrt.Pure (Eq (Expr.PVar var, Expr.LVar ("#" ^ var))))
             proc.Proc.proc_params
-          |> Asrt.star
         in
+
         let bispec =
           BiSpec.
             {

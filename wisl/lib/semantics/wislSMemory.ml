@@ -311,7 +311,7 @@ let get_fixes (err : err_t) =
       let value = Expr.LVar new_var in
       let loc = Expr.loc_from_loc_name loc in
       let ga = WislLActions.str_ga WislLActions.Cell in
-      [ [ Asrt.GA (ga, [ loc; ofs ], [ value ]) ] ]
+      [ [ Asrt.CorePred (ga, [ loc; ofs ], [ value ]) ] ]
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
