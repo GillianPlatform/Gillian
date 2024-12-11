@@ -77,7 +77,7 @@ module type S = sig
   type unfold_info_t = (string * string) list
 
   val produce_assertion :
-    t -> SVal.SESubst.t -> Asrt.simple -> (t, err_t) Res_list.t
+    t -> SVal.SESubst.t -> Asrt.atom -> (t, err_t) Res_list.t
 
   val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
   val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
@@ -573,7 +573,7 @@ module Make (State : SState.S) :
   let rec produce_assertion
       (astate : t)
       (subst : SVal.SESubst.t)
-      (a : Asrt.simple) : (t, err_t) Res_list.t =
+      (a : Asrt.atom) : (t, err_t) Res_list.t =
     let open Res_list.Syntax in
     let { state; preds; pred_defs; variants; wands } = astate in
     let other_state_err msg = [ Error (StateErr.EOther msg) ] in
@@ -584,11 +584,11 @@ module Make (State : SState.S) :
            Produce simple assertion: @[<h>%a@]@\n\
            With subst: %a\n\
           \           -------------------------@\n"
-          Asrt.pp_simple a SVal.SESubst.pp subst);
+          Asrt.pp_atom a SVal.SESubst.pp subst);
 
     L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
-    match (a : Asrt.simple) with
+    match (a : Asrt.atom) with
     | Emp ->
         L.verbose (fun fmt -> fmt "Emp assertion.");
         [ Ok astate ]
@@ -1260,12 +1260,12 @@ module Make (State : SState.S) :
       L.Logging_constants.Content_type.assertion (fun () ->
         let p, outs = step in
         let open Res_list.Syntax in
-        match (p : Asrt.simple) with
+        match (p : Asrt.atom) with
         | CorePred (a_id, e_ins, e_outs) -> (
             let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
             let failure = List.exists (fun x -> x = None) vs_ins in
             if failure then (
-              Fmt.pr "I don't know all ins for %a????" Asrt.pp_simple p;
+              Fmt.pr "I don't know all ins for %a????" Asrt.pp_atom p;
               if !Config.under_approximation then [] else resource_fail)
             else
               let vs_ins = List.map Option.get vs_ins in
@@ -1454,7 +1454,7 @@ module Make (State : SState.S) :
             let other_error =
               StateErr.EOther
                 (Fmt.str "Uncaught exception while matching assertions %a"
-                   Asrt.pp_simple (fst step))
+                   Asrt.pp_atom (fst step))
             in
             Res_list.error_with other_error)
 
@@ -2086,7 +2086,7 @@ module Make (State : SState.S) :
         (step : MP.step) : (package_state list, err_t list) Result.t =
       let open Syntaxes.Result in
       L.verbose (fun m ->
-          m "Wand about to consume RHS step: %a" Asrt.pp_simple (fst step));
+          m "Wand about to consume RHS step: %a" Asrt.pp_atom (fst step));
       (* States are modified in place unfortunately.. so we have to copy them just in case *)
       (* First we try to consume from the lhs_state *)
       let- lhs_errs =

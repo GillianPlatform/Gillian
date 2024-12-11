@@ -561,7 +561,7 @@ module Make (SPState : PState.S) = struct
       * (string * Expr.t list) list
       * Wands.wand list =
     List.fold_left
-      (fun (core_asrts, pure, types, preds, wands) (a : Asrt.simple) ->
+      (fun (core_asrts, pure, types, preds, wands) (a : Asrt.atom) ->
         match a with
         | CorePred (a, es1, es2) ->
             ((a, es1, es2) :: core_asrts, pure, types, preds, wands)
@@ -842,7 +842,7 @@ module Make (SPState : PState.S) = struct
                      m
                        "One branch of produce GA failed for: %a!\n\
                         with Message: %a. Might have lost some paths ?"
-                       Asrt.pp_simple
+                       Asrt.pp_atom
                        (Asrt.CorePred (a, ins, outs))
                        SPState.pp_err msg);
                  None))
@@ -873,7 +873,7 @@ module Make (SPState : PState.S) = struct
     let a = Reduction.reduce_assertion a in
     let subst = SESubst.init [] in
 
-    let find_spec_var_eqs (a : Asrt.simple) =
+    let find_spec_var_eqs (a : Asrt.atom) =
       match a with
       | Pure (Eq (LVar x, LVar y))
         when is_spec_var_name x && not (is_spec_var_name y) ->

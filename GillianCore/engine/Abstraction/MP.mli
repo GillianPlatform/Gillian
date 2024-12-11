@@ -7,7 +7,7 @@ val outs_pp : outs Fmt.t
 (** The [step] type represents a matching plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.simple * outs [@@deriving yojson]
+type step = Asrt.atom * outs [@@deriving yojson]
 
 type label = string * SS.t [@@deriving yojson]
 type post = Flag.t * Asrt.t list [@@deriving yojson]

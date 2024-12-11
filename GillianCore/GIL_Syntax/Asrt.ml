@@ -1,5 +1,5 @@
 (** {b GIL logic assertions}. *)
-type simple = TypeDef__.assertion_simple =
+type atom = TypeDef__.assertion_atom =
   | Emp  (** Empty heap             *)
   | Pred of string * Expr.t list  (** Predicates             *)
   | Pure of Formula.t  (** Pure formula           *)
@@ -12,8 +12,8 @@ type simple = TypeDef__.assertion_simple =
 
 type t = TypeDef__.assertion [@@deriving eq]
 
-let simple_to_yojson = TypeDef__.assertion_simple_to_yojson
-let simple_of_yojson = TypeDef__.assertion_simple_of_yojson
+let atom_to_yojson = TypeDef__.assertion_atom_to_yojson
+let atom_of_yojson = TypeDef__.assertion_atom_of_yojson
 let to_yojson = TypeDef__.assertion_to_yojson
 let of_yojson = TypeDef__.assertion_of_yojson
 
@@ -31,7 +31,7 @@ let compare x y =
   | _, Types _ -> 1
   | _, _ -> cmp x y
 
-let prioritise (a1 : simple) (a2 : simple) =
+let prioritise (a1 : atom) (a2 : atom) =
   let lloc_aloc_pvar_lvar e1 e2 =
     match ((e1 : Expr.t), (e2 : Expr.t)) with
     | Lit (Loc _), Lit (Loc _) -> 0
@@ -127,7 +127,7 @@ let pure_asrts : t -> Formula.t list =
   collector#visit_assertion ()
 
 (* Check if --a-- is a pure assertion *)
-let is_pure_asrt : simple -> bool = function
+let is_pure_asrt : atom -> bool = function
   | Pred _ | CorePred _ | Wand _ -> false
   | _ -> true
 
@@ -143,7 +143,7 @@ let make_pure (a : t) : Formula.t =
   |> Formula.conjunct
 
 (** GIL logic assertions *)
-let _pp_simple ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
+let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
   function
   | Emp -> Fmt.string fmt "emp"
   | Pred (name, params) ->
@@ -167,10 +167,10 @@ let _pp_simple ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
 
 let _pp ~(e_pp : Format.formatter -> Expr.t -> unit) (fmt : Format.formatter) :
     t -> unit =
-  Fmt.list ~sep:(Fmt.any " *@ ") (_pp_simple ~e_pp) fmt
+  Fmt.list ~sep:(Fmt.any " *@ ") (_pp_atom ~e_pp) fmt
 
-let pp_simple = _pp_simple ~e_pp:Expr.pp
-let pp_simple_full = _pp_simple ~e_pp:Expr.full_pp
+let pp_atom = _pp_atom ~e_pp:Expr.pp
+let pp_atom_full = _pp_atom ~e_pp:Expr.full_pp
 let pp = _pp ~e_pp:Expr.pp
 let full_pp = _pp ~e_pp:Expr.full_pp
 

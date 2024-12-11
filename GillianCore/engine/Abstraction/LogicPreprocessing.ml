@@ -49,7 +49,7 @@ let rec auto_unfold
            | Pred (name, args) -> (
                try
                  L.tmi (fun fmt ->
-                     fmt "AutoUnfold: %a : %s" Asrt.pp_simple asrt name);
+                     fmt "AutoUnfold: %a : %s" Asrt.pp_atom asrt name);
                  let pred : Pred.t = Hashtbl.find predicates name in
                  (* If it is not, replace the predicate assertion for the list of its definitions
                     substituting the formal parameters of the predicate with the corresponding

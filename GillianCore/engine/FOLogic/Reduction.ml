@@ -3201,7 +3201,7 @@ let reduce_assertion_loop
     (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
   let fe = reduce_lexpr_loop ~matching pfs gamma in
-  let f : Asrt.simple -> Asrt.t = function
+  let f : Asrt.atom -> Asrt.t = function
     (* Empty heap *)
     | Asrt.Emp -> []
     (* Star *)

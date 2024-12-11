@@ -997,7 +997,7 @@ let admissible_assertion (a : Asrt.t) : bool =
 
   let a = Asrt.pvars_to_lvars a in
 
-  let separate : Asrt.simple -> unit = function
+  let separate : Asrt.atom -> unit = function
     | Pure f -> PFS.extend pfs f
     | Types ets ->
         List.iter

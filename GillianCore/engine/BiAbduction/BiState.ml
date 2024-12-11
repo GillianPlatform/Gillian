@@ -257,7 +257,7 @@ module Make (State : SState.S) = struct
                     "@[<v 2>WARNING: Match Assertion Failed: %a with error: \
                      %a. CUR SUBST:@\n\
                      %a@]@\n"
-                    Asrt.pp_simple (fst step) State.pp_err err SVal.SESubst.pp
+                    Asrt.pp_atom (fst step) State.pp_err err SVal.SESubst.pp
                     subst);
               if not (State.can_fix err) then (
                 L.verbose (fun m -> m "CANNOT FIX!");

@@ -162,7 +162,7 @@ and formula =
   | ForAll of (string * typ option) list * formula
   | IsInt of expr
 
-and assertion_simple =
+and assertion_atom =
   | Emp
   | Pred of string * expr list
   | Pure of formula
@@ -170,7 +170,7 @@ and assertion_simple =
   | CorePred of string * expr list * expr list
   | Wand of { lhs : string * expr list; rhs : string * expr list }
 
-and assertion = assertion_simple list
+and assertion = assertion_atom list
 and bindings = string * (string * expr) list
 
 and slcmd =
