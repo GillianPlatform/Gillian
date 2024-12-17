@@ -86,19 +86,18 @@ let rec auto_unfold
                  raise (Failure ("Error: Can't auto_unfold predicate " ^ name)))
            | _ -> [ [ asrt ] ])
   in
-  (* Now that all assertions have been unfolded to multiple options, do a cross
-      product of all options to get all possible combinations of assertions
-     options: Asrt.t list list, ie list of options to choose from
-  *)
-  let rec cross_product (options : Asrt.t list list) : Asrt.t list =
-    match options with
-    | [] -> []
-    | [ o ] -> o
-    | o :: os ->
-        let rest = cross_product os in
-        List.concat_map (fun a -> List.map (fun b -> a @ b) rest) o
+  (* Now that all assertions have been unfolded to multiple options, do the
+     cross products of options
+     e.g. [[a1; a2]; [b1; b2]] -> [[a1; b1]; [a1; b2]; [a2; b1]; [a2; b2]] *)
+  let options =
+    List.fold_left
+      (fun acc asrts ->
+        List.concat_map
+          (fun asrt -> List.map (fun asrt' -> asrt @ asrt') asrts)
+          acc)
+      [ [] ] options
   in
-  cross_product options
+  List.filter Simplifications.admissible_assertion options
 
 (*
  * Return: Hashtbl from predicate name to boolean
