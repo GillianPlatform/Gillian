@@ -1,6 +1,6 @@
 import produce, { Draft, enableMapSet } from 'immer';
 import create, { State as ZState, StateCreator } from 'zustand';
-import { DebuggerState, MatchMap, State, MatchStep } from '../../types';
+import { DebuggerState, MatchMap, MatchMapSafe, State } from '../../types';
 import { requestMatching } from './VSCodeAPI';
 
 enableMapSet();
@@ -19,7 +19,7 @@ export type Store = State & {
   clearMatching: () => void;
   pushMatching: (matchId: number) => boolean;
   popMatchings: (n: number) => void;
-  selectMatchStep: (step: MatchStep) => void;
+  selectMatchStep: (step: number) => void;
   toggleExecNodeExpanded: (id: string) => void;
   toggleMatchNodeExpanded: (id: number) => void;
   clear: () => void;
@@ -41,8 +41,12 @@ const useStore = create<Store>(
         set(() => ({ debuggerState }));
       },
       loadMatching: (matchId, map) => {
+        const safeMap = {
+          ...map,
+          nodes: Object.fromEntries(map.nodes),
+        } as Draft<MatchMapSafe>;
         set(({ matchState }) => {
-          matchState.matches[matchId] = { id: matchId, map };
+          matchState.matches[matchId] = { id: matchId, map: safeMap };
         });
       },
       requestMatching: matchId => {
