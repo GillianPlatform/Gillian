@@ -5,7 +5,6 @@ open CLogic
 open Compcert
 open CompileState
 module Str_set = Gillian.Utils.Containers.SS
-open Asrt.Infix
 open Formula.Infix
 module CoreP = Constr.Core
 
@@ -31,7 +30,7 @@ let rec split3_expr_comp = function
   | [] -> ([], [], [])
   | (x, y, z) :: l ->
       let rx, ry, rz = split3_expr_comp l in
-      (x :: rx, y @ ry, z :: rz)
+      (x @ rx, y @ ry, z :: rz)
 
 let ( ++ ) = Expr.Infix.( + )
 
@@ -135,83 +134,65 @@ let assert_of_member cenv members id typ =
         Fmt.failwith "Invalid member offset : %a@?" Driveraux.print_error e
   in
   (* The following bit of code should be refactored to be made cleaner ... *)
-  if
-    match typ with
-    | Tstruct _ -> true
-    | _ -> false
-  then
-    let struct_name, struct_id =
-      match typ with
-      | Tstruct (id, _) -> (true_name id, id)
-      | _ -> failwith "impossible"
-    in
-    let pred_name = pred_name_of_struct struct_name in
-    let arg_number =
-      List.length (Option.get (Maps.PTree.get struct_id cenv)).co_members
-    in
-    let args_without_ins =
-      List.init arg_number (fun k ->
-          Expr.LVar ("#i__" ^ field_name ^ "_" ^ string_of_int k))
-    in
-    let list_is_components =
-      let open Formula.Infix in
-      Asrt.Pure pvmember #== (Expr.list args_without_ins)
-    in
-    let ofs =
-      let open Expr.Infix in
-      pvofs + fo
-    in
-    let args = pvloc :: ofs :: args_without_ins in
-    let pred_call = Asrt.Pred (pred_name, args) in
-    list_is_components ** pred_call
-  else if
-    match typ with
-    | Tarray _ -> true
-    | _ -> false
-  then
-    let ty, n =
-      match typ with
-      | Tarray (ty, n, _) -> (ty, n)
-      | _ -> failwith "impossible"
-    in
-    let n = ValueTranslation.int_of_z n in
-    let n_e = Expr.int_z n in
-    let chunk =
-      match access_mode_by_value ty with
-      | Some chunk -> chunk
-      | _ -> failwith "Array in a structure containing complicated types"
-    in
-    Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
-      ~sval_arr:pvmember ~perm:(Some Freeable)
-  else
-    let mk t v = Expr.list [ Expr.string t; v ] in
-    let field_val_name = "#i__" ^ field_name ^ "_v" in
-    let lvval = Expr.LVar field_val_name in
-    let e_to_use, getter_or_type_pred =
-      let open Internal_Predicates in
-      let open VTypes in
-      match typ with
-      | Tint _ -> (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ]))
-      | Tlong _ ->
-          (mk long_type lvval, Asrt.Pred (long_get, [ pvmember; lvval ]))
-      | Tfloat _ ->
-          (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
-      | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
-      | _ ->
-          failwith
-            (Printf.sprintf "unhandled struct field type for now : %s"
-               (PrintCsyntax.name_cdecl field_name typ))
-    in
-    let chunk =
-      match access_mode_by_value typ with
-      | Some chunk -> chunk
-      | _ -> failwith "Invalid access mode for some type"
-    in
-    let ga_asrt =
-      CoreP.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
-        ~perm:(Some Freeable)
-    in
-    getter_or_type_pred ** ga_asrt
+  match typ with
+  | Tstruct (struct_id, _) ->
+      let struct_name = true_name struct_id in
+      let pred_name = pred_name_of_struct struct_name in
+      let arg_number =
+        List.length (Option.get (Maps.PTree.get struct_id cenv)).co_members
+      in
+      let args_without_ins =
+        List.init arg_number (fun k ->
+            Expr.LVar ("#i__" ^ field_name ^ "_" ^ string_of_int k))
+      in
+      let list_is_components =
+        Formula.Infix.(Asrt.Pure pvmember #== (Expr.list args_without_ins))
+      in
+      let ofs = Expr.Infix.(pvofs + fo) in
+      let args = pvloc :: ofs :: args_without_ins in
+      let pred_call = Asrt.Pred (pred_name, args) in
+      [ list_is_components; pred_call ]
+  | Tarray (ty, n, _) ->
+      let n = ValueTranslation.int_of_z n in
+      let n_e = Expr.int_z n in
+      let chunk =
+        match access_mode_by_value ty with
+        | Some chunk -> chunk
+        | _ -> failwith "Array in a structure containing complicated types"
+      in
+      [
+        Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
+          ~sval_arr:pvmember ~perm:(Some Freeable);
+      ]
+  | _ ->
+      let mk t v = Expr.list [ Expr.string t; v ] in
+      let field_val_name = "#i__" ^ field_name ^ "_v" in
+      let lvval = Expr.LVar field_val_name in
+      let e_to_use, getter_or_type_pred =
+        let open Internal_Predicates in
+        let open VTypes in
+        match typ with
+        | Tint _ -> (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ]))
+        | Tlong _ ->
+            (mk long_type lvval, Asrt.Pred (long_get, [ pvmember; lvval ]))
+        | Tfloat _ ->
+            (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
+        | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
+        | _ ->
+            failwith
+              (Printf.sprintf "unhandled struct field type for now : %s"
+                 (PrintCsyntax.name_cdecl field_name typ))
+      in
+      let chunk =
+        match access_mode_by_value typ with
+        | Some chunk -> chunk
+        | _ -> failwith "Invalid access mode for some type"
+      in
+      let ga_asrt =
+        CoreP.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
+          ~perm:(Some Freeable)
+      in
+      [ getter_or_type_pred; ga_asrt ]
 
 let assert_of_hole (low, high) =
   let pvloc = Expr.PVar loc_param_name in
@@ -244,22 +225,18 @@ let gen_pred_of_struct cenv ann struct_name =
     ]
   in
   let struct_params =
-    List.map
-      (function
-        | Member_plain (i, _) -> (true_name i, Some Type.ListType)
-        | Member_bitfield _ -> failwith "Unsupported bitfield members")
-      comp.co_members
+    comp.co_members
+    |> List.map @@ function
+       | Member_plain (i, _) -> (true_name i, Some Type.ListType)
+       | Member_bitfield _ -> failwith "Unsupported bitfield members"
   in
   let pred_params = first_params @ struct_params in
   let pred_num_params = List.length pred_params in
   let def_without_holes =
-    List.fold_left
-      (fun asrt member ->
-        match member with
-        | Member_plain (id, typ) ->
-            asrt ** assert_of_member cenv comp.co_members id typ
-        | Member_bitfield _ -> failwith "Unsupported bitfield members")
-      Asrt.Emp comp.co_members
+    comp.co_members
+    |> List.concat_map @@ function
+       | Member_plain (id, typ) -> assert_of_member cenv comp.co_members id typ
+       | Member_bitfield _ -> failwith "Unsupported bitfield members"
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
@@ -284,7 +261,7 @@ let gen_pred_of_struct cenv ann struct_name =
 
   let holes = get_holes comp.co_members in
   let holes_asserts = List.map assert_of_hole holes in
-  let def = Asrt.star holes_asserts ** def_without_holes in
+  let def = holes_asserts @ def_without_holes in
   (* TODO (Alexis): How to handle changes in structs? *)
   let n_pred =
     Pred.
@@ -354,112 +331,109 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
   match sv with
   | CSVal.Sint se ->
       let eg = tse se in
-      (tint eg, [], mk int_type (tse se))
+      ([ tint eg ], [], mk int_type (tse se))
   | Slong se ->
       let eg = tse se in
-      (tint eg, [], mk long_type (tse se))
+      ([ tint eg ], [], mk long_type (tse se))
   | Ssingle se ->
       let eg = tse se in
-      (tnum eg, [], mk single_type (tse se))
+      ([ tnum eg ], [], mk single_type (tse se))
   | Sfloat se ->
       let eg = tse se in
-      (tnum eg, [], mk float_type (tse se))
+      ([ tnum eg ], [], mk float_type (tse se))
   | Sptr (se1, se2) ->
       let eg1, eg2 = (tse se1, tse se2) in
-      (tloc eg1 ** tint eg2, [], Expr.EList [ tse se1; tse se2 ])
+      ([ tloc eg1; tint eg2 ], [], Expr.EList [ tse se1; tse se2 ])
   | Sfunptr symb ->
       let loc = Global_env.location_of_symbol symb in
       let ptr = Expr.EList [ Lit (Loc loc); Expr.zero_i ] in
-      (Asrt.Emp, [], ptr)
+      ([], [], ptr)
 
 (** Returns assertions that are necessary to define the expression,
       the created variable for binding when necessary, and the used expression *)
 let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
   match e with
-  | CExpr.SExpr se -> (Asrt.Emp, [], trans_simpl_expr se)
+  | CExpr.SExpr se -> ([], [], trans_simpl_expr se)
   | SVal sv -> trans_sval sv
   | EList el ->
-      let asrts, vars, elp = split3_expr_comp (List.map trans_expr el) in
-      let asrt = Asrt.star asrts in
+      let asrt, vars, elp = split3_expr_comp (List.map trans_expr el) in
       (asrt, vars, Expr.EList elp)
   | ESet es ->
-      let asrts, vars, elp = split3_expr_comp (List.map trans_expr es) in
-      let asrt = Asrt.star asrts in
+      let asrt, vars, elp = split3_expr_comp (List.map trans_expr es) in
       (asrt, vars, Expr.ESet elp)
   | BinOp (e1, LstCat, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
       let a2, v2, eg2 = trans_expr e2 in
-      (a1 ** a2, v1 @ v2, Expr.list_cat eg1 eg2)
+      (a1 @ a2, v1 @ v2, Expr.list_cat eg1 eg2)
   | BinOp (e1, LstCons, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
       let a2, v2, eg2 = trans_expr e2 in
-      (a1 ** a2, v1 @ v2, Expr.list_cat (EList [ eg1 ]) eg2)
+      (a1 @ a2, v1 @ v2, Expr.list_cat (EList [ eg1 ]) eg2)
   | BinOp (e1, PtrPlus, e2) -> (
       let a1, v1, ptr = trans_expr e1 in
       let a2, v2, to_add = trans_expr e2 in
       match ptr with
       | Expr.EList [ loc; ofs ] ->
-          (a1 ** a2, v1 @ v2, Expr.EList [ loc; Expr.Infix.( + ) ofs to_add ])
+          (a1 @ a2, v1 @ v2, Expr.EList [ loc; Expr.Infix.( + ) ofs to_add ])
       | ptr ->
           let res_lvar = fresh_lvar () in
           let res = Expr.LVar res_lvar in
-          ( a1 ** a2 ** Constr.Others.ptr_add ~ptr ~to_add ~res,
+          ( a1 @ a2 @ [ Constr.Others.ptr_add ~ptr ~to_add ~res ],
             res_lvar :: (v1 @ v2),
             res ))
   | BinOp (e1, b, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
       let a2, v2, eg2 = trans_expr e2 in
-      (a1 ** a2, v1 @ v2, BinOp (eg1, trans_binop b, eg2))
+      (a1 @ a2, v1 @ v2, BinOp (eg1, trans_binop b, eg2))
   | UnOp (u, e) ->
       let a, v, eg = trans_expr e in
       (a, v, UnOp (trans_unop u, eg))
   | NOp (nop, el) ->
-      let asrts, vs, elp = split3_expr_comp (List.map trans_expr el) in
-      let asrt = Asrt.star asrts in
+      let asrt, vs, elp = split3_expr_comp (List.map trans_expr el) in
       let gnop = trans_nop nop in
       (asrt, vs, Expr.NOp (gnop, elp))
   | LstSub (lst, start, len) ->
       let a1, v1, lst = trans_expr lst in
       let a2, v2, start = trans_expr start in
       let a3, v3, len = trans_expr len in
-      (a1 ** a2 ** a3, v1 @ v2 @ v3, Expr.list_sub ~lst ~start ~size:len)
+      (a1 @ a2 @ a3, v1 @ v2 @ v3, Expr.list_sub ~lst ~start ~size:len)
 
 let rec trans_form (f : CFormula.t) : Asrt.t * Var.t list * Formula.t =
   let open Formula.Infix in
   match f with
-  | CFormula.True -> (Emp, [], Formula.True)
-  | False -> (Emp, [], False)
+  | CFormula.True -> ([], [], Formula.True)
+  | False -> ([], [], False)
   | Eq (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 ** f2, v1 @ v2, eg1 #== eg2)
+      (f1 @ f2, v1 @ v2, eg1 #== eg2)
   | LessEq (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 ** f2, v1 @ v2, eg1 #<= eg2)
+      (f1 @ f2, v1 @ v2, eg1 #<= eg2)
   | Less (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 ** f2, v1 @ v2, eg1 #< eg2)
+      (f1 @ f2, v1 @ v2, eg1 #< eg2)
   | SetMem (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 ** f2, v1 @ v2, SetMem (eg1, eg2))
+      (f1 @ f2, v1 @ v2, SetMem (eg1, eg2))
   | Not fp ->
       let a, v, fpp = trans_form fp in
       (a, v, fnot fpp)
   | Or (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
-      (a1 ** a2, v1 @ v2, fp1 #|| fp2)
+      (a1 @ a2, v1 @ v2, fp1 #|| fp2)
   | And (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
-      (a1 ** a2, v1 @ v2, fp1 #&& fp2)
+      (a1 @ a2, v1 @ v2, fp1 #&& fp2)
   | Implies (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
-      (a1 ** a2, v1 @ v2, fp1 #=> fp2)
+      (a1 @ a2, v1 @ v2, fp1 #=> fp2)
   | ForAll (lvts, f) ->
       let a, v, fp = trans_form f in
       (a, v, ForAll (lvts, fp))
@@ -511,13 +485,13 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         let loc = Global_env.location_of_symbol symb in
         let loc = Expr.Lit (Loc loc) in
         let ofsv = Expr.int 0 in
-        (Asrt.Emp, loc, ofsv)
+        ([], loc, ofsv)
     | _ ->
         let a_s, _, s_e = trans_expr s in
         let locv = gen_loc_var () in
         let ofsv = gen_ofs_var () in
         let pc = ptr_call s_e locv ofsv in
-        (pc ** a_s, locv, ofsv)
+        (pc :: a_s, locv, ofsv)
   in
   let to_assert, locv, ofsv = interpret_s ~typ s in
   let malloc_chunk siz =
@@ -526,52 +500,35 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   let mk str v = Expr.list [ Expr.string str; v ] in
   let mk_ptr l o = Expr.list [ l; o ] in
   match c with
-  | CConstructor.ConsExpr (SVal (Sint se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mint32 in
-      let sv = mk int_type e in
-      let siz = sz (Sint se) in
-      let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+  | CConstructor.ConsExpr (SVal (Sint v as se))
+  | ConsExpr (SVal (Sfloat v as se))
+  | ConsExpr (SVal (Ssingle v as se))
+  | ConsExpr (SVal (Slong v as se)) ->
+      let chunk, typ, asrtfn =
+        match se with
+        | Sint _ -> (Chunk.Mint32, int_type, tint)
+        | Sfloat _ -> (Chunk.Mfloat32, float_type, tnum)
+        | Ssingle _ -> (Chunk.Mfloat32, single_type, tnum)
+        | Slong _ -> (Chunk.Mint64, long_type, tint)
+        | _ -> failwith "Impossible"
       in
-      ga ** to_assert ** tint e ** malloc_chunk siz
-  | ConsExpr (SVal (Sfloat se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mfloat32 in
-      let siz = sz (Sfloat se) in
-      let sv = mk float_type e in
+      let e = cse v in
+      let sval = mk typ e in
+      let siz = sz se in
       let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval ~perm:(Some Freeable)
       in
-      ga ** to_assert ** tnum e ** malloc_chunk siz
-  | ConsExpr (SVal (Ssingle se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mfloat32 in
-      let siz = sz (Ssingle se) in
-      let sv = mk single_type e in
-      let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
-      in
-      ga ** to_assert ** tnum e ** malloc_chunk siz
-  | ConsExpr (SVal (Slong se)) ->
-      let e = cse se in
-      let chunk = Chunk.Mint64 in
-      let siz = sz (Slong se) in
-      let sv = mk long_type e in
-      let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
-      in
-      ga ** to_assert ** tint e ** malloc_chunk siz
+      [ ga; asrtfn e; malloc_chunk siz ] @ to_assert
   | ConsExpr (SVal (Sptr (sl, so))) ->
       let l = cse sl in
       let o = cse so in
       let chunk = Chunk.ptr in
       let siz = sz (Sptr (sl, so)) in
-      let sv = mk_ptr l o in
+      let sval = mk_ptr l o in
       let ga =
-        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval ~perm:(Some Freeable)
       in
-      ga ** to_assert ** tloc l ** tint o ** malloc_chunk siz
+      [ ga; tloc l; tint o; malloc_chunk siz ] @ to_assert
   | ConsExpr (SVal (Sfunptr fname)) ->
       let l = Global_env.location_of_symbol fname in
       let ptr = Expr.EList [ Expr.Lit (Loc l); Expr.zero_i ] in
@@ -580,7 +537,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
       let ga_single =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:ptr ~perm:(Some Freeable)
       in
-      ga_single ** to_assert ** malloc_chunk siz
+      [ ga_single; malloc_chunk siz ] @ to_assert
   | ConsExpr _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
   | ConsStruct (sname, el) ->
@@ -597,72 +554,73 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         split3_expr_comp (List.map trans_expr el)
       in
       let pr =
-        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields)
-        ** Asrt.star more_asrt
+        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields) :: more_asrt
       in
-      pr ** to_assert ** malloc_chunk siz
+      pr @ to_assert @ [ malloc_chunk siz ]
 
 let rec trans_asrt ~fname ~ann asrt =
-  match asrt with
-  | CAssert.Star (a1, a2) ->
-      trans_asrt ~fname ~ann a1 ** trans_asrt ~fname ~ann a2
-  | Array { ptr; chunk; size; content; malloced } ->
-      let a1, _, ptr = trans_expr ptr in
-      let a2, _, size = trans_expr size in
-      let a3, _, content = trans_expr content in
-      let malloc_p =
-        if malloced then
-          let open Expr.Infix in
-          let csize = Expr.int (Chunk.size chunk) in
-          let total_size = size * csize in
-          Constr.Others.malloced_abst ~ptr ~total_size
-        else Asrt.Emp
-      in
-      a1 ** a2 ** a3
-      ** Constr.Others.array_ptr ~ptr ~chunk ~size ~content
-      ** malloc_p
-  | Malloced (e1, e2) ->
-      let a1, _, ce1 = trans_expr e1 in
-      let a2, _, ce2 = trans_expr e2 in
-      a1 ** a2 ** Constr.Others.malloced_abst ~ptr:ce1 ~total_size:ce2
-  | Zeros (e1, e2) ->
-      let a1, _, ce1 = trans_expr e1 in
-      let a2, _, ce2 = trans_expr e2 in
-      a1 ** a2 ** Constr.Others.zeros_ptr_size ~ptr:ce1 ~size:ce2
-  | Undefs (e1, e2) ->
-      let a1, _, ce1 = trans_expr e1 in
-      let a2, _, ce2 = trans_expr e2 in
-      a1 ** a2 ** Constr.Others.undefs_ptr_size ~ptr:ce1 ~size:ce2
-  | Pure f ->
-      let ma, _, fp = trans_form f in
-      ma ** Pure fp
-  | Pred (p, cel) ->
-      let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
-      Asrt.star ap ** Pred (p, gel)
-  | Emp -> Emp
-  | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
+  let a =
+    match asrt with
+    | CAssert.Star (a1, a2) ->
+        trans_asrt ~fname ~ann a1 @ trans_asrt ~fname ~ann a2
+    | Array { ptr; chunk; size; content; malloced } ->
+        let a1, _, ptr = trans_expr ptr in
+        let a2, _, size = trans_expr size in
+        let a3, _, content = trans_expr content in
+        let malloc_p =
+          if malloced then
+            let open Expr.Infix in
+            let csize = Expr.int (Chunk.size chunk) in
+            let total_size = size * csize in
+            [ Constr.Others.malloced_abst ~ptr ~total_size ]
+          else []
+        in
+        a1 @ a2 @ a3
+        @ [ Constr.Others.array_ptr ~ptr ~chunk ~size ~content ]
+        @ malloc_p
+    | Malloced (e1, e2) ->
+        let a1, _, ce1 = trans_expr e1 in
+        let a2, _, ce2 = trans_expr e2 in
+        a1 @ a2 @ [ Constr.Others.malloced_abst ~ptr:ce1 ~total_size:ce2 ]
+    | Zeros (e1, e2) ->
+        let a1, _, ce1 = trans_expr e1 in
+        let a2, _, ce2 = trans_expr e2 in
+        a1 @ a2 @ [ Constr.Others.zeros_ptr_size ~ptr:ce1 ~size:ce2 ]
+    | Undefs (e1, e2) ->
+        let a1, _, ce1 = trans_expr e1 in
+        let a2, _, ce2 = trans_expr e2 in
+        a1 @ a2 @ [ Constr.Others.undefs_ptr_size ~ptr:ce1 ~size:ce2 ]
+    | Pure f ->
+        let ma, _, fp = trans_form f in
+        Pure fp :: ma
+    | Pred (p, cel) ->
+        let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
+        Pred (p, gel) :: ap
+    | Emp -> [ Asrt.Emp ]
+    | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
+  in
+  match List.filter (fun x -> x <> Asrt.Emp) a with
+  | [] -> [ Asrt.Emp ]
+  | a -> a
 
 let rec trans_lcmd ~fname ~ann lcmd =
   let trans_lcmd = trans_lcmd ~fname ~ann in
   let trans_asrt = trans_asrt ~fname ~ann in
   let make_assert ~bindings = function
-    | Asrt.Emp -> []
+    | [] | [ Asrt.Emp ] -> []
     | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
   in
   match lcmd with
   | CLCmd.Apply (pn, el) ->
       let aps, bindings, gel = split3_expr_comp (List.map trans_expr el) in
-      let to_assert = Asrt.star aps in
-      `Normal (make_assert ~bindings to_assert @ [ SL (ApplyLem (pn, gel, [])) ])
+      `Normal (make_assert ~bindings aps @ [ SL (ApplyLem (pn, gel, [])) ])
   | CLCmd.Fold (pn, el) ->
       let aps, bindings, gel = split3_expr_comp (List.map trans_expr el) in
-      let to_assert = Asrt.star aps in
-      `Normal (make_assert ~bindings to_assert @ [ SL (Fold (pn, gel, None)) ])
+      `Normal (make_assert ~bindings aps @ [ SL (Fold (pn, gel, None)) ])
   | Unfold { pred; params; bindings; recursive } ->
       let ap, vs, gel = split3_expr_comp (List.map trans_expr params) in
-      let to_assert = Asrt.star ap in
       `Normal
-        (make_assert ~bindings:vs to_assert
+        (make_assert ~bindings:vs ap
         @ [ SL (Unfold (pred, gel, bindings, recursive)) ])
   | Unfold_all pred_name -> `Normal [ SL (GUnfold pred_name) ]
   | Assert (a, ex) -> `Normal [ SL (SepAssert (trans_asrt a, ex)) ]
@@ -688,16 +646,14 @@ let rec trans_lcmd ~fname ~ann lcmd =
 let trans_asrt_annot da =
   let { label; existentials } = da in
   let exs, typsb =
-    List.split
-      (List.map
-         (fun (ex, topt) ->
-           match topt with
-           | None -> (ex, Asrt.Emp)
-           | Some t -> (ex, types t (Expr.LVar ex)))
-         existentials)
+    existentials
+    |> ( List.map @@ fun (ex, topt) ->
+         match topt with
+         | None -> (ex, Asrt.Emp)
+         | Some t -> (ex, types t (Expr.LVar ex)) )
+    |> List.split
   in
-  let a = Asrt.star typsb in
-  (a, (label, exs))
+  (typsb, (label, exs))
 
 let trans_abs_pred ~filepath cl_pred =
   let CAbsPred.
@@ -747,7 +703,7 @@ let trans_pred ~ann ~filepath cl_pred =
         | None -> (None, trans_asrt ~fname:pred_name ~ann a)
         | Some da ->
             let ada, gda = trans_asrt_annot da in
-            (Some gda, ada ** trans_asrt ~fname:pred_name ~ann a))
+            (Some gda, ada @ trans_asrt ~fname:pred_name ~ann a))
       definitions
   in
   Pred.
@@ -778,7 +734,7 @@ let trans_sspec ~ann fname sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
   let tap, spa =
     match spec_annot with
-    | None -> (Asrt.Emp, None)
+    | None -> ([], None)
     | Some spa ->
         let a, (label, exs) = trans_asrt_annot spa in
         (a, Some (label, exs))
@@ -787,7 +743,7 @@ let trans_sspec ~ann fname sspecs =
   let make_post p = if !Config.allocated_functions then ta p else ta p in
   Spec.
     {
-      ss_pre = tap ** ta pre;
+      ss_pre = tap @ ta pre;
       ss_posts = List.map make_post posts;
       (* FIXME: bring in variant *)
       ss_variant = None;
@@ -965,16 +921,15 @@ let generate_bispec clight_prog fname ident f =
   let mk_lvar x = Expr.LVar ("#" ^ x) in
   let lvars = List.map mk_lvar true_params in
   let equalities =
-    Asrt.star
-      (List.map
-         (fun x -> Asrt.Pure (Formula.Eq (Expr.PVar x, mk_lvar x)))
-         true_params)
+    List.map
+      (fun x -> Asrt.Pure (Formula.Eq (Expr.PVar x, mk_lvar x)))
+      true_params
   in
   (* Right now, triples are : (param_name, csharpminor type, c type)
      The C type will be used to discriminate long/int from pointers *)
   let triples = combine lvars sig_args cligh_params in
   let pred_list = List.map predicate_from_triple triples in
-  let pre = equalities ** Asrt.star pred_list in
+  let pre = equalities @ pred_list in
   BiSpec.
     {
       bispec_name = fname;

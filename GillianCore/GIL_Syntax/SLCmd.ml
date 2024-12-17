@@ -26,40 +26,23 @@ type t = TypeDef__.slcmd =
   | SymbExec
 [@@deriving yojson]
 
-let map
-    (f_l : (t -> t) option)
-    (f_a : (Asrt.t -> Asrt.t) option)
-    (f_e : (Expr.t -> Expr.t) option)
-    (lcmd : t) : t =
-  (* Functions to map over assertions and expressions *)
-  let map_e = Option.value ~default:(fun x -> x) f_e in
-  let map_a = Option.value ~default:(fun x -> x) f_a in
-
-  let mapped_lcmd = Option.fold ~some:(fun f -> f lcmd) ~none:lcmd f_l in
-
-  (* Map over the elements of the command *)
-  match mapped_lcmd with
-  | Fold (name, les, None) -> Fold (name, List.map map_e les, None)
+let map (f_a : Asrt.t -> Asrt.t) (f_e : Expr.t -> Expr.t) : t -> t = function
+  | Fold (name, les, None) -> Fold (name, List.map f_e les, None)
   | Fold (name, les, Some (s, l)) ->
       Fold
-        ( name,
-          List.map map_e les,
-          Some (s, List.map (fun (x, e) -> (x, map_e e)) l) )
+        (name, List.map f_e les, Some (s, List.map (fun (x, e) -> (x, f_e e)) l))
   | Unfold (name, les, unfold_info, b) ->
-      Unfold (name, List.map map_e les, unfold_info, b)
+      Unfold (name, List.map f_e les, unfold_info, b)
   | GUnfold name -> GUnfold name
-  | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map map_e l, existentials)
-  | SepAssert (a, binders) -> SepAssert (map_a a, binders)
-  | Invariant (a, existentials) -> Invariant (map_a a, existentials)
-  | Consume (a, binders) -> Consume (map_a a, binders)
-  | Produce a -> Produce (map_a a)
+  | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map f_e l, existentials)
+  | SepAssert (a, binders) -> SepAssert (f_a a, binders)
+  | Invariant (a, existentials) -> Invariant (f_a a, existentials)
+  | Consume (a, binders) -> Consume (f_a a, binders)
+  | Produce a -> Produce (f_a a)
   | SymbExec -> SymbExec
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
       Package
-        {
-          lhs = (lname, List.map map_e largs);
-          rhs = (rname, List.map map_e rargs);
-        }
+        { lhs = (lname, List.map f_e largs); rhs = (rname, List.map f_e rargs) }
 
 let fold = List.fold_left SS.union SS.empty
 

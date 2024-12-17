@@ -199,8 +199,8 @@ let scope_info_to_assertion
 
   let this_asrt = make_this_assertion () in
 
-  let init_heap_asrt : Asrt.t = Pred (heap_asrt_name, []) in
   if fid <> JS2JSIL_Helpers.main_fid then
+    let init_heap_asrt : Asrt.t = Pred (heap_asrt_name, []) in
     Asrt.star
       (glob_constraints @ (this_asrt :: init_heap_asrt :: a_schain :: a_vars))
   else Asrt.star (glob_constraints @ (this_asrt :: a_schain :: a_vars))

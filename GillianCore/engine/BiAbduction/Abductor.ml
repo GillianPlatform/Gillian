@@ -90,13 +90,12 @@ module Make
           SPState.simplify ~kill_new_lvars:true state_f
         in
         let+ final_simplified = finals_simplified in
-        Asrt.star
-          (List.sort Asrt.compare
-             (SPState.to_assertions ~to_keep:pvars final_simplified))
+        List.sort Asrt.compare
+          (SPState.to_assertions ~to_keep:pvars final_simplified)
       in
 
       let+ pre =
-        let af_asrt = Asrt.star (SPState.to_assertions state_af) in
+        let af_asrt = SPState.to_assertions state_af in
         let af_subst = make_id_subst af_asrt in
         let* af_produce_res = SPState.produce state_i af_subst af_asrt in
         match af_produce_res with
@@ -105,9 +104,8 @@ module Make
               SPState.simplify ~kill_new_lvars:true state_i'
             in
             let+ simplified = simplifieds in
-            Asrt.star
-              (List.sort Asrt.compare
-                 (SPState.to_assertions ~to_keep:pvars simplified))
+            List.sort Asrt.compare
+              (SPState.to_assertions ~to_keep:pvars simplified)
         | Error _ ->
             L.verbose (fun m -> m "Failed to produce anti-frame");
             []

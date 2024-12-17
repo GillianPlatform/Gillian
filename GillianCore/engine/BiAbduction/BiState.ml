@@ -149,7 +149,7 @@ module Make (State : SState.S) = struct
   let get_spec_vars ({ state; _ } : t) : Var.Set.t = State.get_spec_vars state
   let get_lvars ({ state; _ } : t) : Var.Set.t = State.get_lvars state
 
-  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t list =
+  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t =
     State.to_assertions ?to_keep state
 
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
@@ -193,12 +193,12 @@ module Make (State : SState.S) = struct
     in
     SVal.SESubst.init bindings
 
-  let fix_list_apply s =
+  let fix_list_apply (s : state_t) (asrt : Asrt.t) =
     let open Syntaxes.List in
     List.fold_left
       (fun acc a ->
         let* this_state = acc in
-        let lvars = Asrt.lvars a in
+        let lvars = Asrt.lvars [ a ] in
         let this_state = State.add_spec_vars this_state lvars in
         match a with
         | Asrt.Emp -> [ this_state ]
@@ -213,12 +213,11 @@ module Make (State : SState.S) = struct
                    | Some s -> State.assume_t s e t)
                  (Some this_state)
             |> Option.to_list
-        | GA (corepred, ins, outs) ->
+        | CorePred (corepred, ins, outs) ->
             State.produce_core_pred corepred this_state (ins @ outs)
-        | Star _ -> raise (Failure "DEATH. fix_list_apply star")
         | Wand _ -> raise (Failure "DEATH. fix_list_apply wand")
         | Pred _ -> raise (Failure "DEATH. fix_list_apply pred"))
-      [ s ]
+      [ s ] asrt
 
   type post_res = (Flag.t * Asrt.t list) option
 
@@ -258,7 +257,8 @@ module Make (State : SState.S) = struct
                     "@[<v 2>WARNING: Match Assertion Failed: %a with error: \
                      %a. CUR SUBST:@\n\
                      %a@]@\n"
-                    Asrt.pp (fst step) State.pp_err err SVal.SESubst.pp subst);
+                    Asrt.pp_atom (fst step) State.pp_err err SVal.SESubst.pp
+                    subst);
               if not (State.can_fix err) then (
                 L.verbose (fun m -> m "CANNOT FIX!");
                 [])
@@ -448,7 +448,7 @@ module Make (State : SState.S) = struct
 
   (* to throw errors: *)
 
-  let get_fixes (_ : err_t) : Asrt.t list list =
+  let get_fixes (_ : err_t) : Asrt.t list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
   let get_recovery_tactic (_ : t) (_ : err_t list) =
