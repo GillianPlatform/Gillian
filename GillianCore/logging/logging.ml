@@ -104,7 +104,7 @@ module Parent = struct
       Option.bind loggable (fun loggable ->
           log_specific lvl ?title ?severity loggable type_)
     in
-    with_id id f
+    with_id id (fun () -> f id)
 end
 
 let start_phase level ?title ?severity () =

@@ -7,19 +7,6 @@ include Match_map_intf
 
 (**/**)
 
-(** Traverses a [match_seg] to get its result *)
-let rec seg_result = function
-  | Assertion (_, next) -> seg_result next
-  | MatchResult (_, result) -> result
-
-(** Gets the result of a matching.
-  When the matching is a fold, one successful case is sufficient for overall success *)
-let result = function
-  | _, Direct seg -> seg_result seg
-  | _, Fold segs ->
-      if segs |> List.exists (fun seg -> seg_result seg = Success) then Success
-      else Failure
-
 module Make_builder : Make_builder =
 functor
   (Verification : Verifier.S)
@@ -54,59 +41,67 @@ functor
       in
       if aux id then Success else Failure
 
-    let rec build_seg ?(prev_substs = []) (id, type_, content) : match_seg =
+    let build_assertion_data ~prev_substs id content =
       let module Subst = SVal.SESubst in
+      let asrt_report =
+        content |> Yojson.Safe.from_string |> AssertionReport.of_yojson
+        |> Result.get_ok
+      in
+      let assertion =
+        let asrt, _ = asrt_report.step in
+        Fmt.str "%a" Asrt.pp asrt
+      in
+      let substitutions =
+        asrt_report.subst |> Subst.to_list_pp
+        |> List.map (fun subst ->
+               List.find_opt
+                 (fun prev -> [%eq: string * string] prev.subst subst)
+                 prev_substs
+               |> Option.value ~default:{ assert_id = id; subst })
+      in
+      let fold =
+        let+ child_id, type_, _ =
+          match L.Log_queryer.get_children_of id with
+          | [] -> None
+          | [ child ] -> Some child
+          | _ ->
+              Fmt.failwith
+                "Match_map.build_seg: assertion %a has multiple children!"
+                L.Report_id.pp id
+        in
+        if type_ <> Content_type.match_ then
+          Fmt.failwith
+            "Match_map.build_seg: report %a (child of assertion %a) has type \
+             %s (expected %s)!"
+            L.Report_id.pp child_id L.Report_id.pp id type_ Content_type.match_;
+        (child_id, result_of_id child_id)
+      in
+      { id; fold; assertion; substitutions }
+
+    let rec build_map ?(prev_substs = []) ~nodes id type_ content =
       if type_ = Content_type.assertion then
-        let asrt_report =
-          content |> Yojson.Safe.from_string |> AssertionReport.of_yojson
-          |> Result.get_ok
-        in
-        let assertion =
-          let asrt, _ = asrt_report.step in
-          Fmt.str "%a" Asrt.pp asrt
-        in
-        let substitutions =
-          asrt_report.subst |> Subst.to_list_pp
-          |> List.map (fun subst ->
-                 List.find_opt
-                   (fun prev -> [%eq: string * string] prev.subst subst)
-                   prev_substs
-                 |> Option.value ~default:{ assert_id = id; subst })
-        in
-        let fold =
-          let+ child_id, type_, _ =
-            match L.Log_queryer.get_children_of id with
-            | [] -> None
-            | [ child ] -> Some child
-            | _ ->
-                Fmt.failwith
-                  "Match_map.build_seg: assertion %a has multiple children!"
-                  L.Report_id.pp id
-          in
-          if type_ <> Content_type.match_ then
-            Fmt.failwith
-              "Match_map.build_seg: report %a (child of assertion %a) has type \
-               %s (expected %s)!"
-              L.Report_id.pp child_id L.Report_id.pp id type_
-              Content_type.match_;
-          (child_id, result_of_id child_id)
-        in
-        let seg =
-          match L.Log_queryer.get_next_report_ids id with
-          | [] ->
+        let data = build_assertion_data ~prev_substs id content in
+        let next_ids = L.Log_queryer.get_next_report_ids id in
+        let result =
+          let () =
+            if List.is_empty next_ids then
               Fmt.failwith "Match_map.build_seg: assertion %a has no next!"
                 L.Report_id.pp id
-          | [ next_id ] ->
+          in
+          List.fold_left
+            (fun result next_id ->
               let content, type_ =
                 L.Log_queryer.get_report next_id |> Option.get
               in
-              build_seg ~prev_substs:substitutions (next_id, type_, content)
-          | _ ->
-              Fmt.failwith
-                "Match_map.build_seg: assertion %a has multiple nexts!"
-                L.Report_id.pp id
+              let result' =
+                build_map ~prev_substs:data.substitutions ~nodes next_id type_
+                  content
+              in
+              if result = Success then Success else result')
+            Failure next_ids
         in
-        Assertion ({ id; fold; assertion; substitutions }, seg)
+        let () = Hashtbl.replace nodes id (Assertion (data, next_ids)) in
+        result
       else if type_ = Content_type.match_result then
         let result_report =
           content |> Yojson.Safe.from_string |> MatchResultReport.of_yojson
@@ -117,40 +112,12 @@ functor
           | Success _ -> Success
           | Failure _ -> Failure
         in
-        MatchResult (id, result)
+        let () = Hashtbl.replace nodes id (MatchResult (id, result)) in
+        result
       else
         Fmt.failwith
-          "Match_map.build_seg: report %a has invalid type (%s) for match_seg!"
+          "Match_map.build_seg: report %a has invalid type (%s) for match map!"
           L.Report_id.pp id type_
-
-    let build_case id : match_seg =
-      match L.Log_queryer.get_children_of ~roots_only:true id with
-      | [] ->
-          Fmt.failwith "Match_map.build_case: id %a has no children!"
-            L.Report_id.pp id
-      | [ child ] -> build_seg child
-      | _ ->
-          Fmt.failwith "Match_map.build_case: id %a has multiple children!"
-            L.Report_id.pp id
-
-    let build_cases id : match_seg list =
-      let rec aux id acc =
-        let acc = build_case id :: acc in
-        match L.Log_queryer.get_next_reports id with
-        | [] -> acc
-        | [ (id, type_, _) ] ->
-            if type_ <> Content_type.match_case then
-              Fmt.failwith
-                "Match_map.build_cases: %a has type %s (expected %s)!"
-                L.Report_id.pp id type_ Content_type.match_case
-            else aux id acc
-        | _ ->
-            Fmt.failwith
-              "Match_map.build_cases: match_case %a has multiple nexts!"
-              L.Report_id.pp id
-      in
-
-      aux id [] |> List.rev
 
     let f match_id =
       let kind =
@@ -161,21 +128,15 @@ functor
         in
         match_report.match_kind
       in
-      let map =
-        let id, type_, _ =
-          match L.Log_queryer.get_children_of ~roots_only:true match_id with
-          | [ child ] -> child
-          | _ ->
-              Fmt.failwith
-                "Match_map.build: match id %a should have one root child!"
-                L.Report_id.pp match_id
-        in
-        if type_ = Content_type.match_case then
-          let segs = build_cases id in
-          Fold segs
-        else
-          let seg = build_case match_id in
-          Direct seg
+      let roots = L.Log_queryer.get_children_of ~roots_only:true match_id in
+      let nodes = Hashtbl.create 1 in
+      let roots, result =
+        List.fold_left
+          (fun (roots, result) (id, type_, content) ->
+            let result' = build_map ~nodes id type_ content in
+            let result = if result = Success then Success else result' in
+            (id :: roots, result))
+          ([], Failure) roots
       in
-      (kind, map)
+      { kind; roots; nodes; result }
   end

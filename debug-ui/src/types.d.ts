@@ -63,19 +63,27 @@ export type AssertionData = {
   readonly substitutions: readonly Substitution[];
 };
 
-export type MatchSeg =
-  | readonly ['Assertion', AssertionData, MatchSeg]
-  | readonly ['MatchResult', number, MatchResult];
-
 export type MatchKind = [
   'Postcondition' | 'Fold' | 'FunctionCall' | 'Invariant' | 'LogicCommand'
 ];
 
-export type MatchMapInner =
-  | readonly ['Direct', MatchSeg]
-  | readonly ['Fold', MatchSeg[]];
+export type MatchMapNode =
+  | readonly ['Assertion', AssertionData, readonly number[]]
+  | readonly ['MatchResult', number, MatchResult];
 
-export type MatchMap = readonly [MatchKind, MatchMapInner];
+export type MatchMap = {
+  readonly kind: MatchKind;
+  readonly roots: readonly number[];
+  readonly nodes: [number, MatchMapNode][];
+  readonly result: MatchResult;
+};
+
+export type MatchMapSafe = {
+  readonly kind: MatchKind;
+  readonly roots: readonly number[];
+  readonly nodes: Record<number, MatchMapNode>;
+  readonly result: MatchResult;
+};
 
 // #endregion
 
@@ -93,14 +101,10 @@ export type DebuggerState = {
   readonly procs: Record<string, DebugProcState>;
 };
 
-export type MatchStep =
-  | readonly ['Assertion', AssertionData]
-  | readonly ['Result', number, MatchResult];
-
 export type MatchingState = {
   readonly id: number;
-  readonly map: unknown; // TODO: fix when Immer supports recursive types
-  readonly selected?: MatchStep;
+  readonly map: MatchMapSafe;
+  readonly selected?: number;
 };
 
 export type MatchState = {
