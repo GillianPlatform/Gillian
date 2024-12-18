@@ -1,7 +1,7 @@
-Initial Lab
-===========
+Verification Tutorial
+=====================
 
-Welcome to the first Gillian lab! In this lab, you'll be using Gillian and its :doc:`debugger </debugger>` to add missing proof tactics to while programs and verify them with :doc:`/wisl/index`.
+Welcome to this verification tutorial lab! In this lab, you'll be using Gillian and its :doc:`debugger </debugger>` to add missing proof tactics to while programs and verify them with :doc:`/wisl/index`.
 
 You are provided with 2 files: ``sll.wisl`` and ``dll.wisl``, which contain predicates, lemmas and functions. The goal is to use WISL and its debugger to insert the right proof tactics for every function to successfully verify.
 Note that in practice, Gillian can infer a lot of these annotations on its own; for this lab, we disable this by using Gillian's "manual" mode.
