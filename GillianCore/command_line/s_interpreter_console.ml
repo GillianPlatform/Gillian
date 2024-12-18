@@ -9,7 +9,8 @@ module Make
     (SState : SState.S with type init_data = ID.t)
     (S_interpreter : G_interpreter.S
                        with type annot = PC.Annot.t
-                        and type state_t = SState.t)
+                        and type state_t = SState.t
+                        and type state_err_t = SState.err_t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -35,12 +36,23 @@ struct
     open ChangeTracker
 
     let counter_example res =
-      let error_state =
+      let error_state, errors =
         match res with
-        | Exec_res.RFail f -> f.error_state
+        | Exec_res.RFail { error_state; errors; _ } -> (error_state, errors)
         | _ -> failwith "Expected failure"
       in
-      let subst = SState.sat_check_f error_state [] in
+      let f =
+        errors
+        |> List.find_map (function
+             | Exec_err.EState StateErr.(EPure f) -> Some f
+             | _ -> None)
+      in
+      let fs =
+        match f with
+        | Some f -> [ Formula.Not f ]
+        | None -> []
+      in
+      let subst = SState.sat_check_f error_state fs in
       subst
 
     let run_main prog init_data =
@@ -76,11 +88,13 @@ struct
       let total_time = Sys.time () -. !start_time in
       Printf.printf "Total time (Compilation + Symbolic testing): %fs\n"
         total_time;
-      if success then (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!";
-        exit 0)
-      else (
-        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occured!";
+      if success then
+        let () = Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!" in
+        exit 0
+      else
+        let () =
+          Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occurred!"
+        in
         let first_error =
           List.find
             (function
@@ -89,16 +103,18 @@ struct
             all_results
         in
         let counter_example = counter_example first_error in
-        Fmt.pr "Here's a counter example: %a@\n@?"
+        Fmt.pr "Here's a counterexample: %a@\n@?"
           (Fmt.option
-             ~none:(Fmt.any "Couldn't produce counter-example")
+             ~none:(Fmt.any "Couldn't produce counterexample")
              SVal.SESubst.pp)
           counter_example;
-        Fmt.pr "Here's an example of final error state: %a@\n@?"
-          (Exec_res.pp SState.pp S_interpreter.pp_state_vt
-             S_interpreter.pp_err_t)
-          first_error;
-        exit 1)
+        let () =
+          Fmt.pr "Here's an example of final error state: %a@\n@?"
+            (Exec_res.pp SState.pp S_interpreter.pp_state_vt
+               S_interpreter.pp_err_t)
+            first_error
+        in
+        exit 1
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
