@@ -535,7 +535,7 @@ let ins_outs_assertion
       in
       ins_and_outs_from_lists kb (largs @ List.rev llie) lloe
 
-let simplify_asrts ?(sorted = true) a =
+let simplify_asrts a =
   let rec aux (a : Asrt.atom) : Asrt.atom list =
     match a with
     | Pure True | Emp -> []
@@ -549,7 +549,6 @@ let simplify_asrts ?(sorted = true) a =
   in
   let atoms = List.concat_map aux a in
   if List.mem (Asrt.Pure False) atoms then [ Asrt.Pure False ]
-  else if not sorted then atoms
   else
     let overlapping, separating = List.partition Asrt.is_pure_asrt atoms in
     let overlapping = List.sort_uniq Stdlib.compare overlapping in
