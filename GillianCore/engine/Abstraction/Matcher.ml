@@ -768,7 +768,15 @@ module Make (State : SState.S) :
           "@[-----------------@\n\
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
-    let sas = MP.simplify_asrts a in
+    let sas = MP.simplify_asrts ~sorted:false a in
+    let types, rest =
+      List.partition
+        (function
+          | Asrt.Types _ -> true
+          | _ -> false)
+        sas
+    in
+    let sas = types @ List.rev rest in
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
