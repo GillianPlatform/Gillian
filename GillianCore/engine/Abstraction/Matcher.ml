@@ -139,7 +139,6 @@ end
 
 module Make (State : SState.S) :
   S with type state_t = State.t and type err_t = State.err_t = struct
-  open Literal
   open Containers
   module L = Logging
 
@@ -720,6 +719,15 @@ module Make (State : SState.S) :
     | None -> other_state_err "final state non admissible"
     | Some state -> Res_list.return { state; preds; pred_defs; wands; variants }
 
+  let production_priority (a : Asrt.t) : int =
+    match a with
+    | Emp -> 0
+    | Types _ -> 0
+    | Pure _ -> 1
+    | Pred _ | Wand _ -> 2
+    | GA _ -> 3
+    | Star _ -> failwith "unreachable"
+
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
       (t, err_t) Res_list.t =
     L.verbose (fun m ->
@@ -728,6 +736,11 @@ module Make (State : SState.S) :
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
     let sas = MP.collect_simple_asrts a in
+    let sas =
+      List.sort
+        (fun a1 a2 -> compare (production_priority a1) (production_priority a2))
+        sas
+    in
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
@@ -1526,7 +1539,6 @@ module Make (State : SState.S) :
                 L.fail "ERROR: IMPOSSIBLE! MATCHING ERRORS IN UX MODE!!!!"
             | false, [], [] ->
                 L.fail "OX MATCHING VANISHED??? MEDOOOOOOOO!!!!!!!!!"
-            | false, _ :: _ :: _, [] -> L.fail "DEATH. OX MATCHING BRANCHED"
             | true, [], _ ->
                 (* Vanished in UX *)
                 match_mp' (rest_search_states, errs_so_far)
@@ -1546,6 +1558,30 @@ module Make (State : SState.S) :
                 match_mp'
                   ( ((state, subst, rest_mp), assertion_id) :: rest_search_states,
                     errs_so_far )
+            | false, states, [] -> (
+                L.verbose (fun m ->
+                    m
+                      "!!!CONSUMER YIELDED MULTIPLE BRANCHES IN OX MODE: %d \
+                       branches!!!"
+                      (List.length states));
+                (* We have obtained several branches. So there is a disjunction in the PFS.
+                   All branches need to successfuly unify against this *)
+                let all_next =
+                  List.map
+                    (fun state ->
+                      let state = copy_astate state in
+                      let subst = SVal.SESubst.copy subst in
+                      explore_next_states
+                        ( [ ((state, subst, rest_mp), case_depth, false) ],
+                          errs_so_far ))
+                    states
+                in
+                let res = List_res.flat all_next in
+                match res with
+                | Ok res -> Ok res
+                | Error errs ->
+                    explore_next_states (rest_search_states, errs @ errs_so_far)
+                )
             | true, first :: rem, [] ->
                 let rem =
                   List.map
@@ -1699,7 +1735,7 @@ module Make (State : SState.S) :
 
     let is_unfoldable_lit lit =
       match lit with
-      | Loc _ | LList _ -> false
+      | Literal.Loc _ | LList _ -> false
       | _ -> true
     in
 
@@ -2082,6 +2118,8 @@ module Make (State : SState.S) :
         in
         [ { lhs_state = new_lhs_state; current_state; subst } ]
       in
+      (* Importantly, we must *never* unfold anything on the lhs
+         without checking that it yields a unique state, as to avoid unsoundness. *)
       (* If it fails, we try splitting the step and we try again *)
       let- split_errs =
         let split_option =
@@ -2222,36 +2260,17 @@ module Make (State : SState.S) :
         let in_bindings = Pred.in_args rpred.pred all_bindings in
         SVal.SESubst.init in_bindings
       in
-      let start_states =
+      let start_state =
         match lhs_states with
-        | [] -> failwith "wand lhs is False!"
-        | first :: rest ->
-            let rest_pack_states =
-              List.map
-                (fun lhs_state ->
-                  {
-                    lhs_state;
-                    current_state = copy_astate astate;
-                    subst = SVal.SESubst.copy subst;
-                  })
-                rest
-            in
-            let first_pack_state =
-              { lhs_state = first; current_state = astate; subst }
-            in
-            first_pack_state :: rest_pack_states
+        | [] -> Fmt.kstr L.fail "wand lhs is False!"
+        | [ lhs_state ] -> { lhs_state; current_state = astate; subst }
+        | _ :: _ ->
+            Fmt.kstr L.fail "Wand lhs produced %d states!@\n%a"
+              (List.length lhs_states)
+              (Fmt.list ~sep:(Fmt.any "@\n@\n@\nNEXT STATE@\n@\n@\n") pp_astate)
+              lhs_states
       in
-      L.verbose (fun m ->
-          m "About to start consuming rhs of wand. Currently %d search states"
-            (List.length start_states));
-      let final_states =
-        List.fold_left
-          (fun acc state ->
-            let* acc = acc in
-            let+ case = package_mp rhs_mp state in
-            case @ acc)
-          (Ok []) start_states
-      in
+      let final_states = package_mp rhs_mp start_state in
       let* states = final_states in
       let all_res =
         List.map

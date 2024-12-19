@@ -156,8 +156,7 @@ let check_entailment
   in
   let gamma_right = Type_env.filter gamma (fun v -> SS.mem v existentials) in
 
-  (* If left side is false, return false *)
-  if List.mem Formula.False (left_fs @ right_fs) then false
+  if List.mem Formula.False left_fs then true
   else
     (* Check satisfiability of left side *)
     let left_sat =
@@ -272,6 +271,4 @@ let num_is_less_or_equal ~pfs ~gamma e1 e2 =
 
 let resolve_loc_name ~pfs ~gamma loc =
   Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
-  match Reduction.reduce_lexpr ~pfs ~gamma loc with
-  | Lit (Loc loc) | ALoc loc -> Some loc
-  | loc' -> Reduction.resolve_expr_to_location pfs gamma loc'
+  Reduction.resolve_expr_to_location pfs gamma loc
