@@ -9,6 +9,7 @@
   command_line
   bulk
   ;gillian_bulk_rely
+  parserAndCompiler
   logging
   incrementalAnalysis
   monadic

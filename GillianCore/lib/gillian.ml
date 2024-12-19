@@ -5,7 +5,7 @@ module Gil_syntax = struct
 end
 
 (** The GIL parser
-    
+
   This is parametric over target languages, via the [Annot] module parameter. *)
 module Gil_parsing = struct
   (** @inline *)
@@ -38,6 +38,7 @@ end
 
 module Bulk = Bulk
 module Monadic = Monadic
+module ParserAndCompiler = ParserAndCompiler
 
 (** Modules for the debugger and related TL-lifting *)
 module Debugger = struct
