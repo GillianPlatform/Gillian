@@ -607,7 +607,11 @@ struct
             let successes, errors = Res_list.split lemma_evaluation_results in
             match errors with
             | [] -> analyse_lemma_results test successes
-            | _ ->
+            | errors ->
+                L.normal (fun m ->
+                    m "Failed to verify lemma, terminated with errors:\n%a"
+                      (Fmt.Dump.list SPState.pp_err)
+                      errors);
                 print_success_or_failure false;
                 false))
 
