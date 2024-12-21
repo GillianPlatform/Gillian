@@ -49,13 +49,13 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    module MatchCaseReport : sig
-      type t = { astate : AstateRec.t; subst : SVal.SESubst.t; mp : MP.t }
-      [@@deriving yojson]
-    end
-
     module MatchResultReport : sig
-      type remaining_state = MatchCaseReport.t [@@deriving yojson]
+      type remaining_state = {
+        astate : AstateRec.t;
+        subst : SVal.SESubst.t;
+        mp : MP.t;
+      }
+      [@@deriving yojson]
 
       type t =
         | Success of {

@@ -7,7 +7,7 @@ import {
   VSCodeLink,
 } from '@vscode/webview-ui-toolkit/react';
 import React, { useEffect, useMemo } from 'react';
-import { MatchMap, MatchSeg, MatchStep } from '../../../types';
+import { MatchMap, MatchMapNode } from '../../../types';
 import useStore, { mutateStore } from '../store';
 import { Code, getMatchName, showBaseMatchKind } from '../util';
 import { requestMatching } from '../VSCodeAPI';
@@ -15,22 +15,11 @@ import { requestMatching } from '../VSCodeAPI';
 import './MatchData.css';
 
 type Props = {
-  selectStep: (step: MatchStep) => void;
-};
-
-const extractTargets = (seg: MatchSeg): { [key: number]: MatchStep } => {
-  if (seg[0] === 'MatchResult') {
-    const [, id, result] = seg;
-    return { [id]: ['Result', id, result] };
-  }
-
-  const [, asrt, next] = seg;
-  return { [asrt.id]: ['Assertion', asrt], ...extractTargets(next) };
+  selectStep: (step: number) => void;
 };
 
 const MatchData = ({ selectStep }: Props) => {
-  const mainProcName = useStore(store => store.debuggerState?.mainProc || '');
-  const [{ path, matches }, baseMatchKind] = useStore(store => [
+  const [{ path, matches }] = useStore(store => [
     store.matchState,
     showBaseMatchKind(store),
   ]);
@@ -41,20 +30,9 @@ const MatchData = ({ selectStep }: Props) => {
     console.log('Showing match data', path, matches);
   }, [path, matches]);
   const matching = matches[path[0]];
-  const selectedStep = matching?.selected;
-
-  const matchJumpTargets = useMemo(() => {
-    if (matching?.map === undefined) return {};
-    const matchMap = matching?.map as MatchMap;
-    if (matchMap[1][0] === 'Direct') {
-      return extractTargets(matchMap[1][1]);
-    } else {
-      return matchMap[1][1].reduce(
-        (acc, seg) => ({ ...acc, ...extractTargets(seg) }),
-        {}
-      );
-    }
-  }, [matching]);
+  const selectedStep = matching?.selected
+    ? matching.map.nodes[matching.selected]
+    : undefined;
 
   const matchNames = [
     <>
@@ -67,20 +45,19 @@ const MatchData = ({ selectStep }: Props) => {
     const matchId = path[i];
     const matching = matches[matchId];
     if (
-      !matching ||
-      !matching.selected ||
-      matching.selected[0] !== 'Assertion'
+      matching &&
+      matching.selected &&
+      matching.map.nodes[matching.selected][0] === 'Assertion'
     ) {
+      const assertion = matching.map.nodes[matching.selected][1];
+      matchNames.push(<Code>{assertion}</Code>);
+    } else {
       console.error('MatchData: malformed state', {
         path,
         matchId,
         matching,
       });
-      continue;
     }
-    const { assertion } = matching.selected[1];
-
-    matchNames.push(<Code>{assertion}</Code>);
   }
   const matchLinks = matchNames.map((name, i) => {
     let link =
@@ -153,19 +130,15 @@ const MatchData = ({ selectStep }: Props) => {
               <VSCodeDataGridCell cellType="columnheader" gridColumn="3" />
             </VSCodeDataGridRow>
             {substitutions.map(({ assertId, subst: [expr, val] }) => {
-              const target = matchJumpTargets[assertId];
-              const jumpButtonIcon =
-                target === undefined ? 'question' : 'target';
+              const jumpButtonIcon = 'target';
               const jumpButton = (
                 <VSCodeButton
                   appearance="icon"
                   aria-label="Jump to assertion of origin"
                   title="Jump to assertion of origin"
-                  disabled={
-                    target === undefined || selectedStep[1].id === assertId
-                  }
+                  disabled={selectedStep[1].id === assertId}
                   onClick={() => {
-                    selectStep(target);
+                    selectStep(assertId);
                   }}
                 >
                   <span className={`codicon codicon-${jumpButtonIcon}`} />

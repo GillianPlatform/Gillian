@@ -189,7 +189,7 @@ module Phase : sig
   val with_tmi : ?title:string -> ?severity:Severity.t -> (unit -> 'a) -> 'a
 end
 
-val set_previous : Report_id.t option -> unit
+val set_previous : ?force_none:bool -> Report_id.t option -> unit
 
 (** @canonical Gillian.Logging.Parent *)
 module Parent : sig
@@ -204,7 +204,7 @@ module Parent : sig
     ?severity:Severity.t ->
     Loggable.t option ->
     string ->
-    (unit -> 'a) ->
+    (Report_id.t option -> 'a) ->
     'a
 end
 

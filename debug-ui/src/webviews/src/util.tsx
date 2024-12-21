@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { MatchingState, MatchKind, MatchMap } from '../../types';
+import { MatchingState, MatchKind, MatchMapSafe } from '../../types';
 import { Store } from './store';
 
 export const Code: React.FC = ({ children }) => (
@@ -27,7 +27,7 @@ export const getBaseMatching = ({ matchState }: Store) => {
 
 export const showMatchingKind = (matching: MatchingState | undefined) => {
   if (!matching) return undefined;
-  return showMatchKind((matching.map as MatchMap)[0]);
+  return showMatchKind((matching.map as MatchMapSafe).kind);
 };
 
 export const showBaseMatchKind = (store: Store) =>
@@ -36,6 +36,7 @@ export const showBaseMatchKind = (store: Store) =>
 export const getMatchName = (store: Store): [ReactNode, ReactNode] => {
   const { path, matches } = store.matchState;
   if (path.length < 2) {
+    // Top-level match
     const kind = showBaseMatchKind(store);
     const procName = store.debuggerState?.mainProc || 'unknown proc';
     return [
@@ -45,7 +46,9 @@ export const getMatchName = (store: Store): [ReactNode, ReactNode] => {
       <>Match {kind}</>,
     ];
   }
-  const prevStep = matches[path[1]!]!.selected!;
+  // Fold
+  const prevMatch = matches[path[1]!]!;
+  const prevStep = prevMatch.map.nodes[prevMatch.selected!];
   if (prevStep[0] !== 'Assertion') throw 'getMatchName error';
   const assertion = prevStep[1].assertion;
   return [

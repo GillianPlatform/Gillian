@@ -24,11 +24,11 @@ let get_previous () =
   let { previous; _ } = !active_state in
   !previous
 
-let set_previous id =
+let set_previous ?(force_none = false) id =
   let { previous; _ } = !active_state in
   match id with
-  | None -> ()
-  | id -> previous := id
+  | None when not force_none -> ()
+  | _ -> previous := id
 
 let get_parent () =
   let { parents; _ } = !active_state in

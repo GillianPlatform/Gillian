@@ -37,8 +37,8 @@ export async function startDebugging(
     if (!canContinue) return;
     const validLangs = ['wisl', 'js', 'c', 'c2'];
     const langOptions: Record<string, string> = {
-      'WISL': 'wisl',
-      'JS': 'js',
+      WISL: 'wisl',
+      JS: 'js',
       'C (CompCert)': 'c',
       'C (CBMC)': 'c2',
     };
