@@ -1750,23 +1750,9 @@ module Make (State : SState.S) :
       match tactic.try_fold with
       | Some fold_values -> (
           let res = fold_guarded_with_vals astate fold_values in
-          let errors =
-            List.filter_map
-              (function
-                | Error e -> Some e
-                | _ -> None)
-              res
-          in
+          let successes, errors = Res_list.split res in
           match errors with
-          | [] ->
-              let successes =
-                List.filter_map
-                  (function
-                    | Ok x -> Some x
-                    | _ -> None)
-                  res
-              in
-              Ok successes
+          | [] -> Ok successes
           | _ ->
               let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
               Error error_string)
