@@ -1567,13 +1567,13 @@ module Make (State : SState.S) :
     let subst_i = SVal.SESubst.copy subst in
     let can_fix errs = List.exists State.can_fix errs in
 
-    let rec handle_ret ~try_recover ret =
+    let rec handle_ret ~fuel ret =
       match ret with
       | Ok successes ->
           L.verbose (fun fmt -> fmt "Matcher.match_: Success (possibly empty)");
           Res_list.just_oks successes
       | Error errs
-        when try_recover && !Config.unfolding
+        when fuel > 0 && !Config.unfolding
              && Exec_mode.is_verification_exec !Config.current_exec_mode
              && (not in_matching) && can_fix errs -> (
           L.verbose (fun fmt -> fmt "Matcher.match_: Failure");
@@ -1607,8 +1607,7 @@ module Make (State : SState.S) :
                   (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
                   let subst'' = SVal.SESubst.copy subst_i in
                   let new_ret = match_mp ([ (astate, subst'', mp) ], []) in
-                  (* We already tried recovering once and it failed, we stop here *)
-                  handle_ret ~try_recover:false new_ret))
+                  handle_ret ~fuel:(fuel - 1) new_ret))
       | Error errors ->
           L.verbose (fun fmt -> fmt "Matcher.match: Failure");
           Res_list.just_errors errors
@@ -1617,7 +1616,7 @@ module Make (State : SState.S) :
       { astate = AstateRec.from astate; subst; mp; match_kind }
       (fun _ ->
         let ret = match_mp ([ (astate, subst, mp) ], []) in
-        handle_ret ~try_recover:true ret)
+        handle_ret ~fuel:10 ret)
 
   and fold
       ?(in_matching = false)
