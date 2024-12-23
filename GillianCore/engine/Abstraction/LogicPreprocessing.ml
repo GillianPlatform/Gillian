@@ -12,92 +12,89 @@ let rec auto_unfold
     (predicates : (string, Pred.t) Hashtbl.t)
     (rec_tbl : (string, bool) Hashtbl.t)
     (asrt : Asrt.t) : Asrt.t list =
-  let au_no_rec = auto_unfold ~unfold_rec_predicates:false predicates rec_tbl in
-  let options =
-    asrt
-    |> List.map (fun asrt ->
-           match asrt with
-           (* We don't unfold:
-               - Recursive predicates (except in some very specific cases)
-               - predicates marked with no-unfold
-               - predicates with a guard *)
-           | Asrt.Pred (name, _)
-             when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
-                  ||
-                  let pred = Hashtbl.find predicates name in
-                  pred.pred_nounfold || Option.is_some pred.pred_guard ->
-               [ [ asrt ] ]
-           | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
-               L.verbose (fun fmt ->
-                   fmt "Unfolding predicate: %s with nounfold %b" name
-                     (Hashtbl.find predicates name).pred_nounfold);
-               let pred = Hashtbl.find unfolded_preds name in
+  asrt
+  |> List.map (fun asrt ->
+         match asrt with
+         (* We don't unfold:
+             - Recursive predicates (except in some very specific cases)
+             - predicates marked with no-unfold
+             - predicates with a guard *)
+         | Asrt.Pred (name, _)
+           when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
+                ||
+                let pred = Hashtbl.find predicates name in
+                pred.pred_nounfold || Option.is_some pred.pred_guard ->
+             [ [ asrt ] ]
+         | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
+             L.verbose (fun fmt ->
+                 fmt "Unfolding predicate: %s with nounfold %b" name
+                   (Hashtbl.find predicates name).pred_nounfold);
+             let pred = Hashtbl.find unfolded_preds name in
+             let params, _ = List.split pred.pred_params in
+             let combined =
+               try List.combine params args
+               with Invalid_argument _ ->
+                 Fmt.failwith
+                   "Impossible to auto unfold predicate %s. Used with %i args \
+                    instead of %i"
+                   name (List.length args) (List.length params)
+             in
+             let subst = SVal.SSubst.init combined in
+             let defs = List.map (fun (_, def) -> def) pred.pred_definitions in
+             List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
+         | Pred (name, args) -> (
+             try
+               L.tmi (fun fmt ->
+                   fmt "AutoUnfold: %a : %s" Asrt.pp_atom asrt name);
+               let pred : Pred.t = Hashtbl.find predicates name in
+               (* If it is not, replace the predicate assertion for the list of its definitions
+                  substituting the formal parameters of the predicate with the corresponding
+                  logical expressions in the argument list *)
                let params, _ = List.split pred.pred_params in
-               let combined =
-                 try List.combine params args
-                 with Invalid_argument _ ->
-                   Fmt.failwith
-                     "Impossible to auto unfold predicate %s. Used with %i \
-                      args instead of %i"
-                     name (List.length args) (List.length params)
+               let subst = SVal.SSubst.init (List.combine params args) in
+               Logging.tmi (fun fmt ->
+                   fmt "PREDICATE %s has %d definitions" pred.pred_name
+                     (List.length pred.pred_definitions));
+               let new_asrts =
+                 List.map
+                   (fun (_, a) ->
+                     L.tmi (fun fmt ->
+                         fmt "Before Auto Unfolding: %a" Asrt.pp a);
+                     let facts =
+                       List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
+                     in
+                     let a = a @ facts in
+                     let result =
+                       SVal.SSubst.substitute_asrt subst ~partial:false a
+                     in
+                     L.tmi (fun fmt ->
+                         fmt "After Auto Unfolding: %a" Asrt.pp result);
+                     result)
+                   pred.pred_definitions
                in
-               let subst = SVal.SSubst.init combined in
-               let defs =
-                 List.map (fun (_, def) -> def) pred.pred_definitions
-               in
-               List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
-           | Pred (name, args) -> (
-               try
-                 L.tmi (fun fmt ->
-                     fmt "AutoUnfold: %a : %s" Asrt.pp_atom asrt name);
-                 let pred : Pred.t = Hashtbl.find predicates name in
-                 (* If it is not, replace the predicate assertion for the list of its definitions
-                    substituting the formal parameters of the predicate with the corresponding
-                    logical expressions in the argument list *)
-                 let params, _ = List.split pred.pred_params in
-                 let subst = SVal.SSubst.init (List.combine params args) in
-                 Logging.tmi (fun fmt ->
-                     fmt "PREDICATE %s has %d definitions" pred.pred_name
-                       (List.length pred.pred_definitions));
-                 let new_asrts =
-                   List.map
-                     (fun (_, a) ->
-                       L.tmi (fun fmt ->
-                           fmt "Before Auto Unfolding: %a" Asrt.pp a);
-                       let facts =
-                         List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
-                       in
-                       let a = a @ facts in
-                       let result =
-                         SVal.SSubst.substitute_asrt subst ~partial:false a
-                       in
-                       L.tmi (fun fmt ->
-                           fmt "After Auto Unfolding: %a" Asrt.pp result);
-                       result)
-                     pred.pred_definitions
-                 in
 
-                 (* FIXME:
-                    If we processed the predicate definitions in order the recursive call to auto unfold
-                    would be avoided *)
-                 let result = List.concat_map au_no_rec new_asrts in
-                 List.filter Simplifications.admissible_assertion result
-               with Not_found ->
-                 raise (Failure ("Error: Can't auto_unfold predicate " ^ name)))
-           | _ -> [ [ asrt ] ])
-  in
+               (* FIXME:
+                  If we processed the predicate definitions in order the recursive call to auto unfold
+                  would be avoided *)
+               let au_no_rec =
+                 auto_unfold ~unfold_rec_predicates:false predicates rec_tbl
+               in
+               let result = List.concat_map au_no_rec new_asrts in
+               List.filter Simplifications.admissible_assertion result
+             with Not_found ->
+               raise (Failure ("Error: Can't auto_unfold predicate " ^ name)))
+         | _ -> [ [ asrt ] ])
   (* Now that all assertions have been unfolded to multiple options, do the
      cross products of options
      e.g. [[a1; a2]; [b1; b2]] -> [[a1; b1]; [a1; b2]; [a2; b1]; [a2; b2]] *)
-  let options =
-    List.fold_left
-      (fun acc asrts ->
-        List.concat_map
-          (fun asrt -> List.map (fun asrt' -> asrt @ asrt') asrts)
-          acc)
-      [ [] ] options
-  in
-  List.filter Simplifications.admissible_assertion options
+  |> List.map (List.map List.rev)
+  |> List.fold_left
+       (fun acc asrts ->
+         List.concat_map
+           (fun asrt -> List.map (fun asrt' -> asrt' @ asrt) asrts)
+           acc)
+       [ [] ]
+  |> List.filter Simplifications.admissible_assertion
 
 (*
  * Return: Hashtbl from predicate name to boolean
