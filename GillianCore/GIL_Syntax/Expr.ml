@@ -14,7 +14,7 @@ type t = TypeDef__.expr =
   | ESet of t list  (** Sets of expressions     *)
   | Exists of (string * Type.t option) list * t
       (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
-  | EForall of (string * Type.t option) list * t
+  | ForAll of (string * Type.t option) list * t
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -242,10 +242,41 @@ module Infix = struct
   let not a =
     match a with
     | Lit (Bool a) -> Lit (Bool (not a))
-    | x -> UnOp (UNot, x)
+    | x -> UnOp (Not, x)
+
+  let ( && ) a b =
+    match (a, b) with
+    | Lit (Bool x), Lit (Bool y) -> Lit (Bool (x && y))
+    | Lit (Bool true), x | x, Lit (Bool true) -> x
+    | Lit (Bool false), _ | _, Lit (Bool false) -> Lit (Bool false)
+    | _ -> BinOp (a, And, b)
+
+  let ( || ) a b =
+    match (a, b) with
+    | Lit (Bool x), Lit (Bool y) -> Lit (Bool (x || y))
+    | Lit (Bool false), x | x, Lit (Bool false) -> x
+    | Lit (Bool true), _ | _, Lit (Bool true) -> Lit (Bool true)
+    | _ -> BinOp (a, Or, b)
+
+  let ( ==> ) a b =
+    match (a, b) with
+    | Lit (Bool true), x | x, Lit (Bool true) -> x
+    | Lit (Bool false), _ -> Lit (Bool true)
+    | x, Lit (Bool false) -> not x
+    | _ -> BinOp (a, Impl, b)
 
   let ( @+ ) = list_cat
 end
+
+let conjunct = function
+  | [] -> Lit (Bool true)
+  | [ x ] -> x
+  | hd :: tl -> List.fold_left (fun acc x -> Infix.( && ) acc x) hd tl
+
+let disjunct = function
+  | [] -> Lit (Bool false)
+  | [ x ] -> x
+  | hd :: tl -> List.fold_left (fun acc x -> Infix.( || ) acc x) hd tl
 
 module MyExpr = struct
   type nonrec t = t
@@ -257,30 +288,6 @@ end
 
 module Set = Set.Make (MyExpr)
 module Map = Map.Make (MyExpr)
-
-(** Map over expressions *)
-
-(* let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
-     t =
-   (* Apply the mapping *)
-   let map_e = map f_before f_after in
-   let f_after = Option.value ~default:(fun x -> x) f_after in
-
-   let mapped_expr, recurse = f_before expr in
-   if not recurse then mapped_expr
-   else
-     (* Map recursively to expressions *)
-     let mapped_expr =
-       match mapped_expr with
-       | Lit _ | PVar _ | LVar _ | ALoc _ -> mapped_expr
-       | UnOp (op, e) -> UnOp (op, map_e e)
-       | BinOp (e1, op, e2) -> BinOp (map_e e1, op, map_e e2)
-       | LstSub (e1, e2, e3) -> LstSub (map_e e1, map_e e2, map_e e3)
-       | NOp (op, es) -> NOp (op, List.map map_e es)
-       | EList es -> EList (List.map map_e es)
-       | ESet es -> ESet (List.map map_e es)
-     in
-     f_after mapped_expr *)
 
 (** Optional map over expressions *)
 
@@ -318,9 +325,9 @@ let rec map_opt
             match map_e e with
             | Some e' -> Some (Exists (bt, e'))
             | _ -> None)
-        | EForall (bt, e) -> (
+        | ForAll (bt, e) -> (
             match map_e e with
-            | Some e' -> Some (EForall (bt, e'))
+            | Some e' -> Some (ForAll (bt, e'))
             | _ -> None)
       in
       Option.map f_after mapped_expr
@@ -354,7 +361,7 @@ let rec pp fmt e =
       Fmt.pf fmt "(exists %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
-  | EForall (bt, e) ->
+  | ForAll (bt, e) ->
       Fmt.pf fmt "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
@@ -418,7 +425,7 @@ let rec is_concrete (le : t) : bool =
 
   match le with
   | Lit _ | PVar _ -> true
-  | LVar _ | ALoc _ | Exists _ | EForall _ -> false
+  | LVar _ | ALoc _ | Exists _ | ForAll _ -> false
   | UnOp (_, e) -> loop [ e ]
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
@@ -465,6 +472,28 @@ let loc_from_loc_name (loc_name : string) : t =
   if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
 
 (** {2 Visitors} *)
+
+let rec push_in_negations_off (a : t) : t =
+  let f_off = push_in_negations_off in
+  let f_on = push_in_negations_on in
+  match a with
+  | BinOp (a1, And, a2) -> BinOp (f_off a1, And, f_off a2)
+  | BinOp (a1, Or, a2) -> BinOp (f_off a1, Or, f_off a2)
+  | UnOp (Not, a1) -> f_on a1
+  | ForAll (bt, a) -> ForAll (bt, f_off a)
+  | _ -> a
+
+and push_in_negations_on (a : t) : t =
+  let f_off = push_in_negations_off in
+  let f_on = push_in_negations_on in
+  match a with
+  | BinOp (a1, And, a2) -> BinOp (f_on a1, Or, f_on a2)
+  | BinOp (a1, Or, a2) -> BinOp (f_on a1, And, f_on a2)
+  | Lit (Bool b) -> Lit (Bool (not b))
+  | UnOp (Not, a) -> f_off a
+  | _ -> UnOp (Not, a)
+
+and push_in_negations (a : t) : t = push_in_negations_off a
 
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =

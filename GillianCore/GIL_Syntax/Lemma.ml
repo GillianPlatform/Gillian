@@ -64,7 +64,7 @@ let add_param_bindings (lemma : t) =
   let lvar_params = List.map (fun x -> "#" ^ x) params in
   let param_eqs =
     List.map2
-      (fun pv lv -> Asrt.Pure (Eq (PVar pv, LVar lv)))
+      (fun pv lv -> Asrt.Pure (Expr.BinOp (PVar pv, Equal, LVar lv)))
       params lvar_params
   in
   let add_to_spec spec = { spec with lemma_hyp = param_eqs @ spec.lemma_hyp } in

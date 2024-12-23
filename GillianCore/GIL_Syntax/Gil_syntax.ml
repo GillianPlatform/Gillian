@@ -8,7 +8,6 @@ module Cmd = Cmd
 module Constant = Constant
 module Expr = Expr
 module Flag = Flag
-module Formula = Formula
 module LCmd = LCmd
 module Lemma = Lemma
 module Literal = Literal
