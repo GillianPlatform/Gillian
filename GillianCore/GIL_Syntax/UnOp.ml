@@ -5,7 +5,7 @@ type t = TypeDef__.unop =
   | IUnaryMinus  (** Integer unary minus *)
   | FUnaryMinus  (** Float unary minus *)
   (* Boolean *)
-  | UNot  (** Negation *)
+  | Not  (** Negation *)
   (* Bitwise *)
   | BitwiseNot  (** Bitwise negation *)
   (* Mathematics *)
@@ -47,13 +47,14 @@ type t = TypeDef__.unop =
   (* Integer vs Number *)
   | NumToInt  (** Number to Integer - actual cast *)
   | IntToNum  (** Integer to Number - actual cast *)
+  | IsInt  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
 [@@deriving yojson, ord, eq]
 
 let str (x : t) =
   match x with
   | IUnaryMinus -> "i-"
   | FUnaryMinus -> "-"
-  | UNot -> "not"
+  | Not -> "not"
   | BitwiseNot -> "~"
   | M_isNaN -> "isNaN"
   | M_abs -> "m_abs"
@@ -83,5 +84,6 @@ let str (x : t) =
   | LstRev -> "l-rev"
   | StrLen -> "s-len"
   | SetToList -> "set_to_list"
+  | IsInt -> "is_int"
   | NumToInt -> "as_int"
   | IntToNum -> "as_num"

@@ -17,11 +17,10 @@ type t = TypeDef__.binop =
   | FTimes  (** Float multiplication *)
   | FDiv  (** Float division *)
   | FMod  (** Float modulus *)
-  | SLessThan  (** Less or equal for strings *)
   (* Boolean *)
-  | BAnd  (** Boolean conjunction *)
-  | BOr  (** Boolean disjunction *)
-  | BImpl  (** Boolean implication *)
+  | And  (** Boolean conjunction *)
+  | Or  (** Boolean disjunction *)
+  | Impl  (** Boolean implication *)
   (* Bitwise *)
   | BitwiseAnd  (** Bitwise conjunction *)
   | BitwiseOr  (** Bitwise disjunction *)
@@ -51,10 +50,11 @@ type t = TypeDef__.binop =
   (* Strings *)
   | StrCat  (** String concatenation *)
   | StrNth  (** Nth element of a string *)
+  | StrLess  (** Less or equal for strings *)
   (* Sets *)
   | SetDiff  (** Set difference *)
-  | BSetMem  (** Set membership *)
-  | BSetSub  (** Subset *)
+  | SetMem  (** Set membership *)
+  | SetSub  (** Subset *)
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.binop_to_yojson
@@ -77,10 +77,10 @@ let str (x : t) =
   | FTimes -> "*"
   | FDiv -> "/"
   | FMod -> "%"
-  | SLessThan -> "s<"
-  | BAnd -> "and"
-  | BOr -> "or"
-  | BImpl -> "==>"
+  | StrLess -> "s<"
+  | And -> "and"
+  | Or -> "or"
+  | Impl -> "==>"
   | BitwiseAnd -> "&"
   | BitwiseOr -> "|"
   | BitwiseXor -> "^"
@@ -106,5 +106,5 @@ let str (x : t) =
   | StrCat -> "++"
   | StrNth -> "s-nth"
   | SetDiff -> "-d-"
-  | BSetMem -> "-e-"
-  | BSetSub -> "-s-"
+  | SetMem -> "-e-"
+  | SetSub -> "-s-"

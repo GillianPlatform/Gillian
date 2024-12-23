@@ -41,7 +41,7 @@ let test_expr_base_elements () =
         EList
           [
             Lit (LList [ Bool false ]);
-            BinOp (UnOp (UNot, Lit (Num 32.)), FPlus, PVar "b");
+            BinOp (UnOp (Not, Lit (Num 32.)), FPlus, PVar "b");
           ];
         LVar "a";
         ALoc "e";

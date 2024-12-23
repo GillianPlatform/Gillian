@@ -278,7 +278,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %type <UnOp.t>       unop_target
 %type <BinOp.t>      binop_target
 %type <NOp.t>        nop_target
-%type <Formula.t>    pure_assertion_target
+%type <Expr.t>    pure_assertion_target
 
 %type <(Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
 %type <Expr.t> top_level_expr_target
@@ -436,7 +436,7 @@ expr_target:
   | EXISTS; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
-    { Expr.EForall (vars, e) }
+    { Expr.ForAll (vars, e) }
 ;
 
 top_level_expr_target:
@@ -1010,53 +1010,53 @@ existentials_target:
 
 pure_assertion_target:
 (* P /\ Q *)
-  | left_ass=pure_assertion_target; LAND; right_ass=pure_assertion_target
-    { Formula.And (left_ass, right_ass) }
+  | left_ass=expr_target; LAND; right_ass=expr_target
+    { Expr.BinOp (left_ass, Equal, right_ass) }
 (* A ==> B *)
-  | left_ass = pure_assertion_target; LIMPLIES; right_ass=pure_assertion_target
-    { Formula.Impl (left_ass, right_ass) }
+  | left_ass = expr_target; LIMPLIES; right_ass=expr_target
+    { Expr.BinOp (left_ass, Impl, right_ass) }
 (* P \/ Q *)
-  | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
-    { Formula.Or (left_ass, right_ass) }
+  | left_ass=expr_target; LOR; right_ass=expr_target
+    { Expr.BinOp (left_ass, Or, right_ass) }
 (* ! Q *)
-  | LNOT; ass=pure_assertion_target
-    { Formula.Not (ass) }
+  | LNOT; ass=expr_target
+    { Expr.UnOp (Not, ass) }
 (* true *)
   | LTRUE
-    { Formula.True }
+    { Expr.Lit (Bool true) }
 (* false *)
   | LFALSE
-    { Formula.False }
+    { Expr.Lit (Bool false) }
 (* E == E *)
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
-    { Formula.Eq (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, Equal, right_expr) }
 (* E i<# E *)
   | left_expr=expr_target; ILLESSTHAN; right_expr=expr_target
-    { Formula.ILess (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, ILessThan, right_expr) }
 (* E <# E *)
   | left_expr=expr_target; FLLESSTHAN; right_expr=expr_target
-    { Formula.FLess (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, FLessThan, right_expr) }
 (* E i<=# E *)
   | left_expr=expr_target; ILLESSTHANEQUAL; right_expr=expr_target
-    { Formula.ILessEq (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, ILessThanEqual, right_expr) }
 (* E <=# E *)
   | left_expr=expr_target; FLLESSTHANEQUAL; right_expr=expr_target
-    { Formula.FLessEq (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, FLessThanEqual, right_expr) }
 (* E s<# E *)
   | left_expr=expr_target; LSLESSTHAN; right_expr=expr_target
-    { Formula.StrLess (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, StrLess, right_expr) }
 (* E --e-- E *)
   | left_expr=expr_target; LSETMEM; right_expr=expr_target
-    { Formula.SetMem (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, SetMem, right_expr) }
 (* E --s-- E *)
   | left_expr=expr_target; LSETSUB; right_expr=expr_target
-    { Formula.SetSub (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, SetSub, right_expr) }
 (* forall X, Y, Z . P *)
-  | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
-    { Formula.ForAll (vars, ass) }
+  | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = expr_target
+    { Expr.ForAll (vars, ass) }
 (* is-int E *)
   | ISINT; expr=expr_target
-    { Formula.IsInt (expr) }
+    { Expr.UnOp (IsInt, expr) }
 (* (P) *)
   | LBRACE; f=pure_assertion_target; RBRACE
     { f }
@@ -1137,10 +1137,10 @@ binop_target:
   | FTIMES              { BinOp.FTimes }
   | FDIV                { BinOp.FDiv }
   | FMOD                { BinOp.FMod }
-  | SLT                 { BinOp.SLessThan }
-  | AND                 { BinOp.BAnd }
-  | OR                  { BinOp.BOr }
-  | LIMPLIES            { BinOp.BImpl }
+  | SLT                 { BinOp.StrLess }
+  | AND                 { BinOp.And }
+  | OR                  { BinOp.Or }
+  | LIMPLIES            { BinOp.Impl }
   | BITWISEAND          { BinOp.BitwiseAnd }
   | BITWISEOR           { BinOp.BitwiseOr}
   | BITWISEXOR          { BinOp.BitwiseXor }
@@ -1157,13 +1157,13 @@ binop_target:
   | M_POW               { BinOp.M_pow }
   | STRCAT              { BinOp.StrCat }
   | SETDIFF             { BinOp.SetDiff }
-  | SETMEM              { BinOp.BSetMem }
-  | SETSUB              { BinOp.BSetSub }
+  | SETMEM              { BinOp.SetMem }
+  | SETSUB              { BinOp.SetSub }
 ;
 
 unop_target:
   (* Unary minus defined in (l)expr_target *)
-  | NOT         { UnOp.UNot }
+  | NOT         { UnOp.Not }
   | BITWISENOT  { UnOp.BitwiseNot }
   | M_ISNAN     { UnOp.M_isNaN }
   | M_ABS       { UnOp.M_abs }
