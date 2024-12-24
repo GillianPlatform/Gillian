@@ -37,10 +37,10 @@ type typenv = (string, Type.t) Hashtbl.t
 
 let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
 
-let encoding_cache : (Formula.Set.t, sexp list) Hashtbl.t =
+let encoding_cache : (Expr.Set.t, sexp list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
 
-let sat_cache : (Formula.Set.t, sexp option) Hashtbl.t =
+let sat_cache : (Expr.Set.t, sexp option) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
 
 let ( <| ) constr e = app constr [ e ]
@@ -564,14 +564,14 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | FLessThan -> num_lt (get_num p1) (get_num p2) >- BooleanType
   | FLessThanEqual -> num_leq (get_num p1) (get_num p2) >- BooleanType
   | Equal -> encode_equality p1 p2
-  | BOr -> bool_or (get_bool p1) (get_bool p2) >- BooleanType
-  | BImpl -> bool_implies (get_bool p1) (get_bool p2) >- BooleanType
-  | BAnd -> bool_and (get_bool p1) (get_bool p2) >- BooleanType
-  | BSetMem ->
+  | Or -> bool_or (get_bool p1) (get_bool p2) >- BooleanType
+  | Impl -> bool_implies (get_bool p1) (get_bool p2) >- BooleanType
+  | And -> bool_and (get_bool p1) (get_bool p2) >- BooleanType
+  | SetMem ->
       (* p2 has to be already wrapped *)
       set_member Z3 (simple_wrap p1) (get_set p2) >- BooleanType
   | SetDiff -> set_difference Z3 (get_set p1) (get_set p2) >- SetType
-  | BSetSub -> set_subset Z3 (get_set p1) (get_set p2) >- BooleanType
+  | SetSub -> set_subset Z3 (get_set p1) (get_set p2) >- BooleanType
   | LstNth -> seq_nth (get_list p1) (get_int p2) |> simply_wrapped
   | LstRepeat ->
       let x = simple_wrap p1 in
@@ -583,7 +583,7 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
       let res = Axiomatised_operations.snth $$ [ str'; index' ] in
       res >- StringType
   | FMod
-  | SLessThan
+  | StrLess
   | BitwiseAnd
   | BitwiseOr
   | BitwiseXor
@@ -627,7 +627,7 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   | ToStringOp -> Axiomatised_operations.num2str <| get_num le >- StringType
   | ToNumberOp -> Axiomatised_operations.str2num <| get_string le >- NumberType
   | ToIntOp -> Axiomatised_operations.num2int <| get_num le >- NumberType
-  | UNot -> bool_not (get_bool le) >- BooleanType
+  | Not -> bool_not (get_bool le) >- BooleanType
   | Cdr ->
       let list = get_list le in
       seq_extract list (int_k 1) (seq_len list) >- ListType
@@ -637,6 +637,7 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   | LstRev -> Axiomatised_operations.lrev <| get_list le >- ListType
   | NumToInt -> get_num le |> real_to_int >- IntType
   | IntToNum -> get_int le |> int_to_real >- NumberType
+  | IsInt -> num_divisible (get_num le) 1 >- BooleanType
   | BitwiseNot
   | M_isNaN
   | M_abs
@@ -769,87 +770,28 @@ let rec encode_logical_expression
   | Exists (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:exists ~gamma ~llen_lvars ~list_elem_vars bt e
-  | EForall (bt, e) ->
+  | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
-
-and encode_assertion
-    ~(gamma : typenv)
-    ~(llen_lvars : SS.t)
-    ~(list_elem_vars : SS.t)
-    (a : Formula.t) : Encoding.t =
-  let f = encode_assertion ~gamma ~llen_lvars ~list_elem_vars in
-  let fe = encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars in
-  let open Encoding in
-  match a with
-  | Not a ->
-      let>- a = f a in
-      get_bool a |> bool_not >- BooleanType
-  | Eq (le1, le2) -> encode_equality (fe le1) (fe le2)
-  | FLess (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_lt (get_num le1) (get_num le2) >- BooleanType
-  | FLessEq (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_leq (get_num le1) (get_num le2) >- BooleanType
-  | ILess (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_lt (get_int le1) (get_int le2) >- BooleanType
-  | ILessEq (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_leq (get_int le1) (get_int le2) >- BooleanType
-  | Impl (a1, a2) ->
-      let>- a1 = f a1 in
-      let>- a2 = f a2 in
-      bool_implies (get_bool a1) (get_bool a2) >- BooleanType
-  | StrLess (_, _) -> failwith "SMT encoding does not support STRLESS"
-  | True -> bool_k true >- BooleanType
-  | False -> bool_k false >- BooleanType
-  | Or (a1, a2) ->
-      let>- a1 = f a1 in
-      let>- a2 = f a2 in
-      bool_or (get_bool a1) (get_bool a2) >- BooleanType
-  | And (a1, a2) ->
-      let>- a1 = f a1 in
-      let>- a2 = f a2 in
-      bool_and (get_bool a1) (get_bool a2) >- BooleanType
-  | SetMem (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      set_member Z3 (simple_wrap le1) (get_set le2) >- BooleanType
-  | SetSub (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      set_subset Z3 (get_set le1) (get_set le2) >- BooleanType
-  | ForAll (bt, a) ->
-      encode_quantified_expr ~encode_expr:encode_assertion ~mk_quant:forall
-        ~gamma ~llen_lvars ~list_elem_vars bt a
-  | IsInt e ->
-      let>- e = fe e in
-      num_divisible (get_num e) 1 >- BooleanType
 
 let encode_assertion_top_level
     ~(gamma : typenv)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
-    (a : Formula.t) : Encoding.t =
+    (a : Expr.t) : Encoding.t =
   try
-    encode_assertion ~gamma ~llen_lvars ~list_elem_vars
-      (Formula.push_in_negations a)
+    encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
+      (Expr.push_in_negations a)
   with e ->
     let s = Printexc.to_string e in
     let msg =
-      Fmt.str "Failed to encode %a in gamma %a with error %s\n" Formula.pp a
+      Fmt.str "Failed to encode %a in gamma %a with error %s\n" Expr.pp a
         pp_typenv gamma s
     in
     let () = L.print_to_all msg in
     raise e
 
-let lvars_only_in_llen (fs : Formula.Set.t) : SS.t =
+let lvars_only_in_llen (fs : Expr.Set.t) : SS.t =
   let inspector =
     object
       inherit [_] Visitors.iter as super
@@ -864,10 +806,10 @@ let lvars_only_in_llen (fs : Formula.Set.t) : SS.t =
         | _ -> super#visit_expr () e
     end
   in
-  fs |> Formula.Set.iter (inspector#visit_formula ());
+  fs |> Expr.Set.iter (inspector#visit_expr ());
   inspector#get_diff
 
-let lvars_as_list_elements (assertions : Formula.Set.t) : SS.t =
+let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
   let collector =
     object (self)
       inherit [_] Visitors.reduce
@@ -877,7 +819,7 @@ let lvars_as_list_elements (assertions : Formula.Set.t) : SS.t =
         (* Quantified variables need to be excluded *)
         let univ_quant = List.to_seq binders |> Seq.map fst in
         let exclude = Containers.SS.add_seq univ_quant exclude in
-        self#visit_formula (exclude, is_in_list) f
+        self#visit_expr (exclude, is_in_list) f
 
       method! visit_Exists (exclude, is_in_list) binders e =
         let exist_quants = List.to_seq binders |> Seq.map fst in
@@ -906,19 +848,19 @@ let lvars_as_list_elements (assertions : Formula.Set.t) : SS.t =
       method! visit_'annot _ () = self#zero
     end
   in
-  Formula.Set.fold
+  Expr.Set.fold
     (fun f acc ->
-      let new_lvars = collector#visit_formula (SS.empty, false) f in
+      let new_lvars = collector#visit_expr (SS.empty, false) f in
       SS.union new_lvars acc)
     assertions SS.empty
 
-let encode_assertions (fs : Formula.Set.t) (gamma : typenv) : sexp list =
+let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
   let open Encoding in
   let- () = Hashtbl.find_opt encoding_cache fs in
   let llen_lvars = lvars_only_in_llen fs in
   let list_elem_vars = lvars_as_list_elements fs in
   let encoded =
-    Formula.Set.elements fs
+    Expr.Set.elements fs
     |> List.map (encode_assertion_top_level ~gamma ~llen_lvars ~list_elem_vars)
   in
   let consts =
@@ -969,7 +911,7 @@ module Dump = struct
         Fmt.pf
           (Format.formatter_of_out_channel c)
           "GIL query:\nFS: %a\nGAMMA: %a\nEncoded as SMT Query:\n%a@?"
-          (Fmt.iter ~sep:Fmt.comma Formula.Set.iter Formula.pp)
+          (Fmt.iter ~sep:Fmt.comma Expr.Set.iter Expr.pp)
           fs pp_typenv gamma
           (Fmt.list ~sep:(Fmt.any "\n") Sexplib.Sexp.pp_hum)
           cmds)
@@ -981,11 +923,11 @@ let reset_solver () =
   let () = cmd (push 1) in
   ()
 
-let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
+let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
-          (Fmt.iter ~sep:(Fmt.any "@\n") Formula.Set.iter Formula.pp)
+          (Fmt.iter ~sep:(Fmt.any "@\n") Expr.Set.iter Expr.pp)
           fs pp_typenv gamma)
   in
   let () = reset_solver () in
@@ -1017,7 +959,7 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
                Solver:\n\
                %a\n\
                @?"
-              (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
+              (Fmt.iter ~sep:(Fmt.any ", ") Expr.Set.iter Expr.pp)
               fs pp_typenv gamma
               (Fmt.list ~sep:(Fmt.any "\n\n") Sexplib.Sexp.pp_hum)
               encoded_assertions
@@ -1029,14 +971,14 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   in
   ret
 
-let exec_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
+let exec_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   try exec_sat' fs gamma
   with UnexpectedSolverResponse _ as e ->
     let msg = Fmt.str "SMT failure!\n%s\n" (Printexc.to_string e ^ "\n") in
     let () = L.print_to_all msg in
     exit 1
 
-let check_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
+let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   match Hashtbl.find_opt sat_cache fs with
   | Some result ->
       let () =
@@ -1049,13 +991,13 @@ let check_sat (fs : Formula.Set.t) (gamma : typenv) : sexp option =
       let ret = exec_sat fs gamma in
       let () =
         L.verbose (fun m ->
-            let f = Formula.conjunct (Formula.Set.elements fs) in
-            m "Adding to cache : @[%a@]" Formula.pp f)
+            let f = Expr.conjunct (Expr.Set.elements fs) in
+            m "Adding to cache : @[%a@]" Expr.pp f)
       in
       let () = Hashtbl.replace sat_cache fs ret in
       ret
 
-let is_sat (fs : Formula.Set.t) (gamma : typenv) : bool =
+let is_sat (fs : Expr.Set.t) (gamma : typenv) : bool =
   check_sat fs gamma |> Option.is_some
 
 let lift_model
