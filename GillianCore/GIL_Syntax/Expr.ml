@@ -29,6 +29,8 @@ let int n = lit (Int (Z.of_int n))
 let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let false_ = Lit (Bool false)
+let true_ = Lit (Bool true)
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
@@ -244,24 +246,73 @@ module Infix = struct
     | Lit (Bool a) -> Lit (Bool (not a))
     | x -> UnOp (Not, x)
 
+  let ( == ) a b =
+    match (a, b) with
+    | Lit la, Lit lb -> bool (Literal.equal la lb)
+    | a, b when equal a b -> Lit (Bool true)
+    | _ -> BinOp (a, Equal, b)
+
+  let lt = ( < )
+  let lte = ( <= )
+  let gt = ( > )
+  let gte = ( >= )
+
+  let ( < ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (lt x y)
+    | _ -> BinOp (a, ILessThan, b)
+
+  let ( <= ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (lte x y)
+    | _ -> BinOp (a, ILessThanEqual, b)
+
+  let ( > ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (gt x y)
+    | _ -> BinOp (b, ILessThanEqual, a)
+
+  let ( >= ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (gte x y)
+    | _ -> BinOp (b, ILessThan, a)
+
+  let ( <. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (lt x y)
+    | _ -> BinOp (a, FLessThan, b)
+
+  let ( <=. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (lte x y)
+    | _ -> BinOp (a, FLessThanEqual, b)
+
+  let ( >. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (gt x y)
+    | _ -> BinOp (b, FLessThanEqual, a)
+
+  let ( >=. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (gte x y)
+    | _ -> BinOp (b, FLessThan, a)
+
   let ( && ) a b =
     match (a, b) with
-    | Lit (Bool x), Lit (Bool y) -> Lit (Bool (x && y))
     | Lit (Bool true), x | x, Lit (Bool true) -> x
     | Lit (Bool false), _ | _, Lit (Bool false) -> Lit (Bool false)
     | _ -> BinOp (a, And, b)
 
   let ( || ) a b =
     match (a, b) with
-    | Lit (Bool x), Lit (Bool y) -> Lit (Bool (x || y))
     | Lit (Bool false), x | x, Lit (Bool false) -> x
     | Lit (Bool true), _ | _, Lit (Bool true) -> Lit (Bool true)
     | _ -> BinOp (a, Or, b)
 
   let ( ==> ) a b =
     match (a, b) with
-    | Lit (Bool true), x | x, Lit (Bool true) -> x
-    | Lit (Bool false), _ -> Lit (Bool true)
+    | Lit (Bool true), x -> x
+    | Lit (Bool false), _ | _, Lit (Bool true) -> Lit (Bool true)
     | x, Lit (Bool false) -> not x
     | _ -> BinOp (a, Impl, b)
 
@@ -494,6 +545,50 @@ and push_in_negations_on (a : t) : t =
   | _ -> UnOp (Not, a)
 
 and push_in_negations (a : t) : t = push_in_negations_off a
+
+(** Converts the given expression to a boolean expression, returning it and its negation.
+    Returns none if the expression cannot evaluate to a boolean. *)
+let rec as_boolean_expr (e : t) : (t * t) option =
+  let open Syntaxes.Option in
+  let f = as_boolean_expr in
+  match e with
+  | LVar _ | PVar _ -> Some (BinOp (e, Equal, true_), BinOp (e, Equal, false_))
+  | Lit (Bool b) -> Some (bool b, bool (not b))
+  | BinOp (e1, FLessThan, e2) -> Some (e, BinOp (e2, FLessThanEqual, e1))
+  | BinOp (e1, ILessThan, e2) -> Some (e, BinOp (e2, ILessThanEqual, e1))
+  | BinOp (e1, FLessThanEqual, e2) -> Some (e, BinOp (e2, FLessThan, e1))
+  | BinOp (e1, ILessThanEqual, e2) -> Some (e, BinOp (e2, ILessThan, e1))
+  | BinOp (_, SetMem, _)
+  | BinOp (_, Equal, _)
+  | BinOp (_, StrLess, _)
+  | BinOp (_, SetSub, _) -> Some (e, UnOp (Not, e))
+  | BinOp (e1, And, e2) ->
+      let* a1, na1 = f e1 in
+      let+ a2, na2 = f e2 in
+      (BinOp (a1, And, a2), BinOp (na1, Or, na2))
+  | BinOp (e1, Or, e2) ->
+      let* a1, na1 = f e1 in
+      let+ a2, na2 = f e2 in
+      (BinOp (a1, Or, a2), BinOp (na1, And, na2))
+  | BinOp (e1, Impl, e2) ->
+      let* a1, _ = f e1 in
+      let+ a2, na2 = f e2 in
+      (BinOp (a1, Impl, a2), BinOp (a1, And, na2))
+  | UnOp (IsInt, _) -> Some (e, UnOp (Not, e))
+  | UnOp (Not, e') ->
+      let+ a, na = f e' in
+      (na, a)
+  | Exists (bt, inner) ->
+      let+ inner, inner_neg = f inner in
+      let pos = Exists (bt, inner) in
+      let neg = ForAll (bt, inner_neg) in
+      (BinOp (pos, Equal, true_), neg)
+  | ForAll (bt, e) ->
+      let+ inner, inner_neg = f e in
+      let pos = ForAll (bt, inner) in
+      let neg = Exists (bt, inner_neg) in
+      (pos, BinOp (neg, Equal, true_))
+  | _ -> None
 
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =

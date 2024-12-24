@@ -276,6 +276,8 @@ module Expr : sig
   val int_z : Z.t -> t
   val string : string -> t
   val bool : bool -> t
+  val false_ : t
+  val true_ : t
   val to_literal : t -> Literal.t option
 
   (** Lit (Int Z.zero) *)
@@ -320,9 +322,21 @@ module Expr : sig
 
     (** {2: } *)
 
-    (** Booleans *)
-    val not : t -> t
+    (** Comparison  *)
 
+    val ( < ) : t -> t -> t
+    val ( > ) : t -> t -> t
+    val ( <= ) : t -> t -> t
+    val ( >= ) : t -> t -> t
+    val ( <. ) : t -> t -> t
+    val ( >. ) : t -> t -> t
+    val ( <=. ) : t -> t -> t
+    val ( >=. ) : t -> t -> t
+
+    (** Booleans *)
+
+    val not : t -> t
+    val ( == ) : t -> t -> t
     val ( && ) : t -> t -> t
     val ( || ) : t -> t -> t
     val ( ==> ) : t -> t -> t
@@ -381,6 +395,10 @@ module Expr : sig
 
   (** [push_in_negations e] negates e, recursively *)
   val push_in_negations : t -> t
+
+  (** Converts the given expression to a boolean expression, returning it and its negation.
+      Returns none if the expression cannot evaluate to a boolean. *)
+  val as_boolean_expr : t -> (t * t) option
 
   (** [substitutables e] returns all lvars and alocs *)
   val substitutables : t -> SS.t
