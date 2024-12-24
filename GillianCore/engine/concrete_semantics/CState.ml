@@ -70,29 +70,15 @@ end = struct
     | Bool false -> []
     | _ -> raise (Failure "assume. illegal argument to assume")
 
-  let assume_a
-      ?matching:_
-      ?production:_
-      ?time:_
-      (state : t)
-      (ps : Formula.t list) : t option =
-    let les : Expr.t option list = List.map Formula.to_expr ps in
-    let bs : CVal.M.t option list =
-      List.map (Option.map (eval_expr state)) les
-    in
-    if
-      List.for_all
-        (function
-          | Some (Bool true) -> true
-          | _ -> false)
-        bs
-    then Some state
-    else None
+  let assume_a ?matching:_ ?production:_ ?time:_ (state : t) (ps : Expr.t list)
+      : t option =
+    let bs : CVal.M.t list = List.map (eval_expr state) ps in
+    if List.for_all (( = ) (Bool true)) bs then Some state else None
 
   let assume_t (state : t) (v : vt) (t : Type.t) : t option =
     if Literal.type_of v = t then Some state else None
 
-  let assert_a (state : t) (ps : Formula.t list) : bool =
+  let assert_a (state : t) (ps : Expr.t list) : bool =
     Option.fold ~some:(fun _ -> true) ~none:false (assume_a state ps)
 
   let sat_check (_ : t) (l : Literal.t) : bool =
@@ -101,7 +87,7 @@ end = struct
     | _ -> raise (Failure "SAT Check: non-boolean argument")
 
   (* Implentation MISSING!!! *)
-  let sat_check_f (_ : t) (_ : Formula.t list) : st option = None
+  let sat_check_f (_ : t) (_ : Expr.t list) : st option = None
 
   let pp fmt state =
     let heap, store, _ = state in
@@ -152,7 +138,7 @@ end = struct
       (_ : (string * (string * vt) list) option) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
-  let unfolding_vals (_ : t) (_ : Formula.t list) : vt list =
+  let unfolding_vals (_ : t) (_ : Expr.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
   let evaluate_slcmd (_ : 'a MP.prog) (_ : SLCmd.t) (_ : t) :
@@ -183,7 +169,7 @@ end = struct
 
   let update_subst (_ : t) (_ : st) : unit = ()
 
-  let mem_constraints (_ : t) : Formula.t list =
+  let mem_constraints (_ : t) : Expr.t list =
     raise (Failure "DEATH. mem_constraints")
 
   let get_recovery_tactic _ =
@@ -207,7 +193,7 @@ end = struct
              "Concrete printer: non-memory and non-type error")
 
   let can_fix (_ : err_t) : bool = false
-  let get_failing_constraint (_ : err_t) : Formula.t = True
+  let get_failing_constraint (_ : err_t) : Expr.t = Lit (Bool true)
 
   let get_fixes (_ : err_t) : Asrt.t list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
