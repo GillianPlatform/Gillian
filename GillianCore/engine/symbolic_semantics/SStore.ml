@@ -32,9 +32,10 @@ let clocs (x : t) : SS.t =
   fold x (fun _ le ac -> SS.union ac (Expr.clocs le)) SS.empty
 
 (** conversts a symbolic store to a list of assertions *)
-let assertions (x : t) : Formula.t list =
+let assertions (x : t) : Expr.t list =
   fold x
-    (fun x le (assertions : Formula.t list) -> Eq (PVar x, le) :: assertions)
+    (fun x le (assertions : Expr.t list) ->
+      Expr.BinOp (PVar x, Equal, le) :: assertions)
     []
 
 let is_well_formed (_ : t) : bool = true

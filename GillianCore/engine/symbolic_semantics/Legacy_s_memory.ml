@@ -4,18 +4,18 @@ module type S = sig
   type init_data
 
   (** Type of GIL values *)
-  type vt = SVal.M.t
+  type vt := SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SESubst.t
+  type st := SVal.SESubst.t
 
   type err_t [@@deriving yojson, show]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]
 
-  type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+  type action_ret :=
+    ( (t * vt list * Expr.t list * (string * Type.t) list) list,
       err_t list )
     result
 
@@ -54,16 +54,16 @@ module type S = sig
     gamma:Type_env.t ->
     st ->
     t ->
-    (t * Formula.Set.t * (string * Type.t) list) list
+    (t * Expr.Set.t * (string * Type.t) list) list
 
   val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
-  val mem_constraints : t -> Formula.t list
+  val mem_constraints : t -> Expr.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
-  val get_failing_constraint : err_t -> Formula.t
+  val get_failing_constraint : err_t -> Expr.t
   val can_fix : err_t -> bool
   val get_fixes : err_t -> Asrt.t list
   val sure_is_nonempty : t -> bool
@@ -71,15 +71,8 @@ end
 
 module Dummy : S with type init_data = unit = struct
   type init_data = unit
-  type vt = SVal.M.t
-  type st = SVal.SESubst.t
   type err_t = unit [@@deriving yojson, show]
   type t = unit [@@deriving yojson]
-
-  type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-      err_t list )
-    result
 
   let init () = ()
   let get_init_data () = ()

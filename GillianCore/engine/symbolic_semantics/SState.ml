@@ -252,7 +252,7 @@ module Make (SMemory : SMemory.S) :
         | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)
         (* Exists. We can just evaluate pvars because they cannot be quantified *)
         | Exists (bt, e) -> Exists (bt, f e)
-        | EForall (bt, e) -> EForall (bt, f e)
+        | ForAll (bt, e) -> ForAll (bt, f e)
         | Lit _ | LVar _ | ALoc _ -> expr
       in
       (* Perform reduction *)
@@ -277,14 +277,15 @@ module Make (SMemory : SMemory.S) :
       | Lit (Bool false) -> [ state ]
       | _ ->
           (* let t = time() in *)
-          let v_asrt =
-            match
-              Formula.lift_logic_expr (Reduction.reduce_lexpr ~pfs ~gamma v)
-            with
-            | Some (v_asrt, _) -> v_asrt
-            | _ -> False
+          let red =
+            Expr.as_boolean_expr @@ Reduction.reduce_lexpr ~pfs ~gamma v
           in
-          if v_asrt = False then []
+          let v_asrt =
+            match red with
+            | Some (v_asrt, _) -> v_asrt
+            | _ -> Lit (Bool false)
+          in
+          if v_asrt = Lit (Bool false) then []
           else (
             PFS.extend pfs v_asrt;
             [ state ])
@@ -296,7 +297,7 @@ module Make (SMemory : SMemory.S) :
       ?(production = false)
       ?(time = "")
       (state : t)
-      (ps : Formula.t list) : t option =
+      (ps : Expr.t list) : t option =
     let { pfs; gamma; _ } = state in
     try
       let ps =
@@ -319,14 +320,14 @@ module Make (SMemory : SMemory.S) :
           Some state)
         else (
           Logging.verbose (fun m ->
-              m "assume_a: Couldn't assume %a" (Fmt.Dump.list Formula.pp) ps);
+              m "assume_a: Couldn't assume %a" (Fmt.Dump.list Expr.pp) ps);
           None)
       in
       result
     with Reduction.ReductionException (e, msg) ->
       Logging.verbose (fun m ->
           m "assume_a: Couldn't assume due to an error reducing %a - %s\nps: %a"
-            Expr.pp e msg (Fmt.Dump.list Formula.pp) ps);
+            Expr.pp e msg (Fmt.Dump.list Expr.pp) ps);
       None
 
   let assume_t ({ gamma; _ } as state : t) (v : vt) (t : Type.t) : t option =
@@ -343,9 +344,9 @@ module Make (SMemory : SMemory.S) :
     else if v = Lit (Bool false) then false
     else
       let v_asrt =
-        match Formula.lift_logic_expr v with
+        match Expr.as_boolean_expr v with
         | Some (v_asrt, _) -> v_asrt
-        | _ -> False
+        | _ -> Lit (Bool false)
       in
       let relevant_info = (Expr.pvars v, Expr.lvars v, Expr.locs v) in
       let result =
@@ -356,10 +357,10 @@ module Make (SMemory : SMemory.S) :
       L.(verbose (fun m -> m "SState: sat_check done: %b" result));
       result
 
-  let sat_check_f ({ pfs; gamma; _ } : t) (fs : Formula.t list) : st option =
+  let sat_check_f ({ pfs; gamma; _ } : t) (fs : Expr.t list) : st option =
     FOSolver.check_satisfiability_with_model (fs @ PFS.to_list pfs) gamma
 
-  let assert_a ({ pfs; gamma; _ } : t) (ps : Formula.t list) : bool =
+  let assert_a ({ pfs; gamma; _ } : t) (ps : Expr.t list) : bool =
     FOSolver.check_entailment SS.empty pfs ps gamma
 
   let equals ({ pfs; gamma; _ } : t) (le1 : vt) (le2 : vt) : bool =
@@ -432,7 +433,7 @@ module Make (SMemory : SMemory.S) :
         match memories with
         | [] -> failwith "Impossible: memory substitution returned []"
         | [ (mem, lpfs, lgamma) ] ->
-            let () = Formula.Set.iter (PFS.extend pfs) lpfs in
+            let () = Expr.Set.iter (PFS.extend pfs) lpfs in
             let () =
               List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma
             in
@@ -444,7 +445,7 @@ module Make (SMemory : SMemory.S) :
               (fun (mem, lpfs, lgamma) ->
                 let bpfs = PFS.copy pfs in
                 let bgamma = Type_env.copy gamma in
-                let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
+                let () = Expr.Set.iter (PFS.extend bpfs) lpfs in
                 let () =
                   List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
                 in
@@ -551,22 +552,15 @@ module Make (SMemory : SMemory.S) :
       (_ : (string * (string * vt) list) option) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
-  let unfolding_vals (_ : t) (fs : Formula.t list) : vt list =
-    let lvars =
-      SS.of_list
-        (List.concat (List.map (fun f -> SS.elements (Formula.lvars f)) fs))
+  let unfolding_vals (_ : t) (fs : Expr.t list) : vt list =
+    let map to_str to_expr =
+      List.map to_str fs
+      |> List.fold_left SS.union SS.empty
+      |> SS.elements |> List.map to_expr
     in
-    let alocs =
-      SS.of_list
-        (List.concat (List.map (fun f -> SS.elements (Formula.alocs f)) fs))
-    in
-    let clocs =
-      SS.of_list
-        (List.concat (List.map (fun f -> SS.elements (Formula.clocs f)) fs))
-    in
-    let lvars = List.map (fun x -> Expr.LVar x) (SS.elements lvars) in
-    let alocs = List.map (fun x -> Expr.ALoc x) (SS.elements alocs) in
-    let clocs = List.map (fun x -> Expr.Lit (Loc x)) (SS.elements clocs) in
+    let lvars = map Expr.lvars (fun x -> Expr.LVar x) in
+    let alocs = map Expr.alocs (fun x -> Expr.ALoc x) in
+    let clocs = map Expr.clocs (fun x -> Expr.Lit (Loc x)) in
     clocs @ alocs @ lvars
 
   let substitution_in_place ?(subst_all = false) (subst : st) (state : t) :
@@ -581,7 +575,7 @@ module Make (SMemory : SMemory.S) :
       match SMemory.substitution_in_place ~pfs ~gamma subst heap with
       | [] -> failwith "IMPOSSIBLE: SMemory always returns at least one memory"
       | [ (mem, lpfs, lgamma) ] ->
-          let () = Formula.Set.iter (PFS.extend pfs) lpfs in
+          let () = Expr.Set.iter (PFS.extend pfs) lpfs in
           let () = List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma in
           [ { heap = mem; store; pfs; gamma; spec_vars } ]
       | multi_mems ->
@@ -589,7 +583,7 @@ module Make (SMemory : SMemory.S) :
             (fun (mem, lpfs, lgamma) ->
               let bpfs = PFS.copy pfs in
               let bgamma = Type_env.copy gamma in
-              let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
+              let () = Expr.Set.iter (PFS.extend bpfs) lpfs in
               let () =
                 List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
               in
@@ -672,7 +666,7 @@ module Make (SMemory : SMemory.S) :
         | None -> ALoc (ALoc.alloc ()))
     | None -> ALoc (ALoc.alloc ())
 
-  let mem_constraints ({ heap; _ } : t) : Formula.t list =
+  let mem_constraints ({ heap; _ } : t) : Expr.t list =
     SMemory.mem_constraints heap
 
   let get_recovery_tactic (state : t) (errs : err_t list) : vt Recovery_tactic.t
@@ -684,9 +678,9 @@ module Make (SMemory : SMemory.S) :
     if Recovery_tactic.is_none memory_tactic then memory_tactic
     else
       PFS.fold_left
-        (fun (acc : vt Recovery_tactic.t) pf ->
-          match pf with
-          | Eq ((ALoc _ as loc), LVar x) | Eq (LVar x, (ALoc _ as loc)) ->
+        (fun (acc : vt Recovery_tactic.t) -> function
+          | BinOp ((ALoc _ as loc), Equal, LVar x)
+          | BinOp (LVar x, Equal, (ALoc _ as loc)) ->
               if Names.is_spec_var_name x then
                 let try_fold =
                   Option.map
@@ -709,7 +703,7 @@ module Make (SMemory : SMemory.S) :
   let pp_err = StateErr.pp_err SMemory.pp_err SVal.M.pp
   let can_fix = StateErr.can_fix SMemory.can_fix
 
-  let get_failing_constraint (err : err_t) : Formula.t =
+  let get_failing_constraint (err : err_t) : Expr.t =
     StateErr.get_failing_constraint err SMemory.get_failing_constraint
 
   (* get_fixes returns a list of possible fixes.
