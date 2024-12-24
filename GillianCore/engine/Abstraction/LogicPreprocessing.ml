@@ -361,9 +361,7 @@ let remove_equalities_between_binders_and_lvars binders assertion =
   let uf_maker =
     object
       inherit [_] Visitors.iter
-      method! visit_Not _ _ = ()
-      method! visit_Or _ _ _ = ()
-      method! visit_Eq _ e1 e2 = union_expr e1 e2
+      method! visit_BinOp _ e1 op e2 = if op = Equal then union_expr e1 e2
     end
   in
   uf_maker#visit_assertion () assertion;
