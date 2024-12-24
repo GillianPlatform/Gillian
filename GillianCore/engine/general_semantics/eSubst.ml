@@ -84,8 +84,6 @@ module type S = sig
   (** Optional substitution inside a logical expression *)
   val subst_in_expr_opt : t -> Expr.t -> Expr.t option
 
-  val substitute_formula : t -> partial:bool -> Formula.t -> Formula.t
-  val substitute_in_formula_opt : t -> Formula.t -> Formula.t option
   val substitute_asrt : t -> partial:bool -> Asrt.t -> Asrt.t
   val substitute_slcmd : t -> partial:bool -> SLCmd.t -> SLCmd.t
   val substitute_lcmd : t -> partial:bool -> LCmd.t -> LCmd.t
@@ -421,7 +419,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
         if new_expr == e then this else Exists (bt, new_expr)
 
-      method! visit_EForall () this bt e =
+      method! visit_ForAll () this bt e =
         let binders = List.to_seq bt |> Seq.map fst in
         let binder_substs =
           binders
@@ -433,21 +431,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           binders;
         let new_expr = self#visit_expr () e in
         Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
-        if new_expr == e then this else EForall (bt, new_expr)
-
-      method! visit_ForAll () this bt form =
-        let binders = List.to_seq bt |> Seq.map fst in
-        let binders_substs =
-          binders
-          |> Seq.filter_map (fun x ->
-                 Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
-        in
-        Seq.iter
-          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
-          binders;
-        let new_formula = self#visit_formula () form in
-        Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binders_substs;
-        if new_formula == form then this else ForAll (bt, new_formula)
+        if new_expr == e then this else ForAll (bt, new_expr)
     end
 
   (**
@@ -489,7 +473,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
           let result = Option.map (fun e' -> Expr.Exists (bt, e')) e' in
           (result, false)
-      | EForall (bt, e) ->
+      | ForAll (bt, e) ->
           (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
           List.iter
             (fun (x, _) ->
@@ -499,52 +483,13 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             bt;
           let e' = subst_in_expr_opt subst e in
           List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
-          let result = Option.map (fun e' -> Expr.EForall (bt, e')) e' in
+          let result = Option.map (fun e' -> Expr.ForAll (bt, e')) e' in
           (result, false)
       | _ -> (Some le, true)
     in
     Expr.map_opt f_before None le
 
   let is_empty (subst : t) : bool = Hashtbl.length subst = 0
-
-  let substitute_formula (subst : t) ~(partial : bool) (a : Formula.t) :
-      Formula.t =
-    substitutor#init ~partial ~subst;
-    let res = substitutor#visit_formula () a in
-    substitutor#clear ();
-    res
-
-  let substitute_in_formula_opt (subst : t) (a : Formula.t) : Formula.t option =
-    let open Formula in
-    let old_binders_substs = ref [] in
-    let f_before a =
-      match a with
-      | ForAll (bt, _) ->
-          let binders, _ = List.split bt in
-          let binders_substs =
-            List.map
-              (fun x -> Option.map (fun x_v -> (x, x_v)) (get subst (LVar x)))
-              binders
-          in
-          let binders_substs =
-            try List.filter_map (fun x -> x) binders_substs
-            with _ -> raise (Failure "DEATH. asrt_substitution")
-          in
-          old_binders_substs := binders_substs;
-          List.iter (fun x -> put subst (LVar x) (Val.from_lvar_name x)) binders;
-          (Some a, true)
-      | _ -> (Some a, true)
-    in
-    let f_after a =
-      match a with
-      | ForAll _ ->
-          List.iter
-            (fun (x, le_x) -> put subst (LVar x) le_x)
-            !old_binders_substs;
-          a
-      | _ -> a
-    in
-    map_opt (Some f_before) (Some f_after) (Some (subst_in_expr_opt subst)) a
 
   let substitute_asrt (subst : t) ~(partial : bool) (a : Asrt.t) : Asrt.t =
     substitutor#init ~partial ~subst;
