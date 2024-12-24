@@ -2,15 +2,15 @@ module FOSolver = Engine.FOSolver
 module PFS = Engine.PFS
 module Type_env = Engine.Type_env
 module Reduction = Engine.Reduction
-module Formula = Gil_syntax.Formula
+module Expr = Gil_syntax.Expr
 module Typing = Engine.Typing
 
 (** FIXME: optimization? *)
 let build_full_pfs (pc : Pc.t) =
-  if Formula.Set.is_empty pc.learned then pc.pfs
+  if Expr.Set.is_empty pc.learned then pc.pfs
   else
     let copied = PFS.copy pc.pfs in
-    Formula.Set.iter (PFS.extend copied) pc.learned;
+    Expr.Set.iter (PFS.extend copied) pc.learned;
     copied
 
 let build_full_gamma (pc : Pc.t) =
@@ -22,7 +22,7 @@ let build_full_gamma (pc : Pc.t) =
 
 let sat ~(pc : Pc.t) formula =
   Logging.tmi (fun m ->
-      m "Monadic about to check sat of this new formula:@[<hov>%a@]" Formula.pp
+      m "Monadic about to check sat of this new formula:@[<hov>%a@]" Expr.pp
         formula);
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
 
@@ -36,8 +36,7 @@ let check_entailment ~(pc : Pc.t) formula =
       Engine.Reduction.reduce_formula ~matching:pc.matching ~gamma ~pfs formula
     in
     match f with
-    | True -> true
-    | False -> false
+    | Lit (Bool b) -> b
     | _ ->
         FOSolver.check_entailment ~matching:pc.matching
           Utils.Containers.SS.empty pfs [ f ] gamma
@@ -46,7 +45,7 @@ let check_entailment ~(pc : Pc.t) formula =
         m
           "check_entailment: couldn't check due to an error reducing %a - %s\n\
            Formula:%a"
-          Gil_syntax.Expr.pp e msg Formula.pp formula);
+          Gil_syntax.Expr.pp e msg Expr.pp formula);
     false
 
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
