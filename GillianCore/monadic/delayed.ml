@@ -1,14 +1,13 @@
-module Formula = Gil_syntax.Formula
 module Expr = Gil_syntax.Expr
 module Type = Gil_syntax.Type
 
-exception NonExhaustiveEntailment of Formula.t list
+exception NonExhaustiveEntailment of Expr.t list
 
 let () =
   Printexc.register_printer (function
     | NonExhaustiveEntailment fs ->
         let s =
-          Fmt.str "NonExhaustiveEntailment(%a)" (Fmt.Dump.list Formula.pp) fs
+          Fmt.str "NonExhaustiveEntailment(%a)" (Fmt.Dump.list Expr.pp) fs
         in
         Some s
     | _ -> None)
@@ -34,13 +33,13 @@ let branches (x : 'a t list) : 'a t =
  fun ~curr_pc -> List.concat_map (fun (b : 'a t) -> b ~curr_pc) x
 
 let branch_on
-    (guard : Formula.t)
+    (guard : Expr.t)
     ~(then_ : unit -> 'a t)
     ~(else_ : unit -> 'a t)
     ~curr_pc =
   match guard with
-  | True -> then_ () ~curr_pc
-  | False -> else_ () ~curr_pc
+  | Lit (Bool true) -> then_ () ~curr_pc
+  | Lit (Bool false) -> else_ () ~curr_pc
   | guard -> (
       try
         let guard_sat = FOSolver.sat ~pc:curr_pc guard in
@@ -48,7 +47,7 @@ let branch_on
           else_ () ~curr_pc
         else
           let then_branches = then_ () ~curr_pc:(Pc.extend curr_pc [ guard ]) in
-          let not_guard = Formula.Infix.fnot guard in
+          let not_guard = Expr.Infix.not guard in
           if FOSolver.sat ~pc:curr_pc not_guard then
             let else_branches =
               else_ () ~curr_pc:(Pc.extend curr_pc [ not_guard ])
@@ -56,44 +55,36 @@ let branch_on
             then_branches @ else_branches
           else then_branches
       with Smt.SMT_unknown ->
-        Fmt.pr "TIMED OUT ON: %a" Formula.pp guard;
+        Fmt.pr "TIMED OUT ON: %a" Expr.pp guard;
         vanish () ~curr_pc)
 
 let if_sure
-    (guard : Formula.t)
+    (guard : Expr.t)
     ~(then_ : unit -> 'a t)
     ~(else_ : unit -> 'a t)
     ~curr_pc =
   match guard with
-  | True -> then_ () ~curr_pc
-  | False -> else_ () ~curr_pc
+  | Lit (Bool true) -> then_ () ~curr_pc
+  | Lit (Bool false) -> else_ () ~curr_pc
   | guard ->
       if FOSolver.check_entailment ~pc:curr_pc guard then
         let extended_pc = Pc.extend curr_pc [ guard ] in
         then_ () ~curr_pc:extended_pc
       else else_ () ~curr_pc
 
-let branch_entailment (branches : (Formula.t * (unit -> 'a t)) list) ~curr_pc =
-  let rec loop l =
-    match l with
+let branch_entailment (branches : (Expr.t * (unit -> 'a t)) list) ~curr_pc =
+  let rec loop = function
     | [] -> raise (NonExhaustiveEntailment (List.map fst branches))
-    | (guard, thunk) :: r -> (
-        match guard with
-        | Formula.True -> thunk () ~curr_pc
-        | False -> loop r
-        | _ ->
-            if FOSolver.check_entailment ~pc:curr_pc guard then
-              thunk () ~curr_pc
-            else loop r)
+    | (Expr.Lit (Bool true), thunk) :: _ -> thunk () ~curr_pc
+    | (Expr.Lit (Bool false), _) :: r -> loop r
+    | (guard, thunk) :: r ->
+        if FOSolver.check_entailment ~pc:curr_pc guard then thunk () ~curr_pc
+        else loop r
   in
   loop branches
 
 let map x f ~curr_pc =
-  List.map
-    (fun b ->
-      let open Branch in
-      { b with value = f b.value })
-    (x ~curr_pc)
+  List.map (fun b -> Branch.{ b with value = f b.value }) (x ~curr_pc)
 
 let delayed_eval f x ~curr_pc =
   [ Branch.make ~pc:curr_pc ~value:(f ~pc:curr_pc x) ]
