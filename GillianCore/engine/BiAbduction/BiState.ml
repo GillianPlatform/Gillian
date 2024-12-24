@@ -77,7 +77,7 @@ module Make (State : SState.S) = struct
       ?(production = false)
       ?time:_
       (bi_state : t)
-      (fs : Formula.t list) : t option =
+      (fs : Expr.t list) : t option =
     let { state; _ } = bi_state in
     match State.assume_a ~matching ~production state fs with
     | Some state -> Some { bi_state with state }
@@ -89,11 +89,11 @@ module Make (State : SState.S) = struct
 
   let sat_check ({ state; _ } : t) (v : Expr.t) : bool = State.sat_check state v
 
-  let sat_check_f ({ state; _ } : t) (fs : Formula.t list) :
-      SVal.SESubst.t option =
+  let sat_check_f ({ state; _ } : t) (fs : Expr.t list) : SVal.SESubst.t option
+      =
     State.sat_check_f state fs
 
-  let assert_a ({ state; _ } : t) (fs : Formula.t list) : bool =
+  let assert_a ({ state; _ } : t) (fs : Expr.t list) : bool =
     State.assert_a state fs
 
   let equals ({ state; _ } : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
@@ -167,7 +167,7 @@ module Make (State : SState.S) = struct
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for bi-abductive execution")
 
-  let unfolding_vals ({ state; _ } : t) (fs : Formula.t list) : Expr.t list =
+  let unfolding_vals ({ state; _ } : t) (fs : Expr.t list) : Expr.t list =
     State.unfolding_vals state fs
 
   let substitution_in_place ?subst_all:_ (_ : SVal.SESubst.t) (_ : t) =
@@ -461,7 +461,7 @@ module Make (State : SState.S) = struct
 
   (** new functions *)
 
-  let mem_constraints ({ state; _ } : t) : Formula.t list =
+  let mem_constraints ({ state; _ } : t) : Expr.t list =
     State.mem_constraints state
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
