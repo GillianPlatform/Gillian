@@ -19,8 +19,8 @@ module Infer_types_to_gamma = struct
       (tt : Type.t) =
     let f = f flag gamma new_gamma in
     match op with
-    | UNot -> tt = BooleanType && f le BooleanType
-    | M_isNaN -> tt = BooleanType && f le NumberType
+    | Not -> tt = BooleanType && f le BooleanType
+    | IsInt | M_isNaN -> tt = BooleanType && f le NumberType
     | IUnaryMinus -> tt = IntType && f le IntType
     | FUnaryMinus
     | BitwiseNot
@@ -70,13 +70,12 @@ module Infer_types_to_gamma = struct
           (Some IntType, Some IntType, Some BooleanType)
       | FLessThan | FLessThanEqual ->
           (Some NumberType, Some NumberType, Some BooleanType)
-      | SLessThan -> (Some StringType, Some StringType, Some BooleanType)
-      | BAnd | BOr | BImpl ->
-          (Some BooleanType, Some BooleanType, Some BooleanType)
+      | StrLess -> (Some StringType, Some StringType, Some BooleanType)
+      | And | Or | Impl -> (Some BooleanType, Some BooleanType, Some BooleanType)
       | StrCat -> (Some StringType, Some StringType, Some StringType)
-      | BSetMem -> (None, Some SetType, Some BooleanType)
+      | SetMem -> (None, Some SetType, Some BooleanType)
       | SetDiff -> (Some SetType, Some SetType, Some SetType)
-      | BSetSub -> (Some SetType, Some SetType, Some BooleanType)
+      | SetSub -> (Some SetType, Some SetType, Some BooleanType)
       | LstNth -> (Some ListType, Some IntType, None)
       | LstRepeat -> (None, Some IntType, Some ListType)
       | StrNth -> (Some ListType, Some NumberType, None)
@@ -154,30 +153,7 @@ module Infer_types_to_gamma = struct
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
-    | Exists (bt, le) ->
-        if not (tt = BooleanType) then false
-        else
-          let gamma_copy = Type_env.copy gamma in
-          let new_gamma_copy = Type_env.copy new_gamma in
-          let () =
-            List.iter
-              (fun (x, t) ->
-                let () =
-                  match t with
-                  | Some t -> Type_env.update gamma_copy x t
-                  | None -> Type_env.remove gamma_copy x
-                in
-                Type_env.remove new_gamma_copy x)
-              bt
-          in
-          let ret = f' gamma_copy new_gamma_copy le BooleanType in
-          (* We've updated our new_gamma_copy with a bunch of things.
-             We need to import everything except the quantified variables to the new_gamma *)
-          Type_env.iter new_gamma_copy (fun x t ->
-              if not (List.exists (fun (y, _) -> String.equal x y) bt) then
-                Type_env.update new_gamma x t);
-          ret
-    | EForall (bt, le) ->
+    | Exists (bt, le) | ForAll (bt, le) ->
         if not (tt = BooleanType) then false
         else
           let gamma_copy = Type_env.copy gamma in
@@ -245,10 +221,14 @@ let rec infer_types_expr gamma le : unit =
   | EList lle | ESet lle -> List.iter (fun le -> f le) lle
   | BinOp (le1, op, le2) -> (
       match op with
-      | FPlus | FMinus | FTimes | FDiv | FMod ->
+      | Equal -> ()
+      | And | Or | Impl ->
+          e le1 BooleanType;
+          e le2 BooleanType
+      | FPlus | FMinus | FTimes | FDiv | FMod | FLessThan | FLessThanEqual ->
           e le1 NumberType;
           e le2 NumberType
-      | IPlus | IMinus | ITimes | IDiv | IMod ->
+      | IPlus | IMinus | ITimes | IDiv | IMod | ILessThan | ILessThanEqual ->
           e le1 IntType;
           e le2 IntType
       | LstNth ->
@@ -260,36 +240,23 @@ let rec infer_types_expr gamma le : unit =
       | StrNth ->
           e le1 StringType;
           e le2 NumberType
+      | StrLess ->
+          e le1 StringType;
+          e le2 StringType
+      | SetMem -> e le2 SetType
+      | SetSub | SetDiff ->
+          e le1 SetType;
+          e le2 SetType
       (* FIXME: Specify cases *)
       | _ -> ())
   (* FIXME: Specify cases *)
-  | _ -> ()
-
-let rec infer_types_formula (gamma : Type_env.t) (a : Formula.t) : unit =
-  let f = infer_types_formula gamma in
-  let e = safe_extend_gamma gamma in
-
-  match a with
-  (* LForAll can be more precise *)
-  | True | False | ForAll _ -> ()
-  | Not a -> f a
-  | And (a1, a2) | Or (a1, a2) ->
-      f a1;
-      f a2
-  | FLess (e1, e2) | FLessEq (e1, e2) ->
-      e e1 NumberType;
-      e e2 NumberType
-  | ILess (e1, e2) | ILessEq (e1, e2) ->
-      e e1 IntType;
-      e e2 IntType
-  | StrLess (e1, e2) ->
-      e e1 StringType;
-      e e2 StringType
-  | SetMem (_, e2) -> e e2 SetType
-  | SetSub (e1, e2) ->
-      e e1 SetType;
-      e e2 SetType
-  (* FIXME: Specify cases *)
+  | UnOp (op, le) -> (
+      match op with
+      | Not -> e le BooleanType
+      | IsInt | M_isNaN -> e le NumberType
+      | IUnaryMinus -> e le IntType
+      (* FIXME: Specify cases *)
+      | _ -> ())
   | _ -> ()
 
 (*****************)
@@ -357,7 +324,7 @@ module Type_lexpr = struct
       let (tt : Type.t) =
         match op with
         | TypeOf -> TypeType
-        | UNot | M_isNaN -> BooleanType
+        | Not | M_isNaN | IsInt -> BooleanType
         | ToStringOp -> StringType
         | Car | Cdr -> ListType
         | LstRev | SetToList -> ListType
@@ -406,12 +373,12 @@ module Type_lexpr = struct
         | ILessThanEqual
         | FLessThan
         | FLessThanEqual
-        | SLessThan
-        | BAnd
-        | BOr
-        | BImpl
-        | BSetMem
-        | BSetSub -> infer_type le BooleanType
+        | StrLess
+        | And
+        | Or
+        | Impl
+        | SetMem
+        | SetSub -> infer_type le BooleanType
         | SetDiff -> infer_type le SetType
         | StrCat -> infer_type le StringType
         | IPlus
@@ -497,7 +464,7 @@ module Type_lexpr = struct
       | EList _ -> def_pos (Some ListType)
       (* Sets are always typable *)
       | ESet _ -> def_pos (Some SetType)
-      | Exists (bt, e) | EForall (bt, e) -> type_quantified_expr gamma le bt e
+      | Exists (bt, e) | ForAll (bt, e) -> type_quantified_expr gamma le bt e
       | UnOp (op, e) -> type_unop gamma le op e
       | BinOp (e1, op, e2) -> type_binop gamma le op e1 e2
       | NOp (SetUnion, les) | NOp (SetInter, les) ->
@@ -540,15 +507,16 @@ let te_of_list (vt : (Expr.t * Type.t) list) : Type_env.t option =
 let naively_infer_type_information (pfs : PFS.t) (gamma : Type_env.t) : unit =
   PFS.iter
     (fun a ->
-      match (a : Formula.t) with
-      | Eq (LVar x, le) | Eq (le, LVar x) ->
+      match (a : Expr.t) with
+      | Expr.BinOp (LVar x, Equal, le) | Expr.BinOp (le, Equal, LVar x) ->
           if not (Type_env.mem gamma x) then
             let le_type, _ = type_lexpr gamma le in
             Option.fold
               ~some:(fun x_type -> Type_env.update gamma x x_type)
               ~none:() le_type
-      | Eq (UnOp (TypeOf, LVar x), Lit (Type t))
-      | Eq (Lit (Type t), UnOp (TypeOf, LVar x)) -> Type_env.update gamma x t
+      | Expr.BinOp (UnOp (TypeOf, LVar x), Equal, Lit (Type t))
+      | Expr.BinOp (Lit (Type t), Equal, UnOp (TypeOf, LVar x)) ->
+          Type_env.update gamma x t
       | _ -> ())
     pfs
 
