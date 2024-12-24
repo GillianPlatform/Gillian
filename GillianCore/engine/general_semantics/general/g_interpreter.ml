@@ -486,13 +486,19 @@ struct
 
     let eval_assume f state =
       let store_subst = Store.to_ssubst (State.get_store state) in
-      let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
+      let f' = SVal.SESubst.subst_in_expr store_subst ~partial:true f in
       (* Printf.printf "Assuming %s\n" (Formula.str f'); *)
       let open Syntaxes.List in
       let* f'', state =
         (* Sacha: I don't know why something different is happening in bi-exec *)
         if Exec_mode.is_biabduction_exec !Config.current_exec_mode then
-          let fos = Formula.get_disjuncts f' in
+          let fos =
+            let rec aux = function
+              | Expr.BinOp (e1, Or, e2) -> aux e1 @ aux e2
+              | e -> [ e ]
+            in
+            aux f'
+          in
           match fos with
           | [] -> []
           | [ f' ] -> [ (f', state) ]
@@ -518,18 +524,18 @@ struct
 
     let eval_assert f state =
       let store_subst = Store.to_ssubst (State.get_store state) in
-      let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
+      let f' = SVal.SESubst.subst_in_expr store_subst ~partial:true f in
       match State.assert_a state [ f' ] with
       | true -> Res_list.return state
       | false ->
           let err = StateErr.EPure f' in
-          let failing_model = State.sat_check_f state [ Not f' ] in
+          let failing_model = State.sat_check_f state [ Expr.Infix.not f' ] in
           let msg =
             Fmt.str
               "Assert failed with argument @[<h>%a@].@\n\
                @[<v 2>Failing Model:@\n\
                %a@]@\n"
-              Formula.pp f'
+              Expr.pp f'
               Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
               failing_model
           in
@@ -544,7 +550,7 @@ struct
         | None -> Res_list.vanish
       in
       let right_states =
-        match State.assume_a state' [ Not fof ] with
+        match State.assume_a state' [ Expr.Infix.not fof ] with
         | Some state -> Res_list.return state
         | None -> Res_list.vanish
       in
@@ -581,9 +587,9 @@ struct
     and eval_if e lcmds_t lcmds_e prog annot state eval_expr =
       let ve = eval_expr e in
       let e = Val.to_expr ve in
-      match Formula.lift_logic_expr e with
-      | Some (True, False) -> eval_lcmds prog lcmds_t ~annot state
-      | Some (False, True) -> eval_lcmds prog lcmds_e ~annot state
+      match Expr.as_boolean_expr e with
+      | Some (Expr.Lit (Bool true), _) -> eval_lcmds prog lcmds_t ~annot state
+      | Some (Expr.Lit (Bool false), _) -> eval_lcmds prog lcmds_e ~annot state
       | Some (foe, nfoe) ->
           let state' = State.copy state in
           let then_states =
@@ -1252,7 +1258,7 @@ struct
           match lvt with
           | Some (Bool true) -> vfalse
           | Some (Bool false) -> vtrue
-          | _ -> eval_expr (UnOp (UNot, e))
+          | _ -> eval_expr (Expr.Infix.not e)
         in
         L.verbose (fun fmt ->
             fmt "Evaluated expressions: %a, %a" Val.pp vt Val.pp vf);

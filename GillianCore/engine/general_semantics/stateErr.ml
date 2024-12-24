@@ -5,9 +5,9 @@ type ('mem_err, 'value) t =
   | EMem of 'mem_err  (** Memory error, depends on instantiation *)
   | EType of 'value * Type.t option * Type.t
       (** Incorrect type, depends on value *)
-  | EPure of Formula.t (* Missing formula that should be true *)
+  | EPure of Expr.t (* Missing formula that should be true *)
   | EVar of Var.t (* Undefined variable *)
-  | EAsrt of ('value list * Formula.t * Asrt.t list)
+  | EAsrt of ('value list * Expr.t * Asrt.t list)
   | EOther of string
     (* We want all errors to be proper errors - this is a temporary placeholder *)
 [@@deriving yojson, show]
@@ -36,13 +36,13 @@ let pp_err
       Fmt.pf fmt "EType(%a, %a, %s)" pp_v v
         (Fmt.option ~none:(Fmt.any "None") (Fmt.of_to_string Type.str))
         t1 (Type.str t2)
-  | EPure f -> Fmt.pf fmt "EPure(%a)" Formula.pp f
+  | EPure f -> Fmt.pf fmt "EPure(%a)" Expr.pp f
   | EVar x -> Fmt.pf fmt "EVar(%s)" x
   | EAsrt (vs, f, asrtss) ->
       let pp_asrts fmt asrts = Fmt.pf fmt "[%a]" Asrt.pp asrts in
       Fmt.pf fmt "EAsrt(%a; %a; %a)"
         (Fmt.list ~sep:(Fmt.any ", ") pp_v)
-        vs Formula.pp f
+        vs Expr.pp f
         (Fmt.list ~sep:(Fmt.any ", ") pp_asrts)
         asrtss
   | EOther msg -> Fmt.pf fmt "%s" msg
@@ -50,16 +50,15 @@ let pp_err
 let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) t) : bool =
   match err with
   | EMem mem_err -> can_fix_mem mem_err
-  | EPure pf -> Reduction.reduce_formula pf <> False
+  | EPure pf -> Reduction.reduce_formula pf <> Expr.false_
   | EAsrt (_, pf, _) ->
-      let result = Reduction.reduce_formula pf <> True in
-      Logging.verbose (fun fmt -> fmt "Can fix: %a: %b" Formula.pp pf result);
+      let result = Reduction.reduce_formula pf <> Expr.true_ in
+      Logging.verbose (fun fmt -> fmt "Can fix: %a: %b" Expr.pp pf result);
       result
   | _ -> false
 
-let get_failing_constraint (err : ('a, 'b) t) (mem_fc : 'a -> Formula.t) :
-    Formula.t =
+let get_failing_constraint (err : ('a, 'b) t) (mem_fc : 'a -> Expr.t) : Expr.t =
   match err with
   | EMem m_err -> mem_fc m_err
-  | EPure f -> Not f
-  | _ -> True
+  | EPure f -> Expr.Infix.not f
+  | _ -> Expr.true_
