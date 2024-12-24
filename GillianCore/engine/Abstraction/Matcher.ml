@@ -307,9 +307,9 @@ module Make (State : SState.S) :
       preds_list;
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
-  type cons_pure_result = Success of state_t | Abort of Formula.t | Vanish
+  type cons_pure_result = Success of state_t | Abort of Expr.t | Vanish
 
-  let cons_pure (state : state_t) (f : Formula.t) : cons_pure_result =
+  let cons_pure (state : state_t) (f : Expr.t) : cons_pure_result =
     if !Config.under_approximation then
       match State.assume_a ~matching:true state [ f ] with
       | Some state -> Success state
@@ -603,12 +603,12 @@ module Make (State : SState.S) :
                 List.fold_left2
                   (fun facts param le ->
                     let subst =
-                      Formula.subst_expr_for_expr ~to_subst:param ~subst_with:le
+                      Expr.subst_expr_for_expr ~to_subst:param ~subst_with:le
                     in
                     List.map subst facts)
                   facts params les
               in
-              let facts = Asrt.Pure (Formula.conjunct facts) in
+              let facts = Asrt.Pure (Expr.conjunct facts) in
               produce_assertion
                 { state; preds; wands; pred_defs; variants }
                 subst facts
@@ -628,7 +628,7 @@ module Make (State : SState.S) :
         let rargs = List.map (subst_in_expr subst) rargs in
         Wands.extend wands Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
         Res_list.return astate
-    | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) -> (
+    | Pure (BinOp (PVar x, Equal, le)) | Pure (BinOp (le, Equal, PVar x)) -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         match SVal.SESubst.get subst (PVar x) with
         | Some v_x ->
@@ -639,7 +639,7 @@ module Make (State : SState.S) :
                   [ Ok { state; preds; wands; pred_defs; variants } ])
                 (State.assume_a ~matching:true
                    ~production:!Config.delay_entailment state
-                   [ Eq (v_x, v_le) ])
+                   [ BinOp (v_x, Equal, v_le) ])
             in
             Option.value
               ~default:
@@ -657,7 +657,7 @@ module Make (State : SState.S) :
             Res_list.return (update_store astate x v))
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
-        let f' = SVal.SESubst.substitute_formula subst ~partial:false f in
+        let f' = SVal.SESubst.subst_in_expr subst ~partial:false f in
         (* let pp_state =
              match !Config.pbn with
              | false -> State.pp
@@ -676,7 +676,7 @@ module Make (State : SState.S) :
         | None ->
             let msg =
               Fmt.str "Produce Simple Assertion: Cannot assume pure formula %a."
-                Formula.pp f'
+                Expr.pp f'
             in
             other_state_err msg
         | Some state' ->
@@ -699,7 +699,7 @@ module Make (State : SState.S) :
           with e ->
             let admissible =
               State.assume_a ~time:"Produce: final check" ~matching:true
-                intermediate_state.state [ True ]
+                intermediate_state.state [ Expr.true_ ]
             in
             if !Config.delay_entailment && Option.is_none admissible then (
               L.verbose (fun fmt ->
@@ -716,7 +716,7 @@ module Make (State : SState.S) :
       L.verbose (fun fmt -> fmt "Produce: final check");
       try
         State.assume_a ~time:"Produce: final check" ~matching:true state
-          [ True ]
+          [ Expr.true_ ]
       with _ -> None
     in
     L.verbose (fun fmt -> fmt "Concluded final check");
@@ -789,7 +789,7 @@ module Make (State : SState.S) :
         m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n" SVal.SESubst.pp
           subst)
 
-  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], True, []))
+  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], Expr.true_, []))
 
   (* WARNING: At the moment, unfold behaves over-approximately, it will return only success of only error.
      We only use unfold and fold in OX mode right now, and we don't quite know the meaning of UX fold/unfold. *)
@@ -991,14 +991,14 @@ module Make (State : SState.S) :
         | Success new_state -> Res_list.return { astate with state = new_state }
         | Abort fail_pf ->
             let error =
-              StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
+              StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
             in
             Res_list.error_with error
         | Vanish -> Res_list.vanish)
     | None ->
         L.verbose (fun m ->
             m "Could not find any match for the required wand!!!");
-        Res_list.error_with (StateErr.EPure False)
+        Res_list.error_with (StateErr.EPure Expr.false_)
 
   (** Consumes a predicate from the state.
       If the predicate is not "verbatim" in our set of preds,
@@ -1050,7 +1050,7 @@ module Make (State : SState.S) :
                   ({ state = new_state; wands; preds; pred_defs; variants }, vs)
             | Abort fail_pf ->
                 let error =
-                  StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
+                  StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
                 in
                 Res_list.error_with error
             | Vanish -> Res_list.vanish))
@@ -1080,7 +1080,7 @@ module Make (State : SState.S) :
     | _ ->
         let values = List.filter_map Fun.id vs in
         (* The `False` as second parameter is required for the fixing mechanism to trigger *)
-        Res_list.error_with (StateErr.EAsrt (values, False, []))
+        Res_list.error_with (StateErr.EAsrt (values, Expr.false_, []))
 
   and match_ins_outs_lists
       (state : State.t)
@@ -1118,7 +1118,7 @@ module Make (State : SState.S) :
       with _ -> None
     in
     match outs with
-    | None -> Abort True
+    | None -> Abort Expr.true_
     | Some outs -> (
         L.verbose (fun fmt ->
             fmt "Substed outs: %a"
@@ -1147,7 +1147,7 @@ module Make (State : SState.S) :
               match ac with
               | Abort _ | Vanish -> ac
               | Success state ->
-                  let pf : Formula.t = Eq (vd, od) in
+                  let pf = Expr.BinOp (vd, Equal, od) in
                   cons_pure state pf)
             (Success state) vos eos
         with Invalid_argument _ ->
@@ -1247,7 +1247,8 @@ module Make (State : SState.S) :
                       { state = state'''; preds; wands; pred_defs; variants }
                 | Abort fail_pf ->
                     let error =
-                      StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
+                      StateErr.EAsrt
+                        ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
                     in
                     Res_list.error_with error
                 | Vanish -> Res_list.vanish)
@@ -1300,7 +1301,7 @@ module Make (State : SState.S) :
               let fold_outs_info = (subst, step, les_outs) in
               consume_wand ~fold_outs_info astate subst { lhs; rhs }
           (* Conjunction should not be here *)
-          | Pure (Formula.And _) ->
+          | Pure (BinOp (_, And, _)) ->
               raise (Failure "Match assertion: And: should have been reduced")
           (* Other pure assertions *)
           | Pure f -> (
@@ -1321,7 +1322,7 @@ module Make (State : SState.S) :
                         Ok discharges
                     | Some out' when Expr.equal out out' -> Ok discharges
                     | Some out' ->
-                        let new_discharge = Formula.Eq (out, out') in
+                        let new_discharge = Expr.BinOp (out, Equal, out') in
                         Ok (new_discharge :: discharges))
                   (Ok []) outs
               in
@@ -1331,23 +1332,23 @@ module Make (State : SState.S) :
                     Fmt.failwith
                       "INTERNAL ERROR: Matching failure: do not know all ins \
                        for %a"
-                      Formula.pp f
+                      Expr.pp f
                 | Ok discharges -> discharges
               in
               (* To match a pure formula we must know all ins *)
-              let opf = SVal.SESubst.substitute_in_formula_opt subst f in
+              let opf = SVal.SESubst.subst_in_expr_opt subst f in
               match opf with
               | None ->
                   Fmt.failwith "Matching failure: do not know all ins for %a"
-                    Formula.pp f
+                    Expr.pp f
               | Some pf -> (
                   let discharges_pf =
-                    List.fold_left Formula.Infix.( #&& ) True discharges
+                    List.fold_left Expr.Infix.( && ) Expr.true_ discharges
                   in
                   let discharges_pf =
                     Reduction.reduce_formula ~matching:true discharges_pf
                   in
-                  let to_asrt = Formula.Infix.( #&& ) pf discharges_pf in
+                  let to_asrt = Expr.Infix.( && ) pf discharges_pf in
                   match cons_pure state to_asrt with
                   | Success new_state ->
                       Res_list.return
@@ -1356,13 +1357,13 @@ module Make (State : SState.S) :
                   | Abort _ ->
                       let vs = State.unfolding_vals state [ pf ] in
                       let error =
-                        StateErr.EAsrt (vs, Not pf, [ [ Pure pf ] ])
+                        StateErr.EAsrt (vs, Expr.UnOp (Not, pf), [ [ Pure pf ] ])
                       in
                       Res_list.error_with error))
           | Types les -> (
               let corrections =
                 List.fold_left
-                  (fun (ac : Formula.t list) (le, t) ->
+                  (fun (ac : Expr.t list) (le, t) ->
                     let v_le = (subst_in_expr_opt astate subst) le in
                     let v_le : Expr.t =
                       match v_le with
@@ -1371,8 +1372,9 @@ module Make (State : SState.S) :
                     in
                     match State.get_type state v_le with
                     | Some t' ->
-                        if not (Type.equal t t') then False :: ac else ac
-                    | None -> Eq (UnOp (TypeOf, v_le), Lit (Type t)) :: ac)
+                        if not (Type.equal t t') then Expr.false_ :: ac else ac
+                    | None ->
+                        BinOp (UnOp (TypeOf, v_le), Equal, Lit (Type t)) :: ac)
                   [] les
               in
 
@@ -1391,9 +1393,10 @@ module Make (State : SState.S) :
                     let les =
                       List.filter_map (subst_in_expr_opt astate subst) les
                     in
-                    let conjunct = Formula.conjunct corrections in
+                    let conjunct = Expr.conjunct corrections in
                     let error =
-                      StateErr.EAsrt (les, Not conjunct, [ [ Pure conjunct ] ])
+                      StateErr.EAsrt
+                        (les, UnOp (Not, conjunct), [ [ Pure conjunct ] ])
                     in
                     Res_list.error_with error)
           (* LTrue, LFalse, LEmp, LStar *)
@@ -1429,7 +1432,8 @@ module Make (State : SState.S) :
           | Pure pf ->
               let { state = bstate; _ } = state in
               let vs = State.unfolding_vals bstate [ pf ] in
-              Res_list.error_with (StateErr.EAsrt (vs, Not pf, [ [ Pure pf ] ]))
+              Res_list.error_with
+                (StateErr.EAsrt (vs, UnOp (Not, pf), [ [ Pure pf ] ]))
           | asrt ->
               let other_error =
                 StateErr.EOther
@@ -1975,9 +1979,9 @@ module Make (State : SState.S) :
           let learning_equalities =
             List.map2
               (fun old_out new_out ->
-                let open Formula.Infix in
                 Asrt.Pure
-                  (Expr.PVar old_out) #== (subst_in_expr pvar_subst new_out))
+                  (Expr.Infix.( == ) (Expr.PVar old_out)
+                     (subst_in_expr pvar_subst new_out)))
               out_params new_outs_learn
           in
           let atoms = List.rev_append new_cps learning_equalities in
@@ -2030,7 +2034,7 @@ module Make (State : SState.S) :
         (fun acc vd od ->
           let open Syntaxes.Result in
           let* acc = acc in
-          let equality = Formula.Eq (vd, od) in
+          let equality = Expr.BinOp (vd, Equal, od) in
           if
             State.assert_a state.lhs_state.state [ equality ]
             || State.assert_a state.current_state.state [ equality ]
@@ -2039,7 +2043,7 @@ module Make (State : SState.S) :
             Error
               [
                 StateErr.EAsrt
-                  ([], Formula.Infix.fnot equality, [ [ Pure equality ] ]);
+                  ([], Expr.Infix.not equality, [ [ Pure equality ] ]);
               ])
         (Ok state) obtained expected
 
