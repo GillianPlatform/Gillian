@@ -4,10 +4,10 @@ module type S = sig
   type init_data
 
   (** Type of GIL values *)
-  type vt = SVal.M.t
+  type vt := SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SESubst.t
+  type st := SVal.SESubst.t
 
   type err_t [@@deriving yojson, show]
 
@@ -84,8 +84,6 @@ end
 
 module Dummy : S with type init_data = unit = struct
   type init_data = unit
-  type vt = SVal.M.t
-  type st = SVal.SESubst.t
   type err_t = unit [@@deriving yojson, show]
   type t = unit [@@deriving yojson]
 

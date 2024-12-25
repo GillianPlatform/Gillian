@@ -336,6 +336,7 @@ module Expr : sig
     (** Booleans *)
 
     val not : t -> t
+    val forall : (string * Type.t option) list -> t -> t
     val ( == ) : t -> t -> t
     val ( && ) : t -> t -> t
     val ( || ) : t -> t -> t
