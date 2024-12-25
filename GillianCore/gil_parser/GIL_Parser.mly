@@ -278,7 +278,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %type <UnOp.t>       unop_target
 %type <BinOp.t>      binop_target
 %type <NOp.t>        nop_target
-%type <Expr.t>    pure_assertion_target
 
 %type <(Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
 %type <Expr.t> top_level_expr_target
@@ -720,9 +719,9 @@ g_assertion_target:
 (* (P) *)
   | LBRACE; g_assertion_target; RBRACE
     { $2 }
-(* pure *)
-  | pure_assertion_target
-    { [ Asrt.Pure $1 ] }
+(* (pure) *)
+  | LBRACE; expr_target; RBRACE
+    { [ Asrt.Pure $2 ] }
 ;
 
 g_macro_target:
@@ -801,11 +800,11 @@ g_logic_cmd_target:
     { let (name, params) = macro in LCmd.Macro (name, params) }
 
 (* assert (a) *)
-  | ASSERT; LBRACE; a = pure_assertion_target; RBRACE
+  | ASSERT; LBRACE; a = expr_target; RBRACE
     { LCmd.Assert a }
 
 (* assume (a) *)
-  | ASSUME; LBRACE; a = pure_assertion_target; RBRACE
+  | ASSUME; LBRACE; a = expr_target; RBRACE
     { LCmd.Assume a }
 
 (* assume_type (x, t) *)
@@ -818,7 +817,7 @@ g_logic_cmd_target:
     { LCmd.FreshSVar (v) }
 
 (* branch (fo) *)
-  | BRANCH; LBRACE; fo = pure_assertion_target; RBRACE
+  | BRANCH; LBRACE; fo = expr_target; RBRACE
      { LCmd.Branch fo }
 ;
 
@@ -827,7 +826,7 @@ g_pred_def_target:
   { defs }
 
 g_pred_facts_target:
-  FACTS; COLON; facts = separated_nonempty_list(AND, pure_assertion_target); SCOLON
+  FACTS; COLON; facts = separated_nonempty_list(AND, expr_target); SCOLON
   { facts }
 
 g_pred_cost_target:
@@ -1008,61 +1007,6 @@ existentials_target:
     { xs }
 ;
 
-pure_assertion_target:
-(* P /\ Q *)
-  | left_ass=expr_target; LAND; right_ass=expr_target
-    { Expr.BinOp (left_ass, Equal, right_ass) }
-(* A ==> B *)
-  | left_ass = expr_target; LIMPLIES; right_ass=expr_target
-    { Expr.BinOp (left_ass, Impl, right_ass) }
-(* P \/ Q *)
-  | left_ass=expr_target; LOR; right_ass=expr_target
-    { Expr.BinOp (left_ass, Or, right_ass) }
-(* ! Q *)
-  | LNOT; ass=expr_target
-    { Expr.UnOp (Not, ass) }
-(* true *)
-  | LTRUE
-    { Expr.Lit (Bool true) }
-(* false *)
-  | LFALSE
-    { Expr.Lit (Bool false) }
-(* E == E *)
-  | left_expr=expr_target; LEQUAL; right_expr=expr_target
-    { Expr.BinOp (left_expr, Equal, right_expr) }
-(* E i<# E *)
-  | left_expr=expr_target; ILLESSTHAN; right_expr=expr_target
-    { Expr.BinOp (left_expr, ILessThan, right_expr) }
-(* E <# E *)
-  | left_expr=expr_target; FLLESSTHAN; right_expr=expr_target
-    { Expr.BinOp (left_expr, FLessThan, right_expr) }
-(* E i<=# E *)
-  | left_expr=expr_target; ILLESSTHANEQUAL; right_expr=expr_target
-    { Expr.BinOp (left_expr, ILessThanEqual, right_expr) }
-(* E <=# E *)
-  | left_expr=expr_target; FLLESSTHANEQUAL; right_expr=expr_target
-    { Expr.BinOp (left_expr, FLessThanEqual, right_expr) }
-(* E s<# E *)
-  | left_expr=expr_target; LSLESSTHAN; right_expr=expr_target
-    { Expr.BinOp (left_expr, StrLess, right_expr) }
-(* E --e-- E *)
-  | left_expr=expr_target; LSETMEM; right_expr=expr_target
-    { Expr.BinOp (left_expr, SetMem, right_expr) }
-(* E --s-- E *)
-  | left_expr=expr_target; LSETSUB; right_expr=expr_target
-    { Expr.BinOp (left_expr, SetSub, right_expr) }
-(* forall X, Y, Z . P *)
-  | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = expr_target
-    { Expr.ForAll (vars, ass) }
-(* is-int E *)
-  | ISINT; expr=expr_target
-    { Expr.UnOp (IsInt, expr) }
-(* (P) *)
-  | LBRACE; f=pure_assertion_target; RBRACE
-    { f }
-;
-
-
 
 lvar_type_target:
   | lvar = just_logic_variable_target; COLON; the_type = type_target
@@ -1101,7 +1045,9 @@ lit_target:
   | NULL                      { Literal.Null }
   | EMPTY                     { Literal.Empty }
   | constant_target           { Literal.Constant $1 }
+  | LTRUE
   | TRUE                      { Literal.Bool true }
+  | LFALSE
   | FALSE                     { Literal.Bool false }
   | FLOAT                     { Literal.Num $1 }
   | n = INTEGER               { Literal.Int n }
@@ -1122,23 +1068,31 @@ nop_target:
 ;
 
 binop_target:
+  | LEQUAL
   | EQ                  { BinOp.Equal }
+  | ILLESSTHAN
   | ILT                 { BinOp.ILessThan }
+  | ILLESSTHANEQUAL
   | ILE                 { BinOp.ILessThanEqual }
   | IPLUS               { BinOp.IPlus }
   | IMINUS              { BinOp.IMinus }
   | ITIMES              { BinOp.ITimes }
   | IDIV                { BinOp.IDiv }
   | IMOD                { BinOp.IMod }
+  | FLLESSTHAN
   | FLT                 { BinOp.FLessThan }
+  | FLLESSTHANEQUAL
   | FLE                 { BinOp.FLessThanEqual }
   | FPLUS               { BinOp.FPlus }
   | FMINUS              { BinOp.FMinus }
   | FTIMES              { BinOp.FTimes }
   | FDIV                { BinOp.FDiv }
   | FMOD                { BinOp.FMod }
+  | LSLESSTHAN
   | SLT                 { BinOp.StrLess }
+  | LAND
   | AND                 { BinOp.And }
+  | LOR
   | OR                  { BinOp.Or }
   | LIMPLIES            { BinOp.Impl }
   | BITWISEAND          { BinOp.BitwiseAnd }
@@ -1157,12 +1111,15 @@ binop_target:
   | M_POW               { BinOp.M_pow }
   | STRCAT              { BinOp.StrCat }
   | SETDIFF             { BinOp.SetDiff }
+  | LSETMEM
   | SETMEM              { BinOp.SetMem }
+  | LSETSUB
   | SETSUB              { BinOp.SetSub }
 ;
 
 unop_target:
   (* Unary minus defined in (l)expr_target *)
+  | LNOT
   | NOT         { UnOp.Not }
   | BITWISENOT  { UnOp.BitwiseNot }
   | M_ISNAN     { UnOp.M_isNaN }
@@ -1193,8 +1150,9 @@ unop_target:
   | LSTREV      { UnOp.LstRev }
   | STRLEN      { UnOp.StrLen }
   | SETTOLIST   { UnOp.SetToList }
-  | INTTONUM { UnOp.IntToNum }
-  | NUMTOINT { UnOp.NumToInt }
+  | INTTONUM    { UnOp.IntToNum }
+  | NUMTOINT    { UnOp.NumToInt }
+  | ISINT       { UnOp.IsInt }
 ;
 
 constant_target:
