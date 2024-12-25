@@ -904,8 +904,8 @@ let simplify_pfs_and_gamma
       done;
 
       L.verbose (fun m -> m "PFS/Gamma simplification completed:\n");
-      L.(verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs));
-      L.(verbose (fun m -> m "Gamma:@\n%a@\n" Type_env.pp gamma));
+      L.verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs);
+      L.verbose (fun m -> m "Gamma:@\n%a@\n" Type_env.pp gamma);
 
       let cached_simplification =
         {

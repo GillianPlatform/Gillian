@@ -974,7 +974,12 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
 let exec_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   try exec_sat' fs gamma
   with UnexpectedSolverResponse _ as e ->
-    let msg = Fmt.str "SMT failure!\n%s\n" (Printexc.to_string e ^ "\n") in
+    let msg =
+      Fmt.str "SMT failure!@\n%s@\nExpressions: @\n%a"
+        (Printexc.to_string e ^ "\n")
+        Fmt.(list ~sep:(Fmt.any "@\n") Expr.pp)
+        (Expr.Set.elements fs)
+    in
     let () = L.print_to_all msg in
     exit 1
 
