@@ -159,18 +159,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Logic assertions *)
 %token OASSERT
 %token CASSERT
-%token LAND
-%token LOR
 %token LIMPLIES
 %token LNOT
-%token LTRUE
-%token LFALSE
-%token LEQUAL
-%token ILLESSTHAN
-%token ILLESSTHANEQUAL
-%token FLLESSTHAN
-%token FLLESSTHANEQUAL
-%token LSLESSTHAN
 %token ISINT
 %token LEMP
 (*%token LEXISTS *)
@@ -235,8 +225,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SETDIFF
 %token SETMEM
 %token SETSUB
-%token LSETMEM
-%token LSETSUB
 %token SETOPEN
 %token SETCLOSE
 (* EOF *)
@@ -245,19 +233,13 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (***** Precedence of operators *****)
 (* The later an operator is listed, the higher precedence it is given. *)
 (* Logic operators have lower precedence *)
-%nonassoc DOT
-%left LIMPLIES
-%left LOR
-%left LAND
-%left separating_conjunction
-%left magic_wand
-%right LNOT
-%right ISINT
-%nonassoc LEQUAL ILLESSTHAN ILLESSTHANEQUAL FLLESSTHAN FLLESSTHANEQUAL LSLESSTHAN
-%nonassoc SETMEM SETSUB LSETMEM LSETSUB
 (* Program operators have higher precedence.*)
 (* Based on JavaScript:
    https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Operators/Operator_Precedence *)
+%nonassoc DOT
+%left separating_conjunction
+%left magic_wand
+%left LIMPLIES
 %left OR
 %left AND
 %nonassoc EQ
@@ -267,6 +249,9 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left FPLUS FMINUS IPLUS IMINUS
 %left FTIMES FDIV FMOD ITIMES IDIV IMOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
+%nonassoc SETMEM SETSUB
+%right LNOT
+%right ISINT
 
 %nonassoc binop_prec
 %nonassoc unop_prec
@@ -1045,9 +1030,7 @@ lit_target:
   | NULL                      { Literal.Null }
   | EMPTY                     { Literal.Empty }
   | constant_target           { Literal.Constant $1 }
-  | LTRUE
   | TRUE                      { Literal.Bool true }
-  | LFALSE
   | FALSE                     { Literal.Bool false }
   | FLOAT                     { Literal.Num $1 }
   | n = INTEGER               { Literal.Int n }
@@ -1068,31 +1051,23 @@ nop_target:
 ;
 
 binop_target:
-  | LEQUAL
   | EQ                  { BinOp.Equal }
-  | ILLESSTHAN
   | ILT                 { BinOp.ILessThan }
-  | ILLESSTHANEQUAL
   | ILE                 { BinOp.ILessThanEqual }
   | IPLUS               { BinOp.IPlus }
   | IMINUS              { BinOp.IMinus }
   | ITIMES              { BinOp.ITimes }
   | IDIV                { BinOp.IDiv }
   | IMOD                { BinOp.IMod }
-  | FLLESSTHAN
   | FLT                 { BinOp.FLessThan }
-  | FLLESSTHANEQUAL
   | FLE                 { BinOp.FLessThanEqual }
   | FPLUS               { BinOp.FPlus }
   | FMINUS              { BinOp.FMinus }
   | FTIMES              { BinOp.FTimes }
   | FDIV                { BinOp.FDiv }
   | FMOD                { BinOp.FMod }
-  | LSLESSTHAN
   | SLT                 { BinOp.StrLess }
-  | LAND
   | AND                 { BinOp.And }
-  | LOR
   | OR                  { BinOp.Or }
   | LIMPLIES            { BinOp.Impl }
   | BITWISEAND          { BinOp.BitwiseAnd }
@@ -1111,9 +1086,7 @@ binop_target:
   | M_POW               { BinOp.M_pow }
   | STRCAT              { BinOp.StrCat }
   | SETDIFF             { BinOp.SetDiff }
-  | LSETMEM
   | SETMEM              { BinOp.SetMem }
-  | LSETSUB
   | SETSUB              { BinOp.SetSub }
 ;
 

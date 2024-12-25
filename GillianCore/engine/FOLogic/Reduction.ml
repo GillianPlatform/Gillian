@@ -2867,20 +2867,20 @@ let rec reduce_formula_loop
       | BinOp (Lit (Int z), ILessThanEqual, UnOp (LstLen, _))
         when Z.equal z Z.zero -> Expr.true_
       | BinOp (e1, (FLessThan as op), e2) | BinOp (e1, (ILessThan as op), e2) ->
-          let rev : BinOp.t =
+          let op_e : BinOp.t =
             if op = FLessThan then FLessThanEqual else ILessThanEqual
           in
-          if PFS.mem pfs (BinOp (e2, rev, e1)) then Expr.false_
+          if PFS.mem pfs (BinOp (e2, op_e, e1)) then Expr.false_
           else if PFS.mem pfs (BinOp (e2, op, e1)) then Expr.false_
           else fe (Expr.BinOp (e1, op, e2))
       | BinOp (e1, (FLessThanEqual as op), e2)
       | BinOp (e1, (ILessThanEqual as op), e2) ->
-          let rev : BinOp.t =
+          let op_ne : BinOp.t =
             if op = FLessThanEqual then FLessThan else ILessThan
           in
-          if PFS.mem pfs (BinOp (e2, rev, e1)) then BinOp (e1, Equal, e2)
-          else if PFS.mem pfs (BinOp (e1, op, e2)) then Expr.true_
-          else if PFS.mem pfs (BinOp (e2, op, e1)) then Expr.false_
+          if PFS.mem pfs (BinOp (e2, op, e1)) then BinOp (e1, Equal, e2)
+          else if PFS.mem pfs (BinOp (e1, op_ne, e2)) then Expr.true_
+          else if PFS.mem pfs (BinOp (e2, op_ne, e1)) then Expr.false_
           else fe (Expr.BinOp (e1, op, e2))
       | BinOp (leb, SetMem, NOp ((SetUnion as op), lle))
       | BinOp (leb, SetMem, NOp ((SetInter as op), lle)) -> (
