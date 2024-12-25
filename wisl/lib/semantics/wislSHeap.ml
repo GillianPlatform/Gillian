@@ -146,8 +146,8 @@ let get_cell ~pfs ~gamma heap loc ofs =
         | None -> false
         | Some n ->
             let n = Expr.int n in
-            let open Formula.Infix in
-            Solver.sat ~matching:false ~pfs ~gamma n #<= ofs
+            let open Expr.Infix in
+            Solver.sat ~matching:false ~pfs ~gamma (n <= ofs)
       in
       if maybe_out_of_bound then Error (OutOfBounds (bound, loc, ofs))
       else
@@ -176,8 +176,8 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
         | None -> false
         | Some n ->
             let n = Expr.int n in
-            let open Formula.Infix in
-            Solver.sat ~matching:false ~pfs ~gamma n #<= ofs
+            let open Expr.Infix in
+            Solver.sat ~matching:false ~pfs ~gamma (n <= ofs)
       in
       if maybe_out_of_bound then Error (UseAfterFree loc_name)
       else
@@ -265,7 +265,7 @@ let merge_loc (heap : t) new_loc old_loc : unit =
           Hashtbl.remove heap old_loc)
 
 let substitution_in_place subst heap :
-    (t * Formula.Set.t * (string * Type.t) list) list =
+    (t * Expr.Set.t * (string * Type.t) list) list =
   (* First we replace in the offset and values using fvl *)
   let () =
     Hashtbl.iter
@@ -297,7 +297,7 @@ let substitution_in_place subst heap :
                     ((WPrettyUtils.to_str Expr.pp) new_loc)))
       in
       merge_loc heap new_loc_str aloc);
-  [ (heap, Formula.Set.empty, []) ]
+  [ (heap, Expr.Set.empty, []) ]
 
 let assertions heap =
   Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []

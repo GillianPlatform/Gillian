@@ -40,8 +40,8 @@ let compile_binop b =
     | TIMES -> BinOp.ITimes
     | DIV -> BinOp.IDiv
     | MOD -> BinOp.IMod
-    | AND -> BinOp.BAnd
-    | OR -> BinOp.BOr
+    | AND -> BinOp.And
+    | OR -> BinOp.Or
     | LSTNTH -> BinOp.LstNth
     (* operators that do not exist in gil are compiled separately *)
     | _ ->
@@ -51,7 +51,7 @@ let compile_binop b =
 let compile_unop u =
   WUnOp.(
     match u with
-    | NOT -> UnOp.UNot
+    | NOT -> UnOp.Not
     | LEN -> UnOp.LstLen
     | HEAD -> UnOp.Car
     | TAIL -> UnOp.Cdr
@@ -183,7 +183,7 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
         let expr =
-          Expr.UnOp (UnOp.UNot, Expr.BinOp (comp_expr1, BinOp.Equal, comp_expr2))
+          Expr.UnOp (UnOp.Not, Expr.BinOp (comp_expr1, BinOp.Equal, comp_expr2))
         in
         (gvars1 @ gvars2, asrtl1 @ asrtl2, expr)
     | LBinOp (e1, b, e2) when is_internal_pred b ->
@@ -237,57 +237,53 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
 
 (* TODO: compile_lformula should return also the list of created existentials *)
-let rec compile_lformula ?(fname = "main") formula : Asrt.t * Formula.t =
+let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =
   let gen_str = Generators.gen_str fname in
   let compile_lformula = compile_lformula ~fname in
   let compile_lexpr = compile_lexpr ~fname in
   WLFormula.(
     match get formula with
-    | LTrue -> ([], Formula.True)
-    | LFalse -> ([], Formula.False)
+    | LTrue -> ([], Expr.true_)
+    | LFalse -> ([], Expr.false_)
     | LNot lf ->
         let a1, c1 = compile_lformula lf in
-        (a1, Formula.Not c1)
+        (a1, UnOp (Not, c1))
     | LAnd (lf1, lf2) ->
         let a1, c1 = compile_lformula lf1 in
         let a2, c2 = compile_lformula lf2 in
-        (a1 @ a2, Formula.And (c1, c2))
+        (a1 @ a2, BinOp (c1, And, c2))
     | LOr (lf1, lf2) ->
         let a1, c1 = compile_lformula lf1 in
         let a2, c2 = compile_lformula lf2 in
-        (a1 @ a2, Formula.Or (c1, c2))
+        (a1 @ a2, BinOp (c1, Or, c2))
     | LEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
-        (a1 @ a2, Formula.Eq (c1, c2))
+        (a1 @ a2, BinOp (c1, Equal, c2))
     | LLess (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
-        ( a1 @ a2 @ [ pred ],
-          Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
     | LGreater (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
-        ( a1 @ a2 @ [ pred ],
-          Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
     | LLessEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_leq, [ c1; c2; expr_l_var_out ]) in
-        ( a1 @ a2 @ [ pred ],
-          Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
     | LGreaterEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_geq, [ c1; c2; expr_l_var_out ]) in
-        ( a1 @ a2 @ [ pred ],
-          Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) ))
+        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_)))
 
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
@@ -340,7 +336,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
               | Lit (Int _) -> []
               | _ -> [ (expr_offset, Type.IntType) ])
             :: Asrt.Pure
-                 (Formula.Eq (e1, Expr.EList [ Expr.LVar loc; expr_offset ]))
+                 (BinOp (e1, Equal, Expr.EList [ Expr.LVar loc; expr_offset ]))
             :: la1,
             (loc, offset),
             expr_offset )
@@ -891,10 +887,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle, comp_e = compile_expr e in
-      let cmd =
-        let formula = Formula.Eq (comp_e, Expr.bool true) in
-        Cmd.Logic (LCmd.Assert formula)
-      in
+      let cmd = Cmd.Logic (Assert (BinOp (comp_e, Equal, Expr.true_))) in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   | { snode = Assume e; sid; sloc } :: rest ->
@@ -902,10 +895,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle, comp_e = compile_expr e in
-      let cmd =
-        let formula = Formula.Eq (comp_e, Expr.bool true) in
-        Cmd.Logic (LCmd.Assume formula)
-      in
+      let cmd = Cmd.Logic (Assume (BinOp (comp_e, Equal, Expr.true_))) in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   | { snode = AssumeType (e, t); sid; sloc } :: rest ->
@@ -914,7 +904,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle, comp_e = compile_expr e in
-      let cmd = Cmd.Logic (LCmd.AssumeType (comp_e, typ)) in
+      let cmd = Cmd.Logic (AssumeType (comp_e, typ)) in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
 
@@ -1165,7 +1155,7 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
       (fun name proc ->
         let pre =
           List.map
-            (fun var -> Asrt.Pure (Eq (Expr.PVar var, Expr.LVar ("#" ^ var))))
+            (fun var -> Asrt.Pure (BinOp (PVar var, Equal, LVar ("#" ^ var))))
             proc.Proc.proc_params
         in
 
