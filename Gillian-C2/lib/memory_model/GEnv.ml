@@ -16,10 +16,10 @@ module Make (Def_value : sig
 end) (Delayed_hack : sig
   type 'a t
 
-  val ( #== ) : Def_value.t -> Def_value.t -> Gil_syntax.Formula.t list
+  val ( #== ) : Def_value.t -> Def_value.t -> Gil_syntax.Expr.t list
 
   val return :
-    ?learned:Gil_syntax.Formula.t list ->
+    ?learned:Gil_syntax.Expr.t list ->
     ?learned_types:(string * Gil_syntax.Type.t) list ->
     'a ->
     'a t
@@ -280,8 +280,8 @@ module Symbolic =
       let ( let+ ) = map
 
       let ( #== ) a b =
-        let open Gil_syntax.Formula.Infix in
-        [ a #== b ]
+        let open Gil_syntax.Expr.Infix in
+        [ a == b ]
 
       let resolve_or_create_lt lvar_loc : string t =
         let open Syntax in

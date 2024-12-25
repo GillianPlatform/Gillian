@@ -7,8 +7,8 @@ let rec asrt_of_scalar_like ~ctx (type_ : GType.t) (expr : Expr.t) : Asrt.t =
       (* Special case, the bounds are different *)
       let assume_int = Asrt.Types [ (expr, IntType) ] in
       let condition =
-        let open Formula.Infix in
-        expr #== Expr.one_i #|| (expr #== Expr.zero_i)
+        let open Expr.Infix in
+        expr == Expr.one_i || expr == Expr.zero_i
       in
       let asrt_range = Asrt.Pure condition in
       [ assume_int; asrt_range ]
@@ -21,10 +21,8 @@ let rec asrt_of_scalar_like ~ctx (type_ : GType.t) (expr : Expr.t) : Asrt.t =
         match bounds with
         | None -> Asrt.Emp
         | Some (low, high) ->
-            let open Formula.Infix in
-            let condition =
-              (Expr.int_z low) #<= expr #&& (expr #<= (Expr.int_z high))
-            in
+            let open Expr.Infix in
+            let condition = Expr.int_z low <= expr && expr <= Expr.int_z high in
             Asrt.Pure condition
       in
       [ assume_int; assume_range ]
@@ -35,7 +33,7 @@ let rec asrt_of_scalar_like ~ctx (type_ : GType.t) (expr : Expr.t) : Asrt.t =
       let e_loc = Expr.LVar loc in
       let e_ofs = Expr.LVar ofs in
       let assume_list =
-        let f = Formula.Eq (expr, EList [ e_loc; e_ofs ]) in
+        let f = Expr.BinOp (expr, Equal, EList [ e_loc; e_ofs ]) in
         Asrt.Pure f
       in
       let types = Asrt.Types [ (e_loc, ObjectType); (e_ofs, IntType) ] in
@@ -57,7 +55,7 @@ let assumption_of_param ~ctx ~(v : Var.t) ~(ty : GType.t) =
      with [Compiled_expr.nondet_expr] *)
   if Ctx.representable_in_store ctx ty then
     let e_s = Expr.LVar (LVar.alloc ()) in
-    let f = Formula.Eq (Expr.PVar v, e_s) in
+    let f = Expr.BinOp (Expr.PVar v, Equal, e_s) in
     Asrt.Pure f :: asrt_of_scalar_like ~ctx ty e_s
   else failwith "unhandled: composit parameter"
 
