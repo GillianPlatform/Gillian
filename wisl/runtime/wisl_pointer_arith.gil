@@ -109,12 +109,12 @@ proc i__gt (el, er) {
 pred i__pred_add (+el, +er, out):
       types(el: List, er: Int) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset i+ er }}),
       types(er: List, el: Int) * (er == {{ #loc, #offset}}) * (out == {{ #loc, #offset i+ el }}),
-      types(er: Int, el: Int) * (out == er i+ el);
+      types(er: Int, el: Int) * (out == (er i+ el));
 
 (* i__pred_minus(x, y, z) is true if executing i__minus(x, y) would return z *)
 pred i__pred_minus (+el, +er, out):
       types(el: List, er: Int) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset i- er }}),
-      types(er: Int, el: Int) * (out == el i- er);
+      types(er: Int, el: Int) * (out == (el i- er));
 
 (* i__pred_lt(x, y, z) is true if executing i__lt(x, y) would return z *)
 pred i__pred_lt (+el, +er, out):
@@ -135,4 +135,3 @@ pred i__pred_leq (+el, +er, out):
 pred i__pred_geq (+el, +er, out):
       types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl i< #offsetr))),
       types(el: Int, er: Int) * (out == (not (el i< er)));
-

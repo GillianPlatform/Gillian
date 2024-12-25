@@ -50,11 +50,10 @@ type t = TypeDef__.unop =
   | IsInt  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
 [@@deriving yojson, ord, eq]
 
-let str (x : t) =
-  match x with
+let str = function
   | IUnaryMinus -> "i-"
   | FUnaryMinus -> "-"
-  | Not -> "not"
+  | Not -> "!"
   | BitwiseNot -> "~"
   | M_isNaN -> "isNaN"
   | M_abs -> "m_abs"
