@@ -254,10 +254,10 @@ module Infix = struct
     | a, b when equal a b -> Lit (Bool true)
     | _ -> BinOp (a, Equal, b)
 
-  let lt = ( < )
-  let lte = ( <= )
-  let gt = ( > )
-  let gte = ( >= )
+  let lt = Stdlib.( < )
+  let lte = Stdlib.( <= )
+  let gt = Stdlib.( > )
+  let gte = Stdlib.( >= )
 
   let ( < ) a b =
     match (a, b) with
@@ -272,12 +272,12 @@ module Infix = struct
   let ( > ) a b =
     match (a, b) with
     | Lit (Int x), Lit (Int y) -> bool (gt x y)
-    | _ -> BinOp (b, ILessThanEqual, a)
+    | _ -> BinOp (b, ILessThan, a)
 
   let ( >= ) a b =
     match (a, b) with
     | Lit (Int x), Lit (Int y) -> bool (gte x y)
-    | _ -> BinOp (b, ILessThan, a)
+    | _ -> BinOp (b, ILessThanEqual, a)
 
   let ( <. ) a b =
     match (a, b) with
@@ -292,12 +292,12 @@ module Infix = struct
   let ( >. ) a b =
     match (a, b) with
     | Lit (Num x), Lit (Num y) -> bool (gt x y)
-    | _ -> BinOp (b, FLessThanEqual, a)
+    | _ -> BinOp (b, FLessThan, a)
 
   let ( >=. ) a b =
     match (a, b) with
     | Lit (Num x), Lit (Num y) -> bool (gte x y)
-    | _ -> BinOp (b, FLessThan, a)
+    | _ -> BinOp (b, FLessThanEqual, a)
 
   let ( && ) a b =
     match (a, b) with
@@ -399,6 +399,7 @@ let rec pp fmt e =
       match op with
       | LstNth | StrNth | LstRepeat ->
           Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
+      | Equal -> Fmt.pf fmt "@[(%a %s %a)@]" pp e1 (BinOp.str op) pp e2
       | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)

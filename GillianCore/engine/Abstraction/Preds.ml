@@ -100,8 +100,9 @@ let get_alocs (preds : t) : SS.t =
 
 (** Printing function *)
 let pp_pabs fmt pa =
+  let exprpp fmt e = Fmt.pf fmt "@[%a@]" Expr.pp e in
   let pname, vs = pa in
-  Fmt.pf fmt "%s(%a)" pname (Fmt.list ~sep:(Fmt.any ", ") Expr.pp) vs
+  Fmt.pf fmt "%s(%a)" pname (Fmt.list ~sep:(Fmt.any ", ") exprpp) vs
 
 let pp fmt preds =
   let lpreds = to_list preds in

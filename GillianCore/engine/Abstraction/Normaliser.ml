@@ -179,7 +179,7 @@ module Make (SPState : PState.S) = struct
                   | NOp (_, _) | ESet _ -> Lit (Type SetType))
               | _ -> UnOp (uop, nle1)))
       | EList le_list ->
-          let n_le_list = List.map (fun le -> f le) le_list in
+          let n_le_list = List.map f le_list in
           let all_literals, lit_list =
             List.fold_left
               (fun (ac, list) le ->
@@ -190,10 +190,10 @@ module Make (SPState : PState.S) = struct
           in
           if all_literals then Lit (LList lit_list) else EList n_le_list
       | ESet le_list ->
-          let n_le_list = List.map (fun le -> f le) le_list in
+          let n_le_list = List.map f le_list in
           ESet n_le_list
       | NOp (op, le_list) ->
-          let n_le_list = List.map (fun le -> f le) le_list in
+          let n_le_list = List.map f le_list in
           NOp (op, n_le_list)
       | LstSub (le1, le2, le3) -> (
           let nle1 = f le1 in

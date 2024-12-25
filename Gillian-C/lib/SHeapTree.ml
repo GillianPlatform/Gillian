@@ -1404,7 +1404,7 @@ let _check_valid_alignment chunk ofs =
   let al_expr = Expr.int al in
   let divides x y =
     let open Expr.Infix in
-    Expr.(y == int 0) || Expr.imod y x == Expr.int 0
+    Expr.(y == zero_i || imod y x == zero_i)
   in
   if%sat divides al_expr ofs then DR.ok ()
   else DR.error (InvalidAlignment { offset = ofs; alignment = al })

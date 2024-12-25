@@ -469,15 +469,15 @@ let rec set_member (pfs : Expr.t list) m s =
   match s with
   | Expr.LVar _ -> m = s
   | Expr.ESet s -> List.mem m s
-  | Expr.NOp (SetUnion, les) -> List.exists (fun x -> f x) les
-  | Expr.NOp (SetInter, les) -> List.for_all (fun x -> f x) les
+  | Expr.NOp (SetUnion, les) -> List.exists f les
+  | Expr.NOp (SetInter, les) -> List.for_all f les
   | _ -> List.mem (Expr.BinOp (m, SetMem, s)) pfs
 
 let rec not_set_member pfs m s =
   let f = not_set_member pfs m in
   match s with
-  | Expr.NOp (SetUnion, les) -> List.for_all (fun x -> f x) les
-  | Expr.NOp (SetInter, les) -> List.exists (fun x -> f x) les
+  | Expr.NOp (SetUnion, les) -> List.for_all f les
+  | Expr.NOp (SetInter, les) -> List.exists f les
   | Expr.ESet les ->
       List.for_all (fun le -> is_different pfs m le = Some true) les
   | _ -> List.mem (Expr.UnOp (Not, BinOp (m, SetMem, s))) pfs
@@ -2907,7 +2907,7 @@ let rec reduce_formula_loop
               UnOp (Not, BinOp (rleb, SetMem, rler)) )
       | BinOp (leb, SetMem, ESet les) ->
           let rleb = fe leb in
-          let rles = List.map (fun le -> fe le) les in
+          let rles = List.map fe les in
           let result = List.map (fun le -> Expr.BinOp (rleb, Equal, le)) rles in
           Expr.disjunct result
       | UnOp (IsInt, e) -> (

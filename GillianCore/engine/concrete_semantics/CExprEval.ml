@@ -46,7 +46,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
   | Not ->
       let b = as_bool lit in
       Bool (not b)
-  | IUnaryMinus -> unary_int_thing lit (fun x -> Z.neg x)
+  | IUnaryMinus -> unary_int_thing lit Z.neg
   | FUnaryMinus -> unary_num_thing lit (fun x -> -.x)
   | BitwiseNot -> unary_num_thing lit int32_bitwise_not
   | M_abs -> unary_num_thing lit abs_float
@@ -217,14 +217,14 @@ let rec evaluate_binop
           | Num n when is_int n -> String (String.make 1 s.[int_of_float n])
           | Num -0. -> String (String.make 1 s.[0])
           | _ -> typeerr "number" lit2)
-      | ILessThan -> binary_int_bool_thing lit1 lit2 (fun x y -> x < y)
-      | FLessThan -> binary_num_bool_thing lit1 lit2 (fun x y -> x < y)
+      | ILessThan -> binary_int_bool_thing lit1 lit2 ( < )
+      | FLessThan -> binary_num_bool_thing lit1 lit2 ( < )
       | StrLess ->
           let s1 = as_str lit1 in
           let s2 = as_str lit2 in
           Bool (s1 < s2)
-      | ILessThanEqual -> binary_int_bool_thing lit1 lit2 (fun x y -> x <= y)
-      | FLessThanEqual -> binary_num_bool_thing lit1 lit2 (fun x y -> x <= y)
+      | ILessThanEqual -> binary_int_bool_thing lit1 lit2 ( <= )
+      | FLessThanEqual -> binary_num_bool_thing lit1 lit2 ( <= )
       | IPlus -> binary_int_thing lit1 lit2 Z.add
       | IMinus -> binary_int_thing lit1 lit2 Z.sub
       | ITimes -> binary_int_thing lit1 lit2 Z.mul
