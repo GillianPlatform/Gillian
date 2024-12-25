@@ -525,13 +525,13 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
   | Scall (None, _, ex, [ e ]) when is_assert_call ex ->
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
-      let form = Formula.Eq (egil, one) in
+      let form = Expr.BinOp (egil, Equal, one) in
       let assert_cmd = Cmd.Logic (Assert form) in
       (add_annots ~ctx:context (cmds @ [ assert_cmd ]), [])
   | Scall (None, _, ex, [ e ]) when is_assume_call ex ->
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
-      let form = Formula.Eq (egil, one) in
+      let form = Expr.BinOp (egil, Equal, one) in
       let assume_cmd = Cmd.Logic (Assume form) in
       (add_annots ~ctx:context (cmds @ [ assume_cmd ]), [])
   | Scall (Some id, _, ex, []) when is_nondet_int_call ex ->
@@ -600,9 +600,9 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
         | LScons (None, _, r) -> build_isdefault curr r
         | LScons (Some l, _, r) ->
             let ne =
-              Expr.UnOp (UnOp.UNot, Expr.BinOp (guard_expr, BinOp.Equal, num l))
+              Expr.UnOp (UnOp.Not, Expr.BinOp (guard_expr, BinOp.Equal, num l))
             in
-            build_isdefault (Expr.BinOp (ne, BinOp.BAnd, curr)) r
+            build_isdefault (Expr.BinOp (ne, BinOp.And, curr)) r
       in
       let rec make_switch had_default l_stmts =
         match l_stmts with
