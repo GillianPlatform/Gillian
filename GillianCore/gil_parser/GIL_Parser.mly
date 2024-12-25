@@ -701,9 +701,6 @@ g_assertion_target:
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
     { [ Asrt.Types type_pairs ] }
-(* (P) *)
-  | LBRACE; g_assertion_target; RBRACE
-    { $2 }
 (* (pure) *)
   | LBRACE; expr_target; RBRACE
     { [ Asrt.Pure $2 ] }
@@ -811,7 +808,7 @@ g_pred_def_target:
   { defs }
 
 g_pred_facts_target:
-  FACTS; COLON; facts = separated_nonempty_list(AND, expr_target); SCOLON
+  FACTS; COLON; facts = expr_target; SCOLON
   { facts }
 
 g_pred_cost_target:
@@ -845,7 +842,12 @@ g_pred_target:
         preds_with_no_paths := SS.add pred_name !preds_with_no_paths
     in
     let pred_normalised = !Config.previously_normalised in
-    let pred_facts = Option.value ~default:[] pred_facts in
+    let rec split_ands = function
+      | Expr.BinOp (e1, And, e2) -> (split_ands e1) @ (split_ands e2)
+      | e -> [e]
+    in
+    let pred_facts = Option.fold ~none:[] ~some:split_ands pred_facts in
+
     Pred.
       {
         pred_name;

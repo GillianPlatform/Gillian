@@ -62,7 +62,7 @@ let of_yojson = TypeDef__.binop_of_yojson
 
 let str (x : t) =
   match x with
-  | Equal -> "="
+  | Equal -> "=="
   | ILessThan -> "i<"
   | ILessThanEqual -> "i<="
   | IPlus -> "i+"
