@@ -86,10 +86,12 @@ let make_sc (vis_list : string list) : Expr.t list =
   List.map expr_from_fid chopped_vis_list
 
 let asrts_js_val (x_val : Expr.t) : Asrt.t list =
-  let asrt_empty : Asrt.t = Pure (Not (Eq (x_val, Lit Empty))) in
-  let asrt_none : Asrt.t = Pure (Not (Eq (x_val, Lit Nono))) in
+  let asrt_empty : Asrt.t =
+    Pure (UnOp (Not, BinOp (x_val, Equal, Lit Empty)))
+  in
+  let asrt_none : Asrt.t = Pure (UnOp (Not, BinOp (x_val, Equal, Lit Nono))) in
   let asrt_list : Asrt.t =
-    Pure (Not (Eq (UnOp (TypeOf, x_val), Lit (Type ListType))))
+    Pure (UnOp (Not, BinOp (UnOp (TypeOf, x_val), Equal, Lit (Type ListType))))
   in
   [ asrt_empty; asrt_none; asrt_list ]
 
@@ -114,21 +116,22 @@ let var_assertion (fid : string) (x : string) (x_val : Expr.t) : Asrt.t =
 
 let make_this_assertion () : Asrt.t =
   let var_this = JS2JSIL_Helpers.var_this in
-  let f1 : Formula.t =
-    Not (Eq (UnOp (TypeOf, LVar "#this"), Lit (Type ListType)))
+  let f1 : Expr.t =
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type ListType)))
   in
-  let f2 : Formula.t =
-    Not (Eq (UnOp (TypeOf, LVar "#this"), Lit (Type NumberType)))
+  let f2 : Expr.t =
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type NumberType)))
   in
-  let f3 : Formula.t =
-    Not (Eq (UnOp (TypeOf, LVar "#this"), Lit (Type StringType)))
+  let f3 : Expr.t =
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type StringType)))
   in
-  let f4 : Formula.t =
-    Not (Eq (UnOp (TypeOf, LVar "#this"), Lit (Type BooleanType)))
+  let f4 : Expr.t =
+    UnOp
+      (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type BooleanType)))
   in
-  let f5 : Formula.t = Not (Eq (LVar "#this", Lit Empty)) in
-  let f6 : Formula.t = Eq (LVar "#this", PVar var_this) in
-  Asrt.Pure (Formula.conjunct [ f1; f2; f3; f4; f5; f6 ])
+  let f5 : Expr.t = UnOp (Not, BinOp (LVar "#this", Equal, Lit Empty)) in
+  let f6 : Expr.t = BinOp (LVar "#this", Equal, PVar var_this) in
+  Asrt.Pure (Expr.conjunct [ f1; f2; f3; f4; f5; f6 ])
 
 let scope_info_to_assertion
     (eprog : EProg.t)
@@ -144,7 +147,7 @@ let scope_info_to_assertion
   in
 
   let a_schain =
-    Asrt.Pure (Eq (PVar JS2JSIL_Helpers.var_scope, EList sc_bindings))
+    Asrt.Pure (BinOp (PVar JS2JSIL_Helpers.var_scope, Equal, EList sc_bindings))
   in
 
   let glob_constraints =
@@ -152,7 +155,9 @@ let scope_info_to_assertion
     | _ :: les ->
         List.map
           (fun le ->
-            Asrt.Pure (Not (Eq (le, Lit (Loc JS2JSIL_Helpers.locGlobName)))))
+            Asrt.Pure
+              (UnOp
+                 (Not, BinOp (le, Equal, Lit (Loc JS2JSIL_Helpers.locGlobName)))))
           les
     | _ -> []
   in
@@ -190,7 +195,7 @@ let scope_info_to_assertion
           else if SS.mem x args then
             let x_val : Expr.t = LVar (Names.make_svar_name x) in
             let asrts_x = asrts_js_val x_val in
-            Pure (Eq (PVar x, x_val)) :: asrts_x
+            Pure (BinOp (PVar x, Equal, x_val)) :: asrts_x
           else []
         in
         asrts @ new_asrts)
@@ -219,7 +224,7 @@ let create_pre_scope_pred
   in
 
   let a_schain =
-    Asrt.Pure (Eq (PVar JS2JSIL_Helpers.var_scope, EList sc_bindings))
+    Asrt.Pure (BinOp (PVar JS2JSIL_Helpers.var_scope, Equal, EList sc_bindings))
   in
 
   let fid_vis_tbl = Jslogic.JSLogicCommon.get_scope_table cc_tbl fid in
@@ -425,7 +430,7 @@ let bi_post_parse_cmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
             None )
       in
       let test = LabCmd.LGuardedGoto (PVar x_r, lab_t, lab_f) in
-      let t_cmd = LabCmd.LLogic (Assert False) in
+      let t_cmd = LabCmd.LLogic (Assert Expr.false_) in
       let f_cmd = LabCmd.LReturnError in
 
       [

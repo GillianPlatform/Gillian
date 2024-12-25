@@ -38,27 +38,27 @@ let star (asrts : t list) : t =
       if not (a = Emp) then if ac = Emp then a else Star (a, ac) else ac)
     Emp asrts
 
-let rec js2jsil_pure (scope_le : Expr.t option) (a : pt) : Formula.t =
+let rec js2jsil_pure (scope_le : Expr.t option) (a : pt) : Expr.t =
   let f = js2jsil_pure scope_le in
   let fe = JSExpr.js2jsil scope_le in
 
   (* What about metadata here? Or extensibility *)
   match a with
-  | And (a1, a2) -> Formula.And (f a1, f a2)
-  | Or (a1, a2) -> Formula.Or (f a1, f a2)
-  | Not a -> Formula.Not (f a)
-  | True -> Formula.True
-  | False -> Formula.False
-  | Eq (le1, le2) -> Formula.Eq (fe le1, fe le2)
-  | Less (le1, le2) -> Formula.FLess (fe le1, fe le2)
-  | LessEq (le1, le2) -> Formula.FLessEq (fe le1, fe le2)
-  | StrLess (le1, le2) -> Formula.StrLess (fe le1, fe le2)
+  | And (a1, a2) -> Expr.BinOp (f a1, And, f a2)
+  | Or (a1, a2) -> BinOp (f a1, Or, f a2)
+  | Not a -> UnOp (Not, f a)
+  | True -> Expr.true_
+  | False -> Expr.false_
+  | Eq (le1, le2) -> BinOp (fe le1, Equal, fe le2)
+  | Less (le1, le2) -> BinOp (fe le1, FLessThan, fe le2)
+  | LessEq (le1, le2) -> BinOp (fe le1, FLessThanEqual, fe le2)
+  | StrLess (le1, le2) -> BinOp (fe le1, StrLess, fe le2)
   | ForAll (s, a) ->
       let new_binders = List.map (fun (x, t) -> (x, Some t)) s in
-      Formula.ForAll (new_binders, f a)
-  | SetMem (le1, le2) -> Formula.SetMem (fe le1, fe le2)
-  | SetSub (le1, le2) -> Formula.SetSub (fe le1, fe le2)
-  | IsInt e -> Formula.IsInt (fe e)
+      ForAll (new_binders, f a)
+  | SetMem (le1, le2) -> BinOp (fe le1, SetMem, fe le2)
+  | SetSub (le1, le2) -> BinOp (fe le1, SetSub, fe le2)
+  | IsInt e -> UnOp (IsInt, fe e)
 
 let rec js2jsil
     (cur_fid : string option)
@@ -96,12 +96,14 @@ let rec js2jsil
       let len = List.length (get_vis_list vis_tbl fid) in
       let a_len =
         Asrt.Pure
-          (Eq (Lit (Num (float_of_int (len - 1))), UnOp (LstLen, fe sch)))
+          (BinOp
+             (Lit (Num (float_of_int (len - 1))), Equal, UnOp (LstLen, fe sch)))
       in
       let a_lg =
         Asrt.Pure
-          (Eq
+          (BinOp
              ( Lit (Loc locGlobName),
+               Equal,
                Expr.BinOp (fe sch, LstNth, Expr.Lit (Num (float_of_int 0))) ))
       in
       let a_pred =
@@ -135,21 +137,17 @@ let rec js2jsil
         | Some i ->
             let le_x = fe le_x in
             let le_er =
-              Expr.BinOp (fe le_sc, LstNth, Expr.Lit (Num (float_of_int i)))
+              Expr.BinOp (fe le_sc, LstNth, Lit (Num (float_of_int i)))
             in
             let not_lg =
               Asrt.Pure
-                (Formula.Not (Formula.Eq (le_er, Expr.Lit (Loc locGlobName))))
+                (UnOp (Not, BinOp (le_er, Equal, Lit (Loc locGlobName))))
             in
             let not_none =
-              Asrt.Pure (Formula.Not (Formula.Eq (le_x, Expr.Lit Nono)))
+              Asrt.Pure (UnOp (Not, BinOp (le_x, Equal, Lit Nono)))
             in
             Asrt.star
-              [
-                not_lg;
-                not_none;
-                Asrt.PointsTo (le_er, Expr.Lit (String x), le_x);
-              ]
+              [ not_lg; not_none; Asrt.PointsTo (le_er, Lit (String x), le_x) ]
       in
       (* add_extra_scope_chain_info fid le_sc a'*)
       a'
@@ -165,9 +163,10 @@ let rec js2jsil
       let le_sc2' = fe le_sc2 in
       let f j =
         Asrt.Pure
-          (Formula.Eq
-             ( Expr.BinOp (le_sc1', LstNth, Expr.Lit (Num (float_of_int j))),
-               Expr.BinOp (le_sc2', LstNth, Lit (Num (float_of_int j))) ))
+          (BinOp
+             ( BinOp (le_sc1', LstNth, Lit (Num (float_of_int j))),
+               Equal,
+               BinOp (le_sc2', LstNth, Lit (Num (float_of_int j))) ))
       in
       Asrt.star (List.map f is)
   (*  Tr(scope(x: le_x)) ::= Tr(scope(x: le_x, sc, fid)) *)
@@ -256,7 +255,7 @@ let rec js2jsil
       let scope_chain_list =
         vislist_2_les vis_list (List.length vis_list - 1)
       in
-      Asrt.Pure (Formula.Eq (fe le, EList scope_chain_list))
+      Asrt.Pure (BinOp (fe le, Equal, EList scope_chain_list))
 
 let errors_assertion () =
   Asrt.Star
@@ -277,11 +276,13 @@ let js2jsil_tactic
   in
 
   (*  x__scope == {{ #x1, ..., #xn }} *)
-  let a'' = Asrt.Pure (Eq (Expr.PVar scope_var, Expr.EList scope_chain_list)) in
+  let a'' =
+    Asrt.Pure (BinOp (Expr.PVar scope_var, Equal, Expr.EList scope_chain_list))
+  in
 
   (*  x__this == #this                *)
   let a_this =
-    Asrt.Pure (Eq (Expr.PVar var_this, Expr.LVar this_logic_var_name))
+    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_logic_var_name))
   in
 
   Asrt.star [ a'; a''; a_this ]

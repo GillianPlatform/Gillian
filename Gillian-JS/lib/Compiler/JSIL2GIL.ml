@@ -34,7 +34,7 @@ let fresh_var, reset_var = fresh_sth "gvar_aux_"
 
 let resource_error args =
   if Utils.Exec_mode.is_biabduction_exec !Config.current_exec_mode then
-    GCmd.Logic (GLCmd.Assume False)
+    GCmd.Logic (GLCmd.Assume Expr.false_)
   else Fail (JSILNames.resourceError, args)
 
 let reset_generators () =
@@ -74,26 +74,6 @@ let rec jsil2gil_expr (e : Expr.t) : Expr.t =
       ESet es
   | _ -> e
 
-let rec jsil2gil_formula (f : Gil.Formula.t) : Gil.Formula.t =
-  let ff = jsil2gil_formula in
-  let fe = jsil2gil_expr in
-  match f with
-  | True | False -> f
-  | Not f -> Not (ff f)
-  | And (f1, f2) -> And (ff f1, ff f2)
-  | Or (f1, f2) -> Or (ff f1, ff f2)
-  | Impl (f1, f2) -> Impl (ff f1, ff f2)
-  | Eq (e1, e2) -> Eq (fe e1, fe e2)
-  | FLess (e1, e2) -> FLess (fe e1, fe e2)
-  | FLessEq (e1, e2) -> FLessEq (fe e1, fe e2)
-  | ILess (e1, e2) -> ILess (fe e1, fe e2)
-  | ILessEq (e1, e2) -> ILessEq (fe e1, fe e2)
-  | StrLess (e1, e2) -> StrLess (fe e1, fe e2)
-  | SetMem (e1, e2) -> SetMem (fe e1, fe e2)
-  | SetSub (e1, e2) -> SetSub (fe e1, fe e2)
-  | ForAll (qts, f) -> ForAll (qts, ff f)
-  | IsInt e -> IsInt (fe e)
-
 let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   let f = jsil2gil_asrt in
   let fe = jsil2gil_expr in
@@ -106,7 +86,7 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | EmptyFields (e1, e2) ->
       [ Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2) ]
   | Pred (pn, es) -> [ Pred (pn, List.map fe es) ]
-  | Pure f -> [ Pure (jsil2gil_formula f) ]
+  | Pure f -> [ Pure (jsil2gil_expr f) ]
   | Types vts -> [ Types (List.map (fun (v, t) -> (fe v, t)) vts) ]
 
 let jsil2gil_slcmd (slcmd : SLCmd.t) : GSLCmd.t =
@@ -122,13 +102,12 @@ let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
   let f = jsil2gil_lcmd in
   let fs = List.map f in
   let fe = jsil2gil_expr in
-  let ff = jsil2gil_formula in
   match lcmd with
   | If (e, lcmds1, lcmds2) -> If (fe e, fs lcmds1, fs lcmds2)
-  | Branch f -> Branch (ff f)
+  | Branch f -> Branch (fe f)
   | Macro (x, es) -> Macro (x, List.map fe es)
-  | Assert f -> Assert (ff f)
-  | Assume f -> Assume (ff f)
+  | Assert f -> Assert (fe f)
+  | Assume f -> Assume (fe f)
   | AssumeType (x, t) -> AssumeType (fe x, t)
   | FreshSVar x -> FreshSVar x
   | SL slcmd -> SL (jsil2gil_slcmd slcmd)
@@ -189,7 +168,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_ins = pred.ins;
     pred_definitions =
       List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
-    pred_facts = List.map jsil2gil_formula pred.facts;
+    pred_facts = List.map jsil2gil_expr pred.facts;
     pred_guard = None;
     (* TODO: Support for predicates with tokens *)
     pred_pure = pred.pure;
@@ -383,7 +362,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let e =
         Expr.UnOp
-          (UNot, BinOp (BinOp (PVar aux3, LstNth, Expr.int 2), Equal, Lit Nono))
+          (Not, BinOp (BinOp (PVar aux3, LstNth, Expr.int 2), Equal, Lit Nono))
       in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
       let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in

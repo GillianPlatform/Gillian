@@ -1,6 +1,5 @@
 open JSLogicCommon
 open Jsil_syntax
-module Formula = Gillian.Gil_syntax.Formula
 
 type t =
   | Fold of JSAsrt.t * (string * (string * JSExpr.t) list) option

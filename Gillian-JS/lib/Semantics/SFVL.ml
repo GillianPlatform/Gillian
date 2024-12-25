@@ -105,8 +105,8 @@ let selective_substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t
 (* Correctness of field-value lists *)
 let is_well_formed (_ : t) : bool = true
 
-let wf_assertions (sfvl : t) : Formula.t list =
+let wf_assertions (sfvl : t) : Expr.t list =
   let props = field_names sfvl in
   let props' = List_utils.cross_product props props (fun x y -> (x, y)) in
   let props' = List.filter (fun (x, y) -> x <> y) props' in
-  List.map (fun (x, y) : Formula.t -> Not (Eq (x, y))) props'
+  List.map (fun (x, y) : Expr.t -> UnOp (Not, BinOp (x, Equal, y))) props'
