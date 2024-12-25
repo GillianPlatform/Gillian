@@ -241,6 +241,8 @@ module Infix = struct
     | UnOp (IUnaryMinus, z) -> z
     | z -> UnOp (IUnaryMinus, z)
 
+  let forall params f = ForAll (params, f)
+
   let not a =
     match a with
     | Lit (Bool a) -> Lit (Bool (not a))
@@ -436,8 +438,7 @@ let rec full_pp fmt e =
 let to_expr (le : t) : t = le
 
 (** From expression to list, if possible *)
-let to_list (le : t) : t list option =
-  match le with
+let to_list : t -> t list option = function
   | EList les -> Some les
   | Lit (LList les) -> Some (List.map (fun x -> Lit x) les)
   | _ -> None
@@ -450,20 +451,19 @@ let to_literal = function
   | _ -> None
 
 (** Get all the logical variables in --e-- *)
-let lvars (le : t) : SS.t =
-  Visitors.Collectors.lvar_collector#visit_expr SS.empty le
+let lvars : t -> SS.t = Visitors.Collectors.lvar_collector#visit_expr SS.empty
 
 (** Get all the abstract locations in --e-- *)
-let alocs (le : t) : SS.t = Visitors.Collectors.aloc_collector#visit_expr () le
+let alocs : t -> SS.t = Visitors.Collectors.aloc_collector#visit_expr ()
 
 (** Get all the concrete locations in --e-- *)
-let clocs (le : t) : SS.t = Visitors.Collectors.cloc_collector#visit_expr () le
+let clocs : t -> SS.t = Visitors.Collectors.cloc_collector#visit_expr ()
 
-let locs (le : t) : SS.t = Visitors.Collectors.loc_collector#visit_expr () le
+let locs : t -> SS.t = Visitors.Collectors.loc_collector#visit_expr ()
 
 (** Get all substitutables in --e-- *)
-let substitutables (le : t) : SS.t =
-  Visitors.Collectors.substitutable_collector#visit_expr () le
+let substitutables : t -> SS.t =
+  Visitors.Collectors.substitutable_collector#visit_expr ()
 
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
@@ -482,19 +482,17 @@ let rec is_concrete (le : t) : bool =
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
 
-let is_concrete_zero_i (le : t) : bool =
-  match le with
+let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z
   | _ -> false
 
 (** Get all the variables in --e-- *)
-let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le
+let vars : t -> SS.t = Visitors.Collectors.var_collector#visit_expr ()
 
 (** Are all expressions in the list literals? *)
 let all_literals les =
   List.for_all
-    (fun x ->
-      match x with
+    (function
       | Lit _ -> true
       | _ -> false)
     les
@@ -552,8 +550,14 @@ let rec as_boolean_expr (e : t) : (t * t) option =
   let open Syntaxes.Option in
   let f = as_boolean_expr in
   match e with
+  (* TODO: Do these two cases ever happen? If not, then this fn just does two things:
+      - types an Expr as a boolean expression
+      - negates this expr
+      And in this case we can simplify this into two differents fns, one for typing it and one
+      for negating it, because often we us this fn without using the negated expr, so it's
+      wasted work. *)
   | LVar _ | PVar _ -> Some (BinOp (e, Equal, true_), BinOp (e, Equal, false_))
-  | Lit (Bool b) -> Some (bool b, bool (not b))
+  | Lit (Bool b) -> Some (e, bool (not b))
   | BinOp (e1, FLessThan, e2) -> Some (e, BinOp (e2, FLessThanEqual, e1))
   | BinOp (e1, ILessThan, e2) -> Some (e, BinOp (e2, ILessThanEqual, e1))
   | BinOp (e1, FLessThanEqual, e2) -> Some (e, BinOp (e2, FLessThan, e1))
@@ -618,7 +622,7 @@ let base_elements (expr : t) : t list =
   in
   v#visit_expr () expr
 
-let pvars (e : t) : SS.t = Visitors.Collectors.pvar_collector#visit_expr () e
+let pvars : t -> SS.t = Visitors.Collectors.pvar_collector#visit_expr ()
 
 let var_to_expr (x : string) : t =
   if Names.is_lvar_name x then LVar x
@@ -626,8 +630,7 @@ let var_to_expr (x : string) : t =
   else if is_pvar_name x then PVar x
   else raise (Failure ("var_to_expr: Impossible matchable: " ^ x))
 
-let is_matchable (e : t) : bool =
-  match e with
+let is_matchable = function
   | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
       true
   | _ -> false
