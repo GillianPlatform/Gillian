@@ -1,13 +1,16 @@
 open Gillian
 open Gil_syntax
 open Monadic.Delayed
-open Formula.Infix
+
+let add = ( + )
+
+open Expr.Infix
 open Monadic.Delayed.Syntax
 
 let zero = Expr.int 0
 let one = Expr.int 1
 let two = Expr.int 2
-let int_pat n x = x #== (Expr.int n)
+let int_pat n x = x == Expr.int n
 let zero_pat = int_pat 0
 let one_pat = int_pat 1
 let two_pat = int_pat 2
@@ -22,21 +25,21 @@ module type S = sig
 end
 
 module Test_if_sat = struct
-  let computation t = if%sat t #>= one then return 10 else return 0
+  let computation t = if%sat t >= one then return 10 else return 0
 
   let process x =
     let* z = computation x in
     let* y =
-      if%sat x #<= zero then return (-1)
+      if%sat x <= zero then return (-1)
       else
-        if%sat x #<= one then return 0
-        else if%sat x #>= two then return 2 else return 1
+        if%sat x <= one then return 0
+        else if%sat x >= two then return 2 else return 1
     in
-    return (z + y)
+    return (add z y)
 
   let starting_pc x =
     Monadic.Pc.make
-      ~pfs:(Engine.PFS.of_list [ Formula.Not x #== one ])
+      ~pfs:(Engine.PFS.of_list [ not (x == one) ])
       ~gamma:(Engine.Type_env.init ()) ~matching:false ()
 
   let results =
@@ -60,7 +63,7 @@ module Test_match_ent = struct
 
   let pc_with_two x =
     Monadic.Pc.make
-      ~pfs:(Engine.PFS.of_list [ x #== two ])
+      ~pfs:(Engine.PFS.of_list [ x == two ])
       ~gamma:(Engine.Type_env.init ()) ~matching:false ()
 
   let results_no_info =
