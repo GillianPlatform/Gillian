@@ -95,17 +95,18 @@ let check_satisfiability
     result
 
 let sat ~matching ~pfs ~gamma formula : bool =
-  let formula = Reduction.reduce_formula ~matching ~pfs ~gamma formula in
-  match formula with
+  let formula' = Reduction.reduce_formula ~matching ~pfs ~gamma formula in
+  match formula' with
   | Lit (Bool b) ->
-      Logging.verbose (fun fmt -> fmt "Discharged sat before SMT");
+      Logging.verbose (fun fmt ->
+          fmt "Discharged sat before SMT @[%a -> %b@]" Expr.pp formula b);
       b
   | _ ->
       let relevant_info =
-        (Expr.pvars formula, Expr.lvars formula, Expr.locs formula)
+        (Expr.pvars formula', Expr.lvars formula', Expr.locs formula')
       in
       check_satisfiability ~matching ~relevant_info
-        (formula :: PFS.to_list pfs)
+        (formula' :: PFS.to_list pfs)
         gamma
 
 (** ************

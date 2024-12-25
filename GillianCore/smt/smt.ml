@@ -1064,5 +1064,5 @@ let lift_model
 
 let () =
   let decls = List.rev !init_decls in
-  let () = decls |> List.iter (fun decl -> cmd decl) in
+  let () = decls |> List.iter cmd in
   cmd (push 1)

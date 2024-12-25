@@ -461,7 +461,7 @@ let simplify_pfs_and_gamma
             let eqs =
               List.map (fun le -> Expr.BinOp (le, Equal, EList [])) les
             in
-            List.iter (fun eq -> extend_with eq) eqs;
+            List.iter extend_with eqs;
             `Filter
         (* Two list concats, Satan save us *)
         | BinOp (NOp (LstCat, lcat), Equal, NOp (LstCat, rcat)) -> (

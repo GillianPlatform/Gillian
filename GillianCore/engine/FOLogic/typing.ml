@@ -214,11 +214,11 @@ let rec infer_types_expr gamma le : unit =
   (* Set union and intersection - all members must be sets, plus any additional information from the members themselves *)
   | NOp (SetUnion, lle) | NOp (SetInter, lle) ->
       e le SetType;
-      List.iter (fun le -> f le) lle
+      List.iter f lle
   | NOp (LstCat, lle) ->
       e le ListType;
-      List.iter (fun le -> f le) lle
-  | EList lle | ESet lle -> List.iter (fun le -> f le) lle
+      List.iter f lle
+  | EList lle | ESet lle -> List.iter f lle
   | BinOp (le1, op, le2) -> (
       match op with
       | Equal -> ()
