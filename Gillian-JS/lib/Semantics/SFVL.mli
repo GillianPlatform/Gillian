@@ -27,5 +27,5 @@ val assertions : Expr.t -> t -> Asrt.t
 val substitution : Subst.t -> bool -> t -> t
 val selective_substitution : Subst.t -> bool -> t -> t
 val is_well_formed : t -> bool
-val wf_assertions : t -> Formula.t list
+val wf_assertions : t -> Expr.t list
 val to_list : t -> (field_name * field_value) list
