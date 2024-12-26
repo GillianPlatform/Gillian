@@ -251,8 +251,8 @@ rule read = parse
 (* Logic assertions *)
   | "[["                 { GIL_Parser.OASSERT }
   | "]]"                 { GIL_Parser.CASSERT }
-  | "/\\"                { GIL_Parser.AND }
-  | "\\/"                { GIL_Parser.OR }
+  | "/\\"                { GIL_Parser.LAND }
+  | "\\/"                { GIL_Parser.LOR }
   | "!"                  { GIL_Parser.LNOT }
   | "is-int"             { GIL_Parser.ISINT }
   (* Separating conjunction uses the same symbol as product, token TIMES *)

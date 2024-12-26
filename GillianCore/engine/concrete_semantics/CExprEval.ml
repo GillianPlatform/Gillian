@@ -8,40 +8,82 @@ exception EvaluationError of string
 
 let evalerr msg = raise (EvaluationError (Fmt.str "Evaluation Error: %s" msg))
 
-let typeerr typ lit =
-  raise (TypeError (Fmt.str "Expected %s, got %a" typ Literal.pp lit))
+let typeerr ?msg typ lit =
+  raise
+    (TypeError
+       (match msg with
+       | Some msg -> Fmt.str "Expected %s, got %a (%s)" typ Literal.pp lit msg
+       | None -> Fmt.str "Expected %s, got %a" typ Literal.pp lit))
 
-let as_str = function
+let as_str ?msg = function
   | Literal.String s -> s
-  | lit -> typeerr "string" lit
+  | lit -> typeerr ?msg "string" lit
 
-let as_bool = function
+let as_bool ?msg = function
   | Literal.Bool b -> b
-  | lit -> typeerr "boolean" lit
+  | lit -> typeerr ?msg "boolean" lit
 
-let as_int = function
+let as_int ?msg = function
   | Literal.Int i -> i
-  | lit -> typeerr "integer" lit
+  | lit -> typeerr ?msg "integer" lit
 
-let as_num = function
+let as_num ?msg = function
   | Literal.Num n -> n
-  | lit -> typeerr "number" lit
+  | lit -> typeerr ?msg "number" lit
 
-let as_list = function
+let as_list ?msg = function
   | Literal.LList l -> l
-  | lit -> typeerr "list" lit
+  | lit -> typeerr ?msg "list" lit
 
-let unary_int_thing (lit : CVal.M.t) (f : Z.t -> Z.t) : CVal.M.t =
-  let num = as_int lit in
+let unary_int_thing ?msg (lit : CVal.M.t) (f : Z.t -> Z.t) : CVal.M.t =
+  let num = as_int ?msg lit in
   let res = f num in
   Int res
 
-let unary_num_thing (lit : CVal.M.t) (f : float -> float) : CVal.M.t =
-  let num = as_num lit in
+let unary_num_thing ?msg (lit : CVal.M.t) (f : float -> float) : CVal.M.t =
+  let num = as_num ?msg lit in
   let res = f num in
   Num res
 
+let binary_num_thing
+    ?msg
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : float -> float -> float) =
+  let num1 = as_num ?msg lit1 in
+  let num2 = as_num ?msg lit2 in
+  Literal.Num (f num1 num2)
+
+let binary_int_thing
+    ?msg
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : Z.t -> Z.t -> Z.t) =
+  let num1 = as_int ?msg lit1 in
+  let num2 = as_int ?msg lit2 in
+  Literal.Int (f num1 num2)
+
+let binary_int_bool_thing
+    ?msg
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : Z.t -> Z.t -> bool) =
+  let num1 = as_int ?msg lit1 in
+  let num2 = as_int ?msg lit2 in
+  Literal.Bool (f num1 num2)
+
+let binary_num_bool_thing
+    ?msg
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : float -> float -> bool) =
+  let num1 = as_num ?msg lit1 in
+  let num2 = as_num ?msg lit2 in
+  Literal.Bool (f num1 num2)
+
 let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
+  let unary_int_thing = unary_int_thing ~msg:(UnOp.str op) in
+  let unary_num_thing = unary_num_thing ~msg:(UnOp.str op) in
   match op with
   | Not ->
       let b = as_bool lit in
@@ -58,22 +100,24 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
   | M_exp -> unary_num_thing lit exp
   | M_floor -> unary_num_thing lit floor
   | M_log -> unary_num_thing lit log
-  | M_round -> (
-      let n = as_num lit in
-      let sign = copysign 1.0 n in
-      match sign < 0.0 && n >= -0.5 with
-      | true -> Num (-0.0)
-      | _ ->
-          (* This complex rounding is needed for edge case in OCaml: 0.49999999999999994 *)
-          let round_nearest_lb = -.(2. ** 52.) in
-          let round_nearest_ub = 2. ** 52. in
+  | M_round ->
+      let f n =
+        let sign = copysign 1.0 n in
+        match sign < 0.0 && n >= -0.5 with
+        | true -> -0.0
+        | _ ->
+            (* This complex rounding is needed for edge case in OCaml: 0.49999999999999994 *)
+            let round_nearest_lb = -.(2. ** 52.) in
+            let round_nearest_ub = 2. ** 52. in
 
-          let round_nearest t =
-            if t >= round_nearest_lb && t <= round_nearest_ub then
-              floor (t +. 0.49999999999999994)
-            else t
-          in
-          Num (round_nearest n))
+            let round_nearest t =
+              if t >= round_nearest_lb && t <= round_nearest_ub then
+                floor (t +. 0.49999999999999994)
+              else t
+            in
+            round_nearest n
+      in
+      unary_num_thing lit f
   | M_sgn -> unary_num_thing lit (fun x -> copysign 1.0 x)
   | M_sin -> unary_num_thing lit sin
   | M_sqrt -> unary_num_thing lit sqrt
@@ -126,36 +170,6 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
       let x = as_num lit in
       Bool (is_int x)
 
-let binary_num_thing
-    (lit1 : CVal.M.t)
-    (lit2 : CVal.M.t)
-    (f : float -> float -> float) =
-  let num1 = as_num lit1 in
-  let num2 = as_num lit2 in
-  Literal.Num (f num1 num2)
-
-let binary_int_thing (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : Z.t -> Z.t -> Z.t)
-    =
-  let num1 = as_int lit1 in
-  let num2 = as_int lit2 in
-  Literal.Int (f num1 num2)
-
-let binary_int_bool_thing
-    (lit1 : CVal.M.t)
-    (lit2 : CVal.M.t)
-    (f : Z.t -> Z.t -> bool) =
-  let num1 = as_int lit1 in
-  let num2 = as_int lit2 in
-  Literal.Bool (f num1 num2)
-
-let binary_num_bool_thing
-    (lit1 : CVal.M.t)
-    (lit2 : CVal.M.t)
-    (f : float -> float -> bool) =
-  let num1 = as_num lit1 in
-  let num2 = as_num lit2 in
-  Literal.Bool (f num1 num2)
-
 let rec evaluate_binop
     (store : CStore.t)
     (op : BinOp.t)
@@ -163,19 +177,23 @@ let rec evaluate_binop
     (e2 : Expr.t) : CVal.M.t =
   let ee = evaluate_expr store in
   let lit1 = ee e1 in
+  let binary_int_bool_thing = binary_int_bool_thing ~msg:(BinOp.str op) in
+  let binary_num_bool_thing = binary_num_bool_thing ~msg:(BinOp.str op) in
+  let binary_int_thing = binary_int_thing ~msg:(BinOp.str op) in
+  let binary_num_thing = binary_num_thing ~msg:(BinOp.str op) in
   match op with
   | Impl -> ee (BinOp (UnOp (Not, Expr.Lit lit1), Or, e2))
   | And ->
-      let b1 = as_bool lit1 in
+      let b1 = as_bool ~msg:"And" lit1 in
       if not b1 then Bool false
       else
-        let b2 = as_bool @@ ee e2 in
+        let b2 = as_bool ~msg:"And" @@ ee e2 in
         Bool b2
   | Or ->
-      let b1 = as_bool lit1 in
+      let b1 = as_bool ~msg:"Or" lit1 in
       if b1 then Bool true
       else
-        let b2 = as_bool @@ ee e2 in
+        let b2 = as_bool ~msg:"Or" @@ ee e2 in
         Bool b2
   | _ -> (
       let lit2 = ee e2 in
@@ -200,23 +218,23 @@ let rec evaluate_binop
           | Nono, Nono -> Bool true
           | _, _ -> Bool false)
       | LstNth -> (
-          let list = as_list lit1 in
+          let list = as_list ~msg:"LstNth" lit1 in
           match lit2 with
           | Int n -> List.nth list (Z.to_int n)
           | Num n when is_int n -> List.nth list (int_of_float n)
           | Num -0. -> List.nth list 0
-          | _ -> typeerr "integer or number" lit2)
+          | _ -> typeerr ~msg:"LstNth" "integer or number" lit2)
       | LstRepeat ->
-          let n = as_int lit2 in
+          let n = as_int ~msg:"LstRepeat" lit2 in
           let n = Z.to_int n in
           let elements = List.init n (fun _ -> lit1) in
           LList elements
       | StrNth -> (
-          let s = as_str lit1 in
+          let s = as_str ~msg:"StrNth" lit1 in
           match lit2 with
           | Num n when is_int n -> String (String.make 1 s.[int_of_float n])
           | Num -0. -> String (String.make 1 s.[0])
-          | _ -> typeerr "number" lit2)
+          | _ -> typeerr ~msg:"StrNth" "number" lit2)
       | ILessThan -> binary_int_bool_thing lit1 lit2 ( < )
       | FLessThan -> binary_num_bool_thing lit1 lit2 ( < )
       | StrLess ->
@@ -267,7 +285,7 @@ let rec evaluate_binop
 
 and evaluate_nop (nop : NOp.t) (ll : Literal.t list) : CVal.M.t =
   match nop with
-  | LstCat -> LList (List.concat_map as_list ll)
+  | LstCat -> LList (List.concat_map (as_list ~msg:"LstCat") ll)
   | SetInter | SetUnion ->
       raise (Exceptions.Unsupported "Concrete evaluate_nop: set operators")
 

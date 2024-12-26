@@ -48,6 +48,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Binary operators *)
 %token EQ
 %token WAND
+%token LAND
+%token LOR
 
 %token FLT
 %token FGT
@@ -238,10 +240,9 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
    https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Operators/Operator_Precedence *)
 %nonassoc DOT
 %left separating_conjunction
-%left magic_wand
 %left LIMPLIES
-%left OR
-%left AND
+%left OR, LOR
+%left AND, LAND
 %nonassoc EQ
 %nonassoc FLT FLE FGT FGE ILT ILE IGT IGE SLT
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
@@ -250,18 +251,12 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left FTIMES FDIV FMOD ITIMES IDIV IMOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 %nonassoc SETMEM SETSUB
-%right LNOT
-%right ISINT
-
-%nonassoc binop_prec
-%nonassoc unop_prec
 
 (***** Types and entry points *****)
 %type <Literal.t>    lit_target
 %type <Type.t>       type_target
 %type <Constant.t>   constant_target
 %type <UnOp.t>       unop_target
-%type <BinOp.t>      binop_target
 %type <NOp.t>        nop_target
 
 %type <(Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
@@ -353,7 +348,7 @@ pred_head_target:
 (********* Expressions *********)
 (*******************************)
 
-expr_target:
+atomic_expr_target:
 (* literal *)
   | lit=lit_target { Expr.Lit lit }
 (* Logic variable *)
@@ -365,26 +360,6 @@ expr_target:
 (* Program variable (including the special variable "ret") *)
   | pvar = program_variable_target
     { pvar }
-(* e binop e *)
-  | e1=expr_target; bop=binop_target; e2=expr_target
-      { Expr.BinOp (e1, bop, e2) } %prec binop_prec
-  | e1=expr_target; FGT; e2=expr_target
-      { Expr.BinOp (e2, FLessThan, e1) }
-  | e1=expr_target; FGE; e2=expr_target
-      { Expr.BinOp (e2, FLessThanEqual, e1) }
-  | e1=expr_target; IGT; e2=expr_target
-      { Expr.BinOp (e2, ILessThan, e1) }
-  | e1=expr_target; IGE; e2=expr_target
-      { Expr.BinOp (e2, ILessThanEqual, e1) }
-(* unop e *)
-    | uop=unop_target; e=expr_target
-     { Expr.UnOp (uop, e) } %prec unop_prec
-(* - e *)
-(* Unary negation has the same precedence as logical not, not as binary negation. *)
-  | IMINUS; e=expr_target
-     { Expr.UnOp (IUnaryMinus, e) } %prec unop_prec
-  | FMINUS; e=expr_target
-     { Expr.UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE
      { Expr.EList exprlist }
@@ -421,6 +396,138 @@ expr_target:
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.ForAll (vars, e) }
+;
+
+unary_expr:
+  | atomic_expr_target { $1 }
+(* unop e *)
+  | uop=unop_target; e=unary_expr
+    { Expr.UnOp (uop, e) }
+(* - e *)
+  | IMINUS; e=unary_expr
+     { Expr.UnOp (IUnaryMinus, e) }
+  | FMINUS; e=unary_expr
+     { Expr.UnOp (FUnaryMinus, e) }
+
+set_op_expr:
+  | unary_expr { $1 }
+  | e1 = set_op_expr; SETMEM; e2 = unary_expr
+    { Expr.BinOp (e1, SetMem, e2) }
+  | e1 = set_op_expr; SETSUB; e2 = unary_expr
+    { Expr.BinOp (e1, SetSub, e2) }
+
+unary_op_expr:
+  | set_op_expr { $1 }
+  | e1 = unary_op_expr; M_ATAN2; e2 = set_op_expr
+    { Expr.BinOp (e1, M_atan2, e2) }
+  | e1 = unary_op_expr; STRCAT; e2 = set_op_expr
+    { Expr.BinOp (e1, StrCat, e2) }
+  | e1 = unary_op_expr; SETDIFF; e2 = set_op_expr
+    { Expr.BinOp (e1, SetDiff, e2) }
+
+muldiv_expr:
+  | unary_op_expr { $1 }
+  | e1 = muldiv_expr; FTIMES; e2 = unary_op_expr
+    { Expr.BinOp (e1, FTimes, e2) }
+  | e1 = muldiv_expr; FDIV; e2 = unary_op_expr
+    { Expr.BinOp (e1, FDiv, e2) }
+  | e1 = muldiv_expr; FMOD; e2 = unary_op_expr
+    { Expr.BinOp (e1, FMod, e2) }
+  | e1 = muldiv_expr; ITIMES; e2 = unary_op_expr
+    { Expr.BinOp (e1, ITimes, e2) }
+  | e1 = muldiv_expr; IDIV; e2 = unary_op_expr
+    { Expr.BinOp (e1, IDiv, e2) }
+  | e1 = muldiv_expr; IMOD; e2 = unary_op_expr
+    { Expr.BinOp (e1, IMod, e2) }
+  | e1 = muldiv_expr; M_POW; e2 = unary_op_expr
+    { Expr.BinOp (e1, M_pow, e2) }
+
+addsub_expr:
+  | muldiv_expr { $1 }
+  | e1 = addsub_expr; FPLUS; e2 = muldiv_expr
+    { Expr.BinOp (e1, FPlus, e2) }
+  | e1 = addsub_expr; FMINUS; e2 = muldiv_expr
+    { Expr.BinOp (e1, FMinus, e2) }
+  | e1 = addsub_expr; IPLUS; e2 = muldiv_expr
+    { Expr.BinOp (e1, IPlus, e2) }
+  | e1 = addsub_expr; IMINUS; e2 = muldiv_expr
+    { Expr.BinOp (e1, IMinus, e2) }
+
+binary_op_expr:
+  | addsub_expr { $1 }
+  | e1 = binary_op_expr; BITWISEOR; e2 = addsub_expr
+    { Expr.BinOp (e1, BitwiseOr, e2) }
+  | e1 = binary_op_expr; BITWISEXOR; e2 = addsub_expr
+    { Expr.BinOp (e1, BitwiseXor, e2) }
+  | e1 = binary_op_expr; BITWISEAND; e2 = addsub_expr
+    { Expr.BinOp (e1, BitwiseAnd, e2) }
+  | e1 = binary_op_expr; BITWISEXORL; e2 = addsub_expr
+    { Expr.BinOp (e1, BitwiseXorL, e2) }
+  | e1 = binary_op_expr; BITWISEORL; e2 = addsub_expr
+    { Expr.BinOp (e1, BitwiseOrL, e2) }
+  | e1 = binary_op_expr; BITWISEANDL; e2 = addsub_expr
+    { Expr.BinOp (e1, BitwiseAndL, e2) }
+
+shift_expr:
+  | binary_op_expr { $1 }
+  | e1 = shift_expr; LEFTSHIFT; e2 = binary_op_expr
+    { Expr.BinOp (e1, LeftShift, e2) }
+  | e1 = shift_expr; SIGNEDRIGHTSHIFT; e2 = binary_op_expr
+    { Expr.BinOp (e1, SignedRightShift, e2) }
+  | e1 = shift_expr; UNSIGNEDRIGHTSHIFT; e2 = binary_op_expr
+    { Expr.BinOp (e1, UnsignedRightShift, e2) }
+  | e1 = shift_expr; LEFTSHIFTL; e2 = binary_op_expr
+    { Expr.BinOp (e1, LeftShiftL, e2) }
+  | e1 = shift_expr; SIGNEDRIGHTSHIFTL; e2 = binary_op_expr
+    { Expr.BinOp (e1, SignedRightShiftL, e2) }
+  | e1 = shift_expr; UNSIGNEDRIGHTSHIFTL; e2 = binary_op_expr
+    { Expr.BinOp (e1, UnsignedRightShiftL, e2) }
+
+comparison_expr:
+  | shift_expr { $1 }
+  | e1 = comparison_expr; ILT; e2 = shift_expr
+    { Expr.BinOp (e1, ILessThan, e2) }
+  | e1 = comparison_expr; ILE; e2 = shift_expr
+    { Expr.BinOp (e1, ILessThanEqual, e2) }
+  | e1 = comparison_expr; IGT; e2 = shift_expr
+    { Expr.BinOp (e2, ILessThan, e1) }
+  | e1 = comparison_expr; IGE; e2 = shift_expr
+    { Expr.BinOp (e2, ILessThanEqual, e1) }
+  | e1 = comparison_expr; FLT; e2 = shift_expr
+    { Expr.BinOp (e1, FLessThan, e2) }
+  | e1 = comparison_expr; FLE; e2 = shift_expr
+    { Expr.BinOp (e1, FLessThanEqual, e2) }
+  | e1 = comparison_expr; FGT; e2 = shift_expr
+    { Expr.BinOp (e2, FLessThan, e1) }
+  | e1 = comparison_expr; FGE; e2 = shift_expr
+    { Expr.BinOp (e2, FLessThanEqual, e1) }
+  | e1 = comparison_expr; SLT; e2 = shift_expr
+    { Expr.BinOp (e1, StrLess, e2) }
+
+eq_expr:
+  | comparison_expr { $1 }
+  | e1 = eq_expr; EQ; e2 = comparison_expr
+    { Expr.BinOp (e1, Equal, e2) }
+
+and_expr:
+  | eq_expr { $1 }
+  | e1 = and_expr; AND; e2 = eq_expr
+  | e1 = and_expr; LAND; e2 = eq_expr
+    { Expr.BinOp (e1, And, e2) }
+
+or_expr:
+  | and_expr { $1 }
+  | e1 = or_expr; OR; e2 = and_expr
+  | e1 = or_expr; LOR; e2 = and_expr
+    { Expr.BinOp (e1, Or, e2) }
+
+implication_expr:
+  | or_expr { $1 }
+  | e1 = implication_expr; LIMPLIES; e2 = or_expr
+    { Expr.BinOp (e1, Impl, e2) }
+
+expr_target:
+    implication_expr { $1 }
 ;
 
 top_level_expr_target:
@@ -680,12 +787,18 @@ predicate_call:
   { (name, params) }
 
 g_assertion_target:
+(* (pure) /\ (pure) *)
+  | LBRACE; e1 = expr_target; RBRACE; LAND; LBRACE; e2 = expr_target; RBRACE
+    { [ Asrt.Pure (BinOp (e1, And, e2)) ] }
+(* (pure) \/ (pure) *)
+  | LBRACE; e1 = expr_target; RBRACE; LOR; LBRACE; e2 = expr_target; RBRACE
+    { [ Asrt.Pure (BinOp (e1, Or, e2)) ] }
 (* P * Q *)
 (* The precedence of the separating conjunction is not the same as the arithmetic product *)
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { left_ass @ right_ass } %prec separating_conjunction
   | lhs = predicate_call; WAND; rhs = predicate_call
-    { [ Asrt.Wand {lhs; rhs } ] } %prec magic_wand
+    { [ Asrt.Wand {lhs; rhs } ] }
 (* <CorePred>(es; es) *)
   | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
     { [ Asrt.CorePred (v, es1, es2) ] }
@@ -1050,46 +1163,6 @@ nop_target:
   | SETUNION { NOp.SetUnion }
   | SETINTER { NOp.SetInter }
   | LSTCAT   { NOp.LstCat   }
-;
-
-binop_target:
-  | EQ                  { BinOp.Equal }
-  | ILT                 { BinOp.ILessThan }
-  | ILE                 { BinOp.ILessThanEqual }
-  | IPLUS               { BinOp.IPlus }
-  | IMINUS              { BinOp.IMinus }
-  | ITIMES              { BinOp.ITimes }
-  | IDIV                { BinOp.IDiv }
-  | IMOD                { BinOp.IMod }
-  | FLT                 { BinOp.FLessThan }
-  | FLE                 { BinOp.FLessThanEqual }
-  | FPLUS               { BinOp.FPlus }
-  | FMINUS              { BinOp.FMinus }
-  | FTIMES              { BinOp.FTimes }
-  | FDIV                { BinOp.FDiv }
-  | FMOD                { BinOp.FMod }
-  | SLT                 { BinOp.StrLess }
-  | AND                 { BinOp.And }
-  | OR                  { BinOp.Or }
-  | LIMPLIES            { BinOp.Impl }
-  | BITWISEAND          { BinOp.BitwiseAnd }
-  | BITWISEOR           { BinOp.BitwiseOr}
-  | BITWISEXOR          { BinOp.BitwiseXor }
-  | LEFTSHIFT           { BinOp.LeftShift }
-  | SIGNEDRIGHTSHIFT    { BinOp.SignedRightShift }
-  | UNSIGNEDRIGHTSHIFT  { BinOp.UnsignedRightShift }
-  | BITWISEANDL         { BinOp.BitwiseAndL }
-  | BITWISEORL          { BinOp.BitwiseOrL }
-  | BITWISEXORL         { BinOp.BitwiseXorL }
-  | LEFTSHIFTL          { BinOp.LeftShiftL }
-  | SIGNEDRIGHTSHIFTL   { BinOp.SignedRightShiftL }
-  | UNSIGNEDRIGHTSHIFTL { BinOp.UnsignedRightShiftL }
-  | M_ATAN2             { BinOp.M_atan2 }
-  | M_POW               { BinOp.M_pow }
-  | STRCAT              { BinOp.StrCat }
-  | SETDIFF             { BinOp.SetDiff }
-  | SETMEM              { BinOp.SetMem }
-  | SETSUB              { BinOp.SetSub }
 ;
 
 unop_target:
