@@ -114,21 +114,15 @@ let list_cons el r =
   list_cat sgl r
 
 let list el =
-  if
-    List.for_all
-      (function
-        | Lit _ -> true
-        | _ -> false)
-      el
-  then
-    Lit
-      (LList
-         (List.map
-            (function
-              | Lit l -> l
-              | _ -> assert false)
-            el))
-  else EList el
+  let rec aux l =
+    match l with
+    | [] -> Some []
+    | Lit l :: r -> Option.map (fun x -> l :: x) (aux r)
+    | _ -> None
+  in
+  match aux el with
+  | Some l -> Lit (LList l)
+  | None -> EList el
 
 let fmod a b =
   match (a, b) with

@@ -36,7 +36,7 @@ val reduce_lexpr :
     The [matching] flag should not be used by Gillian instantiation developers. *)
 val reduce_formula :
   ?matching:bool ->
-  ?rpfs:bool ->
+  ?_rpfs:bool ->
   ?time:string ->
   ?pfs:PFS.t ->
   ?gamma:Type_env.t ->
