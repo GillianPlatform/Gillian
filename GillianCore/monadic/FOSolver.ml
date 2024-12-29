@@ -33,7 +33,7 @@ let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
   try
     let f =
-      Engine.Reduction.reduce_formula ~matching:pc.matching ~gamma ~pfs formula
+      Engine.Reduction.reduce_lexpr ~matching:pc.matching ~gamma ~pfs formula
     in
     match f with
     | Lit (Bool b) -> b
@@ -62,10 +62,6 @@ let resolve_loc_name ~pc loc =
 let reduce_expr ~pc expr =
   Reduction.reduce_lexpr ~matching:pc.Pc.matching ~pfs:(build_full_pfs pc)
     ~gamma:(build_full_gamma pc) expr
-
-let reduce_formula ~pc formula =
-  Reduction.reduce_formula ~matching:pc.Pc.matching ~pfs:(build_full_pfs pc)
-    ~gamma:(build_full_gamma pc) formula
 
 let resolve_type ~(pc : Pc.t) expr =
   (* TODO: I don't know what that how parameter means.

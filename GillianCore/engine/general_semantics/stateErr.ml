@@ -50,9 +50,9 @@ let pp_err
 let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) t) : bool =
   match err with
   | EMem mem_err -> can_fix_mem mem_err
-  | EPure pf -> Reduction.reduce_formula pf <> Expr.false_
+  | EPure pf -> Reduction.reduce_lexpr pf <> Expr.false_
   | EAsrt (_, pf, _) ->
-      let result = Reduction.reduce_formula pf <> Expr.true_ in
+      let result = Reduction.reduce_lexpr pf <> Expr.true_ in
       Logging.verbose (fun fmt -> fmt "Can fix: %a: %b" Expr.pp pf result);
       result
   | _ -> false

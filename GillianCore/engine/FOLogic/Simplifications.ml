@@ -30,7 +30,7 @@ let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
 (*************************************)
 
 let reduce_pfs_in_place ?(matching = false) _ gamma (pfs : PFS.t) =
-  PFS.map_inplace (Reduction.reduce_formula ~matching ~gamma ~pfs) pfs
+  PFS.map_inplace (Reduction.reduce_lexpr ~matching ~gamma ~pfs) pfs
 
 let sanitise_pfs ?(matching = false) store gamma pfs =
   let old_pfs = ref (PFS.init ()) in
@@ -390,7 +390,7 @@ let simplify_pfs_and_gamma
         (* Reduce current assertion *)
         let rec_call = filter_mapper_formula pfs in
         let extend_with = PFS.extend pfs in
-        let whole = Reduction.reduce_formula ~matching ~gamma ~pfs pf in
+        let whole = Reduction.reduce_lexpr ~matching ~gamma ~pfs pf in
         match whole with
         (* These we must not encounter here *)
         | ForAll (bt, _) ->
@@ -960,7 +960,7 @@ let simplify_implication
       match pf with
       | BinOp (NOp (LstCat, lex), Equal, NOp (LstCat, ley)) ->
           let flen_eq =
-            Reduction.reduce_formula ~gamma ~pfs:lpfs
+            Reduction.reduce_lexpr ~gamma ~pfs:lpfs
               (BinOp
                  ( UnOp (LstLen, NOp (LstCat, lex)),
                    Equal,
@@ -975,7 +975,7 @@ let simplify_implication
   PFS.substitution subst rpfs;
 
   (* Additional *)
-  PFS.map_inplace (Reduction.reduce_formula ~_rpfs:true ~gamma ~pfs:lpfs) rpfs;
+  PFS.map_inplace (Reduction.reduce_lexpr ~gamma ~pfs:lpfs) rpfs;
   L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 
   sanitise_pfs_no_store ~matching gamma rpfs;

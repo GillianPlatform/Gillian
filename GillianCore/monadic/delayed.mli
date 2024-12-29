@@ -9,7 +9,6 @@ val return :
 
 val resolve_loc : Expr.t -> string option t
 val reduce : Expr.t -> Expr.t t
-val reduce_formula : Expr.t -> Expr.t t
 val entails : Expr.t list -> Expr.t -> bool t
 val check_sat : Expr.t -> bool t
 val bind : 'a t -> ('a -> 'b t) -> 'b t

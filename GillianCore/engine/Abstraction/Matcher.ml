@@ -1346,7 +1346,7 @@ module Make (State : SState.S) :
                     List.fold_left Expr.Infix.( && ) Expr.true_ discharges
                   in
                   let discharges_pf =
-                    Reduction.reduce_formula ~matching:true discharges_pf
+                    Reduction.reduce_lexpr ~matching:true discharges_pf
                   in
                   let to_asrt = Expr.Infix.( && ) pf discharges_pf in
                   match cons_pure state to_asrt with

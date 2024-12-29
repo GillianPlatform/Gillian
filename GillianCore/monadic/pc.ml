@@ -63,7 +63,7 @@ let extend pc fs =
     List.filter_map
       (fun f ->
         match
-          Engine.Reduction.reduce_formula ~matching:pc.matching ~pfs ~gamma f
+          Engine.Reduction.reduce_lexpr ~matching:pc.matching ~pfs ~gamma f
         with
         | Expr.Lit (Bool true) -> None
         | f -> Some f)
