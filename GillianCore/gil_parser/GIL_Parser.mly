@@ -402,15 +402,17 @@ gbvintrinsic:
 | BVMUL { BVOps.BVMul } 
 | BVUDIV { BVOps.BVUDiv }
 | BVUREM { BVOps.BVUrem }
-| BVNEGO { BVOps.BVNegO}
-| BVUADDO { BVOps.BVUAddO }
-| BVSADDO { BVOps.BVSAddO }
-| BVUMULO { BVOps.BVUMulO } 
-| BVSMULO { BVOps.BVSMulO }
 | BVSHL { BVOps.BVShl }
 | BVLSHR { BVOps.BVLShr }
-| BVULT { BVOps.BVUlt }
-  
+
+gbvformintrinsic:
+  | BVULT { BVOps.BVUlt }
+  | BVNEGO { BVOps.BVNegO}
+  | BVUADDO { BVOps.BVUAddO }
+  | BVSADDO { BVOps.BVSAddO }
+  | BVUMULO { BVOps.BVUMulO } 
+  | BVSMULO { BVOps.BVSMulO }  
+
 bv_arg_target:
   | BVTYPELIT LBRACE e=expr_target COMMA width=INTEGER RBRACE { Expr.BvExpr(e,Z.to_int width) }
   | n = INTEGER { Expr.Literal(Z.to_int n) }
@@ -483,8 +485,8 @@ expr_target:
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.EForall (vars, e) }
-  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; ty=type_target ; RBRACE
-    { Expr.BVIntrinsic(itname, es, ty) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=INTEGER ; RBRACE
+    { Expr.BVExprIntrinsic(itname, es, Z.to_int width) }
 ;
 
 top_level_expr_target:

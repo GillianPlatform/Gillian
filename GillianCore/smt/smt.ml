@@ -782,7 +782,7 @@ let encode_bvop (op : BVOps.t) (width : int) (bvs : sexp list) : Encoding.t =
     | BVOps.BVPlus -> binop_encode bv_add
     | BVOps.BVAnd -> binop_encode bv_and
     | BVConcat -> binop_encode bv_concat
-    (* | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))*)
+    | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))
   in
   Encoding.native (Gil_syntax.Type.BvType width) sexpr
 
@@ -911,6 +911,7 @@ and encode_assertion
   | IsInt e ->
       let>- e = fe e in
       num_divisible (get_num e) 1 >- BooleanType
+  | BVFormIntrinsic (_, _) -> raise (Failure "unhandled")
 
 let encode_assertion_top_level
     ~(gamma : typenv)
