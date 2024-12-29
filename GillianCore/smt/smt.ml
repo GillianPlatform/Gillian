@@ -784,7 +784,7 @@ let encode_bvop (op : BVOps.t) (width : int) (bvs : sexp list) : Encoding.t =
     | BVOps.BVPlus -> binop_encode bv_add
     | BVOps.BVAnd -> binop_encode bv_and
     | BVConcat -> binop_encode bv_concat
-    (* | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))*)
+    | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))
   in
   Encoding.native (Gil_syntax.Type.BvType width) sexpr
 
@@ -854,6 +854,66 @@ let rec encode_logical_expression
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
+
+and encode_assertion
+    ~(gamma : typenv)
+    ~(llen_lvars : SS.t)
+    ~(list_elem_vars : SS.t)
+    (a : Formula.t) : Encoding.t =
+  let f = encode_assertion ~gamma ~llen_lvars ~list_elem_vars in
+  let fe = encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars in
+  let open Encoding in
+  match a with
+  | Not a ->
+      let>- a = f a in
+      get_bool a |> bool_not >- BooleanType
+  | Eq (le1, le2) -> encode_equality (fe le1) (fe le2)
+  | FLess (le1, le2) ->
+      let>- le1 = fe le1 in
+      let>- le2 = fe le2 in
+      num_lt (get_num le1) (get_num le2) >- BooleanType
+  | FLessEq (le1, le2) ->
+      let>- le1 = fe le1 in
+      let>- le2 = fe le2 in
+      num_leq (get_num le1) (get_num le2) >- BooleanType
+  | ILess (le1, le2) ->
+      let>- le1 = fe le1 in
+      let>- le2 = fe le2 in
+      num_lt (get_int le1) (get_int le2) >- BooleanType
+  | ILessEq (le1, le2) ->
+      let>- le1 = fe le1 in
+      let>- le2 = fe le2 in
+      num_leq (get_int le1) (get_int le2) >- BooleanType
+  | Impl (a1, a2) ->
+      let>- a1 = f a1 in
+      let>- a2 = f a2 in
+      bool_implies (get_bool a1) (get_bool a2) >- BooleanType
+  | StrLess (_, _) -> failwith "SMT encoding does not support STRLESS"
+  | True -> bool_k true >- BooleanType
+  | False -> bool_k false >- BooleanType
+  | Or (a1, a2) ->
+      let>- a1 = f a1 in
+      let>- a2 = f a2 in
+      bool_or (get_bool a1) (get_bool a2) >- BooleanType
+  | And (a1, a2) ->
+      let>- a1 = f a1 in
+      let>- a2 = f a2 in
+      bool_and (get_bool a1) (get_bool a2) >- BooleanType
+  | SetMem (le1, le2) ->
+      let>- le1 = fe le1 in
+      let>- le2 = fe le2 in
+      set_member Z3 (simple_wrap le1) (get_set le2) >- BooleanType
+  | SetSub (le1, le2) ->
+      let>- le1 = fe le1 in
+      let>- le2 = fe le2 in
+      set_subset Z3 (get_set le1) (get_set le2) >- BooleanType
+  | ForAll (bt, a) ->
+      encode_quantified_expr ~encode_expr:encode_assertion ~mk_quant:forall
+        ~gamma ~llen_lvars ~list_elem_vars bt a
+  | IsInt e ->
+      let>- e = fe e in
+      num_divisible (get_num e) 1 >- BooleanType
+  | BVFormIntrinsic (_, _) -> raise (Failure "unhandled")
 
 let encode_assertion_top_level
     ~(gamma : typenv)

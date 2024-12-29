@@ -622,7 +622,7 @@ end
 module Asrt : sig
   (** GIL Assertions *)
 
-  type atom =
+  type atom = TypeDef__.assertion =
     | Emp  (** Empty heap *)
     | Pred of string * Expr.t list  (** Predicates *)
     | Pure of Expr.t  (** Pure formula *)
@@ -699,7 +699,7 @@ end
 module SLCmd : sig
   (** GIL Separation-Logic Commands *)
 
-  type t =
+  type t = TypeDef__.slcmd =
     | Fold of string * Expr.t list * (string * (string * Expr.t) list) option
         (** Fold predicate *)
     | Unfold of string * Expr.t list * (string * string) list option * bool
@@ -730,7 +730,7 @@ end
 module LCmd : sig
   (** GIL Logical Commands *)
 
-  type t =
+  type t = TypeDef__.lcmd =
     | If of Expr.t * t list * t list  (** If-then-else *)
     | Branch of Expr.t  (** Branching on a FO formual *)
     | Macro of string * Expr.t list  (** Macros *)
