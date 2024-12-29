@@ -31,18 +31,6 @@ val reduce_lexpr :
   Gil_syntax.Expr.t ->
   Gil_syntax.Expr.t
 
-(** [reduce_formula ?matching ?pfs ?gamma pf] reduces the formula [pf]
-    given (optional) pure formulae [pfs] and typing environment [gamma].
-    The [matching] flag should not be used by Gillian instantiation developers. *)
-val reduce_formula :
-  ?matching:bool ->
-  ?_rpfs:bool ->
-  ?time:string ->
-  ?pfs:PFS.t ->
-  ?gamma:Type_env.t ->
-  Gil_syntax.Expr.t ->
-  Gil_syntax.Expr.t
-
 (** [reduce_assertion ?matching ?pfs ?gamma a] reduces the assertion [a]
     given (optional) pure formulae [pfs] and typing environment [gamma].
     The [matching] flag should not be used by Gillian instantiation developers. *)

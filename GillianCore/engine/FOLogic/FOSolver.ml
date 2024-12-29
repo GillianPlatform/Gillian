@@ -11,7 +11,7 @@ let get_axioms (fs : Expr.Set.t) (_ : Type_env.t) : Expr.Set.t =
       match pf with
       | BinOp (NOp (LstCat, x), Equal, NOp (LstCat, y)) ->
           Expr.Set.add
-            (Reduction.reduce_formula
+            (Reduction.reduce_lexpr
                (BinOp
                   ( UnOp (LstLen, NOp (LstCat, x)),
                     Equal,
@@ -95,7 +95,7 @@ let check_satisfiability
     result
 
 let sat ~matching ~pfs ~gamma formula : bool =
-  let formula' = Reduction.reduce_formula ~matching ~pfs ~gamma formula in
+  let formula' = Reduction.reduce_lexpr ~matching ~pfs ~gamma formula in
   match formula' with
   | Lit (Bool b) ->
       Logging.verbose (fun fmt ->
@@ -219,10 +219,7 @@ let check_entailment
 
 let is_equal ~pfs ~gamma e1 e2 =
   (* let t = Sys.time () in *)
-  let feq =
-    Reduction.reduce_formula ?gamma:(Some gamma) ?pfs:(Some pfs)
-      (BinOp (e1, Equal, e2))
-  in
+  let feq = Reduction.reduce_lexpr ~gamma ~pfs (BinOp (e1, Equal, e2)) in
   let result =
     match feq with
     | Lit (Bool b) -> b
@@ -240,7 +237,7 @@ let is_equal ~pfs ~gamma e1 e2 =
 let is_different ~pfs ~gamma e1 e2 =
   (* let t = Sys.time () in *)
   let feq =
-    Reduction.reduce_formula ~gamma ~pfs (UnOp (Not, BinOp (e1, Equal, e2)))
+    Reduction.reduce_lexpr ~gamma ~pfs (UnOp (Not, BinOp (e1, Equal, e2)))
   in
   let result =
     match feq with
@@ -257,7 +254,7 @@ let is_different ~pfs ~gamma e1 e2 =
 
 let num_is_less_or_equal ~pfs ~gamma e1 e2 =
   let feq =
-    Reduction.reduce_formula ~gamma ~pfs (Expr.BinOp (e1, FLessThanEqual, e2))
+    Reduction.reduce_lexpr ~gamma ~pfs (Expr.BinOp (e1, FLessThanEqual, e2))
   in
   let result =
     match feq with

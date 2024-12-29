@@ -300,13 +300,7 @@ module Make (SMemory : SMemory.S) :
       (ps : Expr.t list) : t option =
     let { pfs; gamma; _ } = state in
     try
-      let ps =
-        List.map
-          (Reduction.reduce_formula
-             ~time:("SState: assume_a: " ^ time)
-             ~pfs ~gamma)
-          ps
-      in
+      let ps = List.map (Reduction.reduce_lexpr ~pfs ~gamma) ps in
       let result =
         if
           production

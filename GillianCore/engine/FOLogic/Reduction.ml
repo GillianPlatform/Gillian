@@ -2328,6 +2328,8 @@ and reduce_lexpr
   (* let t = Sys.time () in *)
   let result = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
+  Logging.normal (fun f ->
+      f "reduce_lexpr: @[%a -> %a@]" Expr.pp le Expr.pp result);
   result
 
 and simplify_num_arithmetic_lexpr
@@ -2707,16 +2709,6 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
   in
   resolve_expr_to_location_aux max_fuel Expr.Set.empty [ e ]
 
-let reduce_formula
-    ?(matching = false)
-    ?(_rpfs = false)
-    ?time:_
-    ?(pfs : PFS.t = PFS.init ())
-    ?(gamma = Type_env.init ())
-    (a : Expr.t) : Expr.t =
-  reduce_lexpr ~matching ~pfs ~gamma a
-(* reduce_formula_loop ~top_level:true ~rpfs matching pfs gamma a *)
-
 let relate_llen
     (pfs : PFS.t)
     (gamma : Type_env.t)
@@ -2962,4 +2954,4 @@ let reduce_assertion
   loop a
 
 let is_tautology ?pfs ?gamma formula =
-  reduce_formula ?pfs ?gamma formula = Lit (Bool true)
+  reduce_lexpr ?pfs ?gamma formula = Lit (Bool true)
