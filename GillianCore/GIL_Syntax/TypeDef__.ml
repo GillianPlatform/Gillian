@@ -131,6 +131,7 @@ and unop =
   | IsInt
 
 and nop = LstCat | SetUnion | SetInter
+and bvpred = BVUlt | BVUMulO | BVSMulO | BVNegO | BVUAddO | BVSAddO
 
 and bvop =
   | BVConcat
@@ -143,14 +144,8 @@ and bvop =
   | BVMul
   | BVUDiv
   | BVUrem
-  | BVNegO
-  | BVUAddO
-  | BVSAddO
-  | BVUMulO
-  | BVSMulO
   | BVShl
   | BVLShr
-  | BVUlt
 
 and bv_arg = Literal of int | BvExpr of (expr * int)
 
@@ -159,7 +154,7 @@ and expr =
   | PVar of string
   | LVar of string
   | ALoc of string
-  | BVIntrinsic of bvop * bv_arg list * typ
+  | BVExprIntrinsic of bvop * bv_arg list * int
   | UnOp of unop * expr
   | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr
@@ -169,7 +164,26 @@ and expr =
   | Exists of (string * typ option) list * expr
   | ForAll of (string * typ option) list * expr
 
-and assertion_atom =
+and formula =
+  | True
+  | False
+  | Not of formula
+  | And of formula * formula
+  | Or of formula * formula
+  | Eq of expr * expr
+  | Impl of formula * formula
+  | FLess of expr * expr
+  | FLessEq of expr * expr
+  | ILess of expr * expr
+  | ILessEq of expr * expr
+  | BVFormIntrinsic of bvpred * bv_arg list
+  | StrLess of expr * expr
+  | SetMem of expr * expr
+  | SetSub of expr * expr
+  | ForAll of (string * typ option) list * formula
+  | IsInt of expr
+
+and assertion =
   | Emp
   | Pred of string * expr list
   | Pure of expr
