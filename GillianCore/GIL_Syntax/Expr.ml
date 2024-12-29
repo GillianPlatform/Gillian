@@ -6,7 +6,7 @@ type t = TypeDef__.expr =
   | PVar of string  (** GIL program variables  *)
   | LVar of LVar.t  (** GIL logical variables  *)
   | ALoc of string  (** GIL abstract locations *)
-  | BVIntrinsic of BVOps.t * bv_arg list * Type.t
+  | BVExprIntrinsic of BVOps.t * bv_arg list * int
   | UnOp of UnOp.t * t  (** Unary operators         *)
   | BinOp of t * BinOp.t * t  (** Binary operators        *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
@@ -314,14 +314,14 @@ let rec map_opt
         match mapped_expr with
         | Lit _ | LVar _ | ALoc _ | PVar _ -> Some mapped_expr
         | UnOp (op, e) -> Option.map (fun e -> UnOp (op, e)) (map_e e)
-        | BVIntrinsic (op, es, rty) ->
+        | BVExprIntrinsic (op, es, w) ->
             let map_bv_arg = function
               | Literal w -> Some (Literal w)
               | BvExpr (e, w) -> map_e e |> Option.map (fun x -> BvExpr (x, w))
             in
 
             List.map map_bv_arg es |> sequence_opt
-            |> Option.map (fun args -> BVIntrinsic (op, args, rty))
+            |> Option.map (fun args -> BVExprIntrinsic (op, args, w))
         | BinOp (e1, op, e2) -> (
             match (map_e e1, map_e e2) with
             | Some e1', Some e2' -> Some (BinOp (e1', op, e2'))
@@ -354,10 +354,10 @@ let rec pp fmt e =
   match e with
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
-  | BVIntrinsic (op, es, rty) ->
-      Fmt.pf fmt "%s(%a: %a)" (BVOps.str op)
+  | BVExprIntrinsic (op, es, w) ->
+      Fmt.pf fmt "%s(%a: %d)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp_bv_arg)
-        es Type.pp rty
+        es w
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->
@@ -447,7 +447,7 @@ let rec is_concrete (le : t) : bool =
   match le with
   | Lit _ | PVar _ -> true
   | LVar _ | ALoc _ | Exists _ | EForall _ -> false
-  | BVIntrinsic (_, es, _) ->
+  | BVExprIntrinsic (_, es, _) ->
       loop
         (List.filter_map
            (function

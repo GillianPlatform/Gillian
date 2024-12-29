@@ -11,6 +11,7 @@ type t = TypeDef__.formula =
   | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
   | ILessEq of Expr.t * Expr.t
       (** Expression less-than-or-equal for integeres *)
+  | BVFormIntrinsic of BVPred.t * Expr.bv_arg list
   | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
   | SetMem of Expr.t * Expr.t  (** Set membership *)
   | SetSub of Expr.t * Expr.t  (** Set subsetness *)
@@ -81,6 +82,14 @@ let rec map
       | SetSub (e1, e2) -> SetSub (map_e e1, map_e e2)
       | ForAll (bt, a) -> ForAll (bt, map_a a)
       | IsInt e -> IsInt (map_e e)
+      | BVFormIntrinsic (pred, bv_args) ->
+          BVFormIntrinsic
+            ( pred,
+              List.map
+                (function
+                  | Expr.BvExpr (x, w) -> Expr.BvExpr (map_e x, w)
+                  | Expr.Literal x -> Expr.Literal x)
+                bv_args )
     in
     f_a_after a''
 
@@ -136,7 +145,24 @@ let rec map_opt
           | SetSub (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetSub (e1, e2))
           | ForAll (bt, a) -> aux_a_single a (fun a -> ForAll (bt, a))
           | IsInt e -> map_e e |> Option.map (fun e -> IsInt e)
+          | BVFormIntrinsic (pred, bv_args) ->
+              let m_bv_args =
+                List.map
+                  (function
+                    | Expr.BvExpr (x, w) ->
+                        map_e x |> Option.map (fun x -> Expr.BvExpr (x, w))
+                    | Expr.Literal x -> Some (Expr.Literal x))
+                  bv_args
+                |> List.fold_left
+                     (fun acclst elem ->
+                       Option.bind elem (fun bound_elem ->
+                           Option.bind acclst (fun bound_acclst ->
+                               Some (bound_elem :: bound_acclst))))
+                     (Some [])
+              in
+              Option.map (fun x -> BVFormIntrinsic (pred, x)) m_bv_args
         in
+
         Option.map f_a_after a''
 
 (* Get all the logical variables in --a-- *)
@@ -239,6 +265,10 @@ let rec pp_parametric pp_expr fmt f =
   (* e1 --s-- e2 *)
   | SetSub (e1, e2) -> Fmt.pf fmt "(%a --s-- %a)" pp_expr e1 pp_expr e2
   | IsInt e -> Fmt.pf fmt "(is_int %a)" pp_expr e
+  | BVFormIntrinsic (pred, args) ->
+      Fmt.pf fmt "%s(%a)" (BVPred.str pred)
+        (Fmt.list ~sep:Fmt.comma Expr.pp_bv_arg)
+        args
 
 let pp = pp_parametric Expr.pp
 let full_pp = pp_parametric Expr.full_pp
@@ -334,6 +364,10 @@ let rec to_expr (a : t) : Expr.t option =
         Expr.BinOp (Expr.fmod e (Expr.num 1.), BinOp.Equal, Expr.num 0.)
       in
       Some (Expr.BinOp (is_float, BinOp.BAnd, is_whole))
+  | BVFormIntrinsic (_, _) ->
+      Logging.normal ~severity:Logging.Logging_constants.Severity.Warning
+        (fun form -> form "ignoring translation of bvform");
+      None
 
 let rec disjunct (asrts : t list) : t =
   match asrts with

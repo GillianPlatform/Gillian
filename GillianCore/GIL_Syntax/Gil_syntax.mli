@@ -187,14 +187,8 @@ module BVOps : sig
     | BVMul
     | BVUDiv
     | BVUrem
-    | BVNegO
-    | BVUAddO
-    | BVSAddO
-    | BVUMulO
-    | BVSMulO
     | BVShl
     | BVLShr
-    | BVUlt
   [@@deriving yojson, eq]
 
   (** Printer *)
@@ -281,7 +275,7 @@ module Expr : sig
     | PVar of string  (** GIL program variables *)
     | LVar of string  (** GIL logical variables (interpreted symbols) *)
     | ALoc of string  (** GIL abstract locations (uninterpreted symbols) *)
-    | BVIntrinsic of BVOps.t * bv_arg list * Type.t
+    | BVExprIntrinsic of BVOps.t * bv_arg list * int
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)
@@ -457,6 +451,7 @@ module Formula : sig
     | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
     | ILessEq of Expr.t * Expr.t
         (** Expression less-than-or-equal for integeres *)
+    | BVFormIntrinsic of BVPred.t * Expr.bv_arg list
     | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
     | SetMem of Expr.t * Expr.t  (** Set membership *)
     | SetSub of Expr.t * Expr.t  (** Set subsetness *)

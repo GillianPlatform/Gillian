@@ -809,11 +809,20 @@ let rec encode_logical_expression
   | PVar _ -> failwith "HORROR: Program variable in pure formula"
   | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
-  | BVIntrinsic (op, es, width) ->
-      let>-- les = List.map f es in
-      List.combine les width
-      |> List.map (fun (x, w) -> get_bv w x)
-      |> encode_bvop op (List.nth width (List.length width - 1))
+  | BVExprIntrinsic (op, es, width) ->
+      let extract_bv_exprs (lst : Expr.bv_arg list) =
+        List.filter_map
+          (function
+            | Expr.Literal _ -> None
+            | Expr.BvExpr (exp, w) -> Some (exp, w))
+          lst
+      in
+      let extracted = extract_bv_exprs es in
+      let widths = List.map (fun (_, w) -> w) extracted in
+      let>-- les = List.map (fun (e, _) -> f e) extracted in
+      List.combine les widths
+      |> List.map (fun (encoded, w) -> get_bv w encoded)
+      |> encode_bvop op width
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
       les |> List.map get_set |> set_union' Z3 >- SetType
