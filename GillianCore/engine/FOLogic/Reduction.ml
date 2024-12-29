@@ -1429,12 +1429,10 @@ and reduce_lexpr_loop
             Option.fold ~some:(fun (_, tl) -> f tl) ~none:def ohdtl
         (* List operations: length *)
         | LstLen, EList le -> Expr.int (List.length le)
+        | LstLen, NOp (LstCat, []) -> Expr.zero_i
         | LstLen, NOp (LstCat, les) when lexpr_is_list gamma fle ->
             let les = List.map Expr.list_length les in
-            let le =
-              List.fold_left Expr.Infix.( + ) (List.hd les) (List.tl les)
-            in
-            f le
+            List.fold_left Expr.Infix.( + ) (List.hd les) (List.tl les)
         | LstLen, LstSub (_, _, len) when lexpr_is_list gamma fle -> len
         | LstLen, _ when lexpr_is_list gamma fle -> def
         (* List operations: reverse *)
@@ -1564,7 +1562,14 @@ and reduce_lexpr_loop
        ------------------------- *)
     (* BinOps: Equalities (basics) *)
     | BinOp (e1, Equal, e2) when Expr.equal e1 e2 -> Expr.true_
-    | BinOp (UnOp (op, e1), Equal, UnOp (op', e2)) when UnOp.equal op op' ->
+    (* BinOps: Equalities (injective unops) *)
+    | BinOp (UnOp (IUnaryMinus, e1), Equal, UnOp (IUnaryMinus, e2))
+    | BinOp (UnOp (FUnaryMinus, e1), Equal, UnOp (FUnaryMinus, e2))
+    | BinOp (UnOp (BitwiseNot, e1), Equal, UnOp (BitwiseNot, e2))
+    | BinOp (UnOp (Not, e1), Equal, UnOp (Not, e2))
+    | BinOp (UnOp (LstRev, e1), Equal, UnOp (LstRev, e2))
+    | BinOp (UnOp (IntToNum, e1), Equal, UnOp (IntToNum, e2))
+    | BinOp (UnOp (ToStringOp, e1), Equal, UnOp (ToStringOp, e2)) ->
         BinOp (e1, Equal, e2)
     (* BinOps: Equalities (locations) *)
     (* This line is the central mechanism to "matching": *)
@@ -1584,27 +1589,29 @@ and reduce_lexpr_loop
         if List.length ll <> List.length lr then Expr.(false_)
         else if ll = [] then Expr.(true_)
         else List.map2 Expr.Infix.( == ) ll lr |> Expr.conjunct |> f
+    (*
+    This is super slow lol
     | BinOp (left_list, Equal, right_list)
-      when (*(match
-                   ( Typing.type_lexpr gamma left_list,
-                     Typing.type_lexpr gamma right_list )
-                 with
-                | (Some Type.ListType, _), (Some Type.ListType, _) -> true
-                | _ -> false)*)
-           lexpr_is_list gamma left_list
-           && lexpr_is_list gamma right_list
-           &&
-           match
-             f
-               (Expr.Infix.( - )
-                  (Expr.list_length left_list)
-                  (Expr.list_length right_list))
-           with
-           | Expr.Lit (Int k) when not (Z.equal k Z.zero) -> true
-           | _ -> false ->
-        (* If we have two lists but can reduce the equality of their lengths to false,
-           then we know the lists cannot be equal*)
-        Expr.false_
+       when (*(match
+                    ( Typing.type_lexpr gamma left_list,
+                      Typing.type_lexpr gamma right_list )
+                  with
+                 | (Some Type.ListType, _), (Some Type.ListType, _) -> true
+                 | _ -> false)*)
+            lexpr_is_list gamma left_list
+            && lexpr_is_list gamma right_list
+            &&
+            match
+              f
+                (Expr.Infix.( - )
+                   (Expr.list_length left_list)
+                   (Expr.list_length right_list))
+            with
+            | Expr.Lit (Int k) when not (Z.equal k Z.zero) -> true
+            | _ -> false ->
+         (* If we have two lists but can reduce the equality of their lengths to false,
+            then we know the lists cannot be equal*)
+         Expr.false_ *)
     (* x = l1 ++ ... ++ ln when x = li and there is a non empty list => false *)
     | BinOp (NOp (LstCat, les), Equal, (LVar _ as x))
       when List.mem x les
@@ -1620,8 +1627,6 @@ and reduce_lexpr_loop
     | BinOp (e2, Equal, LstSub (e1, Lit (Int z), el))
       when Z.equal z Z.zero && Expr.equal e1 e2 ->
         BinOp (UnOp (LstLen, e1), Equal, el)
-    | BinOp (UnOp (LstRev, ll), Equal, UnOp (LstRev, rl)) ->
-        BinOp (ll, Equal, rl)
     (* (l ++ ...)[0..n] = l  <==> n = len(l) *)
     | BinOp (e2, Equal, LstSub (NOp (LstCat, e1 :: _), Lit (Int z), el))
       when Z.equal z Z.zero && Expr.equal e1 e2 ->
@@ -1806,8 +1811,6 @@ and reduce_lexpr_loop
             And,
             BinOp (sr, Equal, Lit (String "")) )
     (* by injectivity *)
-    | BinOp (UnOp (ToStringOp, le1), Equal, UnOp (ToStringOp, le2)) ->
-        BinOp (le1, Equal, le2)
     | BinOp (UnOp (ToStringOp, le1), Equal, Lit (String s))
     | BinOp (Lit (String s), Equal, UnOp (ToStringOp, le1)) -> (
         match s with
@@ -2343,13 +2346,11 @@ and simplify_int_arithmetic_lexpr
   | BinOp (l, IPlus, Lit (Int z)) when Z.equal z Z.zero -> l
   | BinOp (Lit (Int z), IPlus, l) when Z.equal z Z.zero -> l
   (* Binary minus to unary minus *)
+  (* Opale: how is this any better? *)
   | BinOp (l, IMinus, r) -> f (BinOp (l, IPlus, UnOp (IUnaryMinus, r)))
   (* Unary minus distributes over + *)
-  | UnOp (IUnaryMinus, e) -> (
-      match e with
-      | BinOp (l, IPlus, r) ->
-          f (BinOp (UnOp (IUnaryMinus, l), IPlus, UnOp (IUnaryMinus, r)))
-      | _ -> le)
+  | UnOp (IUnaryMinus, BinOp (l, IPlus, r)) ->
+      f (BinOp (UnOp (IUnaryMinus, l), IPlus, UnOp (IUnaryMinus, r)))
   (* IPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, IPlus, r) ->
       let cl = Cint.of_expr l in
