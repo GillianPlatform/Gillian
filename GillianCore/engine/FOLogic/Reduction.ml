@@ -2016,17 +2016,17 @@ and reduce_lexpr_loop
                             || Expr.equal e (BinOp (fler, Equal, flel)))
                           pfs
                       then Some Expr.true_ *)
-                (*
-                Same with this, eg. if we're reducing (! (a == b)), it then tries to reduce
-                (a == b), and of course its negation is in the PFS.
 
-                else if
-                  PFS.exists
-                    (fun e ->
-                      Expr.equal e (UnOp (Not, BinOp (flel, Equal, fler)))
-                      || Expr.equal e (UnOp (Not, BinOp (fler, Equal, flel))))
-                    pfs
-                then Some Expr.false_*)
+                (* Same with this, eg. if we're reducing (! (a == b)), it then tries to reduce
+                   (a == b), and of course its negation is in the PFS.
+
+                   else if
+                     PFS.exists
+                       (fun e ->
+                         Expr.equal e (UnOp (Not, BinOp (flel, Equal, fler)))
+                         || Expr.equal e (UnOp (Not, BinOp (fler, Equal, flel))))
+                       pfs
+                   then Some Expr.false_*)
               else None
             in
             (* TODO: Here we don't use the 2nd param, is that ok? *)
@@ -2039,8 +2039,9 @@ and reduce_lexpr_loop
             in
             match (flel, fler) with
             (* "RPFS" only? whatever that meant it's here now. *)
-            | NOp (LstCat, _), LVar y when (* rpfs && *) prefix_catch pfs flel y
-              -> BinOp (UnOp (LstLen, flel), Equal, UnOp (LstLen, fler))
+            (* How does this make any sense?? l1 = l2 <=/=> len(l1) = len(l2)
+               | NOp (LstCat, _), LVar y when (* rpfs && *) prefix_catch pfs flel y
+                 -> BinOp (UnOp (LstLen, flel), Equal, UnOp (LstLen, fler)) *)
             (* Lists *)
             | EList [], x | x, EList [] | Lit (LList []), x | x, Lit (LList [])
               -> (
