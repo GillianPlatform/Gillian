@@ -30,9 +30,9 @@ let empty (x : t) : bool = Hashtbl.length x == 0
 
 (* Type of a variable *)
 let get_unsafe (x : t) (var : string) : Type.t =
-  match Hashtbl.mem x var with
-  | true -> Hashtbl.find x var
-  | false ->
+  match Hashtbl.find_opt x var with
+  | Some t -> t
+  | None ->
       raise (Failure ("Type_env.get_unsafe: variable " ^ var ^ " not found."))
 
 (* Get all matchable elements *)
