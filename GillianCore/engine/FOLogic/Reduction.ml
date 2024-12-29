@@ -2001,16 +2001,24 @@ and reduce_lexpr_loop
         | Equal -> (
             let- () =
               if Expr.equal flel fler then Some Expr.true_
+                (* This made sense when Expr!=Formula, because maybe we have the expr = while
+                   knowing the formula = is true.
+                   But now this always returns true, since the expr is always a formula.
+                   Maybe add a flag, so it only happens if this isn't the "top level"?
+
+                   else if
+                        PFS.exists
+                          (fun e ->
+                            Expr.equal e (BinOp (flel, Equal, fler))
+                            || Expr.equal e (BinOp (fler, Equal, flel)))
+                          pfs
+                      then Some Expr.true_ *)
               else if
                 PFS.exists
                   (fun e ->
-                    Expr.equal e (BinOp (flel, Equal, fler))
-                    || Expr.equal e (BinOp (fler, Equal, flel)))
+                    Expr.equal e (UnOp (Not, BinOp (flel, Equal, fler)))
+                    || Expr.equal e (UnOp (Not, BinOp (fler, Equal, flel))))
                   pfs
-              then Some Expr.true_
-              else if
-                PFS.mem pfs (UnOp (Not, BinOp (flel, Equal, fler)))
-                || PFS.mem pfs (UnOp (Not, BinOp (fler, Equal, flel)))
               then Some Expr.false_
               else None
             in
