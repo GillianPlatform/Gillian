@@ -2016,13 +2016,17 @@ and reduce_lexpr_loop
                             || Expr.equal e (BinOp (fler, Equal, flel)))
                           pfs
                       then Some Expr.true_ *)
-              else if
-                PFS.exists
-                  (fun e ->
-                    Expr.equal e (UnOp (Not, BinOp (flel, Equal, fler)))
-                    || Expr.equal e (UnOp (Not, BinOp (fler, Equal, flel))))
-                  pfs
-              then Some Expr.false_
+                (*
+                Same with this, eg. if we're reducing (! (a == b)), it then tries to reduce
+                (a == b), and of course its negation is in the PFS.
+
+                else if
+                  PFS.exists
+                    (fun e ->
+                      Expr.equal e (UnOp (Not, BinOp (flel, Equal, fler)))
+                      || Expr.equal e (UnOp (Not, BinOp (fler, Equal, flel))))
+                    pfs
+                then Some Expr.false_*)
               else None
             in
             (* TODO: Here we don't use the 2nd param, is that ok? *)
