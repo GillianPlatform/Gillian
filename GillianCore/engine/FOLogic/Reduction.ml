@@ -1826,12 +1826,22 @@ and reduce_lexpr_loop
         | EList _ | ESet _ -> Expr.false_
         | _ -> le)
     | BinOp (Lit l1, Equal, Lit l2) -> Expr.bool (l1 = l2)
+    | BinOp (Lit Nono, Equal, PVar _) | BinOp (PVar _, Equal, Lit Nono) -> le
     (* JOSE: Why are we considering the case of a logical variable being bound to None? *)
     | BinOp (Lit Nono, Equal, LVar x) | BinOp (LVar x, Equal, Lit Nono) -> (
         match Type_env.get gamma x with
         | None | Some NoneType -> le
         | _ -> Expr.false_)
-    | BinOp (Lit Nono, Equal, _) | BinOp (_, Equal, Lit Nono) -> Expr.false_
+    | BinOp (Lit Nono, Equal, e) | BinOp (e, Equal, Lit Nono) -> (
+        let fe = f e in
+        match fe with
+        | Lit Nono -> Expr.true_
+        | Lit _ -> Expr.false_
+        | LVar x when Type_env.get gamma x = Some NoneType ->
+            BinOp (Lit Nono, Equal, fe)
+        | PVar _ -> BinOp (Lit Nono, Equal, fe)
+        | LVar _ -> Expr.false_
+        | _ -> Expr.false_)
     (* BinOps: Equalities (typing) *)
     (* Can this be generalised? add an fn to typing, that maps BinOp -> ret type *)
     | BinOp (UnOp (TypeOf, BinOp (_, StrCat, _)), Equal, Lit (Type t))
