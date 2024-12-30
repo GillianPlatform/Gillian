@@ -357,6 +357,13 @@ let partition_bvargs (lst : bv_arg list) : (t * int) list * int list =
       | Literal i -> Right i)
     lst
 
+let map_bv_arg_exprs (f : t -> t) (lst : bv_arg list) : bv_arg list =
+  List.map
+    (function
+      | BvExpr (e, w) -> BvExpr (f e, w)
+      | Literal i -> Literal i)
+    lst
+
 let exprs_from_bvargs (lst : bv_arg list) : t list =
   let es, _ = partition_bvargs lst in
   List.map (fun (e, _) -> e) es
