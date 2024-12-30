@@ -13,8 +13,9 @@ type t = TypeDef__.expr =
   | EList of t list  (** Lists of expressions    *)
   | ESet of t list  (** Sets of expressions     *)
   | Exists of (string * Type.t option) list * t
-      (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
+      (** Existential quantification. *)
   | ForAll of (string * Type.t option) list * t
+      (** Universal quantification. *)
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
