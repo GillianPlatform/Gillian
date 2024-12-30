@@ -755,7 +755,7 @@ module Cmd : sig
   (** Optional bindings for procedure calls *)
   type logic_bindings_t = string * (string * Expr.t) list
 
-  type 'label t =
+  type 'label t = 'label TypeDef__.cmd =
     | Skip  (** Skip *)
     | Assignment of string * Expr.t  (** Variable Assignment *)
     | LAction of string * string * Expr.t list  (** Action *)
@@ -936,7 +936,7 @@ end
 module Flag : sig
   (** Return-flags for GIL specifications *)
 
-  type t =
+  type t = TypeDef__.flag =
     | Normal  (** Normal return *)
     | Error  (** Error return *)
     | Bug  (** Instant crash - for biabduction *)
@@ -953,7 +953,7 @@ module Spec : sig
   (** GIL specifications *)
 
   (** Single specification *)
-  type st = {
+  type st = TypeDef__.single_spec = {
     ss_pre : Asrt.t;  (** Precondition *)
     ss_posts : Asrt.t list;  (** Postcondition *)
     ss_variant : Expr.t option;  (** Variant *)
@@ -963,7 +963,7 @@ module Spec : sig
   }
 
   (** Full specification *)
-  type t = {
+  type t = TypeDef__.spec = {
     spec_name : string;  (** Procedure/spec name *)
     spec_params : string list;  (** Procedure/spec parameters *)
     spec_sspecs : st list;  (** List of single specifications *)
@@ -1089,7 +1089,7 @@ module Proc : sig
     Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
     (starting from 0). *)
 
-  type ('annot, 'label) t = {
+  type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
     proc_name : string;
     proc_source_path : string option;
     proc_internal : bool;
