@@ -250,7 +250,15 @@ module Make (SMemory : SMemory.S) :
             | Some v -> v
             | None -> raise (Internal_State_Error ([ EVar x ], state)))
         | BinOp (e1, op, e2) -> BinOp (f e1, op, f e2)
-        | BVIntrinsic (op, es, width) -> BVIntrinsic (op, List.map f es, width)
+        | BVExprIntrinsic (op, es, width) ->
+            BVExprIntrinsic
+              ( op,
+                List.map
+                  (function
+                    | Expr.Literal i -> Expr.Literal i
+                    | Expr.BvExpr (e, w) -> Expr.BvExpr (f e, w))
+                  es,
+                width )
         (* Unary operators *)
         | UnOp (op, e) -> UnOp (op, f e)
         (* Lists, sets, n-ary operators *)

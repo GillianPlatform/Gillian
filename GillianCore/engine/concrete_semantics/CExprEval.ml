@@ -548,7 +548,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
         | Some v -> v)
-    | BVIntrinsic (_, _, _) ->
+    | BVExprIntrinsic (_, _, _) ->
         raise
           (Failure
              "Bitvector intrinsics currently unsupported in concrete semantics")
