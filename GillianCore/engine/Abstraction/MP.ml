@@ -140,7 +140,10 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     (* The remaining cases proceed recursively *)
     | UnOp (_, e) -> f e
     | BinOp (e1, _, e2) -> join [ e1; e2 ]
-    | BVIntrinsic (_, es, _) -> join es
+    | BVExprIntrinsic (_, es, _) ->
+        join
+          (let e, _ = Expr.partition_bvargs es in
+           List.map (fun (x, _) -> x) e)
     | NOp (_, le) | EList le | ESet le -> join le
     | LstSub (e1, e2, e3) ->
         let result = join [ e1; e2; e3 ] in
@@ -287,7 +290,7 @@ let rec learn_expr
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
   (* TODO: Finish bit vectors inversions *)
-  | BVIntrinsic (_, _, _) -> []
+  | BVExprIntrinsic (_, _, _) -> []
   (* Can we learn anything from Exists? *)
   | Exists _ | EForall _ -> []
 
@@ -450,6 +453,14 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
   | IsInt e ->
       e |> simple_ins_expr |> List_utils.remove_duplicates
       |> List.map minimise_matchables
+  | BVFormIntrinsic (_, es) ->
+      let exprs = Expr.exprs_from_bvargs es in
+      let lists = List.map simple_ins_expr exprs |> List_utils.list_product in
+      let sum =
+        List.map (fun lst -> List.fold_left KB.union KB.empty lst) lists
+      in
+      let dedup = List_utils.remove_duplicates sum in
+      List.map minimise_matchables dedup
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)
