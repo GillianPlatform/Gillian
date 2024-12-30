@@ -350,6 +350,17 @@ let rec sequence_opt (l : 'a option list) : 'a list option =
       | Some x -> Option.map (fun lst -> x :: lst) (sequence_opt tl)
       | None -> None)
 
+let partition_bvargs (lst : bv_arg list) : (t * int) list * int list =
+  List.partition_map
+    (function
+      | BvExpr (e, w) -> Left (e, w)
+      | Literal i -> Right i)
+    lst
+
+let exprs_from_bvargs (lst : bv_arg list) : t list =
+  let es, _ = partition_bvargs lst in
+  List.map (fun (e, _) -> e) es
+
 let rec map_opt
     (f_before : t -> t option * bool)
     (f_after : (t -> t) option)

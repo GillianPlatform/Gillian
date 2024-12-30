@@ -294,6 +294,8 @@ module Expr : sig
   (** {2: Helpers for building expressions}
     Operations will be optimised away if possible, e.g. [type_ (EList x)] will give [Lit (Type ListType)] directly instead of using {!UnOp.TypeOf} *)
 
+  val partition_bvargs : bv_arg list -> (t * int) list * int list
+  val exprs_from_bvargs : bv_arg list -> t list
   val lit : Literal.t -> t
   val num : float -> t
   val num_int : int -> t
