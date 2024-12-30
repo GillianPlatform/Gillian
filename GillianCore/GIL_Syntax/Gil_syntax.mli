@@ -804,7 +804,7 @@ end
 module Pred : sig
   (** GIL Predicates *)
 
-  type t = {
+  type t = TypeDef__.pred = {
     pred_name : string;  (** Name of the predicate *)
     pred_source_path : string option;
     pred_internal : bool;
