@@ -89,7 +89,8 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
         | _, Lit (Num _) -> raise (exn "LstNth with float")
         | le, n -> BinOp (le, LstNth, n))
     | BinOp (le1, op, le2) -> BinOp (f le1, op, f le2)
-    | BVIntrinsic (op, es, width) -> BVIntrinsic (op, List.map f es, width)
+    | BVExprIntrinsic (op, es, width) ->
+        BVExprIntrinsic (op, Expr.map_bv_arg_exprs f es, width)
     (* Unary Operators **)
     | UnOp (Car, lst) -> (
         match f lst with
