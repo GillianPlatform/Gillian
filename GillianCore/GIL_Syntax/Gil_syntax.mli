@@ -885,13 +885,13 @@ end
 module Lemma : sig
   (** GIL Lemmas *)
 
-  type spec = {
+  type spec = TypeDef__.lemma_spec = {
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)
     lemma_spec_variant : Expr.t option;  (** Variant *)
   }
 
-  type t = {
+  type t = TypeDef__.lemma = {
     lemma_name : string;  (** Name *)
     lemma_source_path : string option;
     lemma_internal : bool;
