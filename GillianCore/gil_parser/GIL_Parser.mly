@@ -406,12 +406,12 @@ gbvintrinsic:
 | BVLSHR { BVOps.BVLShr }
 
 gbvformintrinsic:
-  | BVULT { BVOps.BVUlt }
-  | BVNEGO { BVOps.BVNegO}
-  | BVUADDO { BVOps.BVUAddO }
-  | BVSADDO { BVOps.BVSAddO }
-  | BVUMULO { BVOps.BVUMulO } 
-  | BVSMULO { BVOps.BVSMulO }  
+  | BVULT { BVPred.BVUlt }
+  | BVNEGO { BVPred.BVNegO}
+  | BVUADDO { BVPred.BVUAddO }
+  | BVSADDO { BVPred.BVSAddO }
+  | BVUMULO { BVPred.BVUMulO } 
+  | BVSMULO { BVPred.BVSMulO }  
 
 bv_arg_target:
   | BVTYPELIT LBRACE e=expr_target COMMA width=INTEGER RBRACE { Expr.BvExpr(e,Z.to_int width) }
@@ -1102,6 +1102,9 @@ pure_assertion_target:
 (* E --s-- E *)
   | left_expr=expr_target; LSETSUB; right_expr=expr_target
     { Formula.SetSub (left_expr, right_expr) }
+(* bvult(Bitvector(x,w),Bitvector(y,w)) *)
+  | itname=gbvformintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); RBRACE 
+    { Formula.BVFormIntrinsic(itname, es) }
 (* forall X, Y, Z . P *)
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
     { Formula.ForAll (vars, ass) }
