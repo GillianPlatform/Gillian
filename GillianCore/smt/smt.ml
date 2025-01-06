@@ -775,7 +775,11 @@ let encode_quantified_expr
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
-let encode_bvop (op : BVOps.t) (width : int) (bvs : sexp list) : Encoding.t =
+let encode_bvop
+    (op : BVOps.t)
+    (literals : int list)
+    (bvs : sexp list)
+    (width : int) : Encoding.t =
   let binop_encode (f : sexp -> sexp -> sexp) =
     f (List.hd bvs) (List.nth bvs 1)
   in
@@ -784,6 +788,8 @@ let encode_bvop (op : BVOps.t) (width : int) (bvs : sexp list) : Encoding.t =
     | BVOps.BVPlus -> binop_encode bv_add
     | BVOps.BVAnd -> binop_encode bv_and
     | BVConcat -> binop_encode bv_concat
+    | BVExtract ->
+        bv_extract (List.hd literals) (List.nth literals 1) (List.hd bvs)
     | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))
   in
   Encoding.native (Gil_syntax.Type.BvType width) sexpr
@@ -812,19 +818,12 @@ let rec encode_logical_expression
   | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | BVExprIntrinsic (op, es, width) ->
-      let extract_bv_exprs (lst : Expr.bv_arg list) =
-        List.filter_map
-          (function
-            | Expr.Literal _ -> None
-            | Expr.BvExpr (exp, w) -> Some (exp, w))
-          lst
-      in
-      let extracted = extract_bv_exprs es in
-      let widths = List.map (fun (_, w) -> w) extracted in
-      let>-- les = List.map (fun (e, _) -> f e) extracted in
-      List.combine les widths
-      |> List.map (fun (encoded, w) -> get_bv w encoded)
-      |> encode_bvop op width
+      let extracted_bvs, extracted_lits = Expr.partition_bvargs es in
+      let widths = List.map (fun (_, w) -> w) extracted_bvs in
+      let>-- les = List.map (fun (e, _) -> f e) extracted_bvs in
+
+      List.combine les widths |> List.map (fun (encoded, w) -> get_bv w encoded)
+      |> fun encodings -> encode_bvop op extracted_lits encodings width
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
       les |> List.map get_set |> set_union' Z3 >- SetType
