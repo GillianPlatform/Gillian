@@ -182,11 +182,16 @@ module Infer_types_to_gamma = struct
               Some (Expr.Literal i2),
               Some (Expr.BvExpr (_, w)) ) ->
               if i0 < w && i2 < w then
-                Some ([ BvType w ], no_lits_constraint, BvType (i0 - i2 + 1))
+                Some
+                  ( [ BvType w ],
+                    (fun lts ->
+                      List.length lts = 2
+                      && List.for_all (fun x -> x < w) lts
+                      && List.hd lts >= List.nth lts 1),
+                    BvType (i0 - i2 + 1) )
               else None
           | _ -> None)
     in
-
     Option.map
       (fun (type_list, handler, res_ty) ->
         let params_typed =
