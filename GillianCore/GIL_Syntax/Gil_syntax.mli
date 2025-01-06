@@ -196,6 +196,21 @@ module BVOps : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.BVPred *)
+module BVPred : sig
+  type t = TypeDef__.bvpred =
+    | BVUlt
+    | BVUMulO
+    | BVSMulO
+    | BVNegO
+    | BVUAddO
+    | BVSAddO
+  [@@deriving yojson, eq]
+
+  (** Printer *)
+  val str : t -> string
+end
+
 (** @canonical Gillian.Gil_syntax.BinOp *)
 module BinOp : sig
   (** GIL Binary Operators *)
