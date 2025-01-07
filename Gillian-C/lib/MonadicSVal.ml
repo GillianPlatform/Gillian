@@ -237,8 +237,10 @@ module SVArray = struct
             fmt "Undefined pf: not as concrete: %a" Expr.pp size);
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
-        forall [ (i, Some IntType) ] zero <= i_e
-        && i_e < size ==> (Expr.list_nth_e arr_exp i_e == Lit Undefined)
+        forall
+          [ (i, Some IntType) ]
+          ((zero <= i_e && i_e < size)
+          ==> (Expr.list_nth_e arr_exp i_e == Lit Undefined))
 
   let zeros_pf ?size arr_exp =
     let size =
@@ -259,12 +261,12 @@ module SVArray = struct
     | _ ->
         Logging.verbose (fun fmt ->
             fmt "Zeros pf: not as concrete: %a" Expr.pp size);
-        let is_zero e = e == Expr.int 0 in
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         let zero = Expr.int 0 in
-        forall [ (i, Some IntType) ] zero <= i_e
-        && i_e < size ==> is_zero (Expr.list_nth_e arr_exp i_e)
+        forall
+          [ (i, Some IntType) ]
+          ((zero <= i_e && i_e < size) ==> (Expr.list_nth_e arr_exp i_e == zero))
 
   let to_arr_with_size arr s =
     let open Expr.Infix in

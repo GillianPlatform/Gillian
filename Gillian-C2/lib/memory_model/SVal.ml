@@ -290,15 +290,16 @@ module SVArray = struct
             fmt "Zeros pf: not as concrete: %a" Expr.pp size);
         let values_var = LVar.alloc () in
         let values = Expr.LVar values_var in
-        let is_zero e = e == Expr.int 0 in
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         let zero = Expr.zero_i in
         let learned_types = [ (values_var, Type.ListType) ] in
         let correct_length = Expr.list_length values == size in
         let all_zero =
-          forall [ (i, Some IntType) ] zero <= i_e
-          && i_e < size ==> is_zero (Expr.list_nth_e values i_e)
+          forall
+            [ (i, Some IntType) ]
+            ((zero <= i_e && i_e < size)
+            ==> (Expr.list_nth_e values i_e == zero))
         in
         return ~learned:[ correct_length; all_zero ] ~learned_types values
 
