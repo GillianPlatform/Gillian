@@ -794,6 +794,18 @@ let encode_bvop
   in
   Encoding.native (Gil_syntax.Type.BvType width) sexpr
 
+let encode_bv_assertion (op : BVPred.t) (_literals : int list) (bvs : sexp list)
+    =
+  let binop_encode (f : sexp -> sexp -> sexp) =
+    f (List.hd bvs) (List.nth bvs 1)
+  in
+  let sexpr =
+    match op with
+    | BVPred.BVUlt -> binop_encode bv_ult
+    | _ -> raise (Failure ("No encoding for bv op " ^ BVPred.str op))
+  in
+  Encoding.native Gil_syntax.Type.BooleanType sexpr
+
 let rec encode_logical_expression
     ~(gamma : typenv)
     ~(llen_lvars : SS.t)
@@ -821,7 +833,6 @@ let rec encode_logical_expression
       let extracted_bvs, extracted_lits = Expr.partition_bvargs es in
       let widths = List.map (fun (_, w) -> w) extracted_bvs in
       let>-- les = List.map (fun (e, _) -> f e) extracted_bvs in
-
       List.combine les widths |> List.map (fun (encoded, w) -> get_bv w encoded)
       |> fun encodings -> encode_bvop op extracted_lits encodings width
   | NOp (SetUnion, les) ->
@@ -912,7 +923,12 @@ and encode_assertion
   | IsInt e ->
       let>- e = fe e in
       num_divisible (get_num e) 1 >- BooleanType
-  | BVFormIntrinsic (_, _) -> raise (Failure "unhandled")
+  | BVFormIntrinsic (op, es) ->
+      let extracted_es, extracted_lits = Expr.partition_bvargs es in
+      let widths = List.map (fun (_, w) -> w) extracted_es in
+      let>-- les = List.map (fun (e, _) -> fe e) extracted_es in
+      List.combine les widths |> List.map (fun (encoded, w) -> get_bv w encoded)
+      |> fun encodings -> encode_bv_assertion op extracted_lits encodings
 
 let encode_assertion_top_level
     ~(gamma : typenv)
