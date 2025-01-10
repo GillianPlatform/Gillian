@@ -89,9 +89,9 @@ let of_gil_expr sval_e =
   let open Patterns in
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let* sval_e = Delayed.reduce sval_e in
-  if%sat undefined sval_e then DO.some SUndefined
-  else
-    if%sat obj sval_e then
+  match%sat sval_e with
+  | undefined -> DO.some SUndefined
+  | obj ->
       let loc_expr = Expr.list_nth sval_e 0 in
       let ofs = Expr.list_nth sval_e 1 in
       let* ofs = Delayed.reduce ofs in
@@ -105,16 +105,11 @@ let of_gil_expr sval_e =
             (aloc, learned)
       in
       DO.some ~learned (Sptr (loc, ofs))
-    else
-      if%sat int_typ sval_e then DO.some (SVint (Expr.list_nth sval_e 1))
-      else
-        if%sat float_typ sval_e then DO.some (SVfloat (Expr.list_nth sval_e 1))
-        else
-          if%sat long_typ sval_e then DO.some (SVlong (Expr.list_nth sval_e 1))
-          else
-            if%sat single_typ sval_e then
-              DO.some (SVsingle (Expr.list_nth sval_e 1))
-            else DO.none ()
+  | int_typ -> DO.some (SVint (Expr.list_nth sval_e 1))
+  | float_typ -> DO.some (SVfloat (Expr.list_nth sval_e 1))
+  | long_typ -> DO.some (SVlong (Expr.list_nth sval_e 1))
+  | single_typ -> DO.some (SVsingle (Expr.list_nth sval_e 1))
+  | _ -> DO.none ()
 
 let of_gil_expr_exn sval_e =
   let* value_opt = of_gil_expr sval_e in
