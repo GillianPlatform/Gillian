@@ -562,6 +562,7 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
     | Num n -> real_k (Q.of_float n) >- NumberType
     | String s -> encode_string s >- StringType
     | Loc l -> encode_string l >- ObjectType
+    | LBitvector (v, w) -> bv_k w v >- BvType w
     | Type t -> encode_type t >- TypeType
     | LList lits ->
         let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
