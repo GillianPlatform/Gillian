@@ -101,6 +101,7 @@ module Literal : sig
     | Loc of string  (** GIL locations (uninterpreted symbols) *)
     | Type of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList of t list  (** Lists of GIL literals *)
+    | LBitvector of (Z.t * int)
     | Nono  (** Negative information *)
   [@@deriving yojson, eq]
 

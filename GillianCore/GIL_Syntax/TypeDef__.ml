@@ -1,3 +1,9 @@
+let z_to_yojson z = `String (Z.to_string z)
+
+let z_of_yojson = function
+  | `String s -> ( try Ok (Z.of_string s) with Invalid_argument m -> Error m)
+  | _ -> Error "Invalid yojson for Z"
+
 type constant =
   | Min_float
   | Max_float
@@ -29,20 +35,14 @@ and literal =
   | Empty
   | Constant of constant
   | Bool of bool
-  | Int of
-      (Z.t
-      [@opaque]
-      [@to_yojson fun z -> `String (Z.to_string z)]
-      [@of_yojson
-        function
-        | `String s -> (
-            try Ok (Z.of_string s) with Invalid_argument m -> Error m)
-        | _ -> Error "Invalid yojson for Z"])
+  | Int of (Z.t[@opaque] [@to_yojson z_to_yojson] [@of_yojson z_of_yojson])
   | Num of float
   | String of string
   | Loc of string
   | Type of typ
   | LList of literal list
+  | LBitvector of
+      ((Z.t[@opaque] [@to_yojson z_to_yojson] [@of_yojson z_of_yojson]) * int)
   | Nono
 
 and binop =

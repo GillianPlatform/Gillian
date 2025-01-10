@@ -274,7 +274,9 @@ module Node = struct
                 in
                 mk (Array result)
               else
-                let* byte_zeros = SVArr.make_zeros ~size:size_left ~chunk:U8 in
+                let* byte_zeros =
+                  SVArr.make_zeros ~size:size_left ~chunk:Chunk.i8
+                in
                 let+ byte_sv = SVArr.byte_array_of_sval sv in
                 let result =
                   SVArr.concat_same_chunk byte_sv byte_zeros |> Option.get
@@ -302,7 +304,9 @@ module Node = struct
                 (* Garanteed to work *)
                 mk (Array result)
               else
-                let* byte_zeros = SVArr.make_zeros ~size:size_left ~chunk:U8 in
+                let* byte_zeros =
+                  SVArr.make_zeros ~size:size_left ~chunk:Chunk.i8
+                in
                 let+ byte_sv = SVArr.byte_array_of_sval sv in
                 let result =
                   SVArr.concat_same_chunk byte_zeros byte_sv |> Option.get
