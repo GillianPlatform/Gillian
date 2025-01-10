@@ -81,13 +81,13 @@ module Test_match_ent = struct
 end
 
 module Test_match_sat = struct
-  let computation t = if%sat t #>= one then return 10 else return 0
+  let computation t = if%sat t >= one then return 10 else return 0
 
   let process x =
     let* z = computation x in
-    let lt_zero x = x #<= zero in
-    let lt_one x = x #<= one in
-    let gt_two x = x #>= two in
+    let lt_zero x = x <= zero in
+    let lt_one x = x <= one in
+    let gt_two x = x >= two in
     let* y =
       match%sat x with
       | lt_zero -> return (-1)
@@ -95,11 +95,11 @@ module Test_match_sat = struct
       | gt_two -> return 2
       | _ -> return 1
     in
-    return (z + y)
+    return (Stdlib.( + ) z y)
 
   let starting_pc x =
     Monadic.Pc.make
-      ~pfs:(Engine.PFS.of_list [ Formula.Not x #== one ])
+      ~pfs:(Engine.PFS.of_list [ not (x == one) ])
       ~gamma:(Engine.Type_env.init ()) ~matching:false ()
 
   let results =
