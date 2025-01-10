@@ -94,6 +94,17 @@
   printbox-text))
 
 (package
+ (name gillian-llvm)
+ (sites
+  (share runtime))
+ (synopsis "Gillian instantiation for LLVM")
+ (depends
+  (gillian
+   (= :version))
+  dune-site
+  printbox-text))
+
+(package
  (name wisl)
  (sites
   (share runtime))

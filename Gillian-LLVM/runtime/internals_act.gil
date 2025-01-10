@@ -1,0 +1,76 @@
+#internal
+
+proc i__storev(chunk, vptr, v) {
+       goto [(typeOf vptr) = List] ctn sgf;
+  ctn: u := [mem_store](chunk, l-nth(vptr, 0i), l-nth(vptr, 1i), v);
+       ret := undefined;
+       return;
+  sgf: assert (False)
+};
+
+proc i__loadv(chunk, vptr) {
+       goto [(typeOf vptr) = List] ctn sgf;
+  ctn: vload := [mem_load](chunk, l-nth(vptr, 0i), l-nth(vptr, 1i));
+       ret := l-nth(vload, 0i);
+       return;
+  sgf: assert (False)
+};
+
+
+proc i__value_of_bool(v) {
+          goto [v] tr fl;
+      tr: ret := 1i;
+          return;
+      fl: ret := 0i;
+          return
+};
+
+proc i__bool_of_value(v) {
+            goto [ v = 0i ] fl oth;
+      fl:   ret := false;
+            return;
+      oth:  goto [ v = 1i ] tr unde;
+      tr:   ret := true;
+            return;
+      unde: fail[operator]("Not a boolean value")
+};
+
+proc i__greater_perm(perma, permb) {
+            goto [
+                (permb = "None")
+            or ((permb = "Nonempty") and ((perma = "Nonempty") or (perma = "Readable") or (perma = "Writable") or (perma = "Freeable")))
+            or ((permb = "Readable") and ((perma = "Readable") or (perma = "Writable") or (perma = "Freeable")))
+            or ((permb = "Writable") and ((perma = "Writable") or (perma = "Freeable")))
+            or ((permb = "Freeable") and (perma = "Freeable"))
+            ] yes no;
+      yes:  ret := true;
+            return;
+      no:   ret := false;
+            return
+};
+
+proc i__has_cur_perm(b, o, perm) {
+      perml := [mem_getcurperm](b, o);
+      ret := "i__greater_perm"(l-nth(perml, 0i), perm);
+      return
+};
+
+proc i__valid_pointer(b, o) {
+      ret := "i__has_cur_perm"(b, o, "Nonempty");
+      return
+};
+
+proc i__weak_valid_ptr(b, o) {
+      ret := true;
+      return
+};
+
+proc i__ef_memcpy(sz, al, bdst, bsrc) {
+      (* FIXME: It should also check alignment with respect to pointers *)
+      ret := [mem_move](l-nth(bdst, 0i), l-nth(bdst, 1i), l-nth(bsrc, 0i), l-nth(bsrc, 1i), sz);
+      return
+};
+
+proc i__not_implemented() {
+      fail[NotImplemented]()
+};

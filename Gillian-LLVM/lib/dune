@@ -1,0 +1,7 @@
+(library
+ (name gillian_llvm_lib)
+ (libraries gillian yojson irep_lib dune-site))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-llvm))

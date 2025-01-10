@@ -3,6 +3,7 @@
  GillianCore
  Gillian-JS
  Gillian-C
+ Gillian-LLVM
  kanillian
  Gillian-Alcotest-Runner
  ppx_sat)
