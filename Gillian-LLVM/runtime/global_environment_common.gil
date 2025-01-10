@@ -1,0 +1,45 @@
+#internal
+
+proc i__get_function_name(v_ptr) {
+         (* The value given should be a pointer *)
+         goto [not (typeOf (l-nth (v_ptr, 0i)) = Obj)] fail1 ctn1;
+  fail1: fail[functionCall]();
+         (* The offset for a pointer to a function should always be 0i *)
+  ctn1:  goto [not ((l-nth (v_ptr, 1i)) = 0i)] fail2 ctn2;
+  fail2: fail[functionCall]();
+  ctn2:  defl := [genv_getdef](l-nth(v_ptr, 0i));
+         typ := l-nth(l-nth(defl, 1i), 0i);
+         val := l-nth(l-nth(defl, 1i), 1i);
+         goto [not (typ = "function")] fail3 ctn3;
+  fail3: fail[functionCall]();
+  ctn3:  ret := val;
+         return
+};
+
+proc i__glob_set_fun(symb, fname) {
+      ll := [mem_alloc](0i, 1i);
+      l := l-nth(ll, 0i);
+      u := [mem_dropperm](l, 0i, 1i, "Nonempty");
+      u := [genv_setsymbol](symb, l);
+      u := [genv_setdef](l, {{ "function", fname }});
+      ret := null;
+      return
+};
+
+proc i__glob_set_var(symb, vname, size, init_data_list, permission) {
+      ll := [mem_alloc](0i, size);
+      l := l-nth(ll, 0i);
+      u := "i__store_zeros"(l, size);
+      u := "i__store_init_data_list"(l, init_data_list);
+      u := [mem_dropperm](l, 0i, size, permission);
+      u := [genv_setsymbol](symb, l);
+      u := [genv_setdef](l, {{ "variable", vname }});
+      ret := null;
+      return
+};
+
+proc i__store_zeros(b, sz) {
+  u := [mem_zeroinit](b, 0i, sz);
+  ret := null;
+  return
+};

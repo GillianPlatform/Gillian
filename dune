@@ -3,6 +3,7 @@
  GillianCore
  Gillian-JS
  Gillian-C
+ Gillian-LLVM
  Gillian-C2
  transformers
  Gillian-Alcotest-Runner

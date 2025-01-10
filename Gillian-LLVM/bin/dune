@@ -1,0 +1,5 @@
+(executable
+ (name gillian_llvm)
+ (public_name gillian-llvm)
+ (libraries gillian_llvm_lib gillian memory_model lifter)
+ (package gillian-llvm))

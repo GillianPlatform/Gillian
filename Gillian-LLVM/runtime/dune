@@ -1,0 +1,17 @@
+(install
+ (section
+  (site
+   (gillian-llvm runtime)))
+ (files
+  archi32_constants.gil
+  archi64_constants.gil
+  global_environment_common.gil
+  internal_binops.gil
+  internal_unops.gil
+  internal_casts.gil
+  internal_stdlib.gil
+  internals.gil
+  internals_act.gil
+  rust_allocation_internals.gil
+  string.gil)
+ (package gillian-llvm))
