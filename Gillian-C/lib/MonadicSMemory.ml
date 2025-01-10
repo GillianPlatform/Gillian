@@ -256,7 +256,7 @@ module Mem = struct
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
-    let** loc_name = resolve_loc_result loc in
+    let* loc_name = resolve_or_create_loc_name loc in
     let* tree = get_or_create_tree map loc_name in
     let++ tree_set =
       SHeapTree.prod_bounds tree bounds |> DR.of_result |> map_lift_err loc_name
@@ -525,7 +525,7 @@ let execute_prod_single heap params =
   ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let* sval = SVal.of_gil_expr_exn sval_e in
+      let* sval = SVal.of_gil_expr_vanish sval_e in
       let++ mem = Mem.prod_single heap.mem loc ofs chunk sval perm in
       { heap with mem }
   | _ -> fail_ungracefully "set_single" params

@@ -89,7 +89,7 @@ let of_gil_expr sval_e =
   let open Patterns in
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let* sval_e = Delayed.reduce sval_e in
-  match%ent sval_e with
+  match%sat sval_e with
   | undefined -> DO.some SUndefined
   | obj ->
       let loc_expr = Expr.list_nth sval_e 0 in
@@ -118,6 +118,12 @@ let of_gil_expr_exn sval_e =
   | None ->
       if !Gillian.Utils.Config.under_approximation then Delayed.vanish ()
       else raise (NotACompCertValue sval_e)
+
+let of_gil_expr_vanish sval_e =
+  let* value_opt = of_gil_expr sval_e in
+  match value_opt with
+  | Some value -> Delayed.return value
+  | None -> Delayed.vanish ()
 
 let to_gil_expr_undelayed = to_gil_expr
 

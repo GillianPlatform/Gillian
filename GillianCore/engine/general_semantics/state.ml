@@ -107,7 +107,7 @@ module type S = sig
   val get_lvars : t -> Var.Set.t
 
   (** Turns a state into a list of assertions *)
-  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
+  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
 
   val evaluate_slcmd : 'a MP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
@@ -144,7 +144,7 @@ module type S = sig
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t -> bool
   val get_failing_constraint : err_t -> Formula.t
-  val get_fixes : err_t -> Asrt.t list list
+  val get_fixes : err_t -> Asrt.t list
   val get_equal_values : t -> vt list -> vt list
   val get_heap : t -> heap_t
 end

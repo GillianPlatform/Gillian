@@ -345,8 +345,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
 
   let is_empty (subst : t) : bool = Hashtbl.length subst = 0
 
-  let substitute_formula (subst : t) ~(partial : bool) (a : Formula.t) :
-      Formula.t =
+  let substitute_formula (subst : t) ~(partial : bool) : Formula.t -> Formula.t
+      =
     let open Formula in
     let old_binders_substs = ref [] in
     let f_before a =
@@ -376,25 +376,17 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           a
       | _ -> a
     in
-    map (Some f_before) (Some f_after) (Some (subst_in_expr subst ~partial)) a
+    map (Some f_before) (Some f_after) (Some (subst_in_expr subst ~partial))
 
-  let substitute_asrt (subst : t) ~(partial : bool) (a : Asrt.t) : Asrt.t =
-    Asrt.map None None
-      (Some (subst_in_expr subst ~partial))
-      (Some (substitute_formula subst ~partial))
-      a
+  let substitute_asrt (subst : t) ~(partial : bool) : Asrt.t -> Asrt.t =
+    Asrt.map (subst_in_expr subst ~partial) (substitute_formula subst ~partial)
 
-  let substitute_slcmd (subst : t) ~(partial : bool) (lcmd : SLCmd.t) : SLCmd.t
-      =
-    SLCmd.map None
-      (Some (substitute_asrt subst ~partial))
-      (Some (subst_in_expr subst ~partial))
-      lcmd
+  let substitute_slcmd (subst : t) ~(partial : bool) : SLCmd.t -> SLCmd.t =
+    SLCmd.map (substitute_asrt subst ~partial) (subst_in_expr subst ~partial)
 
-  let substitute_lcmd (subst : t) ~(partial : bool) (lcmd : LCmd.t) : LCmd.t =
-    LCmd.map None
-      (Some (subst_in_expr subst ~partial))
-      (Some (substitute_formula subst ~partial))
-      (Some (substitute_slcmd subst ~partial))
-      lcmd
+  let substitute_lcmd (subst : t) ~(partial : bool) : LCmd.t -> LCmd.t =
+    LCmd.map
+      (subst_in_expr subst ~partial)
+      (substitute_formula subst ~partial)
+      (substitute_slcmd subst ~partial)
 end

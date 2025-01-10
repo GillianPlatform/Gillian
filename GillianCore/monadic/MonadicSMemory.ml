@@ -42,12 +42,12 @@ module type S = sig
   val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t
-  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
+  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
   val mem_constraints : t -> Formula.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
-  val get_fixes : err_t -> Asrt.t list list
+  val get_fixes : err_t -> Asrt.t list
   val can_fix : err_t -> bool
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
@@ -67,7 +67,7 @@ module Lift (MSM : S) :
   include MSM
 
   let assertions ?to_keep t =
-    List.map Engine.Reduction.reduce_assertion (assertions ?to_keep t)
+    Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
   let execute_action action_name mem gpc params =
     let open Syntaxes.List in

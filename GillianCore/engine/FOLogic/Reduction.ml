@@ -2159,7 +2159,7 @@ and simplify_int_arithmetic_lexpr
   | _ -> le
 
 (** Checks if an int expression is greater than zero.
-      
+
     @returns [Some true] if definitely > 0, [Some false] if definitely < 0,
       and [None] if both outcomes are satisfiable. *)
 and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
@@ -2412,76 +2412,77 @@ and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
 
 let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     string option =
-  let max_fuel = 5 in
+  let max_fuel = 10 in
+
+  let loc_name = function
+    | Expr.ALoc loc | Lit (Loc loc) -> Some loc
+    | _ -> None
+  in
 
   let rec resolve_expr_to_location_aux
       (fuel : int)
       (tried : Expr.Set.t)
       (to_try : Expr.t list) : string option =
+    let open Syntaxes.Option in
+    L.tmi (fun m -> m "to_try: %a" (Fmt.Dump.list Expr.pp) to_try);
+    let* () = if fuel <= 0 then None else Some () in
+    let* e, rest =
+      match to_try with
+      | [] -> None
+      | e :: rest -> Some (e, rest)
+    in
     let f = resolve_expr_to_location_aux (fuel - 1) in
-    match fuel = 0 with
-    | true -> None
-    | false -> (
-        match to_try with
-        | [] -> None
-        | e :: _rest -> (
-            match e with
-            | Lit (Loc loc) | ALoc loc -> Some loc
-            | _ -> (
-                let equal_e = get_equal_expressions pfs e in
-                let equal_e =
-                  equal_e @ List.map (reduce_lexpr ~pfs ~gamma) equal_e
-                in
-                let ores =
-                  List.find_opt
-                    (fun x ->
-                      match x with
-                      | Expr.ALoc _ | Lit (Loc _) -> true
-                      | _ -> false)
-                    equal_e
-                in
-                match ores with
-                | Some (ALoc loc) | Some (Lit (Loc loc)) -> Some loc
-                | _ -> (
-                    let lvars_e =
-                      List.map
-                        (fun x -> Expr.LVar x)
-                        (Containers.SS.elements (Expr.lvars e))
-                    in
-                    let found_subst =
-                      List.map
-                        (fun e -> (e, get_equal_expressions pfs e))
-                        lvars_e
-                    in
-                    let found_subst =
-                      List.filter_map
-                        (fun (e, es) ->
-                          match es with
-                          | [] -> None
-                          | es :: _ -> Some (e, es))
-                        found_subst
-                    in
-                    let subst_e =
-                      List.fold_left
-                        (fun (e : Expr.t) (e_to, e_with) ->
-                          Expr.subst_expr_for_expr ~to_subst:e_to
-                            ~subst_with:e_with e)
-                        e found_subst
-                    in
-                    let subst_e = reduce_lexpr ~pfs ~gamma subst_e in
-                    match subst_e with
-                    | ALoc loc | Lit (Loc loc) -> Some loc
-                    | _ ->
-                        let new_tried = Expr.Set.add e tried in
-                        let new_to_try = equal_e @ [ subst_e ] in
-                        let new_to_try =
-                          List.filter
-                            (fun e -> not (Expr.Set.mem e new_tried))
-                            new_to_try
-                        in
-                        f new_tried new_to_try))))
+    (* If e is a loc name, we return it *)
+    let/ () = loc_name e in
+    let equal_e = get_equal_expressions pfs e in
+    let equal_e = equal_e @ List.map (reduce_lexpr ~pfs ~gamma) equal_e in
+    (* If we find a loc in there, we return it *)
+    let/ () = List.find_map loc_name equal_e in
+    (* We actually want to try all possible substs! *)
+    let all_lvars = Containers.SS.elements (Expr.lvars e) in
+    let subst_for_each_lvar =
+      List.map
+        (fun x ->
+          let e = Expr.LVar x in
+          let with_eq =
+            List.map (fun eq -> (e, eq)) (get_equal_expressions pfs e)
+          in
+          (e, e) :: with_eq)
+        all_lvars
+    in
+    L.tmi (fun m ->
+        m "subst_for_each_lvar: %a"
+          (Fmt.Dump.list (Fmt.Dump.list (Fmt.Dump.pair Expr.pp Expr.pp)))
+          subst_for_each_lvar);
+    let found_substs =
+      List.fold_left
+        (fun l1 l2 -> List_utils.cross_product l1 l2 (fun l x -> x :: l))
+        [ [] ] subst_for_each_lvar
+    in
+    L.tmi (fun m ->
+        m "found_substs: %a"
+          (Fmt.Dump.list (Fmt.Dump.list (Fmt.Dump.pair Expr.pp Expr.pp)))
+          found_substs);
+    (* lvar and substs is a list [ (ei, esi) ] where for each ei, esi is a list of equal expressions.
+       We are going to build the product of each esi to obtain *)
+    let subst_es =
+      List.map
+        (List.fold_left
+           (fun (e : Expr.t) (e_to, e_with) ->
+             Expr.subst_expr_for_expr ~to_subst:e_to ~subst_with:e_with e)
+           e)
+        found_substs
+    in
+    L.tmi (fun m -> m "subst_es: %a" (Fmt.Dump.list Expr.pp) subst_es);
+    let subst_es = List.map (reduce_lexpr ~pfs ~gamma) subst_es in
+    let/ () = List.find_map loc_name subst_es in
+    let new_tried = Expr.Set.add e tried in
+    let new_to_try = rest @ equal_e @ subst_es in
+    let new_to_try =
+      List.filter (fun e -> not (Expr.Set.mem e new_tried)) new_to_try
+    in
+    f new_tried new_to_try
   in
-
   resolve_expr_to_location_aux max_fuel Expr.Set.empty [ e ]
 
 let rec reduce_formula_loop
@@ -3172,59 +3173,53 @@ end
 module ETSet = Set.Make (MyET)
 
 let reduce_types (a : Asrt.t) : Asrt.t =
-  let rec separate (a : Asrt.t) =
-    match a with
-    | Pure True -> ([], [])
-    | Pure False -> raise PFSFalse
-    | Pure (Eq (UnOp (TypeOf, e), Lit (Type t)))
-    | Pure (Eq (Lit (Type t), UnOp (TypeOf, e))) -> ([], [ (e, t) ])
-    | Star (a1, a2) ->
-        let fa1, ft1 = separate a1 in
-        let fa2, ft2 = separate a2 in
-        (fa1 @ fa2, ft1 @ ft2)
-    | Types ets -> ([], ets)
-    | _ -> ([ a ], [])
-  in
-
   try
-    let others, ets = separate a in
+    let others, ets =
+      List.fold_left
+        (fun (others, ets) -> function
+          | Asrt.Pure True -> (others, ets)
+          | Asrt.Pure False -> raise PFSFalse
+          | Asrt.Pure (Eq (UnOp (TypeOf, e), Lit (Type t)))
+          | Asrt.Pure (Eq (Lit (Type t), UnOp (TypeOf, e))) ->
+              (others, (e, t) :: ets)
+          | Asrt.Types ets' -> (others, ets' @ ets)
+          | a -> (a :: others, ets))
+        ([], []) a
+    in
 
     let ets = ETSet.elements (ETSet.of_list ets) in
     match (others, ets) with
-    | [], [] -> Pure True
-    | [], ets -> Types ets
-    | a, ets ->
-        let result = Asrt.star a in
-        if ets = [] then result else Star (Types ets, result)
-  with PFSFalse -> Pure False
+    | [], [] -> [ Asrt.Pure True ] (* Could this be []? *)
+    | [], ets -> [ Asrt.Types ets ]
+    | others, [] -> others
+    | others, ets -> Asrt.Types ets :: others
+  with PFSFalse -> [ Asrt.Pure False ]
 
 (* Reduction of assertions *)
-let rec reduce_assertion_loop
+let reduce_assertion_loop
     (matching : bool)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
-  let f = reduce_assertion_loop matching pfs gamma in
   let fe = reduce_lexpr_loop ~matching pfs gamma in
-  let result =
-    match a with
+  let f : Asrt.atom -> Asrt.t = function
     (* Empty heap *)
-    | Emp -> Asrt.Emp
+    | Asrt.Emp -> []
     (* Star *)
-    | Star (a1, a2) -> (
-        match (f a1, f a2) with
-        | Emp, a | a, Emp -> a
-        | Pure False, _ | _, Pure False -> Asrt.Pure False
-        | Pure True, a | a, Pure True -> a
-        | fa1, fa2 -> Star (fa1, fa2))
     | Wand { lhs = lname, largs; rhs = rname, rargs } ->
-        Wand
-          { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
+        [
+          Wand
+            {
+              lhs = (lname, List.map fe largs);
+              rhs = (rname, List.map fe rargs);
+            };
+        ]
     (* Predicates *)
-    | Pred (name, les) -> Pred (name, List.map fe les)
+    | Pred (name, les) -> [ Pred (name, List.map fe les) ]
     (* Pure assertions *)
-    | Pure True -> Emp
-    | Pure f -> Pure (reduce_formula_loop ~top_level:true matching pfs gamma f)
+    | Pure True -> []
+    | Pure f ->
+        [ Pure (reduce_formula_loop ~top_level:true matching pfs gamma f) ]
     (* Types *)
     | Types lvt -> (
         try
@@ -3232,29 +3227,32 @@ let rec reduce_assertion_loop
             List.fold_right
               (fun (e, t) ac ->
                 match (e : Expr.t) with
-                | Lit lit ->
-                    if t <> Literal.type_of lit then raise WrongType else ac
+                | Lit lit when t <> Literal.type_of lit -> raise WrongType
+                | Lit _ -> ac
                 | _ -> (e, t) :: ac)
               lvt []
           in
-          if lvt = [] then Emp else Types lvt
-        with WrongType -> Pure False)
+          if lvt = [] then [] else [ Types lvt ]
+        with WrongType -> [ Pure False ])
     (* General action *)
-    | GA (act, l_ins, l_outs) -> GA (act, List.map fe l_ins, List.map fe l_outs)
+    | CorePred (act, l_ins, l_outs) ->
+        [ CorePred (act, List.map fe l_ins, List.map fe l_outs) ]
+  in
+  let result = List.concat_map f a in
+  let result =
+    if List.mem (Asrt.Pure False) result then [ Asrt.Pure False ] else result
   in
 
-  if a <> result && not (a == result) then (
-    L.(tmi (fun m -> m "Reduce_assertion: %a -> %a" Asrt.pp a Asrt.pp result));
-    f result)
-  else result
+  (if a <> result && not (a == result) then
+     L.(tmi (fun m -> m "Reduce_assertion: %a -> %a" Asrt.pp a Asrt.pp result)));
+  result
 
-let rec extract_lvar_equalities (a : Asrt.t) =
-  match a with
-  | Pure (Eq (LVar x, v) | Eq (v, LVar x)) ->
-      if Names.is_lvar_name x && not (Names.is_spec_var_name x) then [ (x, v) ]
-      else []
-  | Star (a1, a2) -> extract_lvar_equalities a1 @ extract_lvar_equalities a2
-  | _ -> []
+let extract_lvar_equalities : Asrt.t -> (string * Expr.t) list =
+  List.filter_map @@ function
+  | Asrt.Pure (Eq (LVar x, v) | Eq (v, LVar x)) ->
+      if Names.is_lvar_name x && not (Names.is_spec_var_name x) then Some (x, v)
+      else None
+  | _ -> None
 
 let reduce_assertion
     ?(matching = false)

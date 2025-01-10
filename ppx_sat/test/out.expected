@@ -23,3 +23,16 @@
        learned_types: []};
   value: 2}]
 
+[{pc:
+   {pfs: [(! (x == 1i))];
+    gamma: (x: Int);
+    learned: [(1i i<=# x); (2i i<=# x)];
+    learned_types: []};
+  value: 12},
+ {pc:
+   {pfs: [(! (x == 1i))];
+    gamma: (x: Int);
+    learned: [(x i<# 1i); (x i<=# 0i)];
+    learned_types: []};
+  value: -1}]
+
