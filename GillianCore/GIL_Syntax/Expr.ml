@@ -32,6 +32,8 @@ let int n = lit (Int (Z.of_int n))
 let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let bv_z (z : Z.t) (w : int) = lit (LBitvector (z, w))
+let zero_bv (w : int) = bv_z Z.zero w
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
