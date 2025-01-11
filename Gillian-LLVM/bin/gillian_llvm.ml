@@ -1,4 +1,4 @@
-open Memory_model
+open Llvm_memory_model
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 module Init_data = Gillian.General.Init_data.Dummy
 module DummyParserAndCompiler = ParserAndCompiler.Dummy
