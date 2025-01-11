@@ -11,10 +11,12 @@ let of_string = function
   | "f64" -> F64
   | x ->
       let lst = String.split_on_char '-' x in
+      let len_comp = List.length lst = 2 in
+      print_endline ("Looking at chunk: \n" ^ x ^ " " ^ Bool.to_string len_comp);
       if List.length lst = 2 && String.equal (List.hd lst) "i" then
         let st = List.nth lst 1 in
         IntegerChunk (int_of_string st)
-      else failwith "invalid chunk"
+      else failwith ("invalid chunk " ^ x)
 
 let size = function
   | IntegerChunk i -> i / 8
