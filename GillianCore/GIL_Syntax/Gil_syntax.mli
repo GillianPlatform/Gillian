@@ -311,6 +311,7 @@ module Expr : sig
   val partition_bvargs : bv_arg list -> (t * int) list * int list
   val exprs_from_bvargs : bv_arg list -> t list
   val map_bv_arg_exprs : (t -> t) -> bv_arg list -> bv_arg list
+  val bv_extract_between_sz : int -> int -> t -> t
   val lit : Literal.t -> t
   val num : float -> t
   val num_int : int -> t
