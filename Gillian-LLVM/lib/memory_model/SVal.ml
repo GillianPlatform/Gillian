@@ -316,10 +316,17 @@ module SVArray = struct
           in
           make ~chunk ~values:(Expr.EList values)
     | Int { bit_width = size_from }, Int { bit_width = size_into } ->
-        let extracted_bv =
-          Expr.bv_extract_between_sz size_from size_into sval.value
-        in
-        make ~chunk ~values:extracted_bv |> Delayed.return
+        if size_from < size_into then
+          failwith
+            "Trying to build an array of elements smaller than the total size \
+             of the array"
+        else
+          let num_elems = size_from / size_into in
+          let each_elem =
+            List.init num_elems (fun i ->
+                Expr.bv_extract i (i + size_into) sval.value)
+          in
+          make ~chunk ~values:(Expr.list each_elem) |> Delayed.return
 
   let decode_as_sval ~chunk arr =
     let get_exactly_one arr =
