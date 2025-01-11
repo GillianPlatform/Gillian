@@ -335,38 +335,25 @@ module SVArray = struct
                 m "Warning: over-approximating float-int type punning (array)")
           in
           SVal.any_of_chunk chunk
-    | ( Int { bit_width = size_from; signed = signed_from },
-        Int { bit_width = size_to; signed = signed_to } ) ->
-        if size_from > size_to then
-          failwith
-            "Error: reencoding an array of a type to a single element of \
-             smaller type";
+    | Int { bit_width = size_from }, Int { bit_width = size_to } ->
         if size_from == size_to then
-          let sval = get_exactly_one arr in
-          if signed_from == signed_to then Delayed.return sval
-          else if signed_from then
-            let+ unsigned = SVal.unsign_int ~bit_size:size_from sval.value in
-            { sval with value = unsigned }
-          else
-            let+ signed = SVal.sign_int ~bit_size:size_from sval.value in
-            { sval with value = signed }
+          let selem = get_exactly_one arr in
+          Delayed.return
+            SVal.
+              {
+                chunk;
+                value = Expr.bv_extract_between_sz size_from size_to selem.value;
+              }
         else
-          (* We did our best effort to preserve abstraction, and there's maybe still
-             improvements to make. But until then, we just turn everything into an array of
-             bytes and then reencode it.
-             We know the array size exactly, because we know the size of each element
-             and the total size. *)
-          let array_size = size_to / size_from in
-          let concrete_array = concretize_with_size ~size:array_size arr in
-          let* raw_bytes_se =
-            List.fold_left
-              (fun acc sval ->
-                let* acc = acc in
-                let+ sval_bytes = SVal.to_raw_bytes_se sval in
-                List.rev_append sval_bytes acc)
-              (Delayed.return []) concrete_array
+          (* Same size conversion so just concat everything *)
+          let ln = size_to / size_from in
+          let bts =
+            List.init ln (fun i ->
+                let elem = Expr.list_nth arr.values i in
+                elem)
           in
-          SVal.of_raw_bytes_se ~chunk raw_bytes_se
+          let built = Expr.bv_concat bts in
+          Delayed.return SVal.{ chunk; value = built }
     | Float { bit_width = size_from }, Float { bit_width = size_to } ->
         if size_from > size_to then
           failwith
