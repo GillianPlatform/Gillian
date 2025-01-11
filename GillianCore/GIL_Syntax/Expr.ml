@@ -37,6 +37,27 @@ let zero_bv (w : int) = bv_z Z.zero w
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
+let extract_bv_width (e : t) =
+  match e with
+  | Lit (LBitvector (_, w)) -> w
+  | BVExprIntrinsic (_, _, w) -> w
+  | _ -> failwith "unrecoginized bitvector expression"
+
+let concat_single (little : t) (big : t) : t =
+  let little_size = extract_bv_width little in
+  let big_size = extract_bv_width big in
+  let nwidth = Int.add little_size big_size in
+  BVExprIntrinsic
+    ( BVOps.BVConcat,
+      [ BvExpr (big, big_size); BvExpr (little, little_size) ],
+      nwidth )
+
+let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
+  List.fold_right f (List.tl list) (List.hd list)
+
+let bv_concat (lst : t List.t) =
+  reduce (fun elem sum -> concat_single elem sum) lst
+
 let num_to_int = function
   | Lit (Num n) -> int (int_of_float n)
   | e -> UnOp (NumToInt, e)

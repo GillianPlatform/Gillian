@@ -61,8 +61,7 @@ module SVal = struct
   let zero_of_chunk (chunk : Chunk.t) =
     let make value = make ~chunk ~value in
     match chunk with
-    | I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 ->
-        make Expr.zero_i
+    | IntegerChunk w -> make (Expr.zero_bv w)
     | F32 -> make (Lit (Num 0.))
     | F64 -> make (Lit (Num 0.))
 
@@ -72,15 +71,10 @@ module SVal = struct
     let lvar_e = Expr.LVar lvar in
     let learned_types, learned =
       match chunk with
-      | I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 ->
-          let learned_types = [ (lvar, Type.IntType) ] in
-          let learned =
-            match Chunk.bounds chunk with
-            | Some (low, high) ->
-                let open Formula.Infix in
-                [ lvar_e #>= (Expr.int_z low); lvar_e #<= (Expr.int_z high) ]
-            | None -> []
-          in
+      | IntegerChunk i ->
+          let learned_types = [ (lvar, Type.BvType i) ] in
+          (* TODO(Ian): since we already havea bv type sitting there it should be fine right?*)
+          let learned = [] in
           (learned_types, learned)
       | F32 | F64 ->
           let learned_types = [ (lvar, Type.NumberType) ] in
@@ -100,17 +94,10 @@ module SVal = struct
                 m "Warning: over-approximating float-int type punning")
           in
           any_of_chunk chunk
-    | ( Int { bit_width = size_from; signed = signed_from },
-        Int { bit_width = size_to; signed = signed_to } ) ->
+    | Int { bit_width = size_from }, Int { bit_width = size_to } ->
         if size_from != size_to then
-          failwith "Error: sval reencode size mismatch, shouldn't happen";
-        if signed_from == signed_to then Delayed.return v
-        else if signed_from then
-          let+ value = unsign_int ~bit_size:size_from v.value in
-          { value; chunk }
-        else
-          let+ value = sign_int ~bit_size:size_from v.value in
-          { value; chunk }
+          failwith "Error: sval reencode size mismatch, shouldn't happen"
+        else Delayed.return v
     | Float { bit_width = size_from }, Float { bit_width = size_to } ->
         if size_from != size_to then
           failwith "Error: sval float reencode size mismatch, shouldn't happen";
@@ -120,40 +107,30 @@ module SVal = struct
   let to_raw_bytes_se (sval : t) : Expr.t list Delayed.t =
     if not (Chunk.is_int sval.chunk) then
       Fmt.failwith "Unhandled: byte_array of float value";
-    let signed, size = Chunk.int_chunk_to_signed_and_size sval.chunk in
-    let* unsigned_value =
-      if signed then unsign_int ~bit_size:size sval.value
-      else Delayed.return sval.value
-    in
+    let size = Chunk.size sval.chunk in
     (* We can't just Seq.init, because it would recreate a LVar every time *)
     let array = List.init size (fun _ -> LVar.alloc ()) in
-    let learned_types = List.map (fun lvar -> (lvar, Type.IntType)) array in
+    let learned_types = List.map (fun lvar -> (lvar, Type.BvType 8)) array in
     let exprs = List.map (fun lvar -> Expr.LVar lvar) array in
-    let all_bytes =
-      List.map
-        (fun lv ->
-          let open Formula.Infix in
-          Expr.zero_i #<= lv #&& (lv #<= (Expr.int 255)))
-        exprs
+    let learned =
+      List.init size (fun i ->
+          let target_lvar = List.nth exprs i in
+          let lb = i * 8 in
+          let ub = (i + 1) * 8 in
+          let extracted =
+            Expr.BVExprIntrinsic
+              ( BVOps.BVExtract,
+                [
+                  Expr.Literal lb;
+                  Expr.Literal ub;
+                  Expr.BvExpr (sval.value, size * 8);
+                ],
+                8 )
+          in
+          Formula.Eq (target_lvar, extracted))
     in
-    (* We take the bytes from small to big *)
-    let add_to_sval =
-      let total_sum_bytes =
-        List.fold_left
-          (fun (i, acc) lvar ->
-            let res_expr =
-              let open Expr.Infix in
-              acc + (lvar * Expr.int_z i)
-            in
-            (Z.shift_left i 8, res_expr))
-          (Z.one, Expr.zero_i) exprs
-      in
-      let open Formula.Infix in
-      unsigned_value #== (snd total_sum_bytes)
-    in
-    let learned = add_to_sval :: all_bytes in
     let result =
-      match !Kconfig.endianness with
+      match !Llvmconfig.endianness with
       | `LittleEndian -> exprs
       | `BigEndian -> List.rev exprs
     in
@@ -164,26 +141,13 @@ module SVal = struct
     let open Delayed.Syntax in
     if not (Chunk.is_int chunk) then
       Fmt.failwith "Unhandled: byte_array of float value";
-    let signed, byte_size = Chunk.int_chunk_to_signed_and_size chunk in
     let bytes =
-      match !Kconfig.endianness with
+      match !Llvmconfig.endianness with
       | `LittleEndian -> bytes
       | `BigEndian -> List.rev bytes
     in
-    let expr, _ =
-      List.fold_left
-        (fun (acc, factor) byte ->
-          let next = Z.shift_left factor 8 in
-          let factor = Expr.int_z factor in
-          let open Expr.Infix in
-          (acc + (byte * factor), next))
-        (Expr.zero_i, Z.one) bytes
-    in
-    let+ expr =
-      if signed then sign_int ~bit_size:(byte_size * 8) expr
-      else Delayed.return expr
-    in
-    make ~chunk ~value:expr
+    let expr = Expr.bv_concat bytes in
+    make ~chunk ~value:expr |> Delayed.return
 end
 
 module SVArray = struct
@@ -387,7 +351,7 @@ module SVArray = struct
              so values are [AB, CD]. However, that's the wrong order for a
              small-endian architecture.*)
           let values =
-            match !Kconfig.endianness with
+            match !Llvmconfig.endianness with
             | `BigEndian -> values
             | `LittleEndian -> List.rev values
           in

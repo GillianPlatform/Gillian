@@ -326,6 +326,8 @@ module Expr : sig
   (** Lit (Int Z.one) *)
   val one_i : t
 
+  val bv_z : Z.t -> int -> t
+  val zero_bv : int -> t
   val int_to_num : t -> t
   val num_to_int : t -> t
   val type_ : Type.t -> t
@@ -342,6 +344,7 @@ module Expr : sig
   val imod : t -> t -> t
   val type_eq : t -> Type.t -> t
   val is_concrete_zero_i : t -> bool
+  val bv_concat : t list -> t
 
   module Infix : sig
     (** Floating point math *)

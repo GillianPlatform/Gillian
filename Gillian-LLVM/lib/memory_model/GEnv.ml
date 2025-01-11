@@ -122,7 +122,7 @@ struct
         Format.fprintf ft "'%s' -> %s -> %a@\n" s l pp_def d
       with Not_found -> Format.fprintf ft "'%s' -> %s -> UNKNOWN@\n" s l
     in
-    if !Kconfig.hide_genv then Format.fprintf fmt "{@[<v 2>@\nHIDDEN@]@\n}"
+    if !Llvmconfig.hide_genv then Format.fprintf fmt "{@[<v 2>@\nHIDDEN@]@\n}"
     else
       let () = Format.fprintf fmt "{@[<v 2>@\n" in
       StringMap.iter (fun s l -> pp_one fmt s l) genv.symb;
