@@ -61,6 +61,16 @@ let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
 let bv_concat (lst : t List.t) =
   reduce (fun elem sum -> concat_single elem sum) lst
 
+let bv_extract_between_sz (src : int) (dst : int) (e : t) : t =
+  let src_width = extract_bv_width e in
+  assert (src = src_width);
+  if dst > src then
+    failwith "We are reading outside of a symbolic value... unsound"
+  else
+    let diff = dst - src in
+    BVExprIntrinsic
+      (BVOps.BVExtract, [ Literal diff; Literal 0; BvExpr (e, src_width) ], dst)
+
 let num_to_int = function
   | Lit (Num n) -> int (int_of_float n)
   | e -> UnOp (NumToInt, e)

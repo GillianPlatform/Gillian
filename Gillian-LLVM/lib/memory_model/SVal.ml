@@ -315,47 +315,11 @@ module SVArray = struct
               (Delayed.return []) (Seq.init amount Fun.id)
           in
           make ~chunk ~values:(Expr.EList values)
-    | ( Int { bit_width = size_from; signed = signed_from },
-        Int { bit_width = size_into; signed = signed_into } ) ->
-        if size_from < size_into then
-          failwith
-            "Error: decomposing one smaller int into a list of bigger ones"
-        else if size_from == size_into then
-          (* Callng reencode is maybe a bit slower here since a lot
-             of checks will be done again, but it's nicer to centralise
-             this logic. *)
-          let+ sval = SVal.reencode ~chunk sval in
-          singleton sval
-        else if size_from mod size_into != 0 then
-          failwith "decomposition size doesn't match"
-        else
-          (* Otherwise, our best effort for now is to simply decompose the value
-             as an array of bytes, and then recompose the bytes into the right form. *)
-          let* raw_bytes_se = SVal.to_raw_bytes_se sval in
-          (* On a big endian architecture where a U32 would be represented as ABCD,
-             the bytes are now [D, C, B, A]. *)
-          let packed_bytes =
-            Kutils.batch_list ~batch_size:size_into raw_bytes_se
-          in
-          (* For example if we're building a list of U16 from a U32, from example above,
-             we now have [[D, C], [B, A]]*)
-          let+ values =
-            List.fold_left
-              (fun acc bytes_se ->
-                let* acc = acc in
-                let+ value = SVal.of_raw_bytes_se ~chunk bytes_se in
-                value.value :: acc)
-              (Delayed.return []) packed_bytes
-          in
-          (* We have now built each value and reversed the order,
-             so values are [AB, CD]. However, that's the wrong order for a
-             small-endian architecture.*)
-          let values =
-            match !Llvmconfig.endianness with
-            | `BigEndian -> values
-            | `LittleEndian -> List.rev values
-          in
-          make ~chunk ~values:(Expr.EList values)
+    | Int { bit_width = size_from }, Int { bit_width = size_into } ->
+        let extracted_bv =
+          Expr.bv_extract_between_sz size_from size_into sval.value
+        in
+        make ~chunk ~values:extracted_bv |> Delayed.return
 
   let decode_as_sval ~chunk arr =
     let get_exactly_one arr =
