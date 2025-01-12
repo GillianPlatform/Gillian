@@ -8,38 +8,38 @@ module DR = Delayed_result
 exception NotACompCertValue of Expr.t
 
 module Patterns = struct
-  open Formula.Infix
+  open Expr.Infix
 
   let number e =
     let open Expr in
-    (typeof e) #== (type_ NumberType)
+    typeof e == type_ NumberType
 
   let integer e =
     let open Expr in
-    (typeof e) #== (type_ IntType)
+    typeof e == type_ IntType
 
   let int_typ, float_typ, single_typ, long_typ =
     let open Expr in
     let open CConstants.VTypes in
     let num_typ int_t typ_str x =
-      (typeof x) #== (type_ ListType)
-      #&& ((list_length x) #== (int 2))
-      #&& ((list_nth x 0) #== (string typ_str))
-      #&& ((typeof (list_nth x 1)) #== (type_ int_t))
+      typeof x == type_ ListType
+      && list_length x == int 2
+      && list_nth x 0 == string typ_str
+      && typeof (list_nth x 1) == type_ int_t
     in
     ( num_typ IntType int_type,
       num_typ NumberType float_type,
       num_typ NumberType single_type,
       num_typ IntType long_type )
 
-  let undefined x = x #== (Expr.Lit Undefined)
+  let undefined x = x == Expr.Lit Undefined
 
   let obj x =
     let open Expr in
-    (typeof x) #== (type_ ListType)
-    #&& ((list_length x) #== (int 2))
-    #&& ((typeof (list_nth x 0)) #== (type_ ObjectType))
-    #&& ((typeof (list_nth x 1)) #== (type_ IntType))
+    typeof x == type_ ListType
+    && list_length x == int 2
+    && typeof (list_nth x 0) == type_ ObjectType
+    && typeof (list_nth x 1) == type_ IntType
 end
 
 let of_chunk_and_expr chunk e =
@@ -72,11 +72,11 @@ let of_chunk_and_expr chunk e =
                     Expr.pp e))
       | Tlong -> return (SVlong e)
       | Tint ->
-          let open Formula.Infix in
+          let open Expr.Infix in
           let i k = Expr.int k in
           let learned =
             match chunk with
-            | Mint8unsigned -> [ (i 0) #<= e; e #<= (i 255) ]
+            | Mint8unsigned -> [ i 0 <= e; e <= i 255 ]
             | _ -> []
           in
           return ~learned (SVint e)
@@ -85,7 +85,7 @@ let of_chunk_and_expr chunk e =
       | Tany32 | Tany64 -> Fmt.failwith "Unhandled chunk: %a" Chunk.pp chunk)
 
 let of_gil_expr sval_e =
-  let open Formula.Infix in
+  let open Expr.Infix in
   let open Patterns in
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let* sval_e = Delayed.reduce sval_e in
@@ -101,7 +101,7 @@ let of_gil_expr sval_e =
         | Some l -> (l, [])
         | None ->
             let aloc = ALoc.alloc () in
-            let learned = [ loc_expr #== (ALoc aloc) ] in
+            let learned = [ loc_expr == ALoc aloc ] in
             (aloc, learned)
       in
       DO.some ~learned (Sptr (loc, ofs))
@@ -133,8 +133,8 @@ let to_gil_expr sval =
     List.map
       (fun (e, t) ->
         let open Expr in
-        let open Formula.Infix in
-        (typeof e) #== (type_ t))
+        let open Expr.Infix in
+        typeof e == type_ t)
       typings
   in
   Delayed.return ~learned:typing_pfs exp
@@ -169,10 +169,10 @@ module SVArray = struct
   let empty = Arr (EList [])
 
   let is_empty =
-    let open Formula.Infix in
+    let open Expr.Infix in
     function
-    | Arr e -> (Expr.list_length e) #== (Expr.int 0)
-    | _ -> False
+    | Arr e -> Expr.list_length e == Expr.int 0
+    | _ -> Expr.false_
 
   let sure_is_all_zeros = function
     | Arr (EList l) ->
@@ -200,8 +200,8 @@ module SVArray = struct
     in
     let learned =
       List.map
-        (let open Formula.Infix in
-         fun (e, t) -> (Expr.typeof e) #== (Expr.type_ t))
+        (let open Expr.Infix in
+         fun (e, t) -> Expr.typeof e == Expr.type_ t)
         gamma
     in
     (Expr.EList (List.rev rev_l), learned)
@@ -216,7 +216,7 @@ module SVArray = struct
       | None -> Expr.list_length arr_exp
       | Some size -> size
     in
-    let open Formula.Infix in
+    let open Expr.Infix in
     let zero = Expr.int 0 in
     let size = Engine.Reduction.reduce_lexpr size in
     match size with
@@ -226,7 +226,7 @@ module SVArray = struct
         let undefs =
           Expr.Lit (LList (List.init (Z.to_int x) (fun _ -> Literal.Undefined)))
         in
-        arr_exp #== undefs
+        arr_exp == undefs
     | _ ->
         Logging.verbose (fun fmt ->
             fmt "Undefined pf: not as concrete: %a" Expr.pp size);
@@ -234,8 +234,8 @@ module SVArray = struct
         let i_e = Expr.LVar i in
         forall
           [ (i, Some IntType) ]
-          zero #<= i_e #&& (i_e #< size)
-          #=> ((Expr.list_nth_e arr_exp i_e) #== (Lit Undefined))
+          ((zero <= i_e && i_e < size)
+          ==> (Expr.list_nth_e arr_exp i_e == Lit Undefined))
 
   let zeros_pf ?size arr_exp =
     let size =
@@ -243,7 +243,7 @@ module SVArray = struct
       | None -> Expr.list_length arr_exp
       | Some size -> size
     in
-    let open Formula.Infix in
+    let open Expr.Infix in
     let size = Engine.Reduction.reduce_lexpr size in
     match size with
     | Lit (Int x) ->
@@ -252,26 +252,24 @@ module SVArray = struct
           Expr.Lit
             (LList (List.init (Z.to_int x) (fun _ -> Literal.Int Z.zero)))
         in
-        arr_exp #== zeros
+        arr_exp == zeros
     | _ ->
         Logging.verbose (fun fmt ->
             fmt "Zeros pf: not as concrete: %a" Expr.pp size);
-        let is_zero e = e #== (Expr.int 0) in
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         let zero = Expr.int 0 in
         forall
           [ (i, Some IntType) ]
-          zero #<= i_e #&& (i_e #< size)
-          #=> (is_zero (Expr.list_nth_e arr_exp i_e))
+          ((zero <= i_e && i_e < size) ==> (Expr.list_nth_e arr_exp i_e == zero))
 
   let to_arr_with_size arr s =
-    let open Formula.Infix in
-    let allocate_array_lvar (descr : ?size:Expr.t -> Expr.t -> Formula.t) =
+    let open Expr.Infix in
+    let allocate_array_lvar (descr : ?size:Expr.t -> Expr.t -> Expr.t) =
       let x = LVar.alloc () in
       let learned_types = [ (x, Gil_syntax.Type.ListType) ] in
       let x = Expr.LVar x in
-      let learned = [ (Expr.list_length x) #== s; descr ~size:s x ] in
+      let learned = [ Expr.list_length x == s; descr ~size:s x ] in
       Delayed.return ~learned ~learned_types x
     in
     match arr with
@@ -338,14 +336,14 @@ module SVArray = struct
       | Lit (Int n) ->
           (Expr.EList (Utils.List_utils.make (Z.to_int n) concrete_single), [])
       | _ ->
-          let open Formula.Infix in
+          let open Expr.Infix in
           let arr = LVar.alloc () in
           let arr_e = Expr.LVar arr in
           let learned =
             let open Expr in
             [
-              (typeof arr_e) #== (type_ ListType);
-              (list_length arr_e) #== size;
+              typeof arr_e == type_ ListType;
+              list_length arr_e == size;
               describing_pf arr_e;
             ]
           in
@@ -353,12 +351,9 @@ module SVArray = struct
     in
     match svarr with
     | Arr e ->
-        let open Formula.Infix in
+        let open Expr.Infix in
         let learned =
-          [
-            (Expr.typeof e) #== (Expr.type_ ListType);
-            (Expr.list_length e) #== size;
-          ]
+          [ Expr.typeof e == Expr.type_ ListType; Expr.list_length e == size ]
         in
         (e, learned)
     | AllZeros ->
@@ -393,8 +388,8 @@ module SVArray = struct
                 (function
                   | Expr.Lit Undefined -> []
                   | x ->
-                      let open Formula.Infix in
-                      [ (i low) #<= x; x #<= (i high) ])
+                      let open Expr.Infix in
+                      [ i low <= x; x <= i high ])
                 e
             in
             Delayed.return ~learned ()
@@ -406,8 +401,8 @@ module SVArray = struct
                   List.concat
                     (List.init (Z.to_int n) (fun k ->
                          let x = Expr.list_nth e k in
-                         let open Formula.Infix in
-                         [ (i low) #<= x; x #<= (i high) ]))
+                         let open Expr.Infix in
+                         [ i low <= x; x <= i high ]))
                 in
                 Delayed.return ~learned ()
             | _ -> Delayed.return ())

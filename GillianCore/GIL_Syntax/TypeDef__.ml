@@ -60,10 +60,9 @@ and binop =
   | FTimes
   | FDiv
   | FMod
-  | SLessThan
-  | BAnd
-  | BOr
-  | BImpl
+  | And
+  | Or
+  | Impl
   | BitwiseAnd
   | BitwiseOr
   | BitwiseXor
@@ -88,14 +87,15 @@ and binop =
   | LstRepeat
   | StrCat
   | StrNth
+  | StrLess
   | SetDiff
-  | BSetMem
-  | BSetSub
+  | SetMem
+  | SetSub
 
 and unop =
   | IUnaryMinus
   | FUnaryMinus
-  | UNot
+  | Not
   | BitwiseNot
   | M_isNaN
   | M_abs
@@ -127,6 +127,7 @@ and unop =
   | StrLen
   | NumToInt
   | IntToNum
+  | IsInt
 
 and nop = LstCat | SetUnion | SetInter
 
@@ -142,30 +143,12 @@ and expr =
   | EList of expr list
   | ESet of expr list
   | Exists of (string * typ option) list * expr
-  | EForall of (string * typ option) list * expr
-
-and formula =
-  | True
-  | False
-  | Not of formula
-  | And of formula * formula
-  | Or of formula * formula
-  | Eq of expr * expr
-  | Impl of formula * formula
-  | FLess of expr * expr
-  | FLessEq of expr * expr
-  | ILess of expr * expr
-  | ILessEq of expr * expr
-  | StrLess of expr * expr
-  | SetMem of expr * expr
-  | SetSub of expr * expr
-  | ForAll of (string * typ option) list * formula
-  | IsInt of expr
+  | ForAll of (string * typ option) list * expr
 
 and assertion_atom =
   | Emp
   | Pred of string * expr list
-  | Pure of formula
+  | Pure of expr
   | Types of (expr * typ) list
   | CorePred of string * expr list * expr list
   | Wand of { lhs : string * expr list; rhs : string * expr list }
@@ -188,10 +171,10 @@ and slcmd =
 
 and lcmd =
   | If of expr * lcmd list * lcmd list
-  | Branch of formula
+  | Branch of expr
   | Macro of string * expr list
-  | Assert of formula
-  | Assume of formula
+  | Assert of expr
+  | Assume of expr
   | AssumeType of expr * typ
   | FreshSVar of string
   | SL of slcmd
@@ -222,7 +205,7 @@ and pred = {
   pred_params : (string * typ option) list;
   pred_ins : int list;
   pred_definitions : ((string * string list) option * assertion) list;
-  pred_facts : formula list;
+  pred_facts : expr list;
   pred_guard : assertion option;
   pred_pure : bool;
   pred_abstract : bool;

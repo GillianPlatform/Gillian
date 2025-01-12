@@ -52,7 +52,7 @@ val substitution_in_place :
   Gillian.Symbolic.Subst.t ->
   t ->
   (t
-  * Gillian.Gil_syntax.Formula.Set.t
+  * Gillian.Gil_syntax.Expr.Set.t
   * (string * Gillian.Gil_syntax.Type.t) list)
   list
 

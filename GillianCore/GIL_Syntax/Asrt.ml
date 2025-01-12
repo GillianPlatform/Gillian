@@ -2,7 +2,7 @@
 type atom = TypeDef__.assertion_atom =
   | Emp  (** Empty heap             *)
   | Pred of string * Expr.t list  (** Predicates             *)
-  | Pure of Formula.t  (** Pure formula           *)
+  | Pure of Expr.t  (** Pure formula           *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
   | CorePred of string * Expr.t list * Expr.t list
       (** Core assertion         *)
@@ -20,9 +20,9 @@ let of_yojson = TypeDef__.assertion_of_yojson
 let compare x y =
   let cmp = Stdlib.compare in
   match (x, y) with
-  | Pure (Eq (PVar x, _)), Pure (Eq (PVar y, _)) -> cmp x y
-  | Pure (Eq (PVar _, _)), _ -> -1
-  | _, Pure (Eq (PVar _, _)) -> 1
+  | Pure (BinOp (PVar x, Equal, _)), Pure (BinOp (PVar y, Equal, _)) -> cmp x y
+  | Pure (BinOp (PVar _, Equal, _)), _ -> -1
+  | _, Pure (BinOp (PVar _, Equal, _)) -> 1
   | Pure _, Pure _ -> cmp x y
   | Pure _, _ -> -1
   | _, Pure _ -> 1
@@ -69,11 +69,11 @@ end
 module Set = Set.Make (MyAssertion)
 
 (** Deprecated, use {!Visitors.endo} instead. *)
-let map (f_e : Expr.t -> Expr.t) (f_p : Formula.t -> Formula.t) : t -> t =
+let map (f_e : Expr.t -> Expr.t) : t -> t =
   List.map (function
     | Emp -> Emp
     | Pred (s, le) -> Pred (s, List.map f_e le)
-    | Pure form -> Pure (f_p form)
+    | Pure form -> Pure (f_e form)
     | Types lt -> Types (List.map (fun (exp, typ) -> (f_e exp, typ)) lt)
     | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2)
     | Wand { lhs = lhs_pred, lhs_args; rhs = rhs_pred, rhs_args } ->
@@ -82,11 +82,6 @@ let map (f_e : Expr.t -> Expr.t) (f_p : Formula.t -> Formula.t) : t -> t =
             lhs = (lhs_pred, List.map f_e lhs_args);
             rhs = (rhs_pred, List.map f_e rhs_args);
           })
-
-(* Get all the logical expressions of --a-- that denote a list
-   and are not logical variables *)
-let list_lexprs : t -> Expr.Set.t =
-  Formula.list_lexprs_collector#visit_assertion ()
 
 (* Get all the logical variables in --a-- *)
 let lvars : t -> SS.t =
@@ -116,7 +111,7 @@ let pred_names : t -> string list =
   collector#visit_assertion ()
 
 (* Returns a list with the pure assertions that occur in --a-- *)
-let pure_asrts : t -> Formula.t list =
+let pure_asrts : t -> Expr.t list =
   let collector =
     object
       inherit [_] Visitors.reduce
@@ -131,16 +126,16 @@ let is_pure_asrt : atom -> bool = function
   | Pred _ | CorePred _ | Wand _ -> false
   | _ -> true
 
-(* Eliminate LStar and LTypes assertions.
-   LTypes disappears. LStar is replaced by LAnd.
+(* Eliminate Emp assertions.
+   Pure assertions are converted to a single formula.
    This function expects its argument to be a PURE assertion. *)
-let make_pure (a : t) : Formula.t =
+let make_pure (a : t) : Expr.t =
   a
   |> List.filter_map (function
        | Pure f -> Some f
        | Emp -> None
        | _ -> raise (Failure "DEATH. make_pure received unpure assertion"))
-  |> Formula.conjunct
+  |> Expr.conjunct
 
 (** GIL logic assertions *)
 let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
@@ -152,7 +147,7 @@ let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
   | Types tls ->
       let pp_tl f (e, t) = Fmt.pf f "%a : %s" e_pp e (Type.str t) in
       Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls
-  | Pure f -> Formula.pp fmt f
+  | Pure f -> e_pp fmt f
   | CorePred (a, ins, outs) ->
       let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
       Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
@@ -175,11 +170,9 @@ let pp = _pp ~e_pp:Expr.pp
 let full_pp = _pp ~e_pp:Expr.full_pp
 
 let subst_clocs (subst : string -> Expr.t) : t -> t =
-  map (Expr.subst_clocs subst) (Formula.subst_clocs subst)
+  map (Expr.subst_clocs subst)
 
 let subst_expr_for_expr ~(to_subst : Expr.t) ~(subst_with : Expr.t) : t -> t =
-  map
-    (Expr.subst_expr_for_expr ~to_subst ~subst_with)
-    (Formula.subst_expr_for_expr ~to_subst ~subst_with)
+  map (Expr.subst_expr_for_expr ~to_subst ~subst_with)
 
-let pvars_to_lvars : t -> t = map Expr.pvars_to_lvars Formula.pvars_to_lvars
+let pvars_to_lvars : t -> t = map Expr.pvars_to_lvars

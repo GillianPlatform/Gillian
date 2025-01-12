@@ -189,7 +189,7 @@ module Make (State : SState.S) :
       ?(production = false)
       ?(time = "")
       (astate : t)
-      (fs : Formula.t list) : t option =
+      (fs : Expr.t list) : t option =
     match State.assume_a ~matching ~production ~time astate.state fs with
     | Some state -> Some { astate with state }
     | None -> None
@@ -201,10 +201,10 @@ module Make (State : SState.S) :
   let sat_check (astate : t) (v : Expr.t) : bool =
     State.sat_check astate.state v
 
-  let sat_check_f (astate : t) (fs : Formula.t list) : SVal.SESubst.t option =
+  let sat_check_f (astate : t) (fs : Expr.t list) : SVal.SESubst.t option =
     State.sat_check_f astate.state fs
 
-  let assert_a (astate : t) (fs : Formula.t list) : bool =
+  let assert_a (astate : t) (fs : Expr.t list) : bool =
     State.assert_a astate.state fs
 
   let equals (astate : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
@@ -503,7 +503,9 @@ module Make (State : SState.S) :
           @ additional_bindings
         in
         let new_bindings =
-          List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v))) new_bindings
+          List.map
+            (fun (e, e_v) -> Asrt.Pure (BinOp (e, Equal, e_v)))
+            new_bindings
         in
         let full_subst = make_id_subst a in
         let a_produce = new_bindings in
@@ -532,7 +534,7 @@ module Make (State : SState.S) :
             StateErr.EOther msg)
           result
     | Error err ->
-        let fail_pfs : Formula.t = State.get_failing_constraint err in
+        let fail_pfs : Expr.t = State.get_failing_constraint err in
 
         let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
         let msg =
@@ -666,7 +668,7 @@ module Make (State : SState.S) :
       match result with
       | Ok state -> Ok state
       | Error err ->
-          let fail_pfs : Formula.t = State.get_failing_constraint err in
+          let fail_pfs : Expr.t = State.get_failing_constraint err in
           let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
           let () =
             L.print_to_all
@@ -720,7 +722,7 @@ module Make (State : SState.S) :
                | Expr.PVar x when List.mem x pvar_binders -> false
                | UnOp (LstLen, _) -> false
                | _ -> true)
-        |> List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v)))
+        |> List.map (fun (e, e_v) -> Asrt.Pure (BinOp (e, Equal, e_v)))
       in
       let subst_bindings = make_id_subst bindings in
       let pvar_subst_list_known =
@@ -1007,7 +1009,9 @@ module Make (State : SState.S) :
                 @ additional_bindings
               in
               let new_bindings =
-                List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v))) new_bindings
+                List.map
+                  (fun (e, e_v) -> Asrt.Pure (BinOp (e, Equal, e_v)))
+                  new_bindings
               in
               let a_new_bindings = new_bindings in
               let subst_bindings = make_id_subst a_new_bindings in
@@ -1044,7 +1048,7 @@ module Make (State : SState.S) :
                   StateErr.EOther msg)
                 result
           | Error err ->
-              let fail_pfs : Formula.t = State.get_failing_constraint err in
+              let fail_pfs : Expr.t = State.get_failing_constraint err in
 
               let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
               let msg =
@@ -1120,7 +1124,7 @@ module Make (State : SState.S) :
     L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success);
     success
 
-  let unfolding_vals (astate : t) (fs : Formula.t list) : vt list =
+  let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
     State.unfolding_vals astate.state fs
 
   let add_pred_defs (pred_defs : MP.preds_tbl_t) (astate : t) : t =
@@ -1176,7 +1180,7 @@ module Make (State : SState.S) :
   let split_core_pred_further astate core_pred ins err =
     State.split_core_pred_further astate.state core_pred ins err
 
-  let mem_constraints (astate : t) : Formula.t list =
+  let mem_constraints (astate : t) : Expr.t list =
     State.mem_constraints astate.state
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a

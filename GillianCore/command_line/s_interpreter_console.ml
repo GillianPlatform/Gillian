@@ -49,7 +49,7 @@ struct
       in
       let fs =
         match f with
-        | Some f -> [ Formula.Not f ]
+        | Some f -> [ Expr.Infix.not f ]
         | None -> []
       in
       let subst = SState.sat_check_f error_state fs in

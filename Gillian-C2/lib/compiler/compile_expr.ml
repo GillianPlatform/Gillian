@@ -199,19 +199,15 @@ let compile_binop
           | Some (low, high) -> (low, high))
     in
     let ( <= ) a b = Expr.BinOp (a, ILessThanEqual, b) in
-    let ( && ) a b = Expr.BinOp (a, BAnd, b) in
+    let ( && ) a b = Expr.BinOp (a, And, b) in
     Expr.int_z low <= e && e <= Expr.int_z high
   in
   let assert_int_in_bounds ~ty e =
     let expr_cond = int_in_bounds ~ty e in
-    let formula =
-      match Formula.lift_logic_expr expr_cond with
-      | Some (f, _) -> f
-      | _ ->
-          Error.code_error
-            "created bound condition that cannot be lifted to formula"
-    in
-    let cmd = Cmd.Logic (LCmd.Assert formula) in
+    if not @@ Expr.is_boolean_expr expr_cond then
+      Error.code_error
+        "created bound condition that cannot be lifted to formula";
+    let cmd = Cmd.Logic (LCmd.Assert expr_cond) in
     Cs.return ~app:[ cmd ] e
   in
   let high ~ty =
@@ -344,8 +340,8 @@ let compile_binop
         | CInteger _ | Unsignedbv _ | Signedbv _ -> GilBinop IMod
         | Float -> GilBinop FMod
         | _ -> Unhandled `With_type)
-    | Or -> GilBinop BinOp.BOr
-    | And -> GilBinop BinOp.BAnd
+    | Or -> GilBinop BinOp.Or
+    | And -> GilBinop BinOp.And
     | OverflowPlus -> (
         let int_check =
           GilBinop IPlus ||> int_in_bounds ~ty:lty ||> Expr.Infix.not
@@ -424,8 +420,8 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       (* Special case, the bounds are different *)
       let assume_int = Cmd.Logic (AssumeType (expr, IntType)) in
       let condition =
-        let open Formula.Infix in
-        expr #== Expr.one_i #|| (expr #== Expr.zero_i)
+        let open Expr.Infix in
+        expr == Expr.one_i || expr == Expr.zero_i
       in
       let assume_range = Cmd.Logic (Assume condition) in
       Cs.return ~app:[ assume_int; assume_range ] ()
@@ -438,10 +434,8 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
         match bounds with
         | None -> []
         | Some (low, high) ->
-            let open Formula.Infix in
-            let condition =
-              (Expr.int_z low) #<= expr #&& (expr #<= (Expr.int_z high))
-            in
+            let open Expr.Infix in
+            let condition = Expr.int_z low <= expr && expr <= Expr.int_z high in
             [ Cmd.Logic (Assume condition) ]
       in
       Cs.unit (assume_int :: assume_range)
@@ -454,7 +448,7 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       let e_loc = Expr.PVar loc in
       let e_ofs = Expr.PVar ofs in
       let assume_list =
-        let f = Formula.Eq (expr, EList [ e_loc; e_ofs ]) in
+        let f = Expr.BinOp (expr, Equal, EList [ e_loc; e_ofs ]) in
         Cmd.Logic (Assume f)
       in
       let assume_obj = Cmd.Logic (AssumeType (e_loc, ObjectType)) in
@@ -544,8 +538,8 @@ let rec nondet_expr ~ctx ~loc ~type_ ~display () : Val_repr.t Cs.with_body =
              let variant_number = Expr.int variant_amount in
              let variant_int = LCmd.AssumeType (variant, IntType) in
              let variant_constraint =
-               let open Formula.Infix in
-               Expr.zero_i #<= variant #&& (variant #< variant_number)
+               let open Expr.Infix in
+               Expr.zero_i <= variant && variant < variant_number
              in
              let variant_value = LCmd.Assume variant_constraint in
              Cs.return
@@ -861,12 +855,12 @@ and compile_call
         else Cs.return to_assume
       in
       let f =
-        match Formula.lift_logic_expr to_assume with
-        | None ->
+        match Expr.is_boolean_expr to_assume with
+        | false ->
             Logging.normal ~severity:Warning (fun m ->
                 m "Cannot assume %a, assuming False instead" Expr.pp to_assume);
-            Formula.False
-        | Some (f, _) -> f
+            Expr.false_
+        | true -> to_assume
       in
       by_value ~app:[ b (Logic (Assume f)) ] (Lit Null)
   | Symbol "__CPROVER_assert" ->
@@ -902,12 +896,12 @@ and compile_call
         else Cs.return to_assert
       in
       let f =
-        match Formula.lift_logic_expr to_assert with
-        | None ->
+        match Expr.is_boolean_expr to_assert with
+        | false ->
             Logging.normal ~severity:Warning (fun m ->
                 m "Cannot assert %a, asserting False instead" Expr.pp to_assert);
-            Formula.False
-        | Some (f, _) -> f
+            Expr.false_
+        | true -> to_assert
       in
       by_value ~app:[ b (Logic (Assert f)) ] (Expr.Lit Null)
   | _ ->
@@ -1132,13 +1126,13 @@ and compile_address_of ~ctx ~b (expr : GExpr.t) x =
       *)
       assert ctx.machine.null_is_zero;
       let assume_not_null =
-        let open Formula.Infix in
-        b (Cmd.Logic (Assume (fnot ptr #== Expr.zero_i)))
+        let open Expr.Infix in
+        b (Cmd.Logic (Assume (not (ptr == Expr.zero_i))))
       in
       let assume_align_8 =
-        let open Formula.Infix in
+        let open Expr.Infix in
         let mod_8 = Expr.BinOp (ptr, IMod, Expr.int 8) in
-        b (Cmd.Logic (Assume mod_8 #== Expr.zero_i))
+        b (Cmd.Logic (Assume (mod_8 == Expr.zero_i)))
       in
       Cs.return ~app:[ assume_not_null; assume_align_8 ] (Val_repr.ByValue ptr)
       (* Should probably just return a long, with a nondet value that has the right offset *)
@@ -1473,12 +1467,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         Expr.subst_expr_for_expr ~to_subst:(Expr.Lit Nono)
           ~subst_with:(Expr.Lit (Bool true)) e
       in
-      let f =
-        match Formula.lift_logic_expr e with
-        | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
-        | Some (f, _) -> f
-      in
-      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assume f)) ] |> void
+      if not @@ Expr.is_boolean_expr e then
+        Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e);
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assume e)) ] |> void
   (* We can't output nothing, as a label might have to get attached *)
   | Assert { property_class = Some "cover"; _ } ->
       let () = log_kind "Assert (cover)" in
@@ -1495,12 +1486,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         Expr.subst_expr_for_expr ~to_subst:(Expr.Lit Nono)
           ~subst_with:(Expr.Lit (Bool false)) e
       in
-      let f =
-        match Formula.lift_logic_expr e with
-        | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
-        | Some (f, _) -> f
-      in
-      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assert f)) ] |> void
+      if not @@ Expr.is_boolean_expr e then
+        Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e);
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assert e)) ] |> void
   | Return e ->
       let () = log_kind "Return" in
       let e, s =

@@ -40,7 +40,7 @@ let rec pp fmt x =
   | Empty -> Fmt.string fmt "empty"
   | Nono -> Fmt.string fmt "none"
   | Constant c -> Fmt.string fmt (Constant.str c)
-  | Bool b -> if b then Fmt.string fmt "true" else Fmt.string fmt "false"
+  | Bool b -> Fmt.pf fmt "%b" b
   | Int i -> Fmt.pf fmt "%ai" Z.pp_print i
   | Num n -> Fmt.pf fmt "%F" n
   | String x -> Fmt.pf fmt "\"%s\"" x

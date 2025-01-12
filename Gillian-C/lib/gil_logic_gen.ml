@@ -5,8 +5,8 @@ open CLogic
 open Compcert
 open CompileState
 module Str_set = Gillian.Utils.Containers.SS
-open Formula.Infix
 module CoreP = Constr.Core
+open Expr.Infix
 
 let id_of_string = Camlcoq.intern_string
 let true_name = Camlcoq.extern_atom
@@ -34,10 +34,11 @@ let rec split3_expr_comp = function
 
 let ( ++ ) = Expr.Infix.( + )
 
-let ( == ) e1 e2 =
-  match e1 #== e2 with
-  | True -> Asrt.Emp
+let to_assrt_of_gen_form = function
+  | Expr.Lit (Bool true) -> Asrt.Emp
   | f -> Pure f
+
+let ( #== ) e1 e2 = to_assrt_of_gen_form (e1 == e2)
 
 let types t e =
   let static_error () =
@@ -54,13 +55,6 @@ let types t e =
   | BinOp _ | UnOp _ | NOp _ ->
       static_error () (* Maybe a more precise message ? *)
   | _ -> Emp
-
-let fold_and l = List.fold_left (fun a b -> a #&& b) Formula.True l
-
-let to_assrt_of_gen_form f =
-  match f with
-  | Formula.True -> Asrt.Emp
-  | _ -> Pure f
 
 type gil_annots = {
   preds : Pred.t list;
@@ -88,7 +82,9 @@ let get_structs_not_annot struct_types =
   let struct_names = List.map get_name struct_types in
   let already_annot = !already_annot_structs in
   let structs_not_annot =
-    List.filter (fun name -> not (Str_set.mem name already_annot)) struct_names
+    List.filter
+      (fun name -> Stdlib.not (Str_set.mem name already_annot))
+      struct_names
   in
   let newly_annot =
     Str_set.union already_annot (Str_set.of_list structs_not_annot)
@@ -143,11 +139,9 @@ let assert_of_member cenv members id typ =
       in
       let args_without_ins =
         List.init arg_number (fun k ->
-            Expr.LVar ("#i__" ^ field_name ^ "_" ^ string_of_int k))
+            Expr.LVar ("i__" ^ field_name ^ "_" ^ string_of_int k))
       in
-      let list_is_components =
-        Formula.Infix.(Asrt.Pure pvmember #== (Expr.list args_without_ins))
-      in
+      let list_is_components = pvmember #== (Expr.list args_without_ins) in
       let ofs = Expr.Infix.(pvofs + fo) in
       let args = pvloc :: ofs :: args_without_ins in
       let pred_call = Asrt.Pred (pred_name, args) in
@@ -166,7 +160,7 @@ let assert_of_member cenv members id typ =
       ]
   | _ ->
       let mk t v = Expr.list [ Expr.string t; v ] in
-      let field_val_name = "#i__" ^ field_name ^ "_v" in
+      let field_val_name = "i__" ^ field_name ^ "_v" in
       let lvval = Expr.LVar field_val_name in
       let e_to_use, getter_or_type_pred =
         let open Internal_Predicates in
@@ -255,7 +249,8 @@ let gen_pred_of_struct cenv ann struct_name =
     | Member_plain (ida, t) :: (Member_plain (idb, _) :: _ as r) ->
         let end_a = Z.add (fo ida) (sz t) in
         let start_b = fo idb in
-        if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
+        if Stdlib.( < ) end_a start_b then (end_a, start_b) :: get_holes r
+        else get_holes r
     | _ -> failwith "Unsupported bitfield members"
   in
 
@@ -283,35 +278,31 @@ let gen_pred_of_struct cenv ann struct_name =
   in
   { ann with preds = n_pred :: ann.preds }
 
-let trans_binop b =
-  match b with
-  | CBinOp.LstCons -> failwith "LstCons shouldn't be compiled that way"
+let trans_binop : CBinOp.t -> BinOp.t = function
+  | LstCons -> failwith "LstCons shouldn't be compiled that way"
   | LstCat -> failwith "LstCat shouldn't be compiled that way"
   | PtrPlus -> failwith "PtrPlus shouldn't be compiled that way"
-  | Plus -> BinOp.IPlus
-  | Times -> BinOp.ITimes
-  | Minus -> BinOp.IMinus
-  | Div -> BinOp.IDiv
+  | Plus -> IPlus
+  | Times -> ITimes
+  | Minus -> IMinus
+  | Div -> IDiv
   | Equal -> Equal
-  | SetSub -> BSetSub
+  | SetSub -> SetSub
   | SetDiff -> SetDiff
-  | SetMem -> BSetMem
+  | SetMem -> SetMem
   | LessThan -> ILessThan
-  | And -> BAnd
-  | Or -> BOr
+  | And -> And
+  | Or -> Or
 
-let trans_unop u =
-  match u with
-  | CUnOp.LstLen -> UnOp.LstLen
-  | Not -> UNot
+let trans_unop : CUnOp.t -> UnOp.t = function
+  | LstLen -> LstLen
+  | Not -> Not
 
-let trans_nop n =
-  match n with
-  | CNOp.SetUnion -> NOp.SetUnion
+let trans_nop : CNOp.t -> NOp.t = function
+  | SetUnion -> SetUnion
 
-let trans_simpl_expr se =
-  match se with
-  | CSimplExpr.PVar s -> Expr.PVar s
+let trans_simpl_expr : CSimplExpr.t -> Expr.t = function
+  | PVar s -> PVar s
   | LVar s -> LVar s
   | Loc s -> Lit (Loc s)
   | Int i -> Lit (Int i)
@@ -398,42 +389,40 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
       let a3, v3, len = trans_expr len in
       (a1 @ a2 @ a3, v1 @ v2 @ v3, Expr.list_sub ~lst ~start ~size:len)
 
-let rec trans_form (f : CFormula.t) : Asrt.t * Var.t list * Formula.t =
-  let open Formula.Infix in
-  match f with
-  | CFormula.True -> ([], [], Formula.True)
-  | False -> ([], [], False)
+let rec trans_form : CFormula.t -> Asrt.t * Var.t list * Expr.t = function
+  | True -> ([], [], Expr.true_)
+  | False -> ([], [], Expr.false_)
   | Eq (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 @ f2, v1 @ v2, eg1 #== eg2)
+      (f1 @ f2, v1 @ v2, eg1 == eg2)
   | LessEq (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 @ f2, v1 @ v2, eg1 #<= eg2)
+      (f1 @ f2, v1 @ v2, eg1 <= eg2)
   | Less (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 @ f2, v1 @ v2, eg1 #< eg2)
+      (f1 @ f2, v1 @ v2, eg1 < eg2)
   | SetMem (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
-      (f1 @ f2, v1 @ v2, SetMem (eg1, eg2))
+      (f1 @ f2, v1 @ v2, BinOp (eg1, SetMem, eg2))
   | Not fp ->
       let a, v, fpp = trans_form fp in
-      (a, v, fnot fpp)
+      (a, v, not fpp)
   | Or (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
-      (a1 @ a2, v1 @ v2, fp1 #|| fp2)
+      (a1 @ a2, v1 @ v2, fp1 || fp2)
   | And (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
-      (a1 @ a2, v1 @ v2, fp1 #&& fp2)
+      (a1 @ a2, v1 @ v2, fp1 && fp2)
   | Implies (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
-      (a1 @ a2, v1 @ v2, fp1 #=> fp2)
+      (a1 @ a2, v1 @ v2, fp1 ==> fp2)
   | ForAll (lvts, f) ->
       let a, v, fp = trans_form f in
       (a, v, ForAll (lvts, fp))
@@ -795,7 +784,7 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
         spec_sspecs = List.map (trans_sspec ~ann fname) sspecs;
         spec_normalised = false;
         spec_incomplete = false;
-        spec_to_verify = not only_spec;
+        spec_to_verify = Stdlib.not only_spec;
       }
   in
   let _ =
@@ -873,7 +862,7 @@ let bit_size = function
   | IBool -> 1
 
 let bounds signedness bit_size =
-  let bit_size_m_1 = bit_size - 1 in
+  let bit_size_m_1 = Stdlib.( - ) bit_size 1 in
   let open Z in
   let min, max =
     match signedness with
@@ -904,7 +893,7 @@ let predicate_from_triple (e, csmt, ct) =
            (PrintAST.name_of_type csmt))
 
 let simple_predicate_from_triple (pn, _, _) =
-  Asrt.Pure (Eq (Expr.PVar pn, Expr.LVar ("#" ^ pn)))
+  Asrt.Pure (BinOp (Expr.PVar pn, Equal, Expr.LVar ("" ^ pn)))
 
 let generate_bispec clight_prog fname ident f =
   let rec combine a b c =
@@ -918,11 +907,11 @@ let generate_bispec clight_prog fname ident f =
   let true_params = List.map true_name params in
   let clight_fun = get_clight_fun clight_prog ident in
   let cligh_params = clight_fun.Clight.fn_params in
-  let mk_lvar x = Expr.LVar ("#" ^ x) in
+  let mk_lvar x = Expr.LVar ("" ^ x) in
   let lvars = List.map mk_lvar true_params in
   let equalities =
     List.map
-      (fun x -> Asrt.Pure (Formula.Eq (Expr.PVar x, mk_lvar x)))
+      (fun x -> Asrt.Pure (Expr.BinOp (Expr.PVar x, Equal, mk_lvar x)))
       true_params
   in
   (* Right now, triples are : (param_name, csharpminor type, c type)

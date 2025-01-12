@@ -1,5 +1,5 @@
 (** @canonical Gillian.Symbolic.Pure_context
-    
+
 GIL pure formulae *)
 
 (** @canonical Gillian.Symbolic.Pure_context.t *)
@@ -12,18 +12,18 @@ val init : unit -> t
 val equal : t -> t -> bool
 
 (** [to_list pfs] serialises the pure formulae [pfs] into a list *)
-val to_list : t -> Formula.t list
+val to_list : t -> Expr.t list
 
 (** [of_list fs] deserialises a list of formulae [fs] into pure formulae *)
-val of_list : Formula.t list -> t
+val of_list : Expr.t list -> t
 
-val to_set : t -> Formula.Set.t
+val to_set : t -> Expr.Set.t
 
 (** [mem pfs f] return true iff the formula [f] is part of the pure formulae [pfs] *)
-val mem : t -> Formula.t -> bool
+val mem : t -> Expr.t -> bool
 
 (** [extend pfs f] extends the pure formulae [pfs] with the formula [f] *)
-val extend : t -> Formula.t -> unit
+val extend : t -> Expr.t -> unit
 
 (*
 (** [nth_get pfs n] returns the n-th pure formula of [pfs] *)
@@ -48,16 +48,16 @@ val copy : t -> t
 val merge_into_left : t -> t -> unit
 
 (** [set pfs fs] sets the pure formulae [pfs] to [fs] *)
-val set : t -> Formula.t list -> unit
+val set : t -> Expr.t list -> unit
 
 (** [iter f pfs] iterates over the pure formulae [pfs] using the function [f] *)
-val iter : (Formula.t -> unit) -> t -> unit
+val iter : (Expr.t -> unit) -> t -> unit
 
 (** [fold_left f ac pfs] folds over the pure formulae [pfs] using the function [f] and initial accumulator [ac] *)
-val fold_left : ('a -> Formula.t -> 'a) -> 'a -> t -> 'a
+val fold_left : ('a -> Expr.t -> 'a) -> 'a -> t -> 'a
 
 (** [map_inplace f pfs] is like a map operation, but performing in place *)
-val map_inplace : (Formula.t -> Formula.t) -> t -> unit
+val map_inplace : (Expr.t -> Expr.t) -> t -> unit
 
 (** [substitution subst pfs] substitutes the substutition subst in the pure formulae [pfs] in-place *)
 val substitution : SVal.SESubst.t -> t -> unit
@@ -103,16 +103,16 @@ val get_relevant_info :
   Containers.SS.t * Containers.SS.t * Containers.SS.t
 
 val filter_map_stop :
-  (Formula.t -> [ `Stop | `Filter | `Replace of Formula.t ]) -> t -> bool
+  (Expr.t -> [ `Stop | `Filter | `Replace of Expr.t ]) -> t -> bool
 
 (** See Gillian.Utils.Ext_list.filter_stop_cond *)
 val filter_stop_cond :
-  keep:(Formula.t -> bool) -> cond:(Formula.t -> bool) -> t -> bool
+  keep:(Expr.t -> bool) -> cond:(Expr.t -> bool) -> t -> bool
 
-val filter : (Formula.t -> bool) -> t -> unit
-val filter_map : (Formula.t -> Formula.t option) -> t -> unit
-val exists : (Formula.t -> bool) -> t -> bool
+val filter : (Expr.t -> bool) -> t -> unit
+val filter_map : (Expr.t -> Expr.t option) -> t -> unit
+val exists : (Expr.t -> bool) -> t -> bool
 
 (** Gets the nths formula. There are very few good use cases for this function, and uses should generaly use iterators instead.
     O(n) *)
-val get_nth : int -> t -> Formula.t option
+val get_nth : int -> t -> Expr.t option

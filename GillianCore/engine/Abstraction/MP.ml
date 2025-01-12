@@ -148,7 +148,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
               Fmt.(brackets (list ~sep:semi kb_pp))
               result);
         result
-    | Exists (bt, e) | EForall (bt, e) ->
+    | Exists (bt, e) | ForAll (bt, e) ->
         let kb' =
           KB.add_seq (List.to_seq bt |> Seq.map (fun (x, _) -> Expr.LVar x)) kb
         in
@@ -286,7 +286,7 @@ let rec learn_expr
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
   (* Can we learn anything from Exists? *)
-  | Exists _ | EForall _ -> []
+  | Exists _ | ForAll _ -> []
 
 and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* L.(verbose (fun m -> m "Entering learn_expr_list: \nKB: %a\nList: %a" kb_pp kb Fmt.(brackets (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))) le)); *)
@@ -325,7 +325,7 @@ let simple_ins_expr_collector =
           (KB.empty, KB.singleton e)
       | UnOp (LstLen, ((PVar s | LVar s) as v)) when not (SS.mem s exclude) ->
           (KB.singleton v, KB.empty)
-      | Exists (bt, e) | EForall (bt, e) ->
+      | Exists (bt, e) | ForAll (bt, e) ->
           let exclude =
             List.fold_left (fun acc (x, _) -> SS.add x acc) exclude bt
           in
@@ -401,28 +401,21 @@ let ins_and_outs_from_lists (kb : KB.t) (lei : Expr.t list) (leo : Expr.t list)
 
 (** [simple_ins_formula pf] returns the list of possible ins
     for a given formula [pf] *)
-let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
+let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
   let f = simple_ins_formula kb in
   match pf with
-  | True | False -> []
-  | Not pf -> f pf
+  | UnOp (Not, pf) -> f pf
   (* Conjunction and disjunction are treated the same *)
-  | And (pf1, pf2) | Or (pf1, pf2) ->
+  | BinOp (pf1, And, pf2) | BinOp (pf1, Or, pf2) ->
       let ins_pf1 = f pf1 in
       let ins_pf2 = f pf2 in
       let ins = List_utils.cross_product ins_pf1 ins_pf2 KB.union in
       let ins = List_utils.remove_duplicates ins in
       List.map minimise_matchables ins
-  | Impl (f1, f2) -> simple_ins_formula kb (Or (Not f1, f2))
+  | BinOp (f1, Impl, f2) ->
+      simple_ins_formula kb (BinOp (UnOp (Not, f1), Or, f2))
   (* Relational formulae are all treated the same *)
-  | Eq (e1, e2)
-  | ILess (e1, e2)
-  | ILessEq (e1, e2)
-  | FLess (e1, e2)
-  | FLessEq (e1, e2)
-  | StrLess (e1, e2)
-  | SetMem (e1, e2)
-  | SetSub (e1, e2) ->
+  | BinOp (e1, _, e2) ->
       let ins_e1 = simple_ins_expr e1 in
       let ins_e2 = simple_ins_expr e2 in
       let ins = List_utils.list_product [ ins_e1; ins_e2 ] in
@@ -434,8 +427,11 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       in
       let ins = List_utils.remove_duplicates ins in
       List.map minimise_matchables ins
-  (* Forall must exclude the binders *)
-  | ForAll (binders, pf) ->
+  | UnOp (_, e) ->
+      e |> simple_ins_expr |> List_utils.remove_duplicates
+      |> List.map minimise_matchables
+  (* ForAll/Exists must exclude the binders *)
+  | Exists (binders, pf) | ForAll (binders, pf) ->
       let binders =
         List.fold_left
           (fun acc (b, _) -> KB.add (Expr.LVar b) acc)
@@ -444,20 +440,18 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       let ins_pf = f pf in
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
       List.map minimise_matchables ins
-  | IsInt e ->
-      e |> simple_ins_expr |> List_utils.remove_duplicates
-      |> List.map minimise_matchables
+  | Lit _ | PVar _ | LVar _ | ALoc _ | LstSub _ | NOp _ | EList _ | ESet _ -> []
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)
-let ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
+let ins_outs_formula (kb : KB.t) (pf : Expr.t) : (KB.t * outs) list =
   let default_ins = simple_ins_formula kb pf in
   let default_result : (KB.t * outs) list =
     List.map (fun ins -> (ins, [])) default_ins
   in
   match pf with
-  | Eq (e1, e2) -> (
-      L.verbose (fun fmt -> fmt "IO Equality: %a" Formula.pp pf);
+  | BinOp (e1, Equal, e2) -> (
+      L.verbose (fun fmt -> fmt "IO Equality: %a" Expr.pp pf);
       L.verbose (fun fmt ->
           fmt "Ins: %a" Fmt.(brackets (list ~sep:semi kb_pp)) default_ins);
       L.verbose (fun fmt -> fmt "KB: %a" kb_pp kb);
@@ -487,11 +481,11 @@ let ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
                     (list ~sep:semi (parens (pair ~sep:comma kb_pp outs_pp))))
                 result);
           result)
-  | And _ ->
+  | BinOp (_, And, _) ->
       raise
         (Failure
            (Format.asprintf "ins_outs_formula: Should have been reduced: %a"
-              Formula.pp pf))
+              Expr.pp pf))
   | _ -> default_result
 
 (** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs
@@ -538,8 +532,8 @@ let ins_outs_assertion
 let simplify_asrts ?(sorted = true) a =
   let rec aux (a : Asrt.atom) : Asrt.atom list =
     match a with
-    | Pure True | Emp -> []
-    | Pure (And (f1, f2)) -> aux (Pure f1) @ aux (Pure f2)
+    | Pure (Lit (Bool true)) | Emp -> []
+    | Pure (BinOp (f1, And, f2)) -> aux (Pure f1) @ aux (Pure f2)
     | Pure _ | Pred _ | CorePred _ | Wand _ -> [ a ]
     | Types _ -> (
         let a = Reduction.reduce_assertion [ a ] in
@@ -548,7 +542,8 @@ let simplify_asrts ?(sorted = true) a =
         | _ -> List.concat_map aux a)
   in
   let atoms = List.concat_map aux a in
-  if List.mem (Asrt.Pure False) atoms then [ Asrt.Pure False ]
+  if List.mem (Asrt.Pure (Lit (Bool false))) atoms then
+    [ Asrt.Pure (Lit (Bool false)) ]
   else if not sorted then atoms
   else
     let overlapping, separating = List.partition Asrt.is_pure_asrt atoms in

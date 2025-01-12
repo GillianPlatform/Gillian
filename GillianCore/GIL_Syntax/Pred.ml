@@ -7,7 +7,7 @@ type t = TypeDef__.pred = {
   pred_ins : int list;  (** Ins                    *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
-  pred_facts : Formula.t list;  (** Facts that hold for every definition *)
+  pred_facts : Expr.t list;  (** Facts that hold for every definition *)
   pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
   pred_pure : bool;  (** Is the predicate pure  *)
   pred_abstract : bool;  (** Is the predicate abstract *)
@@ -113,9 +113,7 @@ let pp fmt pred =
   let pp_facts fmt = function
     | [] -> ()
     | facts ->
-        Fmt.pf fmt "facts: %a;@\n"
-          Fmt.(list ~sep:(any " and ") Formula.pp)
-          facts
+        Fmt.pf fmt "facts: %a;@\n" Fmt.(list ~sep:(any " and ") Expr.pp) facts
   in
   let pp_guard fmt = function
     | None -> ()
@@ -238,7 +236,8 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
         match t_x with
         | None -> new_facts
         | Some t_x ->
-            Formula.Eq (UnOp (TypeOf, PVar x), Lit (Type t_x)) :: new_facts)
+            Expr.BinOp (UnOp (TypeOf, PVar x), Equal, Lit (Type t_x))
+            :: new_facts)
       pred.pred_params []
   in
   {

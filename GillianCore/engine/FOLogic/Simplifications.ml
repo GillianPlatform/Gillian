@@ -5,7 +5,7 @@ module SB = Containers.SB
 type simpl_key_type = {
   kill_new_lvars : bool option;
   gamma_list : (Var.t * Type.t) list;
-  pfs_list : Formula.t list;
+  pfs_list : Expr.t list;
   existentials : SS.t;
   matching : bool;
   save_spec_vars : (SS.t * bool) option; (* rpfs_lvars  : CCommon.SS.t *)
@@ -13,7 +13,7 @@ type simpl_key_type = {
 
 type simpl_val_type = {
   simpl_gamma : (Var.t * Type.t) list;
-  simpl_pfs : Formula.t list;
+  simpl_pfs : Expr.t list;
   simpl_existentials : SS.t;
   subst : SVal.SESubst.t;
 }
@@ -30,7 +30,7 @@ let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
 (*************************************)
 
 let reduce_pfs_in_place ?(matching = false) _ gamma (pfs : PFS.t) =
-  PFS.map_inplace (Reduction.reduce_formula ~matching ~gamma ~pfs) pfs
+  PFS.map_inplace (Reduction.reduce_lexpr ~matching ~gamma ~pfs) pfs
 
 let sanitise_pfs ?(matching = false) store gamma pfs =
   let old_pfs = ref (PFS.init ()) in
@@ -50,24 +50,25 @@ let sanitise_pfs_no_store ?(matching = false) =
 let clean_up_stuff (left : PFS.t) (right : PFS.t) =
   let sleft = PFS.to_set left in
   let pf_sym pfa pfb =
-    match ((pfa, pfb) : Formula.t * Formula.t) with
-    | Eq (a, b), Eq (c, d) when a = d && b = c -> true
-    | Not (Eq (a, b)), Not (Eq (c, d)) when a = d && b = c -> true
+    match ((pfa, pfb) : Expr.t * Expr.t) with
+    | BinOp (a, Equal, b), BinOp (c, Equal, d) when a = d && b = c -> true
+    | UnOp (Not, BinOp (a, Equal, b)), UnOp (Not, BinOp (c, Equal, d))
+      when a = d && b = c -> true
     | _ -> false
   in
   let eq_or_sym pfa pfb = pfa = pfb || pf_sym pfa pfb in
-  let keep pf = not (Formula.Set.exists (eq_or_sym pf) sleft) in
+  let keep pf = not (Expr.Set.exists (eq_or_sym pf) sleft) in
   let cond pf =
     let npf =
       match pf with
-      | Formula.Not pf -> pf
-      | _ -> Not pf
+      | Expr.UnOp (Not, pf) -> pf
+      | _ -> UnOp (Not, pf)
     in
-    Formula.Set.exists (eq_or_sym npf) sleft
+    Expr.Set.exists (eq_or_sym npf) sleft
   in
   if PFS.filter_stop_cond ~keep ~cond right then
     let () = PFS.clear right in
-    PFS.set left [ False ]
+    PFS.set left [ Expr.false_ ]
 
 (* Set intersections *)
 let get_num_set_intersections pfs =
@@ -76,16 +77,22 @@ let get_num_set_intersections pfs =
 
   List.iter
     (fun pf ->
-      match (pf : Formula.t) with
+      match (pf : Expr.t) with
       | ForAll
           ( [ (x, Some NumberType) ],
-            Or (Not (SetMem (LVar y, LVar set)), FLess (LVar elem, LVar z)) )
+            BinOp
+              ( UnOp (Not, BinOp (LVar y, SetMem, LVar set)),
+                Or,
+                BinOp (LVar elem, FLessThan, LVar z) ) )
         when x = y && x = z ->
           L.(verbose (fun m -> m "Got left: %s, %s" elem set));
           Hashtbl.add lvars elem set
       | ForAll
           ( [ (x, Some NumberType) ],
-            Or (Not (SetMem (LVar y, LVar set)), FLess (LVar z, LVar elem)) )
+            BinOp
+              ( UnOp (Not, BinOp (LVar y, SetMem, LVar set)),
+                Or,
+                BinOp (LVar z, FLessThan, LVar elem) ) )
         when x = y && x = z ->
           L.(verbose (fun m -> m "Got right: %s, %s" elem set));
           Hashtbl.add rvars elem set
@@ -133,8 +140,8 @@ let get_num_set_intersections pfs =
   (* 4. *)
   List.iter
     (fun a ->
-      match (a : Formula.t) with
-      | FLess (LVar v1, LVar v2) -> (
+      match (a : Expr.t) with
+      | BinOp (LVar v1, FLessThan, LVar v2) -> (
           match (Hashtbl.mem lvars v1, Hashtbl.mem lvars v2) with
           | true, true ->
               intersections :=
@@ -181,35 +188,25 @@ let _resolve_set_existentials
                       (List.map (fun e -> (Fmt.to_to_string Expr.pp) e) s))
                   intersections))));
 
-    let filter_map_fun (formula_to_filter : Formula.t) =
+    let filter_map_fun (formula_to_filter : Expr.t) =
       match formula_to_filter with
-      | Eq (NOp (SetUnion, ul), NOp (SetUnion, ur)) ->
+      | BinOp (NOp (SetUnion, ul), Equal, NOp (SetUnion, ur)) ->
           (* Expand ESets *)
-          let ul =
-            List.flatten
-              (List.map
-                 (fun (u : Expr.t) : Expr.t list ->
-                   match (u : Expr.t) with
-                   | ESet x ->
-                       List.map (fun (x : Expr.t) : Expr.t -> ESet [ x ]) x
-                   | _ -> [ u ])
-                 ul)
+          let aux e =
+            List.concat_map
+              (function
+                | Expr.ESet x -> List.map (fun x : Expr.t -> ESet [ x ]) x
+                | u -> [ u ])
+              e
           in
-          let ur =
-            List.flatten
-              (List.map
-                 (fun (u : Expr.t) : Expr.t list ->
-                   match u with
-                   | ESet x -> List.map (fun x : Expr.t -> ESet [ x ]) x
-                   | _ -> [ u ])
-                 ur)
-          in
+          let ul = aux ul in
+          let ur = aux ur in
 
           let sul = Expr.Set.of_list ul in
           let sur = Expr.Set.of_list ur in
           L.verbose (fun m ->
               m "Resolve set existentials: I have found a union equality.");
-          L.verbose (fun m -> m "%a" Formula.pp formula_to_filter);
+          L.verbose (fun m -> m "%a" Expr.pp formula_to_filter);
 
           (* Trying to cut the union *)
           let same_parts = Expr.Set.inter sul sur in
@@ -291,7 +288,7 @@ let _resolve_set_existentials
                     Type_env.remove gamma v
                   done;
                   None
-              | _ -> Some (Formula.Eq (lhs, rhs))
+              | _ -> Some (Expr.BinOp (lhs, Equal, rhs))
             else Some formula_to_filter)
           else Some formula_to_filter
       | _ -> Some formula_to_filter
@@ -342,9 +339,9 @@ let simplify_pfs_and_gamma
       PFS.set lpfs simpl_pfs;
 
       (* Deal with rpfs *)
-      if PFS.length lpfs > 0 && PFS.get_nth 0 lpfs == Some False then (
+      if PFS.length lpfs > 0 && PFS.get_nth 0 lpfs == Some Expr.false_ then (
         PFS.clear rpfs;
-        PFS.extend rpfs True);
+        PFS.extend rpfs Expr.true_);
 
       (SESubst.copy subst, simpl_existentials)
   | false ->
@@ -378,9 +375,9 @@ let simplify_pfs_and_gamma
       (* Pure formulae false *)
       let pfs_false lpfs rpfs : unit =
         PFS.clear lpfs;
-        PFS.extend lpfs False;
+        PFS.extend lpfs Expr.false_;
         PFS.clear rpfs;
-        PFS.extend rpfs True
+        PFS.extend rpfs Expr.true_
       in
 
       let stop_explain (msg : string) : [> `Stop ] =
@@ -388,12 +385,12 @@ let simplify_pfs_and_gamma
         `Stop
       in
       (* PF simplification *)
-      let rec filter_mapper_formula (pfs : PFS.t) (pf : Formula.t) :
-          [ `Stop | `Replace of Formula.t | `Filter ] =
+      let rec filter_mapper_formula (pfs : PFS.t) (pf : Expr.t) :
+          [ `Stop | `Replace of Expr.t | `Filter ] =
         (* Reduce current assertion *)
         let rec_call = filter_mapper_formula pfs in
         let extend_with = PFS.extend pfs in
-        let whole = Reduction.reduce_formula ~matching ~gamma ~pfs pf in
+        let whole = Reduction.reduce_lexpr ~matching ~gamma ~pfs pf in
         match whole with
         (* These we must not encounter here *)
         | ForAll (bt, _) ->
@@ -401,15 +398,15 @@ let simplify_pfs_and_gamma
             List.iter (fun x -> Type_env.remove gamma x) lx;
             `Replace whole
         (* And is expanded *)
-        | And (a1, a2) ->
+        | BinOp (a1, And, a2) ->
             extend_with a2;
             rec_call a1
         (* If we find true, we can delete it *)
-        | True -> `Filter
+        | Lit (Bool true) -> `Filter
         (* If we find false, the entire pfs are false *)
-        | False -> stop_explain "False in pure formulae"
+        | Lit (Bool false) -> stop_explain "False in pure formulae"
         (* Inequality of things with different types *)
-        | Not (Eq (le1, le2)) -> (
+        | UnOp (Not, BinOp (le1, Equal, le2)) -> (
             let te1, _ = Typing.type_lexpr gamma le1 in
             let te2, _ = Typing.type_lexpr gamma le2 in
             match (te1, te2) with
@@ -420,8 +417,8 @@ let simplify_pfs_and_gamma
                      || te1 = NoneType) ->
                 stop_explain "Inequality of two undefined/null/empty/none"
             | _ -> `Replace whole)
-        | Eq (BinOp (lst, LstNth, idx), elem)
-        | Eq (elem, BinOp (lst, LstNth, idx)) -> (
+        | BinOp (BinOp (lst, LstNth, idx), Equal, elem)
+        | BinOp (elem, Equal, BinOp (lst, LstNth, idx)) -> (
             match idx with
             | Lit (Int nx) ->
                 let prepend_lvars =
@@ -435,36 +432,39 @@ let simplify_pfs_and_gamma
                 let prepend = List.map (fun x -> Expr.LVar x) prepend_lvars in
                 let append = Expr.LVar append_lvar in
                 rec_call
-                  (Eq
+                  (BinOp
                      ( lst,
+                       Equal,
                        NOp
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
             | Lit (Num _) -> failwith "l-nth(l, f) where f is Num and not Int!"
             | _ -> `Replace whole)
-        | Eq (UnOp (LstLen, le), Lit (Int z)) when Z.equal z Z.zero ->
-            rec_call (Eq (le, EList []))
-        | Eq (Lit (Int z), UnOp (LstLen, le)) when Z.equal z Z.zero ->
-            rec_call (Eq (le, EList []))
-        | Eq (UnOp (LstLen, le), Lit (Int len))
-        | Eq (Lit (Int len), UnOp (LstLen, le))
+        | BinOp (UnOp (LstLen, le), Equal, Lit (Int z)) when Z.equal z Z.zero ->
+            rec_call (BinOp (le, Equal, EList []))
+        | BinOp (Lit (Int z), Equal, UnOp (LstLen, le)) when Z.equal z Z.zero ->
+            rec_call (BinOp (le, Equal, EList []))
+        | BinOp (UnOp (LstLen, le), Equal, Lit (Int len))
+        | BinOp (Lit (Int len), Equal, UnOp (LstLen, le))
           when (not matching) && Z.leq len (Z.of_int 100) ->
             let len = Z.to_int len in
             if len >= 0 then (
               let le_vars = List.init len (fun _ -> LVar.alloc ()) in
               vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
               let le' = List.map (fun x -> Expr.LVar x) le_vars in
-              rec_call (Eq (le, EList le')))
+              rec_call (BinOp (le, Equal, EList le')))
             else stop_explain "List length an unexpected integer."
-        | Eq (NOp (LstCat, les), EList [])
-        | Eq (NOp (LstCat, les), Lit (LList []))
-        | Eq (EList [], NOp (LstCat, les))
-        | Eq (Lit (LList []), NOp (LstCat, les)) ->
-            let eqs = List.map (fun le -> Formula.Eq (le, EList [])) les in
-            List.iter (fun eq -> extend_with eq) eqs;
+        | BinOp (NOp (LstCat, les), Equal, EList [])
+        | BinOp (NOp (LstCat, les), Equal, Lit (LList []))
+        | BinOp (EList [], Equal, NOp (LstCat, les))
+        | BinOp (Lit (LList []), Equal, NOp (LstCat, les)) ->
+            let eqs =
+              List.map (fun le -> Expr.BinOp (le, Equal, EList [])) les
+            in
+            List.iter extend_with eqs;
             `Filter
         (* Two list concats, Satan save us *)
-        | Eq (NOp (LstCat, lcat), NOp (LstCat, rcat)) -> (
+        | BinOp (NOp (LstCat, lcat), Equal, NOp (LstCat, rcat)) -> (
             match Reduction.understand_lstcat lpfs gamma lcat rcat with
             | None -> `Replace whole
             | Some (pf, new_vars) ->
@@ -472,21 +472,23 @@ let simplify_pfs_and_gamma
                 vars_to_kill := SS.union !vars_to_kill new_vars;
                 `Replace whole)
         (*  *)
-        | Eq (UnOp (LstLen, x), BinOp (Lit (Int n), IPlus, LVar z))
+        | BinOp (UnOp (LstLen, x), Equal, BinOp (Lit (Int n), IPlus, LVar z))
           when Z.geq n Z.zero ->
             let new_lvars =
               List.init (Z.to_int n) (fun _ -> Expr.LVar (LVar.alloc ()))
             in
             let rest = LVar.alloc () in
             let lst_eq =
-              Formula.Eq (x, NOp (LstCat, [ EList new_lvars; LVar rest ]))
+              Expr.BinOp (x, Equal, NOp (LstCat, [ EList new_lvars; LVar rest ]))
             in
-            let len_rest = Formula.Eq (UnOp (LstLen, LVar rest), LVar z) in
+            let len_rest =
+              Expr.BinOp (UnOp (LstLen, LVar rest), Equal, LVar z)
+            in
             extend_with len_rest;
             `Replace lst_eq
         (* Sublist *)
-        | Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num))
-          ->
+        | BinOp (LstSub (lst, start, num), Equal, sl)
+        | BinOp (sl, Equal, LstSub (lst, start, num)) ->
             let prefix_lvar = LVar.alloc () in
             let suffix_lvar = LVar.alloc () in
             vars_to_kill :=
@@ -502,17 +504,21 @@ let simplify_pfs_and_gamma
                 fmt "Reduced suffix length: %a" Expr.pp suffix_len);
             let lst_eq =
               if suffix_len = Expr.zero_i then
-                Formula.Eq (lst, NOp (LstCat, [ LVar prefix_lvar; sl ]))
+                Expr.BinOp (lst, Equal, NOp (LstCat, [ LVar prefix_lvar; sl ]))
               else
-                Formula.Eq
-                  (lst, NOp (LstCat, [ LVar prefix_lvar; sl; LVar suffix_lvar ]))
+                Expr.BinOp
+                  ( lst,
+                    Equal,
+                    NOp (LstCat, [ LVar prefix_lvar; sl; LVar suffix_lvar ]) )
             in
-            let len_pr = Formula.Eq (UnOp (LstLen, LVar prefix_lvar), start) in
-            let len_sl = Formula.Eq (UnOp (LstLen, sl), num) in
+            let len_pr =
+              Expr.BinOp (UnOp (LstLen, LVar prefix_lvar), Equal, start)
+            in
+            let len_sl = Expr.BinOp (UnOp (LstLen, sl), Equal, num) in
             extend_with len_pr;
             extend_with len_sl;
             `Replace lst_eq
-        | Eq (le1, le2) -> (
+        | BinOp (le1, Equal, le2) -> (
             let te1, _ = Typing.type_lexpr gamma le1 in
             let te2, _ = Typing.type_lexpr gamma le2 in
             match (te1, te2) with
@@ -555,7 +561,7 @@ let simplify_pfs_and_gamma
                     in
                     PFS.substitution temp_subst lpfs;
                     let substituted =
-                      SESubst.substitute_formula ~partial:true temp_subst whole
+                      SESubst.subst_in_expr ~partial:true temp_subst whole
                     in
                     rec_call substituted
                 | ALoc alocl, ALoc alocr when not matching ->
@@ -612,7 +618,7 @@ let simplify_pfs_and_gamma
                                           ((Fmt.to_to_string Expr.pp) le)
                                           ((Fmt.to_to_string Expr.pp) le'))); *)
                                  if le <> le' then
-                                   PFS.extend lpfs (Eq (le, le')));
+                                   PFS.extend lpfs (BinOp (le, Equal, le')));
                               SESubst.iter result (fun x le ->
                                   let sle =
                                     SESubst.subst_in_expr temp_subst
@@ -704,21 +710,22 @@ let simplify_pfs_and_gamma
             (fun (lens, cats, xcats) pf ->
               match pf with
               (* List length direct equality *)
-              | Eq (UnOp (LstLen, LVar x), UnOp (LstLen, LVar y))
+              | BinOp (UnOp (LstLen, LVar x), Equal, UnOp (LstLen, LVar y))
                 when not (String.equal x y) ->
                   let lens = map_add (UnOp (LstLen, LVar y)) (LVar x) lens in
                   (map_add (UnOp (LstLen, LVar x)) (LVar y) lens, cats, xcats)
               (* List length equals some other expression on the right *)
-              | Eq (UnOp (LstLen, LVar x), rhs)
+              | BinOp (UnOp (LstLen, LVar x), Equal, rhs)
                 when not (List.mem (Expr.LVar x) (Expr.base_elements rhs)) ->
                   (map_add rhs (LVar x) lens, cats, xcats)
               (* List length equals some other expression on the left *)
-              | Eq (lhs, UnOp (LstLen, LVar x))
+              | BinOp (lhs, Equal, UnOp (LstLen, LVar x))
                 when not (List.mem (Expr.LVar x) (Expr.base_elements lhs)) ->
                   (map_add lhs (LVar x) lens, cats, xcats)
               (*************** CATS **************)
               (* Two cats *)
-              | Eq (NOp (LstCat, LVar a :: b), NOp (LstCat, LVar c :: d))
+              | BinOp
+                  (NOp (LstCat, LVar a :: b), Equal, NOp (LstCat, LVar c :: d))
                 when a <> c ->
                   let cats =
                     map_map_add
@@ -744,12 +751,12 @@ let simplify_pfs_and_gamma
                       (NOp (LstCat, LVar a :: b))
                       xcats )
               (* One cat on the left *)
-              | Eq (NOp (LstCat, LVar a :: b), rhs) ->
+              | BinOp (NOp (LstCat, LVar a :: b), Equal, rhs) ->
                   ( lens,
                     map_map_add rhs (Expr.LVar a) (NOp (LstCat, b)) cats,
                     map_add (NOp (LstCat, LVar a :: b)) rhs xcats )
               (* One cat on the right *)
-              | Eq (lhs, NOp (LstCat, LVar a :: b)) ->
+              | BinOp (lhs, Equal, NOp (LstCat, LVar a :: b)) ->
                   ( lens,
                     map_map_add lhs (Expr.LVar a) (NOp (LstCat, b)) cats,
                     map_add (NOp (LstCat, LVar a :: b)) lhs xcats )
@@ -772,7 +779,7 @@ let simplify_pfs_and_gamma
                     L.verbose (fun fmt ->
                         fmt "ULTRA LSTCAT: cat equality: %a and %a" Expr.pp x
                           Expr.pp y);
-                    PFS.extend pfs (Eq (x, y))
+                    PFS.extend pfs (BinOp (x, Equal, y))
                   done
                 done)
               eqs)
@@ -787,7 +794,7 @@ let simplify_pfs_and_gamma
                 L.verbose (fun fmt ->
                     fmt "ULTRA LSTCAT: xcat equality: %a and %a" Expr.pp x
                       Expr.pp y);
-                PFS.extend pfs (Eq (x, y))
+                PFS.extend pfs (BinOp (x, Equal, y))
               done
             done)
           xcats;
@@ -820,13 +827,13 @@ let simplify_pfs_and_gamma
                     L.verbose (fun fmt ->
                         fmt "ULTRA LSTCAT: head equality: %a and %a" Expr.pp x
                           Expr.pp y);
-                    PFS.extend pfs (Eq (x, y));
+                    PFS.extend pfs (Expr.BinOp (x, Equal, y));
                     let x = Expr.Map.find x eqcats in
                     let y = Expr.Map.find y eqcats in
                     L.verbose (fun fmt ->
                         fmt "ULTRA LSTCAT: tail equality: %a and %a" Expr.pp x
                           Expr.pp y);
-                    PFS.extend pfs (Eq (x, y))
+                    PFS.extend pfs (Expr.BinOp (x, Equal, y))
                   done
                 done)
               cats)
@@ -859,7 +866,7 @@ let simplify_pfs_and_gamma
 
         if
           PFS.length lpfs = 0
-          || (PFS.length lpfs > 0 && not (PFS.get_nth 0 lpfs = Some False))
+          || (PFS.length lpfs > 0 && not (PFS.get_nth 0 lpfs = Some Expr.false_))
         then (
           (* Step 3 - Bring back my variables *)
           SESubst.iter result (fun v le ->
@@ -871,7 +878,7 @@ let simplify_pfs_and_gamma
                        || (kill_new_lvars && SS.mem v vars_to_save)
                        || ((not kill_new_lvars) && vars_to_save <> SS.empty))
                     && not (Names.is_aloc_name v)
-                  then PFS.extend lpfs (Eq (LVar v, le))
+                  then PFS.extend lpfs (BinOp (LVar v, Equal, le))
               | _ -> ());
 
           sanitise_pfs_no_store ~matching gamma lpfs;
@@ -885,7 +892,10 @@ let simplify_pfs_and_gamma
               match t with
               | Type.ListType ->
                   PFS.extend lpfs
-                    (ILessEq (Expr.zero_i, UnOp (LstLen, Expr.from_var_name v)))
+                    (BinOp
+                       ( Expr.zero_i,
+                         ILessThanEqual,
+                         UnOp (LstLen, Expr.from_var_name v) ))
               | _ -> ());
 
           analyse_list_structure lpfs;
@@ -894,8 +904,8 @@ let simplify_pfs_and_gamma
       done;
 
       L.verbose (fun m -> m "PFS/Gamma simplification completed:\n");
-      L.(verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs));
-      L.(verbose (fun m -> m "Gamma:@\n%a@\n" Type_env.pp gamma));
+      L.verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs);
+      L.verbose (fun m -> m "Gamma:@\n%a@\n" Type_env.pp gamma);
 
       let cached_simplification =
         {
@@ -946,13 +956,14 @@ let simplify_implication
     (gamma : Type_env.t) =
   (* let t = Sys.time () in *)
   List.iter
-    (fun (pf : Formula.t) ->
+    (fun (pf : Expr.t) ->
       match pf with
-      | Eq (NOp (LstCat, lex), NOp (LstCat, ley)) ->
+      | BinOp (NOp (LstCat, lex), Equal, NOp (LstCat, ley)) ->
           let flen_eq =
-            Reduction.reduce_formula ~gamma ~pfs:lpfs
-              (Eq
+            Reduction.reduce_lexpr ~gamma ~pfs:lpfs
+              (BinOp
                  ( UnOp (LstLen, NOp (LstCat, lex)),
+                   Equal,
                    UnOp (LstLen, NOp (LstCat, ley)) ))
           in
           PFS.extend lpfs flen_eq
@@ -964,7 +975,7 @@ let simplify_implication
   PFS.substitution subst rpfs;
 
   (* Additional *)
-  PFS.map_inplace (Reduction.reduce_formula ~rpfs:true ~gamma ~pfs:lpfs) rpfs;
+  PFS.map_inplace (Reduction.reduce_lexpr ~gamma ~pfs:lpfs) rpfs;
   L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 
   sanitise_pfs_no_store ~matching gamma rpfs;
@@ -1011,7 +1022,7 @@ let admissible_assertion (a : Asrt.t) : bool =
   try
     List.iter separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
-    let res = not (PFS.mem pfs Formula.False) in
+    let res = not (PFS.mem pfs Expr.false_) in
     L.tmi (fun m -> m "Admissible? %b" res);
     res
   with e ->

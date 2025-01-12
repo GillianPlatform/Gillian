@@ -28,13 +28,13 @@ module M = struct
     | FLoc of vt
     | FCell of vt * vt
     | FMetadata of vt
-    | FPure of Formula.t
+    | FPure of Expr.t
   [@@deriving yojson, show]
 
-  type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson, show]
+  type err_t = vt list * i_fix_t list list * Expr.t [@@deriving yojson, show]
 
   type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+    ( (t * vt list * Expr.t list * (string * Type.t) list) list,
       err_t list )
     result
 
@@ -45,9 +45,9 @@ module M = struct
     | FCell (loc, prop) ->
         pf ft "@[<h>MIFCell(%a, %a)@]" SVal.pp loc SVal.pp prop
     | FMetadata loc -> pf ft "@[<h>MIFMetadata(%a)@]" SVal.pp loc
-    | FPure f -> pf ft "@[<h>MIFPure(%a)@]" Formula.pp f
+    | FPure f -> pf ft "@[<h>MIFPure(%a)@]" Expr.pp f
 
-  let get_failing_constraint (err : err_t) : Formula.t =
+  let get_failing_constraint (err : err_t) : Expr.t =
     let _, _, f = err in
     f
 
@@ -55,7 +55,7 @@ module M = struct
     let open Fmt in
     let vs, fixes, f = err in
     let pp_fixes ft fix = pf ft "[%a]" (list ~sep:comma pp_i_fix) fix in
-    pf ft "@[<h><[%a], %a, %a>@]" (list ~sep:comma SVal.pp) vs Formula.pp f
+    pf ft "@[<h><[%a], %a, %a>@]" (list ~sep:comma SVal.pp) vs Expr.pp f
       (list ~sep:semi pp_fixes) fixes
 
   let get_recovery_tactic (heap : t) (err : err_t) =
@@ -100,7 +100,7 @@ module M = struct
 
   let substitution_in_place ~pfs:_ ~gamma:_ (subst : st) (heap : t) =
     SHeap.substitution_in_place subst heap;
-    [ (heap, Formula.Set.empty, []) ]
+    [ (heap, Expr.Set.empty, []) ]
 
   let pp fmt (heap : t) : unit = SHeap.pp fmt heap
   let pp_by_need locs fmt heap = SHeap.pp_by_need locs fmt heap
@@ -114,7 +114,7 @@ module M = struct
     Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma
 
   let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : Type_env.t) :
-      string * vt * Formula.t list =
+      string * vt * Expr.t list =
     match loc with
     | Some loc -> (
         let loc_name = get_loc_name pfs gamma loc in
@@ -125,7 +125,7 @@ module M = struct
             else (loc_name, Expr.Lit (Loc loc_name), [])
         | None ->
             let al = ALoc.alloc () in
-            (al, ALoc al, [ Formula.Eq (ALoc al, loc) ]))
+            (al, ALoc al, [ Expr.BinOp (ALoc al, Equal, loc) ]))
     | None ->
         let al = ALoc.alloc () in
         (al, ALoc al, [])
@@ -145,7 +145,7 @@ module M = struct
       | Some (ALoc loc) -> (loc, ALoc loc)
       | Some (LVar v) ->
           let loc_name = ALoc.alloc () in
-          PFS.extend pfs (Eq (LVar v, ALoc loc_name));
+          PFS.extend pfs (BinOp (LVar v, Equal, ALoc loc_name));
           (loc_name, ALoc loc_name)
       | Some le ->
           raise
@@ -188,19 +188,23 @@ module M = struct
       let loc = Expr.loc_from_loc_name loc_name in
       (*  failing_constraint *)
       let ff =
-        Formula.conjunct
-          (List.map (fun prop' -> Formula.Not (Eq (prop, prop'))) props)
+        Expr.conjunct
+          (List.map
+             (fun prop' -> Expr.UnOp (Not, BinOp (prop, Equal, prop')))
+             props)
       in
 
       let fixes_exist_props : i_fix_t list list =
-        List.map (fun prop' -> [ FPure (Formula.Eq (prop, prop')) ]) props
+        List.map
+          (fun prop' -> [ FPure (Expr.BinOp (prop, Equal, prop')) ])
+          props
       in
       let fix_new_property : i_fix_t list = [ FCell (loc, prop); FPure ff ] in
 
       match dom with
       | Some dom ->
-          let ff' : Formula.t = SetMem (prop, dom) in
-          let ff'' : Formula.t = And (ff, ff') in
+          let ff' : Expr.t = BinOp (prop, SetMem, dom) in
+          let ff'' : Expr.t = BinOp (ff, And, ff') in
           let fix_new_property' : i_fix_t list =
             FPure ff' :: fix_new_property
           in
@@ -233,7 +237,9 @@ module M = struct
                     ]
               | _, Some (ffn, ffv) -> Ok [ (heap, [ loc; ffn; ffv ], [], []) ]
               | Some dom, None ->
-                  let a_set_inclusion : Formula.t = Not (SetMem (prop, dom)) in
+                  let a_set_inclusion : Expr.t =
+                    UnOp (Not, BinOp (prop, SetMem, dom))
+                  in
                   if
                     FOSolver.check_entailment Containers.SS.empty pfs
                       [ a_set_inclusion ] gamma
@@ -250,17 +256,18 @@ module M = struct
                     Ok [ (heap, [ loc; prop; Lit Nono ], [], []) ])
                   else
                     let f_names : Expr.t list = SFVL.field_names fv_list in
-                    let full_knowledge : Formula.t = Eq (dom, ESet f_names) in
+                    let full_knowledge : Expr.t =
+                      BinOp (dom, Equal, ESet f_names)
+                    in
                     if
                       FOSolver.check_entailment Containers.SS.empty pfs
                         [ full_knowledge ] gamma
                     then (
                       L.verbose (fun m -> m "GET CELL will branch\n");
-                      let rets : (t * vt list * Formula.t list * 'a) option list
-                          =
+                      let rets : (t * vt list * Expr.t list * 'a) option list =
                         List.map
                           (fun (f_name, f_value) ->
-                            let new_f : Formula.t = Eq (f_name, prop) in
+                            let new_f : Expr.t = BinOp (f_name, Equal, prop) in
                             let sat =
                               FOSolver.check_satisfiability
                                 ~time:"JS getCell branch: heap"
@@ -284,7 +291,9 @@ module M = struct
                       in
 
                       (* I need the case in which the prop does not exist *)
-                      let new_f : Formula.t = Not (SetMem (prop, dom)) in
+                      let new_f : Expr.t =
+                        UnOp (Not, BinOp (prop, SetMem, dom))
+                      in
                       let sat =
                         FOSolver.check_satisfiability
                           ~time:"JS getCell branch: domain"
@@ -303,15 +312,13 @@ module M = struct
                           make_gc_error loc_name prop (SFVL.field_names fv_list)
                             (Some dom);
                         ]))
-        ~none:
-          (Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
+        ~none:(Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Expr.false_) ])
         (SHeap.get heap loc_name)
     in
 
     let result =
       Option.fold ~some:get_cell_from_loc
-        ~none:
-          (Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
+        ~none:(Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Expr.false_) ])
         loc_name
     in
     result
@@ -354,7 +361,7 @@ module M = struct
 
     let make_gm_error (loc_name : string) : err_t =
       let loc = Expr.loc_from_loc_name loc_name in
-      ([ loc ], [ [ FMetadata loc ] ], False)
+      ([ loc ], [ [ FMetadata loc ] ], Expr.false_)
     in
 
     let f loc_name =
@@ -372,8 +379,7 @@ module M = struct
     in
 
     Option.fold ~some:f
-      ~none:
-        (Error [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Formula.False) ])
+      ~none:(Error [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Expr.false_) ])
       loc_name
 
   let set_metadata
@@ -391,7 +397,7 @@ module M = struct
         SHeap.set heap loc_name fv_list dom (Some mtdt)
     | Some ((fv_list, dom), Some omet) ->
         if omet <> Option.get (SVal.from_expr (Lit Null)) then
-          PFS.extend pfs (Eq (mtdt, omet))
+          PFS.extend pfs (BinOp (mtdt, Equal, omet))
         else SHeap.set heap loc_name fv_list dom (Some mtdt));
     L.tmi (fun m -> m "Done setting metadata.");
     Ok [ (heap, [], new_pfs, []) ]
@@ -461,9 +467,7 @@ module M = struct
           | _ -> raise (Failure "DEATH. get_partial_domain. dom_diff"))
     in
     let result =
-      Option.fold ~some:f
-        ~none:(Error [ ([ loc ], [], Formula.False) ])
-        loc_name
+      Option.fold ~some:f ~none:(Error [ ([ loc ], [], Expr.false_) ]) loc_name
     in
     result
 
@@ -481,7 +485,7 @@ module M = struct
           raise (Failure "DEATH. TODO. get_full_domain. missing domain")
       | Some ((fv_list, Some dom), _) ->
           let props = SFVL.field_names fv_list in
-          let a_set_equality : Formula.t = Eq (dom, ESet props) in
+          let a_set_equality : Expr.t = BinOp (dom, Equal, ESet props) in
           let solver_ret =
             FOSolver.check_entailment Containers.SS.empty pfs [ a_set_equality ]
               gamma
@@ -495,9 +499,7 @@ module M = struct
     in
 
     let result =
-      Option.fold ~some:f
-        ~none:(Error [ ([ loc ], [], Formula.False) ])
-        loc_name
+      Option.fold ~some:f ~none:(Error [ ([ loc ], [], Expr.false_) ]) loc_name
     in
     result
 
@@ -589,7 +591,7 @@ module M = struct
     else if a_id = JSILNames.aProps then JSILNames.delProps
     else raise (Failure "DEATH. ga_to_setter")
 
-  let mem_constraints (state : t) : Formula.t list = SHeap.wf_assertions state
+  let mem_constraints (state : t) : Expr.t list = SHeap.wf_assertions state
 
   let is_overlapping_asrt (a : string) : bool =
     if a = JSILNames.aMetadata then true else false
@@ -605,7 +607,7 @@ module M = struct
            however it only seemed to add the binding without creating any state, so did it really
            "do" anything? Bi-abduction is broken for Gillian-JS anyways. *)
         let al = ALoc.alloc () in
-        [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
+        [ [ Asrt.Pure (BinOp (ALoc al, Equal, v)) ] ]
     | FCell (l, p) -> (
         let none_fix () =
           [ Asrt.CorePred (JSILNames.aCell, [ l; p ], [ Lit Nono ]) ]
@@ -614,10 +616,10 @@ module M = struct
         let some_fix () =
           let vvar = LVar.alloc () in
           let v : vt = LVar vvar in
-          let asrt_empty : Formula.t = Not (Eq (v, Lit Empty)) in
-          let asrt_none : Formula.t = Not (Eq (v, Lit Nono)) in
-          let asrt_list : Formula.t =
-            Not (Eq (UnOp (TypeOf, v), Lit (Type ListType)))
+          let asrt_empty : Expr.t = UnOp (Not, BinOp (v, Equal, Lit Empty)) in
+          let asrt_none : Expr.t = UnOp (Not, BinOp (v, Equal, Lit Nono)) in
+          let asrt_list : Expr.t =
+            UnOp (Not, BinOp (UnOp (TypeOf, v), Equal, Lit (Type ListType)))
           in
           let descriptor : Expr.t =
             EList
@@ -648,7 +650,7 @@ module M = struct
         let mloc = Expr.ALoc al in
         [
           [
-            Asrt.Pure (Eq (ALoc al, l));
+            Asrt.Pure (BinOp (ALoc al, Equal, l));
             Asrt.CorePred (JSILNames.aMetadata, [ l ], [ mloc ]);
             Asrt.CorePred (JSILNames.aMetadata, [ mloc ], [ Lit Null ]);
             Asrt.CorePred
@@ -673,13 +675,13 @@ module M = struct
     | FLoc v ->
         (* Get a fresh location *)
         let al = ALoc.alloc () in
-        [ [ Asrt.Pure (Eq (ALoc al, v)) ] ]
+        [ [ Asrt.Pure (BinOp (ALoc al, Equal, v)) ] ]
     | FCell (l, p) ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
         (* Value is not none - we always bi-abduce presence *)
-        let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
+        let not_none : Expr.t = UnOp (Not, BinOp (v, Equal, Lit Nono)) in
         [
           [
             Asrt.CorePred (JSILNames.aCell, [ l; p ], [ v ]); Asrt.Pure not_none;
@@ -689,7 +691,7 @@ module M = struct
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
         let v : vt = LVar vvar in
-        let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
+        let not_none : Expr.t = UnOp (Not, BinOp (v, Equal, Lit Nono)) in
         [
           [
             Asrt.CorePred (JSILNames.aMetadata, [ l ], [ v ]);

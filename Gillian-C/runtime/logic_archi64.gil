@@ -2,31 +2,31 @@
 
 pred i__is_ptr_to_0_opt (e: List):
   i__is_ptr_to_0(e),
-  e == {{ "long", 0i }};
+  (e == {{ "long", 0i }});
 
 pred i__is_ptr_opt (e: List):
   i__is_ptr(e),
-  e == {{ "long", 0i }};
+  (e == {{ "long", 0i }});
 
 pred i__is_ptr_to_int_opt (+e: List):
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0i, "int32"; {{ "int", #i }}, "Freeable"),
-  e == {{ "long", 0i }};
+  (e == {{ "long", 0i }});
 
 pred i__is_ptr_to_float_opt (+e: List):
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0i, "float32"; {{ "float", #i }}, "Freeable"),
-  e == {{ "long", 0i }};
+  (e == {{ "long", 0i }});
 
 pred i__is_ptr_to_long_opt (+e: List):
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0i, "int64"; {{ "long", #i }}, "Freeable"),
-  e == {{ "long", 0i }};
+  (e == {{ "long", 0i }});
 
 pred i__is_ptr_to_single_opt (+e: List):
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0i, "float32"; {{ "single", #i }}, "Freeable"),
-  e == {{ "long", 0i }};
+  (e == {{ "long", 0i }});
 
 pred i__malloced(+p: List, bytes: Int):
   i__ptr(p, #l, 0i) *

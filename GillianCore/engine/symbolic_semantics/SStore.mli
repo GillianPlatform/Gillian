@@ -24,7 +24,7 @@ val vars : t -> Var.Set.t
 val lvars : t -> Var.Set.t
 val clocs : t -> Var.Set.t
 val alocs : t -> Var.Set.t
-val assertions : t -> Formula.t list
+val assertions : t -> Expr.t list
 val substitution_in_place : ?subst_all:bool -> SVal.SESubst.t -> t -> unit
 val is_well_formed : t -> bool
 val bindings : t -> (Var.t * vt) list
