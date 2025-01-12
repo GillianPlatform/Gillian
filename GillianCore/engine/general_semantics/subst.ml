@@ -304,8 +304,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             | None -> raise (Failure "DEATH. subst_in_expr"))
     in
     let mapper =
-      object
+      object (self)
         inherit [_] Gil_syntax.Visitors.endo
+        val mutable self_subst = init []
 
         method! visit_LVar () this x =
           find_in_subst x this (fun () -> Expr.LVar (LVar.alloc ()))
@@ -324,7 +325,29 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
                       x lvar));
               Expr.LVar lvar)
 
-        (* Need to handle visit_ForAll ?? *)
+        method! visit_Exists () this bt e =
+          let binders = List.to_seq bt |> Seq.map fst in
+          let binder_substs =
+            binders
+            |> Seq.filter_map (fun x ->
+                   Option.map (fun x_v -> (x, x_v)) (get self_subst x))
+          in
+          Seq.iter (fun x -> put self_subst x (Val.from_lvar_name x)) binders;
+          let new_expr = self#visit_expr () e in
+          Seq.iter (fun (x, le_x) -> put self_subst x le_x) binder_substs;
+          if new_expr == e then this else Exists (bt, new_expr)
+
+        method! visit_ForAll () this bt e =
+          let binders = List.to_seq bt |> Seq.map fst in
+          let binder_substs =
+            binders
+            |> Seq.filter_map (fun x ->
+                   Option.map (fun x_v -> (x, x_v)) (get self_subst x))
+          in
+          Seq.iter (fun x -> put self_subst x (Val.from_lvar_name x)) binders;
+          let new_expr = self#visit_expr () e in
+          Seq.iter (fun (x, le_x) -> put self_subst x le_x) binder_substs;
+          if new_expr == e then this else ForAll (bt, new_expr)
       end
     in
     mapper#visit_expr () le
