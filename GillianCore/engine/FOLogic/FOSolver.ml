@@ -182,11 +182,7 @@ let check_entailment
 
       (* Get axioms *)
       (* let axioms   = get_axioms (left_fs @ right_fs) gamma in *)
-      let right_fs =
-        List.map
-          (fun f : Expr.t -> Expr.push_in_negations (UnOp (Not, f)))
-          right_fs
-      in
+      let right_fs = List.map Expr.negate right_fs in
       let right_f : Expr.t =
         if SS.is_empty existentials then Expr.disjunct right_fs
         else

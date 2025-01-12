@@ -204,14 +204,10 @@ let compile_binop
   in
   let assert_int_in_bounds ~ty e =
     let expr_cond = int_in_bounds ~ty e in
-    let formula =
-      match Expr.as_boolean_expr expr_cond with
-      | Some (f, _) -> f
-      | _ ->
-          Error.code_error
-            "created bound condition that cannot be lifted to formula"
-    in
-    let cmd = Cmd.Logic (LCmd.Assert formula) in
+    if not @@ Expr.is_boolean_expr expr_cond then
+      Error.code_error
+        "created bound condition that cannot be lifted to formula";
+    let cmd = Cmd.Logic (LCmd.Assert expr_cond) in
     Cs.return ~app:[ cmd ] e
   in
   let high ~ty =
@@ -859,12 +855,12 @@ and compile_call
         else Cs.return to_assume
       in
       let f =
-        match Expr.as_boolean_expr to_assume with
-        | None ->
+        match Expr.is_boolean_expr to_assume with
+        | false ->
             Logging.normal ~severity:Warning (fun m ->
                 m "Cannot assume %a, assuming False instead" Expr.pp to_assume);
             Expr.false_
-        | Some (f, _) -> f
+        | true -> to_assume
       in
       by_value ~app:[ b (Logic (Assume f)) ] (Lit Null)
   | Symbol "__CPROVER_assert" ->
@@ -900,12 +896,12 @@ and compile_call
         else Cs.return to_assert
       in
       let f =
-        match Expr.as_boolean_expr to_assert with
-        | None ->
+        match Expr.is_boolean_expr to_assert with
+        | false ->
             Logging.normal ~severity:Warning (fun m ->
                 m "Cannot assert %a, asserting False instead" Expr.pp to_assert);
             Expr.false_
-        | Some (f, _) -> f
+        | true -> to_assert
       in
       by_value ~app:[ b (Logic (Assert f)) ] (Expr.Lit Null)
   | _ ->
@@ -1471,12 +1467,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         Expr.subst_expr_for_expr ~to_subst:(Expr.Lit Nono)
           ~subst_with:(Expr.Lit (Bool true)) e
       in
-      let f =
-        match Expr.as_boolean_expr e with
-        | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
-        | Some (f, _) -> f
-      in
-      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assume f)) ] |> void
+      if not @@ Expr.is_boolean_expr e then
+        Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e);
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assume e)) ] |> void
   (* We can't output nothing, as a label might have to get attached *)
   | Assert { property_class = Some "cover"; _ } ->
       let () = log_kind "Assert (cover)" in
@@ -1493,12 +1486,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         Expr.subst_expr_for_expr ~to_subst:(Expr.Lit Nono)
           ~subst_with:(Expr.Lit (Bool false)) e
       in
-      let f =
-        match Expr.as_boolean_expr e with
-        | None -> Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e)
-        | Some (f, _) -> f
-      in
-      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assert f)) ] |> void
+      if not @@ Expr.is_boolean_expr e then
+        Error.code_error (Fmt.str "Unable to lift: %a" Expr.pp e);
+      pre @ [ b ~cmd_kind:(Normal true) (Logic (Assert e)) ] |> void
   | Return e ->
       let () = log_kind "Return" in
       let e, s =

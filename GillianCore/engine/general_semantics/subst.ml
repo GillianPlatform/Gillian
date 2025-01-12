@@ -337,8 +337,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Expression resulting from the substitution. No fresh locations are created.
   *)
   let subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
-    let f_before (le : Expr.t) =
-      match (le : Expr.t) with
+    let f_before : Expr.t -> Expr.t option * bool = function
       | LVar x | ALoc x | PVar x -> (Option.map Val.to_expr (get subst x), false)
       | _ -> (Some le, true)
     in

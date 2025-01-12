@@ -2074,16 +2074,9 @@ let rec translate_expr tr_ctx e :
           in
 
           let le = SSubst.subst_in_expr subst ~partial:true e' in
-          let asrt =
-            match Expr.as_boolean_expr le with
-            | Some (asrt_b, _) -> asrt_b
-            | _ ->
-                raise
-                  (Failure
-                     (Printf.sprintf "Invalid assert. Could not lift\n%s"
-                        ((Fmt.to_to_string Expr.pp) le)))
-          in
-          let cmd = (metadata, None, LLogic (LCmd.Assert asrt)) in
+          if not @@ Expr.is_boolean_expr le then
+            Fmt.failwith "Invalid assert. Could not lift\n%a" Expr.pp le;
+          let cmd = (metadata, None, LLogic (LCmd.Assert le)) in
 
           (cmds @ [ cmd ], Lit Empty, errs)
       | es ->
@@ -2093,7 +2086,7 @@ let rec translate_expr tr_ctx e :
                  (fun e -> JS_Parser.PrettyPrint.string_of_exp_syntax_1 e true)
                  es)
           in
-          raise (Failure (Printf.sprintf "Invalid assert:\n%s" msg)))
+          Fmt.failwith "Invalid assert:\n%s" msg)
   | JS_Parser.Syntax.Call (e_f, xes)
     when e_f.JS_Parser.Syntax.exp_stx
          = JS_Parser.Syntax.Var js_symbolic_constructs.js_assume -> (
@@ -2118,16 +2111,9 @@ let rec translate_expr tr_ctx e :
           in
 
           let le = SSubst.subst_in_expr subst ~partial:true e' in
-          let asrt =
-            match Expr.as_boolean_expr le with
-            | Some (asrt_b, _) -> asrt_b
-            | _ ->
-                raise
-                  (Failure
-                     (Printf.sprintf "Invalid assume. Could not lift\n%s"
-                        ((Fmt.to_to_string Expr.pp) le)))
-          in
-          let cmd = (metadata, None, LLogic (LCmd.Assume asrt)) in
+          if not @@ Expr.is_boolean_expr le then
+            Fmt.failwith "Invalid assume. Could not lift\n%a" Expr.pp le;
+          let cmd = (metadata, None, LLogic (LCmd.Assume le)) in
 
           (cmds @ [ cmd ], Lit Empty, errs)
       | _ -> raise (Failure "Invalid assume"))

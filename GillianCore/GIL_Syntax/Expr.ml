@@ -464,8 +464,7 @@ let substitutables : t -> SS.t =
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
 
-  let rec loop les =
-    match les with
+  let rec loop = function
     | [] -> true
     | le :: rest -> if f le then loop rest else false
   in
@@ -473,7 +472,7 @@ let rec is_concrete (le : t) : bool =
   match le with
   | Lit _ | PVar _ -> true
   | LVar _ | ALoc _ | Exists _ | ForAll _ -> false
-  | UnOp (_, e) -> loop [ e ]
+  | UnOp (_, e) -> f e
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
@@ -486,12 +485,10 @@ let is_concrete_zero_i : t -> bool = function
 let vars : t -> SS.t = Visitors.Collectors.var_collector#visit_expr ()
 
 (** Are all expressions in the list literals? *)
-let all_literals les =
-  List.for_all
-    (function
-      | Lit _ -> true
-      | _ -> false)
-    les
+let all_literals =
+  List.for_all (function
+    | Lit _ -> true
+    | _ -> false)
 
 (** Lifting literal lists to lists of expressions *)
 let rec from_lit_list (lit : Literal.t) : t =
@@ -518,77 +515,47 @@ let loc_from_loc_name (loc_name : string) : t =
 
 (** {2 Visitors} *)
 
-let rec push_in_negations_off (a : t) : t =
-  let f_off = push_in_negations_off in
-  let f_on = push_in_negations_on in
-  match a with
-  | BinOp (a1, And, a2) -> BinOp (f_off a1, And, f_off a2)
-  | BinOp (a1, Or, a2) -> BinOp (f_off a1, Or, f_off a2)
-  | UnOp (Not, a1) -> f_on a1
-  | ForAll (bt, a) -> ForAll (bt, f_off a)
-  | _ -> a
+let push_in_negations, negate =
+  let rec f_off = function
+    | BinOp (a1, And, a2) -> BinOp (f_off a1, And, f_off a2)
+    | BinOp (a1, Or, a2) -> BinOp (f_off a1, Or, f_off a2)
+    | BinOp (a1, Impl, a2) -> BinOp (f_off a1, Impl, f_off a2)
+    | UnOp (Not, a1) -> f_on a1
+    | ForAll (bt, a) -> ForAll (bt, f_off a)
+    | Exists (bt, a) -> Exists (bt, f_off a)
+    | a -> a
+  and f_on = function
+    | BinOp (a1, And, a2) -> BinOp (f_on a1, Or, f_on a2)
+    | BinOp (a1, Or, a2) -> BinOp (f_on a1, And, f_on a2)
+    | BinOp (a1, Impl, a2) -> BinOp (f_off a1, And, f_on a2)
+    | BinOp (e1, ILessThan, e2) -> BinOp (e2, ILessThanEqual, e1)
+    | BinOp (e1, FLessThan, e2) -> BinOp (e2, FLessThanEqual, e1)
+    | BinOp (e1, ILessThanEqual, e2) -> BinOp (e2, ILessThan, e1)
+    | BinOp (e1, FLessThanEqual, e2) -> BinOp (e2, FLessThan, e1)
+    | Lit (Bool b) -> Lit (Bool (not b))
+    | UnOp (Not, a) -> f_off a
+    | Exists (bt, a) -> ForAll (bt, f_on a)
+    | ForAll (bt, a) -> Exists (bt, f_on a)
+    | a -> UnOp (Not, a)
+  in
+  (f_off, f_on)
 
-and push_in_negations_on (a : t) : t =
-  let f_off = push_in_negations_off in
-  let f_on = push_in_negations_on in
-  match a with
-  | BinOp (a1, And, a2) -> BinOp (f_on a1, Or, f_on a2)
-  | BinOp (a1, Or, a2) -> BinOp (f_on a1, And, f_on a2)
-  | Lit (Bool b) -> Lit (Bool (not b))
-  | UnOp (Not, a) -> f_off a
-  | _ -> UnOp (Not, a)
-
-and push_in_negations (a : t) : t = push_in_negations_off a
-
-(** Converts the given expression to a boolean expression, returning it and its negation.
-    Returns none if the expression cannot evaluate to a boolean. *)
-let rec as_boolean_expr (e : t) : (t * t) option =
-  let open Syntaxes.Option in
-  let f = as_boolean_expr in
-  match e with
-  (* TODO: Do these two cases ever happen? If not, then this fn just does two things:
-      - types an Expr as a boolean expression
-      - negates this expr
-      And in this case we can simplify this into two differents fns, one for typing it and one
-      for negating it, because often we us this fn without using the negated expr, so it's
-      wasted work. *)
-  | LVar _ | PVar _ -> Some (BinOp (e, Equal, true_), BinOp (e, Equal, false_))
-  | Lit (Bool b) -> Some (e, bool (not b))
-  | BinOp (e1, FLessThan, e2) -> Some (e, BinOp (e2, FLessThanEqual, e1))
-  | BinOp (e1, ILessThan, e2) -> Some (e, BinOp (e2, ILessThanEqual, e1))
-  | BinOp (e1, FLessThanEqual, e2) -> Some (e, BinOp (e2, FLessThan, e1))
-  | BinOp (e1, ILessThanEqual, e2) -> Some (e, BinOp (e2, ILessThan, e1))
+let rec is_boolean_expr : t -> bool = function
+  | LVar _ | PVar _
+  | Lit (Bool _)
+  | BinOp (_, FLessThan, _)
+  | BinOp (_, ILessThan, _)
+  | BinOp (_, FLessThanEqual, _)
+  | BinOp (_, ILessThanEqual, _)
   | BinOp (_, SetMem, _)
   | BinOp (_, Equal, _)
   | BinOp (_, StrLess, _)
-  | BinOp (_, SetSub, _) -> Some (e, UnOp (Not, e))
-  | BinOp (e1, And, e2) ->
-      let* a1, na1 = f e1 in
-      let+ a2, na2 = f e2 in
-      (BinOp (a1, And, a2), BinOp (na1, Or, na2))
-  | BinOp (e1, Or, e2) ->
-      let* a1, na1 = f e1 in
-      let+ a2, na2 = f e2 in
-      (BinOp (a1, Or, a2), BinOp (na1, And, na2))
-  | BinOp (e1, Impl, e2) ->
-      let* a1, _ = f e1 in
-      let+ a2, na2 = f e2 in
-      (BinOp (a1, Impl, a2), BinOp (a1, And, na2))
-  | UnOp (IsInt, _) -> Some (e, UnOp (Not, e))
-  | UnOp (Not, e') ->
-      let+ a, na = f e' in
-      (na, a)
-  | Exists (bt, inner) ->
-      let+ inner, inner_neg = f inner in
-      let pos = Exists (bt, inner) in
-      let neg = ForAll (bt, inner_neg) in
-      (BinOp (pos, Equal, true_), neg)
-  | ForAll (bt, e) ->
-      let+ inner, inner_neg = f e in
-      let pos = ForAll (bt, inner) in
-      let neg = Exists (bt, inner_neg) in
-      (pos, BinOp (neg, Equal, true_))
-  | _ -> None
+  | BinOp (_, SetSub, _)
+  | UnOp (IsInt, _) -> true
+  | UnOp (Not, e') | Exists (_, e') | ForAll (_, e') -> is_boolean_expr e'
+  | BinOp (e1, And, e2) | BinOp (e1, Or, e2) | BinOp (e1, Impl, e2) ->
+      is_boolean_expr e1 && is_boolean_expr e2
+  | _ -> false
 
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =

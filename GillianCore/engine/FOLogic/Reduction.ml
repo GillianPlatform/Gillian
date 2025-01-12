@@ -1813,19 +1813,19 @@ and reduce_lexpr_loop
     | BinOp (_, Impl, Lit (Bool true)) -> Expr.true_
     | BinOp (left, Impl, Lit (Bool false)) -> UnOp (Not, left)
     | BinOp (left, Impl, right) -> (
-        let left = f left in
-        match Expr.as_boolean_expr left with
-        | None -> BinOp (left, Impl, f right)
-        | Some (Lit (Bool true), _) -> right
-        | Some (Lit (Bool false), _) -> Expr.true_
-        | Some (left_f, _) ->
-            let pfs_with_left = PFS.copy pfs in
-            PFS.extend pfs_with_left left_f;
-            let right =
-              reduce_lexpr_loop ~matching ~reduce_lvars pfs_with_left gamma
-                right
-            in
-            BinOp (left, Impl, right))
+        match f left with
+        | Lit (Bool true) -> right
+        | Lit (Bool false) -> Expr.true_
+        | left ->
+            if not @@ Expr.is_boolean_expr left then BinOp (left, Impl, f right)
+            else
+              let pfs_with_left = PFS.copy pfs in
+              PFS.extend pfs_with_left left;
+              let right =
+                reduce_lexpr_loop ~matching ~reduce_lvars pfs_with_left gamma
+                  right
+              in
+              BinOp (left, Impl, right))
     (* BinOps: List indexing *)
     | BinOp (le, LstNth, idx) -> (
         let fle = f le in
@@ -2066,11 +2066,12 @@ and reduce_lexpr_loop
             | Lit (Bool false), _ | _, Lit (Bool false) -> Lit (Bool false)
             (* Rest *)
             | _, _ ->
-                let fal, nfal = Option.get @@ Expr.as_boolean_expr flel in
-                let far, nfar = Option.get @@ Expr.as_boolean_expr fler in
-                if PFS.mem pfs nfal || PFS.mem pfs nfar then Lit (Bool false)
-                else if PFS.mem pfs fal then f fler
-                else if PFS.mem pfs far then f flel
+                if
+                  (PFS.mem pfs @@ Expr.negate flel)
+                  || (PFS.mem pfs @@ Expr.negate fler)
+                then Lit (Bool false)
+                else if PFS.mem pfs flel then fler
+                else if PFS.mem pfs fler then flel
                 else BinOp (flel, And, fler))
         | Or when lexpr_is_bool gamma def -> (
             match (flel, fler) with
@@ -2079,11 +2080,9 @@ and reduce_lexpr_loop
             | Lit (Bool false), x | x, Lit (Bool false) -> x
             (* Rest *)
             | _, _ ->
-                let fal, nfal = Option.get @@ Expr.as_boolean_expr flel in
-                let far, nfar = Option.get @@ Expr.as_boolean_expr fler in
-                if PFS.mem pfs fal || PFS.mem pfs far then Lit (Bool true)
-                else if PFS.mem pfs nfal then f fler
-                else if PFS.mem pfs nfar then f flel
+                if PFS.mem pfs flel || PFS.mem pfs fler then Lit (Bool true)
+                else if PFS.mem pfs @@ Expr.negate flel then fler
+                else if PFS.mem pfs @@ Expr.negate fler then flel
                 else BinOp (flel, Or, fler))
         | StrCat when lexpr_is_string gamma def -> (
             match (flel, fler) with

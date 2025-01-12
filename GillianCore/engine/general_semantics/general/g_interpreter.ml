@@ -587,25 +587,27 @@ struct
     and eval_if e lcmds_t lcmds_e prog annot state eval_expr =
       let ve = eval_expr e in
       let e = Val.to_expr ve in
-      match Expr.as_boolean_expr e with
-      | Some (Expr.Lit (Bool true), _) -> eval_lcmds prog lcmds_t ~annot state
-      | Some (Expr.Lit (Bool false), _) -> eval_lcmds prog lcmds_e ~annot state
-      | Some (foe, nfoe) ->
+      match e with
+      | Expr.Lit (Bool true) -> eval_lcmds prog lcmds_t ~annot state
+      | Expr.Lit (Bool false) -> eval_lcmds prog lcmds_e ~annot state
+      | _ ->
+          if not @@ Expr.is_boolean_expr e then
+            Fmt.failwith
+              "Non-boolean expression in the condition of the logical if: %a"
+              Expr.pp e;
+          let ne = Expr.negate e in
           let state' = State.copy state in
           let then_states =
-            match State.assume_a state [ foe ] with
+            match State.assume_a state [ e ] with
             | Some state -> eval_lcmds prog lcmds_t ~annot state
             | None -> Res_list.vanish
           in
           let else_states =
-            match State.assume_a state' [ nfoe ] with
+            match State.assume_a state' [ ne ] with
             | Some state -> eval_lcmds prog lcmds_e ~annot state
             | None -> Res_list.vanish
           in
           then_states @ else_states
-      | None ->
-          raise
-            (Failure "Non-boolean expression in the condition of the logical if")
 
     and eval_lcmd
         (prog : annot MP.prog)

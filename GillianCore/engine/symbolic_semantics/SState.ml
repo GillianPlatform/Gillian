@@ -271,26 +271,17 @@ module Make (SMemory : SMemory.S) :
   let assume ?unfold:_ (state : t) (v : Expr.t) : t list =
     L.verbose (fun fmt -> fmt "Assuming expression: %a" Expr.pp v);
     let { pfs; gamma; _ } = state in
-    let result =
-      match v with
-      | Lit (Bool true) -> [ state ]
-      | Lit (Bool false) -> [ state ]
-      | _ ->
-          (* let t = time() in *)
-          let red =
-            Expr.as_boolean_expr @@ Reduction.reduce_lexpr ~pfs ~gamma v
-          in
-          let v_asrt =
-            match red with
-            | Some (v_asrt, _) -> v_asrt
-            | _ -> Lit (Bool false)
-          in
-          if v_asrt = Lit (Bool false) then []
-          else (
-            PFS.extend pfs v_asrt;
-            [ state ])
-    in
-    result
+    match v with
+    | Lit (Bool true) -> [ state ]
+    | Lit (Bool false) -> []
+    | _ ->
+        (* let t = time() in *)
+        let red = Reduction.reduce_lexpr ~pfs ~gamma v in
+        if not @@ Expr.is_boolean_expr red then []
+        else if red = Lit (Bool false) then []
+        else (
+          PFS.extend pfs red;
+          [ state ])
 
   let assume_a
       ?(matching = false)
@@ -336,16 +327,11 @@ module Make (SMemory : SMemory.S) :
     let v = Reduction.reduce_lexpr ~pfs ~gamma v in
     if v = Lit (Bool true) then true
     else if v = Lit (Bool false) then false
+    else if not @@ Expr.is_boolean_expr v then false
     else
-      let v_asrt =
-        match Expr.as_boolean_expr v with
-        | Some (v_asrt, _) -> v_asrt
-        | _ -> Lit (Bool false)
-      in
       let relevant_info = (Expr.pvars v, Expr.lvars v, Expr.locs v) in
       let result =
-        FOSolver.check_satisfiability ~relevant_info
-          (v_asrt :: PFS.to_list pfs)
+        FOSolver.check_satisfiability ~relevant_info (v :: PFS.to_list pfs)
           gamma
       in
       L.(verbose (fun m -> m "SState: sat_check done: %b" result));

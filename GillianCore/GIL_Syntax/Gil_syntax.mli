@@ -394,12 +394,14 @@ module Expr : sig
   (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
   val vars : t -> SS.t
 
-  (** [push_in_negations e] negates e, recursively *)
+  (** [push_in_negations e] pushes all negations in e "downwards", recursively *)
   val push_in_negations : t -> t
 
-  (** Converts the given expression to a boolean expression, returning it and its negation.
-      Returns none if the expression cannot evaluate to a boolean. *)
-  val as_boolean_expr : t -> (t * t) option
+  (** [negate e] negates the expression, recursively *)
+  val negate : t -> t
+
+  (** Returns if this expression is a boolean expression, recursively. *)
+  val is_boolean_expr : t -> bool
 
   (** [substitutables e] returns all lvars and alocs *)
   val substitutables : t -> SS.t
