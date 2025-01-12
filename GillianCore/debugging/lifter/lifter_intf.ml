@@ -14,7 +14,7 @@ module Types = struct
     next_kind : (Branch_case.t, unit) Exec_map.next_kind;
     id : Logging.Report_id.t;
     cmd_report : 'cmd_report;
-    matches : Exec_map.matching list;
+    matches : Match_map.matching list;
     errors : string list;
     branch_path : Branch_case.path;
   }
@@ -25,7 +25,11 @@ module Types = struct
     | ExecNext of (Logging.Report_id.t option * Branch_case.t option)
   [@@deriving yojson]
 
-  type _ Effect.t += IsBreakpoint : (string * int list) -> bool Effect.t
+  type _ Effect.t +=
+    | IsBreakpoint : (string * int list) -> bool Effect.t
+    | Node_updated :
+        (Logging.Report_id.t * Exec_map.Packaged.node option)
+        -> unit Effect.t
 end
 
 include Types
@@ -68,7 +72,7 @@ module type S = sig
 
   (** Gives a JSON representation of the lifter's state.
 
-    Used for debugging problems with the lifter.*)
+      Used for debugging problems with the lifter.*)
   val dump : t -> Yojson.Safe.t
 
   val step_over : t -> Logging.Report_id.t -> Logging.Report_id.t * stop_reason
@@ -87,22 +91,8 @@ module type S = sig
   val continue_back :
     t -> Logging.Report_id.t -> Logging.Report_id.t * stop_reason
 
-  (** Gets the non-lifted execution map of GIL commands.
-
-    In most cases, it's recommended to use a {!Gil_fallback_lifter}, and just
-    defer this call to the GIL lifter. *)
-  val get_gil_map : t -> Exec_map.Packaged.t
-
-  (** Gets the lifted execution map.
-
-    Returns [None] if lifting is not supported. *)
-  val get_lifted_map : t -> Exec_map.Packaged.t option
-
-  (** Exception-raising version of {!get_lifted_map}. *)
-  val get_lifted_map_exn : t -> Exec_map.Packaged.t
-
   (** Gives a list of matches that occurred at the specified command. *)
-  val get_matches_at_id : Logging.Report_id.t -> t -> Exec_map.matching list
+  val get_matches_at_id : Logging.Report_id.t -> t -> Match_map.matching list
 
   val memory_error_to_exception_info :
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
@@ -140,7 +130,7 @@ module type Intf = sig
     (Branch_case.t, unit) Exec_map.next_kind ->
     Logging.Report_id.t ->
     'cmd_report ->
-    ?matches:Exec_map.matching list ->
+    ?matches:Match_map.matching list ->
     ?errors:string list ->
     Branch_case.path ->
     'cmd_report executed_cmd_data

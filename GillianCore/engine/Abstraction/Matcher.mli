@@ -1,7 +1,7 @@
 type match_kind =
-  | Postcondition
-  | Fold
-  | FunctionCall
+  | Postcondition of string
+  | Fold of string
+  | FunctionCall of string
   | Invariant
   | LogicCommand
   | PredicateGuard

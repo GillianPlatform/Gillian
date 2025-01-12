@@ -44,6 +44,7 @@ struct
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable proc_name : string;
+    mutable root_created : bool; [@default false]
     lifter_state : Lifter.t;
     report_state : L.Report_state.t;
     ext : 'ext;
@@ -60,6 +61,10 @@ struct
     init_data : ID.t;
     proc_names : string list;
     mutable cur_proc_name : string;
+    all_nodes : (L.Report_id.t, Sedap_types.Map_node.t) Hashtbl.t;
+        [@default Hashtbl.create 0]
+    changed_nodes : L.Report_id.t Hashset.t; [@default Hashset.empty ()]
+    roots : (string, string) Hashtbl.t; [@default Hashtbl.create 0]
     ext : 'ext;
   }
   [@@deriving make]
@@ -90,13 +95,13 @@ struct
         proc_name:string ->
         (state_t, state_vt, err_t) Exec_res.t ->
         debug_state_ext base_debug_state ->
-        Exec_map.matching list
+        Match_map.matching list
 
       val get_matches :
         L.Report_id.t ->
         debug_state_ext base_debug_state ->
         proc_state_ext base_proc_state ->
-        Exec_map.matching list
+        Match_map.matching list
 
       val get_match_map :
         L.Report_id.t -> debug_state_ext base_debug_state -> Match_map.t
@@ -148,11 +153,229 @@ struct
       | Error msg -> failwith msg
 
     module Inspect = struct
+      open Sedap_types
+
+      let show_id = Fmt.str "%a" L.Report_id.pp
+      let show_id_opt = Option.map show_id
+
+      let add_node state id node =
+        let { all_nodes; changed_nodes; _ } = state.debug_state in
+        let () = Hashtbl.replace all_nodes id node in
+        let () = Hashset.add changed_nodes id in
+        ()
+
+      let show_match_kind ({ kind; _ } : Match_map.matching) =
+        let open Matcher in
+        match kind with
+        | Postcondition p -> Fmt.str "Postcondition of %s" p
+        | Fold p -> Fmt.str "Folding %s" p
+        | FunctionCall f -> Fmt.str "Calling %s" f
+        | Invariant -> "Loop invariant"
+        | LogicCommand -> "Logic command"
+        | PredicateGuard -> "Predicate Guard"
+
+      let make_basic_next ids =
+        let open Map_node_next in
+        let cases =
+          ids
+          |> List.map @@ fun id ->
+             Cases.
+               {
+                 branch_label = "";
+                 branch_case = `Null;
+                 id = Some (show_id id);
+               }
+        in
+        Branch { cases }
+
+      let convert_match_root
+          state
+          (matching : Match_map.matching)
+          (map : Match_map.t) =
+        let id = show_id matching.id in
+        let next = make_basic_next map.roots in
+        let options =
+          Map_node_options.Root
+            {
+              title = "Match";
+              subtitle = show_match_kind matching;
+              zoomable = true;
+              extras = [];
+            }
+        in
+        Map_node.make ~id ~next ~options () |> add_node state matching.id
+
+      let convert_match_node state (map : Match_map.t) node_id =
+        let node = Hashtbl.find map.nodes node_id in
+        let id = show_id node_id in
+        match node with
+        | Assertion (data, nexts) ->
+            let next = make_basic_next nexts in
+            let options =
+              Map_node_options.Basic
+                { display = data.assertion; selectable = true; extras = [] }
+            in
+            let submaps, folds =
+              match data.fold with
+              | None -> ([], [])
+              | Some matching ->
+                  let id = show_id matching.id in
+                  ([ id ], [ matching ])
+            in
+            let () =
+              Map_node.make ~id ~submaps ~next ~options ()
+              |> add_node state node_id
+            in
+            folds
+        | MatchResult (_, result) ->
+            let options =
+              Map_node_options.Basic
+                {
+                  display = Match_map.show_match_result result;
+                  selectable = false;
+                  extras = [];
+                }
+            in
+            let () =
+              Map_node.make ~id ~next:Final ~options ()
+              |> add_node state node_id
+            in
+            []
+
+      let convert_match_map' state (matching : Match_map.matching) =
+        let map = get_match_map matching.id state.debug_state in
+        let () = convert_match_root state matching map in
+        let rec aux other_matches = function
+          | [] -> other_matches
+          | node_id :: rest ->
+              let folds = convert_match_node state map node_id in
+              aux (folds @ other_matches) rest
+        in
+        aux [] map.roots
+
+      let rec convert_match_maps state = function
+        | [] -> ()
+        | matching :: rest ->
+            let folds = convert_match_map' state matching in
+            convert_match_maps state (folds @ rest)
+
+      let get_node_extras (node : Exec_map.Packaged.node) =
+        let open Map_node_extra in
+        match node.data.matches with
+        | [] -> []
+        | matches ->
+            let tag =
+              if
+                List.for_all
+                  (fun (m : Match_map.matching) -> m.result = Success)
+                  matches
+              then "success"
+              else "fail"
+            in
+            [ Badge { text = "Match"; tag } ]
+
+      let get_node_next (node : Exec_map.Packaged.node) =
+        let open Map_node_next in
+        match node.next with
+        | None -> Final
+        | Some (Single (next_id, _)) ->
+            let id = show_id_opt next_id in
+            Single { id }
+        | Some (Branch cases) ->
+            let cases =
+              cases
+              |> List.map @@ fun (branch_case, (id, branch_label)) ->
+                 let id = show_id_opt id in
+                 Cases.{ branch_label; branch_case; id }
+            in
+            Branch { cases }
+
+      let convert_node node_id (node : Exec_map.Packaged.node) state =
+        let id = show_id node_id in
+        let aliases = node.data.all_ids |> List.map show_id in
+        let () = convert_match_maps state node.data.matches in
+        let submaps =
+          let matches =
+            node.data.matches
+            |> List.map (fun (m : Match_map.matching) -> show_id m.id)
+          in
+          let submaps =
+            match node.data.submap with
+            | NoSubmap -> []
+            | Submap id -> [ show_id id ]
+            | Proc p -> [ "proc " ^ p ]
+          in
+          submaps @ matches
+        in
+        let next = get_node_next node in
+        let options =
+          Map_node_options.Basic
+            {
+              display = node.data.display;
+              selectable = true;
+              extras = get_node_extras node;
+            }
+        in
+        Map_node.make ~id ~aliases ~submaps ~next ~options ()
+        |> add_node state node_id
+
+      let add_root proc root_id state =
+        let id = "proc " ^ proc in
+        let next = Map_node_next.Single { id = Some (show_id root_id) } in
+        let options =
+          Map_node_options.Root
+            { title = proc; subtitle = ""; zoomable = true; extras = [] }
+        in
+        let () = Hashtbl.add state.debug_state.roots proc id in
+        Map_node.make ~id ~next ~options () |> add_node state root_id
+
+      let add_changed_node id node proc_state state =
+        let () =
+          if not proc_state.root_created then
+            let () = add_root proc_state.proc_name id state in
+            proc_state.root_created <- true
+        in
+        match node with
+        | Some node -> convert_node id node state
+        | None -> Hashtbl.remove_all state.debug_state.all_nodes id
+
+      let get_changed_nodes state =
+        let { changed_nodes; all_nodes; _ } = state.debug_state in
+        let nodes =
+          changed_nodes |> Hashset.to_seq
+          |> Seq.fold_left
+               (fun acc id ->
+                 let node = Hashtbl.find_opt all_nodes id in
+                 String_map.add (show_id id) node acc)
+               String_map.empty
+        in
+        let () = Hashset.filter_in_place changed_nodes (fun _ -> false) in
+        nodes
+
+      let get_roots state =
+        state.debug_state.roots |> Hashtbl.to_seq
+        |> Seq.fold_left
+             (fun acc (proc, id) -> String_map.add proc id acc)
+             String_map.empty
+
+      let get_current_steps state : string list =
+        Hashtbl.fold
+          (fun _ proc_state acc ->
+            match proc_state.cur_report_id with
+            | Some id -> show_id id :: acc
+            | None -> acc)
+          state.procs []
+
+      let get_map_update state =
+        let nodes = get_changed_nodes state in
+        let roots = Some (get_roots state) in
+        let current_steps = Some (get_current_steps state) in
+        Map_update_event_body.make ~nodes ~roots ~current_steps ()
+
       type debug_proc_state_view = {
-        exec_map : Exec_map.Packaged.t; [@key "execMap"]
-        lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExecMap"]
+        lifter_state : Yojson.Safe.t; [@key "lifterState"]
         current_cmd_id : L.Report_id.t; [@key "currentCmdId"]
-        matches : Exec_map.matching list;
+        matches : Match_map.matching list;
         proc_name : string; [@key "procName"]
       }
       [@@deriving yojson]
@@ -181,8 +404,7 @@ struct
       }
       [@@deriving yojson]
 
-      let get_debug_state ({ debug_state; procs } : t) : debug_state_view =
-        DL.log (fun m -> m "Getting debug state");
+      let dump_state ({ debug_state; procs } : t) : Yojson.Safe.t =
         let procs =
           Hashtbl.fold
             (fun proc_name state acc ->
@@ -190,28 +412,17 @@ struct
               let matches =
                 state.lifter_state |> Lifter.get_matches_at_id current_cmd_id
               in
-              let exec_map = state.lifter_state |> Lifter.get_gil_map in
-              let lifted_exec_map =
-                state.lifter_state |> Lifter.get_lifted_map
-              in
-              let proc =
-                {
-                  exec_map;
-                  lifted_exec_map;
-                  current_cmd_id;
-                  matches;
-                  proc_name;
-                }
-              in
+              let lifter_state = Lifter.dump state.lifter_state in
+              let proc = { lifter_state; current_cmd_id; matches; proc_name } in
               (proc_name, proc) :: acc)
             procs []
         in
-        DL.log (fun m -> m "Got debug state");
-        {
-          main_proc_name = debug_state.main_proc_name;
-          current_proc_name = debug_state.cur_proc_name;
-          procs;
-        }
+        debug_state_view_to_yojson
+          {
+            main_proc_name = debug_state.main_proc_name;
+            current_proc_name = debug_state.cur_proc_name;
+            procs;
+          }
 
       let get_match_map id { debug_state; _ } = get_match_map id debug_state
     end
@@ -650,6 +861,13 @@ struct
                     Some
                       (fun (k : (a, _) continuation) ->
                         is_breakpoint ~file ~lines proc_state |> continue k)
+                | Node_updated (id, node) ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        let () =
+                          Inspect.add_changed_node id node proc_state state
+                        in
+                        continue k ())
                 | _ ->
                     let s = Printexc.to_string (Effect.Unhandled eff) in
                     Fmt.failwith "HORROR: effect leak!\n%s" s);
@@ -728,6 +946,7 @@ struct
                let** stop_reason =
                  Step.lifter_call init_lifter' proc_state state
                in
+
                Ok (proc_state, stop_reason))
     end
 

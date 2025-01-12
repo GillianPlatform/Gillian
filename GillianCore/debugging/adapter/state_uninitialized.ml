@@ -1,4 +1,4 @@
-open Debug_protocol_ext
+open Protocol
 
 (**/**)
 

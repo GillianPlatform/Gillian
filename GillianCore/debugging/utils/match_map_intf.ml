@@ -2,7 +2,7 @@ module Types = struct
   (** Describes {i why} this matching is happening *)
   type kind = Matcher.match_kind [@@deriving yojson]
 
-  type match_result = Success | Failure [@@deriving yojson]
+  type match_result = Success | Failure [@@deriving yojson, show]
 
   (** A substitution, and the ID of the assertion where it was learned *)
   type substitution = {
@@ -11,11 +11,19 @@ module Types = struct
   }
   [@@deriving yojson]
 
+  (** Data about a matching *)
+  type matching = {
+    id : Logging.Report_id.t;
+    kind : Matcher.match_kind;
+    result : match_result;
+  }
+  [@@deriving yojson]
+
   (** Represents one step of a matching *)
   type assertion_data = {
     id : Logging.Report_id.t;
         (** The report ID of the assertion in the log database *)
-    fold : (Logging.Report_id.t * match_result) option;
+    fold : matching option;
         (** The ID of the fold matching and its result, if this assertion requires a fold *)
     assertion : string;  (** The string representation of this assertion *)
     substitutions : substitution list;

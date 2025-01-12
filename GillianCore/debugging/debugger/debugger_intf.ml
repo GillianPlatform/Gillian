@@ -3,10 +3,8 @@ module type S = sig
   type t
 
   module Inspect : sig
-    type debug_state_view [@@deriving yojson]
-
-    val get_debug_state : t -> debug_state_view
-    val get_match_map : Logging.Report_id.t -> t -> Match_map.t
+    val get_map_update : t -> Sedap_types.Map_update_event.Payload.t
+    val dump_state : t -> Yojson.Safe.t
   end
 
   val launch : string -> string option -> (t, string) result

@@ -32,6 +32,7 @@ module Report_id : sig
 
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
+  val of_string_opt : string -> t option
 end
 
 module Reporter : sig

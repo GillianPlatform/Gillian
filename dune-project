@@ -34,8 +34,7 @@
    (= 1.0.1))
   (cmdliner
    (>= 1.1.1))
-  (dap
-   (= 1.0.6))
+  sedap
   (fmt
    (>= 0.8.8))
   (memtrace

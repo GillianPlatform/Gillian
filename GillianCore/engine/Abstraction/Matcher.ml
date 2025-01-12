@@ -1,7 +1,7 @@
 type match_kind =
-  | Postcondition
-  | Fold
-  | FunctionCall
+  | Postcondition of string
+  | Fold of string
+  | FunctionCall of string
   | Invariant
   | LogicCommand
   | PredicateGuard
@@ -898,8 +898,8 @@ module Make (State : SState.S) :
           L.verbose (fun m -> m "FOUND STH TO FOLD: %s!!!!\n" pname);
           let pred = MP.get_pred_def astate.pred_defs pname in
           let rets =
-            fold ~in_matching:true ~match_kind:Fold ~state:(copy_astate astate)
-              pred v_args
+            fold ~in_matching:true ~match_kind:(Fold pname)
+              ~state:(copy_astate astate) pred v_args
           in
           Res_list.map_error
             (fun _ -> "fold_guarded_with_vals: Failed to fold")
@@ -1071,7 +1071,8 @@ module Make (State : SState.S) :
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let** folded =
-          fold ~in_matching:true ~state:astate ~match_kind:Fold pred vs_ins
+          fold ~in_matching:true ~state:astate ~match_kind:(Fold pname) pred
+            vs_ins
         in
         (* Supposedly, we don't need a guard to make sure we're not looping indefinitely:
            if the fold worked, then consume_pred should not take this branch on the next try.
