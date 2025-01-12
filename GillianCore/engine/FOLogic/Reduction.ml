@@ -1975,6 +1975,10 @@ and reduce_lexpr_loop
             in
             match (flel, fler) with
             (* Lists *)
+            (* Removed for now since we removed the `rpfs` parameter. Was important for AWS-JS,
+               so might need to be re-added later.
+               | NOp (LstCat, _), LVar y when rpfs && prefix_catch pfs flel y ->
+                                 BinOp (UnOp (LstLen, flel), Equal, UnOp (LstLen, fler)) *)
             | EList [], x | x, EList [] | Lit (LList []), x | x, Lit (LList [])
               -> (
                 match x with
