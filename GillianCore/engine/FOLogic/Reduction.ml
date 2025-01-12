@@ -193,27 +193,13 @@ let resolve_list (le : Expr.t) (pfs : Expr.t list) : Expr.t =
 (**********************************)
 
 let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
-  let lpfs = PFS.to_list pfs in
-  let lpfs =
-    List.find_all
-      (fun x ->
-        match x with
-        | Expr.BinOp (x, Equal, y) -> Expr.equal x le || Expr.equal y le
-        | _ -> false)
-      lpfs
-  in
-  let result =
-    List.map
-      (fun x ->
-        match x with
-        | Expr.BinOp (x, Equal, y) -> if Expr.equal x le then y else x
-        | _ ->
-            raise
-              (Exceptions.Impossible
-                 "find_equalities_in_pfs: guarantee by match/filter"))
-      lpfs
-  in
-  result
+  PFS.to_list pfs
+  |> List.filter_map (function
+       | Expr.BinOp (x, Equal, y) ->
+           if Expr.equal x le then Some y
+           else if Expr.equal y le then Some x
+           else None
+       | _ -> None)
 
 (***************************)
 (* TYPING HELPER FUNCTIONS *)
@@ -390,10 +376,8 @@ let rec get_length_of_string (str : Expr.t) : int option =
       Option.value ~default:None
         (Option.map (fun ll -> Option.map (( + ) ll) (f sr)) (f sl))
   | _ ->
-      raise
-        (Failure
-           (Fmt.str "get_length_of_string: string equals %a, impossible" Expr.pp
-              str))
+      Fmt.failwith "get_length_of_string: string equals %a, impossible" Expr.pp
+        str
 
 (* Finding the nth element of a list *)
 let rec get_nth_of_string (str : Expr.t) (idx : int) : Expr.t option =
@@ -423,10 +407,8 @@ let rec get_nth_of_string (str : Expr.t) (idx : int) : Expr.t option =
             let lst, idx = if idx < llen then (ls, idx) else (rs, idx - llen) in
             f lst idx)
     | _ ->
-        raise
-          (Failure
-             (Fmt.str "get_nth_of_string: string equals %a, impossible" Expr.pp
-                str))
+        Fmt.failwith "get_nth_of_string: string equals %a, impossible" Expr.pp
+          str
   in
   result
 
