@@ -1,6 +1,13 @@
 (library
  (name gillian_llvm_lib)
- (libraries gillian yojson irep_lib dune-site))
+ (libraries
+  gillian
+  gillian.parserAndCompiler
+  llvm_memory_model
+  yojson
+  irep_lib
+  dune-site
+  gillian.alcotest-runner))
 
 (generate_sites_module
  (module runtime_sites)
