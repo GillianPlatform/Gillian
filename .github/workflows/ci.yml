@@ -74,12 +74,12 @@ jobs:
       - name: Building docs
         run: make docs
         if: runner.os == 'Linux'
-      - name: Sending docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ runner.os }}-docs
-          path: _docs
-        if: runner.os == 'Linux'
+      # - name: Sending docs artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ${{ runner.os }}-docs
+      #     path: _docs
+      #   if: runner.os == 'Linux'
       - name: Setting dependency cache
         run: opam clean
         if: steps.restore-cache.outputs.cache-hit != 'true'
