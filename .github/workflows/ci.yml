@@ -48,7 +48,7 @@ jobs:
       - name: Install dependencies
         run: make init-ci
       - name: Install ubuntu dependencies
-        run: apt-get install libgmp-dev pkg-config libsqlite3-dev python3 z3 -y
+        run: sudo apt-get install libgmp-dev pkg-config libsqlite3-dev python3 z3 -y
         if: runner.os == 'Linux'
       - name: Build Gillian
         run: opam exec -- dune build @all
