@@ -57,6 +57,13 @@ module Make (Annot : Annot.S) = struct
     in
     { labeled_prog; init_data }
 
+  let get_callees (proc : ('a, 'b) Proc.t) : string list =
+    Array.to_list proc.proc_body
+    |> List.filter_map (function
+         | _, _, Cmd.Call (_, Expr.Lit (Literal.String callee), _, _, _) ->
+             Some callee
+         | _ -> None)
+
   let trans_procs procs path internal_file =
     let procs' = Hashtbl.create Config.small_tbl_size in
     let () =
@@ -67,7 +74,9 @@ module Make (Annot : Annot.S) = struct
             else Some path
           in
           let proc_internal = proc.proc_internal || internal_file in
-          Hashtbl.add procs' name { proc with proc_source_path; proc_internal })
+          let proc_calls = get_callees proc in
+          Hashtbl.add procs' name
+            { proc with proc_source_path; proc_internal; proc_calls })
         procs
     in
     procs'
