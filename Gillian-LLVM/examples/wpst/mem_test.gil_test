@@ -1,0 +1,36 @@
+
+
+bispec split_vector(x) : [[types(x : Bitvector(32i))]]
+proc split_vector(x) {
+    xtopslice := extract(31i, 16i, Bitvector(x, 32i): 16i);
+    xbotslice := extract(15i, 0i, Bitvector(x, 32i): 16i);
+    ret := {{ xtopslice, xbotslice }};
+    return
+};
+
+bispec main() : [[emp]]
+proc main() {
+    x := fresh_svar();
+    y := fresh_svar();
+    splitx := "split_vector"(x);
+    splity := "split_vector"(y);
+    xtopslice := l-nth(splitx,0i);
+    xbotslice := l-nth(splitx,1i);
+    ytopslice := l-nth(splity,0i);
+    ybotslice := l-nth(splity,1i);
+
+    newx := concat(Bitvector(xtopslice, 16i), Bitvector(ybotslice, 16i) : 32i);
+    newy := concat(Bitvector(ytopslice, 16i), Bitvector(xbotslice, 16i) : 32i);
+
+    sum0 := bvadd(Bitvector(x,32i), Bitvector(y,32i): 32i);
+    sum1 := bvadd(Bitvector(newx,32i), Bitvector(newy,32i): 32i);
+    xptr_l := [mem_alloc](0i, 32i);
+    xptr := l-nth(xptr_l, 0i);
+    a := [mem_store]("i-32", xptr, 0i, sum0);
+    rtt_l := [mem_load]("i-32", xptr, 0i);
+    rtt := l-nth(rtt_l, 0i);
+    assert((!(bvult(Bitvector(sum1, 32i), Bitvector(sum0, 32i)))));
+    assert((rtt == sum1));
+    ret := x;
+    return
+};
