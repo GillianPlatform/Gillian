@@ -1,2 +1,2 @@
 *.symtab.json
-*.gil
+!*.gil
