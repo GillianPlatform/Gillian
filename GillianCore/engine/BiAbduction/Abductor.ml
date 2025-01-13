@@ -393,6 +393,7 @@ module Make
   let str_concat = String.concat ", "
 
   let sort_tests_by_callgraph tests callgraph =
+    L.verbose (fun m -> m "CG: %a" Call_graph.pp callgraph);
     let rec aux acc rest_tests = function
       | [] -> (acc, rest_tests)
       | name :: rest ->

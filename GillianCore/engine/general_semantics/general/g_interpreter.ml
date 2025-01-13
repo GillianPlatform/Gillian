@@ -2030,6 +2030,12 @@ struct
                      if Hashtbl.mem prog.specs pid then Some conf else None)
                    on_hold
                in
+               let () =
+                 L.(
+                   verbose (fun m ->
+                       m "Resuming size of: %d total size of: %d"
+                         (List.length hold_confs) (List.length on_hold)))
+               in
                continue_or_pause hold_confs (fun ?selector () ->
                    eval_step ret_fun false prog results [] hold_confs selector
                      []))
@@ -2203,7 +2209,9 @@ struct
             }
           in
           debug_log conf rest_confs;
-
+          L.(
+            verbose (fun m ->
+                m "Evaluating a conf with holds %d" (List.length on_hold)));
           match conf with
           | None -> Handle_conf.none eval_step_state
           | Some (ConfCont ({ branch_count; _ } as c))
