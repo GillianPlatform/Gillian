@@ -22,7 +22,7 @@ module Suite = struct
     with Not_found -> false
 
   let filter_source s =
-    Filename.check_suffix s ".gil"
+    Filename.check_suffix s ".gil_test"
     && not (!Gillian.Utils.Config.ci && contains_substring s "bug/")
 
   let beforeEach () = Generators.reset ()
