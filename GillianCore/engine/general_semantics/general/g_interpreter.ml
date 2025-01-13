@@ -845,11 +845,11 @@ struct
                       | Error x -> Right (Exec_err.EState x))
                     ret
                 in
-                let b_counter, has_branched =
-                  match successes with
-                  | [] -> (b_counter, false)
-                  | _ -> (b_counter + 1, true)
+
+                let b_counter =
+                  Int.max 0 (List.length successes - 1) + b_counter
                 in
+                let has_branched = List.length successes > 1 in
                 let spec_name = spec.data.spec_name in
                 let success_confs =
                   successes
