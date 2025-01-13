@@ -155,7 +155,6 @@ let create_datatype name type_params (variants : (module Variant.S) list) =
     |> List.split
   in
   let decl = declare_datatype name type_params constructors in
-  print_endline (Sexplib.Sexp.to_string decl);
   (decl, recognizer_defs)
 
 let mk_datatype name type_params (variants : (module Variant.S) list) =
@@ -385,7 +384,6 @@ module Encoding = struct
   let none_encoding = make ~kind:Simple_wrapped Lit_operations.None.construct
 
   let native typ =
-    print_endline (Type.str typ);
     (match typ with
     | Type.BvType width -> defined_bv_variants := width :: !defined_bv_variants
     | _ -> ());
@@ -1084,7 +1082,6 @@ let perform_decls _ =
   (bv_decl :: bv_recogs) @ decls |> List.iter (fun decl -> cmd decl)
 
 let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
-  let () = print_endline "in solver" in
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
@@ -1093,8 +1090,6 @@ let exec_sat' (fs : Formula.Set.t) (gamma : typenv) : sexp option =
   in
   let encoded_assertions = encode_assertions fs gamma in
   let () = perform_decls () in
-  let () = print_endline "after decling" in
-  let () = print_endline "in solver" in
   let () = if true then Dump.dump fs gamma encoded_assertions in
   let () = encoded_assertions |> List.iter (fun a -> cmd a) in
   L.verbose (fun fmt -> fmt "Reached SMT.");
