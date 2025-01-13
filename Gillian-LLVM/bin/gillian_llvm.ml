@@ -85,7 +85,8 @@ module CLI =
     (DummyParserAndCompiler)
     (External.M)
     (struct
-      let runners : Gillian.Bulk.Runner.t list = []
+      let runners : Gillian.Bulk.Runner.t list =
+        [ (module Gillian_llvm_lib.SRunner) ]
     end)
     (DummyLifter)
 
