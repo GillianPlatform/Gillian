@@ -7,8 +7,8 @@
   gillian
   gillian.ppx_sat.runtime
   gillian-js.js2jsil_lib
-  semantics
-  cgil_lib
+  gillian-js.semantics
+  gillian-c.cgil_lib
   ppx_deriving_yojson.runtime)
  (preprocess
   (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson)))
