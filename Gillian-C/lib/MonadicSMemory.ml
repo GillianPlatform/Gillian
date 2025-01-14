@@ -24,7 +24,7 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   match loc_name with
   | None ->
       let new_loc_name = ALoc.alloc () in
-      let learned = [ Formula.Eq (ALoc new_loc_name, lvar_loc) ] in
+      let learned = [ Expr.BinOp (ALoc new_loc_name, Equal, lvar_loc) ] in
       Logging.verbose (fun fmt ->
           fmt "Couldn't resolve loc %a, created %s" Expr.pp lvar_loc
             new_loc_name);
@@ -175,8 +175,8 @@ module Mem = struct
   let cons_array map loc ofs size chunk =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let open Formula.Infix in
-    if%sat size #<= (Expr.int 0) then
+    let open Expr.Infix in
+    if%sat size <= Expr.int 0 then
       DR.ok (map, MonadicSVal.SVArray.empty, Some Perm.Freeable)
     else
       let** tree = get_tree_res map loc_name (Some ofs) (Some chunk) in
@@ -187,8 +187,8 @@ module Mem = struct
 
   let prod_array map loc ofs size chunk array perm =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat size #<= (Expr.int 0) then DR.ok map
+    let open Expr.Infix in
+    if%sat size <= Expr.int 0 then DR.ok map
     else
       let* loc_name = resolve_or_create_loc_name loc in
       let* tree = get_or_create_tree map loc_name in
@@ -213,9 +213,9 @@ module Mem = struct
 
   let cons_simple ~sheap_consumer map loc low high =
     let open DR.Syntax in
-    let open Formula.Infix in
+    let open Expr.Infix in
     let** loc_name = resolve_loc_result loc in
-    if%sat high #<= low then DR.ok (map, Some Perm.Freeable)
+    if%sat high <= low then DR.ok (map, Some Perm.Freeable)
     else
       let** tree = get_tree_res map loc_name None None in
       let++ new_tree, perm =
@@ -225,8 +225,8 @@ module Mem = struct
 
   let prod_simple ~sheap_producer map loc low high perm =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat high #<= low then DR.ok map
+    let open Expr.Infix in
+    if%sat high <= low then DR.ok map
     else
       let* loc_name = resolve_or_create_loc_name loc in
       let* tree = get_or_create_tree map loc_name in
@@ -256,7 +256,7 @@ module Mem = struct
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
-    let** loc_name = resolve_loc_result loc in
+    let* loc_name = resolve_or_create_loc_name loc in
     let* tree = get_or_create_tree map loc_name in
     let++ tree_set =
       SHeapTree.prod_bounds tree bounds |> DR.of_result |> map_lift_err loc_name
@@ -265,8 +265,8 @@ module Mem = struct
 
   let move map dst_loc dst_ofs src_loc src_ofs sz =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat sz #== (Expr.int 0) then DR.ok map
+    let open Expr.Infix in
+    if%sat sz == Expr.int 0 then DR.ok map
     else
       let** dst_loc_name = resolve_loc_result dst_loc in
       let** src_loc_name = resolve_loc_result src_loc in
@@ -525,7 +525,7 @@ let execute_prod_single heap params =
   ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let* sval = SVal.of_gil_expr_exn sval_e in
+      let* sval = SVal.of_gil_expr_vanish sval_e in
       let++ mem = Mem.prod_single heap.mem loc ofs chunk sval perm in
       { heap with mem }
   | _ -> fail_ungracefully "set_single" params
@@ -955,7 +955,7 @@ let get_fixes err =
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ [ Asrt.Pure (Eq (new_expr, loc)) ] ]
+      [ [ Asrt.Pure (BinOp (new_expr, Equal, loc)) ] ]
   | SHeapTreeErr
       {
         at_locations;

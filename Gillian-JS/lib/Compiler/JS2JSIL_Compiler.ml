@@ -84,7 +84,7 @@ let prefix_lcmds
 let is_list_type x = BinOp (UnOp (TypeOf, x), Equal, lit_typ ListType)
 let is_vref x = BinOp (rtype x, Equal, lit_refv)
 let is_oref x = BinOp (rtype x, Equal, lit_refo)
-let is_ref x = BinOp (is_vref x, BOr, is_oref x)
+let is_ref x = BinOp (is_vref x, Or, is_oref x)
 
 let rec get_break_lab loop_list lab =
   match loop_list with
@@ -206,14 +206,14 @@ let non_writable_ref_test x =
   let right_e =
     BinOp
       ( BinOp (field x, Equal, lit_str "eval"),
-        BOr,
+        Or,
         BinOp (field x, Equal, Lit (String "arguments")) )
   in
-  BinOp (left_e, BAnd, right_e)
+  BinOp (left_e, And, right_e)
 
 let make_unresolvable_ref_test x =
   BinOp
-    (BinOp (base x, Equal, Lit Null), BOr, BinOp (base x, Equal, Lit Undefined))
+    (BinOp (base x, Equal, Lit Null), Or, BinOp (base x, Equal, Lit Undefined))
 
 let make_get_value_call x err =
   (* x_v := getValue (x) with err *)
@@ -437,7 +437,7 @@ let translate_binop_plus x1 x2 x1_v x2_v err =
   let goto_guard_right =
     BinOp (UnOp (TypeOf, PVar x2_p), Equal, Lit (Type StringType))
   in
-  let goto_guard = BinOp (goto_guard_left, BOr, goto_guard_right) in
+  let goto_guard = BinOp (goto_guard_left, Or, goto_guard_right) in
   let cmd_goto = LGuardedGoto (goto_guard, then_lab, else_lab) in
 
   (* then: x1_s := i__toString (x1_p) with err *)
@@ -598,7 +598,7 @@ let translate_binop_equality _ _ x1_v x2_v non_strict non_negated err =
     | false ->
         let x_r2 = fresh_var () in
         (* x_r2 := (not x_r1) *)
-        ([ (None, LBasic (Assignment (x_r2, UnOp (UNot, PVar x_r1)))) ], x_r2)
+        ([ (None, LBasic (Assignment (x_r2, UnOp (Not, PVar x_r1)))) ], x_r2)
   in
 
   let new_cmds = [ (None, cmd_ass_xr1) ] @ cmd_ass_xr2 in
@@ -1699,7 +1699,7 @@ let rec translate_expr tr_ctx e :
       let next1 = fresh_next_label () in
       let goto_guard_expr =
         UnOp
-          ( UNot,
+          ( Not,
             BinOp (UnOp (TypeOf, PVar x_f_val), Equal, Lit (Type ObjectType)) )
       in
       let cmd_goto_is_obj =
@@ -2074,16 +2074,9 @@ let rec translate_expr tr_ctx e :
           in
 
           let le = SSubst.subst_in_expr subst ~partial:true e' in
-          let asrt =
-            match Formula.lift_logic_expr le with
-            | Some (asrt_b, _) -> asrt_b
-            | _ ->
-                raise
-                  (Failure
-                     (Printf.sprintf "Invalid assert. Could not lift\n%s"
-                        ((Fmt.to_to_string Expr.pp) le)))
-          in
-          let cmd = (metadata, None, LLogic (LCmd.Assert asrt)) in
+          if not @@ Expr.is_boolean_expr le then
+            Fmt.failwith "Invalid assert. Could not lift\n%a" Expr.pp le;
+          let cmd = (metadata, None, LLogic (LCmd.Assert le)) in
 
           (cmds @ [ cmd ], Lit Empty, errs)
       | es ->
@@ -2093,7 +2086,7 @@ let rec translate_expr tr_ctx e :
                  (fun e -> JS_Parser.PrettyPrint.string_of_exp_syntax_1 e true)
                  es)
           in
-          raise (Failure (Printf.sprintf "Invalid assert:\n%s" msg)))
+          Fmt.failwith "Invalid assert:\n%s" msg)
   | JS_Parser.Syntax.Call (e_f, xes)
     when e_f.JS_Parser.Syntax.exp_stx
          = JS_Parser.Syntax.Var js_symbolic_constructs.js_assume -> (
@@ -2118,16 +2111,9 @@ let rec translate_expr tr_ctx e :
           in
 
           let le = SSubst.subst_in_expr subst ~partial:true e' in
-          let asrt =
-            match Formula.lift_logic_expr le with
-            | Some (asrt_b, _) -> asrt_b
-            | _ ->
-                raise
-                  (Failure
-                     (Printf.sprintf "Invalid assume. Could not lift\n%s"
-                        ((Fmt.to_to_string Expr.pp) le)))
-          in
-          let cmd = (metadata, None, LLogic (LCmd.Assume asrt)) in
+          if not @@ Expr.is_boolean_expr le then
+            Fmt.failwith "Invalid assume. Could not lift\n%a" Expr.pp le;
+          let cmd = (metadata, None, LLogic (LCmd.Assume le)) in
 
           (cmds @ [ cmd ], Lit Empty, errs)
       | _ -> raise (Failure "Invalid assume"))
@@ -2143,16 +2129,22 @@ let rec translate_expr tr_ctx e :
       let cmd1 = (metadata, None, LLogic (LCmd.FreshSVar x_v)) in
       let x_v = PVar x_v in
       let cmd2 =
-        (metadata, None, LLogic (LCmd.Assume (Not (Eq (x_v, Lit Empty)))))
+        ( metadata,
+          None,
+          LLogic (LCmd.Assume (UnOp (Not, BinOp (x_v, Equal, Lit Empty)))) )
       in
       let cmd3 =
-        (metadata, None, LLogic (LCmd.Assume (Not (Eq (x_v, Lit Nono)))))
+        ( metadata,
+          None,
+          LLogic (LCmd.Assume (UnOp (Not, BinOp (x_v, Equal, Lit Nono)))) )
       in
       let cmd4 =
         ( metadata,
           None,
           LLogic
-            (LCmd.Assume (Not (Eq (UnOp (TypeOf, x_v), Lit (Type ListType)))))
+            (LCmd.Assume
+               (UnOp
+                  (Not, BinOp (UnOp (TypeOf, x_v), Equal, Lit (Type ListType)))))
         )
       in
       ([ cmd1; cmd2; cmd3; cmd4 ], x_v, [])
@@ -2274,7 +2266,7 @@ let rec translate_expr tr_ctx e :
       let next1 = fresh_next_label () in
       let goto_guard_expr =
         UnOp
-          ( UNot,
+          ( Not,
             BinOp (UnOp (TypeOf, PVar x_f_val), Equal, Lit (Type ObjectType)) )
       in
       let cmd_goto_is_obj =
@@ -2934,7 +2926,7 @@ let rec translate_expr tr_ctx e :
 
       (*  x_r := (not x_b)   *)
       let x_r = fresh_var () in
-      let cmd_xr_ass = LBasic (Assignment (x_r, UnOp (UNot, PVar x_b))) in
+      let cmd_xr_ass = LBasic (Assignment (x_r, UnOp (Not, PVar x_b))) in
 
       let cmds =
         annotate_first_cmd
@@ -3265,7 +3257,7 @@ let rec translate_expr tr_ctx e :
           tr_ctx.tr_err_lab
       in
       let x_r2 = fresh_var () in
-      let new_cmd = LBasic (Assignment (x_r2, UnOp (UNot, PVar x_r1))) in
+      let new_cmd = LBasic (Assignment (x_r2, UnOp (Not, PVar x_r1))) in
       let cmds =
         annotate_first_cmd
           (cmds1
@@ -3310,7 +3302,7 @@ let rec translate_expr tr_ctx e :
           tr_ctx.tr_err_lab
       in
       let x_r2 = fresh_var () in
-      let new_cmd = LBasic (Assignment (x_r2, UnOp (UNot, PVar x_r1))) in
+      let new_cmd = LBasic (Assignment (x_r2, UnOp (Not, PVar x_r1))) in
       let cmds =
         annotate_first_cmd
           (cmds1
@@ -5325,7 +5317,7 @@ and translate_statement tr_ctx e =
       let next1 = fresh_next_label () in
       let next2 = fresh_next_label () in
       let expr_goto_guard = BinOp (PVar x_ret_2, Equal, Lit Empty) in
-      let expr_goto_guard = UnOp (UNot, expr_goto_guard) in
+      let expr_goto_guard = UnOp (Not, expr_goto_guard) in
       let cmd_goto_empty_test = LGuardedGoto (expr_goto_guard, next1, next2) in
 
       (* x_ret_3 := PHI(x_ret_1, x_ret_2)  *)
@@ -5473,7 +5465,7 @@ and translate_statement tr_ctx e =
       let next1 = fresh_next_label () in
       let next2 = fresh_next_label () in
       let expr_goto_guard = BinOp (PVar x_ret_2, Equal, Lit Empty) in
-      let expr_goto_guard = UnOp (UNot, expr_goto_guard) in
+      let expr_goto_guard = UnOp (Not, expr_goto_guard) in
       let cmd_goto_empty_test = LGuardedGoto (expr_goto_guard, next1, next2) in
 
       (* x_ret_3 := PHI(x_ret_1, x_ret_2) *)
@@ -5627,7 +5619,7 @@ and translate_statement tr_ctx e =
       let expr_goto_guard =
         BinOp
           ( BinOp (PVar x2_v, Equal, Lit Null),
-            BOr,
+            Or,
             BinOp (PVar x2_v, Equal, Lit Undefined) )
       in
       let cmd_goto_null_undef = LGuardedGoto (expr_goto_guard, next6, next0) in
@@ -5717,7 +5709,7 @@ and translate_statement tr_ctx e =
 
       (* goto [ not (x_ret_2 = empty) ] next2 next3 *)
       let expr_goto_guard = BinOp (PVar x_ret_2, Equal, Lit Empty) in
-      let expr_goto_guard = UnOp (UNot, expr_goto_guard) in
+      let expr_goto_guard = UnOp (Not, expr_goto_guard) in
       let cmd_goto_xret2 = LGuardedGoto (expr_goto_guard, next2, next3) in
 
       (* x_ret_3 := PHI(x_ret_1, x_ret_2) *)
@@ -5952,7 +5944,7 @@ and translate_statement tr_ctx e =
       let next1 = fresh_next_label () in
       let next2 = fresh_next_label () in
       let expr_goto_guard = BinOp (PVar x_ret_2, Equal, Lit Empty) in
-      let expr_goto_guard = UnOp (UNot, expr_goto_guard) in
+      let expr_goto_guard = UnOp (Not, expr_goto_guard) in
       let cmd_goto_empty_test = LGuardedGoto (expr_goto_guard, next1, next2) in
 
       (* next2:    x_ret_3 := PHI(x_ret_1, x_ret_2) *)
@@ -6323,7 +6315,7 @@ and translate_statement tr_ctx e =
 
         (* goto [ not x_prev_found ] next1 next2 *)
         let cmd_goto_1 =
-          LGuardedGoto (UnOp (UNot, PVar x_prev_found), next1, next2)
+          LGuardedGoto (UnOp (Not, PVar x_prev_found), next1, next2)
         in
 
         (* x1_v := getValue (x1) with err *)
@@ -6428,7 +6420,7 @@ and translate_statement tr_ctx e =
         (* goto [ not (x_found_b) ] next end_switch *)
         let next = fresh_next_label () in
         let cmd_goto =
-          LGuardedGoto (UnOp (UNot, PVar x_found_b), next, end_switch)
+          LGuardedGoto (UnOp (Not, PVar x_found_b), next, end_switch)
         in
         let cmds_def = add_initial_label cmds_def next metadata in
 
@@ -6800,7 +6792,7 @@ let generate_main e strictness spec : EProc.t =
     make_final_cmd errs ctx.tr_err_lab Names.return_variable origin_loc
   in
   let lab_err_cmd = annotate_cmd LReturnError None in
-  let global_err_asrt = annotate_cmd (LLogic (LCmd.Assert False)) None in
+  let global_err_asrt = annotate_cmd (LLogic (LCmd.Assert Expr.false_)) None in
   let err_cmds =
     if !Javert_utils.Js_config.cosette then
       [ cmd_err_phi_node; global_err_asrt; lab_err_cmd ]

@@ -75,10 +75,10 @@ let alocs (sfvl : t) : SS.t =
       SS.union ac (SS.union (Expr.alocs e_field) (Expr.alocs e_val)))
     sfvl SS.empty
 
-let assertions (loc : Expr.t) (sfvl : t) : Asrt.t list =
+let assertions (loc : Expr.t) (sfvl : t) : Asrt.t =
   List.rev
     (Expr.Map.fold
-       (fun field value (ac : Asrt.t list) ->
+       (fun field value (ac : Asrt.t) ->
          Asrt_utils.points_to ~loc ~field ~value :: ac)
        sfvl [])
 
@@ -105,8 +105,8 @@ let selective_substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t
 (* Correctness of field-value lists *)
 let is_well_formed (_ : t) : bool = true
 
-let wf_assertions (sfvl : t) : Formula.t list =
+let wf_assertions (sfvl : t) : Expr.t list =
   let props = field_names sfvl in
   let props' = List_utils.cross_product props props (fun x y -> (x, y)) in
   let props' = List.filter (fun (x, y) -> x <> y) props' in
-  List.map (fun (x, y) : Formula.t -> Not (Eq (x, y))) props'
+  List.map (fun (x, y) : Expr.t -> UnOp (Not, BinOp (x, Equal, y))) props'

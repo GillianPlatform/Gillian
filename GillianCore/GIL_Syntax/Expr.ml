@@ -13,8 +13,9 @@ type t = TypeDef__.expr =
   | EList of t list  (** Lists of expressions    *)
   | ESet of t list  (** Sets of expressions     *)
   | Exists of (string * Type.t option) list * t
-      (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
-  | EForall of (string * Type.t option) list * t
+      (** Existential quantification. *)
+  | ForAll of (string * Type.t option) list * t
+      (** Universal quantification. *)
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -29,6 +30,8 @@ let int n = lit (Int (Z.of_int n))
 let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let false_ = Lit (Bool false)
+let true_ = Lit (Bool true)
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
@@ -112,21 +115,15 @@ let list_cons el r =
   list_cat sgl r
 
 let list el =
-  if
-    List.for_all
-      (function
-        | Lit _ -> true
-        | _ -> false)
-      el
-  then
-    Lit
-      (LList
-         (List.map
-            (function
-              | Lit l -> l
-              | _ -> assert false)
-            el))
-  else EList el
+  let rec aux l =
+    match l with
+    | [] -> Some []
+    | Lit l :: r -> Option.map (fun x -> l :: x) (aux r)
+    | _ -> None
+  in
+  match aux el with
+  | Some l -> Lit (LList l)
+  | None -> EList el
 
 let fmod a b =
   match (a, b) with
@@ -239,13 +236,95 @@ module Infix = struct
     | UnOp (IUnaryMinus, z) -> z
     | z -> UnOp (IUnaryMinus, z)
 
+  let forall params f = ForAll (params, f)
+
   let not a =
     match a with
     | Lit (Bool a) -> Lit (Bool (not a))
-    | x -> UnOp (UNot, x)
+    | x -> UnOp (Not, x)
+
+  let ( == ) a b =
+    match (a, b) with
+    | Lit la, Lit lb -> bool (Literal.equal la lb)
+    | a, b when equal a b -> Lit (Bool true)
+    | _ -> BinOp (a, Equal, b)
+
+  let lt = Stdlib.( < )
+  let lte = Stdlib.( <= )
+  let gt = Stdlib.( > )
+  let gte = Stdlib.( >= )
+
+  let ( < ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (lt x y)
+    | _ -> BinOp (a, ILessThan, b)
+
+  let ( <= ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (lte x y)
+    | _ -> BinOp (a, ILessThanEqual, b)
+
+  let ( > ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (gt x y)
+    | _ -> BinOp (b, ILessThan, a)
+
+  let ( >= ) a b =
+    match (a, b) with
+    | Lit (Int x), Lit (Int y) -> bool (gte x y)
+    | _ -> BinOp (b, ILessThanEqual, a)
+
+  let ( <. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (lt x y)
+    | _ -> BinOp (a, FLessThan, b)
+
+  let ( <=. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (lte x y)
+    | _ -> BinOp (a, FLessThanEqual, b)
+
+  let ( >. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (gt x y)
+    | _ -> BinOp (b, FLessThan, a)
+
+  let ( >=. ) a b =
+    match (a, b) with
+    | Lit (Num x), Lit (Num y) -> bool (gte x y)
+    | _ -> BinOp (b, FLessThanEqual, a)
+
+  let ( && ) a b =
+    match (a, b) with
+    | Lit (Bool true), x | x, Lit (Bool true) -> x
+    | Lit (Bool false), _ | _, Lit (Bool false) -> Lit (Bool false)
+    | _ -> BinOp (a, And, b)
+
+  let ( || ) a b =
+    match (a, b) with
+    | Lit (Bool false), x | x, Lit (Bool false) -> x
+    | Lit (Bool true), _ | _, Lit (Bool true) -> Lit (Bool true)
+    | _ -> BinOp (a, Or, b)
+
+  let ( ==> ) a b =
+    match (a, b) with
+    | Lit (Bool true), x -> x
+    | Lit (Bool false), _ | _, Lit (Bool true) -> Lit (Bool true)
+    | x, Lit (Bool false) -> not x
+    | _ -> BinOp (a, Impl, b)
 
   let ( @+ ) = list_cat
 end
+
+let conjunct = function
+  | [] -> Lit (Bool true)
+  | [ x ] -> x
+  | hd :: tl -> List.fold_left (fun acc x -> Infix.( && ) acc x) hd tl
+
+let disjunct = function
+  | [] -> Lit (Bool false)
+  | [ x ] -> x
+  | hd :: tl -> List.fold_left (fun acc x -> Infix.( || ) acc x) hd tl
 
 module MyExpr = struct
   type nonrec t = t
@@ -257,30 +336,6 @@ end
 
 module Set = Set.Make (MyExpr)
 module Map = Map.Make (MyExpr)
-
-(** Map over expressions *)
-
-(* let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
-     t =
-   (* Apply the mapping *)
-   let map_e = map f_before f_after in
-   let f_after = Option.value ~default:(fun x -> x) f_after in
-
-   let mapped_expr, recurse = f_before expr in
-   if not recurse then mapped_expr
-   else
-     (* Map recursively to expressions *)
-     let mapped_expr =
-       match mapped_expr with
-       | Lit _ | PVar _ | LVar _ | ALoc _ -> mapped_expr
-       | UnOp (op, e) -> UnOp (op, map_e e)
-       | BinOp (e1, op, e2) -> BinOp (map_e e1, op, map_e e2)
-       | LstSub (e1, e2, e3) -> LstSub (map_e e1, map_e e2, map_e e3)
-       | NOp (op, es) -> NOp (op, List.map map_e es)
-       | EList es -> EList (List.map map_e es)
-       | ESet es -> ESet (List.map map_e es)
-     in
-     f_after mapped_expr *)
 
 (** Optional map over expressions *)
 
@@ -318,9 +373,9 @@ let rec map_opt
             match map_e e with
             | Some e' -> Some (Exists (bt, e'))
             | _ -> None)
-        | EForall (bt, e) -> (
+        | ForAll (bt, e) -> (
             match map_e e with
-            | Some e' -> Some (EForall (bt, e'))
+            | Some e' -> Some (ForAll (bt, e'))
             | _ -> None)
       in
       Option.map f_after mapped_expr
@@ -339,6 +394,7 @@ let rec pp fmt e =
       match op with
       | LstNth | StrNth | LstRepeat ->
           Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
+      | Equal -> Fmt.pf fmt "@[(%a %s %a)@]" pp e1 (BinOp.str op) pp e2
       | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
@@ -354,7 +410,7 @@ let rec pp fmt e =
       Fmt.pf fmt "(exists %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
-  | EForall (bt, e) ->
+  | ForAll (bt, e) ->
       Fmt.pf fmt "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
@@ -378,8 +434,7 @@ let rec full_pp fmt e =
 let to_expr (le : t) : t = le
 
 (** From expression to list, if possible *)
-let to_list (le : t) : t list option =
-  match le with
+let to_list : t -> t list option = function
   | EList les -> Some les
   | Lit (LList les) -> Some (List.map (fun x -> Lit x) les)
   | _ -> None
@@ -392,54 +447,48 @@ let to_literal = function
   | _ -> None
 
 (** Get all the logical variables in --e-- *)
-let lvars (le : t) : SS.t =
-  Visitors.Collectors.lvar_collector#visit_expr SS.empty le
+let lvars : t -> SS.t = Visitors.Collectors.lvar_collector#visit_expr SS.empty
 
 (** Get all the abstract locations in --e-- *)
-let alocs (le : t) : SS.t = Visitors.Collectors.aloc_collector#visit_expr () le
+let alocs : t -> SS.t = Visitors.Collectors.aloc_collector#visit_expr ()
 
 (** Get all the concrete locations in --e-- *)
-let clocs (le : t) : SS.t = Visitors.Collectors.cloc_collector#visit_expr () le
+let clocs : t -> SS.t = Visitors.Collectors.cloc_collector#visit_expr ()
 
-let locs (le : t) : SS.t = Visitors.Collectors.loc_collector#visit_expr () le
+let locs : t -> SS.t = Visitors.Collectors.loc_collector#visit_expr ()
 
 (** Get all substitutables in --e-- *)
-let substitutables (le : t) : SS.t =
-  Visitors.Collectors.substitutable_collector#visit_expr () le
+let substitutables : t -> SS.t =
+  Visitors.Collectors.substitutable_collector#visit_expr ()
 
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
 
-  let rec loop les =
-    match les with
+  let rec loop = function
     | [] -> true
     | le :: rest -> if f le then loop rest else false
   in
 
   match le with
   | Lit _ | PVar _ -> true
-  | LVar _ | ALoc _ | Exists _ | EForall _ -> false
-  | UnOp (_, e) -> loop [ e ]
+  | LVar _ | ALoc _ | Exists _ | ForAll _ -> false
+  | UnOp (_, e) -> f e
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
 
-let is_concrete_zero_i (le : t) : bool =
-  match le with
+let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z
   | _ -> false
 
 (** Get all the variables in --e-- *)
-let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le
+let vars : t -> SS.t = Visitors.Collectors.var_collector#visit_expr ()
 
 (** Are all expressions in the list literals? *)
-let all_literals les =
-  List.for_all
-    (fun x ->
-      match x with
-      | Lit _ -> true
-      | _ -> false)
-    les
+let all_literals =
+  List.for_all (function
+    | Lit _ -> true
+    | _ -> false)
 
 (** Lifting literal lists to lists of expressions *)
 let rec from_lit_list (lit : Literal.t) : t =
@@ -465,6 +514,48 @@ let loc_from_loc_name (loc_name : string) : t =
   if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
 
 (** {2 Visitors} *)
+
+let push_in_negations, negate =
+  let rec f_off = function
+    | BinOp (a1, And, a2) -> BinOp (f_off a1, And, f_off a2)
+    | BinOp (a1, Or, a2) -> BinOp (f_off a1, Or, f_off a2)
+    | BinOp (a1, Impl, a2) -> BinOp (f_off a1, Impl, f_off a2)
+    | UnOp (Not, a1) -> f_on a1
+    | ForAll (bt, a) -> ForAll (bt, f_off a)
+    | Exists (bt, a) -> Exists (bt, f_off a)
+    | a -> a
+  and f_on = function
+    | BinOp (a1, And, a2) -> BinOp (f_on a1, Or, f_on a2)
+    | BinOp (a1, Or, a2) -> BinOp (f_on a1, And, f_on a2)
+    | BinOp (a1, Impl, a2) -> BinOp (f_off a1, And, f_on a2)
+    | BinOp (e1, ILessThan, e2) -> BinOp (e2, ILessThanEqual, e1)
+    | BinOp (e1, FLessThan, e2) -> BinOp (e2, FLessThanEqual, e1)
+    | BinOp (e1, ILessThanEqual, e2) -> BinOp (e2, ILessThan, e1)
+    | BinOp (e1, FLessThanEqual, e2) -> BinOp (e2, FLessThan, e1)
+    | Lit (Bool b) -> Lit (Bool (not b))
+    | UnOp (Not, a) -> f_off a
+    | Exists (bt, a) -> ForAll (bt, f_on a)
+    | ForAll (bt, a) -> Exists (bt, f_on a)
+    | a -> UnOp (Not, a)
+  in
+  (f_off, f_on)
+
+let rec is_boolean_expr : t -> bool = function
+  | LVar _ | PVar _
+  | Lit (Bool _)
+  | BinOp (_, FLessThan, _)
+  | BinOp (_, ILessThan, _)
+  | BinOp (_, FLessThanEqual, _)
+  | BinOp (_, ILessThanEqual, _)
+  | BinOp (_, SetMem, _)
+  | BinOp (_, Equal, _)
+  | BinOp (_, StrLess, _)
+  | BinOp (_, SetSub, _)
+  | UnOp (IsInt, _) -> true
+  | UnOp (Not, e') | Exists (_, e') | ForAll (_, e') -> is_boolean_expr e'
+  | BinOp (e1, And, e2) | BinOp (e1, Or, e2) | BinOp (e1, Impl, e2) ->
+      is_boolean_expr e1 && is_boolean_expr e2
+  | _ -> false
 
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =
@@ -494,7 +585,7 @@ let base_elements (expr : t) : t list =
   in
   v#visit_expr () expr
 
-let pvars (e : t) : SS.t = Visitors.Collectors.pvar_collector#visit_expr () e
+let pvars : t -> SS.t = Visitors.Collectors.pvar_collector#visit_expr ()
 
 let var_to_expr (x : string) : t =
   if Names.is_lvar_name x then LVar x
@@ -502,8 +593,7 @@ let var_to_expr (x : string) : t =
   else if is_pvar_name x then PVar x
   else raise (Failure ("var_to_expr: Impossible matchable: " ^ x))
 
-let is_matchable (e : t) : bool =
-  match e with
+let is_matchable = function
   | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
       true
   | _ -> false

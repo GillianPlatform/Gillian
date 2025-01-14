@@ -52,7 +52,7 @@ module type S = sig
     ?production:bool ->
     ?time:string ->
     t ->
-    Formula.t list ->
+    Expr.t list ->
     t option
 
   (** Assume type *)
@@ -61,10 +61,10 @@ module type S = sig
   (** Satisfiability check *)
   val sat_check : t -> vt -> bool
 
-  val sat_check_f : t -> Formula.t list -> st option
+  val sat_check_f : t -> Expr.t list -> st option
 
   (** Assert assertion *)
-  val assert_a : t -> Formula.t list -> bool
+  val assert_a : t -> Expr.t list -> bool
 
   (** Value Equality *)
   val equals : t -> vt -> vt -> bool
@@ -107,7 +107,7 @@ module type S = sig
   val get_lvars : t -> Var.Set.t
 
   (** Turns a state into a list of assertions *)
-  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
+  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
 
   val evaluate_slcmd : 'a MP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
@@ -133,7 +133,7 @@ module type S = sig
     (t * Flag.t, err_t) Res_list.t
 
   val sure_is_nonempty : t -> bool
-  val unfolding_vals : t -> Formula.t list -> vt list
+  val unfolding_vals : t -> Expr.t list -> vt list
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
   val clean_up : ?keep:Expr.Set.t -> t -> unit
@@ -141,10 +141,10 @@ module type S = sig
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t, err_t) Res_list.t
   val update_subst : t -> st -> unit
-  val mem_constraints : t -> Formula.t list
+  val mem_constraints : t -> Expr.t list
   val can_fix : err_t -> bool
-  val get_failing_constraint : err_t -> Formula.t
-  val get_fixes : err_t -> Asrt.t list list
+  val get_failing_constraint : err_t -> Expr.t
+  val get_fixes : err_t -> Asrt.t list
   val get_equal_values : t -> vt list -> vt list
   val get_heap : t -> heap_t
 end

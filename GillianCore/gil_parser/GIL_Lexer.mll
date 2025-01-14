@@ -28,7 +28,9 @@
         "null",      GIL_Parser.NULL;
         "empty",     GIL_Parser.EMPTY;
         "true",      GIL_Parser.TRUE;
+        "True",      GIL_Parser.TRUE;
         "false",     GIL_Parser.FALSE;
+        "False",     GIL_Parser.FALSE;
         "nan",       GIL_Parser.NAN;
         "inf",       GIL_Parser.INFINITY;
         "nil",       GIL_Parser.LSTNIL;
@@ -87,8 +89,6 @@
         "none", GIL_Parser.LNONE;
 
         (* Logic assertions *)
-        "True",         GIL_Parser.LTRUE;
-        "False",        GIL_Parser.LFALSE;
         "emp",          GIL_Parser.LEMP;
         "types",        GIL_Parser.LTYPES;
         "forall",       GIL_Parser.LFORALL;
@@ -181,11 +181,14 @@ rule read = parse
 
 (* Binary operators *)
   | "==>"                { GIL_Parser.LIMPLIES   }
+  | "=="
   | "="                  { GIL_Parser.EQ     }
   | "-*"                 { GIL_Parser.WAND   }
 
+  | "i<#"
   | "i<"                 { GIL_Parser.ILT    }
   | "i>"                 { GIL_Parser.IGT    }
+  | "i<=#"
   | "i<="                { GIL_Parser.ILE    }
   | "i>="                { GIL_Parser.IGE    }
   | "i+"                 { GIL_Parser.IPLUS  }
@@ -194,8 +197,10 @@ rule read = parse
   | "i/"                 { GIL_Parser.IDIV   }
   | "i%"                 { GIL_Parser.IMOD   }
 
+  | "<#"
   | "<"                  { GIL_Parser.FLT    }
   | ">"                  { GIL_Parser.FGT    }
+  | "<=#"
   | "<="                 { GIL_Parser.FLE    }
   | ">="                 { GIL_Parser.FGE    }
   | "+"                  { GIL_Parser.FPLUS  }
@@ -204,6 +209,7 @@ rule read = parse
   | "/"                  { GIL_Parser.FDIV   }
   | "%"                  { GIL_Parser.FMOD   }
 
+  | "s<#"
   | "s<"                 { GIL_Parser.SLT           }
   | "&"                  { GIL_Parser.BITWISEAND    }
   | "|"                  { GIL_Parser.BITWISEOR     }
@@ -223,10 +229,10 @@ rule read = parse
   | "-u-"                { GIL_Parser.SETUNION      }
   | "-i-"                { GIL_Parser.SETINTER      }
   | "-d-"                { GIL_Parser.SETDIFF       }
+  | "--e--"
   | "-e-"                { GIL_Parser.SETMEM        }
+  | "--s--"
   | "-s-"                { GIL_Parser.SETSUB        }
-  | "--e--"              { GIL_Parser.LSETMEM       }
-  | "--s--"              { GIL_Parser.LSETSUB       }
   | "-{"                 { GIL_Parser.SETOPEN       }
   | "}-"                 { GIL_Parser.SETCLOSE      }
 (* Unary operators *)
@@ -248,12 +254,6 @@ rule read = parse
   | "/\\"                { GIL_Parser.LAND }
   | "\\/"                { GIL_Parser.LOR }
   | "!"                  { GIL_Parser.LNOT }
-  | "=="                 { GIL_Parser.LEQUAL }
-  | "i<#"                { GIL_Parser.ILLESSTHAN }
-  | "i<=#"               { GIL_Parser.ILLESSTHANEQUAL }
-  | "<#"                 { GIL_Parser.FLLESSTHAN       }
-  | "<=#"                { GIL_Parser.FLLESSTHANEQUAL  }
-  | "s<#"                { GIL_Parser.LSLESSTHAN }
   | "is-int"             { GIL_Parser.ISINT }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
 (* Logic commands *)

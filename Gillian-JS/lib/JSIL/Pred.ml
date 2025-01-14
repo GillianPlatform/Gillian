@@ -2,7 +2,6 @@ module SSubst = Gillian.Symbolic.Subst
 module L = Logging
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
-module Formula = Gillian.Gil_syntax.Formula
 
 (** {b JSIL logic predicate}. *)
 type t = {
@@ -12,7 +11,7 @@ type t = {
   ins : int list;  (** Ins                    *)
   definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
-  facts : Formula.t list;  (** Facts about the predicate *)
+  facts : Expr.t list;  (** Facts about the predicate *)
   pure : bool;  (** Is the predicate pure  *)
   abstract : bool;  (** Is the predicate abstract  *)
   nounfold : bool;  (** Should the predicate be unfolded? *)
@@ -68,9 +67,7 @@ let pp fmt pred =
   let pp_facts fmt = function
     | [] -> ()
     | facts ->
-        Fmt.pf fmt "@\nfacts: %a;"
-          Fmt.(list ~sep:(any " and ") Formula.pp)
-          facts
+        Fmt.pf fmt "@\nfacts: %a;" Fmt.(list ~sep:(any " and ") Expr.pp) facts
   in
   Fmt.pf fmt "@[<v 2>%a%a%apred %s(%a):@\n%a;%a@]" pp_abstract pred.abstract
     pp_pure pred.pure pp_nounfold pred.nounfold name

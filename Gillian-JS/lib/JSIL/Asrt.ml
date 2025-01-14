@@ -9,15 +9,15 @@ type t =
   | MetaData of Expr.t * Expr.t  (** MetaData               *)
   | Pred of string * Expr.t list  (** Predicates             *)
   | EmptyFields of Expr.t * Expr.t  (** emptyFields assertion  *)
-  | Pure of Formula.t  (** Pure formula           *)
+  | Pure of Expr.t  (** Pure formula           *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
 
 let compare x y =
   let cmp = Stdlib.compare in
   match (x, y) with
-  | Pure (Eq (PVar x, _)), Pure (Eq (PVar y, _)) -> cmp x y
-  | Pure (Eq (PVar _, _)), _ -> -1
-  | _, Pure (Eq (PVar _, _)) -> 1
+  | Pure (BinOp (PVar x, Equal, _)), Pure (BinOp (PVar y, Equal, _)) -> cmp x y
+  | Pure (BinOp (PVar _, Equal, _)), _ -> -1
+  | _, Pure (BinOp (PVar _, Equal, _)) -> 1
   | PointsTo _, PointsTo _ -> cmp x y
   | PointsTo _, _ -> -1
   | _, PointsTo _ -> 1
@@ -66,7 +66,7 @@ let rec pp fmt (a : t) : unit =
   (* MetaData (e1, e2) *)
   | MetaData (e1, e2) -> Fmt.pf fmt "MetaData (%a, %a)" Expr.pp e1 Expr.pp e2
   (* Pure *)
-  | Pure f -> Formula.pp fmt f
+  | Pure f -> Expr.pp fmt f
 
 let full_pp = pp
 let pp_list = Fmt.list ~sep:(Fmt.any "  ") pp

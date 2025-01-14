@@ -42,31 +42,33 @@ let js2jsil_st
   (* x \in params -> (! (x == empty)) *)
   let params_not_empty : Asrt.t list =
     List.map
-      (fun x -> Asrt.Pure (Not (Eq (Expr.PVar x, Expr.Lit Empty))))
+      (fun x -> Asrt.Pure (UnOp (Not, BinOp (PVar x, Equal, Lit Empty))))
       params
   in
   let params_not_none : Asrt.t list =
-    List.map (fun x -> Asrt.Pure (Not (Eq (Expr.PVar x, Expr.Lit Nono)))) params
+    List.map
+      (fun x -> Asrt.Pure (UnOp (Not, BinOp (PVar x, Equal, Lit Nono))))
+      params
   in
 
   let params_and_lists : Asrt.t list =
     List.map
       (fun x ->
-        let fml : Formula.t =
-          Eq (Expr.UnOp (TypeOf, Expr.PVar x), Expr.Lit (Type ListType))
+        let fml : Expr.t =
+          BinOp (UnOp (TypeOf, PVar x), Equal, Lit (Type ListType))
         in
-        let fml : Formula.t = if x = var_scope then fml else Not fml in
+        let fml = if x = var_scope then fml else UnOp (Not, fml) in
         Asrt.Pure fml)
       params
   in
 
   (*  x__this == #this                *)
   let a_this =
-    Asrt.Pure (Eq (Expr.PVar var_this, Expr.LVar this_logic_var_name))
+    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_logic_var_name))
   in
   (*  x__scope == {{ #x1, ..., #xn }} *)
   let a_scope =
-    Asrt.Pure (Eq (Expr.PVar var_scope, Expr.EList scope_chain_list))
+    Asrt.Pure (BinOp (Expr.PVar var_scope, Equal, Expr.EList scope_chain_list))
   in
 
   (* let er_sc_list  = (match scope_chain_list with | [] -> [] | _ -> List.tl scope_chain_list) in

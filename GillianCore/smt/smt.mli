@@ -2,13 +2,11 @@ open Gil_syntax
 
 exception SMT_unknown
 
-val exec_sat :
-  Formula.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
-
-val is_sat : Formula.Set.t -> (string, Type.t) Hashtbl.t -> bool
+val exec_sat : Expr.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
+val is_sat : Expr.Set.t -> (string, Type.t) Hashtbl.t -> bool
 
 val check_sat :
-  Formula.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
+  Expr.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
 
 val lift_model :
   Sexplib.Sexp.t ->

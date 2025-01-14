@@ -77,7 +77,7 @@ module Make (State : SState.S) = struct
       ?(production = false)
       ?time:_
       (bi_state : t)
-      (fs : Formula.t list) : t option =
+      (fs : Expr.t list) : t option =
     let { state; _ } = bi_state in
     match State.assume_a ~matching ~production state fs with
     | Some state -> Some { bi_state with state }
@@ -89,11 +89,11 @@ module Make (State : SState.S) = struct
 
   let sat_check ({ state; _ } : t) (v : Expr.t) : bool = State.sat_check state v
 
-  let sat_check_f ({ state; _ } : t) (fs : Formula.t list) :
-      SVal.SESubst.t option =
+  let sat_check_f ({ state; _ } : t) (fs : Expr.t list) : SVal.SESubst.t option
+      =
     State.sat_check_f state fs
 
-  let assert_a ({ state; _ } : t) (fs : Formula.t list) : bool =
+  let assert_a ({ state; _ } : t) (fs : Expr.t list) : bool =
     State.assert_a state fs
 
   let equals ({ state; _ } : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
@@ -149,7 +149,7 @@ module Make (State : SState.S) = struct
   let get_spec_vars ({ state; _ } : t) : Var.Set.t = State.get_spec_vars state
   let get_lvars ({ state; _ } : t) : Var.Set.t = State.get_lvars state
 
-  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t list =
+  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t =
     State.to_assertions ?to_keep state
 
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
@@ -167,7 +167,7 @@ module Make (State : SState.S) = struct
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for bi-abductive execution")
 
-  let unfolding_vals ({ state; _ } : t) (fs : Formula.t list) : Expr.t list =
+  let unfolding_vals ({ state; _ } : t) (fs : Expr.t list) : Expr.t list =
     State.unfolding_vals state fs
 
   let substitution_in_place ?subst_all:_ (_ : SVal.SESubst.t) (_ : t) =
@@ -193,12 +193,12 @@ module Make (State : SState.S) = struct
     in
     SVal.SESubst.init bindings
 
-  let fix_list_apply s =
+  let fix_list_apply (s : state_t) (asrt : Asrt.t) =
     let open Syntaxes.List in
     List.fold_left
       (fun acc a ->
         let* this_state = acc in
-        let lvars = Asrt.lvars a in
+        let lvars = Asrt.lvars [ a ] in
         let this_state = State.add_spec_vars this_state lvars in
         match a with
         | Asrt.Emp -> [ this_state ]
@@ -213,12 +213,11 @@ module Make (State : SState.S) = struct
                    | Some s -> State.assume_t s e t)
                  (Some this_state)
             |> Option.to_list
-        | GA (corepred, ins, outs) ->
+        | CorePred (corepred, ins, outs) ->
             State.produce_core_pred corepred this_state (ins @ outs)
-        | Star _ -> raise (Failure "DEATH. fix_list_apply star")
         | Wand _ -> raise (Failure "DEATH. fix_list_apply wand")
         | Pred _ -> raise (Failure "DEATH. fix_list_apply pred"))
-      [ s ]
+      [ s ] asrt
 
   type post_res = (Flag.t * Asrt.t list) option
 
@@ -258,7 +257,8 @@ module Make (State : SState.S) = struct
                     "@[<v 2>WARNING: Match Assertion Failed: %a with error: \
                      %a. CUR SUBST:@\n\
                      %a@]@\n"
-                    Asrt.pp (fst step) State.pp_err err SVal.SESubst.pp subst);
+                    Asrt.pp_atom (fst step) State.pp_err err SVal.SESubst.pp
+                    subst);
               if not (State.can_fix err) then (
                 L.verbose (fun m -> m "CANNOT FIX!");
                 [])
@@ -448,7 +448,7 @@ module Make (State : SState.S) = struct
 
   (* to throw errors: *)
 
-  let get_fixes (_ : err_t) : Asrt.t list list =
+  let get_fixes (_ : err_t) : Asrt.t list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
   let get_recovery_tactic (_ : t) (_ : err_t list) =
@@ -461,7 +461,7 @@ module Make (State : SState.S) = struct
 
   (** new functions *)
 
-  let mem_constraints ({ state; _ } : t) : Formula.t list =
+  let mem_constraints ({ state; _ } : t) : Expr.t list =
     State.mem_constraints state
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a

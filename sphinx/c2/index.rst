@@ -1,5 +1,5 @@
-Gillian-C2 (Alternative C Instantiation)
-========================================
+Gillian-C2
+==========
 
 .. danger::
 

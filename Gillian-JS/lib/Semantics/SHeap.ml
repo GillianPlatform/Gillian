@@ -338,7 +338,7 @@ let to_list (heap : t) : (string * s_object) list =
   SS.fold (fun loc ac -> (loc, Option.get (get heap loc)) :: ac) domain []
 
 (** converts a symbolic heap to a list of assertions *)
-let assertions (heap : t) : Asrt.t list =
+let assertions (heap : t) : Asrt.t =
   let make_loc_lexpr loc =
     if Names.is_aloc_name loc then Expr.ALoc loc else Expr.Lit (Loc loc)
   in
@@ -359,10 +359,9 @@ let assertions (heap : t) : Asrt.t list =
     fv_assertions @ domain @ metadata
   in
 
-  List.sort Asrt.compare
-    (List.concat (List.map assertions_of_object (to_list heap)))
+  to_list heap |> List.concat_map assertions_of_object |> List.sort Asrt.compare
 
-let wf_assertions_of_obj (heap : t) (loc : string) : Formula.t list =
+let wf_assertions_of_obj (heap : t) (loc : string) : Expr.t list =
   let cfvl =
     Option.value ~default:SFVL.empty (Hashtbl.find_opt heap.cfvl loc)
   in
@@ -373,9 +372,9 @@ let wf_assertions_of_obj (heap : t) (loc : string) : Formula.t list =
   let spps = SFVL.field_names sfvl in
   let props = List_utils.cross_product spps (cpps @ spps) (fun x y -> (x, y)) in
   let props = List.filter (fun (x, y) -> x <> y) props in
-  List.map (fun (x, y) : Formula.t -> Not (Eq (x, y))) props
+  List.map (fun (x, y) : Expr.t -> UnOp (Not, BinOp (x, Equal, y))) props
 
-let wf_assertions (heap : t) : Formula.t list =
+let wf_assertions (heap : t) : Expr.t list =
   let domain = domain heap in
   SS.fold (fun loc ac -> wf_assertions_of_obj heap loc @ ac) domain []
 

@@ -39,7 +39,7 @@ module Concrete : sig
   (** {3 Symbolic things} *)
 
   val substitution : Gillian.Symbolic.Subst.t -> t -> t
-  val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t list
+  val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t
 end
 
 module Symbolic : sig
@@ -79,5 +79,5 @@ module Symbolic : sig
   (** {3 Symbolic things} *)
 
   val substitution : Gillian.Symbolic.Subst.t -> t -> t
-  val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t list
+  val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t
 end

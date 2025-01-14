@@ -6,4 +6,4 @@ WISL is an instantiation of Gillian to a simple while language with a C-style bl
 .. toctree::
    :titlesonly:
 
-   lab
+   verification-tutorial

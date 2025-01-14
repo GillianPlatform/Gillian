@@ -75,11 +75,11 @@ let of_gil_expr_almost_concrete ?(gamma = Type_env.init ()) gexpr =
       Some (Sptr (loc, offset), [])
   | EList [ LVar loc; Lit (Int k) ] ->
       let aloc = ALoc.alloc () in
-      let new_pf = Formula.Eq (LVar loc, Expr.ALoc aloc) in
+      let new_pf = Expr.BinOp (LVar loc, Equal, Expr.ALoc aloc) in
       Some (Sptr (aloc, Lit (Int k)), [ new_pf ])
   | EList [ LVar loc; LVar ofs ] when is_loc_ofs gamma loc ofs ->
       let aloc = ALoc.alloc () in
-      let new_pf = Formula.Eq (LVar loc, Expr.ALoc aloc) in
+      let new_pf = Expr.BinOp (LVar loc, Equal, Expr.ALoc aloc) in
       Some (Sptr (aloc, LVar ofs), [ new_pf ])
   | EList [ Lit (String typ); value ] when String.equal typ int_type ->
       Some (SVint value, [])

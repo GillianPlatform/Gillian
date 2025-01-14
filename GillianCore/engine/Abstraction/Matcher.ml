@@ -49,13 +49,13 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    module MatchCaseReport : sig
-      type t = { astate : AstateRec.t; subst : SVal.SESubst.t; mp : MP.t }
-      [@@deriving yojson]
-    end
-
     module MatchResultReport : sig
-      type remaining_state = MatchCaseReport.t [@@deriving yojson]
+      type remaining_state = {
+        astate : AstateRec.t;
+        subst : SVal.SESubst.t;
+        mp : MP.t;
+      }
+      [@@deriving yojson]
 
       type t =
         | Success of {
@@ -76,7 +76,9 @@ module type S = sig
 
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
+  val produce_assertion :
+    t -> SVal.SESubst.t -> Asrt.atom -> (t, err_t) Res_list.t
+
   val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
   val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
 
@@ -159,7 +161,7 @@ module Make (State : SState.S) :
   type post_res = (Flag.t * Asrt.t list) option
   type s_state = t * SVal.SESubst.t * MP.t
   type search_state = s_state list * err_t list
-  type search_state' = (s_state * int * bool) list * err_t list
+  type search_state' = (s_state * L.Report_id.t option) list * err_t list
   type unfold_info_t = (string * string) list
 
   (* This is mostly to do with Gillian legacy.
@@ -241,19 +243,13 @@ module Make (State : SState.S) :
           L.Logging_constants.Content_type.match_ f
     end
 
-    module MatchCaseReport = struct
-      type t = { astate : AstateRec.t; subst : SVal.SESubst.t; mp : MP.t }
-      [@@deriving yojson]
-
-      let to_loggable = L.Loggable.make L.dummy_pp of_yojson to_yojson
-
-      let log report =
-        L.Specific.normal (to_loggable report)
-          L.Logging_constants.Content_type.match_case
-    end
-
     module MatchResultReport = struct
-      type remaining_state = MatchCaseReport.t [@@deriving yojson]
+      type remaining_state = {
+        astate : AstateRec.t;
+        subst : SVal.SESubst.t;
+        mp : MP.t;
+      }
+      [@@deriving yojson]
 
       type t =
         | Success of {
@@ -292,37 +288,6 @@ module Make (State : SState.S) :
         L.Specific.normal (to_loggable report)
           L.Logging_constants.Content_type.match_result
     end
-
-    let structure_match_case_reports
-        parent_ids_ref
-        target_case_depth
-        is_new_case
-        astate
-        subst
-        mp =
-      let actual_target_depth =
-        if is_new_case then target_case_depth - 1 else target_case_depth
-      in
-      let case_depth = List.length !parent_ids_ref in
-      (* assert (actual_target_depth <= case_depth + 1); *)
-      for _ = case_depth downto actual_target_depth + 1 do
-        match !parent_ids_ref with
-        | [] -> raise (Failure "Mismatched case depth and parent_id list!")
-        | parent_id :: rest ->
-            L.Parent.release (Some parent_id);
-            parent_ids_ref := rest
-      done;
-      if is_new_case then
-        let new_parent_id =
-          MatchCaseReport.log { astate = AstateRec.from astate; subst; mp }
-        in
-        match new_parent_id with
-        | Some new_parent_id ->
-            L.Parent.set new_parent_id;
-            parent_ids_ref := new_parent_id :: !parent_ids_ref;
-            target_case_depth
-        | None -> target_case_depth
-      else target_case_depth
   end
 
   open Logging
@@ -342,9 +307,9 @@ module Make (State : SState.S) :
       preds_list;
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
-  type cons_pure_result = Success of state_t | Abort of Formula.t | Vanish
+  type cons_pure_result = Success of state_t | Abort of Expr.t | Vanish
 
-  let cons_pure (state : state_t) (f : Formula.t) : cons_pure_result =
+  let cons_pure (state : state_t) (f : Expr.t) : cons_pure_result =
     if !Config.under_approximation then
       match State.assume_a ~matching:true state [ f ] with
       | Some state -> Success state
@@ -568,8 +533,10 @@ module Make (State : SState.S) :
         in
         Some (actual_pred, args)
 
-  let rec produce_assertion (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
-      (t, err_t) Res_list.t =
+  let rec produce_assertion
+      (astate : t)
+      (subst : SVal.SESubst.t)
+      (a : Asrt.atom) : (t, err_t) Res_list.t =
     let open Res_list.Syntax in
     let { state; preds; pred_defs; variants; wands } = astate in
     let other_state_err msg = [ Error (StateErr.EOther msg) ] in
@@ -580,12 +547,15 @@ module Make (State : SState.S) :
            Produce simple assertion: @[<h>%a@]@\n\
            With subst: %a\n\
           \           -------------------------@\n"
-          Asrt.pp a SVal.SESubst.pp subst);
+          Asrt.pp_atom a SVal.SESubst.pp subst);
 
     L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
-    match a with
-    | GA (a_id, ins, outs) ->
+    match (a : Asrt.atom) with
+    | Emp ->
+        L.verbose (fun fmt -> fmt "Emp assertion.");
+        [ Ok astate ]
+    | CorePred (a_id, ins, outs) ->
         L.verbose (fun fmt -> fmt "Memory producer.");
 
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
@@ -633,12 +603,12 @@ module Make (State : SState.S) :
                 List.fold_left2
                   (fun facts param le ->
                     let subst =
-                      Formula.subst_expr_for_expr ~to_subst:param ~subst_with:le
+                      Expr.subst_expr_for_expr ~to_subst:param ~subst_with:le
                     in
                     List.map subst facts)
                   facts params les
               in
-              let facts = Asrt.Pure (Formula.conjunct facts) in
+              let facts = Asrt.Pure (Expr.conjunct facts) in
               produce_assertion
                 { state; preds; wands; pred_defs; variants }
                 subst facts
@@ -658,7 +628,7 @@ module Make (State : SState.S) :
         let rargs = List.map (subst_in_expr subst) rargs in
         Wands.extend wands Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
         Res_list.return astate
-    | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) -> (
+    | Pure (BinOp (PVar x, Equal, le)) | Pure (BinOp (le, Equal, PVar x)) -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         match SVal.SESubst.get subst (PVar x) with
         | Some v_x ->
@@ -669,7 +639,7 @@ module Make (State : SState.S) :
                   [ Ok { state; preds; wands; pred_defs; variants } ])
                 (State.assume_a ~matching:true
                    ~production:!Config.delay_entailment state
-                   [ Eq (v_x, v_le) ])
+                   [ BinOp (v_x, Equal, v_le) ])
             in
             Option.value
               ~default:
@@ -687,7 +657,7 @@ module Make (State : SState.S) :
             Res_list.return (update_store astate x v))
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
-        let f' = SVal.SESubst.substitute_formula subst ~partial:false f in
+        let f' = SVal.SESubst.subst_in_expr subst ~partial:false f in
         (* let pp_state =
              match !Config.pbn with
              | false -> State.pp
@@ -706,18 +676,15 @@ module Make (State : SState.S) :
         | None ->
             let msg =
               Fmt.str "Produce Simple Assertion: Cannot assume pure formula %a."
-                Formula.pp f'
+                Expr.pp f'
             in
             other_state_err msg
         | Some state' ->
             Res_list.return
               { state = state'; preds; wands; pred_defs; variants })
-    | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
-  and produce_asrt_list
-      (astate : t)
-      (subst : SVal.SESubst.t)
-      (sas : Asrt.t list) : (t, err_t) Res_list.t =
+  and produce_asrt_list (astate : t) (subst : SVal.SESubst.t) (sas : Asrt.t) :
+      (t, err_t) Res_list.t =
     let open Res_list.Syntax in
     let other_state_err msg = Res_list.error_with (StateErr.EOther msg) in
     let () =
@@ -732,7 +699,7 @@ module Make (State : SState.S) :
           with e ->
             let admissible =
               State.assume_a ~time:"Produce: final check" ~matching:true
-                intermediate_state.state [ True ]
+                intermediate_state.state [ Expr.true_ ]
             in
             if !Config.delay_entailment && Option.is_none admissible then (
               L.verbose (fun fmt ->
@@ -749,7 +716,7 @@ module Make (State : SState.S) :
       L.verbose (fun fmt -> fmt "Produce: final check");
       try
         State.assume_a ~time:"Produce: final check" ~matching:true state
-          [ True ]
+          [ Expr.true_ ]
       with _ -> None
     in
     L.verbose (fun fmt -> fmt "Concluded final check");
@@ -764,7 +731,7 @@ module Make (State : SState.S) :
           "@[-----------------@\n\
            -----------------@\n\
            Produce assertion: @[%a@]@]" Asrt.pp a);
-    let sas = MP.collect_simple_asrts a in
+    let sas = MP.simplify_asrts a in
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
@@ -822,7 +789,7 @@ module Make (State : SState.S) :
         m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n" SVal.SESubst.pp
           subst)
 
-  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], True, []))
+  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], Expr.true_, []))
 
   (* WARNING: At the moment, unfold behaves over-approximately, it will return only success of only error.
      We only use unfold and fold in OX mode right now, and we don't quite know the meaning of UX fold/unfold. *)
@@ -956,26 +923,13 @@ module Make (State : SState.S) :
       | Some (pname, v_args) -> (
           L.verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname);
           let rets = unfold (copy_astate astate) pname v_args in
-          let only_errors =
-            List.filter_map
-              (function
-                | Error e -> Some e
-                | _ -> None)
-              rets
-          in
+          let only_successes, only_errors = Res_list.split rets in
           match only_errors with
           | [] ->
               L.verbose (fun m ->
                   m "Unfold complete: %s(@[<h>%a@]): %d" pname
                     Fmt.(list ~sep:comma Expr.pp)
                     v_args (List.length rets));
-              let only_successes =
-                List.filter_map
-                  (function
-                    | Ok x -> Some x
-                    | _ -> None)
-                  rets
-              in
               Some only_successes
           | _ :: _ ->
               L.verbose (fun m ->
@@ -1037,14 +991,14 @@ module Make (State : SState.S) :
         | Success new_state -> Res_list.return { astate with state = new_state }
         | Abort fail_pf ->
             let error =
-              StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
+              StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
             in
             Res_list.error_with error
         | Vanish -> Res_list.vanish)
     | None ->
         L.verbose (fun m ->
             m "Could not find any match for the required wand!!!");
-        Res_list.error_with (StateErr.EPure False)
+        Res_list.error_with (StateErr.EPure Expr.false_)
 
   (** Consumes a predicate from the state.
       If the predicate is not "verbatim" in our set of preds,
@@ -1096,7 +1050,7 @@ module Make (State : SState.S) :
                   ({ state = new_state; wands; preds; pred_defs; variants }, vs)
             | Abort fail_pf ->
                 let error =
-                  StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
+                  StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
                 in
                 Res_list.error_with error
             | Vanish -> Res_list.vanish))
@@ -1126,7 +1080,7 @@ module Make (State : SState.S) :
     | _ ->
         let values = List.filter_map Fun.id vs in
         (* The `False` as second parameter is required for the fixing mechanism to trigger *)
-        Res_list.error_with (StateErr.EAsrt (values, False, []))
+        Res_list.error_with (StateErr.EAsrt (values, Expr.false_, []))
 
   and match_ins_outs_lists
       (state : State.t)
@@ -1164,7 +1118,7 @@ module Make (State : SState.S) :
       with _ -> None
     in
     match outs with
-    | None -> Abort True
+    | None -> Abort Expr.true_
     | Some outs -> (
         L.verbose (fun fmt ->
             fmt "Substed outs: %a"
@@ -1193,298 +1147,315 @@ module Make (State : SState.S) :
               match ac with
               | Abort _ | Vanish -> ac
               | Success state ->
-                  let pf : Formula.t = Eq (vd, od) in
+                  let pf = Expr.BinOp (vd, Equal, od) in
                   cons_pure state pf)
             (Success state) vos eos
         with Invalid_argument _ ->
           Fmt.failwith "Invalid amount of args for the following MP step : %a"
             MP.pp_step step)
 
-  and match_assertion
+  and match_assertion'
       ?(no_auto_fold = false)
       (astate : t)
       (subst : SVal.SESubst.t)
-      (step : MP.step) : (t, err_t) Res_list.t =
+      (step : MP.step) : (t, err_t) Res_list.t * L.Report_id.t option =
+    let open Syntaxes.Option in
     (* Auxiliary function for actions and predicates, with indexed outs *)
     let { state; wands; preds; pred_defs; variants } = astate in
 
     let assertion_loggable =
-      if L.Mode.enabled () then
-        Some
-          (let a = fst step in
-           (* Get pvars, lvars, locs from the assertion *)
-           let a_pvars, a_lvars, a_locs =
-             (Asrt.pvars a, Asrt.lvars a, Asrt.locs a)
-           in
-           let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
+      let+ () = if L.Mode.enabled () then Some () else None in
+      let a = fst step in
+      (* Get pvars, lvars, locs from the assertion *)
+      let a_pvars, a_lvars, a_locs =
+        (Asrt.pvars [ a ], Asrt.lvars [ a ], Asrt.locs [ a ])
+      in
+      let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
 
-           (* From the subst, we take any pair that has any of those and collect
-              the pvars, lvars, and alocs, from their values *)
-           let s_pvars, s_lvars, s_locs =
-             SVal.SESubst.fold subst
-               (fun e v (s_pvars, s_lvars, s_locs) ->
-                 let pvars, lvars, locs =
-                   (Expr.pvars e, Expr.lvars e, Expr.locs e)
-                 in
-                 if
-                   Containers.SS.inter
-                     (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
-                     filter_vars
-                   <> SS.empty
-                 then
-                   ( SS.union s_pvars (Expr.pvars v),
-                     SS.union s_lvars (Expr.lvars v),
-                     SS.union s_locs (Expr.locs v) )
-                 else (s_pvars, s_lvars, s_locs))
-               (SS.empty, SS.empty, SS.empty)
-           in
+      (* From the subst, we take any pair that has any of those and collect
+         the pvars, lvars, and alocs, from their values *)
+      let s_pvars, s_lvars, s_locs =
+        SVal.SESubst.fold subst
+          (fun e v (s_pvars, s_lvars, s_locs) ->
+            let pvars, lvars, locs =
+              (Expr.pvars e, Expr.lvars e, Expr.locs e)
+            in
+            if
+              Containers.SS.inter
+                (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
+                filter_vars
+              <> SS.empty
+            then
+              ( SS.union s_pvars (Expr.pvars v),
+                SS.union s_lvars (Expr.lvars v),
+                SS.union s_locs (Expr.locs v) )
+            else (s_pvars, s_lvars, s_locs))
+          (SS.empty, SS.empty, SS.empty)
+      in
 
-           let subst_pp =
-             match !Config.pbn with
-             | false -> SVal.SESubst.pp
-             | true ->
-                 SVal.SESubst.pp_by_need
-                   (SS.union a_pvars (SS.union a_lvars a_locs))
-           in
+      let subst_pp =
+        match !Config.pbn with
+        | false -> SVal.SESubst.pp
+        | true ->
+            SVal.SESubst.pp_by_need (SS.union a_pvars (SS.union a_lvars a_locs))
+      in
 
-           let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+      let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
 
-           L.verbose (fun fmt ->
-               fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars)
-                 pp_str_list (SS.elements s_lvars) pp_str_list
-                 (SS.elements s_locs));
+      L.verbose (fun fmt ->
+          fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars)
+            pp_str_list (SS.elements s_lvars) pp_str_list (SS.elements s_locs));
 
-           let pp_astate =
-             match !Config.pbn with
-             | false -> pp_astate
-             | true -> pp_astate_by_need s_pvars s_lvars s_locs
-           in
+      let pp_astate =
+        match !Config.pbn with
+        | false -> pp_astate
+        | true -> pp_astate_by_need s_pvars s_lvars s_locs
+      in
 
-           AssertionReport.to_loggable pp_astate subst_pp
-             { step; subst; astate = AstateRec.from astate })
-      else None
+      AssertionReport.to_loggable pp_astate subst_pp
+        { step; subst; astate = AstateRec.from astate }
     in
 
     L.Parent.with_specific assertion_loggable
-      L.Logging_constants.Content_type.assertion (fun () ->
+      L.Logging_constants.Content_type.assertion (fun assertion_id ->
+        ignore assertion_id;
         let p, outs = step in
         let open Res_list.Syntax in
-        match (p : Asrt.t) with
-        | GA (a_id, e_ins, e_outs) -> (
-            let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
-            let failure = List.exists (fun x -> x = None) vs_ins in
-            if failure then (
-              Fmt.pr "I don't know all ins for %a????" Asrt.pp p;
-              if !Config.under_approximation then [] else resource_fail)
-            else
-              let vs_ins = List.map Option.get vs_ins in
-              L.verbose (fun m ->
-                  m "Executing consume: %s with ins: @[<h>%a@]" a_id
-                    Fmt.(list ~sep:comma Expr.pp)
-                    vs_ins);
-              let** state'', vs_outs =
-                State.consume_core_pred a_id state vs_ins
-              in
-              (* Separate outs into direct matchables and others*)
-              match match_ins_outs_lists state'' subst step vs_outs e_outs with
-              | Success state''' ->
-                  Res_list.return
-                    { state = state'''; preds; wands; pred_defs; variants }
-              | Abort fail_pf ->
-                  let error =
-                    StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
-                  in
-                  Res_list.error_with error
-              | Vanish -> Res_list.vanish)
-        | Pred (pname, les) ->
-            L.verbose (fun m -> m "Matching predicate assertion");
-            (* Perform substitution in all predicate parameters *)
-            L.verbose (fun fmt ->
-                fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
-            L.verbose (fun fmt -> fmt "SUBST:\n%a" SVal.SESubst.pp subst);
-            let vs = List.map (subst_in_expr_opt astate subst) les in
-            (* Get the ins of the predicate *)
-            let pred = MP.get_pred_def pred_defs pname in
-            let pred_def = pred.pred in
-            let vs_ins = Pred.in_args pred_def vs in
-            let les_outs = Pred.out_args pred_def les in
-            (* All of which must have survived substitution *)
-            let failure = List.exists (fun x -> x = None) vs_ins in
-            if failure then (
-              L.verbose (fun m -> m "Cannot match: not all in-parameters known");
-              resource_fail)
-            else
-              let vs_ins = List.map Option.get vs_ins in
-              L.verbose (fun m ->
-                  m "Looking for ins: %a"
-                    Fmt.(brackets (list ~sep:comma Expr.pp))
-                    vs_ins);
-              let consume_pred_res =
-                consume_pred ~no_auto_fold astate pname vs
-                  ~fold_outs_info:(subst, step, les_outs)
-              in
-              let () =
-                match consume_pred_res with
-                | [] ->
-                    let msg = "CONSUME_PRED VANISHED! MEDOOOOOO!!!!!" in
-                    L.verbose ~severity:Warning (fun m -> m "%s" msg);
-                    if not !Config.under_approximation then
-                      Fmt.failwith "%s\n@?" msg
-                    else ()
-                | _ -> ()
-              in
-              let++ astate', _ = consume_pred_res in
-              astate'
-        | Wand { lhs; rhs } ->
-            if !Config.under_approximation then L.fail "Wand in under-approx";
-            let les_outs =
-              let pred = (MP.get_pred_def pred_defs (fst rhs)).pred in
-              Pred.out_args pred (snd rhs)
-            in
-            let fold_outs_info = (subst, step, les_outs) in
-            consume_wand ~fold_outs_info astate subst { lhs; rhs }
-        (* Conjunction should not be here *)
-        | Pure (Formula.And _) ->
-            raise (Failure "Match assertion: And: should have been reduced")
-        (* Other pure assertions *)
-        | Pure f -> (
-            let discharges =
-              List.fold_left
-                (fun discharges (u, out) ->
-                  let open Syntaxes.Result in
-                  let* discharges = discharges in
-                  (* Perform the substitution in the out *)
-                  let* out =
-                    SVal.SESubst.subst_in_expr_opt subst out
-                    |> Result_utils.of_option ~none:()
-                  in
-                  (* And add to e-subst *)
-                  match SVal.SESubst.get subst u with
-                  | None ->
-                      SVal.SESubst.put subst u out;
-                      Ok discharges
-                  | Some out' when Expr.equal out out' -> Ok discharges
-                  | Some out' ->
-                      let new_discharge = Formula.Eq (out, out') in
-                      Ok (new_discharge :: discharges))
-                (Ok []) outs
-            in
-            let discharges =
-              match discharges with
-              | Error () ->
-                  Fmt.failwith
-                    "INTERNAL ERROR: Matching failure: do not know all ins for \
-                     %a"
-                    Formula.pp f
-              | Ok discharges -> discharges
-            in
-            (* To match a pure formula we must know all ins *)
-            let opf = SVal.SESubst.substitute_in_formula_opt subst f in
-            match opf with
-            | None ->
-                Fmt.failwith "Matching failure: do not know all ins for %a"
-                  Formula.pp f
-            | Some pf -> (
-                let discharges_pf =
-                  List.fold_left Formula.Infix.( #&& ) True discharges
+        let res_list =
+          match (p : Asrt.atom) with
+          | CorePred (a_id, e_ins, e_outs) -> (
+              let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
+              let failure = List.exists (fun x -> x = None) vs_ins in
+              if failure then (
+                Fmt.pr "I don't know all ins for %a????" Asrt.pp_atom p;
+                if !Config.under_approximation then [] else resource_fail)
+              else
+                let vs_ins = List.map Option.get vs_ins in
+                L.verbose (fun m ->
+                    m "Executing consume: %s with ins: @[<h>%a@]" a_id
+                      Fmt.(list ~sep:comma Expr.pp)
+                      vs_ins);
+                let** state'', vs_outs =
+                  State.consume_core_pred a_id state vs_ins
                 in
-                let discharges_pf =
-                  Reduction.reduce_formula ~matching:true discharges_pf
-                in
-                let to_asrt = Formula.Infix.( #&& ) pf discharges_pf in
-                match cons_pure state to_asrt with
-                | Success new_state ->
+                (* Separate outs into direct matchables and others*)
+                match
+                  match_ins_outs_lists state'' subst step vs_outs e_outs
+                with
+                | Success state''' ->
                     Res_list.return
-                      { state = new_state; preds; wands; pred_defs; variants }
-                | Vanish -> Res_list.vanish
-                | Abort _ ->
-                    let vs = State.unfolding_vals state [ pf ] in
-                    let error = StateErr.EAsrt (vs, Not pf, [ [ Pure pf ] ]) in
-                    Res_list.error_with error))
-        | Types les -> (
-            let corrections =
-              List.fold_left
-                (fun (ac : Formula.t list) (le, t) ->
-                  let v_le = (subst_in_expr_opt astate subst) le in
-                  let v_le : Expr.t =
-                    match v_le with
-                    | Some v_le -> v_le
-                    | None -> raise (Failure "DEATH. match assertion Types")
+                      { state = state'''; preds; wands; pred_defs; variants }
+                | Abort fail_pf ->
+                    let error =
+                      StateErr.EAsrt
+                        ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
+                    in
+                    Res_list.error_with error
+                | Vanish -> Res_list.vanish)
+          | Pred (pname, les) ->
+              L.verbose (fun m -> m "Matching predicate assertion");
+              (* Perform substitution in all predicate parameters *)
+              L.verbose (fun fmt ->
+                  fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
+              L.verbose (fun fmt -> fmt "SUBST:\n%a" SVal.SESubst.pp subst);
+              let vs = List.map (subst_in_expr_opt astate subst) les in
+              (* Get the ins of the predicate *)
+              let pred = MP.get_pred_def pred_defs pname in
+              let pred_def = pred.pred in
+              let vs_ins = Pred.in_args pred_def vs in
+              let les_outs = Pred.out_args pred_def les in
+              (* All of which must have survived substitution *)
+              let failure = List.exists (fun x -> x = None) vs_ins in
+              if failure then (
+                L.verbose (fun m ->
+                    m "Cannot match: not all in-parameters known");
+                resource_fail)
+              else
+                let vs_ins = List.map Option.get vs_ins in
+                L.verbose (fun m ->
+                    m "Looking for ins: %a"
+                      Fmt.(brackets (list ~sep:comma Expr.pp))
+                      vs_ins);
+                let consume_pred_res =
+                  consume_pred ~no_auto_fold astate pname vs
+                    ~fold_outs_info:(subst, step, les_outs)
+                in
+                let () =
+                  match consume_pred_res with
+                  | [] ->
+                      let msg = "CONSUME_PRED VANISHED! MEDOOOOOO!!!!!" in
+                      L.verbose ~severity:Warning (fun m -> m "%s" msg);
+                      if not !Config.under_approximation then
+                        Fmt.failwith "%s\n@?" msg
+                      else ()
+                  | _ -> ()
+                in
+                let++ astate', _ = consume_pred_res in
+                astate'
+          | Wand { lhs; rhs } ->
+              if !Config.under_approximation then L.fail "Wand in under-approx";
+              let les_outs =
+                let pred = (MP.get_pred_def pred_defs (fst rhs)).pred in
+                Pred.out_args pred (snd rhs)
+              in
+              let fold_outs_info = (subst, step, les_outs) in
+              consume_wand ~fold_outs_info astate subst { lhs; rhs }
+          (* Conjunction should not be here *)
+          | Pure (BinOp (_, And, _)) ->
+              raise (Failure "Match assertion: And: should have been reduced")
+          (* Other pure assertions *)
+          | Pure f -> (
+              let discharges =
+                List.fold_left
+                  (fun discharges (u, out) ->
+                    let open Syntaxes.Result in
+                    let* discharges = discharges in
+                    (* Perform the substitution in the out *)
+                    let* out =
+                      SVal.SESubst.subst_in_expr_opt subst out
+                      |> Result_utils.of_option ~none:()
+                    in
+                    (* And add to e-subst *)
+                    match SVal.SESubst.get subst u with
+                    | None ->
+                        SVal.SESubst.put subst u out;
+                        Ok discharges
+                    | Some out' when Expr.equal out out' -> Ok discharges
+                    | Some out' ->
+                        let new_discharge = Expr.BinOp (out, Equal, out') in
+                        Ok (new_discharge :: discharges))
+                  (Ok []) outs
+              in
+              let discharges =
+                match discharges with
+                | Error () ->
+                    Fmt.failwith
+                      "INTERNAL ERROR: Matching failure: do not know all ins \
+                       for %a"
+                      Expr.pp f
+                | Ok discharges -> discharges
+              in
+              (* To match a pure formula we must know all ins *)
+              let opf = SVal.SESubst.subst_in_expr_opt subst f in
+              match opf with
+              | None ->
+                  Fmt.failwith "Matching failure: do not know all ins for %a"
+                    Expr.pp f
+              | Some pf -> (
+                  let discharges_pf =
+                    List.fold_left Expr.Infix.( && ) Expr.true_ discharges
                   in
-                  match State.get_type state v_le with
-                  | Some t' -> if not (Type.equal t t') then False :: ac else ac
-                  | None -> Eq (UnOp (TypeOf, v_le), Lit (Type t)) :: ac)
-                [] les
-            in
-
-            match corrections with
-            | [] -> Res_list.return astate
-            | _ ->
-                if !Config.under_approximation then
-                  (* In under-approx we try to assume the types hold*)
-                  match State.assume_a ~matching:true state corrections with
-                  | None -> Res_list.vanish
-                  | Some state' ->
+                  let discharges_pf =
+                    Reduction.reduce_lexpr ~matching:true discharges_pf
+                  in
+                  let to_asrt = Expr.Infix.( && ) pf discharges_pf in
+                  match cons_pure state to_asrt with
+                  | Success new_state ->
                       Res_list.return
-                        { state = state'; wands; preds; pred_defs; variants }
-                else
-                  let les, _ = List.split les in
-                  let les =
-                    List.filter_map (subst_in_expr_opt astate subst) les
-                  in
-                  let conjunct = Formula.conjunct corrections in
-                  let error =
-                    StateErr.EAsrt (les, Not conjunct, [ [ Pure conjunct ] ])
-                  in
-                  Res_list.error_with error)
-        (* LTrue, LFalse, LEmp, LStar *)
-        | _ -> raise (Failure "Illegal Assertion in Matching Plan"))
+                        { state = new_state; preds; wands; pred_defs; variants }
+                  | Vanish -> Res_list.vanish
+                  | Abort _ ->
+                      let vs = State.unfolding_vals state [ pf ] in
+                      let error =
+                        StateErr.EAsrt (vs, Expr.UnOp (Not, pf), [ [ Pure pf ] ])
+                      in
+                      Res_list.error_with error))
+          | Types les -> (
+              let corrections =
+                List.fold_left
+                  (fun (ac : Expr.t list) (le, t) ->
+                    let v_le = (subst_in_expr_opt astate subst) le in
+                    let v_le : Expr.t =
+                      match v_le with
+                      | Some v_le -> v_le
+                      | None -> raise (Failure "DEATH. match assertion Types")
+                    in
+                    match State.get_type state v_le with
+                    | Some t' ->
+                        if not (Type.equal t t') then Expr.false_ :: ac else ac
+                    | None ->
+                        BinOp (UnOp (TypeOf, v_le), Equal, Lit (Type t)) :: ac)
+                  [] les
+              in
+
+              match corrections with
+              | [] -> Res_list.return astate
+              | _ ->
+                  if !Config.under_approximation then
+                    (* In under-approx we try to assume the types hold*)
+                    match State.assume_a ~matching:true state corrections with
+                    | None -> Res_list.vanish
+                    | Some state' ->
+                        Res_list.return
+                          { state = state'; wands; preds; pred_defs; variants }
+                  else
+                    let les, _ = List.split les in
+                    let les =
+                      List.filter_map (subst_in_expr_opt astate subst) les
+                    in
+                    let conjunct = Expr.conjunct corrections in
+                    let error =
+                      StateErr.EAsrt
+                        (les, UnOp (Not, conjunct), [ [ Pure conjunct ] ])
+                    in
+                    Res_list.error_with error)
+          (* LTrue, LFalse, LEmp, LStar *)
+          | _ -> raise (Failure "Illegal Assertion in Matching Plan")
+        in
+        (res_list, assertion_id))
+
+  and match_assertion
+      ?(no_auto_fold = false)
+      (astate : t)
+      (subst : SVal.SESubst.t)
+      (step : MP.step) =
+    match_assertion' ~no_auto_fold astate subst step |> fst
 
   and match_assertion_safely ?(no_auto_fold = false) state subst step =
-    try match_assertion ~no_auto_fold state subst step
-    with err -> (
-      L.verbose (fun m ->
-          m
-            "WARNING: UNCAUGHT EXCEPTION IN MATCH ASSERTION: %s@\n\
-             Here's the backtrace: %s" (Printexc.to_string err)
-            (Printexc.get_backtrace ()));
-      if !Config.under_approximation then
-        let () =
-          L.verbose (fun m -> m "UX mode: vanishing despite exception!")
-        in
-        Res_list.vanish
-      else
-        match fst step with
-        | Pure pf ->
-            let { state = bstate; _ } = state in
-            let vs = State.unfolding_vals bstate [ pf ] in
-            Res_list.error_with (StateErr.EAsrt (vs, Not pf, [ [ Pure pf ] ]))
-        | _ ->
-            let other_error =
-              StateErr.EOther
-                (Fmt.str "Uncaught exception while matching assertions %a"
-                   Asrt.pp (fst step))
-            in
-            Res_list.error_with other_error)
+    try match_assertion' ~no_auto_fold state subst step
+    with err ->
+      let () =
+        L.verbose (fun m ->
+            m
+              "WARNING: UNCAUGHT EXCEPTION IN MATCH ASSERTION: %s@\n\
+               Here's the backtrace: %s" (Printexc.to_string err)
+              (Printexc.get_backtrace ()))
+      in
+      let res_list =
+        if !Config.under_approximation then
+          let () =
+            L.verbose (fun m -> m "UX mode: vanishing despite exception!")
+          in
+          Res_list.vanish
+        else
+          match fst step with
+          | Pure pf ->
+              let { state = bstate; _ } = state in
+              let vs = State.unfolding_vals bstate [ pf ] in
+              Res_list.error_with
+                (StateErr.EAsrt (vs, UnOp (Not, pf), [ [ Pure pf ] ]))
+          | asrt ->
+              let other_error =
+                StateErr.EOther
+                  (Fmt.str "Uncaught exception while matching assertions %a"
+                     Asrt.pp_atom asrt)
+              in
+              Res_list.error_with other_error
+      in
+      (res_list, None)
 
-  and match_mp' (parent_ids : L.Report_id.t list ref) (s_states : search_state')
-      : internal_mp_u_res =
+  and match_mp' (s_states : search_state') : internal_mp_u_res =
     let s_states, errs_so_far = s_states in
     L.verbose (fun m ->
         m "Match MP: There are %d states left to consider."
           (List.length s_states));
-    let explore_next_states = match_mp' parent_ids in
     let ux = !Config.under_approximation in
     match s_states with
     | [] ->
         (* There are no more states to explore: in OX, it means we failed to match, in UX, it means there are not valid path we know about, we vanish. *)
         if ux then List_res.vanish else Error errs_so_far
-    | ((astate, subst, mp), target_case_depth, is_new_case)
-      :: rest_search_states -> (
-        let case_depth =
-          structure_match_case_reports parent_ids target_case_depth is_new_case
-            astate subst mp
-        in
+    | ((astate, subst, mp), prev_id) :: rest_search_states -> (
+        let () = L.set_previous ~force_none:true prev_id in
         match mp with
         | LabelStep (label, rest_mp) ->
             L.verbose (fun m ->
@@ -1494,19 +1465,16 @@ module Make (State : SState.S) :
                   Fmt.(Dump.iter SS.iter nop string)
                   (snd label));
             complete_subst subst label;
-            let current_state = ((astate, subst, rest_mp), case_depth, false) in
-            explore_next_states
-              (current_state :: rest_search_states, errs_so_far)
+            let current_state = ((astate, subst, rest_mp), prev_id) in
+            match_mp' (current_state :: rest_search_states, errs_so_far)
         | Choice (left_mp, right_mp) ->
             L.verbose (fun m ->
                 m "Reached a choice with 2 MPs: about to branch");
             let astate_copy = copy_astate astate in
             let subst_copy = SVal.SESubst.copy subst in
-            let left_state = ((astate, subst, left_mp), case_depth + 1, true) in
-            let right_state =
-              ((astate_copy, subst_copy, right_mp), case_depth + 1, true)
-            in
-            explore_next_states
+            let left_state = ((astate, subst, left_mp), prev_id) in
+            let right_state = ((astate_copy, subst_copy, right_mp), prev_id) in
+            match_mp'
               (left_state :: right_state :: rest_search_states, errs_so_far)
         | Finished posts ->
             (* We're done with matching of this case.
@@ -1514,30 +1482,35 @@ module Make (State : SState.S) :
                In UX, we explore more as to extend coverage. *)
             let remaining_states =
               List.map
-                (fun ((astate, subst, mp), _, _) ->
-                  MatchCaseReport.{ astate = AstateRec.from astate; subst; mp })
+                (fun ((astate, subst, mp), _) ->
+                  MatchResultReport.
+                    { astate = AstateRec.from astate; subst; mp })
                 rest_search_states
             in
-            ignore
-            @@ MatchResultReport.log
-                 (Success
-                    {
-                      remaining_states;
-                      astate = AstateRec.from astate;
-                      subst;
-                      posts;
-                    });
+            let _ =
+              MatchResultReport.log
+                (Success
+                   {
+                     remaining_states;
+                     astate = AstateRec.from astate;
+                     subst;
+                     posts;
+                   })
+            in
             if ux then
               let other_paths =
-                match explore_next_states (rest_search_states, errs_so_far) with
+                match match_mp' (rest_search_states, errs_so_far) with
                 | Error _ -> failwith "match_mp' failed in UX!"
                 | Ok other_paths -> other_paths
               in
               Ok ((astate, subst, posts) :: other_paths)
             else List_res.return (astate, subst, posts)
         | ConsumeStep (step, rest_mp) -> (
-            let successes, errors =
+            let res_list, assertion_id =
               match_assertion_safely astate subst step
+            in
+            let successes, errors =
+              res_list
               |> List.partition_map (function
                    | Ok x -> Left x
                    | Error x -> Right x)
@@ -1551,7 +1524,7 @@ module Make (State : SState.S) :
             | false, _ :: _ :: _, [] -> L.fail "DEATH. OX MATCHING BRANCHED"
             | true, [], _ ->
                 (* Vanished in UX *)
-                explore_next_states (rest_search_states, errs_so_far)
+                match_mp' (rest_search_states, errs_so_far)
             | false, _, _ :: _ ->
                 (* Matching failed in OX. We try the next case *)
                 ignore
@@ -1563,35 +1536,29 @@ module Make (State : SState.S) :
                           subst;
                           errors;
                         });
-                explore_next_states (rest_search_states, errors @ errs_so_far)
+                match_mp' (rest_search_states, errors @ errs_so_far)
             | _, [ state ], [] ->
-                explore_next_states
-                  ( ((state, subst, rest_mp), case_depth, false)
-                    :: rest_search_states,
+                match_mp'
+                  ( ((state, subst, rest_mp), assertion_id) :: rest_search_states,
                     errs_so_far )
             | true, first :: rem, [] ->
                 let rem =
                   List.map
                     (fun state ->
-                      ( (state, SVal.SESubst.copy subst, rest_mp),
-                        case_depth,
-                        false ))
+                      ((state, SVal.SESubst.copy subst, rest_mp), assertion_id))
                     rem
                 in
-                explore_next_states
-                  ( ((first, subst, rest_mp), case_depth, false) :: rem,
-                    errs_so_far )))
+                match_mp'
+                  (((first, subst, rest_mp), assertion_id) :: rem, errs_so_far))
+        )
 
   and match_mp (s_states : search_state) : internal_mp_u_res =
-    let parent_ids = ref [] in
     let s_states =
       let states, errs = s_states in
-      let states = states |> List.map (fun state -> (state, 0, false)) in
+      let states = states |> List.map (fun state -> (state, None)) in
       (states, errs)
     in
-    let res = match_mp' parent_ids s_states in
-    List.iter (fun parent_id -> L.Parent.release (Some parent_id)) !parent_ids;
-    res
+    match_mp' s_states
 
   and match_
       ?(in_matching = false)
@@ -1604,13 +1571,13 @@ module Make (State : SState.S) :
     let subst_i = SVal.SESubst.copy subst in
     let can_fix errs = List.exists State.can_fix errs in
 
-    let rec handle_ret ~try_recover ret =
+    let rec handle_ret ~fuel ret =
       match ret with
       | Ok successes ->
           L.verbose (fun fmt -> fmt "Matcher.match_: Success (possibly empty)");
           Res_list.just_oks successes
       | Error errs
-        when try_recover && !Config.unfolding
+        when fuel > 0 && !Config.unfolding
              && Exec_mode.is_verification_exec !Config.current_exec_mode
              && (not in_matching) && can_fix errs -> (
           L.verbose (fun fmt -> fmt "Matcher.match_: Failure");
@@ -1644,17 +1611,16 @@ module Make (State : SState.S) :
                   (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
                   let subst'' = SVal.SESubst.copy subst_i in
                   let new_ret = match_mp ([ (astate, subst'', mp) ], []) in
-                  (* We already tried recovering once and it failed, we stop here *)
-                  handle_ret ~try_recover:false new_ret))
+                  handle_ret ~fuel:(fuel - 1) new_ret))
       | Error errors ->
           L.verbose (fun fmt -> fmt "Matcher.match: Failure");
           Res_list.just_errors errors
     in
     MatchReport.as_parent
       { astate = AstateRec.from astate; subst; mp; match_kind }
-      (fun () ->
+      (fun _ ->
         let ret = match_mp ([ (astate, subst, mp) ], []) in
-        handle_ret ~try_recover:true ret)
+        handle_ret ~fuel:10 ret)
 
   and fold
       ?(in_matching = false)
@@ -1787,23 +1753,9 @@ module Make (State : SState.S) :
       match tactic.try_fold with
       | Some fold_values -> (
           let res = fold_guarded_with_vals astate fold_values in
-          let errors =
-            List.filter_map
-              (function
-                | Error e -> Some e
-                | _ -> None)
-              res
-          in
+          let successes, errors = Res_list.split res in
           match errors with
-          | [] ->
-              let successes =
-                List.filter_map
-                  (function
-                    | Ok x -> Some x
-                    | _ -> None)
-                  res
-              in
-              Ok successes
+          | [] -> Ok successes
           | _ ->
               let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
               Error error_string)
@@ -1862,14 +1814,13 @@ module Make (State : SState.S) :
 
     let get_defs (pred : Pred.t) largs =
       if pred.pred_abstract || Option.is_some pred.pred_guard then
-        [ Asrt.Pred (pred.pred_name, largs) ]
+        [ [ Asrt.Pred (pred.pred_name, largs) ] ]
       else
         let unfolded_pred =
           Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
         in
-        match unfolded_pred with
-        | Some pred -> List.map snd pred.pred_definitions
-        | None -> List.map snd pred.pred_definitions
+        let pred = Option.value ~default:pred unfolded_pred in
+        List.map snd pred.pred_definitions
 
     let make_lhs_states ~pred_defs ~empty_state (lname, largs) =
       let open Syntaxes.List in
@@ -1895,16 +1846,21 @@ module Make (State : SState.S) :
       (* We are in OX mode, matching must not branch. If it does, something is very wrong.
          Mainly because the substitution is performed in place.
          This function simplifies the return type of match-assertion: it returns a single outcome if it's a success. *)
-      let res = match_assertion_safely ~no_auto_fold:true astate subst step in
+      let res, _ =
+        match_assertion_safely ~no_auto_fold:true astate subst step
+      in
       let successes, errors = Res_list.split res in
-      match (successes, errors) with
-      | [ x ], [] -> Ok x
-      | [], errs -> Error errs
-      | _ ->
-          Fmt.failwith
-            "Impossible: match-assertion branched in OX mode: %d successes and \
-             %d errors"
-            (List.length successes) (List.length errors)
+      let r =
+        match (successes, errors) with
+        | [ x ], [] -> Ok x
+        | [], errs -> Error errs
+        | _ ->
+            Fmt.failwith
+              "Impossible: match-assertion branched in OX mode: %d successes \
+               and %d errors"
+              (List.length successes) (List.length errors)
+      in
+      r
 
     let make_pred_ins_table pred_tbl =
       let tbl = Hashtbl.create (Hashtbl.length pred_tbl) in
@@ -1970,7 +1926,7 @@ module Make (State : SState.S) :
               init_subst;
               fold_outs_info = (subst, step, out_params, out_args);
             }
-      | (GA (core_pred, ins, outs), _), [ err ] ->
+      | (CorePred (core_pred, ins, outs), _), [ err ] ->
           (* What we do here is simulate the idea that the core predicate is actually a folded core-predicate *)
           let kb =
             List.to_seq ins
@@ -2017,15 +1973,15 @@ module Make (State : SState.S) :
                   List.init out_amount (fun o_i ->
                       all_new_outs.((cp_i * out_amount) + o_i))
                 in
-                Asrt.GA (core_pred, ins, outs))
+                Asrt.CorePred (core_pred, ins, outs))
               new_ins_l
           in
           let learning_equalities =
             List.map2
               (fun old_out new_out ->
-                let open Formula.Infix in
                 Asrt.Pure
-                  (Expr.PVar old_out) #== (subst_in_expr pvar_subst new_out))
+                  (Expr.Infix.( == ) (Expr.PVar old_out)
+                     (subst_in_expr pvar_subst new_out)))
               out_params new_outs_learn
           in
           let atoms = List.rev_append new_cps learning_equalities in
@@ -2078,7 +2034,7 @@ module Make (State : SState.S) :
         (fun acc vd od ->
           let open Syntaxes.Result in
           let* acc = acc in
-          let equality = Formula.Eq (vd, od) in
+          let equality = Expr.BinOp (vd, Equal, od) in
           if
             State.assert_a state.lhs_state.state [ equality ]
             || State.assert_a state.current_state.state [ equality ]
@@ -2087,15 +2043,16 @@ module Make (State : SState.S) :
             Error
               [
                 StateErr.EAsrt
-                  ([], Formula.Infix.fnot equality, [ [ Pure equality ] ]);
+                  ([], Expr.Infix.not equality, [ [ Pure equality ] ]);
               ])
         (Ok state) obtained expected
 
-    let rec package_case_step { lhs_state; current_state; subst } step :
-        (package_state list, err_t list) Result.t =
+    let rec package_case_step
+        { lhs_state; current_state; subst }
+        (step : MP.step) : (package_state list, err_t list) Result.t =
       let open Syntaxes.Result in
       L.verbose (fun m ->
-          m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
+          m "Wand about to consume RHS step: %a" Asrt.pp_atom (fst step));
       (* States are modified in place unfortunately.. so we have to copy them just in case *)
       (* First we try to consume from the lhs_state *)
       let- lhs_errs =

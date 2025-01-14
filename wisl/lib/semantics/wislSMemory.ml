@@ -8,14 +8,8 @@ module SS = Gillian.Utils.Containers.SS
 
 type init_data = unit
 type vt = Values.t
-type st = Subst.t
 type err_t = WislSHeap.err [@@deriving yojson, show]
 type t = WislSHeap.t [@@deriving yojson]
-
-type action_ret =
-  ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-    err_t list )
-  result
 
 let init () = WislSHeap.init ()
 let get_init_data _ = ()
@@ -45,7 +39,7 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
         else (loc_name, [])
     | None ->
         let al = ALoc.alloc () in
-        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
+        (al, [ Expr.BinOp (Expr.ALoc al, Equal, loc) ])
   in
   match WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value with
   | Error e -> Error [ e ]
@@ -83,7 +77,7 @@ let set_bound heap pfs gamma (loc : vt) (bound : int) =
         else (loc_name, [])
     | None ->
         let al = ALoc.alloc () in
-        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
+        (al, [ Expr.BinOp (ALoc al, Equal, loc) ])
   in
   match WislSHeap.set_bound heap loc_name bound with
   | Error e -> Error [ e ]
@@ -120,7 +114,7 @@ let set_freed heap pfs gamma (loc : vt) =
         else (loc_name, [])
     | None ->
         let al = ALoc.alloc () in
-        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
+        (al, [ Expr.BinOp (ALoc al, Equal, loc) ])
   in
   let () = WislSHeap.set_freed heap loc_name in
   Ok [ (heap, [], new_pfs, []) ]
@@ -311,17 +305,17 @@ let get_fixes (err : err_t) =
       let value = Expr.LVar new_var in
       let loc = Expr.loc_from_loc_name loc in
       let ga = WislLActions.str_ga WislLActions.Cell in
-      [ [ Asrt.GA (ga, [ loc; ofs ], [ value ]) ] ]
+      [ [ Asrt.CorePred (ga, [ loc; ofs ], [ value ]) ] ]
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ [ Asrt.Pure (Eq (new_expr, loc)) ] ]
+      [ [ Asrt.Pure (BinOp (new_expr, Equal, loc)) ] ]
   | _ -> []
 
 let can_fix = function
   | WislSHeap.InvalidLocation _ | MissingResource _ -> true
   | _ -> false
 
-let get_failing_constraint _ = Formula.True
+let get_failing_constraint _ = Expr.true_
 let add_debugger_variables = WislSHeap.add_debugger_variables
 let sure_is_nonempty t = not (WislSHeap.is_empty t)

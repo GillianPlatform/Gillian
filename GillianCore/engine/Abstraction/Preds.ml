@@ -100,8 +100,9 @@ let get_alocs (preds : t) : SS.t =
 
 (** Printing function *)
 let pp_pabs fmt pa =
+  let exprpp fmt e = Fmt.pf fmt "@[%a@]" Expr.pp e in
   let pname, vs = pa in
-  Fmt.pf fmt "%s(%a)" pname (Fmt.list ~sep:(Fmt.any ", ") Expr.pp) vs
+  Fmt.pf fmt "%s(%a)" pname (Fmt.list ~sep:(Fmt.any ", ") exprpp) vs
 
 let pp fmt preds =
   let lpreds = to_list preds in
@@ -223,7 +224,7 @@ let substitution_in_place (subst : st) (preds : t) : unit =
   let pred_substitution subst (s, vs) = (s, List.map (subst_in_val subst) vs) in
   preds := List.map (pred_substitution subst) !preds
 
-let to_assertions (preds : t) : Asrt.t list =
+let to_assertions (preds : t) : Asrt.atom list =
   let preds = to_list preds in
   let pred_to_assert (n, args) = Asrt.Pred (n, args) in
   List.sort Asrt.compare (List.map pred_to_assert preds)

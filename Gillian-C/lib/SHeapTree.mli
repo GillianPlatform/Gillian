@@ -85,7 +85,7 @@ val allocated_function : t
     [dst_tree] after modification *)
 val move : t -> Expr.t -> t -> Expr.t -> Expr.t -> t d_or_error
 
-val assertions : loc:string -> t -> Asrt.t list
+val assertions : loc:string -> t -> Asrt.t
 
 val substitution :
   le_subst:(Expr.t -> Expr.t) ->

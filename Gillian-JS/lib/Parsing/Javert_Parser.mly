@@ -269,7 +269,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %type <BinOp.t>                    binop_target
 %type <NOp.t>                      nop_target
 %type <Expr.t>                     expr_target
-%type <Gillian.Gil_syntax.Formula.t>   pure_assertion_target
+%type <Gillian.Gil_syntax.Expr.t>   pure_assertion_target
 %type <Jsil_syntax.EProg.t>               jsil_main_target
 
 %start jsil_main_target
@@ -338,7 +338,7 @@ lit_target:
 
 
 unop_target:
-  | NOT         { UnOp.UNot }
+  | NOT         { UnOp.Not }
   | BITWISENOT  { UnOp.BitwiseNot }
   | M_ISNAN     { UnOp.M_isNaN }
   | M_ABS       { UnOp.M_abs }
@@ -375,14 +375,14 @@ binop_target:
   | EQUAL              { BinOp.Equal }
   | LESSTHAN           { BinOp.FLessThan }
   | LESSTHANEQUAL      { BinOp.FLessThanEqual }
-  | LESSTHANSTRING     { BinOp.SLessThan }
+  | LESSTHANSTRING     { BinOp.StrLess }
   | PLUS               { BinOp.FPlus }
   | MINUS              { BinOp.FMinus }
   | TIMES              { BinOp.FTimes }
   | DIV                { BinOp.FDiv }
   | MOD                { BinOp.FMod }
-  | AND                { BinOp.BAnd }
-  | OR                 { BinOp.BOr }
+  | AND                { BinOp.And }
+  | OR                 { BinOp.Or }
   | BITWISEAND         { BinOp.BitwiseAndF }
   | BITWISEOR          { BinOp.BitwiseOrF }
   | BITWISEXOR         { BinOp.BitwiseXorF }
@@ -393,8 +393,8 @@ binop_target:
   | M_POW              { BinOp.M_pow }
   | STRCAT             { BinOp.StrCat }
   | SETDIFF            { BinOp.SetDiff }
-  | SETMEM             { BinOp.BSetMem }
-  | SETSUB             { BinOp.BSetSub }
+  | SETMEM             { BinOp.SetMem }
+  | SETSUB             { BinOp.SetSub }
 
 nop_target:
   | SETUNION { NOp.SetUnion }
@@ -448,27 +448,27 @@ lvar_type_target:
 
 pure_assertion_target:
   | left_ass=pure_assertion_target; LAND; right_ass=pure_assertion_target
-    { Formula.And (left_ass, right_ass) }
+    { Expr.BinOp (left_ass, And, right_ass) }
   | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
-    { Formula.Or (left_ass, right_ass) }
-  | LNOT; ass=pure_assertion_target { Formula.Not (ass) }
-  | ISINT; expr=expr_target { Formula.IsInt (expr) }
-  | LTRUE { Formula.True }
-  | LFALSE { Formula.False }
+    { Expr.BinOp (left_ass, Or, right_ass) }
+  | LNOT; ass=pure_assertion_target { Expr.UnOp (Not, ass) }
+  | ISINT; expr=expr_target { Expr.UnOp (IsInt, expr) }
+  | LTRUE { Expr.Lit (Bool true) }
+  | LFALSE { Expr.Lit (Bool false) }
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
-    { Formula.Eq (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, Equal, right_expr) }
   | left_expr=expr_target; LLESSTHAN; right_expr=expr_target
-    { Formula.FLess (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, FLessThan, right_expr) }
   | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
-    { Formula.FLessEq (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, FLessThanEqual, right_expr) }
   | left_expr=expr_target; LLESSTHANSTRING; right_expr=expr_target
-    { Formula.StrLess (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, StrLess, right_expr) }
   | left_expr=expr_target; LSETMEM; right_expr=expr_target
-    { Formula.SetMem (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, SetMem, right_expr) }
   | left_expr=expr_target; LSETSUB; right_expr=expr_target
-    { Formula.SetSub (left_expr, right_expr) }
+    { Expr.BinOp (left_expr, SetSub, right_expr) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
-    { Formula.ForAll (vars, ass) }
+    { Expr.ForAll (vars, ass) }
   | delimited(LBRACE, pure_assertion_target, RBRACE)
     { $1 }
 

@@ -101,8 +101,8 @@ struct
                 ext.match_maps <- (match_id, map) :: ext.match_maps;
                 map
           in
-          let result = match_map |> Match_map.result in
-          (match_id, fst match_map, result)
+          let Match_map.{ result; kind; _ } = match_map in
+          (match_id, kind, result)
         in
         match match_ with
         | None -> []

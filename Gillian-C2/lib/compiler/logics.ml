@@ -2,17 +2,16 @@ open Gil_syntax
 module GType = Goto_lib.Type
 
 let rec asrt_of_scalar_like ~ctx (type_ : GType.t) (expr : Expr.t) : Asrt.t =
-  let open Asrt.Infix in
   match type_ with
   | CInteger I_bool ->
       (* Special case, the bounds are different *)
       let assume_int = Asrt.Types [ (expr, IntType) ] in
       let condition =
-        let open Formula.Infix in
-        expr #== Expr.one_i #|| (expr #== Expr.zero_i)
+        let open Expr.Infix in
+        expr == Expr.one_i || expr == Expr.zero_i
       in
       let asrt_range = Asrt.Pure condition in
-      assume_int ** asrt_range
+      [ assume_int; asrt_range ]
   | CInteger _ | Signedbv _ | Unsignedbv _ ->
       let assume_int = Asrt.Types [ (expr, IntType) ] in
       let bounds =
@@ -22,26 +21,24 @@ let rec asrt_of_scalar_like ~ctx (type_ : GType.t) (expr : Expr.t) : Asrt.t =
         match bounds with
         | None -> Asrt.Emp
         | Some (low, high) ->
-            let open Formula.Infix in
-            let condition =
-              (Expr.int_z low) #<= expr #&& (expr #<= (Expr.int_z high))
-            in
+            let open Expr.Infix in
+            let condition = Expr.int_z low <= expr && expr <= Expr.int_z high in
             Asrt.Pure condition
       in
-      assume_int ** assume_range
-  | Double | Float -> Asrt.Types [ (expr, NumberType) ]
+      [ assume_int; assume_range ]
+  | Double | Float -> [ Asrt.Types [ (expr, NumberType) ] ]
   | Pointer _ ->
       let loc = LVar.alloc () in
       let ofs = LVar.alloc () in
       let e_loc = Expr.LVar loc in
       let e_ofs = Expr.LVar ofs in
       let assume_list =
-        let f = Formula.Eq (expr, EList [ e_loc; e_ofs ]) in
+        let f = Expr.BinOp (expr, Equal, EList [ e_loc; e_ofs ]) in
         Asrt.Pure f
       in
       let types = Asrt.Types [ (e_loc, ObjectType); (e_ofs, IntType) ] in
-      assume_list ** types
-  | Bool -> Asrt.Types [ (expr, BooleanType) ]
+      [ assume_list; types ]
+  | Bool -> [ Asrt.Types [ (expr, BooleanType) ] ]
   | StructTag _ | Struct _ ->
       let ty =
         let fields = Ctx.resolve_struct_components ctx type_ in
@@ -56,11 +53,10 @@ let rec asrt_of_scalar_like ~ctx (type_ : GType.t) (expr : Expr.t) : Asrt.t =
 let assumption_of_param ~ctx ~(v : Var.t) ~(ty : GType.t) =
   (* The logic of what formulaes is generated should be factorised
      with [Compiled_expr.nondet_expr] *)
-  let open Asrt.Infix in
   if Ctx.representable_in_store ctx ty then
     let e_s = Expr.LVar (LVar.alloc ()) in
-    let f = Formula.Eq (Expr.PVar v, e_s) in
-    Asrt.Pure f ** asrt_of_scalar_like ~ctx ty e_s
+    let f = Expr.BinOp (Expr.PVar v, Equal, e_s) in
+    Asrt.Pure f :: asrt_of_scalar_like ~ctx ty e_s
   else failwith "unhandled: composit parameter"
 
 let assumption_of_ret_by_copy ~ctx ty =
@@ -71,11 +67,11 @@ let assumption_of_ret_by_copy ~ctx ty =
       ~perm:(Some Freeable)
   in
   let types = Asrt.Types [ (loc, ObjectType) ] in
-  Asrt.Star (types, hole)
+  [ types; hole ]
 
 let bispec ~ctx ~(compiled : (C2_annot.t, string) Proc.t) (f : Program.Func.t) =
   let ret_type_assume =
-    if Ctx.representable_in_store ctx f.return_type then Asrt.Emp
+    if Ctx.representable_in_store ctx f.return_type then []
     else assumption_of_ret_by_copy ~ctx f.return_type
   in
   let param_names =
@@ -88,7 +84,7 @@ let bispec ~ctx ~(compiled : (C2_annot.t, string) Proc.t) (f : Program.Func.t) =
       (fun v Param.{ type_ = ty; _ } -> assumption_of_param ~ctx ~v ~ty)
       param_names f.params
   in
-  let pre = List.fold_left Asrt.Infix.( ** ) ret_type_assume param_asrts in
+  let pre = ret_type_assume @ List.flatten param_asrts in
   BiSpec.
     {
       bispec_name = compiled.proc_name;

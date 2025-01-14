@@ -129,7 +129,7 @@ module UnOp : sig
   type t =
     | IUnaryMinus  (** Integer unary minus *)
     | FUnaryMinus  (** Float unary minus *)
-    | UNot  (** Negation *)
+    | Not  (** Negation *)
     | BitwiseNot  (** Bitwise negation *)
     | M_isNaN  (** Test for NaN *)
     | M_abs  (** Absolute value *)
@@ -167,6 +167,7 @@ module UnOp : sig
     (* Integer vs Number *)
     | NumToInt  (** Number to Integer - actual cast *)
     | IntToNum  (** Integer to Number - actual cast *)
+    | IsInt  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
   [@@deriving yojson, eq]
 
   (** Printer *)
@@ -193,10 +194,9 @@ module BinOp : sig
     | FTimes  (** Float multiplication *)
     | FDiv  (** Float division *)
     | FMod  (** Float modulus *)
-    | SLessThan  (** Less or equal for strings *)
-    | BAnd  (** Boolean conjunction *)
-    | BOr  (** Boolean disjunction *)
-    | BImpl  (** Boolean implication *)
+    | And  (** Boolean conjunction *)
+    | Or  (** Boolean disjunction *)
+    | Impl  (** Boolean implication *)
     | BitwiseAnd  (** Bitwise conjunction *)
     | BitwiseOr  (** Bitwise disjunction *)
     | BitwiseXor  (** Bitwise exclusive disjunction *)
@@ -208,7 +208,7 @@ module BinOp : sig
     | BitwiseXorL  (** Bitwise exclusive disjunction 64bit *)
     | LeftShiftL  (** Left bitshift 64bit *)
     | SignedRightShiftL  (** Signed right bitshift 64bit *)
-    | UnsignedRightShiftL  (** Unsigned right bitshift 64bit *)
+    | UnsignedRightShiftL  (** Right bitshift 64bit *)
     | BitwiseAndF  (** Bitwise conjunction float *)
     | BitwiseOrF  (** Bitwise disjunction float *)
     | BitwiseXorF  (** Bitwise exclusive disjunction float *)
@@ -218,12 +218,14 @@ module BinOp : sig
     | M_atan2  (** Arctangent y/x *)
     | M_pow  (** Power *)
     | LstNth  (** Nth element of a string *)
-    | LstRepeat  (** Nth element of a string *)
+    | LstRepeat
+    (* [[a; b]] is the list that contains [b] times the element [a] *)
     | StrCat  (** String concatenation *)
     | StrNth  (** Nth element of a string *)
+    | StrLess  (** Less or equal for strings *)
     | SetDiff  (** Set difference *)
-    | BSetMem  (** Set membership *)
-    | BSetSub  (** Subset *)
+    | SetMem  (** Set membership *)
+    | SetSub  (** Subset *)
   [@@deriving yojson, eq]
 
   (** Printer *)
@@ -260,8 +262,8 @@ module Expr : sig
     | EList of t list  (** Lists of expressions *)
     | ESet of t list  (** Sets of expressions *)
     | Exists of (string * Type.t option) list * t
-        (** Existential quantification. This is now a circus because the separation between Formula and Expr doesn't make sense anymore. *)
-    | EForall of (string * Type.t option) list * t
+        (** Existential quantification. *)
+    | ForAll of (string * Type.t option) list * t
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -274,6 +276,8 @@ module Expr : sig
   val int_z : Z.t -> t
   val string : string -> t
   val bool : bool -> t
+  val false_ : t
+  val true_ : t
   val to_literal : t -> Literal.t option
 
   (** Lit (Int Z.zero) *)
@@ -318,12 +322,32 @@ module Expr : sig
 
     (** {2: } *)
 
-    (** Boolean not *)
+    (** Comparison  *)
+
+    val ( < ) : t -> t -> t
+    val ( > ) : t -> t -> t
+    val ( <= ) : t -> t -> t
+    val ( >= ) : t -> t -> t
+    val ( <. ) : t -> t -> t
+    val ( >. ) : t -> t -> t
+    val ( <=. ) : t -> t -> t
+    val ( >=. ) : t -> t -> t
+
+    (** Booleans *)
+
     val not : t -> t
+    val forall : (string * Type.t option) list -> t -> t
+    val ( == ) : t -> t -> t
+    val ( && ) : t -> t -> t
+    val ( || ) : t -> t -> t
+    val ( ==> ) : t -> t -> t
 
     (** List concatenation *)
     val ( @+ ) : t -> t -> t
   end
+
+  val conjunct : t list -> t
+  val disjunct : t list -> t
 
   (** Sets of expressions *)
   module Set : Set.S with type elt := t
@@ -370,6 +394,15 @@ module Expr : sig
   (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
   val vars : t -> SS.t
 
+  (** [push_in_negations e] pushes all negations in e "downwards", recursively *)
+  val push_in_negations : t -> t
+
+  (** [negate e] negates the expression, recursively *)
+  val negate : t -> t
+
+  (** Returns if this expression is a boolean expression, recursively. *)
+  val is_boolean_expr : t -> bool
+
   (** [substitutables e] returns all lvars and alocs *)
   val substitutables : t -> SS.t
 
@@ -409,192 +442,33 @@ module Expr : sig
   val is_matchable : t -> bool
 end
 
-(** @canonical Gillian.Gil_syntax.Formula *)
-module Formula : sig
-  (** GIL Formulae *)
-
-  type t =
-    | True  (** Logical true *)
-    | False  (** Logical false *)
-    | Not of t  (** Logical negation *)
-    | And of t * t  (** Logical conjunction *)
-    | Or of t * t  (** Logical disjunction *)
-    | Eq of Expr.t * Expr.t  (** Expression equality *)
-    | Impl of t * t  (** Logical implication *)
-    | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
-    | FLessEq of Expr.t * Expr.t
-        (** Expression less-than-or-equal for numbers *)
-    | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
-    | ILessEq of Expr.t * Expr.t
-        (** Expression less-than-or-equal for integeres *)
-    | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
-    | SetMem of Expr.t * Expr.t  (** Set membership *)
-    | SetSub of Expr.t * Expr.t  (** Set subsetness *)
-    | ForAll of (string * Type.t option) list * t  (** Forall *)
-    | IsInt of Expr.t  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
-  [@@deriving yojson, eq]
-
-  val of_bool : bool -> t
-
-  (** Sets of formulae *)
-  module Set : Set.S with type elt := t
-
-  (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t * bool) option ->
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    t ->
-    t
-
-  val map_opt :
-    (t -> t option * bool) option ->
-    (t -> t) option ->
-    (Expr.t -> Expr.t option) option ->
-    t ->
-    t option
-
-  (** Get all the logical variables*)
-  val lvars : t -> SS.t
-
-  (** Get all the program variables *)
-  val pvars : t -> SS.t
-
-  (** Get all the abstract locations *)
-  val alocs : t -> SS.t
-
-  (** Get all the concrete locations *)
-  val clocs : t -> SS.t
-
-  (** Get all locations *)
-  val locs : t -> SS.t
-
-  (** Get print info *)
-  val get_print_info : t -> SS.t * SS.t * SS.t
-
-  (** Get all the logical expressions of the formula of the form (Lit (LList lst)) and (EList lst) *)
-  val lists : t -> Expr.t list
-
-  (** Get all the list expressions *)
-  val list_lexprs : t -> Expr.Set.t
-
-  (** [push_in_negations a] takes negations off the toplevel of [a] and pushes them in the leaves.
-    For example [push_in_negations (Not (And (True, False)))] returns [Or (False, False)] *)
-  val push_in_negations : t -> t
-
-  (** Turns [f1 /\ f2 /\ f3] into [\[f1; f2; f3\]] *)
-  val split_conjunct_formulae : t -> t list
-
-  (** Pretty-printer *)
-  val pp : Format.formatter -> t -> unit
-
-  (** Pretty-printer with constructors (will not parse) *)
-  val full_pp : Format.formatter -> t -> unit
-
-  (** Lifts an expression to a formula, if possible. It returns
-      the lifted expression and its negation *)
-  val lift_logic_expr : Expr.t -> (t * t) option
-
-  (** Unlifts the formula to an expression, if possible *)
-  val to_expr : t -> Expr.t option
-
-  (** [conjunct \[a1; ...; an\]] returns [a1 /\ ... /\ an] *)
-  val conjunct : t list -> t
-
-  (** [disjunct \[a1; ...; an\]] returns [a1 \/ ... \/ an] *)
-  val disjunct : t list -> t
-
-  val subst_expr_for_expr : to_subst:Expr.t -> subst_with:Expr.t -> t -> t
-
-  (** [subst_clocs subst e] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [e] *)
-  val subst_clocs : (string -> Expr.t) -> t -> t
-
-  (** [get_disjuncts (a1 \/ ... \/ an)] returns [\[a1; ...; an\]] *)
-  val get_disjuncts : t -> t list
-
-  (** Returns a list of strings and a list of numbers that are contained in the formula *)
-  val strings_and_numbers : t -> string list * float list
-
-  module Infix : sig
-    (** Same as Not *)
-    val fnot : t -> t
-
-    (** Same as Forall *)
-    val forall : (string * Type.t option) list -> t -> t
-
-    (** Same as Or *)
-    val ( #|| ) : t -> t -> t
-
-    (** Same as And *)
-    val ( #&& ) : t -> t -> t
-
-    (** Same as Eq *)
-    val ( #== ) : Expr.t -> Expr.t -> t
-
-    (** Same as ILess *)
-    val ( #< ) : Expr.t -> Expr.t -> t
-
-    (** [a #> b] if [Not ILess (b, a)]*)
-    val ( #> ) : Expr.t -> Expr.t -> t
-
-    (** Same as ILessEq *)
-    val ( #<= ) : Expr.t -> Expr.t -> t
-
-    (** [a #>= b] is [Not ILess (b, a)] *)
-    val ( #>= ) : Expr.t -> Expr.t -> t
-
-    (** Same as FLess *)
-    val ( #<. ) : Expr.t -> Expr.t -> t
-
-    (** [a #>. b] if [Not FLess (b, a)]*)
-    val ( #>. ) : Expr.t -> Expr.t -> t
-
-    (** Same as FLessEq *)
-    val ( #<=. ) : Expr.t -> Expr.t -> t
-
-    (** [a #>=. b] is [Not FLess (b, a)] *)
-    val ( #>=. ) : Expr.t -> Expr.t -> t
-
-    val ( #=> ) : t -> t -> t
-  end
-end
-
 (** @canonical Gillian.Gil_syntax.Asrt *)
 module Asrt : sig
   (** GIL Assertions *)
 
-  type t =
+  type atom =
     | Emp  (** Empty heap *)
-    | Star of t * t  (** Separating conjunction *)
     | Pred of string * Expr.t list  (** Predicates *)
-    | Pure of Formula.t  (** Pure formula *)
+    | Pure of Expr.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
-    | GA of string * Expr.t list * Expr.t list  (** Core assertion *)
+    | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
     | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand of the form [P(...) -* Q(...)] *)
   [@@deriving yojson, eq]
 
+  type t = atom list [@@deriving yojson, eq]
+
   (** Comparison of assertions *)
-  val compare : t -> t -> int
+  val compare : atom -> atom -> int
 
   (** Sorting of assertions *)
-  val prioritise : t -> t -> int
+  val prioritise : atom -> atom -> int
 
   (** Sets of assertions *)
   module Set : Set.S with type elt := t
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t * bool) option ->
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    (Formula.t -> Formula.t) option ->
-    t ->
-    t
-
-  (** Get all the logical expressions of [a] that denote a list
-   and are not logical variables *)
-  val list_lexprs : t -> Expr.Set.t
+  val map : (Expr.t -> Expr.t) -> t -> t
 
   (** Get all the logical variables in [a] *)
   val lvars : t -> SS.t
@@ -615,31 +489,25 @@ module Asrt : sig
   val pred_names : t -> string list
 
   (** Returns a list with the pure assertions that occur in [a] *)
-  val pure_asrts : t -> Formula.t list
-
-  (** Returns a list with the pure assertions that occur in [a] *)
-  val simple_asrts : t -> t list
+  val pure_asrts : t -> Expr.t list
 
   (** Check if [a] is a pure assertion *)
-  val is_pure_asrt : t -> bool
+  val is_pure_asrt : atom -> bool
 
-  (** Check if [a] is a pure assertion & non-recursive assertion.
-   It assumes that only pure assertions are universally quantified *)
-  val is_pure_non_rec_asrt : t -> bool
-
-  (** Eliminate LStar and LTypes assertions.
-   LTypes disappears. LStar is replaced by LAnd.
-   This function expects its argument to be a PURE assertion. *)
-  val make_pure : t -> Formula.t
+  (** Eliminate Emp assertions.
+      Pure assertions are converted to a single formula.
+      This function expects its argument to be a PURE assertion. *)
+  val make_pure : t -> Expr.t
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
 
+  val pp_atom : Format.formatter -> atom -> unit
+
   (** Full pretty-printer *)
   val full_pp : Format.formatter -> t -> unit
 
-  (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
-  val star : t list -> t
+  val pp_atom_full : Format.formatter -> atom -> unit
 
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
   val subst_clocs : (string -> Expr.t) -> t -> t
@@ -649,11 +517,6 @@ module Asrt : sig
 
   (** Move pvars to lvars *)
   val pvars_to_lvars : t -> t
-
-  module Infix : sig
-    (** Star constructor *)
-    val ( ** ) : t -> t -> t
-  end
 end
 
 (** @canonical Gillian.Gil_syntax.SLCmd *)
@@ -676,12 +539,7 @@ module SLCmd : sig
     | SymbExec
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t) option ->
-    (Asrt.t -> Asrt.t) option ->
-    (Expr.t -> Expr.t) option ->
-    t ->
-    t
+  val map : (Asrt.t -> Asrt.t) -> (Expr.t -> Expr.t) -> t -> t
 
   (** Pretty-printer of folding info *)
   val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
@@ -698,22 +556,16 @@ module LCmd : sig
 
   type t =
     | If of Expr.t * t list * t list  (** If-then-else *)
-    | Branch of Formula.t  (** Branching on a FO formual *)
+    | Branch of Expr.t  (** Branching on a FO formual *)
     | Macro of string * Expr.t list  (** Macros *)
-    | Assert of Formula.t  (** Assert *)
-    | Assume of Formula.t  (** Assume *)
+    | Assert of Expr.t  (** Assert *)
+    | Assume of Expr.t  (** Assume *)
     | AssumeType of Expr.t * Type.t  (** Assume Type *)
     | FreshSVar of string  (** x := fresh_svar() *)
     | SL of SLCmd.t  (** Separation-logic command *)
 
   (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    (Formula.t -> Formula.t) option ->
-    (SLCmd.t -> SLCmd.t) option ->
-    t ->
-    t
+  val map : (Expr.t -> Expr.t) -> (SLCmd.t -> SLCmd.t) -> t -> t
 
   (** Pretty-printer *)
   val pp : t Fmt.t
@@ -783,7 +635,7 @@ module Pred : sig
     pred_ins : int list;  (** Ins *)
     pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
-    pred_facts : Formula.t list;  (** Facts that hold for every definition *)
+    pred_facts : Expr.t list;  (** Facts that hold for every definition *)
     pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
     pred_pure : bool;  (** Is the predicate pure? *)
     pred_abstract : bool;  (**  Is the predicate abstract? *)
@@ -845,7 +697,7 @@ module Pred : sig
 
   (** Given a guarded predicate, return a "call" to its close token.
       The arguments given are PVars with the same name as the ins of the predicate. *)
-  val close_token_call : t -> Asrt.t
+  val close_token_call : t -> Asrt.atom
 
   (** Given a name, if it's a close_token name, returns the name of the corresponding predicate,
    otherwise return None. *)
@@ -1269,22 +1121,17 @@ module Visitors : sig
     'b = < visit_'annot : 'c -> 'd -> 'd
          ; visit_'label : 'c -> 'f -> 'f
          ; visit_ALoc : 'c -> Expr.t -> string -> Expr.t
-         ; visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
-         ; visit_Impl : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+         ; visit_And : 'c -> BinOp.t -> BinOp.t
+         ; visit_Impl : 'c -> BinOp.t -> BinOp.t
          ; visit_Apply :
              'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
          ; visit_ApplyLem :
              'c -> SLCmd.t -> string -> Expr.t list -> string list -> SLCmd.t
          ; visit_Arguments : 'c -> 'f Cmd.t -> string -> 'f Cmd.t
-         ; visit_Assert : 'c -> LCmd.t -> Formula.t -> LCmd.t
+         ; visit_Assert : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
-         ; visit_Assume : 'c -> LCmd.t -> Formula.t -> LCmd.t
+         ; visit_Assume : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
-         ; visit_BAnd : 'c -> BinOp.t -> BinOp.t
-         ; visit_BOr : 'c -> BinOp.t -> BinOp.t
-         ; visit_BImpl : 'c -> BinOp.t -> BinOp.t
-         ; visit_BSetMem : 'c -> BinOp.t -> BinOp.t
-         ; visit_BSetSub : 'c -> BinOp.t -> BinOp.t
          ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
          ; visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
          ; visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
@@ -1298,7 +1145,7 @@ module Visitors : sig
          ; visit_BitwiseXorF : 'c -> BinOp.t -> BinOp.t
          ; visit_Bool : 'c -> Literal.t -> bool -> Literal.t
          ; visit_BooleanType : 'c -> Type.t -> Type.t
-         ; visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
+         ; visit_Branch : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_Bug : 'c -> Flag.t -> Flag.t
          ; visit_Call :
              'c ->
@@ -1324,13 +1171,10 @@ module Visitors : sig
          ; visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
          ; visit_Exists :
              'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
-         ; visit_EForall :
-             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
-         ; visit_Emp : 'c -> Asrt.t -> Asrt.t
+         ; visit_Emp : 'c -> Asrt.atom -> Asrt.atom
          ; visit_Empty : 'c -> Literal.t -> Literal.t
          ; visit_EmptyType : 'c -> Type.t -> Type.t
          ; visit_Epsilon : 'c -> Constant.t -> Constant.t
-         ; visit_Eq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
          ; visit_Equal : 'c -> BinOp.t -> BinOp.t
          ; visit_Error : 'c -> Flag.t -> Flag.t
          ; visit_FDiv : 'c -> BinOp.t -> BinOp.t
@@ -1338,11 +1182,12 @@ module Visitors : sig
          ; visit_FLessThanEqual : 'c -> BinOp.t -> BinOp.t
          ; visit_FMinus : 'c -> BinOp.t -> BinOp.t
          ; visit_FMod : 'c -> BinOp.t -> BinOp.t
+         ; visit_ForAll :
+             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
          ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
          ; visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
          ; visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
-         ; visit_False : 'c -> Formula.t -> Formula.t
          ; visit_Fold :
              'c ->
              SLCmd.t ->
@@ -1350,20 +1195,19 @@ module Visitors : sig
              Expr.t list ->
              (string * (string * Expr.t) list) option ->
              SLCmd.t
-         ; visit_ForAll :
+         ; visit_CorePred :
              'c ->
-             Formula.t ->
-             (string * Type.t option) list ->
-             Formula.t ->
-             Formula.t
-         ; visit_GA :
-             'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+             Asrt.atom ->
+             string ->
+             Expr.t list ->
+             Expr.t list ->
+             Asrt.atom
          ; visit_Wand :
              'c ->
-             Asrt.t ->
+             Asrt.atom ->
              string * Expr.t list ->
              string * Expr.t list ->
-             Asrt.t
+             Asrt.atom
          ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
          ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
          ; visit_GuardedGoto : 'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
@@ -1389,11 +1233,7 @@ module Visitors : sig
          ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
          ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
-         ; visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-         ; visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-         ; visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-         ; visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-         ; visit_IsInt : 'c -> Formula.t -> Expr.t -> Formula.t
+         ; visit_IsInt : 'c -> UnOp.t -> UnOp.t
          ; visit_ListType : 'c -> Type.t -> Type.t
          ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
          ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1430,29 +1270,28 @@ module Visitors : sig
          ; visit_NoneType : 'c -> Type.t -> Type.t
          ; visit_Nono : 'c -> Literal.t -> Literal.t
          ; visit_Normal : 'c -> Flag.t -> Flag.t
-         ; visit_Not : 'c -> Formula.t -> Formula.t -> Formula.t
+         ; visit_Not : 'c -> UnOp.t -> UnOp.t
          ; visit_Null : 'c -> Literal.t -> Literal.t
          ; visit_NullType : 'c -> Type.t -> Type.t
          ; visit_Num : 'c -> Literal.t -> float -> Literal.t
          ; visit_NumberType : 'c -> Type.t -> Type.t
          ; visit_ObjectType : 'c -> Type.t -> Type.t
-         ; visit_Or : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+         ; visit_Or : 'c -> BinOp.t -> BinOp.t
          ; visit_PVar : 'c -> Expr.t -> string -> Expr.t
          ; visit_PhiAssignment :
              'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
          ; visit_Pi : 'c -> Constant.t -> Constant.t
-         ; visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
-         ; visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
+         ; visit_Pred : 'c -> Asrt.atom -> string -> Expr.t list -> Asrt.atom
+         ; visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
          ; visit_Random : 'c -> Constant.t -> Constant.t
          ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_SL : 'c -> LCmd.t -> SLCmd.t -> LCmd.t
-         ; visit_SLessThan : 'c -> BinOp.t -> BinOp.t
          ; visit_SepAssert : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
          ; visit_SetDiff : 'c -> BinOp.t -> BinOp.t
          ; visit_SetInter : 'c -> NOp.t -> NOp.t
-         ; visit_SetMem : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-         ; visit_SetSub : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+         ; visit_SetMem : 'c -> BinOp.t -> BinOp.t
+         ; visit_SetSub : 'c -> BinOp.t -> BinOp.t
          ; visit_SetToList : 'c -> UnOp.t -> UnOp.t
          ; visit_SetType : 'c -> Type.t -> Type.t
          ; visit_SetUnion : 'c -> NOp.t -> NOp.t
@@ -1461,12 +1300,12 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
-         ; visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
          ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
          ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
+         ; visit_StrLess : 'c -> BinOp.t -> BinOp.t
          ; visit_NumToInt : 'c -> UnOp.t -> UnOp.t
          ; visit_IntToNum : 'c -> UnOp.t -> UnOp.t
-         ; visit_StrLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+         ; visit_StrLess : 'c -> BinOp.t -> BinOp.t
          ; visit_StrNth : 'c -> BinOp.t -> BinOp.t
          ; visit_String : 'c -> Literal.t -> string -> Literal.t
          ; visit_StringType : 'c -> Type.t -> Type.t
@@ -1477,12 +1316,10 @@ module Visitors : sig
          ; visit_ToStringOp : 'c -> UnOp.t -> UnOp.t
          ; visit_ToUint16Op : 'c -> UnOp.t -> UnOp.t
          ; visit_ToUint32Op : 'c -> UnOp.t -> UnOp.t
-         ; visit_True : 'c -> Formula.t -> Formula.t
          ; visit_Type : 'c -> Literal.t -> Type.t -> Literal.t
          ; visit_TypeOf : 'c -> UnOp.t -> UnOp.t
          ; visit_TypeType : 'c -> Type.t -> Type.t
-         ; visit_Types : 'c -> Asrt.t -> (Expr.t * Type.t) list -> Asrt.t
-         ; visit_UNot : 'c -> UnOp.t -> UnOp.t
+         ; visit_Types : 'c -> Asrt.atom -> (Expr.t * Type.t) list -> Asrt.atom
          ; visit_UTCTime : 'c -> Constant.t -> Constant.t
          ; visit_UnOp : 'c -> Expr.t -> UnOp.t -> Expr.t -> Expr.t
          ; visit_Undefined : 'c -> Literal.t -> Literal.t
@@ -1504,6 +1341,7 @@ module Visitors : sig
          ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
          ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
+         ; visit_assertion_atom : 'c -> Asrt.atom -> Asrt.atom
          ; visit_assertion : 'c -> Asrt.t -> Asrt.t
          ; visit_bindings :
              'c ->
@@ -1515,7 +1353,6 @@ module Visitors : sig
          ; visit_constant : 'c -> Constant.t -> Constant.t
          ; visit_expr : 'c -> Expr.t -> Expr.t
          ; visit_flag : 'c -> Flag.t -> Flag.t
-         ; visit_formula : 'c -> Formula.t -> Formula.t
          ; visit_lcmd : 'c -> LCmd.t -> LCmd.t
          ; visit_lemma : 'c -> Lemma.t -> Lemma.t
          ; visit_lemma_spec : 'c -> Lemma.spec -> Lemma.spec
@@ -1534,8 +1371,8 @@ module Visitors : sig
     method visit_'annot : 'c -> 'd -> 'd
     method visit_'label : 'c -> 'f -> 'f
     method visit_ALoc : 'c -> Expr.t -> string -> Expr.t
-    method visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
-    method visit_Impl : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+    method visit_And : 'c -> BinOp.t -> BinOp.t
+    method visit_Impl : 'c -> BinOp.t -> BinOp.t
 
     method visit_Apply :
       'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
@@ -1544,15 +1381,10 @@ module Visitors : sig
       'c -> SLCmd.t -> string -> Expr.t list -> string list -> SLCmd.t
 
     method visit_Arguments : 'c -> 'f Cmd.t -> string -> 'f Cmd.t
-    method visit_Assert : 'c -> LCmd.t -> Formula.t -> LCmd.t
+    method visit_Assert : 'c -> LCmd.t -> Expr.t -> LCmd.t
     method visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
-    method visit_Assume : 'c -> LCmd.t -> Formula.t -> LCmd.t
+    method visit_Assume : 'c -> LCmd.t -> Expr.t -> LCmd.t
     method visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
-    method visit_BAnd : 'c -> BinOp.t -> BinOp.t
-    method visit_BOr : 'c -> BinOp.t -> BinOp.t
-    method visit_BImpl : 'c -> BinOp.t -> BinOp.t
-    method visit_BSetMem : 'c -> BinOp.t -> BinOp.t
-    method visit_BSetSub : 'c -> BinOp.t -> BinOp.t
     method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
     method visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
     method visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
@@ -1566,7 +1398,7 @@ module Visitors : sig
     method visit_BitwiseXorF : 'c -> BinOp.t -> BinOp.t
     method visit_Bool : 'c -> Literal.t -> bool -> Literal.t
     method visit_BooleanType : 'c -> Type.t -> Type.t
-    method visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
+    method visit_Branch : 'c -> LCmd.t -> Expr.t -> LCmd.t
     method visit_Bug : 'c -> Flag.t -> Flag.t
 
     method visit_Call :
@@ -1592,14 +1424,10 @@ module Visitors : sig
     method visit_Exists :
       'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
 
-    method visit_EForall :
-      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
-
-    method visit_Emp : 'c -> Asrt.t -> Asrt.t
+    method visit_Emp : 'c -> Asrt.atom -> Asrt.atom
     method visit_Empty : 'c -> Literal.t -> Literal.t
     method visit_EmptyType : 'c -> Type.t -> Type.t
     method visit_Epsilon : 'c -> Constant.t -> Constant.t
-    method visit_Eq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
     method visit_Equal : 'c -> BinOp.t -> BinOp.t
     method visit_Error : 'c -> Flag.t -> Flag.t
     method visit_FDiv : 'c -> BinOp.t -> BinOp.t
@@ -1611,7 +1439,6 @@ module Visitors : sig
     method visit_FTimes : 'c -> BinOp.t -> BinOp.t
     method visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
     method visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
-    method visit_False : 'c -> Formula.t -> Formula.t
 
     method visit_Fold :
       'c ->
@@ -1622,13 +1449,17 @@ module Visitors : sig
       SLCmd.t
 
     method visit_ForAll :
-      'c -> Formula.t -> (string * Type.t option) list -> Formula.t -> Formula.t
+      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
 
-    method visit_GA :
-      'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+    method visit_CorePred :
+      'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
 
     method visit_Wand :
-      'c -> Asrt.t -> string * Expr.t list -> string * Expr.t list -> Asrt.t
+      'c ->
+      Asrt.atom ->
+      string * Expr.t list ->
+      string * Expr.t list ->
+      Asrt.atom
 
     method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
     method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
@@ -1659,11 +1490,7 @@ module Visitors : sig
     method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
     method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
     method visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
-    method visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-    method visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-    method visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-    method visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-    method visit_IsInt : 'c -> Formula.t -> Expr.t -> Formula.t
+    method visit_IsInt : 'c -> UnOp.t -> UnOp.t
     method visit_ListType : 'c -> Type.t -> Type.t
     method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
     method visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1700,31 +1527,30 @@ module Visitors : sig
     method visit_NoneType : 'c -> Type.t -> Type.t
     method visit_Nono : 'c -> Literal.t -> Literal.t
     method visit_Normal : 'c -> Flag.t -> Flag.t
-    method visit_Not : 'c -> Formula.t -> Formula.t -> Formula.t
+    method visit_Not : 'c -> UnOp.t -> UnOp.t
     method visit_Null : 'c -> Literal.t -> Literal.t
     method visit_NullType : 'c -> Type.t -> Type.t
     method visit_Num : 'c -> Literal.t -> float -> Literal.t
     method visit_NumberType : 'c -> Type.t -> Type.t
     method visit_ObjectType : 'c -> Type.t -> Type.t
-    method visit_Or : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+    method visit_Or : 'c -> BinOp.t -> BinOp.t
     method visit_PVar : 'c -> Expr.t -> string -> Expr.t
 
     method visit_PhiAssignment :
       'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
 
     method visit_Pi : 'c -> Constant.t -> Constant.t
-    method visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
-    method visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
+    method visit_Pred : 'c -> Asrt.atom -> string -> Expr.t list -> Asrt.atom
+    method visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
     method visit_Random : 'c -> Constant.t -> Constant.t
     method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_SL : 'c -> LCmd.t -> SLCmd.t -> LCmd.t
-    method visit_SLessThan : 'c -> BinOp.t -> BinOp.t
     method visit_SepAssert : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
     method visit_SetDiff : 'c -> BinOp.t -> BinOp.t
     method visit_SetInter : 'c -> NOp.t -> NOp.t
-    method visit_SetMem : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-    method visit_SetSub : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+    method visit_SetMem : 'c -> BinOp.t -> BinOp.t
+    method visit_SetSub : 'c -> BinOp.t -> BinOp.t
     method visit_SetToList : 'c -> UnOp.t -> UnOp.t
     method visit_SetType : 'c -> Type.t -> Type.t
     method visit_SetUnion : 'c -> NOp.t -> NOp.t
@@ -1733,12 +1559,12 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
     method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
-    method visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
     method visit_StrCat : 'c -> BinOp.t -> BinOp.t
     method visit_StrLen : 'c -> UnOp.t -> UnOp.t
+    method visit_StrLess : 'c -> BinOp.t -> BinOp.t
     method visit_IntToNum : 'c -> UnOp.t -> UnOp.t
     method visit_NumToInt : 'c -> UnOp.t -> UnOp.t
-    method visit_StrLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+    method visit_StrLess : 'c -> BinOp.t -> BinOp.t
     method visit_StrNth : 'c -> BinOp.t -> BinOp.t
     method visit_String : 'c -> Literal.t -> string -> Literal.t
     method visit_StringType : 'c -> Type.t -> Type.t
@@ -1749,12 +1575,10 @@ module Visitors : sig
     method visit_ToStringOp : 'c -> UnOp.t -> UnOp.t
     method visit_ToUint16Op : 'c -> UnOp.t -> UnOp.t
     method visit_ToUint32Op : 'c -> UnOp.t -> UnOp.t
-    method visit_True : 'c -> Formula.t -> Formula.t
     method visit_Type : 'c -> Literal.t -> Type.t -> Literal.t
     method visit_TypeOf : 'c -> UnOp.t -> UnOp.t
     method visit_TypeType : 'c -> Type.t -> Type.t
-    method visit_Types : 'c -> Asrt.t -> (Expr.t * Type.t) list -> Asrt.t
-    method visit_UNot : 'c -> UnOp.t -> UnOp.t
+    method visit_Types : 'c -> Asrt.atom -> (Expr.t * Type.t) list -> Asrt.atom
     method visit_UTCTime : 'c -> Constant.t -> Constant.t
     method visit_UnOp : 'c -> Expr.t -> UnOp.t -> Expr.t -> Expr.t
     method visit_Undefined : 'c -> Literal.t -> Literal.t
@@ -1779,6 +1603,7 @@ module Visitors : sig
     method private visit_array :
       'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a array -> 'a array
 
+    method visit_assertion_atom : 'c -> Asrt.atom -> Asrt.atom
     method visit_assertion : 'c -> Asrt.t -> Asrt.t
 
     method visit_bindings :
@@ -1794,7 +1619,6 @@ module Visitors : sig
     method visit_expr : 'c -> Expr.t -> Expr.t
     method visit_flag : 'c -> Flag.t -> Flag.t
     method private visit_float : 'env. 'env -> float -> float
-    method visit_formula : 'c -> Formula.t -> Formula.t
     method private visit_int : 'env. 'env -> int -> int
     method private visit_int32 : 'env. 'env -> int32 -> int32
     method private visit_int64 : 'env. 'env -> int64 -> int64
@@ -1845,20 +1669,15 @@ module Visitors : sig
     'b = < visit_'annot : 'c -> 'd -> 'f
          ; visit_'label : 'c -> 'g -> 'f
          ; visit_ALoc : 'c -> ALoc.t -> 'f
-         ; visit_And : 'c -> Formula.t -> Formula.t -> 'f
-         ; visit_Impl : 'c -> Formula.t -> Formula.t -> 'f
+         ; visit_And : 'c -> 'f
+         ; visit_Impl : 'c -> 'f
          ; visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
          ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
          ; visit_Arguments : 'c -> string -> 'f
-         ; visit_Assert : 'c -> Formula.t -> 'f
+         ; visit_Assert : 'c -> Expr.t -> 'f
          ; visit_Assignment : 'c -> string -> Expr.t -> 'f
-         ; visit_Assume : 'c -> Formula.t -> 'f
+         ; visit_Assume : 'c -> Expr.t -> 'f
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
-         ; visit_BAnd : 'c -> 'f
-         ; visit_BOr : 'c -> 'f
-         ; visit_BImpl : 'c -> 'f
-         ; visit_BSetMem : 'c -> 'f
-         ; visit_BSetSub : 'c -> 'f
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
          ; visit_BitwiseAnd : 'c -> 'f
          ; visit_BitwiseAndL : 'c -> 'f
@@ -1872,7 +1691,7 @@ module Visitors : sig
          ; visit_BitwiseXorF : 'c -> 'f
          ; visit_Bool : 'c -> bool -> 'f
          ; visit_BooleanType : 'c -> 'f
-         ; visit_Branch : 'c -> Formula.t -> 'f
+         ; visit_Branch : 'c -> Expr.t -> 'f
          ; visit_Bug : 'c -> 'f
          ; visit_Call :
              'c ->
@@ -1892,24 +1711,21 @@ module Visitors : sig
          ; visit_EList : 'c -> Expr.t list -> 'f
          ; visit_ESet : 'c -> Expr.t list -> 'f
          ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
-         ; visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> 'f
          ; visit_Emp : 'c -> 'f
          ; visit_Empty : 'c -> 'f
          ; visit_EmptyType : 'c -> 'f
          ; visit_Epsilon : 'c -> 'f
-         ; visit_Eq : 'c -> Expr.t -> Expr.t -> 'f
          ; visit_Equal : 'c -> 'f
          ; visit_Error : 'c -> 'f
          ; visit_Fail : 'c -> string -> Expr.t list -> 'f
-         ; visit_False : 'c -> 'f
          ; visit_Fold :
              'c ->
              string ->
              Expr.t list ->
              (string * (string * Expr.t) list) option ->
              'f
-         ; visit_ForAll : 'c -> (string * Type.t option) list -> Formula.t -> 'f
-         ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+         ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
          ; visit_Goto : 'c -> 'g -> 'f
@@ -1924,16 +1740,11 @@ module Visitors : sig
          ; visit_LeftShift : 'c -> 'f
          ; visit_LeftShiftL : 'c -> 'f
          ; visit_LeftShiftF : 'c -> 'f
-         ; visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
-         ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
-         ; visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
-         ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
-         ; visit_IsInt : 'c -> Expr.t -> 'f
+         ; visit_IsInt : 'c -> 'f
          ; visit_ILessThan : 'c -> 'f
          ; visit_ILessThanEqual : 'c -> 'f
          ; visit_FLessThan : 'c -> 'f
          ; visit_FLessThanEqual : 'c -> 'f
-         ; visit_SLessThan : 'c -> 'f
          ; visit_ListType : 'c -> 'f
          ; visit_Lit : 'c -> Literal.t -> 'f
          ; visit_Loc : 'c -> string -> 'f
@@ -1974,7 +1785,7 @@ module Visitors : sig
          ; visit_NoneType : 'c -> 'f
          ; visit_Nono : 'c -> 'f
          ; visit_Normal : 'c -> 'f
-         ; visit_Not : 'c -> Formula.t -> 'f
+         ; visit_Not : 'c -> 'f
          ; visit_Null : 'c -> 'f
          ; visit_NullType : 'c -> 'f
          ; visit_Int : 'c -> Z.t -> 'f
@@ -1982,14 +1793,14 @@ module Visitors : sig
          ; visit_IntType : 'c -> 'f
          ; visit_NumberType : 'c -> 'f
          ; visit_ObjectType : 'c -> 'f
-         ; visit_Or : 'c -> Formula.t -> Formula.t -> 'f
+         ; visit_Or : 'c -> 'f
          ; visit_PVar : 'c -> string -> 'f
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
          ; visit_Pred : 'c -> string -> Expr.t list -> 'f
-         ; visit_Pure : 'c -> Formula.t -> 'f
+         ; visit_Pure : 'c -> Expr.t -> 'f
          ; visit_Random : 'c -> 'f
          ; visit_ReturnError : 'c -> 'f
          ; visit_ReturnNormal : 'c -> 'f
@@ -1997,8 +1808,8 @@ module Visitors : sig
          ; visit_SepAssert : 'c -> Asrt.t -> string list -> 'f
          ; visit_SetDiff : 'c -> 'f
          ; visit_SetInter : 'c -> 'f
-         ; visit_SetMem : 'c -> Expr.t -> Expr.t -> 'f
-         ; visit_SetSub : 'c -> Expr.t -> Expr.t -> 'f
+         ; visit_SetMem : 'c -> 'f
+         ; visit_SetSub : 'c -> 'f
          ; visit_SetToList : 'c -> 'f
          ; visit_SetType : 'c -> 'f
          ; visit_SetUnion : 'c -> 'f
@@ -2007,12 +1818,12 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> 'f
          ; visit_Skip : 'c -> 'f
          ; visit_FreshSVar : 'c -> string -> 'f
-         ; visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
          ; visit_StrCat : 'c -> 'f
          ; visit_StrLen : 'c -> 'f
+         ; visit_StrLess : 'c -> 'f
          ; visit_IntToNum : 'c -> 'f
          ; visit_NumToInt : 'c -> 'f
-         ; visit_StrLess : 'c -> Expr.t -> Expr.t -> 'f
+         ; visit_StrLess : 'c -> 'f
          ; visit_StrNth : 'c -> 'f
          ; visit_String : 'c -> string -> 'f
          ; visit_StringType : 'c -> 'f
@@ -2025,12 +1836,10 @@ module Visitors : sig
          ; visit_ToStringOp : 'c -> 'f
          ; visit_ToUint16Op : 'c -> 'f
          ; visit_ToUint32Op : 'c -> 'f
-         ; visit_True : 'c -> 'f
          ; visit_Type : 'c -> Type.t -> 'f
          ; visit_TypeOf : 'c -> 'f
          ; visit_TypeType : 'c -> 'f
          ; visit_Types : 'c -> (Expr.t * Type.t) list -> 'f
-         ; visit_UNot : 'c -> 'f
          ; visit_UTCTime : 'c -> 'f
          ; visit_UnOp : 'c -> UnOp.t -> Expr.t -> 'f
          ; visit_IUnaryMinus : 'c -> 'f
@@ -2049,6 +1858,7 @@ module Visitors : sig
          ; visit_UnsignedRightShift : 'c -> 'f
          ; visit_UnsignedRightShiftL : 'c -> 'f
          ; visit_UnsignedRightShiftF : 'c -> 'f
+         ; visit_assertion_atom : 'c -> Asrt.atom -> 'f
          ; visit_assertion : 'c -> Asrt.t -> 'f
          ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
          ; visit_binop : 'c -> BinOp.t -> 'f
@@ -2057,7 +1867,6 @@ module Visitors : sig
          ; visit_constant : 'c -> Constant.t -> 'f
          ; visit_expr : 'c -> Expr.t -> 'f
          ; visit_flag : 'c -> Flag.t -> 'f
-         ; visit_formula : 'c -> Formula.t -> 'f
          ; visit_lcmd : 'c -> LCmd.t -> 'f
          ; visit_lemma : 'c -> Lemma.t -> 'f
          ; visit_lemma_spec : 'c -> Lemma.spec -> 'f
@@ -2077,20 +1886,15 @@ module Visitors : sig
     method visit_'annot : 'c -> 'd -> 'f
     method visit_'label : 'c -> 'g -> 'f
     method visit_ALoc : 'c -> ALoc.t -> 'f
-    method visit_And : 'c -> Formula.t -> Formula.t -> 'f
-    method visit_Impl : 'c -> Formula.t -> Formula.t -> 'f
+    method visit_And : 'c -> 'f
+    method visit_Impl : 'c -> 'f
     method visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
     method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
     method visit_Arguments : 'c -> string -> 'f
-    method visit_Assert : 'c -> Formula.t -> 'f
+    method visit_Assert : 'c -> Expr.t -> 'f
     method visit_Assignment : 'c -> string -> Expr.t -> 'f
-    method visit_Assume : 'c -> Formula.t -> 'f
+    method visit_Assume : 'c -> Expr.t -> 'f
     method visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
-    method visit_BAnd : 'c -> 'f
-    method visit_BOr : 'c -> 'f
-    method visit_BImpl : 'c -> 'f
-    method visit_BSetMem : 'c -> 'f
-    method visit_BSetSub : 'c -> 'f
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
     method visit_BitwiseAnd : 'c -> 'f
     method visit_BitwiseAndL : 'c -> 'f
@@ -2104,7 +1908,7 @@ module Visitors : sig
     method visit_BitwiseXorF : 'c -> 'f
     method visit_Bool : 'c -> bool -> 'f
     method visit_BooleanType : 'c -> 'f
-    method visit_Branch : 'c -> Formula.t -> 'f
+    method visit_Branch : 'c -> Expr.t -> 'f
     method visit_Bug : 'c -> 'f
 
     method visit_Call :
@@ -2128,16 +1932,13 @@ module Visitors : sig
     method visit_EList : 'c -> Expr.t list -> 'f
     method visit_ESet : 'c -> Expr.t list -> 'f
     method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
-    method visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> 'f
     method visit_Emp : 'c -> 'f
     method visit_Empty : 'c -> 'f
     method visit_EmptyType : 'c -> 'f
     method visit_Epsilon : 'c -> 'f
-    method visit_Eq : 'c -> Expr.t -> Expr.t -> 'f
     method visit_Equal : 'c -> 'f
     method visit_Error : 'c -> 'f
     method visit_Fail : 'c -> string -> Expr.t list -> 'f
-    method visit_False : 'c -> 'f
 
     method visit_Fold :
       'c ->
@@ -2146,13 +1947,14 @@ module Visitors : sig
       (string * (string * Expr.t) list) option ->
       'f
 
-    method visit_ForAll : 'c -> (string * Type.t option) list -> Formula.t -> 'f
-    method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+    method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
     method visit_Goto : 'c -> 'g -> 'f
     method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
     method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
+    method visit_IsInt : 'c -> 'f
     method visit_Invariant : 'c -> Asrt.t -> string list -> 'f
     method visit_Consume : 'c -> Asrt.t -> string list -> 'f
     method visit_Produce : 'c -> Asrt.t -> 'f
@@ -2162,16 +1964,10 @@ module Visitors : sig
     method visit_LeftShift : 'c -> 'f
     method visit_LeftShiftL : 'c -> 'f
     method visit_LeftShiftF : 'c -> 'f
-    method visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
-    method visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
-    method visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
-    method visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
-    method visit_IsInt : 'c -> Expr.t -> 'f
     method visit_ILessThan : 'c -> 'f
     method visit_ILessThanEqual : 'c -> 'f
     method visit_FLessThan : 'c -> 'f
     method visit_FLessThanEqual : 'c -> 'f
-    method visit_SLessThan : 'c -> 'f
     method visit_ListType : 'c -> 'f
     method visit_Lit : 'c -> Literal.t -> 'f
     method visit_Loc : 'c -> string -> 'f
@@ -2212,7 +2008,7 @@ module Visitors : sig
     method visit_NoneType : 'c -> 'f
     method visit_Nono : 'c -> 'f
     method visit_Normal : 'c -> 'f
-    method visit_Not : 'c -> Formula.t -> 'f
+    method visit_Not : 'c -> 'f
     method visit_Null : 'c -> 'f
     method visit_NullType : 'c -> 'f
     method visit_Int : 'c -> Z.t -> 'f
@@ -2220,14 +2016,14 @@ module Visitors : sig
     method visit_IntType : 'c -> 'f
     method visit_NumberType : 'c -> 'f
     method visit_ObjectType : 'c -> 'f
-    method visit_Or : 'c -> Formula.t -> Formula.t -> 'f
+    method visit_Or : 'c -> 'f
     method visit_PVar : 'c -> string -> 'f
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
     method visit_Pred : 'c -> string -> Expr.t list -> 'f
-    method visit_Pure : 'c -> Formula.t -> 'f
+    method visit_Pure : 'c -> Expr.t -> 'f
     method visit_Random : 'c -> 'f
     method visit_ReturnError : 'c -> 'f
     method visit_ReturnNormal : 'c -> 'f
@@ -2235,8 +2031,8 @@ module Visitors : sig
     method visit_SepAssert : 'c -> Asrt.t -> string list -> 'f
     method visit_SetDiff : 'c -> 'f
     method visit_SetInter : 'c -> 'f
-    method visit_SetMem : 'c -> Expr.t -> Expr.t -> 'f
-    method visit_SetSub : 'c -> Expr.t -> Expr.t -> 'f
+    method visit_SetMem : 'c -> 'f
+    method visit_SetSub : 'c -> 'f
     method visit_SetToList : 'c -> 'f
     method visit_SetType : 'c -> 'f
     method visit_SetUnion : 'c -> 'f
@@ -2245,12 +2041,12 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> 'f
     method visit_Skip : 'c -> 'f
     method visit_FreshSVar : 'c -> string -> 'f
-    method visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
     method visit_StrCat : 'c -> 'f
     method visit_StrLen : 'c -> 'f
+    method visit_StrLess : 'c -> 'f
     method visit_IntToNum : 'c -> 'f
     method visit_NumToInt : 'c -> 'f
-    method visit_StrLess : 'c -> Expr.t -> Expr.t -> 'f
+    method visit_StrLess : 'c -> 'f
     method visit_StrNth : 'c -> 'f
     method visit_String : 'c -> string -> 'f
     method visit_StringType : 'c -> 'f
@@ -2263,12 +2059,10 @@ module Visitors : sig
     method visit_ToStringOp : 'c -> 'f
     method visit_ToUint16Op : 'c -> 'f
     method visit_ToUint32Op : 'c -> 'f
-    method visit_True : 'c -> 'f
     method visit_Type : 'c -> Type.t -> 'f
     method visit_TypeOf : 'c -> 'f
     method visit_TypeType : 'c -> 'f
     method visit_Types : 'c -> (Expr.t * Type.t) list -> 'f
-    method visit_UNot : 'c -> 'f
     method visit_UTCTime : 'c -> 'f
     method visit_UnOp : 'c -> UnOp.t -> Expr.t -> 'f
     method visit_IUnaryMinus : 'c -> 'f
@@ -2285,6 +2079,7 @@ module Visitors : sig
     method visit_UnsignedRightShift : 'c -> 'f
     method visit_UnsignedRightShiftL : 'c -> 'f
     method visit_UnsignedRightShiftF : 'c -> 'f
+    method visit_assertion_atom : 'c -> Asrt.atom -> 'f
     method visit_assertion : 'c -> Asrt.t -> 'f
     method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
     method visit_binop : 'c -> BinOp.t -> 'f
@@ -2293,7 +2088,6 @@ module Visitors : sig
     method visit_constant : 'c -> Constant.t -> 'f
     method visit_expr : 'c -> Expr.t -> 'f
     method visit_flag : 'c -> Flag.t -> 'f
-    method visit_formula : 'c -> Formula.t -> 'f
     method visit_lcmd : 'c -> LCmd.t -> 'f
     method visit_lemma : 'c -> Lemma.t -> 'f
     method visit_lemma_spec : 'c -> Lemma.spec -> 'f
@@ -2315,20 +2109,15 @@ module Visitors : sig
     'b = < visit_'annot : 'c -> 'd -> unit
          ; visit_'label : 'c -> 'f -> unit
          ; visit_ALoc : 'c -> string -> unit
-         ; visit_And : 'c -> Formula.t -> Formula.t -> unit
-         ; visit_Impl : 'c -> Formula.t -> Formula.t -> unit
+         ; visit_And : 'c -> unit
+         ; visit_Impl : 'c -> unit
          ; visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
          ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
          ; visit_Arguments : 'c -> string -> unit
-         ; visit_Assert : 'c -> Formula.t -> unit
+         ; visit_Assert : 'c -> Expr.t -> unit
          ; visit_Assignment : 'c -> string -> Expr.t -> unit
-         ; visit_Assume : 'c -> Formula.t -> unit
+         ; visit_Assume : 'c -> Expr.t -> unit
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
-         ; visit_BAnd : 'c -> unit
-         ; visit_BOr : 'c -> unit
-         ; visit_BImpl : 'c -> unit
-         ; visit_BSetMem : 'c -> unit
-         ; visit_BSetSub : 'c -> unit
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
          ; visit_BitwiseAnd : 'c -> unit
          ; visit_BitwiseAndL : 'c -> unit
@@ -2342,7 +2131,7 @@ module Visitors : sig
          ; visit_BitwiseXorF : 'c -> unit
          ; visit_Bool : 'c -> bool -> unit
          ; visit_BooleanType : 'c -> unit
-         ; visit_Branch : 'c -> Formula.t -> unit
+         ; visit_Branch : 'c -> Expr.t -> unit
          ; visit_Bug : 'c -> unit
          ; visit_Call :
              'c ->
@@ -2360,12 +2149,10 @@ module Visitors : sig
          ; visit_EList : 'c -> Expr.t list -> unit
          ; visit_ESet : 'c -> Expr.t list -> unit
          ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
-         ; visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> unit
          ; visit_Emp : 'c -> unit
          ; visit_Empty : 'c -> unit
          ; visit_EmptyType : 'c -> unit
          ; visit_Epsilon : 'c -> unit
-         ; visit_Eq : 'c -> Expr.t -> Expr.t -> unit
          ; visit_Equal : 'c -> unit
          ; visit_Error : 'c -> unit
          ; visit_FDiv : 'c -> unit
@@ -2377,16 +2164,14 @@ module Visitors : sig
          ; visit_FTimes : 'c -> unit
          ; visit_FUnaryMinus : 'c -> unit
          ; visit_Fail : 'c -> string -> Expr.t list -> unit
-         ; visit_False : 'c -> unit
          ; visit_Fold :
              'c ->
              string ->
              Expr.t list ->
              (string * (string * Expr.t) list) option ->
              unit
-         ; visit_ForAll :
-             'c -> (string * Type.t option) list -> Formula.t -> unit
-         ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+         ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
+         ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_Wand :
              'c -> string * Expr.t list -> string * Expr.t list -> unit
          ; visit_GUnfold : 'c -> string -> unit
@@ -2412,11 +2197,7 @@ module Visitors : sig
          ; visit_LeftShift : 'c -> unit
          ; visit_LeftShiftL : 'c -> unit
          ; visit_LeftShiftF : 'c -> unit
-         ; visit_FLess : 'c -> Expr.t -> Expr.t -> unit
-         ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
-         ; visit_ILess : 'c -> Expr.t -> Expr.t -> unit
-         ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
-         ; visit_IsInt : 'c -> Expr.t -> unit
+         ; visit_IsInt : 'c -> unit
          ; visit_ListType : 'c -> unit
          ; visit_Lit : 'c -> Literal.t -> unit
          ; visit_Loc : 'c -> string -> unit
@@ -2453,28 +2234,27 @@ module Visitors : sig
          ; visit_NoneType : 'c -> unit
          ; visit_Nono : 'c -> unit
          ; visit_Normal : 'c -> unit
-         ; visit_Not : 'c -> Formula.t -> unit
+         ; visit_Not : 'c -> unit
          ; visit_Null : 'c -> unit
          ; visit_NullType : 'c -> unit
          ; visit_Num : 'c -> float -> unit
          ; visit_NumberType : 'c -> unit
          ; visit_ObjectType : 'c -> unit
-         ; visit_Or : 'c -> Formula.t -> Formula.t -> unit
+         ; visit_Or : 'c -> unit
          ; visit_PVar : 'c -> string -> unit
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
          ; visit_Pred : 'c -> string -> Expr.t list -> unit
-         ; visit_Pure : 'c -> Formula.t -> unit
+         ; visit_Pure : 'c -> Expr.t -> unit
          ; visit_Random : 'c -> unit
          ; visit_ReturnError : 'c -> unit
          ; visit_ReturnNormal : 'c -> unit
          ; visit_SL : 'c -> SLCmd.t -> unit
-         ; visit_SLessThan : 'c -> unit
          ; visit_SepAssert : 'c -> Asrt.t -> string list -> unit
          ; visit_SetDiff : 'c -> unit
          ; visit_SetInter : 'c -> unit
-         ; visit_SetMem : 'c -> Expr.t -> Expr.t -> unit
-         ; visit_SetSub : 'c -> Expr.t -> Expr.t -> unit
+         ; visit_SetMem : 'c -> unit
+         ; visit_SetSub : 'c -> unit
          ; visit_SetToList : 'c -> unit
          ; visit_SetType : 'c -> unit
          ; visit_SetUnion : 'c -> unit
@@ -2483,12 +2263,11 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> unit
          ; visit_Skip : 'c -> unit
          ; visit_FreshSVar : 'c -> string -> unit
-         ; visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
          ; visit_StrCat : 'c -> unit
          ; visit_StrLen : 'c -> unit
+         ; visit_StrLess : 'c -> unit
          ; visit_IntToNum : 'c -> unit
          ; visit_NumToInt : 'c -> unit
-         ; visit_StrLess : 'c -> Expr.t -> Expr.t -> unit
          ; visit_StrNth : 'c -> unit
          ; visit_String : 'c -> string -> unit
          ; visit_StringType : 'c -> unit
@@ -2499,12 +2278,10 @@ module Visitors : sig
          ; visit_ToStringOp : 'c -> unit
          ; visit_ToUint16Op : 'c -> unit
          ; visit_ToUint32Op : 'c -> unit
-         ; visit_True : 'c -> unit
          ; visit_Type : 'c -> Type.t -> unit
          ; visit_TypeOf : 'c -> unit
          ; visit_TypeType : 'c -> unit
          ; visit_Types : 'c -> (Expr.t * Type.t) list -> unit
-         ; visit_UNot : 'c -> unit
          ; visit_UTCTime : 'c -> unit
          ; visit_UnOp : 'c -> UnOp.t -> Expr.t -> unit
          ; visit_Undefined : 'c -> unit
@@ -2521,6 +2298,7 @@ module Visitors : sig
          ; visit_UnsignedRightShift : 'c -> unit
          ; visit_UnsignedRightShiftL : 'c -> unit
          ; visit_UnsignedRightShiftF : 'c -> unit
+         ; visit_assertion_atom : 'c -> Asrt.atom -> unit
          ; visit_assertion : 'c -> Asrt.t -> unit
          ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
          ; visit_binop : 'c -> BinOp.t -> unit
@@ -2529,7 +2307,6 @@ module Visitors : sig
          ; visit_constant : 'c -> Constant.t -> unit
          ; visit_expr : 'c -> Expr.t -> unit
          ; visit_flag : 'c -> Flag.t -> unit
-         ; visit_formula : 'c -> Formula.t -> unit
          ; visit_lcmd : 'c -> LCmd.t -> unit
          ; visit_lemma : 'c -> Lemma.t -> unit
          ; visit_lemma_spec : 'c -> Lemma.spec -> unit
@@ -2548,20 +2325,15 @@ module Visitors : sig
     method visit_'annot : 'c -> 'd -> unit
     method visit_'label : 'c -> 'f -> unit
     method visit_ALoc : 'c -> string -> unit
-    method visit_And : 'c -> Formula.t -> Formula.t -> unit
-    method visit_Impl : 'c -> Formula.t -> Formula.t -> unit
+    method visit_And : 'c -> unit
+    method visit_Impl : 'c -> unit
     method visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
     method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
     method visit_Arguments : 'c -> string -> unit
-    method visit_Assert : 'c -> Formula.t -> unit
+    method visit_Assert : 'c -> Expr.t -> unit
     method visit_Assignment : 'c -> string -> Expr.t -> unit
-    method visit_Assume : 'c -> Formula.t -> unit
+    method visit_Assume : 'c -> Expr.t -> unit
     method visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
-    method visit_BAnd : 'c -> unit
-    method visit_BOr : 'c -> unit
-    method visit_BImpl : 'c -> unit
-    method visit_BSetMem : 'c -> unit
-    method visit_BSetSub : 'c -> unit
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
     method visit_BitwiseAnd : 'c -> unit
     method visit_BitwiseAndL : 'c -> unit
@@ -2575,7 +2347,7 @@ module Visitors : sig
     method visit_BitwiseXorF : 'c -> unit
     method visit_Bool : 'c -> bool -> unit
     method visit_BooleanType : 'c -> unit
-    method visit_Branch : 'c -> Formula.t -> unit
+    method visit_Branch : 'c -> Expr.t -> unit
     method visit_Bug : 'c -> unit
 
     method visit_Call :
@@ -2597,12 +2369,10 @@ module Visitors : sig
     method visit_EList : 'c -> Expr.t list -> unit
     method visit_ESet : 'c -> Expr.t list -> unit
     method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
-    method visit_EForall : 'c -> (string * Type.t option) list -> Expr.t -> unit
     method visit_Emp : 'c -> unit
     method visit_Empty : 'c -> unit
     method visit_EmptyType : 'c -> unit
     method visit_Epsilon : 'c -> unit
-    method visit_Eq : 'c -> Expr.t -> Expr.t -> unit
     method visit_Equal : 'c -> unit
     method visit_Error : 'c -> unit
     method visit_FDiv : 'c -> unit
@@ -2614,7 +2384,6 @@ module Visitors : sig
     method visit_FTimes : 'c -> unit
     method visit_FUnaryMinus : 'c -> unit
     method visit_Fail : 'c -> string -> Expr.t list -> unit
-    method visit_False : 'c -> unit
 
     method visit_Fold :
       'c ->
@@ -2623,10 +2392,8 @@ module Visitors : sig
       (string * (string * Expr.t) list) option ->
       unit
 
-    method visit_ForAll :
-      'c -> (string * Type.t option) list -> Formula.t -> unit
-
-    method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+    method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
+    method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
 
     method visit_Wand :
       'c -> string * Expr.t list -> string * Expr.t list -> unit
@@ -2654,11 +2421,7 @@ module Visitors : sig
     method visit_LeftShift : 'c -> unit
     method visit_LeftShiftL : 'c -> unit
     method visit_LeftShiftF : 'c -> unit
-    method visit_FLess : 'c -> Expr.t -> Expr.t -> unit
-    method visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
-    method visit_ILess : 'c -> Expr.t -> Expr.t -> unit
-    method visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
-    method visit_IsInt : 'c -> Expr.t -> unit
+    method visit_IsInt : 'c -> unit
     method visit_ListType : 'c -> unit
     method visit_Lit : 'c -> Literal.t -> unit
     method visit_Loc : 'c -> string -> unit
@@ -2695,28 +2458,27 @@ module Visitors : sig
     method visit_NoneType : 'c -> unit
     method visit_Nono : 'c -> unit
     method visit_Normal : 'c -> unit
-    method visit_Not : 'c -> Formula.t -> unit
+    method visit_Not : 'c -> unit
     method visit_Null : 'c -> unit
     method visit_NullType : 'c -> unit
     method visit_Num : 'c -> float -> unit
     method visit_NumberType : 'c -> unit
     method visit_ObjectType : 'c -> unit
-    method visit_Or : 'c -> Formula.t -> Formula.t -> unit
+    method visit_Or : 'c -> unit
     method visit_PVar : 'c -> string -> unit
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit
     method visit_Pred : 'c -> string -> Expr.t list -> unit
-    method visit_Pure : 'c -> Formula.t -> unit
+    method visit_Pure : 'c -> Expr.t -> unit
     method visit_Random : 'c -> unit
     method visit_ReturnError : 'c -> unit
     method visit_ReturnNormal : 'c -> unit
     method visit_SL : 'c -> SLCmd.t -> unit
-    method visit_SLessThan : 'c -> unit
     method visit_SepAssert : 'c -> Asrt.t -> string list -> unit
     method visit_SetDiff : 'c -> unit
     method visit_SetInter : 'c -> unit
-    method visit_SetMem : 'c -> Expr.t -> Expr.t -> unit
-    method visit_SetSub : 'c -> Expr.t -> Expr.t -> unit
+    method visit_SetMem : 'c -> unit
+    method visit_SetSub : 'c -> unit
     method visit_SetToList : 'c -> unit
     method visit_SetType : 'c -> unit
     method visit_SetUnion : 'c -> unit
@@ -2725,12 +2487,11 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> unit
     method visit_Skip : 'c -> unit
     method visit_FreshSVar : 'c -> string -> unit
-    method visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
     method visit_StrCat : 'c -> unit
     method visit_StrLen : 'c -> unit
+    method visit_StrLess : 'c -> unit
     method visit_IntToNum : 'c -> unit
     method visit_NumToInt : 'c -> unit
-    method visit_StrLess : 'c -> Expr.t -> Expr.t -> unit
     method visit_StrNth : 'c -> unit
     method visit_String : 'c -> string -> unit
     method visit_StringType : 'c -> unit
@@ -2741,12 +2502,10 @@ module Visitors : sig
     method visit_ToStringOp : 'c -> unit
     method visit_ToUint16Op : 'c -> unit
     method visit_ToUint32Op : 'c -> unit
-    method visit_True : 'c -> unit
     method visit_Type : 'c -> Type.t -> unit
     method visit_TypeOf : 'c -> unit
     method visit_TypeType : 'c -> unit
     method visit_Types : 'c -> (Expr.t * Type.t) list -> unit
-    method visit_UNot : 'c -> unit
     method visit_UTCTime : 'c -> unit
     method visit_UnOp : 'c -> UnOp.t -> Expr.t -> unit
     method visit_Undefined : 'c -> unit
@@ -2770,6 +2529,7 @@ module Visitors : sig
     method private visit_array :
       'env 'a. ('env -> 'a -> unit) -> 'env -> 'a array -> unit
 
+    method visit_assertion_atom : 'c -> Asrt.atom -> unit
     method visit_assertion : 'c -> Asrt.t -> unit
     method visit_bindings : 'c -> string * (string * Expr.t) list -> unit
     method visit_binop : 'c -> BinOp.t -> unit
@@ -2782,7 +2542,6 @@ module Visitors : sig
     method visit_expr : 'c -> Expr.t -> unit
     method visit_flag : 'c -> Flag.t -> unit
     method private visit_float : 'env. 'env -> float -> unit
-    method visit_formula : 'c -> Formula.t -> unit
     method private visit_int : 'env. 'env -> int -> unit
     method private visit_int32 : 'env. 'env -> int32 -> unit
     method private visit_int64 : 'env. 'env -> int64 -> unit

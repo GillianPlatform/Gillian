@@ -45,12 +45,13 @@ let expand_if ~ext ~loc expr then_ else_ =
       (Labelled "else_branch", to_thunk ~loc else_);
     ]
 
-let transform_case_ent ~expr (case : case) =
+let transform_case ~ext ~expr (case : case) =
   let () =
     match case.pc_guard with
     | Some guard ->
         Location.raise_errorf ~loc:guard.pexp_loc
-          "pattern guards are not authorized with the 'ent' extension"
+          "pattern guards are not authorized with the '%%%s' extension"
+          (Extension_name.to_string ext)
     | None -> ()
   in
   let lhs = case.pc_lhs in
@@ -67,22 +68,52 @@ let transform_case_ent ~expr (case : case) =
         to_thunk ~loc:lhs.ppat_loc true_expr
     | _ ->
         Location.raise_errorf ~loc:lhs.ppat_loc
-          "the 'ent' extension only works if you provide function name have \
-           type Expr.t -> Formula.t as pattern which"
+          "the '%%%s' extension only works if the pattern is a function name \
+           with type Expr.t -> Formula.t, or a '_' pattern"
+          (Extension_name.to_string ext)
   in
   let applied = pexp_apply ~loc:lhs.ppat_loc formula_expr [ (Nolabel, expr) ] in
   let rhs = to_thunk ~loc:case.pc_rhs.pexp_loc case.pc_rhs in
-  pexp_tuple ~loc:lhs.ppat_loc [ applied; rhs ]
+  (applied, rhs)
 
-let expand_match ~ext ~loc (expr : expression) (cases : case list) =
+let expand_match
+    ~(ext : Extension_name.t)
+    ~loc
+    (expr : expression)
+    (cases : case list) =
   match ext with
-  | Extension_name.Sat ->
-      Location.raise_errorf ~loc "%%%s cannot be used with 'match'"
-        (Extension_name.to_string ext)
+  | Sat ->
+      let cases = List.map (transform_case ~ext ~expr) cases in
+      let fexpr = if_fexpr ~ext loc in
+      let non_exhaustive_error =
+        pexp_apply ~loc
+          (pexp_ident ~loc (Located.mk ~loc (Lident "failwith")))
+          [
+            ( Nolabel,
+              pexp_constant ~loc
+                (Pconst_string
+                   ("Non-exhaustive %sat pattern matching", loc, None)) );
+          ]
+      in
+      List.fold_right
+        (fun (lhs, rhs) acc ->
+          pexp_apply ~loc fexpr
+            [
+              (Nolabel, lhs);
+              (Labelled "then_branch", rhs);
+              (Labelled "else_branch", to_thunk ~loc acc);
+            ])
+        cases non_exhaustive_error
   | Ent ->
-      let cases = List.map (transform_case_ent ~expr) cases in
+      let cases =
+        List.map
+          (fun case ->
+            let lhs, rhs = transform_case ~ext ~expr case in
+            pexp_tuple ~loc:case.pc_lhs.ppat_loc [ lhs; rhs ])
+          cases
+      in
       let list_cases = elist ~loc cases in
-      pexp_apply ~loc (match_fexpr ~ext:Ent loc) [ (Nolabel, list_cases) ]
+      pexp_apply ~loc (match_fexpr ~ext loc) [ (Nolabel, list_cases) ]
 
 let expand ~ext expr =
   let loc = { expr.pexp_loc with loc_ghost = true } in
@@ -98,11 +129,8 @@ let expand ~ext expr =
                 (Extension_name.to_string ext)
         in
         expand_if ~ext ~loc expr then_ else_
-    | _ when ext == Ent ->
-        Location.raise_errorf ~loc "%%%s can only be used with 'if' and 'match'"
-          (Extension_name.to_string ext)
     | _ ->
-        Location.raise_errorf ~loc "%%%s can only be used with 'if'"
+        Location.raise_errorf ~loc "%%%s can only be used with 'if' and 'match'"
           (Extension_name.to_string ext)
   in
   {
