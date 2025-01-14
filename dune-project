@@ -112,5 +112,9 @@
  (depends
   (gillian
    (= :version))
+  (gillian-c
+   (= :version))
+  (gillian-js
+   (= :version))
   dune-site
   printbox-text))
