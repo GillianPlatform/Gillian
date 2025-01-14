@@ -47,7 +47,7 @@ end
 
 module ExpMapMake (Check : sig
   val check :
-    Formula.t ->
+    Expr.t ->
     then_:(unit -> 'a Delayed.t) ->
     else_:(unit -> 'a Delayed.t) ->
     'a Delayed.t
@@ -78,7 +78,7 @@ end) : SymExprMap = struct
                 -> Delayed.return (Some (k', v))
               | _ ->
                   Check.check
-                    Formula.Infix.(k' #== k)
+                    Expr.Infix.(k' == k)
                     ~then_:(fun () -> Delayed.return (Some (k', v)))
                     ~else_:(fun () -> find_match tl))
         in
@@ -139,7 +139,6 @@ extending the path condition. Returns None if the input can definitely not be a 
 let get_loc =
   let open Delayed.Syntax in
   let open Delayed_option in
-  let open Formula.Infix in
   function
   | Expr.Lit (Loc loc) -> some loc
   | Expr.ALoc loc -> some loc
@@ -148,8 +147,9 @@ let get_loc =
       match loc with
       | Some loc -> some loc
       | None ->
+          let open Expr.Infix in
           let loc_name = ALoc.alloc () in
-          some ~learned:[ e #== (ALoc loc_name) ] loc_name)
+          some ~learned:[ e == ALoc loc_name ] loc_name)
   | _ -> none ()
 
 module SMap = Gillian.Utils.Prelude.Map.Make (struct

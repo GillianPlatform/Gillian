@@ -191,7 +191,7 @@ struct
         | Some (idx', ss), _ -> DR.ok (s, idx', ss)
         | None, None -> DR.ok (s, idx', S.empty ())
         | None, Some d -> (
-            if%sat Formula.SetMem (idx', d) then DR.ok (s, idx', S.empty ())
+            if%sat Expr.BinOp (idx', SetMem, d) then DR.ok (s, idx', S.empty ())
             else
               match I.mode with
               | Static ->
@@ -220,7 +220,7 @@ struct
     | SubAction _, [] -> failwith "Missing index for sub-action"
     | SubAction action, idx :: args ->
         let** s, idx', ss = get s idx in
-        let* () = Delayed.return ~learned:[ Formula.Eq (idx, idx') ] () in
+        let* () = Delayed.return ~learned:[ Expr.Infix.(idx == idx') ] () in
         let+ r = S.execute_action action ss args in
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
@@ -242,7 +242,7 @@ struct
            - return as a list *)
         | h, Some d ->
             let keys = I.fold (fun k _ acc -> k :: acc) h [] in
-            if%ent Formula.Infix.(d #== (Expr.ESet keys)) then
+            if%ent Expr.Infix.(d == Expr.ESet keys) then
               let keys =
                 I.fold
                   (fun k v acc -> if S.is_empty v then acc else k :: acc)
@@ -389,7 +389,7 @@ struct
     | SubError (idx, idx', e) ->
         S.get_fixes e
         |> MyUtils.deep_map @@ MyAsrt.map_cp @@ lift_corepred idx'
-        |> List.map @@ List.cons @@ Formula.Infix.(MyAsrt.Pure idx #== idx')
+        |> List.map @@ List.cons @@ MyAsrt.Pure Expr.Infix.(idx == idx')
     | MissingDomainSet ->
         let lvar = Expr.LVar (LVar.alloc ()) in
         [
@@ -552,7 +552,7 @@ struct
     | SubError (idx, idx', e) ->
         S.get_fixes e
         |> MyUtils.deep_map @@ MyAsrt.map_cp @@ lift_corepred idx'
-        |> List.map @@ List.cons @@ Formula.Infix.(MyAsrt.Pure idx #== idx')
+        |> List.map @@ List.cons @@ MyAsrt.Pure Expr.Infix.(idx == idx')
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 
@@ -600,7 +600,6 @@ module StringIndex : PMapIndex = struct
 end
 
 module IntegerIndex : PMapIndex = struct
-  open Formula.Infix
   open Expr.Infix
 
   let mode = Static
@@ -612,7 +611,7 @@ module IntegerIndex : PMapIndex = struct
     let learnt =
       match !last_index with
       | None -> []
-      | Some last -> [ e #== (last + Expr.int 1) ]
+      | Some last -> [ e == last + Expr.one_i ]
     in
     last_index := Some e;
     Delayed.return ~learned:learnt
@@ -763,11 +762,10 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
     | Expr.Lit (Loc loc) -> loc
     | Expr.ALoc loc -> loc
     | e ->
-        failwith
-          (Fmt.str
-             "ALocImpl: get_loc_fast: non-trivial location passed to \
-              get_loc_fast: %a"
-             Expr.pp e)
+        Fmt.failwith
+          "ALocImpl: get_loc_fast: non-trivial location passed to \
+           get_loc_fast: %a"
+          Expr.pp e
 
   let validate_index idx = DO.map (MyUtils.get_loc idx) Expr.loc_from_loc_name
 

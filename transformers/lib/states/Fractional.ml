@@ -5,6 +5,9 @@ open Gil_syntax
 module DR = Delayed_result
 module Recovery_tactic = Gillian.General.Recovery_tactic
 
+let _0 = Expr.num 0.
+let _1 = Expr.num 1.
+
 (** Value * Fraction *)
 type t = (Expr.t * Expr.t) option [@@deriving show, yojson]
 
@@ -34,40 +37,32 @@ let list_preds () = [ (Frac, [ "fraction" ], [ "value" ]) ]
 let empty () : t = None
 
 let execute_action action s args =
-  let open Formula.Infix in
+  let open Expr.Infix in
   match (action, s, args) with
   | _, None, _ -> DR.error MissingState
   | Load, Some (v, q), [] -> DR.ok (Some (v, q), [ v ])
   | Store, Some (_, q), [ v' ] ->
-      if%sat q #== (Expr.num 1.) then DR.ok (Some (v', q), [])
+      if%sat q == _1 then DR.ok (Some (v', q), [])
       else DR.error NotEnoughPermission
   | a, _, args ->
-      failwith
-        (Fmt.str "Invalid action %s with state %a and args %a" (action_to_str a)
-           pp s (Fmt.Dump.list Expr.pp) args)
+      Fmt.failwith "Invalid action %s with state %a and args %a"
+        (action_to_str a) pp s (Fmt.Dump.list Expr.pp) args
 
 let consume core_pred s args =
-  let open Formula.Infix in
   let open Expr.Infix in
   match (core_pred, s, args) with
   | Frac, Some (v, q), [ q' ] ->
-      if%sat q #== q' then DR.ok (None, [ v ])
-      else
-        DR.ok
-          ~learned:[ q' #>. (Expr.num 0.); (q -. q') #>. (Expr.num 0.) ]
-          (Some (v, q -. q'), [ v ])
+      if%sat q == q' then DR.ok (None, [ v ])
+      else DR.ok ~learned:[ q' >. _0; q -. q' >. _0 ] (Some (v, q -. q'), [ v ])
   | Frac, None, _ -> DR.error MissingState
   | Frac, _, _ -> failwith "Invalid Agree consume"
 
 let produce core_pred s args =
-  let open Formula.Infix in
   let open Expr.Infix in
   match (core_pred, s, args) with
   | Frac, None, [ q'; v' ] -> Delayed.return (Some (v', q'))
   | Frac, Some (v, q), [ q'; v' ] ->
-      Delayed.return
-        ~learned:[ v #== v'; (q +. q') #<=. (Expr.num 1.) ]
-        (Some (v, q +. q'))
+      Delayed.return ~learned:[ v == v'; q +. q' <=. _1 ] (Some (v, q +. q'))
   | Frac, _, _ -> failwith "Invalid Frac produce"
 
 let substitution_in_place subst s =
@@ -79,20 +74,17 @@ let substitution_in_place subst s =
       Delayed.return (Some (v', q'))
 
 let compose (s1 : t) (s2 : t) =
-  let open Formula.Infix in
   let open Expr.Infix in
   match (s1, s2) with
   | None, _ -> Delayed.return s2
   | _, None -> Delayed.return s1
   | Some (v, q), Some (v', q') ->
-      Delayed.return
-        ~learned:[ v #== v'; (q +. q') #<=. (Expr.num 1.) ]
-        (Some (v, q +. q'))
+      Delayed.return ~learned:[ v == v'; q +. q' <=. _1 ] (Some (v, q +. q'))
 
 let is_exclusively_owned s _ =
   match s with
   | None -> Delayed.return false
-  | Some (_, q) -> Delayed.check_sat Formula.Infix.(q #== (Expr.num 1.))
+  | Some (_, q) -> Delayed.check_sat Expr.Infix.(q == _1)
 
 let is_empty = function
   | None -> true
@@ -103,7 +95,7 @@ let is_concrete = function
   | Some (v, q) -> Expr.is_concrete v && Expr.is_concrete q
 
 let instantiate = function
-  | [] -> (Some (Expr.int 0, Expr.num 1.), [])
+  | [] -> (Some (Expr.int 0, _1), [])
   | _ -> failwith "Invalid Fractional instantiation"
 
 let lvars = function

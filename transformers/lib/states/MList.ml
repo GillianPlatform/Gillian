@@ -63,7 +63,7 @@ module Make (S : MyMonadicSMemory.S) :
     | None -> (
         match n with
         | Some n ->
-            if%sat Formula.Infix.(Expr.zero_i #<= idx #&& (idx #< n)) then
+            if%sat Expr.Infix.(Expr.zero_i <= idx && idx < n) then
               DR.ok (idx, S.empty ())
             else DR.error (OutOfBounds (idx, n))
         | None -> DR.ok (idx, S.empty ()))
@@ -125,11 +125,10 @@ module Make (S : MyMonadicSMemory.S) :
 
   let is_exclusively_owned s e =
     let open Delayed.Syntax in
-    let open Formula.Infix in
     match s with
     | b, Some n ->
         (* This does the assumption that all indices are different values *)
-        if%sat n #== (Expr.int (ExpMap.cardinal b)) then
+        if%sat Expr.Infix.(n == Expr.int (ExpMap.cardinal b)) then
           let rec check l acc =
             let* acc = acc in
             match (acc, l) with

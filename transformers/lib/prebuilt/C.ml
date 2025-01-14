@@ -51,8 +51,8 @@ module ExtendMemory (S : C_PMapType) = struct
       match args with
       | [ dst_loc; dst_ofs; src_loc; src_ofs; size ] -> (
           let open DR.Syntax in
-          let open Formula.Infix in
-          if%sat size #== (Expr.int 0) then DR.ok (s, [])
+          let open Expr.Infix in
+          if%sat size == Expr.zero_i then DR.ok (s, [])
           else
             let**^ s, _, src = S.get s src_loc in
             let**^ s, dst_loc', dest = S.get s dst_loc in

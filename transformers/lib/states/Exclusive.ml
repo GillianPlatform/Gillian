@@ -39,9 +39,8 @@ let execute_action action s args =
   | Load, Some v, [] -> DR.ok (Some v, [ v ])
   | Store, Some _, [ v' ] -> DR.ok (Some v', [])
   | a, _, args ->
-      failwith
-        (Fmt.str "Invalid action %s with state %a and args %a" (action_to_str a)
-           pp s (Fmt.Dump.list Expr.pp) args)
+      Fmt.failwith "Invalid action %s with state %a and args %a"
+        (action_to_str a) pp s (Fmt.Dump.list Expr.pp) args
 
 let consume core_pred s args =
   match (core_pred, s, args) with

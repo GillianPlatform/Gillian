@@ -57,7 +57,7 @@ module type S = sig
   val assertions : t -> (pred * Expr.t list * Expr.t list) list
 
   (** The list of assertions that aren't core predicates corresponding to the state. *)
-  val assertions_others : t -> Asrt.t list
+  val assertions_others : t -> Asrt.atom list
 
   (** If the error can be fixed *)
   val can_fix : err_t -> bool
@@ -166,7 +166,7 @@ struct
   let assertions ?to_keep:_ s =
     let core_preds = assertions s in
     let formulas = assertions_others s in
-    let mapping (p, ins, outs) = Asrt.GA (pred_to_str p, ins, outs) in
+    let mapping (p, ins, outs) = Asrt.CorePred (pred_to_str p, ins, outs) in
     List.map mapping core_preds @ formulas
 
   let get_fixes e =
@@ -175,7 +175,8 @@ struct
        | MyAsrt.Emp -> Asrt.Emp
        | MyAsrt.Pure f -> Asrt.Pure f
        | MyAsrt.Types ts -> Asrt.Types ts
-       | MyAsrt.CorePred (p, ins, outs) -> Asrt.GA (pred_to_str p, ins, outs)
+       | MyAsrt.CorePred (p, ins, outs) ->
+           Asrt.CorePred (pred_to_str p, ins, outs)
 
   (* Override methods to keep implementations light *)
   let clear _ = empty ()

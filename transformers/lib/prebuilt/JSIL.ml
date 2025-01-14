@@ -62,13 +62,12 @@ module MoveInToOut (S : States.MyMonadicSMemory.S) :
         let** s', outs = S.consume pred s [] in
         match outs with
         | [ out' ] ->
-            if%ent Formula.Infix.(out #== out') then Delayed_result.ok (s', [])
+            if%ent Expr.Infix.(out == out') then Delayed_result.ok (s', [])
             else
-              failwith
-                (Fmt.str
-                   "Mismatch in domainset (Props) consumption - got: %a, \
-                    expected %a"
-                   Expr.pp out' Expr.pp out)
+              Fmt.failwith
+                "Mismatch in domainset (Props) consumption - got: %a, expected \
+                 %a"
+                Expr.pp out' Expr.pp out
         | _ -> Delayed_result.ok (s', outs))
     | _ -> consume pred s ins
 end
