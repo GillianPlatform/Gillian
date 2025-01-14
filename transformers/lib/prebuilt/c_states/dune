@@ -5,7 +5,7 @@
   states
   gillian
   gillian.ppx_sat.runtime
-  cgil_lib
+  gillian-c.cgil_lib
   compcert
   ppx_deriving_yojson.runtime
   printbox-text)
