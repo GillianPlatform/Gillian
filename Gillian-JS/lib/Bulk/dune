@@ -1,4 +1,3 @@
 (library
  (name cosetteRunner)
- (public_name gillian-js-libs.cosetteRunner)
  (libraries js2jsil_lib gillian.alcotest-runner semantics str))

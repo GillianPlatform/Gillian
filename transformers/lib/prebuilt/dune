@@ -6,8 +6,8 @@
   c_states
   gillian
   gillian.ppx_sat.runtime
-  gillian-js-libs.js2jsil_lib
-  gillian-js-libs.semantics
+  gillian-js.js2jsil_lib
+  semantics
   cgil_lib
   ppx_deriving_yojson.runtime)
  (preprocess

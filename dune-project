@@ -70,18 +70,6 @@
  (synopsis "Gillian instantiation for JavaScript"))
 
 (package
- (name gillian-js-libs)
- (sites
-  (share runtime))
- (depends
-  dune-site
-  flow_parser
-  fpath
-  (gillian
-   (= :version)))
- (synopsis "Gillian instantiation for JavaScript (LIBS)"))
-
-(package
  (name gillian-c)
  (sites
   (share runtime)
