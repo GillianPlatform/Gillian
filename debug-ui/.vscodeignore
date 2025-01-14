@@ -8,13 +8,3 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
-node_modules
-!node_modules/vscode-codicons/dist/codicon.css
-!node_modules/vscode-codicons/dist/codicon.ttf
-.parcel-cache
-tailwind.config.json
-webpack.config.js
-screenshots
-examples
-**/*.config.js
-tsconfig-webview.json

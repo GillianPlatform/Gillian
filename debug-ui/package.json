@@ -3,24 +3,20 @@
   "publisher": "gillianplatform",
   "displayName": "Gillian Debugger",
   "icon": "gillian-debugging.png",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Debugger for Gillian.",
   "author": {
     "name": "Verified Trustworthy Software Specification Group at Imperial College",
     "url": "https://vtss.doc.ic.ac.uk"
   },
-  "homepage": "GillianDev.github.io",
+  "homepage": "gillianplatform.github.io",
   "license": "BSD-3-Clause",
-  "keywords": [
-    "multi-root ready"
-  ],
   "engines": {
-    "vscode": "^1.54.0"
+    "vscode": "^1.96.0"
   },
   "categories": [
     "Debuggers"
   ],
-  "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/GillianPlatform/Gillian.git"
@@ -28,92 +24,31 @@
   "bugs": {
     "url": "https://github.com/GillianPlatform/Gillian/issues"
   },
+  "main": "./out/extension.js",
   "scripts": {
-    "extension:build": "webpack",
-    "extension:watch": "tsc --watch --preserveWatchOutput -p ./",
-    "webview:build": "TAILWIND_MODE='build' snowpack build",
-    "webview:watch": "nodemon --watch src/webviews/ -e 'ts,tsx,css' --exec snowpack build",
-    "build": "run-s extension:build webview:build",
-    "watch": "run-p extension:watch webview:watch",
-    "clean": "rm -rf out dist",
-    "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write **/*.ts **/*.tsx",
-    "vscode:prepublish": "run-s clean build"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@babel/core": "^7.13.14",
-    "@babel/plugin-proposal-class-properties": "^7.13.0",
-    "@babel/plugin-transform-runtime": "^7.13.10",
-    "@babel/preset-env": "^7.13.12",
-    "@babel/preset-typescript": "^7.13.0",
-    "@snowpack/plugin-dotenv": "^2.0.5",
-    "@snowpack/plugin-postcss": "^1.2.1",
-    "@snowpack/plugin-typescript": "^1.2.1",
-    "@types/lodash-es": "^4.17.4",
-    "@types/node": "^12.12.0",
-    "@types/react": "^17.0.3",
-    "@types/react-dom": "^17.0.2",
-    "@types/snowpack-env": "^2.3.3",
-    "@types/tailwindcss": "^2.0.2",
-    "@types/vscode": "^1.54.0",
-    "@typescript-eslint/eslint-plugin": "^4.16.0",
-    "@typescript-eslint/parser": "^4.16.0",
-    "autoprefixer": "^10.2.5",
-    "babel-loader": "^8.2.2",
-    "eslint": "^7.21.0",
-    "eslint-plugin-react": "^7.30.0",
-    "nodemon": "^2.0.7",
-    "npm-run-all": "^4.1.5",
-    "postcss": "^8.4.5",
-    "prettier": "^2.2.1",
-    "snowpack": "^3.1.0",
-    "tailwindcss": "^3.0.17",
-    "ts-loader": "^8.1.0",
-    "typescript": "^4.2.2",
-    "webpack": "^5.30.0",
-    "webpack-cli": "^4.6.0"
-  },
-  "dependencies": {
-    "@radix-ui/react-dropdown-menu": "^0.0.17",
-    "@reach/combobox": "^0.16.5",
-    "@tippyjs/react": "^4.2.6",
-    "@types/isomorphic-fetch": "^0.0.35",
-    "@vscode/codicons": "^0.0.30",
-    "@vscode/debugadapter": "^1.55.1",
-    "@vscode/webview-ui-toolkit": "^0.9.0",
-    "allotment": "^1.14.2",
-    "cronstrue": "^1.123.0",
-    "immer": "^9.0.1",
-    "isomorphic-fetch": "^3.0.0",
-    "lodash-es": "^4.17.21",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
-    "react-error-boundary": "^3.1.4",
-    "react-flow-renderer": "^10.3.5",
-    "ts-debounce": "^3.0.0",
-    "yup": "^0.32.9",
-    "zod": "^3.0.0-alpha.33",
-    "zustand": "^3.3.3"
-  },
-  "main": "./out/extension.js",
-  "extensionDependencies": [
-    "gillian.code-gillian"
-  ],
-  "babel": {
-    "presets": [
-      "@babel/preset-env",
-      "@babel/preset-typescript"
-    ],
-    "plugins": [
-      "@babel/plugin-proposal-class-properties",
-      "@babel/plugin-transform-runtime"
-    ]
+    "@sedap/types": "github:GillianPlatform/sedap-ts#c010500efaab8f656655c3e005981c2637973dce",
+    "@types/vscode": "^1.96.0",
+    "@types/glob": "^7.2.0",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "14.x",
+    "@typescript-eslint/eslint-plugin": "^5.21.0",
+    "@typescript-eslint/parser": "^5.21.0",
+    "eslint": "^8.14.0",
+    "glob": "^8.0.1",
+    "mocha": "^9.2.2",
+    "typescript": "^4.6.4",
+    "@vscode/test-electron": "^2.1.3"
   },
   "activationEvents": [
     "onDebugDynamicConfigurations:gillian",
     "onCommand:extension.gillian-debug.getProgramName",
-    "onCommand:extension.gillian-debug.runEditorContents",
-    "onCommand:extension.gillian-debug.debugEditorContents",
     "onLanguage:javascript",
     "onLanguage:gil",
     "onLanguage:wisl",

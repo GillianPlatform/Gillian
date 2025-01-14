@@ -1,0 +1,57 @@
+{
+	"folders": [
+		{
+			"name": "Gillian Core",
+			"path": "GillianCore"
+		},
+		{
+			"name": "WISL",
+			"path": "wisl"
+		},
+		{
+			"name": "Gillian-C",
+			"path": "Gillian-C"
+		},
+		{
+			"name": "Gillian-JS",
+			"path": "Gillian-JS"
+		},
+		{
+			"name": "Gillian-C2",
+			"path": "Gillian-C2"
+		},
+		{
+			"name": "Debugger Extension",
+			"path": "debug-ui",
+		},
+		{
+			"name": "Debugger UI",
+			"path": "debug-ui/web"
+		},
+		{
+			"name": "Gillian (root)",
+			"path": "."
+		},
+	],
+	"settings": {
+		"files.associations": {
+			"stdlib.h": "c",
+			"stdio.h": "c",
+			"slist.h": "c",
+			"algorithm": "c",
+			"__bit_reference": "cpp",
+			"__string": "cpp",
+			"cstring": "cpp",
+			"tuple": "c",
+			"string.h": "c",
+			"random": "c",
+			"ranges": "c",
+			"base.h": "c"
+		},
+		"ocaml.sandbox": {
+			"kind": "opam",
+			"switch": "${workspaceFolder:Gillian (root)}"
+		},
+		"typescript.tsc.autoDetect": "off"
+	}
+}

@@ -2,40 +2,35 @@
 
 import * as vscode from 'vscode';
 import {
-  WorkspaceFolder,
-  DebugConfiguration,
-  ProviderResult,
   CancellationToken,
+  DebugConfiguration,
+  Disposable,
+  ProviderResult,
+  WorkspaceFolder,
 } from 'vscode';
-
-import { startDebugging } from './commands';
-import { BranchCase, DebuggerState, MatchMap } from './types';
-import { WebviewPanel } from './WebviewPanel';
+import { DEBUG_TYPE } from './consts';
+import SEDAPSession from './sedap/SEDAPSession';
+import { getWebviewHtml } from './webviewHtml';
 
 type LogEvent = {
   msg: string;
   json: any;
 };
 
-type Disposable = {
-  dispose(): any;
-};
+const sessions: Record<string, SEDAPSession> = {};
 
 function handleCustomDebugEvent({
+  session,
   body,
   event,
 }: vscode.DebugSessionCustomEvent) {
-  if (event === 'log') {
+  if (session.type === DEBUG_TYPE && event === 'log') {
     const { msg, json } = body as LogEvent;
     if (Object.keys(json).length === 0) {
       console.log(`<D> ${msg}`);
     } else {
       console.log(`<D> ${msg}`, json);
     }
-  } else if (event === 'debugStateUpdate') {
-    WebviewPanel.currentPanel?.updateState(body as DebuggerState);
-  } else {
-    console.error(`Unhandled custom event '${event}'`);
   }
 }
 
@@ -44,58 +39,70 @@ export function activateDebug(
   factory: vscode.DebugAdapterDescriptorFactory
 ) {
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'extension.gillian-debug.runEditorContents',
-      (resource: vscode.Uri) => {
-        let targetResource = resource;
-        if (!targetResource && vscode.window.activeTextEditor) {
-          targetResource = vscode.window.activeTextEditor.document.uri;
-        }
-        if (targetResource) {
-          startDebugging({
-            type: 'gillian',
-            name: 'Run File',
-            request: 'launch',
-            program: targetResource.fsPath,
-            execMode: 'debugverify',
-          });
-        }
+    // vscode.commands.registerCommand(
+    //   'extension.gillian-debug.runEditorContents',
+    //   (resource: vscode.Uri) => {
+    //     let targetResource = resource;
+    //     if (!targetResource && vscode.window.activeTextEditor) {
+    //       targetResource = vscode.window.activeTextEditor.document.uri;
+    //     }
+    //     if (targetResource) {
+    //       startDebugging({
+    //         type: DEBUG_TYPE,
+    //         name: 'Run File',
+    //         request: 'launch',
+    //         program: targetResource.fsPath,
+    //         execMode: 'debugverify',
+    //       });
+    //     }
+    //   }
+    // ),
+    // vscode.commands.registerCommand(
+    //   'extension.gillian-debug.debugEditorContents',
+    //   (resource: vscode.Uri) => {
+    //     let targetResource = resource;
+    //     if (!targetResource && vscode.window.activeTextEditor) {
+    //       targetResource = vscode.window.activeTextEditor.document.uri;
+    //     }
+    //     if (targetResource) {
+    //       startDebugging({
+    //         type: DEBUG_TYPE,
+    //         name: 'Debug File',
+    //         request: 'launch',
+    //         program: targetResource.fsPath,
+    //         execMode: 'debugverify',
+    //       });
+    //     }
+    //   }
+    // ),
+    vscode.debug.onDidStartDebugSession(session => {
+      if (session.type !== DEBUG_TYPE) {
+        return;
       }
-    ),
-    vscode.commands.registerCommand(
-      'extension.gillian-debug.debugEditorContents',
-      (resource: vscode.Uri) => {
-        let targetResource = resource;
-        if (!targetResource && vscode.window.activeTextEditor) {
-          targetResource = vscode.window.activeTextEditor.document.uri;
-        }
-        if (targetResource) {
-          startDebugging({
-            type: 'gillian',
-            name: 'Debug File',
-            request: 'launch',
-            program: targetResource.fsPath,
-            execMode: 'debugverify',
-          });
-        }
-      }
-    ),
+      const sedapSession = new SEDAPSession({
+        panelName: 'Gillian Debugging',
+        session,
+        getWebviewHtml: getWebviewHtml(context),
+      });
+      sessions[session.id] = sedapSession;
+      sedapSession.showWebviewPanel();
+      sedapSession.onDispose(() => {
+        delete sessions[session.id];
+      });
+    }),
     vscode.commands.registerCommand(
       'extension.gillian-debug.showDebuggerWebview',
       () => {
-        WebviewPanel.render(context.extensionUri);
+        Object.values(sessions).forEach(s => s.showWebviewPanel());
       }
     ),
-    vscode.debug.onDidStartDebugSession(() => {
-      WebviewPanel.render(context.extensionUri);
-    }),
     vscode.debug.onDidReceiveDebugSessionCustomEvent(handleCustomDebugEvent)
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'extension.gillian-debug.getProgramName',
-      config => {
+      () => {
         return vscode.window.showInputBox({
           placeHolder: 'Please enter the name of a file',
         });
@@ -103,18 +110,13 @@ export function activateDebug(
     )
   );
 
-  // register a configuration provider for 'gillian' debug type
+  // register a configuration provider for our debug type
   const provider = new ConfigurationProvider();
   context.subscriptions.push(
-    vscode.debug.registerDebugConfigurationProvider('gillian', provider)
+    vscode.debug.registerDebugConfigurationProvider(DEBUG_TYPE, provider),
+    vscode.debug.registerDebugAdapterDescriptorFactory(DEBUG_TYPE, factory),
+    ...('dispose' in factory ? [factory as Disposable] : []),
   );
-
-  context.subscriptions.push(
-    vscode.debug.registerDebugAdapterDescriptorFactory('gillian', factory)
-  );
-  if ('dispose' in factory) {
-    context.subscriptions.push(factory as unknown as Disposable);
-  }
 }
 
 class ConfigurationProvider implements vscode.DebugConfigurationProvider {
@@ -131,7 +133,7 @@ class ConfigurationProvider implements vscode.DebugConfigurationProvider {
     if (!config.type && !config.request && !config.name) {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
-        config.type = 'gillian';
+        config.type = DEBUG_TYPE;
         config.name = 'Launch';
         config.request = 'launch';
         config.program = '${file}';
@@ -148,69 +150,5 @@ class ConfigurationProvider implements vscode.DebugConfigurationProvider {
     }
 
     return config;
-  }
-}
-
-export async function getDebuggerState() {
-  const session = vscode.debug.activeDebugSession;
-  if (session !== undefined) {
-    const state: DebuggerState = await session.customRequest('debuggerState');
-    return state;
-  }
-}
-
-export async function getMatch(
-  id: number
-): Promise<[number, MatchMap] | undefined> {
-  const session = vscode.debug.activeDebugSession;
-  if (session !== undefined) {
-    const result = await session.customRequest('matching', { id });
-    const { matchId, matchMap } = result;
-    return [matchId, matchMap];
-  }
-}
-
-export async function jumpToCmd(id: number) {
-  const session = vscode.debug.activeDebugSession;
-  if (session !== undefined) {
-    console.log('Requesting jump', {
-      id,
-    });
-    const result = await session.customRequest('jump', {
-      id,
-    });
-    if (!result.success) {
-      vscode.window.showErrorMessage(result.err || 'jumpToCmd: unknown error');
-    }
-  }
-}
-
-export async function execSpecificCmd(
-  prevId: number,
-  branchCase: BranchCase | null
-) {
-  const session = vscode.debug.activeDebugSession;
-  if (session !== undefined) {
-    console.log('Requesting step specific', {
-      prevId,
-      branchCase,
-    });
-    const result = await session.customRequest('stepSpecific', {
-      prevId,
-      branchCase,
-    });
-    if (!result.success) {
-      vscode.window.showErrorMessage(result.err || 'help');
-    }
-  }
-}
-
-export async function startProc(procName: string) {
-  const session = vscode.debug.activeDebugSession;
-  if (session !== undefined) {
-    const result = await session.customRequest('startProc', { procName });
-    if (!result.success) {
-      vscode.window.showErrorMessage(result.err || 'startProc: unknown error');
-    }
   }
 }
