@@ -9,7 +9,7 @@ fmt:
 	opam exec -- dune fmt
 
 deps:
-	opam exec -- dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam
+	opam exec -- dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam transformers.opam
 	opam install . -y --deps-only
 
 init-dev:
@@ -21,7 +21,7 @@ init-ci:
 	opam install $(shell echo ${BUILD_PACKAGES} | tr ',' ' ') -y
 
 uninstall:
-	opam remove gillian gillian-c gillian-js wisl gillian-c2 -y
+	opam remove gillian gillian-c gillian-js wisl gillian-c2 transformers -y
 
 watch:
 	opam exec -- dune build --watch

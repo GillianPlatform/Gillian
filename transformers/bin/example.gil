@@ -1,0 +1,175 @@
+(* A simple list algorithm, for a linear heap.
+   To verify this code, use the following transformer stack:
+   OpenPMap (IntegerIndex) (Freeable (Exclusive)) *)
+
+pred sll(+x, vs: List) :
+    (* empty list *)
+    (x == null) * (vs == {{  }}),
+    (* non-empty list *)
+    (x == #h) * (vs == l+ ({{ #v }}, #vs)) *
+    <ex>(#h; #v) * <ex>(#h i+ 1i; #next) *
+    sll(#next, #vs);
+
+spec alloc_node(v)
+    [[ v == #v ]]
+    [[ sll(ret, {{ #v }}) ]]
+    normal
+proc alloc_node(v) {
+    c1 := [alloc]();
+    c1 := l-nth(c1, 0i);
+    c2 := [alloc]();
+    c2 := l-nth(c2, 0i);
+    x := [store](c1, v);
+    x := [store](c2, null);
+    ret := c1;
+    return
+};
+
+spec append(h, v)
+    [[ (h == #h) * (v == #v) * sll(#h, #vs) ]]
+    [[ (ret == #h2) * sll(#h2, l+ (#vs, {{ #v }})) ]]
+    normal
+proc append(h, v) {
+    goto [h = null] then0 else0;
+
+then0:
+    ret := "alloc_node"(v);
+    goto end;
+
+else0:
+    next := [load](h i+ 1i);
+    next := l-nth(next, 1i);
+    h_new := "append"(next, v);
+    x := [store](h i+ 1i, h_new);
+    ret := h;
+
+end:
+    return
+};
+
+spec prepend(h, v)
+    [[ (h == #h) * (v == #v) * sll(#h, #vs) ]]
+    [[ (ret == #h2) * sll(#h2, l+ ({{ #v }}, #vs)) ]]
+    normal
+proc prepend(h, v) {
+    ret := "alloc_node"(v);
+    x := [store](ret i+ 1i, h);
+    return
+};
+
+spec length(h)
+    [[ (h == #h) * sll(#h, #vs) ]]
+    [[ (ret == (l-len #vs)) * sll(#h, #vs) ]]
+    normal
+proc length(h) {
+    goto [h = null] then0 else0;
+
+then0:
+    ret := 0i;
+    goto end;
+
+else0:
+    next := [load](h i+ 1i);
+    next := l-nth(next, 1i);
+    ret := "length"(next);
+    ret := ret i+ 1i;
+    goto end;
+
+end:
+    return
+};
+
+spec concat(h1, h2)
+    [[ (h1 == #h1) * (h2 == #h2) * sll(#h1, #vs1) * sll(#h2, #vs2) ]]
+    [[ (ret == #h3) * sll(#h3, l+ (#vs1, #vs2)) ]]
+    normal
+proc concat(h1, h2) {
+    goto [h1 = null] then0 else0;
+
+then0:
+    ret := h2;
+    goto end;
+
+else0:
+    next := [load](h1 i+ 1i);
+    next := l-nth(next, 1i);
+    h_new := "concat"(next, h2);
+    x := [store](h1 i+ 1i, h_new);
+    ret := h1;
+
+end:
+    return
+};
+
+pred sll_member(+vs : List, +v, r : Bool) :
+    (vs == {{  }}) * (r == false), (* empty list *)
+    (vs == l+ ({{  v  }}, #vs2)) *   (r == true) * sll_member(#vs2, v, #etc), (* found a match *)
+    (vs == l+ ({{ #v2 }}, #vs2)) * (!(v == #v2)) * sll_member(#vs2, v, r); (* no match yet *)
+
+spec member(h, v)
+    [[ (h == #h) * (v == #v) * sll(#h, #vs) * sll_member(#vs, #v, #r) ]]
+    [[ (ret == #r) * sll(#h, #vs) * sll_member(#vs, #v, #r) ]]
+    normal
+proc member(h, v) {
+    goto [h = null] then0 else0;
+
+then0:
+    ret := false;
+    goto end;
+
+else0:
+    h_val := [load](h);
+    h_val := l-nth(h_val, 1i);
+    goto [h_val = v] then1 else1;
+
+then1:
+    ret := true;
+    goto end;
+
+else1:
+    next := [load](h i+ 1i);
+    next := l-nth(next, 1i);
+    ret := "member"(next, v);
+    goto end;
+
+end:
+    return
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+spec free_list(h)
+     [[ (h == #h) * sll(#h, #vs) ]]
+    [[ (ret == null) ]]
+    normal
+proc free_list(h) {
+    goto [h = null] then0 else0;
+
+then0:
+    ret := null;
+    goto end;
+
+else0:
+    next := [load](h i+ 1i);
+    next := l-nth(next, 1i);
+    x := "free_list"(next);
+    x := [free](h);
+    x := [free](h i+ 1i);
+    ret := null;
+
+end:
+    return
+};

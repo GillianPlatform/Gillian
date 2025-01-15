@@ -7,4 +7,5 @@
 
 (library
  (name parsing)
+ (public_name gillian-js.parsing)
  (libraries gillian jsil_syntax jslogic javert_utils str))
