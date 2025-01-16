@@ -798,7 +798,6 @@ let encode_bvop
     | BVConcat -> binop_encode bv_concat
     | BVExtract ->
         bv_extract (List.hd literals) (List.nth literals 1) (List.hd bvs)
-    | _ -> raise (Failure ("No encoding for bv op " ^ BVOps.str op))
   in
   Encoding.native (Gil_syntax.Type.BvType width) sexpr
 
