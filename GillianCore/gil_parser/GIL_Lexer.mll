@@ -197,6 +197,11 @@ rule read = parse
   | "bvuleq" { GIL_Parser.BVULEQ }
   | "bvslt" { GIL_Parser.BVSLT }
   | "bvsleq" { GIL_Parser.BVSLEQ }
+  | "bvsext" { GIL_Parser.BVSIGNEXTEND }
+  | "bvzext" { GIL_Parser.BVZEROEXTEND }
+  | "bvsdiv" { GIL_Parser.BVSDIV }
+  | "bvsmod" { GIL_Parser.BVSMOD }
+  | "bvashr" { GIL_Parser.BVASHR }
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
   | "$$max_float"        { GIL_Parser.MAX_FLOAT     }
