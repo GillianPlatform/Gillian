@@ -42,6 +42,9 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token BVSHL
 %token BVLSHR
 %token BVULT
+%token BVXOR
+%token BVSREM
+%token BVSUB
 
 (* Constants *)
 %token MIN_FLOAT
@@ -383,6 +386,9 @@ gbvintrinsic:
 | BVUREM { BVOps.BVUrem }
 | BVSHL { BVOps.BVShl }
 | BVLSHR { BVOps.BVLShr }
+| BVXOR { BVOps.BVXor }
+| BVSREM { BVOps.BVSrem }
+| BVSUB { BVOps.BVSub }
 
 gbvformintrinsic:
   | BVULT { BVPred.BVUlt }

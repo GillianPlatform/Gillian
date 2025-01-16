@@ -190,6 +190,9 @@ rule read = parse
   | "bvsmulo" { GIL_Parser.BVSMULO }
   | "bvshl" { GIL_Parser.BVSHL }
   | "bvlshr" { GIL_Parser.BVLSHR }
+  | "bvxor" {GIL_Parser.BVXOR }
+  | "bvsrem" { GIL_Parser.BVSREM }
+  | "bvsub" { GIL_Parser.BVSUB }
   | "bvult" { GIL_Parser.BVULT }
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
