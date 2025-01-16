@@ -65,5 +65,10 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.return
           (Exception_info_command.Result.make ~exception_id ~description
              ~break_mode ()));
+    DL.set_rpc_command_handler rpc ~name:"Get full map"
+      (module Get_full_map_command)
+      (fun _ ->
+        let full_map = Debugger.Inspect.get_full_map dbg in
+        Lwt.return full_map);
     Lwt.return ()
 end

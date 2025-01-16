@@ -4,6 +4,7 @@ module type S = sig
 
   module Inspect : sig
     val get_map_update : t -> Sedap_types.Map_update_event.Payload.t
+    val get_full_map : t -> Sedap_types.Map_update_event.Payload.t
     val dump_state : t -> Yojson.Safe.t
   end
 

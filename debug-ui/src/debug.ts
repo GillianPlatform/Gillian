@@ -32,6 +32,7 @@ function handleCustomDebugEvent({
       console.log(`<D> ${msg}`, json);
     }
   }
+  console.log('Custom debug event', { session, body, event });
 }
 
 export function activateDebug(
@@ -79,8 +80,10 @@ export function activateDebug(
       if (session.type !== DEBUG_TYPE) {
         return;
       }
+      const panelIcon = vscode.Uri.joinPath(context.extensionUri, 'gillian.svg');
       const sedapSession = new SEDAPSession({
         panelName: 'Gillian Debugging',
+        panelIcon,
         session,
         getWebviewHtml: getWebviewHtml(context),
       });

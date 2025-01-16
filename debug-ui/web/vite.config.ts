@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    minify: false,
+    // minify: !process.env.DEV_MODE,
     rollupOptions: {
       output: {
         entryFileNames: `[name].js`,

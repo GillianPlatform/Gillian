@@ -5,22 +5,26 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build-dev": "tsc -b && vite build --mode development",
+    "build": "tsc --build && vite build",
+    "watch:tsc": "tsc --build --watch --preserveWatchOutput",
+    "watch:vite": "vite build --watch",
+    "watch": "concurrently -n tsc,vite -c cyan,green \"npm run watch:tsc\" \"npm run watch:vite\"",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@sedap/react": "github:GillianPlatform/sedap-react#52352ac6f52f9ab3b353e021ea9c4dc493efa94a"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@sedap/types": "github:GillianPlatform/sedap-ts#57b9f2ff7ef3ea186af46df3437ae4852599331f",
-    "@sedap/react": "github:GillianPlatform/sedap-react#52352ac6f52f9ab3b353e021ea9c4dc493efa94a",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/vscode-webview": "^1.57.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",

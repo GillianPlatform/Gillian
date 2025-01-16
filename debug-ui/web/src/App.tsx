@@ -1,24 +1,35 @@
-import { useState } from 'react'
 import './App.css'
+import { TraceView } from '@sedap/react';
+import { useMapState } from './mapState';
+
+function isEmpty(obj: Record<string, unknown>) {
+  for (const prop in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+      return false;
+    }
+  }
+
+  return true
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { roots, nodes } = useMapState();
+
+  const root = Object.values(roots)[0];
+
+  let body = (
+    <b><i>Empty map!</i></b>
+  );
+  if (!isEmpty(roots) && !isEmpty(nodes)) {
+    body = (
+      <TraceView {...{root, nodes}} />
+    );
+  }
 
   return (
-    <>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div style={{height: '100vh', width: '100vw'}}>
+      {body}
+    </div>
   )
 }
 

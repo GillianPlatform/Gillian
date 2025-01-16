@@ -339,6 +339,14 @@ struct
         | Some node -> convert_node id node state
         | None -> Hashtbl.remove_all state.debug_state.all_nodes id
 
+      let get_all_nodes state =
+        let { all_nodes; _ } = state.debug_state in
+        let seq =
+          all_nodes |> Hashtbl.to_seq
+          |> Seq.map (fun (k, v) -> (show_id k, Some v))
+        in
+        String_map.add_seq seq String_map.empty
+
       let get_changed_nodes state =
         let { changed_nodes; all_nodes; _ } = state.debug_state in
         let nodes =
@@ -371,6 +379,12 @@ struct
         let roots = Some (get_roots state) in
         let current_steps = Some (get_current_steps state) in
         Map_update_event_body.make ~nodes ~roots ~current_steps ()
+
+      let get_full_map state =
+        let nodes = get_all_nodes state in
+        let roots = Some (get_roots state) in
+        let current_steps = Some (get_current_steps state) in
+        Map_update_event_body.make ~reset:true ~nodes ~roots ~current_steps ()
 
       type debug_proc_state_view = {
         lifter_state : Yojson.Safe.t; [@key "lifterState"]
