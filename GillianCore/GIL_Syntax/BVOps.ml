@@ -11,6 +11,9 @@ type t = TypeDef__.bvop =
   | BVUrem
   | BVShl
   | BVLShr
+  | BVXor
+  | BVSrem
+  | BVSub
 [@@deriving eq, ord]
 
 let str (x : t) =
@@ -27,6 +30,9 @@ let str (x : t) =
   | BVUrem -> "bvurem"
   | BVShl -> "bvshl"
   | BVLShr -> "bvlshr"
+  | BVXor -> "bvxor"
+  | BVSrem -> "bvsrem"
+  | BVSub -> "bvsub"
 
 let to_yojson = TypeDef__.bvop_to_yojson
 let of_yojson = TypeDef__.bvop_of_yojson

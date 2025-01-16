@@ -796,6 +796,9 @@ let encode_bvop
     | BVOps.BVShl -> binop_encode bv_shl
     | BVOps.BVLShr -> binop_encode bv_lshr
     | BVConcat -> binop_encode bv_concat
+    | BVXor -> binop_encode bv_xor
+    | BVSrem -> binop_encode bv_srem
+    | BVSub -> binop_encode bv_sub
     | BVExtract ->
         bv_extract (List.hd literals) (List.nth literals 1) (List.hd bvs)
   in

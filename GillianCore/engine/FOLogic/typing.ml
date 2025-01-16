@@ -162,7 +162,10 @@ module Infer_types_to_gamma = struct
       | BVOr
       | BVUrem
       | BVShl
-      | BVLShr ->
+      | BVLShr
+      | BVXor
+      | BVSrem
+      | BVSub ->
           Some ([ BvType width; BvType width ], no_lits_constraint, BvType width)
       | BVConcat -> (
           let x1 = List.nth_opt es 0 in
@@ -520,6 +523,9 @@ module Type_lexpr = struct
         | BVLShr
         | BVUrem
         | BVUDiv
+        | BVXor
+        | BVSrem
+        | BVSub
         | BVMul
         | BVPlus
         | BVAnd

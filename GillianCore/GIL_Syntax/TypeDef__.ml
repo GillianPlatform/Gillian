@@ -146,6 +146,9 @@ and bvop =
   | BVUrem
   | BVShl
   | BVLShr
+  | BVXor
+  | BVSrem
+  | BVSub
 
 and bv_arg = Literal of int | BvExpr of (expr * int)
 
