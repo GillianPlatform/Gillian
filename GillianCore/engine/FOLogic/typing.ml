@@ -165,6 +165,9 @@ module Infer_types_to_gamma = struct
       | BVLShr
       | BVXor
       | BVSrem
+      | BVSmod
+      | BVAshr
+      | BVSdiv
       | BVSub ->
           Some ([ BvType width; BvType width ], no_lits_constraint, BvType width)
       | BVConcat -> (
@@ -193,7 +196,16 @@ module Infer_types_to_gamma = struct
                     BvType (i0 - i2 + 1) )
               else None
           | _ -> None)
+      | BVZeroExtend | BVSignExtend -> (
+          let x1 = List.nth_opt es 0 in
+          let x2 = List.nth_opt es 1 in
+          match (x1, x2) with
+          | Some (Expr.Literal i0), Some (Expr.BvExpr (_, w)) ->
+              Some
+                ([ BvType w ], (fun lts -> List.length lts = 1), BvType (w + i0))
+          | _ -> None)
     in
+
     Option.map
       (fun (type_list, handler, res_ty) ->
         let params_typed =
@@ -530,7 +542,12 @@ module Type_lexpr = struct
         | BVPlus
         | BVAnd
         | BVOr
-        | BVConcat -> 2
+        | BVConcat
+        | BVAshr
+        | BVSdiv
+        | BVSmod
+        | BVSignExtend
+        | BVZeroExtend -> 2
         | BVExtract -> 3)
     in
     let pars =
