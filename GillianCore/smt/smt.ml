@@ -774,6 +774,20 @@ let encode_quantified_expr
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
+(*
+  
+    | BVConcat
+  | BVExtract
+  | BVNot
+  | BVAnd
+  | BVOr
+  | BVNeg
+  | BVPlus
+  | BVMul
+  | BVUDiv
+  | BVUrem
+  | BVShl
+  | BVLShr*)
 let encode_bvop
     (op : BVOps.t)
     (literals : int list)
@@ -786,6 +800,12 @@ let encode_bvop
     match op with
     | BVOps.BVPlus -> binop_encode bv_add
     | BVOps.BVAnd -> binop_encode bv_and
+    | BVOps.BVOr -> binop_encode bv_or
+    | BVOps.BVMul -> binop_encode bv_mul
+    | BVOps.BVUDiv -> binop_encode bv_udiv
+    | BVOps.BVUrem -> binop_encode bv_urem
+    | BVOps.BVShl -> binop_encode bv_shl
+    | BVOps.BVLShr -> binop_encode bv_lshr
     | BVConcat -> binop_encode bv_concat
     | BVExtract ->
         bv_extract (List.hd literals) (List.nth literals 1) (List.hd bvs)
