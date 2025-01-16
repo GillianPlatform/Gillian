@@ -194,6 +194,9 @@ rule read = parse
   | "bvsrem" { GIL_Parser.BVSREM }
   | "bvsub" { GIL_Parser.BVSUB }
   | "bvult" { GIL_Parser.BVULT }
+  | "bvuleq" { GIL_Parser.BVULEQ }
+  | "bvslt" { GIL_Parser.BVSLT }
+  | "bvsleq" { GIL_Parser.BVSLEQ }
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
   | "$$max_float"        { GIL_Parser.MAX_FLOAT     }
