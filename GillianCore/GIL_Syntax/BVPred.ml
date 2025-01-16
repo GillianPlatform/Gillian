@@ -1,5 +1,8 @@
 type t = TypeDef__.bvpred =
   | BVUlt
+  | BVUleq
+  | BVSlt
+  | BVSleq
   | BVUMulO
   | BVSMulO
   | BVNegO
@@ -10,6 +13,9 @@ type t = TypeDef__.bvpred =
 let str (x : t) =
   match x with
   | BVUlt -> "bvult"
+  | BVUleq -> "bvuleq"
+  | BVSlt -> "bvslt"
+  | BVSleq -> "bvsleq"
   | BVUMulO -> "bvumulo"
   | BVSMulO -> "bvsmulo"
   | BVNegO -> "bvnego"

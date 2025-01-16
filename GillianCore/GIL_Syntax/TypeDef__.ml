@@ -131,7 +131,17 @@ and unop =
   | IsInt
 
 and nop = LstCat | SetUnion | SetInter
-and bvpred = BVUlt | BVUMulO | BVSMulO | BVNegO | BVUAddO | BVSAddO
+
+and bvpred =
+  | BVUlt
+  | BVUleq
+  | BVSlt
+  | BVSleq
+  | BVUMulO
+  | BVSMulO
+  | BVNegO
+  | BVUAddO
+  | BVSAddO
 
 and bvop =
   | BVConcat

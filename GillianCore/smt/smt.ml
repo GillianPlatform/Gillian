@@ -812,6 +812,9 @@ let encode_bv_assertion (op : BVPred.t) (_literals : int list) (bvs : sexp list)
   let sexpr =
     match op with
     | BVPred.BVUlt -> binop_encode bv_ult
+    | BVPred.BVUleq -> binop_encode bv_uleq
+    | BVPred.BVSlt -> binop_encode bv_slt
+    | BVPred.BVSleq -> binop_encode bv_sleq
     | _ -> raise (Failure ("No encoding for bv op " ^ BVPred.str op))
   in
   Encoding.native Gil_syntax.Type.BooleanType sexpr
