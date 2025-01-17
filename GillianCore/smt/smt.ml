@@ -820,7 +820,11 @@ let encode_bv_assertion (op : BVPred.t) (_literals : int list) (bvs : sexp list)
     | BVPred.BVUleq -> binop_encode bv_uleq
     | BVPred.BVSlt -> binop_encode bv_slt
     | BVPred.BVSleq -> binop_encode bv_sleq
-    | _ -> raise (Failure ("No encoding for bv op " ^ BVPred.str op))
+    | BVPred.BVNegO -> bv_nego (List.hd bvs)
+    | BVPred.BVUMulO -> binop_encode bv_umulo
+    | BVPred.BVSMulO -> binop_encode bv_smulo
+    | BVPred.BVUAddO -> binop_encode bv_uaddo
+    | BVPred.BVSAddO -> binop_encode bv_saddo
   in
   Encoding.native Gil_syntax.Type.BooleanType sexpr
 
