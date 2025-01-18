@@ -170,7 +170,7 @@ and expr =
   | PVar of string
   | LVar of string
   | ALoc of string
-  | BVExprIntrinsic of bvop * bv_arg list * int
+  | BVExprIntrinsic of bvop * bv_arg list * int option
   | UnOp of unop * expr
   | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr

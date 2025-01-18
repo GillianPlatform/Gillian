@@ -778,7 +778,7 @@ let encode_bvop
     (op : BVOps.t)
     (literals : int list)
     (bvs : sexp list)
-    (width : int) : Encoding.t =
+    (width : int option) : Encoding.t =
   let unop_encode (f : sexp -> sexp) = f (List.hd bvs) in
   let binop_encode (f : sexp -> sexp -> sexp) =
     f (List.hd bvs) (List.nth bvs 1)
@@ -816,7 +816,10 @@ let encode_bvop
     | BVOps.BVUAddO -> binop_encode bv_uaddo
     | BVOps.BVSAddO -> binop_encode bv_saddo
   in
-  Encoding.native (Gil_syntax.Type.BvType width) sexpr
+  Encoding.native
+    (Option.map (fun w -> Gil_syntax.Type.BvType w) width
+    |> Option.value ~default:Gil_syntax.Type.BooleanType)
+    sexpr
 
 let rec encode_logical_expression
     ~(gamma : typenv)

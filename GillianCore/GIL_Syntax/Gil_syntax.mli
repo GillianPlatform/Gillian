@@ -295,7 +295,7 @@ module Expr : sig
     | PVar of string  (** GIL program variables *)
     | LVar of string  (** GIL logical variables (interpreted symbols) *)
     | ALoc of string  (** GIL abstract locations (uninterpreted symbols) *)
-    | BVExprIntrinsic of BVOps.t * bv_arg list * int
+    | BVExprIntrinsic of BVOps.t * bv_arg list * int option
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)

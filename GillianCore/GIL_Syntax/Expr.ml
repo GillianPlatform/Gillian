@@ -6,7 +6,7 @@ type t = TypeDef__.expr =
   | PVar of string  (** GIL program variables  *)
   | LVar of LVar.t  (** GIL logical variables  *)
   | ALoc of string  (** GIL abstract locations *)
-  | BVExprIntrinsic of BVOps.t * bv_arg list * int
+  | BVExprIntrinsic of BVOps.t * bv_arg list * int option
   | UnOp of UnOp.t * t  (** Unary operators         *)
   | BinOp of t * BinOp.t * t  (** Binary operators        *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
@@ -43,7 +43,7 @@ let one_i = int_z Z.one
 let extract_bv_width (e : t) =
   match e with
   | Lit (LBitvector (_, w)) -> w
-  | BVExprIntrinsic (_, _, w) -> w
+  | BVExprIntrinsic (_, _, Some w) -> w
   | _ -> failwith "unrecoginized bitvector expression"
 
 let concat_single (little : t) (big : t) : t =
@@ -53,7 +53,7 @@ let concat_single (little : t) (big : t) : t =
   BVExprIntrinsic
     ( BVOps.BVConcat,
       [ BvExpr (big, big_size); BvExpr (little, little_size) ],
-      nwidth )
+      Some nwidth )
 
 let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
   List.fold_right f (List.tl list) (List.hd list)
@@ -67,7 +67,7 @@ let bv_extract (low_index : int) (high_index : int) (e : t) : t =
   BVExprIntrinsic
     ( BVOps.BVExtract,
       [ Literal high_index; Literal low_index; BvExpr (e, src_width) ],
-      nsize )
+      Some nsize )
 
 let bv_extract_between_sz (src : int) (dst : int) (e : t) : t =
   let src_width = extract_bv_width e in
@@ -466,9 +466,11 @@ let rec pp fmt e =
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
   | BVExprIntrinsic (op, es, w) ->
-      Fmt.pf fmt "%s(%a: %d)" (BVOps.str op)
+      Fmt.pf fmt "%s(%a: %a)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp_bv_arg)
-        es w
+        es
+        (Fmt.option ~none:Fmt.nop Fmt.int)
+        w
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->

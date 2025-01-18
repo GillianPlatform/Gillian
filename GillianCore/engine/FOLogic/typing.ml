@@ -147,14 +147,16 @@ module Infer_types_to_gamma = struct
       (new_gamma : Type_env.t)
       (op : BVOps.t)
       (es : Expr.bv_arg list)
-      (width : int)
+      (width : int option)
       (tt : Type.t) : bool =
     let no_lits_constraint lst = List.length lst = 0 in
 
     let opt =
       match op with
       | BVNot | BVNeg ->
-          Some ([ BvType width ], no_lits_constraint, BvType width)
+          Option.map
+            (fun w -> ([ BvType w ], no_lits_constraint, BvType w))
+            width
       | BVOps.BVPlus
       | BVOps.BVMul
       | BVOps.BVAnd
@@ -169,7 +171,9 @@ module Infer_types_to_gamma = struct
       | BVAshr
       | BVSdiv
       | BVSub ->
-          Some ([ BvType width; BvType width ], no_lits_constraint, BvType width)
+          Option.map
+            (fun w -> ([ BvType w; BvType w ], no_lits_constraint, BvType w))
+            width
       | BVConcat -> (
           let x1 = List.nth_opt es 0 in
           let x2 = List.nth_opt es 1 in
@@ -213,7 +217,10 @@ module Infer_types_to_gamma = struct
           type_bv_args_for_intrinsic flag gamma new_gamma type_list es handler
         in
         let rets_tped =
-          Type.equal res_ty (BvType width) && Type.equal tt res_ty
+          Type.equal res_ty
+            (Option.value ~default:BooleanType
+               (Option.map (fun w -> BvType w) width))
+          && Type.equal tt res_ty
         in
         rets_tped && params_typed)
       opt
@@ -525,7 +532,7 @@ module Type_lexpr = struct
       le
       (op : BVOps.t)
       (es : Expr.bv_arg list)
-      (width : int) =
+      (width : int option) =
     let f = f gamma in
     let infer_type = infer_type gamma in
     let arity =
@@ -562,7 +569,10 @@ module Type_lexpr = struct
         es
       |> List.for_all (fun x -> x)
     in
-    if pars && arity = List.length es then infer_type le (Type.BvType width)
+    if pars && arity = List.length es then
+      infer_type le
+        (Option.value ~default:Type.BooleanType
+           (Option.map (fun w -> Type.BvType w) width))
     else (None, false)
   (* Both expressions must be typable *)
 

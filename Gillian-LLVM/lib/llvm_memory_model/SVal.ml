@@ -125,7 +125,7 @@ module SVal = struct
                   Expr.Literal ub;
                   Expr.BvExpr (sval.value, size * 8);
                 ],
-                8 )
+                Some 8 )
           in
           Expr.BinOp (target_lvar, Equal, extracted))
     in

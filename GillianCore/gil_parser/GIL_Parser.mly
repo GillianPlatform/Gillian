@@ -493,8 +493,8 @@ muldiv_expr:
     { Expr.BinOp (e1, FMod, e2) }
   | e1 = muldiv_expr; ITIMES; e2 = unary_op_expr
     { Expr.BinOp (e1, ITimes, e2) }
-  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=INTEGER ; RBRACE
-    { Expr.BVExprIntrinsic(itname, es, Z.to_int width) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=option(INTEGER) ; RBRACE
+    { Expr.BVExprIntrinsic(itname, es, Option.map Z.to_int width) }
   | e1 = muldiv_expr; IDIV; e2 = unary_op_expr
     { Expr.BinOp (e1, IDiv, e2) }
   | e1 = muldiv_expr; IMOD; e2 = unary_op_expr
