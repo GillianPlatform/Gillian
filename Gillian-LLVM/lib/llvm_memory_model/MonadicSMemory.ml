@@ -790,8 +790,6 @@ let execute_genvsetdef heap params =
 
 (* Complete fixes  *)
 
-type c_fix_t = Nop
-
 (* Pretty printing utils *)
 
 let pp_c_fix _fmt _c_fix = failwith "Not ready for bi-abduction yet"
@@ -1022,8 +1020,7 @@ let get_failing_constraint e =
   Fmt.failwith "Not ready for bi-abduction yet: get_failing_constraint %a"
     pp_err e
 
-let get_fixes _heap _pfs _gamma err =
-  Fmt.failwith "unimplemented get_fix for %a" pp_err err
+let get_fixes err = Fmt.failwith "unimplemented get_fix for %a" pp_err err
 
 let apply_fix _heap fix =
   Fmt.failwith "Not ready for bi-abdcution: apply_fix %a" pp_c_fix fix
