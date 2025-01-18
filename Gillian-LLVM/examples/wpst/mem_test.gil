@@ -29,7 +29,7 @@ proc main() {
     a := [mem_store]("i-32", xptr, 0i, sum0);
     rtt_l := [mem_load]("i-32", xptr, 0i);
     rtt := l-nth(rtt_l, 0i);
-    assert((!(bvult(Bitvector(sum1, 32i), Bitvector(sum0, 32i)))));
+    assert((!(bvult(Bitvector(sum1, 32i), Bitvector(sum0, 32i):))));
     assert((rtt == sum1));
     ret := x;
     return
