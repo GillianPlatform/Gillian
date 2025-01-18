@@ -381,6 +381,18 @@ pred_head_target:
 (********* Expressions *********)
 (*******************************)
 
+
+gbvpred: 
+| BVULT { BVOps.BVUlt }
+| BVULEQ { BVOps.BVUleq }
+| BVSLT { BVOps.BVSlt }
+| BVSLEQ { BVOps.BVSleq }
+| BVUMULO { BVOps.BVUMulO }
+| BVSMULO { BVOps.BVSMulO }
+| BVNEGO { BVOps.BVNegO }
+| BVUADDO { BVOps.BVUAddO }
+| BVSADDO { BVOps.BVSAddO }
+
 gbvintrinsic:
 | BVCONCAT { BVOps.BVConcat }
 | BVEXTRACT { BVOps.BVExtract }
@@ -493,8 +505,6 @@ muldiv_expr:
     { Expr.BinOp (e1, FMod, e2) }
   | e1 = muldiv_expr; ITIMES; e2 = unary_op_expr
     { Expr.BinOp (e1, ITimes, e2) }
-  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=option(INTEGER) ; RBRACE
-    { Expr.BVExprIntrinsic(itname, es, Option.map Z.to_int width) }
   | e1 = muldiv_expr; IDIV; e2 = unary_op_expr
     { Expr.BinOp (e1, IDiv, e2) }
   | e1 = muldiv_expr; IMOD; e2 = unary_op_expr
@@ -587,7 +597,11 @@ implication_expr:
     { Expr.BinOp (e1, Impl, e2) }
 
 expr_target:
-    implication_expr { $1 }
+    | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=INTEGER ; RBRACE
+      { Expr.BVExprIntrinsic(itname, es, Some (Z.to_int width)) }
+    | itname=gbvpred; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON ; RBRACE
+      { Expr.BVExprIntrinsic(itname, es, None) }
+    | implication_expr { $1 }
 ;
 
 top_level_expr_target:
@@ -1224,46 +1238,6 @@ nop_target:
   | SETUNION { NOp.SetUnion }
   | SETINTER { NOp.SetInter }
   | LSTCAT   { NOp.LstCat   }
-;
-
-binop_target:
-  | EQ                  { BinOp.Equal }
-  | ILT                 { BinOp.ILessThan }
-  | ILE                 { BinOp.ILessThanEqual }
-  | IPLUS               { BinOp.IPlus }
-  | IMINUS              { BinOp.IMinus }
-  | ITIMES              { BinOp.ITimes }
-  | IDIV                { BinOp.IDiv }
-  | IMOD                { BinOp.IMod }
-  | FLT                 { BinOp.FLessThan }
-  | FLE                 { BinOp.FLessThanEqual }
-  | FPLUS               { BinOp.FPlus }
-  | FMINUS              { BinOp.FMinus }
-  | FTIMES              { BinOp.FTimes }
-  | FDIV                { BinOp.FDiv }
-  | FMOD                { BinOp.FMod }
-  | SLT                 { BinOp.SLessThan }
-  | AND                 { BinOp.BAnd }
-  | OR                  { BinOp.BOr }
-  | LIMPLIES            { BinOp.BImpl }
-  | BITWISEAND          { BinOp.BitwiseAnd }
-  | BITWISEOR           { BinOp.BitwiseOr}
-  | BITWISEXOR          { BinOp.BitwiseXor }
-  | LEFTSHIFT           { BinOp.LeftShift }
-  | SIGNEDRIGHTSHIFT    { BinOp.SignedRightShift }
-  | UNSIGNEDRIGHTSHIFT  { BinOp.UnsignedRightShift }
-  | BITWISEANDL         { BinOp.BitwiseAndL }
-  | BITWISEORL          { BinOp.BitwiseOrL }
-  | BITWISEXORL         { BinOp.BitwiseXorL }
-  | LEFTSHIFTL          { BinOp.LeftShiftL }
-  | SIGNEDRIGHTSHIFTL   { BinOp.SignedRightShiftL }
-  | UNSIGNEDRIGHTSHIFTL { BinOp.UnsignedRightShiftL }
-  | M_ATAN2             { BinOp.M_atan2 }
-  | M_POW               { BinOp.M_pow }
-  | STRCAT              { BinOp.StrCat }
-  | SETDIFF             { BinOp.SetDiff }
-  | SETMEM              { BinOp.BSetMem }
-  | SETSUB              { BinOp.BSetSub }
 ;
 
 unop_target:
