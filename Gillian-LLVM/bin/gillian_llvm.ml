@@ -9,7 +9,11 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
      and type memory_error = SMemory.err_t
      and type tl_ast = DummyParserAndCompiler.tl_ast
      and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-     and type annot = DummyParserAndCompiler.Annot.t = struct
+     and type annot = DummyParserAndCompiler.Annot.t
+     and type init_data = DummyParserAndCompiler.init_data
+     and type pc_err = DummyParserAndCompiler.err = struct
+  type pc_err = DummyParserAndCompiler.err
+  type init_data = unit
   type t = unit
   type memory = SMemory.t
   type memory_error = SMemory.err_t
@@ -78,6 +82,8 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
 
   let add_variables ~store:_ ~memory:_ ~is_gil_file:_ ~get_new_scope_id:_ _ =
     raise (Failure "unsupported")
+
+  let parse_and_compile_files ~entrypoint:_ fls = raise (Failure "unsupported")
 end
 
 module CLI =

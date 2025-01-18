@@ -806,27 +806,17 @@ let encode_bvop
     | BVSignExtend -> bv_sign_extend (List.hd literals) (List.hd bvs)
     | BVExtract ->
         bv_extract (List.hd literals) (List.nth literals 1) (List.hd bvs)
+    | BVOps.BVUlt -> binop_encode bv_ult
+    | BVOps.BVUleq -> binop_encode bv_uleq
+    | BVOps.BVSlt -> binop_encode bv_slt
+    | BVOps.BVSleq -> binop_encode bv_sleq
+    | BVOps.BVNegO -> bv_nego (List.hd bvs)
+    | BVOps.BVUMulO -> binop_encode bv_umulo
+    | BVOps.BVSMulO -> binop_encode bv_smulo
+    | BVOps.BVUAddO -> binop_encode bv_uaddo
+    | BVOps.BVSAddO -> binop_encode bv_saddo
   in
   Encoding.native (Gil_syntax.Type.BvType width) sexpr
-
-let encode_bv_assertion (op : BVPred.t) (_literals : int list) (bvs : sexp list)
-    =
-  let binop_encode (f : sexp -> sexp -> sexp) =
-    f (List.hd bvs) (List.nth bvs 1)
-  in
-  let sexpr =
-    match op with
-    | BVPred.BVUlt -> binop_encode bv_ult
-    | BVPred.BVUleq -> binop_encode bv_uleq
-    | BVPred.BVSlt -> binop_encode bv_slt
-    | BVPred.BVSleq -> binop_encode bv_sleq
-    | BVPred.BVNegO -> bv_nego (List.hd bvs)
-    | BVPred.BVUMulO -> binop_encode bv_umulo
-    | BVPred.BVSMulO -> binop_encode bv_smulo
-    | BVPred.BVUAddO -> binop_encode bv_uaddo
-    | BVPred.BVSAddO -> binop_encode bv_saddo
-  in
-  Encoding.native Gil_syntax.Type.BooleanType sexpr
 
 let rec encode_logical_expression
     ~(gamma : typenv)
@@ -886,71 +876,6 @@ let rec encode_logical_expression
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
-
-and encode_assertion
-    ~(gamma : typenv)
-    ~(llen_lvars : SS.t)
-    ~(list_elem_vars : SS.t)
-    (a : Formula.t) : Encoding.t =
-  let f = encode_assertion ~gamma ~llen_lvars ~list_elem_vars in
-  let fe = encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars in
-  let open Encoding in
-  match a with
-  | Not a ->
-      let>- a = f a in
-      get_bool a |> bool_not >- BooleanType
-  | Eq (le1, le2) -> encode_equality (fe le1) (fe le2)
-  | FLess (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_lt (get_num le1) (get_num le2) >- BooleanType
-  | FLessEq (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_leq (get_num le1) (get_num le2) >- BooleanType
-  | ILess (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_lt (get_int le1) (get_int le2) >- BooleanType
-  | ILessEq (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      num_leq (get_int le1) (get_int le2) >- BooleanType
-  | Impl (a1, a2) ->
-      let>- a1 = f a1 in
-      let>- a2 = f a2 in
-      bool_implies (get_bool a1) (get_bool a2) >- BooleanType
-  | StrLess (_, _) -> failwith "SMT encoding does not support STRLESS"
-  | True -> bool_k true >- BooleanType
-  | False -> bool_k false >- BooleanType
-  | Or (a1, a2) ->
-      let>- a1 = f a1 in
-      let>- a2 = f a2 in
-      bool_or (get_bool a1) (get_bool a2) >- BooleanType
-  | And (a1, a2) ->
-      let>- a1 = f a1 in
-      let>- a2 = f a2 in
-      bool_and (get_bool a1) (get_bool a2) >- BooleanType
-  | SetMem (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      set_member Z3 (simple_wrap le1) (get_set le2) >- BooleanType
-  | SetSub (le1, le2) ->
-      let>- le1 = fe le1 in
-      let>- le2 = fe le2 in
-      set_subset Z3 (get_set le1) (get_set le2) >- BooleanType
-  | ForAll (bt, a) ->
-      encode_quantified_expr ~encode_expr:encode_assertion ~mk_quant:forall
-        ~gamma ~llen_lvars ~list_elem_vars bt a
-  | IsInt e ->
-      let>- e = fe e in
-      num_divisible (get_num e) 1 >- BooleanType
-  | BVFormIntrinsic (op, es) ->
-      let extracted_es, extracted_lits = Expr.partition_bvargs es in
-      let widths = List.map (fun (_, w) -> w) extracted_es in
-      let>-- les = List.map (fun (e, _) -> fe e) extracted_es in
-      List.combine les widths |> List.map (fun (encoded, w) -> get_bv w encoded)
-      |> fun encodings -> encode_bv_assertion op extracted_lits encodings
 
 let encode_assertion_top_level
     ~(gamma : typenv)

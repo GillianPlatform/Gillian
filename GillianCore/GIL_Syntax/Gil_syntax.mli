@@ -199,15 +199,6 @@ module BVOps : sig
     | BVSdiv
     | BVSmod
     | BVAshr
-  [@@deriving yojson, eq]
-
-  (** Printer *)
-  val str : t -> string
-end
-
-(** @canonical Gillian.Gil_syntax.BVPred *)
-module BVPred : sig
-  type t = TypeDef__.bvpred =
     | BVUlt
     | BVUleq
     | BVSlt
@@ -502,162 +493,11 @@ module Expr : sig
   val is_matchable : t -> bool
 end
 
-(** @canonical Gillian.Gil_syntax.Formula *)
-module Formula : sig
-  (** GIL Formulae *)
-
-  type t = TypeDef__.formula =
-    | True  (** Logical true *)
-    | False  (** Logical false *)
-    | Not of t  (** Logical negation *)
-    | And of t * t  (** Logical conjunction *)
-    | Or of t * t  (** Logical disjunction *)
-    | Eq of Expr.t * Expr.t  (** Expression equality *)
-    | Impl of t * t  (** Logical implication *)
-    | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
-    | FLessEq of Expr.t * Expr.t
-        (** Expression less-than-or-equal for numbers *)
-    | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
-    | ILessEq of Expr.t * Expr.t
-        (** Expression less-than-or-equal for integeres *)
-    | BVFormIntrinsic of BVPred.t * Expr.bv_arg list
-    | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
-    | SetMem of Expr.t * Expr.t  (** Set membership *)
-    | SetSub of Expr.t * Expr.t  (** Set subsetness *)
-    | ForAll of (string * Type.t option) list * t  (** Forall *)
-    | IsInt of Expr.t  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
-  [@@deriving yojson, eq]
-
-  val of_bool : bool -> t
-
-  (** Sets of formulae *)
-  module Set : Set.S with type elt := t
-
-  (** @deprecated Use {!Visitors.endo} instead *)
-  val map :
-    (t -> t * bool) option ->
-    (t -> t) option ->
-    (Expr.t -> Expr.t) option ->
-    t ->
-    t
-
-  val map_opt :
-    (t -> t option * bool) option ->
-    (t -> t) option ->
-    (Expr.t -> Expr.t option) option ->
-    t ->
-    t option
-
-  (** Get all the logical variables*)
-  val lvars : t -> SS.t
-
-  (** Get all the program variables *)
-  val pvars : t -> SS.t
-
-  (** Get all the abstract locations *)
-  val alocs : t -> SS.t
-
-  (** Get all the concrete locations *)
-  val clocs : t -> SS.t
-
-  (** Get all locations *)
-  val locs : t -> SS.t
-
-  (** Get print info *)
-  val get_print_info : t -> SS.t * SS.t * SS.t
-
-  (** Get all the logical expressions of the formula of the form (Lit (LList lst)) and (EList lst) *)
-  val lists : t -> Expr.t list
-
-  (** Get all the list expressions *)
-  val list_lexprs : t -> Expr.Set.t
-
-  (** [push_in_negations a] takes negations off the toplevel of [a] and pushes them in the leaves.
-    For example [push_in_negations (Not (And (True, False)))] returns [Or (False, False)] *)
-  val push_in_negations : t -> t
-
-  (** Turns [f1 /\ f2 /\ f3] into [\[f1; f2; f3\]] *)
-  val split_conjunct_formulae : t -> t list
-
-  (** Pretty-printer *)
-  val pp : Format.formatter -> t -> unit
-
-  (** Pretty-printer with constructors (will not parse) *)
-  val full_pp : Format.formatter -> t -> unit
-
-  (** Lifts an expression to a formula, if possible. It returns
-      the lifted expression and its negation *)
-  val lift_logic_expr : Expr.t -> (t * t) option
-
-  (** Unlifts the formula to an expression, if possible *)
-  val to_expr : t -> Expr.t option
-
-  (** [conjunct \[a1; ...; an\]] returns [a1 /\ ... /\ an] *)
-  val conjunct : t list -> t
-
-  (** [disjunct \[a1; ...; an\]] returns [a1 \/ ... \/ an] *)
-  val disjunct : t list -> t
-
-  val subst_expr_for_expr : to_subst:Expr.t -> subst_with:Expr.t -> t -> t
-
-  (** [subst_clocs subst e] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [e] *)
-  val subst_clocs : (string -> Expr.t) -> t -> t
-
-  (** [get_disjuncts (a1 \/ ... \/ an)] returns [\[a1; ...; an\]] *)
-  val get_disjuncts : t -> t list
-
-  (** Returns a list of strings and a list of numbers that are contained in the formula *)
-  val strings_and_numbers : t -> string list * float list
-
-  module Infix : sig
-    (** Same as Not *)
-    val fnot : t -> t
-
-    (** Same as Forall *)
-    val forall : (string * Type.t option) list -> t -> t
-
-    (** Same as Or *)
-    val ( #|| ) : t -> t -> t
-
-    (** Same as And *)
-    val ( #&& ) : t -> t -> t
-
-    (** Same as Eq *)
-    val ( #== ) : Expr.t -> Expr.t -> t
-
-    (** Same as ILess *)
-    val ( #< ) : Expr.t -> Expr.t -> t
-
-    (** [a #> b] if [Not ILess (b, a)]*)
-    val ( #> ) : Expr.t -> Expr.t -> t
-
-    (** Same as ILessEq *)
-    val ( #<= ) : Expr.t -> Expr.t -> t
-
-    (** [a #>= b] is [Not ILess (b, a)] *)
-    val ( #>= ) : Expr.t -> Expr.t -> t
-
-    (** Same as FLess *)
-    val ( #<. ) : Expr.t -> Expr.t -> t
-
-    (** [a #>. b] if [Not FLess (b, a)]*)
-    val ( #>. ) : Expr.t -> Expr.t -> t
-
-    (** Same as FLessEq *)
-    val ( #<=. ) : Expr.t -> Expr.t -> t
-
-    (** [a #>=. b] is [Not FLess (b, a)] *)
-    val ( #>=. ) : Expr.t -> Expr.t -> t
-
-    val ( #=> ) : t -> t -> t
-  end
-end
-
 (** @canonical Gillian.Gil_syntax.Asrt *)
 module Asrt : sig
   (** GIL Assertions *)
 
-  type atom = TypeDef__.assertion =
+  type atom = TypeDef__.assertion_atom =
     | Emp  (** Empty heap *)
     | Pred of string * Expr.t list  (** Predicates *)
     | Pure of Expr.t  (** Pure formula *)

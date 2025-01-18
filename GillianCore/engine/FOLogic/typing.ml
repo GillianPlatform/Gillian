@@ -204,6 +204,7 @@ module Infer_types_to_gamma = struct
               Some
                 ([ BvType w ], (fun lts -> List.length lts = 1), BvType (w + i0))
           | _ -> None)
+      | _ -> raise (Failure "avoiding supporting for now")
     in
 
     Option.map
@@ -548,7 +549,8 @@ module Type_lexpr = struct
         | BVSmod
         | BVSignExtend
         | BVZeroExtend -> 2
-        | BVExtract -> 3)
+        | BVExtract -> 3
+        | _ -> raise (Failure "avoid supporting for now"))
     in
     let pars =
       List.map

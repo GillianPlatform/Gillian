@@ -19,7 +19,7 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   match loc_name with
   | None ->
       let new_loc_name = ALoc.alloc () in
-      let learned = [ Formula.Eq (ALoc new_loc_name, lvar_loc) ] in
+      let learned = [ Expr.BinOp (ALoc new_loc_name, Equal, lvar_loc) ] in
       Logging.verbose (fun fmt ->
           fmt "Couldn't resolve loc %a, created %s" Expr.pp lvar_loc
             new_loc_name);
@@ -180,8 +180,8 @@ module Mem = struct
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
 
-    let open Formula.Infix in
-    if%sat size #<= (Expr.int 0) then DR.error (NonPositiveArraySize size)
+    let open Expr.Infix in
+    if%sat size <= Expr.int 0 then DR.error (NonPositiveArraySize size)
     else
       let** tree = get_tree_res map loc_name in
       let++ sarr, perm, new_tree =
@@ -193,8 +193,8 @@ module Mem = struct
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
 
-    let open Formula.Infix in
-    if%sat size #<= (Expr.int 0) then DR.error (NonPositiveArraySize size)
+    let open Expr.Infix in
+    if%sat size <= Expr.int 0 then DR.error (NonPositiveArraySize size)
     else
       let** tree = get_tree_res map loc_name in
       let++ sarr, perm, new_tree =
@@ -204,8 +204,8 @@ module Mem = struct
 
   let prod_array map loc ofs size chunk array perm =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat size #<= (Expr.int 0) then DR.ok map
+    let open Expr.Infix in
+    if%sat size <= Expr.int 0 then DR.ok map
     else
       let* loc_name = resolve_or_create_loc_name loc in
       let* tree = get_or_create_tree map loc_name in
@@ -231,9 +231,9 @@ module Mem = struct
 
   let cons_simple ~sheap_consumer map loc low high =
     let open DR.Syntax in
-    let open Formula.Infix in
+    let open Expr.Infix in
     let** loc_name = resolve_loc_result loc in
-    if%sat high #<= low then DR.ok (map, Some Perm.Freeable)
+    if%sat high <= low then DR.ok (map, Some Perm.Freeable)
     else
       let** tree = get_tree_res map loc_name in
       let++ new_tree, perm =
@@ -243,8 +243,8 @@ module Mem = struct
 
   let prod_simple ~sheap_producer map loc low high perm =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat high #<= low then DR.ok map
+    let open Expr.Infix in
+    if%sat high <= low then DR.ok map
     else
       let* loc_name = resolve_or_create_loc_name loc in
       let* tree = get_or_create_tree map loc_name in
@@ -287,8 +287,8 @@ module Mem = struct
 
   let move map dst_loc dst_ofs src_loc src_ofs sz =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat sz #== (Expr.int 0) then DR.ok map
+    let open Expr.Infix in
+    if%sat sz == Expr.int 0 then DR.ok map
     else
       let** dst_loc_name = resolve_loc_result dst_loc in
       let** src_loc_name = resolve_loc_result src_loc in

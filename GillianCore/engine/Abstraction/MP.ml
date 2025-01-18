@@ -447,7 +447,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
       List.map minimise_matchables ins
   | Lit _ | PVar _ | LVar _ | ALoc _ | LstSub _ | NOp _ | EList _ | ESet _ -> []
-  | BVFormIntrinsic (_, es) ->
+  | BVExprIntrinsic (_, es, _) ->
       let exprs = Expr.exprs_from_bvargs es in
       let lists = List.map simple_ins_expr exprs |> List_utils.list_product in
       let sum =

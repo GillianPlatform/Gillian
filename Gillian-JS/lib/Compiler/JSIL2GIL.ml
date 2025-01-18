@@ -74,28 +74,6 @@ let rec jsil2gil_expr (e : Expr.t) : Expr.t =
       ESet es
   | _ -> e
 
-let rec jsil2gil_formula (f : Gil.Formula.t) : Gil.Formula.t =
-  let ff = jsil2gil_formula in
-  let fe = jsil2gil_expr in
-  match f with
-  | True | False -> f
-  | Not f -> Not (ff f)
-  | And (f1, f2) -> And (ff f1, ff f2)
-  | Or (f1, f2) -> Or (ff f1, ff f2)
-  | Impl (f1, f2) -> Impl (ff f1, ff f2)
-  | Eq (e1, e2) -> Eq (fe e1, fe e2)
-  | FLess (e1, e2) -> FLess (fe e1, fe e2)
-  | FLessEq (e1, e2) -> FLessEq (fe e1, fe e2)
-  | ILess (e1, e2) -> ILess (fe e1, fe e2)
-  | ILessEq (e1, e2) -> ILessEq (fe e1, fe e2)
-  | StrLess (e1, e2) -> StrLess (fe e1, fe e2)
-  | SetMem (e1, e2) -> SetMem (fe e1, fe e2)
-  | SetSub (e1, e2) -> SetSub (fe e1, fe e2)
-  | ForAll (qts, f) -> ForAll (qts, ff f)
-  | IsInt e -> IsInt (fe e)
-  | BVFormIntrinsic (pred, es) ->
-      BVFormIntrinsic (pred, Expr.map_bv_arg_exprs fe es)
-
 let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   let f = jsil2gil_asrt in
   let fe = jsil2gil_expr in

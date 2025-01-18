@@ -886,6 +886,8 @@ and reduce_lexpr_loop
               Base cases
        ------------------------- *)
     | Lit _ | PVar _ | ALoc _ -> le
+    | BVExprIntrinsic (op, es, width) ->
+        BVExprIntrinsic (op, Expr.map_bv_arg_exprs f es, width)
     (* -------------------------
                  LVar
        ------------------------- *)

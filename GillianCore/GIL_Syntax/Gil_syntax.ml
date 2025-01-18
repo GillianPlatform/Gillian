@@ -23,6 +23,5 @@ module Spec = Spec
 module Type = Type
 module UnOp = UnOp
 module BVOps = BVOps
-module BVPred = BVPred
 module Var = Var
 module Visitors = Visitors

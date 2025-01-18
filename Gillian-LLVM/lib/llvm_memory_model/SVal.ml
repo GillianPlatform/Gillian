@@ -21,18 +21,18 @@ module SVal = struct
     { v with value }
 
   let unsign_int ~bit_size (e : Expr.t) =
-    let open Formula.Infix in
-    if%sat Expr.zero_i #<= e then Delayed.return e
+    let open Expr.Infix in
+    if%sat Expr.zero_i <= e then Delayed.return e
     else
       let two_power_size = Z.(one lsl bit_size) in
       let open Expr.Infix in
       Delayed.return (e + Expr.int_z two_power_size)
 
   let sign_int ~bit_size (e : Expr.t) =
-    let open Formula.Infix in
+    let open Expr.Infix in
     let two_power_size = Z.(one lsl bit_size) in
     let imax = Expr.int_z Z.((two_power_size asr 1) - one) in
-    if%sat e #<= imax then Delayed.return e
+    if%sat e <= imax then Delayed.return e
     else
       let open Expr.Infix in
       Delayed.return (e - Expr.int_z two_power_size)
@@ -127,7 +127,7 @@ module SVal = struct
                 ],
                 8 )
           in
-          Formula.Eq (target_lvar, extracted))
+          Expr.BinOp (target_lvar, Equal, extracted))
     in
     let result =
       match !Llvmconfig.endianness with
@@ -234,7 +234,6 @@ module SVArray = struct
     else None
 
   let make_zeros ~chunk ~size : t Delayed.t =
-    let open Formula.Infix in
     let return ?learned ?learned_types values =
       Delayed.return ?learned ?learned_types { chunk; values }
     in
@@ -250,21 +249,20 @@ module SVArray = struct
         in
         return values
     | _ ->
+        let open Expr.Infix in
         Logging.verbose (fun fmt ->
             fmt "Zeros pf: not as concrete: %a" Expr.pp size);
         let values_var = LVar.alloc () in
         let values = Expr.LVar values_var in
-        let is_zero e = e #== (Expr.int 0) in
+        let is_zero e = e == Expr.int 0 in
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         let zero = Expr.zero_i in
         let learned_types = [ (values_var, Type.ListType) ] in
-        let correct_length = (Expr.list_length values) #== size in
+        let correct_length = Expr.list_length values == size in
         let all_zero =
-          forall
-            [ (i, Some IntType) ]
-            zero #<= i_e #&& (i_e #< size)
-            #=> (is_zero (Expr.list_nth_e values i_e))
+          forall [ (i, Some IntType) ] zero <= i_e
+          && i_e < size ==> is_zero (Expr.list_nth_e values i_e)
         in
         return ~learned:[ correct_length; all_zero ] ~learned_types values
 
@@ -388,8 +386,8 @@ module SVArray = struct
   let split_at_byte ~at arr : (t * t) Delayed.t =
     let chunk_size = Expr.int (Chunk.size arr.chunk) in
     let can_keep_chunk =
-      let open Formula.Infix in
-      (Expr.imod at chunk_size) #== Expr.zero_i
+      let open Expr.Infix in
+      Expr.imod at chunk_size == Expr.zero_i
     in
     if%ent can_keep_chunk then
       Delayed.return (split_at_offset ~at:Expr.Infix.(at / chunk_size) arr)
