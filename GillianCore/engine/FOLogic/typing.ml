@@ -150,9 +150,26 @@ module Infer_types_to_gamma = struct
       (width : int option)
       (tt : Type.t) : bool =
     let no_lits_constraint lst = List.length lst = 0 in
-
+    let extract_width (arg : Expr.bv_arg) : int option =
+      match arg with
+      | Expr.Literal _ -> None
+      | Expr.BvExpr (_, i) -> Some i
+    in
+    let type_bv_pred
+        (create_types_from_width : int -> t list * (int list -> bool) * t) =
+      if Option.is_none width then
+        Option.map create_types_from_width (List.hd es |> extract_width)
+      else None
+    in
     let opt =
       match op with
+      | BVUlt | BVUleq | BVSlt | BVSleq | BVUMulO | BVSMulO | BVUAddO | BVSAddO
+        ->
+          type_bv_pred (fun w ->
+              ([ BvType w; BvType w ], no_lits_constraint, Type.BooleanType))
+      | BVNegO ->
+          type_bv_pred (fun w ->
+              ([ BvType w ], no_lits_constraint, Type.BooleanType))
       | BVNot | BVNeg ->
           Option.map
             (fun w -> ([ BvType w ], no_lits_constraint, BvType w))
@@ -208,7 +225,6 @@ module Infer_types_to_gamma = struct
               Some
                 ([ BvType w ], (fun lts -> List.length lts = 1), BvType (w + i0))
           | _ -> None)
-      | _ -> raise (Failure "avoiding supporting for now")
     in
 
     Option.map
@@ -538,7 +554,7 @@ module Type_lexpr = struct
     let arity =
       BVOps.(
         match op with
-        | BVNeg | BVNot -> 1
+        | BVNeg | BVNegO | BVNot -> 1
         | BVShl
         | BVLShr
         | BVUrem
@@ -555,9 +571,16 @@ module Type_lexpr = struct
         | BVSdiv
         | BVSmod
         | BVSignExtend
-        | BVZeroExtend -> 2
-        | BVExtract -> 3
-        | _ -> raise (Failure "avoid supporting for now"))
+        | BVZeroExtend
+        | BVUAddO
+        | BVUlt
+        | BVUleq
+        | BVSlt
+        | BVSleq
+        | BVUMulO
+        | BVSMulO
+        | BVSAddO -> 2
+        | BVExtract -> 3)
     in
     let pars =
       List.map
