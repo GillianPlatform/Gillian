@@ -2,14 +2,50 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
 }
 
 .sedap__nodeWrap {
-  background-color: var(--vscode-editor-background);
+  overflow: hidden;
+  border-color: var(--vscode-editorCursor-foreground);
+}
+
+.sedap__nodeBadge {
+  display: flex;
+  flex-direction: row;
+  gap: 0.25em;
+  align-items: center;
+}
+
+.sedap__node {
+  background: linear-gradient(var(--vscode-editor-background), var(--vscode-editor-background));
+}
+
+[data-sedap-node-selected=true] {
+  border-width: 2px;
+}
+
+[data-sedap-node-selected=true] .sedap__node {
+  background:
+    linear-gradient(var(--vscode-editor-selectionBackground), var(--vscode-editor-selectionBackground)),
+    linear-gradient(var(--vscode-editor-background), var(--vscode-editor-background));
+  color: var(--vscode-editor-selectionForeground)
+}
+
+.sedap__nodeText {
+  font-family: var(--vscode-editor-font-family);
 }
 
 .react-flow__edge-textbg {
   fill: var(--vscode-editor-background);
+}
+
+.react-flow__edge-path {
+  stroke: var(--vscode-editorCursor-foreground);
+}
+
+.react-flow__edge-text {
+  fill: var(--vscode-editor-foreground);
 }
 
 .react-flow__background {
@@ -17,9 +53,24 @@ body {
 }
 
 .react-flow__controls-button {
-  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
 }
 
 .react-flow__controls-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--vscode-button-hoverBackground);
+}
+
+.react-flow__minimap {
+  border: 2px solid var(--vscode-editorCursor-foreground);
+  background: var(--vscode-editor-background);
+}
+
+.react-flow__minimap-node {
+  fill: var(--vscode-editor-inactiveSelectionBackground);
+  stroke: var(--vscode-editor-foreground);
+}
+
+.react-flow__minimap-mask {
+  fill: var(--vscode-editor-selectionBackground);
 }

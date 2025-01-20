@@ -61,9 +61,10 @@ struct
     init_data : ID.t;
     proc_names : string list;
     mutable cur_proc_name : string;
-    all_nodes : (L.Report_id.t, Sedap_types.Map_node.t) Hashtbl.t;
+    all_nodes : (string, Sedap_types.Map_node.t) Hashtbl.t;
         [@default Hashtbl.create 0]
-    changed_nodes : L.Report_id.t Hashset.t; [@default Hashset.empty ()]
+    changed_nodes : string Hashset.t; [@default Hashset.empty ()]
+    mutable extra_selected_steps : L.Report_id.t list; [@default []]
     roots : (string, string) Hashtbl.t; [@default Hashtbl.create 0]
     ext : 'ext;
   }
@@ -158,7 +159,8 @@ struct
       let show_id = Fmt.str "%a" L.Report_id.pp
       let show_id_opt = Option.map show_id
 
-      let add_node state id node =
+      let add_node state ?id (node : Map_node.t) =
+        let id = Option.value id ~default:node.id in
         let { all_nodes; changed_nodes; _ } = state.debug_state in
         let () = Hashtbl.replace all_nodes id node in
         let () = Hashset.add changed_nodes id in
@@ -203,7 +205,7 @@ struct
               extras = [];
             }
         in
-        Map_node.make ~id ~next ~options () |> add_node state matching.id
+        Map_node.make ~id ~next ~options () |> add_node state
 
       let convert_match_node state (map : Match_map.t) node_id =
         let node = Hashtbl.find map.nodes node_id in
@@ -223,10 +225,9 @@ struct
                   ([ id ], [ matching ])
             in
             let () =
-              Map_node.make ~id ~submaps ~next ~options ()
-              |> add_node state node_id
+              Map_node.make ~id ~submaps ~next ~options () |> add_node state
             in
-            folds
+            (nexts, folds)
         | MatchResult (_, result) ->
             let options =
               Map_node_options.Basic
@@ -237,10 +238,9 @@ struct
                 }
             in
             let () =
-              Map_node.make ~id ~next:Final ~options ()
-              |> add_node state node_id
+              Map_node.make ~id ~next:Final ~options () |> add_node state
             in
-            []
+            ([], [])
 
       let convert_match_map' state (matching : Match_map.matching) =
         let map = get_match_map matching.id state.debug_state in
@@ -248,8 +248,8 @@ struct
         let rec aux other_matches = function
           | [] -> other_matches
           | node_id :: rest ->
-              let folds = convert_match_node state map node_id in
-              aux (folds @ other_matches) rest
+              let nexts, folds = convert_match_node state map node_id in
+              aux (folds @ other_matches) (nexts @ rest)
         in
         aux [] map.roots
 
@@ -290,8 +290,8 @@ struct
             in
             Branch { cases }
 
-      let convert_node node_id (node : Exec_map.Packaged.node) state =
-        let id = show_id node_id in
+      let convert_node (node : Exec_map.Packaged.node) state =
+        let id = show_id node.data.id in
         let aliases = node.data.all_ids |> List.map show_id in
         let () = convert_match_maps state node.data.matches in
         let submaps =
@@ -316,8 +316,7 @@ struct
               extras = get_node_extras node;
             }
         in
-        Map_node.make ~id ~aliases ~submaps ~next ~options ()
-        |> add_node state node_id
+        Map_node.make ~id ~aliases ~submaps ~next ~options () |> add_node state
 
       let add_root proc root_id state =
         let id = "proc " ^ proc in
@@ -327,7 +326,7 @@ struct
             { title = proc; subtitle = ""; zoomable = true; extras = [] }
         in
         let () = Hashtbl.add state.debug_state.roots proc id in
-        Map_node.make ~id ~next ~options () |> add_node state root_id
+        Map_node.make ~id ~next ~options () |> add_node state
 
       let add_changed_node id node proc_state state =
         let () =
@@ -336,28 +335,29 @@ struct
             proc_state.root_created <- true
         in
         match node with
-        | Some node -> convert_node id node state
-        | None -> Hashtbl.remove_all state.debug_state.all_nodes id
+        | Some node -> convert_node node state
+        | None -> Hashtbl.remove_all state.debug_state.all_nodes (show_id id)
 
       let get_all_nodes state =
         let { all_nodes; _ } = state.debug_state in
         let seq =
-          all_nodes |> Hashtbl.to_seq
-          |> Seq.map (fun (k, v) -> (show_id k, Some v))
+          all_nodes |> Hashtbl.to_seq |> Seq.map (fun (k, v) -> (k, Some v))
         in
         String_map.add_seq seq String_map.empty
 
-      let get_changed_nodes state =
+      let get_changed_nodes ?(clear = false) state =
         let { changed_nodes; all_nodes; _ } = state.debug_state in
         let nodes =
           changed_nodes |> Hashset.to_seq
           |> Seq.fold_left
                (fun acc id ->
                  let node = Hashtbl.find_opt all_nodes id in
-                 String_map.add (show_id id) node acc)
+                 String_map.add id node acc)
                String_map.empty
         in
-        let () = Hashset.filter_in_place changed_nodes (fun _ -> false) in
+        let () =
+          if clear then Hashset.filter_in_place changed_nodes (fun _ -> false)
+        in
         nodes
 
       let get_roots state =
@@ -366,18 +366,25 @@ struct
              (fun acc (proc, id) -> String_map.add proc id acc)
              String_map.empty
 
-      let get_current_steps state : string list =
-        Hashtbl.fold
-          (fun _ proc_state acc ->
-            match proc_state.cur_report_id with
-            | Some id -> show_id id :: acc
-            | None -> acc)
-          state.procs []
+      let get_current_steps ?(clear = false) state : string list =
+        let from_procs =
+          Hashtbl.fold
+            (fun _ proc_state acc ->
+              match proc_state.cur_report_id with
+              | Some id -> show_id id :: acc
+              | None -> acc)
+            state.procs []
+        in
+        let extra =
+          state.debug_state.extra_selected_steps |> List.map show_id
+        in
+        let () = if clear then state.debug_state.extra_selected_steps <- [] in
+        from_procs @ extra
 
       let get_map_update state =
-        let nodes = get_changed_nodes state in
+        let nodes = get_changed_nodes ~clear:true state in
         let roots = Some (get_roots state) in
-        let current_steps = Some (get_current_steps state) in
+        let current_steps = Some (get_current_steps ~clear:true state) in
         Map_update_event_body.make ~nodes ~roots ~current_steps ()
 
       let get_full_map state =
@@ -681,8 +688,10 @@ struct
       with Failure msg -> Error msg
 
     let jump_to_id id (state : t) =
-      let** proc_state = get_proc_state ~cmd_id:id state in
-      jump_state_to_id id state.debug_state proc_state
+      let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
+      let** proc_state = get_proc_state ~cmd_id state in
+      let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
+      state.debug_state.extra_selected_steps <- List.map fst matches
 
     let handle_stop debug_state proc_state ?(is_end = false) id id' =
       let id =

@@ -2,7 +2,11 @@ module Types = struct
   (** Describes {i why} this matching is happening *)
   type kind = Matcher.match_kind [@@deriving yojson]
 
-  type match_result = Success | Failure [@@deriving yojson, show]
+  type match_result = Success | Failure [@@deriving yojson]
+
+  let show_match_result = function
+    | Success -> "Success"
+    | Failure -> "Failure"
 
   (** A substitution, and the ID of the assertion where it was learned *)
   type substitution = {

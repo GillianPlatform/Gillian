@@ -189,3 +189,38 @@ let get_children_of roots_only id =
   in
   rc |> check_result_code db ~log:"fold: get children";
   children
+
+let get_report_from_stmt ~msg db stmt =
+  let row = zero_or_one_row db ~log:("step: " ^ msg) ~stmt in
+  let report =
+    row
+    |> Option.map (fun row ->
+           let id : Report_id.t = Sqlite3.Data.to_int64_exn row.(0) in
+           let type_ = Sqlite3.Data.to_string_exn row.(1) in
+           let content = Sqlite3.Data.to_string_exn row.(2) in
+           (id, type_, content))
+  in
+  Sqlite3.finalize stmt |> check_result_code db ~log:("finalize: " ^ msg);
+  report
+
+let get_parent_of id =
+  let db = get_db () in
+  let stmt =
+    Sqlite3.prepare db
+      "SELECT id, type, content FROM report WHERE id = (SELECT parent FROM \
+       report WHERE id = ?);"
+  in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
+  |> check_result_code db ~log:"get parent bind id";
+  get_report_from_stmt ~msg:"get parent" db stmt
+
+let get_grandparent_of id =
+  let db = get_db () in
+  let stmt =
+    Sqlite3.prepare db
+      "SELECT id, type, content FROM report WHERE id = (SELECT parent FROM \
+       report WHERE id = (SELECT parent FROM report WHERE id = ?));"
+  in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
+  |> check_result_code db ~log:"get grandparent bind id";
+  get_report_from_stmt ~msg:"get grandparent" db stmt

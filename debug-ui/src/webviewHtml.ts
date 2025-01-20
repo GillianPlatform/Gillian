@@ -1,26 +1,28 @@
 import { ExtensionContext, Uri, WebviewPanel } from "vscode";
 import { randomUUID } from "crypto";
 
-const scriptSrcs = [
-  "web/dist/index.js",
-];
-const styleSrcs = [
-  "web/dist/index.css",
-];
+const scriptSrcs = ["web/dist/index.js"];
+const styleSrcs = ["web/dist/index.css"];
 
-export const getWebviewHtml = (context: ExtensionContext) => ({ webview }: WebviewPanel): string => {
-  const nonce = randomUUID();
+export const getWebviewHtml =
+  (context: ExtensionContext) =>
+  ({ webview }: WebviewPanel): string => {
+    const nonce = randomUUID();
 
-  const scripts = scriptSrcs.map((src) => {
-    const script = webview.asWebviewUri(Uri.joinPath(context.extensionUri, src));
-    return `<script nonce="${nonce}" src="${script}"></script>`;
-  }).join('\n');
-  const styles = styleSrcs.map((src) => {
-    const style = webview.asWebviewUri(Uri.joinPath(context.extensionUri, src));
-    return `<link rel="stylesheet" href="${style}">`;
-  }).join('\n');
-  
-  return `
+    const scripts = scriptSrcs
+      .map((src) => {
+        const script = webview.asWebviewUri(Uri.joinPath(context.extensionUri, src));
+        return `<script nonce="${nonce}" src="${script}"></script>`;
+      })
+      .join("\n");
+    const styles = styleSrcs
+      .map((src) => {
+        const style = webview.asWebviewUri(Uri.joinPath(context.extensionUri, src));
+        return `<link rel="stylesheet" href="${style}">`;
+      })
+      .join("\n");
+
+    return `
     <!doctype html>
     <html lang="en">
       <head>
@@ -44,4 +46,4 @@ export const getWebviewHtml = (context: ExtensionContext) => ({ webview }: Webvi
       </body>
     </html>
   `;
-};
+  };

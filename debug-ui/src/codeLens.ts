@@ -7,29 +7,29 @@ import {
   Range,
   TextDocument,
   workspace,
-} from 'vscode';
-import { startDebugging } from './startDebugging';
-import { DEBUG_TYPE } from './consts';
+} from "vscode";
+import { startDebugging } from "./startDebugging";
+import { DEBUG_TYPE } from "./consts";
 
-type ExecMode = 'debugverify' | 'debugwpst';
+type ExecMode = "debugverify" | "debugwpst";
 
 export function activateCodeLens(context: ExtensionContext) {
   const commandDisposable = commands.registerCommand(
-    'extension.gillian-debug.debugProcedure',
-    startDebugging
+    "extension.gillian-debug.debugProcedure",
+    startDebugging,
   );
 
-  const supportedLanguages = ['javascript', 'gil', 'wisl', 'c'];
+  const supportedLanguages = ["javascript", "gil", "wisl", "c"];
 
   for (const language of supportedLanguages) {
     const docSelector = {
       language: language,
-      scheme: 'file',
+      scheme: "file",
     };
 
     const codeLensProviderDisposable = languages.registerCodeLensProvider(
       docSelector,
-      new DebugCodeLensProvider()
+      new DebugCodeLensProvider(),
     );
 
     context.subscriptions.push(commandDisposable);
@@ -47,38 +47,30 @@ function getLensKinds(lang: string | undefined): [ExecMode, string][] {
   }
   const lensKinds: [ExecMode, string][] = [];
   if (showVerifyLens) {
-    lensKinds.push(['debugverify', 'Verify ']);
+    lensKinds.push(["debugverify", "Verify "]);
   }
   if (showSymbolicDebugLens) {
-    lensKinds.push(['debugwpst', 'Symbolic-debug ']);
+    lensKinds.push(["debugwpst", "Symbolic-debug "]);
   }
   return lensKinds;
 }
 
 class DebugCodeLensProvider implements CodeLensProvider {
-  private makeLensesFromPattern(
-    pattern: RegExp,
-    document: TextDocument
-  ): CodeLens[] {
+  private makeLensesFromPattern(pattern: RegExp, document: TextDocument): CodeLens[] {
     const text = document.getText();
     const procNamePattern = /(.+?)\(/g;
 
-    let reProcedure: RegExp;
     let langCmd: string | undefined = undefined;
     switch (document.languageId) {
-      case 'gil':
-        reProcedure = /proc /g;
+      case "gil":
         break;
-      case 'javascript':
-        reProcedure = /function /g;
-        langCmd = 'gillian-js';
+      case "javascript":
+        langCmd = "gillian-js";
         break;
-      case 'wisl':
-        reProcedure = /function /g;
-        langCmd = 'wisl';
+      case "wisl":
+        langCmd = "wisl";
         break;
       default:
-        reProcedure = /function /g;
         break;
     }
 
@@ -95,7 +87,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
             procedureName,
             document,
             execMode,
-            commandPrefix
+            commandPrefix,
           );
           if (codeLens !== undefined) {
             lenses.push(codeLens);
@@ -110,20 +102,14 @@ class DebugCodeLensProvider implements CodeLensProvider {
   private makeCLens(document: TextDocument): CodeLens[] {
     const text = document.getText();
     const pattern = /int\s+main\s*\(\)/g;
-    const lensKinds = getLensKinds('gillian-c2');
+    const lensKinds = getLensKinds("gillian-c2");
 
     const lenses: CodeLens[] = [];
     let match = pattern.exec(text);
     while (match !== null) {
-      const ix = match.index + 'int main'.length;
+      const ix = match.index + "int main".length;
       for (const [execMode, commandPrefix] of lensKinds) {
-        const codeLens = this.makeCodeLens(
-          ix,
-          'main',
-          document,
-          execMode,
-          commandPrefix
-        );
+        const codeLens = this.makeCodeLens(ix, "main", document, execMode, commandPrefix);
         if (codeLens !== undefined) {
           lenses.push(codeLens);
         }
@@ -137,13 +123,13 @@ class DebugCodeLensProvider implements CodeLensProvider {
   async provideCodeLenses(document: TextDocument): Promise<CodeLens[]> {
     let pattern: RegExp;
     switch (document.languageId) {
-      case 'gil':
+      case "gil":
         pattern = /proc /g;
         break;
-      case 'c':
+      case "c":
         return this.makeCLens(document);
-      case 'javascript':
-      case 'wisl':
+      case "javascript":
+      case "wisl":
       default:
         pattern = /function /g;
         break;
@@ -157,34 +143,26 @@ class DebugCodeLensProvider implements CodeLensProvider {
     procedureName: string,
     document: TextDocument,
     execMode: ExecMode,
-    commandPrefix: string
+    commandPrefix: string,
   ) {
     const startIdx = index - procedureName.length;
     const start = document.positionAt(startIdx);
     const end = document.positionAt(index);
     const range = new Range(start, end);
-    const debugConfig = this.createDebugConfig(
-      procedureName,
-      document.uri.fsPath,
-      execMode
-    );
+    const debugConfig = this.createDebugConfig(procedureName, document.uri.fsPath, execMode);
     return new CodeLens(range, {
-      command: 'extension.gillian-debug.debugProcedure',
+      command: "extension.gillian-debug.debugProcedure",
       title: commandPrefix + procedureName,
       tooltip: commandPrefix + procedureName,
       arguments: [debugConfig],
     });
   }
 
-  private createDebugConfig(
-    procedureName: string,
-    program: string,
-    execMode: ExecMode
-  ) {
+  private createDebugConfig(procedureName: string, program: string, execMode: ExecMode) {
     return {
       type: DEBUG_TYPE,
-      name: 'Debug File',
-      request: 'launch',
+      name: "Debug File",
+      request: "launch",
       program: program,
       procedureName: procedureName,
       stopOnEntry: true,

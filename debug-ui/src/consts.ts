@@ -1,1 +1,1 @@
-export const DEBUG_TYPE = 'gillian';
+export const DEBUG_TYPE = "gillian";

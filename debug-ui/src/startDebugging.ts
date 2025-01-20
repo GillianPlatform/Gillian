@@ -1,9 +1,9 @@
-import { debug, DebugConfiguration, DebugSession, window } from 'vscode';
+import { debug, DebugConfiguration, DebugSession, window } from "vscode";
 
 let debugSession: DebugSession | null = null;
 let isDebugStarting = false;
 
-debug.onDidStartDebugSession(session => {
+debug.onDidStartDebugSession((session) => {
   debugSession = session;
 });
 
@@ -19,21 +19,18 @@ async function checkForExistingDebugSession() {
     return true;
   }
   const response = await window.showInformationMessage(
-    'Only one Gillian debugger can run at a time.\nTerminate old session and continue?',
-    'OK',
-    'Cancel'
+    "Only one Gillian debugger can run at a time.\nTerminate old session and continue?",
+    "OK",
+    "Cancel",
   );
-  if (response === 'OK') {
+  if (response === "OK") {
     await debug.stopDebugging(debugSession);
     return true;
   }
   return false;
 }
 
-export async function startDebugging(
-  config: DebugConfiguration,
-  noDebug = false
-) {
+export async function startDebugging(config: DebugConfiguration, noDebug = false) {
   if (isDebugStarting) {
     return;
   }
@@ -43,18 +40,18 @@ export async function startDebugging(
     if (!canContinue) {
       return;
     }
-    const validLangs = ['wisl', 'js', 'c', 'c2'];
+    const validLangs = ["wisl", "js", "c", "c2"];
     const langOptions: Map<string, string> = new Map([
-      ['WISL', 'wisl'],
-      ['JS', 'js'],
-      ['C (CompCert)', 'c'],
-      ['C (CBMC)', 'c2'],
+      ["WISL", "wisl"],
+      ["JS", "js"],
+      ["C (CompCert)", "c"],
+      ["C (CBMC)", "c2"],
     ]);
 
-    const fileExtension = config.program.split('.').pop();
-    if (fileExtension === 'gil') {
+    const fileExtension = config.program.split(".").pop();
+    if (fileExtension === "gil") {
       const selected = await window.showQuickPick(validLangs, {
-        title: 'Target language',
+        title: "Target language",
       });
       const targetLanguage = selected ? langOptions.get(selected) : undefined;
       config = {

@@ -1,6 +1,5 @@
 import { fixupConfigRules, fixupPluginRules } from "@eslint/compat";
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import globals from "globals";
 import tsParser from "@typescript-eslint/parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,17 +16,15 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ["dist/"],
+    ignores: ["out/", "web/"],
   },
   ...fixupConfigRules(
     compat.extends(
       "eslint:recommended",
-      "plugin:react/recommended",
       "plugin:@typescript-eslint/recommended",
       "plugin:@typescript-eslint/eslint-recommended",
       "prettier",
       "plugin:prettier/recommended",
-      "plugin:react-hooks/recommended",
     ),
   ),
   {
@@ -36,22 +33,7 @@ export default [
     },
 
     languageOptions: {
-      globals: {
-        ...globals.browser,
-      },
-
       parser: tsParser,
-    },
-
-    rules: {
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-    },
-
-    settings: {
-      react: {
-        version: "detect",
-      },
     },
   },
 ];

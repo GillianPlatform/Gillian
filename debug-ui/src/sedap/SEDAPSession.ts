@@ -1,17 +1,24 @@
-import * as vscode from 'vscode';
-import { DebugSession, Disposable, ViewColumn, WebviewOptions, WebviewPanel, WebviewPanelOptions } from 'vscode';
+import * as vscode from "vscode";
+import {
+  DebugSession,
+  Disposable,
+  ViewColumn,
+  WebviewOptions,
+  WebviewPanel,
+  WebviewPanelOptions,
+} from "vscode";
 
 type SEDAPSessionPartialProps = {
-  panelName?: string,
-  panelIcon?: vscode.Uri,
-  getWebviewHtml: (panel: WebviewPanel) => string,
-  webviewOptions?: WebviewPanelOptions & WebviewOptions,
-  webviewShowOptions?: ViewColumn | { viewColumn: ViewColumn; preserveFocus?: boolean }
-  showPanel?: boolean,
+  panelName?: string;
+  panelIcon?: vscode.Uri;
+  getWebviewHtml: (panel: WebviewPanel) => string;
+  webviewOptions?: WebviewPanelOptions & WebviewOptions;
+  webviewShowOptions?: ViewColumn | { viewColumn: ViewColumn; preserveFocus?: boolean };
+  showPanel?: boolean;
 };
 
 type SEDAPSessionProps = SEDAPSessionPartialProps & {
-  session: DebugSession,
+  session: DebugSession;
 };
 
 const defaultOptions: WebviewPanelOptions & WebviewOptions = {
@@ -34,42 +41,48 @@ export default class SEDAPSession implements Disposable {
   private disposeListeners: ((session: SEDAPSession) => void)[] = [];
   // #endregion
 
-  private async cusomDebuggerCommand(command: string, args: any): Promise<any> {
+  private async cusomDebuggerCommand(command: string, args: unknown): Promise<unknown> {
     return await this.session.customRequest(command, args);
   }
 
-  private async sendWebviewMessage(type: string, body: any): Promise<boolean> {
+  private async sendWebviewMessage(type: string, body: unknown): Promise<boolean> {
     if (!this.panel) {
       return false;
     }
     return this.panel.webview.postMessage({ type, body });
   }
 
-  private handleCustomEvent(event: string, body: any) {
+  private handleCustomEvent(event: string, body: unknown) {
     this.panel?.webview?.postMessage({ type: "debuggerEvent", body: { event, body } });
   }
 
-  private handleWebviewMessage(type: string, body: any) {
+  private handleWebviewMessage(type: string, body: unknown) {
     const panel = this.panel!;
     switch (type) {
       case "setPanelTitle":
-        if (typeof body === 'string') {
+        if (typeof body === "string") {
           panel.title = body;
-          break;
+          return;
         }
+        break;
       case "debuggerCommand":
         if (body) {
-          const { command, commandId, args } = body;
-          if (typeof body.command === "string") {
+          const { command, commandId, args } = body as Record<string, unknown>;
+          if (typeof command === "string") {
             this.cusomDebuggerCommand(command, args).then((result) => {
-              this.sendWebviewMessage("debuggerCommandResult", { commandId: commandId, result }).then((success) => { console.log("sent", success); });
+              this.sendWebviewMessage("debuggerCommandResult", {
+                commandId: commandId,
+                result,
+              }).then((success) => {
+                console.log("sent", success);
+              });
             });
-            break;
+            return;
           }
         }
-      default:
-        console.warn('Unknown or invalid webview message:', type, body);
+        break;
     }
+    console.warn("Unknown or invalid webview message:", type, body);
   }
 
   // #region Webview handling
@@ -79,15 +92,20 @@ export default class SEDAPSession implements Disposable {
   }
 
   private createWebview() {
-    let panel = vscode.window.createWebviewPanel(this.debugType, this.panelName, this.webviewShowOptions, this.webviewOptions);
+    const panel = vscode.window.createWebviewPanel(
+      this.debugType,
+      this.panelName,
+      this.webviewShowOptions,
+      this.webviewOptions,
+    );
 
     panel.webview.html = this.getWebviewHtml(panel);
     panel.iconPath = this.panelIcon;
 
-    panel.webview.onDidReceiveMessage(msg => {
+    panel.webview.onDidReceiveMessage((msg) => {
       this.handleWebviewMessage(msg.type, msg.body);
     });
-  
+
     this.panel = panel;
     panel.onDidDispose(() => {
       this.panel = undefined;
@@ -115,16 +133,16 @@ export default class SEDAPSession implements Disposable {
     this.disposeListeners.push(listener);
     return {
       dispose: () => {
-        this.disposeListeners = this.disposeListeners.filter(x => x !== listener);
-      }
+        this.disposeListeners = this.disposeListeners.filter((x) => x !== listener);
+      },
     };
   }
 
   public dispose() {
     if (!this.disposed) {
-      this.disposables.forEach(x => x.dispose());
+      this.disposables.forEach((x) => x.dispose());
       this.panel?.dispose();
-      this.disposeListeners.forEach(f => f(this));
+      this.disposeListeners.forEach((f) => f(this));
       this.disposed = true;
     }
   }
@@ -136,7 +154,7 @@ export default class SEDAPSession implements Disposable {
     getWebviewHtml,
     webviewOptions = {},
     webviewShowOptions = ViewColumn.Two,
-    showPanel = false
+    showPanel = false,
   }: SEDAPSessionProps) {
     this.panelName = panelName || session.name;
     this.panelIcon = panelIcon;
@@ -146,13 +164,17 @@ export default class SEDAPSession implements Disposable {
     this.webviewShowOptions = webviewShowOptions;
     this.getWebviewHtml = getWebviewHtml;
 
-    vscode.debug.onDidReceiveDebugSessionCustomEvent(({ session, event, body }) => {
-      if (session.id === this.session.id) {
-        this.handleCustomEvent(event, body);
-      }
-    }, this, this.disposables);
+    vscode.debug.onDidReceiveDebugSessionCustomEvent(
+      ({ session, event, body }) => {
+        if (session.id === this.session.id) {
+          this.handleCustomEvent(event, body);
+        }
+      },
+      this,
+      this.disposables,
+    );
 
-    vscode.debug.onDidTerminateDebugSession(session => {
+    vscode.debug.onDidTerminateDebugSession((session) => {
       if (session.id === this.session.id) {
         this.dispose();
       }
@@ -167,7 +189,7 @@ export default class SEDAPSession implements Disposable {
     p: (session: DebugSession) => SEDAPSessionPartialProps | null,
     onSessionCreated: (session: SEDAPSession) => void = () => {},
   ): Disposable {
-    return vscode.debug.onDidStartDebugSession(session => {
+    return vscode.debug.onDidStartDebugSession((session) => {
       const props = p(session);
       if (props) {
         const sedapSession = new SEDAPSession({ ...props, session });
@@ -182,8 +204,8 @@ export default class SEDAPSession implements Disposable {
     onSessionCreated: (session: SEDAPSession) => void = () => {},
   ): Disposable {
     return SEDAPSession.autoAttachIf(
-      session => session.type === type ? props : null,
-      onSessionCreated
+      (session) => (session.type === type ? props : null),
+      onSessionCreated,
     );
   }
 }
