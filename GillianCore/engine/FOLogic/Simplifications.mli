@@ -12,24 +12,19 @@
 val simplify_pfs_and_gamma :
   ?matching:bool ->
   ?kill_new_lvars:bool ->
-  ?save_spec_vars:Utils.Containers.SS.t * bool ->
-  ?existentials:Utils.Containers.SS.t ->
+  ?save_spec_vars:LVar.Set.t * bool ->
+  ?existentials:LVar.Set.t ->
   PFS.t ->
   ?rpfs:PFS.t ->
   Type_env.t ->
-  SVal.SESubst.t * Utils.Containers.SS.t
+  SVal.SESubst.t * LVar.Set.t
 
 (** [simplify_implication existentials lpfs rpfs gamma]
     simplifies the entailment << ∃ [existentials]. [lpfs] => [rpfs] >>
     under the typing environment [gamma], attempting to instantiate the
     [existentials] and returning a (possibly smaller) new set of existentials *)
 val simplify_implication :
-  matching:bool ->
-  Utils.Containers.SS.t ->
-  PFS.t ->
-  PFS.t ->
-  Type_env.t ->
-  Utils.Containers.SS.t
+  matching:bool -> LVar.Set.t -> PFS.t -> PFS.t -> Type_env.t -> LVar.Set.t
 
 (** [admissible_assertion a] checks whether or not the assertion [a] is
     a contradiction only using the reductions/simplifications *)

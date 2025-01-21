@@ -58,13 +58,13 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   (** Store printer by need *)
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+  val pp_by_need : Var.Set.t -> Format.formatter -> t -> unit
 
   (** Converts the store into an ssubst *)
   val to_ssubst : t -> SESubst.t
 
   (** Logical variables *)
-  val lvars : t -> Var.Set.t
+  val lvars : t -> LVar.Set.t
 end
 
 (** Implementation of GIL Stores *)
@@ -114,7 +114,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let get_unsafe (store : t) (v : Var.t) : vt =
     match get store v with
     | Some result -> result
-    | None -> Fmt.failwith "Store.get_unsafe: variable %s not found in store" v
+    | None ->
+        Fmt.failwith "Store.get_unsafe: variable %a not found in store" Var.pp v
 
   (**
     Store update (in-place)
@@ -225,25 +226,23 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let pp fmt (store : t) =
     let sep = Fmt.any "@\n" in
     let pp_pair =
-      Fmt.(hbox (parens (pair ~sep:(any ": ") string Val.full_pp)))
+      Fmt.(hbox (parens (pair ~sep:(any ": ") Var.pp Val.full_pp)))
     in
     let bindings =
       List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) (bindings store)
     in
     (Fmt.list ~sep pp_pair) fmt bindings
 
-  let pp_by_need (pvars : Containers.SS.t) fmt (store : t) =
+  let pp_by_need (pvars : Var.Set.t) fmt (store : t) =
     let sep = Fmt.any "@\n" in
     let pp_pair =
-      Fmt.(hbox (parens (pair ~sep:(any ": ") string Val.full_pp)))
+      Fmt.(hbox (parens (pair ~sep:(any ": ") Var.pp Val.full_pp)))
     in
     let bindings =
       List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) (bindings store)
     in
     (* Filter for the ones needed *)
-    let bindings =
-      List.filter (fun (v, _) -> Containers.SS.mem v pvars) bindings
-    in
+    let bindings = List.filter (fun (v, _) -> Var.Set.mem v pvars) bindings in
     (Fmt.list ~sep pp_pair) fmt bindings
 
   (**
@@ -257,8 +256,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     iter store (fun x v -> SESubst.put subst (Expr.PVar x) (Val.to_expr v));
     subst
 
-  let lvars (store : t) : Var.Set.t =
+  let lvars (store : t) : LVar.Set.t =
     Hashtbl.fold
-      (fun _ v ac -> Var.Set.union ac (Expr.lvars (Val.to_expr v)))
-      store Var.Set.empty
+      (fun _ v ac -> LVar.Set.union ac (Expr.lvars (Val.to_expr v)))
+      store LVar.Set.empty
 end

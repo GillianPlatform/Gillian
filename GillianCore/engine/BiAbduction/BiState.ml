@@ -120,7 +120,10 @@ module Make (State : SState.S) = struct
           let svars = State.get_spec_vars state in
           SVal.SESubst.filter_in_place af_subst (fun x x_v ->
               match x with
-              | LVar x -> if SS.mem x svars then None else Some x_v
+              | LVar x ->
+                  if Id.Sets.SubstSet.mem (x :> Id.substable Id.t) svars then
+                    None
+                  else Some x_v
               | _ -> Some x_v);
           List.map
             (fun af_state -> { procs; state; af_state })
@@ -141,16 +144,14 @@ module Make (State : SState.S) = struct
   (* TODO: By-need formatter *)
   let pp_by_need _ _ _ fmt state = pp fmt state
 
-  let add_spec_vars (bi_state : t) (vs : Var.Set.t) : t =
+  let add_spec_vars bi_state vs =
     let { state; _ } = bi_state in
     let state' = State.add_spec_vars state vs in
     { bi_state with state = state' }
 
-  let get_spec_vars ({ state; _ } : t) : Var.Set.t = State.get_spec_vars state
-  let get_lvars ({ state; _ } : t) : Var.Set.t = State.get_lvars state
-
-  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t =
-    State.to_assertions ?to_keep state
+  let get_spec_vars { state; _ } = State.get_spec_vars state
+  let get_lvars { state; _ } = State.get_lvars state
+  let to_assertions ?to_keep { state; _ } = State.to_assertions ?to_keep state
 
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
       (t, err_t) Res_list.t =
@@ -199,7 +200,9 @@ module Make (State : SState.S) = struct
       (fun acc a ->
         let* this_state = acc in
         let lvars = Asrt.lvars [ a ] in
-        let this_state = State.add_spec_vars this_state lvars in
+        let this_state =
+          State.add_spec_vars this_state (Id.Sets.lvar_to_subst lvars)
+        in
         match a with
         | Asrt.Emp -> [ this_state ]
         | Pure f ->
@@ -291,7 +294,9 @@ module Make (State : SState.S) = struct
                 let svars = State.get_spec_vars state' in
                 SVal.SESubst.filter_in_place new_subst (fun x x_v ->
                     match x with
-                    | LVar x -> if SS.mem x svars then None else Some x_v
+                    | LVar x
+                      when Id.Sets.SubstSet.mem (x :> Id.substable Id.t) svars
+                      -> None
                     | _ -> Some x_v);
                 let subst_afs =
                   State.substitution_in_place new_subst af_state'
@@ -321,8 +326,7 @@ module Make (State : SState.S) = struct
     in
     search (state, af_state, subst, mp)
 
-  let update_store (state : State.t) (x : string option) (v : Expr.t) : State.t
-      =
+  let update_store (state : State.t) (x : Var.t option) (v : Expr.t) : State.t =
     match x with
     | None -> state
     | Some x ->
@@ -334,9 +338,9 @@ module Make (State : SState.S) = struct
   let run_spec
       (spec : MP.spec)
       (bi_state : t)
-      (x : string)
+      (x : Var.t)
       (args : Expr.t list)
-      (_ : (string * (string * Expr.t) list) option) : (t * Flag.t) list =
+      _ : (t * Flag.t) list =
     (* let start_time = time() in *)
     L.(
       verbose (fun m ->
@@ -404,7 +408,7 @@ module Make (State : SState.S) = struct
     let+ final_state = State.produce_posts frame_state subst posts in
     let af_state' : State.t = State.copy af_state in
     let final_store : SStore.t = State.get_store final_state in
-    let v_ret : Expr.t option = SStore.get final_store Names.return_variable in
+    let v_ret : Expr.t option = SStore.get final_store Id.return_variable in
     let final_state' : State.t =
       State.set_store final_state (SStore.copy old_store)
     in
@@ -428,9 +432,9 @@ module Make (State : SState.S) = struct
   let run_spec
       (spec : MP.spec)
       (bi_state : t)
-      (x : string)
+      (x : Var.t)
       (args : Expr.t list)
-      (_ : (string * (string * Expr.t) list) option) =
+      _ =
     Res_list.just_oks (run_spec spec bi_state x args None)
 
   let produce_posts (_ : t) (_ : SVal.SESubst.t) (_ : Asrt.t list) : t list =

@@ -108,7 +108,7 @@ module type S = sig
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
 
   val add_variables :
-    store:(string * Expr.t) list ->
+    store:(Var.t * Expr.t) list ->
     memory:memory ->
     is_gil_file:bool ->
     get_new_scope_id:(unit -> int) ->

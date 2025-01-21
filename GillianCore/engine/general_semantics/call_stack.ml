@@ -1,5 +1,5 @@
 (** @canonical Gillian.General.Call_stack
-    
+
   Implementation of GIL call stacks *)
 
 (** @canonical Gillian.General.Call_stack.S *)
@@ -51,7 +51,7 @@ module type S = sig
     Get current procedure identifier
 
     @param cs Target call stack
-    @return Identifier of the procedure currently being executed
+    @return Id of the procedure currently being executed
   *)
   val get_cur_proc_id : t -> string
 
@@ -161,7 +161,7 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
     Get current procedure identifier
 
     @param cs Target call stack
-    @return Identifier of the procedure currently being executed
+    @return Id of the procedure currently being executed
   *)
 
   let get_cur_proc_id (cs : t) : string =

@@ -79,21 +79,29 @@ let extend wands new_wand = wands := new_wand :: !wands
 
 let get_lvars t =
   let lvars_val_list el =
-    List.fold_left (fun acc expr -> SS.union acc (Expr.lvars expr)) SS.empty el
+    List.fold_left
+      (fun acc expr -> LVar.Set.union acc (Expr.lvars expr))
+      LVar.Set.empty el
   in
   List.fold_left
     (fun acc { lhs = _, largs; rhs = _, rargs } ->
-      acc |> SS.union (lvars_val_list largs) |> SS.union (lvars_val_list rargs))
-    SS.empty !t
+      acc
+      |> LVar.Set.union (lvars_val_list largs)
+      |> LVar.Set.union (lvars_val_list rargs))
+    LVar.Set.empty !t
 
 let get_alocs t =
   let alocs_val_list el =
-    List.fold_left (fun acc v -> SS.union acc (Expr.alocs v)) SS.empty el
+    List.fold_left
+      (fun acc v -> ALoc.Set.union acc (Expr.alocs v))
+      ALoc.Set.empty el
   in
   List.fold_left
     (fun acc { lhs = _, largs; rhs = _, rargs } ->
-      acc |> SS.union (alocs_val_list largs) |> SS.union (alocs_val_list rargs))
-    SS.empty !t
+      acc
+      |> ALoc.Set.union (alocs_val_list largs)
+      |> ALoc.Set.union (alocs_val_list rargs))
+    ALoc.Set.empty !t
 
 let to_assertions (wands : t) =
   let wand_to_asrt { lhs; rhs } = Asrt.Wand { lhs; rhs } in

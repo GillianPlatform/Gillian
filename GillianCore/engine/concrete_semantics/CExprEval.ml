@@ -320,10 +320,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | Lit lit -> lit
     | PVar x -> (
         match CStore.get store x with
-        | None ->
-            let err_msg = Fmt.str "Variable %s not found in the store" x in
-            (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
-            raise (Failure err_msg)
+        | None -> Fmt.failwith "Variable %a not found in the store" Var.pp x
         | Some v -> v)
     | BinOp (e1, bop, e2) -> evaluate_binop store bop e1 e2
     | UnOp (unop, e) -> evaluate_unop unop (ee e)

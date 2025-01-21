@@ -7,7 +7,7 @@ type t = {
   pfs : Pure_context.t;
   gamma : Type_env.t;
   learned : Expr.Set.t;
-  learned_types : (string * Type.t) list;
+  learned_types : (Id.any_var Id.t * Type.t) list;
   matching : bool;
 }
 
@@ -29,9 +29,9 @@ let init ?(matching = false) () =
 let empty = init ()
 
 let pfs_to_pfs_and_gamma pfs =
-  let expr_type_binding_to_gamma etb =
-    match etb with
-    | Expr.PVar s, t | Expr.LVar s, t -> Some (s, t)
+  let expr_type_binding_to_gamma = function
+    | Expr.PVar s, t -> Some ((s :> Id.any_var Id.t), t)
+    | LVar s, t -> Some ((s :> Id.any_var Id.t), t)
     | _ -> None
   in
   let rec aux = function
@@ -82,7 +82,7 @@ let equal pca pcb =
   pca.pfs = pcb.pfs && pca.gamma = pcb.gamma
   && Expr.Set.equal pca.learned pcb.learned
   && List.for_all2
-       (fun (n1, t1) (n2, t2) -> String.equal n1 n2 && Type.equal t1 t2)
+       (fun (n1, t1) (n2, t2) -> Id.equal n1 n2 && Type.equal t1 t2)
        pca.learned_types pcb.learned_types
 
 let pp =
@@ -99,8 +99,7 @@ let pp =
            (Fmt.Dump.seq Expr.pp);
          Fmt.field "learned_types"
            (fun x -> x.learned_types)
-           (Fmt.Dump.list
-              (Fmt.Dump.pair Fmt.string (Fmt.of_to_string Type.str)));
+           (Fmt.Dump.list (Fmt.Dump.pair Id.pp (Fmt.of_to_string Type.str)));
        ])
 
 let diff pca pcb =

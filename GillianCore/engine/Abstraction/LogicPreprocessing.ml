@@ -31,7 +31,7 @@ let rec auto_unfold
            let pred = Hashtbl.find unfolded_preds name in
            let params, _ = List.split pred.pred_params in
            let combined =
-             try List.combine params args
+             try (List.combine params args :> (Id.substable Id.t * Expr.t) list)
              with Invalid_argument _ ->
                Fmt.failwith
                  "Impossible to auto unfold predicate %s. Used with %i args \
@@ -49,7 +49,10 @@ let rec auto_unfold
                 substituting the formal parameters of the predicate with the corresponding
                 logical expressions in the argument list *)
              let params, _ = List.split pred.pred_params in
-             let subst = SVal.SSubst.init (List.combine params args) in
+             let combined =
+               (List.combine params args :> (Id.substable Id.t * Expr.t) list)
+             in
+             let subst = SVal.SSubst.init combined in
              L.tmi (fun fmt ->
                  fmt "PREDICATE %s has %d definitions" pred.pred_name
                    (List.length pred.pred_definitions));
@@ -243,7 +246,7 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
     (fun (name, _) ->
       let pred = Hashtbl.find preds name in
       L.verbose (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
-      let definitions' : ((string * string list) option * Asrt.t) list =
+      let definitions' =
         List.concat_map
           (fun (os, a) ->
             List.map (fun a -> (os, a)) (auto_unfold preds recursion_info a))
@@ -347,11 +350,16 @@ let remove_equalities_between_binders_and_lvars binders assertion =
     | true, false -> `Greater
     | false, true -> `Lower
   in
-  let equal = String.equal in
-  let uf = Union_find.init ~priority ~equal in
+  let equal = Id.equal in
+  let uf : Id.any_var Id.t Union_find.t = Union_find.init ~priority ~equal in
   let rec union_expr (e1 : Expr.t) (e2 : Expr.t) =
     match (e1, e2) with
-    | (LVar x | PVar x), (LVar y | PVar y) -> Union_find.union uf x y
+    | LVar x, PVar y | PVar y, LVar x ->
+        Union_find.union uf (x :> Id.any_var Id.t) (y :> Id.any_var Id.t)
+    | LVar x, LVar y ->
+        Union_find.union uf (x :> Id.any_var Id.t) (y :> Id.any_var Id.t)
+    | PVar x, PVar y ->
+        Union_find.union uf (x :> Id.any_var Id.t) (y :> Id.any_var Id.t)
     | EList x, EList y -> (
         try List.iter2 union_expr x y
         with Invalid_argument _ ->
@@ -371,9 +379,10 @@ let remove_equalities_between_binders_and_lvars binders assertion =
 
       method! visit_expr () e =
         match e with
-        | LVar x | PVar x ->
+        | LVar x ->
+            let x = (x :> Id.any_var Id.t) in
             let rep = Union_find.rep uf x in
-            if String.equal x rep then e else Expr.var_to_expr rep
+            if Id.equal x rep then e else Expr.var_to_expr rep
         | _ -> super#visit_expr () e
     end
   in

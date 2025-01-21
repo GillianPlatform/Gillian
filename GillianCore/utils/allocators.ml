@@ -7,7 +7,7 @@ let reset_all () = List.iter (fun f -> f ()) !resetters
 module Basic () = struct
   open Containers
 
-  type t = int [@@deriving yojson, eq, ord]
+  type t = int [@@deriving yojson, eq, ord, show]
 
   let counter = ref 0
   let freed = ref SI.empty
@@ -26,17 +26,17 @@ module Basic () = struct
 
   let () = register_resetter reset
   let of_string = int_of_string
-  let to_string = string_of_int
+  let str = string_of_int
 end
 
 module Make_with_prefix
     (A : S_with_stringify)
     (P : sig
       val prefix : string
-    end) : S with type t = string = struct
-  type t = string [@@deriving yojson, eq, ord]
+    end) : S_with_stringify with type t = string = struct
+  type t = string [@@deriving yojson, eq, ord, show]
 
-  let construct x = P.prefix ^ A.to_string x
+  let construct x = P.prefix ^ A.str x
 
   let deconstruct str =
     let lp = String.length P.prefix in
@@ -52,4 +52,6 @@ module Make_with_prefix
   let dealloc s = A.dealloc (deconstruct s)
   let eq = String.equal
   let reset = A.reset
+  let str s : string = s
+  let of_string s = s
 end

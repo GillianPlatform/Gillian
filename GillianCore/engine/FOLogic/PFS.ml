@@ -32,14 +32,20 @@ let subst_expr_for_expr (to_subst : Expr.t) (subst_with : Expr.t) (pfs : t) :
     unit =
   Ext_list.map_inplace (Expr.subst_expr_for_expr ~to_subst ~subst_with) pfs
 
-let lvars (pfs : t) : SS.t =
-  Ext_list.fold_left (fun ac a -> SS.union ac (Expr.lvars a)) SS.empty pfs
+let lvars (pfs : t) : LVar.Set.t =
+  Ext_list.fold_left
+    (fun ac a -> LVar.Set.union ac (Expr.lvars a))
+    LVar.Set.empty pfs
 
-let alocs (pfs : t) : SS.t =
-  Ext_list.fold_left (fun ac a -> SS.union ac (Expr.alocs a)) SS.empty pfs
+let alocs (pfs : t) : ALoc.Set.t =
+  Ext_list.fold_left
+    (fun ac a -> ALoc.Set.union ac (Expr.alocs a))
+    ALoc.Set.empty pfs
 
-let clocs (pfs : t) : SS.t =
-  Ext_list.fold_left (fun ac a -> SS.union ac (Expr.clocs a)) SS.empty pfs
+let clocs (pfs : t) : Loc.Set.t =
+  Ext_list.fold_left
+    (fun ac a -> Loc.Set.union ac (Expr.clocs a))
+    Loc.Set.empty pfs
 
 let pp = Fmt.vbox (Ext_list.pp ~sep:Fmt.cut Expr.pp)
 
@@ -81,41 +87,42 @@ let clean_up pfs =
       | _ -> true)
     pfs
 
-let rec get_relevant_info (_ : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t) :
-    SS.t * SS.t * SS.t =
-  let relevant = SS.union lvars locs in
+let rec get_relevant_info
+    (_ : Var.Set.t)
+    (lvars : LVar.Set.t)
+    (locs : Id.Sets.LocSet.t)
+    (pfs : t) : Var.Set.t * LVar.Set.t * Id.Sets.LocSet.t =
   let new_pvars, new_lvars, new_locs =
     fold_left
       (fun (new_pvars, new_lvars, new_locs) pf ->
         let pf_pvars = Expr.pvars pf in
         let pf_lvars = Expr.lvars pf in
         let pf_locs = Expr.locs pf in
-        let pf_relevant = SS.union pf_pvars (SS.union pf_lvars pf_locs) in
-        if SS.inter relevant pf_relevant = SS.empty then
-          (new_pvars, new_lvars, new_locs)
+        if
+          (LVar.Set.is_empty @@ LVar.Set.inter lvars pf_lvars)
+          || (Id.Sets.LocSet.is_empty @@ Id.Sets.LocSet.inter locs pf_locs)
+        then (new_pvars, new_lvars, new_locs)
         else
-          ( SS.union new_pvars pf_pvars,
-            SS.union new_lvars pf_lvars,
-            SS.union new_locs pf_locs ))
-      (SS.empty, SS.empty, SS.empty)
+          ( Var.Set.union new_pvars pf_pvars,
+            LVar.Set.union new_lvars pf_lvars,
+            Id.Sets.LocSet.union new_locs pf_locs ))
+      (Var.Set.empty, LVar.Set.empty, Id.Sets.LocSet.empty)
       pfs
   in
   if new_lvars = lvars && new_locs = locs then (new_pvars, new_lvars, new_locs)
   else get_relevant_info new_pvars new_lvars new_locs pfs
 
 let filter_with_info relevant_info (pfs : t) : t =
-  let pvars, lvars, locs = relevant_info in
+  let pvars, lvars, alocs = relevant_info in
 
-  let _, lvars, locs = get_relevant_info pvars lvars locs pfs in
+  let _, lvars, alocs = get_relevant_info pvars lvars alocs pfs in
 
-  let relevant = List.fold_left SS.union SS.empty [ lvars; locs ] in
   let filtered_pfs = copy pfs in
   let () =
     filter
       (fun pf ->
-        let pf_info = SS.union (Expr.lvars pf) (Expr.locs pf) in
-        let overlap = SS.inter relevant pf_info in
-        not @@ SS.is_empty overlap)
+        LVar.Set.(not @@ is_empty @@ inter (Expr.lvars pf) lvars)
+        || Id.Sets.LocSet.(not @@ is_empty @@ inter (Expr.locs pf) alocs))
       filtered_pfs
   in
   filtered_pfs

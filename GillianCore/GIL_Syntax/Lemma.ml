@@ -9,14 +9,14 @@ type t = TypeDef__.lemma = {
   (* Name of the lemma *)
   lemma_source_path : string option;
   lemma_internal : bool;
-  lemma_params : string list;
+  lemma_params : Id.Var.t list;
   (* Params *)
   lemma_specs : spec list;
   lemma_proof : LCmd.t list option;
   (* (Optional) Proof body *)
   lemma_variant : Expr.t option;
   (* The paramater to treat as the variant. Will trigger termination checks *)
-  lemma_existentials : string list;
+  lemma_existentials : Id.LVar.t list;
 }
 
 let init_tbl () : (string, t) Hashtbl.t = Hashtbl.create Config.small_tbl_size

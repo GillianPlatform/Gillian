@@ -1,11 +1,11 @@
 (***************************************************************)
 (** Separation Logic Commmands                                **)
-
 (***************************************************************)
 
+open Id
 module SS = Containers.SS
 
-type folding_info = string * (string * Expr.t) list [@@deriving yojson]
+type folding_info = string * (LVar.t * Expr.t) list [@@deriving yojson]
 type unfold_info = (string * string) list [@@deriving yojson]
 
 (** {b GIL Separation Logic commands}. *)
@@ -44,61 +44,62 @@ let map (f_a : Asrt.t -> Asrt.t) (f_e : Expr.t -> Expr.t) : t -> t = function
       Package
         { lhs = (lname, List.map f_e largs); rhs = (rname, List.map f_e rargs) }
 
-let fold = List.fold_left SS.union SS.empty
-
-let pvars (slcmd : t) : SS.t =
+let pvars (slcmd : t) : Var.Set.t =
+  let fold = List.fold_left Var.Set.union Var.Set.empty in
   let pvars_es es = fold (List.map Expr.pvars es) in
   match slcmd with
   | Fold (_, es, _) | Unfold (_, es, _, _) | ApplyLem (_, es, _) -> pvars_es es
-  | GUnfold _ -> SS.empty
+  | GUnfold _ -> Var.Set.empty
   | Package { lhs = _, les1; rhs = _, les2 } ->
-      SS.union (pvars_es les1) (pvars_es les2)
+      Var.Set.union (pvars_es les1) (pvars_es les2)
   | SepAssert (a, _) | Invariant (a, _) | Consume (a, _) | Produce a ->
       Asrt.pvars a
-  | SymbExec -> SS.empty
+  | SymbExec -> Var.Set.empty
 
-let lvars (slcmd : t) : SS.t =
+let lvars (slcmd : t) : LVar.Set.t =
+  let fold = List.fold_left LVar.Set.union LVar.Set.empty in
   let lvars_es es = fold (List.map Expr.lvars es) in
   match slcmd with
   | Fold (_, es, finfo) ->
       let lvars_finfo =
         match finfo with
-        | None -> SS.empty
+        | None -> LVar.Set.empty
         | Some (_, les) ->
             let _, es = List.split les in
             fold (List.map Expr.lvars es)
       in
-      SS.union lvars_finfo (lvars_es es)
+      LVar.Set.union lvars_finfo (lvars_es es)
   | Unfold (_, es, _, _) -> lvars_es es
   | Package { lhs = _, les1; rhs = _, les2 } ->
-      SS.union (lvars_es les1) (lvars_es les2)
+      LVar.Set.union (lvars_es les1) (lvars_es les2)
   | ApplyLem (_, es, _) -> lvars_es es
-  | GUnfold _ -> SS.empty
+  | GUnfold _ -> LVar.Set.empty
   | SepAssert (a, binders) | Consume (a, binders) ->
-      SS.union (Asrt.lvars a) (SS.of_list binders)
+      LVar.Set.union (Asrt.lvars a) (LVar.Set.of_list binders)
   | Invariant (a, _) | Produce a -> Asrt.lvars a
-  | SymbExec -> SS.empty
+  | SymbExec -> LVar.Set.empty
 
-let locs (slcmd : t) : SS.t =
+let locs (slcmd : t) : Sets.LocSet.t =
+  let fold = List.fold_left Sets.LocSet.union Sets.LocSet.empty in
   let locs_es es = fold (List.map Expr.locs es) in
   match slcmd with
   | Fold (_, es, finfo) ->
       let lvars_finfo =
         match finfo with
-        | None -> SS.empty
+        | None -> Sets.LocSet.empty
         | Some (_, les) ->
             let _, es = List.split les in
             fold (List.map Expr.locs es)
       in
-      SS.union lvars_finfo (locs_es es)
+      Sets.LocSet.union lvars_finfo (locs_es es)
   | Unfold (_, es, _, _) -> locs_es es
   | Package { lhs = _, les1; rhs = _, les2 } ->
-      SS.union (locs_es les1) (locs_es les2)
+      Sets.LocSet.union (locs_es les1) (locs_es les2)
   | ApplyLem (_, es, _) -> locs_es es
-  | GUnfold _ -> SS.empty
+  | GUnfold _ -> Sets.LocSet.empty
   | SepAssert (a, _) | Invariant (a, _) | Consume (a, _) | Produce a ->
       Asrt.locs a
-  | SymbExec -> SS.empty
+  | SymbExec -> Sets.LocSet.empty
 
 let pp_folding_info =
   let pp_ui f (v, le) = Fmt.pf f "(%s := %a)" v Expr.pp le in

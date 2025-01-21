@@ -5,9 +5,12 @@ type 'a t
 val resolve : curr_pc:Pc.t -> 'a t -> 'a Branch.t list
 
 val return :
-  ?learned:Expr.t list -> ?learned_types:(string * Type.t) list -> 'a -> 'a t
+  ?learned:Expr.t list ->
+  ?learned_types:(Id.any_var Id.t * Type.t) list ->
+  'a ->
+  'a t
 
-val resolve_loc : Expr.t -> string option t
+val resolve_loc : Expr.t -> Id.any_loc Id.t option t
 val reduce : Expr.t -> Expr.t t
 val entails : Expr.t list -> Expr.t -> bool t
 val check_sat : Expr.t -> bool t

@@ -41,19 +41,19 @@ module type S = sig
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
-  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+  val pp_by_need : Id.Sets.LocSet.t -> Format.formatter -> t -> unit
+  val get_print_info : Id.Sets.LocSet.t -> t -> LVar.Set.t * Id.Sets.LocSet.t
 
   val substitution_in_place :
     pfs:PFS.t ->
     gamma:Type_env.t ->
     st ->
     t ->
-    (t * Expr.Set.t * (string * Type.t) list) list
+    (t * Expr.Set.t * (Id.any_var Id.t * Type.t) list) list
 
   val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
-  val lvars : t -> Containers.SS.t
-  val alocs : t -> Containers.SS.t
+  val lvars : t -> LVar.Set.t
+  val alocs : t -> ALoc.Set.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
   val mem_constraints : t -> Expr.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t

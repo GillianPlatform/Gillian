@@ -15,7 +15,7 @@ module type S = sig
   type t [@@deriving yojson]
 
   type action_ret :=
-    ( (t * vt list * Expr.t list * (string * Type.t) list) list,
+    ( (t * vt list * Expr.t list * (Id.any_var Id.t * Type.t) list) list,
       err_t list )
     result
 

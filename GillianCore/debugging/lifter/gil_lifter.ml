@@ -227,6 +227,7 @@ functor
       let store_vars =
         store
         |> List.map (fun (var, value) : Variable.t ->
+               let var = Var.str var in
                let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
                Variable.create_leaf var value ())
         |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)

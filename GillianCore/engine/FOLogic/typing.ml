@@ -131,7 +131,14 @@ module Infer_types_to_gamma = struct
     | Lit lit -> Literal.type_of lit = tt
     (* Variables are reverse-typable if they are already typable *)
     (* with the target type or if they are not typable           *)
-    | LVar var | PVar var -> (
+    | LVar var -> (
+        match (Type_env.get gamma var, Type_env.get new_gamma var) with
+        | Some t, None | None, Some t -> t = tt
+        | None, None ->
+            Type_env.update new_gamma var tt;
+            true
+        | Some t1, Some t2 -> t1 = t2)
+    | PVar var -> (
         match (Type_env.get gamma var, Type_env.get new_gamma var) with
         | Some t, None | None, Some t -> t = tt
         | None, None ->
@@ -173,7 +180,7 @@ module Infer_types_to_gamma = struct
           (* We've updated our new_gamma_copy with a bunch of things.
              We need to import everything except the quantified variables to the new_gamma *)
           Type_env.iter new_gamma_copy (fun x t ->
-              if not (List.exists (fun (y, _) -> String.equal x y) bt) then
+              if not (List.exists (fun (y, _) -> Id.equal x y) bt) then
                 Type_env.update new_gamma x t);
           ret
 end
@@ -457,7 +464,8 @@ module Type_lexpr = struct
       (* Literals are always typable *)
       | Lit lit -> def_pos (Some (Literal.type_of lit))
       (* Variables are typable if in gamma, otherwise no, but typing continues *)
-      | LVar var | PVar var -> def_pos (Type_env.get gamma var)
+      | LVar var -> def_pos (Type_env.get gamma var)
+      | PVar var -> def_pos (Type_env.get gamma var)
       (* Abstract locations are always typable, by construction *)
       | ALoc _ -> def_pos (Some ObjectType)
       (* Lists are always typable *)
@@ -490,11 +498,14 @@ let te_of_list (vt : (Expr.t * Type.t) list) : Type_env.t option =
         | Lit l ->
             let t' = Literal.type_of l in
             if t <> t' then raise Break
-        | LVar x | PVar x ->
-            if Type_env.mem result x then (
-              let t' = Type_env.get_unsafe result x in
-              if t <> t' then raise Break)
-            else Type_env.update result x t
+        | LVar x -> (
+            match Type_env.get result x with
+            | Some t' -> if t <> t' then raise Break
+            | None -> Type_env.update result x t)
+        | PVar x -> (
+            match Type_env.get result x with
+            | Some t' -> if t <> t' then raise Break
+            | None -> Type_env.update result x t)
         | _ -> (
             let t', _ = type_lexpr result e in
             match t' with
@@ -511,9 +522,7 @@ let naively_infer_type_information (pfs : PFS.t) (gamma : Type_env.t) : unit =
       | Expr.BinOp (LVar x, Equal, le) | Expr.BinOp (le, Equal, LVar x) ->
           if not (Type_env.mem gamma x) then
             let le_type, _ = type_lexpr gamma le in
-            Option.fold
-              ~some:(fun x_type -> Type_env.update gamma x x_type)
-              ~none:() le_type
+            Option.fold ~some:(Type_env.update gamma x) ~none:() le_type
       | Expr.BinOp (UnOp (TypeOf, LVar x), Equal, Lit (Type t))
       | Expr.BinOp (Lit (Type t), Equal, UnOp (TypeOf, LVar x)) ->
           Type_env.update gamma x t
@@ -526,7 +535,13 @@ let substitution_in_place (subst : SSubst.t) (gamma : Type_env.t) : unit =
     List.fold_left
       (fun ac (x, e) ->
         match x with
-        | Expr.LVar x | PVar x ->
+        | Expr.LVar x ->
+            Option.fold
+              ~some:(fun x_type ->
+                Type_env.remove gamma x;
+                (e, x_type) :: ac)
+              ~none:ac (Type_env.get gamma x)
+        | PVar x ->
             Option.fold
               ~some:(fun x_type ->
                 Type_env.remove gamma x;
@@ -536,4 +551,4 @@ let substitution_in_place (subst : SSubst.t) (gamma : Type_env.t) : unit =
       [] ve_pairs
   in
   let gamma' = reverse_type_lexpr true gamma et_pairs in
-  Option.fold ~some:(fun gamma' -> Type_env.extend gamma gamma') ~none:() gamma'
+  Option.fold ~some:(Type_env.extend gamma) ~none:() gamma'

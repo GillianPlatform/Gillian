@@ -39,7 +39,7 @@ and literal =
         | _ -> Error "Invalid yojson for Z"])
   | Num of float
   | String of string
-  | Loc of string
+  | Loc of (Id.Loc.t[@opaque])
   | Type of typ
   | LList of literal list
   | Nono
@@ -133,17 +133,17 @@ and nop = LstCat | SetUnion | SetInter
 
 and expr =
   | Lit of literal
-  | PVar of string
-  | LVar of string
-  | ALoc of string
+  | PVar of (Id.Var.t[@opaque])
+  | LVar of (Id.LVar.t[@opaque])
+  | ALoc of (Id.ALoc.t[@opaque])
   | UnOp of unop * expr
   | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr
   | NOp of nop * expr list
   | EList of expr list
   | ESet of expr list
-  | Exists of (string * typ option) list * expr
-  | ForAll of (string * typ option) list * expr
+  | Exists of ((Id.LVar.t[@opaque]) * typ option) list * expr
+  | ForAll of ((Id.LVar.t[@opaque]) * typ option) list * expr
 
 and assertion_atom =
   | Emp
@@ -154,7 +154,7 @@ and assertion_atom =
   | Wand of { lhs : string * expr list; rhs : string * expr list }
 
 and assertion = assertion_atom list
-and bindings = string * (string * expr) list
+and bindings = string * ((Id.LVar.t[@opaque]) * expr) list
 
 and slcmd =
   | Fold of string * expr list * bindings option
@@ -202,7 +202,7 @@ and pred = {
   pred_source_path : string option;
   pred_internal : bool;
   pred_num_params : int;
-  pred_params : (string * typ option) list;
+  pred_params : ((Id.Var.t[@opaque]) * typ option) list;
   pred_ins : int list;
   pred_definitions : ((string * string list) option * assertion) list;
   pred_facts : expr list;
@@ -223,7 +223,7 @@ and lemma = {
   lemma_name : string;
   lemma_source_path : string option;
   lemma_internal : bool;
-  lemma_params : string list;
+  lemma_params : (Id.Var.t[@opaque]) list;
   lemma_specs : lemma_spec list;
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
@@ -236,12 +236,12 @@ and single_spec = {
   ss_variant : expr option;
   ss_flag : flag;
   ss_to_verify : bool;
-  ss_label : (string * string list) option;
+  ss_label : (string * (Id.LVar.t[@opaque]) list) option;
 }
 
 and spec = {
   spec_name : string;
-  spec_params : string list;
+  spec_params : (Id.Var.t[@opaque]) list;
   spec_sspecs : single_spec list;
   spec_normalised : bool;
   spec_incomplete : bool;

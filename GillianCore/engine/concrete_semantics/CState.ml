@@ -127,22 +127,16 @@ end = struct
   let get_lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
 
-  let to_assertions ?to_keep:_ (_ : t) : Asrt.t =
+  let to_assertions ?to_keep:_ _ =
     raise (Failure "ERROR: to_assertions called for concrete executions")
 
-  let run_spec
-      (_ : MP.spec)
-      (_ : t)
-      (_ : string)
-      (_ : vt list)
-      (_ : (string * (string * vt) list) option) =
+  let run_spec _ _ _ _ _ =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
-  let unfolding_vals (_ : t) (_ : Expr.t list) : vt list =
+  let unfolding_vals _ _ =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
-  let evaluate_slcmd (_ : 'a MP.prog) (_ : SLCmd.t) (_ : t) :
-      (t, err_t) Res_list.t =
+  let evaluate_slcmd _ _ _ =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let match_invariant _ _ _ _ _ =

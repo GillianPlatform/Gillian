@@ -35,11 +35,10 @@ let is_aloc_name (name : string) : bool =
   try String.sub name 0 4 = aloc_prefix with _ -> false
 
 let is_lvar_name (name : string) : bool =
-  try String.sub name 0 1 = "#" || String.sub name 0 6 = lvar_prefix
-  with _ -> false
+  try name.[0] = '#' || String.sub name 0 6 = lvar_prefix with _ -> false
 
 let is_spec_var_name (name : string) : bool =
-  try String.sub name 0 1 = "#" with _ -> false
+  try name.[0] = '#' with _ -> false
 
 let is_lloc_name (name : string) : bool =
   try String.sub name 0 2 = lloc_prefix with _ -> false

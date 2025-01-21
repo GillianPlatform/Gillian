@@ -58,13 +58,13 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   (** Store printer by need *)
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+  val pp_by_need : Var.Set.t -> Format.formatter -> t -> unit
 
   (** Converts the store into an ssubst *)
   val to_ssubst : t -> SVal.SESubst.t
 
   (** Logical variables *)
-  val lvars : t -> Var.Set.t
+  val lvars : t -> LVar.Set.t
 end
 
 module Make (Val : Val.S) : S with type vt = Val.t

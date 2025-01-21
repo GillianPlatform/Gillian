@@ -37,7 +37,7 @@ let pp_err
         (Fmt.option ~none:(Fmt.any "None") (Fmt.of_to_string Type.str))
         t1 (Type.str t2)
   | EPure f -> Fmt.pf fmt "EPure(%a)" Expr.pp f
-  | EVar x -> Fmt.pf fmt "EVar(%s)" x
+  | EVar x -> Fmt.pf fmt "EVar(%a)" Id.pp x
   | EAsrt (vs, f, asrtss) ->
       let pp_asrts fmt asrts = Fmt.pf fmt "[%a]" Asrt.pp asrts in
       Fmt.pf fmt "EAsrt(%a; %a; %a)"

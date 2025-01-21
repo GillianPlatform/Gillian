@@ -11,8 +11,6 @@ type field_value = Expr.t [@@deriving yojson]
 (* Definition *)
 type t = field_value Expr.Map.t [@@deriving yojson]
 
-let gsbsts = Expr.substitutables
-
 (* Printing *)
 let pp ft sfvl =
   let open Fmt in

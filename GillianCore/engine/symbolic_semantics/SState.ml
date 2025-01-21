@@ -1,5 +1,3 @@
-open Literal
-open Names
 module L = Logging
 module SSubst = SVal.SESubst
 
@@ -15,7 +13,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:Id.Sets.SubstSet.t ->
     t
 
   val init : init_data -> t
@@ -48,7 +46,7 @@ module Make (SMemory : SMemory.S) :
     store : store_t;
     pfs : PFS.t;
     gamma : Type_env.t;
-    spec_vars : SS.t;
+    spec_vars : Id.Sets.SubstSet.t;
   }
   [@@deriving yojson]
 
@@ -80,7 +78,7 @@ module Make (SMemory : SMemory.S) :
        @\n\
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
-      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+      (Fmt.iter ~sep:Fmt.comma Id.Sets.SubstSet.iter Id.pp)
       spec_vars SStore.pp store pp_heap heap PFS.pp pfs Type_env.pp gamma
 
   let sure_is_nonempty { heap; _ } = SMemory.sure_is_nonempty heap
@@ -88,7 +86,8 @@ module Make (SMemory : SMemory.S) :
   let pp_by_need pvars cmd_lvars cmd_locs fmt state =
     let { heap = memory; store; pfs; gamma; spec_vars } = state in
 
-    let rec get_print_info (lvars : SS.t) (locs : SS.t) : SS.t * SS.t =
+    let rec get_print_info (lvars : LVar.Set.t) (locs : Id.Sets.LocSet.t) :
+        LVar.Set.t * Id.Sets.LocSet.t =
       (* let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
          let () =
            L.verbose (fun fmt ->
@@ -97,49 +96,54 @@ module Make (SMemory : SMemory.S) :
          in *)
       (* Get locs from lvars... *)
       let pfs_locs =
-        SS.fold
+        LVar.Set.fold
           (fun x ac ->
             match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
-            | Some loc -> SS.add loc ac
+            | Some loc -> Id.Sets.LocSet.add loc ac
             | None -> ac)
-          lvars SS.empty
+          lvars Id.Sets.LocSet.empty
       in
       (* ...and add them to the current locs *)
-      let new_locs = SS.union locs pfs_locs in
+      let new_locs = Id.Sets.LocSet.union locs pfs_locs in
       (* Get relevant lvars and locs from the memory... *)
       let mem_lvars, mem_locs = SMemory.get_print_info new_locs memory in
       (* ...and add them accordingly *)
-      let new_lvars = SS.union lvars mem_lvars in
-      let new_locs = SS.union new_locs mem_locs in
+      let new_lvars = LVar.Set.union lvars mem_lvars in
+      let new_locs = Id.Sets.LocSet.union new_locs mem_locs in
       (* Learn more from the pfs... *)
       let _, more_lvars, more_locs =
         PFS.get_relevant_info pvars new_lvars new_locs pfs
       in
       (* ...and add that accordingly *)
-      let new_lvars = SS.union new_lvars more_lvars in
-      let new_locs = SS.union new_locs more_locs in
+      let new_lvars = LVar.Set.union new_lvars more_lvars in
+      let new_locs = Id.Sets.LocSet.union new_locs more_locs in
       (* If nothing has been learned, stop; otherwise, retry *)
-      if SS.equal lvars new_lvars && SS.equal locs new_locs then (lvars, locs)
+      if LVar.Set.equal lvars new_lvars && Id.Sets.LocSet.equal locs new_locs
+      then (lvars, locs)
       else get_print_info new_lvars new_locs
     in
 
     (* Logical variables and locations from the store *)
     let store_lvars, store_locs =
-      SS.fold
-        (fun pvar ac ->
+      Var.Set.fold
+        (fun pvar ((lvars, locs) as ac) ->
           match SStore.get store pvar with
           | None -> ac
           | Some e ->
-              (SS.union (fst ac) (Expr.lvars e), SS.union (snd ac) (Expr.locs e)))
-        pvars (SS.empty, SS.empty)
+              ( LVar.Set.union lvars (Expr.lvars e),
+                Id.Sets.LocSet.union locs (Expr.locs e) ))
+        pvars
+        (LVar.Set.empty, Id.Sets.LocSet.empty)
     in
     (* LVars: commands + store *)
-    let lvars = SS.union cmd_lvars store_lvars in
-    let locs = SS.union cmd_locs store_locs in
+    let lvars = LVar.Set.union cmd_lvars store_lvars in
+    let locs = Id.Sets.LocSet.union cmd_locs store_locs in
     (* Locations found in the pfs *)
     let lvars, locs = get_print_info lvars locs in
     (* Filter spec vars *)
-    let spec_vars = SS.filter (fun x -> SS.mem x lvars) spec_vars in
+    let spec_vars =
+      Id.Sets.SubstSet.inter spec_vars @@ Id.Sets.lvar_to_subst lvars
+    in
 
     (* TODO: Locations for the heap *)
     (* TODO: Logical variables for the pfs and gamma *)
@@ -161,11 +165,14 @@ module Make (SMemory : SMemory.S) :
        @\n\
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
-      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+      (Fmt.iter ~sep:Fmt.comma Id.Sets.SubstSet.iter Id.pp)
       spec_vars (SStore.pp_by_need pvars) store pp_memory memory
       (PFS.pp_by_need (pvars, lvars, locs))
       pfs
-      (Type_env.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
+      (Type_env.pp_by_need
+         (Id.Sets.VarSet.union
+            (Id.Sets.pvar_to_varset pvars)
+            (Id.Sets.lvar_to_varset lvars)))
       gamma
 
   let init init_data =
@@ -174,7 +181,7 @@ module Make (SMemory : SMemory.S) :
       store = SStore.init [];
       pfs = PFS.init ();
       gamma = Type_env.init ();
-      spec_vars = SS.empty;
+      spec_vars = Id.Sets.SubstSet.empty;
     }
 
   let make_s
@@ -182,7 +189,7 @@ module Make (SMemory : SMemory.S) :
       ~(store : SStore.t)
       ~(pfs : PFS.t)
       ~(gamma : Type_env.t)
-      ~(spec_vars : SS.t) : t =
+      ~(spec_vars : Id.Sets.SubstSet.t) : t =
     { heap = SMemory.init init_data; store; pfs; gamma; spec_vars }
 
   let execute_action (action : string) (state : t) (args : vt list) : action_ret
@@ -341,7 +348,7 @@ module Make (SMemory : SMemory.S) :
     FOSolver.check_satisfiability_with_model (fs @ PFS.to_list pfs) gamma
 
   let assert_a ({ pfs; gamma; _ } : t) (ps : Expr.t list) : bool =
-    FOSolver.check_entailment SS.empty pfs ps gamma
+    FOSolver.check_entailment LVar.Set.empty pfs ps gamma
 
   let equals ({ pfs; gamma; _ } : t) (le1 : vt) (le2 : vt) : bool =
     let result = FOSolver.is_equal ~pfs ~gamma le1 le2 in
@@ -359,7 +366,13 @@ module Make (SMemory : SMemory.S) :
       (state : t) : st * t list =
     let { heap; store; pfs; gamma; spec_vars } = state in
     let save_spec_vars =
-      if save then (SS.empty, true) else (spec_vars, false)
+      if save then (LVar.Set.empty, true)
+      else (
+        assert (
+          Id.Sets.SubstSet.for_all
+            (fun x -> Names.is_lvar_name @@ Id.str x)
+            spec_vars);
+        (Id.Sets.substset_to_lvar spec_vars, false))
     in
     L.verbose (fun m ->
         m
@@ -375,7 +388,12 @@ module Make (SMemory : SMemory.S) :
     let subst =
       SSubst.filter subst (fun x _ ->
           match x with
-          | LVar x | PVar x | ALoc x -> not (SS.mem x spec_vars)
+          | LVar x ->
+              not (Id.Sets.SubstSet.mem (x :> Id.substable Id.t) spec_vars)
+          | PVar x ->
+              not (Id.Sets.SubstSet.mem (x :> Id.substable Id.t) spec_vars)
+          | ALoc x ->
+              not (Id.Sets.SubstSet.mem (x :> Id.substable Id.t) spec_vars)
           | _ -> true)
     in
     (* Sometimes, [simplify_pfs_and_gamma] leaves abstract locations on the
@@ -474,25 +492,30 @@ module Make (SMemory : SMemory.S) :
     in
     result
 
-  let add_spec_vars (state : t) (xs : Var.Set.t) : t =
-    let spec_vars = SS.union xs state.spec_vars in
+  let add_spec_vars (state : t) (xs : Id.Sets.SubstSet.t) : t =
+    let spec_vars = Id.Sets.SubstSet.union xs state.spec_vars in
     { state with spec_vars }
 
-  let get_spec_vars ({ spec_vars; _ } : t) : SS.t = spec_vars
+  let get_spec_vars ({ spec_vars; _ } : t) : Id.Sets.SubstSet.t = spec_vars
 
-  let get_lvars (state : t) : Var.Set.t =
+  let get_lvars (state : t) : LVar.Set.t =
     let { heap; store; pfs; gamma; spec_vars } = state in
     SMemory.lvars heap
-    |> SS.union (SStore.lvars store)
-    |> SS.union (PFS.lvars pfs)
-    |> SS.union (Type_env.lvars gamma)
-    |> SS.union spec_vars
+    |> LVar.Set.union (SStore.lvars store)
+    |> LVar.Set.union (PFS.lvars pfs)
+    |> LVar.Set.union (Type_env.lvars gamma)
+    |> LVar.Set.union
+       (* TODO: ???? should spec_vars be an lvar.set rather than substset ?? otherwise why is this here *)
+       @@ LVar.Set.of_list
+       @@ List.map (fun x -> LVar.of_string @@ Id.str x)
+       @@ Id.Sets.SubstSet.to_list spec_vars
 
-  let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t =
+  let to_assertions ?(to_keep : Var.Set.t option) (state : t) : Asrt.t =
     let { heap; store; pfs; gamma; _ } = state in
     let store' =
       Option.fold
-        ~some:(fun store_dom -> SStore.projection store (SS.elements store_dom))
+        ~some:(fun store_dom ->
+          SStore.projection store (Var.Set.elements store_dom))
         ~none:store to_keep
     in
     let asrts_pfs =
@@ -524,24 +547,19 @@ module Make (SMemory : SMemory.S) :
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for symbolic execution")
 
-  let run_spec
-      (_ : MP.spec)
-      (_ : t)
-      (_ : string)
-      (_ : vt list)
-      (_ : (string * (string * vt) list) option) =
+  let run_spec _ _ _ _ _ =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
   let unfolding_vals (_ : t) (fs : Expr.t list) : vt list =
-    let map to_str to_expr =
-      List.map to_str fs
-      |> List.fold_left SS.union SS.empty
-      |> SS.elements |> List.map to_expr
+    let map_e to_set union empty elements to_expr =
+      List.map to_set fs |> List.fold_left union empty |> elements
+      |> List.map to_expr
     in
-    let lvars = map Expr.lvars (fun x -> Expr.LVar x) in
-    let alocs = map Expr.alocs (fun x -> Expr.ALoc x) in
-    let clocs = map Expr.clocs (fun x -> Expr.Lit (Loc x)) in
-    clocs @ alocs @ lvars
+
+    LVar.Set.(map_e Expr.lvars union empty elements (fun x -> Expr.LVar x))
+    @ ALoc.Set.(map_e Expr.alocs union empty elements (fun x -> Expr.ALoc x))
+    @ Loc.Set.(
+        map_e Expr.clocs union empty elements (fun x -> Expr.Lit (Loc x)))
 
   let substitution_in_place ?(subst_all = false) (subst : st) (state : t) :
       t list =
@@ -589,8 +607,8 @@ module Make (SMemory : SMemory.S) :
     let { heap; store; _ } = state in
     let keep =
       keep
-      |> SS.fold (fun x ac -> ES.add (Expr.ALoc x) ac) (SStore.alocs store)
-      |> SS.fold (fun x ac -> ES.add (Expr.LVar x) ac) (SStore.lvars store)
+      |> ALoc.Set.fold (fun x -> ES.add (Expr.ALoc x)) (SStore.alocs store)
+      |> LVar.Set.fold (fun x -> ES.add (Expr.LVar x)) (SStore.lvars store)
     in
     let forgettables, keep = SMemory.clean_up ~keep heap in
     L.verbose (fun fmt ->
@@ -612,10 +630,10 @@ module Make (SMemory : SMemory.S) :
                   match
                     Reduction.resolve_expr_to_location pfs gamma (LVar y)
                   with
-                  | Some loc_name ->
-                      if is_aloc_name loc_name then
-                        (x, Expr.ALoc loc_name) :: ac
-                      else ac
+                  | Some loc_name -> (
+                      match Id.as_aloc loc_name with
+                      | Some loc_name -> (x, Expr.ALoc loc_name) :: ac
+                      | None -> ac)
                   | _ -> ac)
               | _ -> ac)
           | _ -> ac)
@@ -624,11 +642,12 @@ module Make (SMemory : SMemory.S) :
     List.iter (fun (x, e) -> SSubst.put subst x e) new_bindings
 
   (* Auxiliary Functions *)
-  let get_loc_name (loc : Expr.t) state : string option =
+  let get_loc_name (loc : Expr.t) state : Id.any_loc Id.t option =
     L.(tmi (fun m -> m "get_loc_name: %s" ((Fmt.to_to_string Expr.pp) loc)));
     let { pfs; gamma; _ } = state in
     match loc with
-    | Lit (Loc loc) | ALoc loc -> Some loc
+    | Lit (Loc loc) -> Some (loc :> Id.any_loc Id.t)
+    | ALoc loc -> Some (loc :> Id.any_loc Id.t)
     | LVar x -> Reduction.resolve_expr_to_location pfs gamma (LVar x)
     | _ ->
         L.verbose (fun m -> m "Unsupported location MAKESState: %a" Expr.pp loc);
@@ -638,11 +657,8 @@ module Make (SMemory : SMemory.S) :
   let fresh_loc ?(loc : vt option) (state : t) : vt =
     match loc with
     | Some loc -> (
-        let loc_name = get_loc_name loc state in
-        match loc_name with
-        | Some loc_name ->
-            if is_aloc_name loc_name then Expr.ALoc loc_name
-            else Expr.Lit (Loc loc_name)
+        match get_loc_name loc state with
+        | Some loc_name -> Expr.loc_from_loc_name loc_name
         | None -> ALoc (ALoc.alloc ()))
     | None -> ALoc (ALoc.alloc ())
 
@@ -660,20 +676,19 @@ module Make (SMemory : SMemory.S) :
       PFS.fold_left
         (fun (acc : vt Recovery_tactic.t) -> function
           | BinOp ((ALoc _ as loc), Equal, LVar x)
-          | BinOp (LVar x, Equal, (ALoc _ as loc)) ->
-              if Names.is_spec_var_name x then
-                let try_fold =
-                  Option.map
-                    (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
-                    acc.try_fold
-                in
-                let try_unfold =
-                  Option.map
-                    (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
-                    acc.try_unfold
-                in
-                { try_fold; try_unfold }
-              else acc
+          | BinOp (LVar x, Equal, (ALoc _ as loc))
+            when Names.is_spec_var_name @@ LVar.str x ->
+              let try_fold =
+                Option.map
+                  (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
+                  acc.try_fold
+              in
+              let try_unfold =
+                Option.map
+                  (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
+                  acc.try_unfold
+              in
+              { try_fold; try_unfold }
           | _ -> acc)
         memory_tactic pfs
 

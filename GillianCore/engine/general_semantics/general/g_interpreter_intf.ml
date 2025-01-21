@@ -82,7 +82,7 @@ module type S = sig
   type conf_t = BConfErr of err_t list | BConfCont of state_t
 
   (** The result of execution
-      
+
     In the symbolic case, this is the result of {i one branch} of execution *)
   type result_t = (state_t, state_vt, err_t) Exec_res.t
 
@@ -156,7 +156,7 @@ module type S = sig
     (result_t -> 'a) ->
     annot MP.prog ->
     string ->
-    string list ->
+    Var.t list ->
     state_t ->
     'a cont_func
 
@@ -165,7 +165,7 @@ module type S = sig
     (result_t -> 'a) ->
     annot MP.prog ->
     string ->
-    string list ->
+    Var.t list ->
     state_t ->
     'a list
 

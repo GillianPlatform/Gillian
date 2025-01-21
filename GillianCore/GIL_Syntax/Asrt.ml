@@ -1,3 +1,5 @@
+open Id
+
 (** {b GIL logic assertions}. *)
 type atom = TypeDef__.assertion_atom =
   | Emp  (** Empty heap             *)
@@ -84,20 +86,24 @@ let map (f_e : Expr.t -> Expr.t) : t -> t =
           })
 
 (* Get all the logical variables in --a-- *)
-let lvars : t -> SS.t =
-  Visitors.Collectors.lvar_collector#visit_assertion SS.empty
+let lvars : t -> LVar.Set.t =
+  Visitors.Collectors.lvar_collector#visit_assertion LVar.Set.empty
 
 (* Get all the program variables in --a-- *)
-let pvars : t -> SS.t = Visitors.Collectors.pvar_collector#visit_assertion ()
+let pvars : t -> Var.Set.t =
+  Visitors.Collectors.pvar_collector#visit_assertion ()
 
 (* Get all the abstract locations in --a-- *)
-let alocs : t -> SS.t = Visitors.Collectors.aloc_collector#visit_assertion ()
+let alocs : t -> ALoc.Set.t =
+  Visitors.Collectors.aloc_collector#visit_assertion ()
 
 (* Get all the concrete locations in [a] *)
-let clocs : t -> SS.t = Visitors.Collectors.cloc_collector#visit_assertion ()
+let clocs : t -> Loc.Set.t =
+  Visitors.Collectors.cloc_collector#visit_assertion ()
 
-(* Get all the concrete locations in [a] *)
-let locs : t -> SS.t = Visitors.Collectors.loc_collector#visit_assertion ()
+(* Get all the abstract and concrete locations in [a] *)
+let locs : t -> Sets.LocSet.t =
+  Visitors.Collectors.loc_collector#visit_assertion ()
 
 (* Returns a list with the names of the predicates that occur in --a-- *)
 let pred_names : t -> string list =
@@ -169,7 +175,7 @@ let pp_atom_full = _pp_atom ~e_pp:Expr.full_pp
 let pp = _pp ~e_pp:Expr.pp
 let full_pp = _pp ~e_pp:Expr.full_pp
 
-let subst_clocs (subst : string -> Expr.t) : t -> t =
+let subst_clocs (subst : Id.Loc.t -> Expr.t) : t -> t =
   map (Expr.subst_clocs subst)
 
 let subst_expr_for_expr ~(to_subst : Expr.t) ~(subst_with : Expr.t) : t -> t =

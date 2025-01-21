@@ -86,17 +86,17 @@ let remove_by_name (preds : t) (pname : string) : abs_t option =
 let find_pabs_by_name (preds : t) (pname : string) : abs_t list =
   List.filter (fun (pn, _) -> pn = pname) !preds
 
-let get_lvars (preds : t) : SS.t =
+let get_lvars (preds : t) : LVar.Set.t =
   List.fold_left
     (fun ac (_, vs) ->
-      List.fold_left (fun ac e -> SS.union ac (Expr.lvars e)) ac vs)
-    SS.empty !preds
+      List.fold_left (fun ac e -> LVar.Set.union ac (Expr.lvars e)) ac vs)
+    LVar.Set.empty !preds
 
-let get_alocs (preds : t) : SS.t =
+let get_alocs (preds : t) : ALoc.Set.t =
   List.fold_left
     (fun ac (_, vs) ->
-      List.fold_left (fun ac e -> SS.union ac (Expr.alocs e)) ac vs)
-    SS.empty !preds
+      List.fold_left (fun ac e -> ALoc.Set.union ac (Expr.alocs e)) ac vs)
+    ALoc.Set.empty !preds
 
 (** Printing function *)
 let pp_pabs fmt pa =

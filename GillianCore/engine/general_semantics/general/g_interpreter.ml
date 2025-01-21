@@ -417,20 +417,16 @@ struct
       raise
         (Failure (Printf.sprintf "Undefined predecessor: %s %d %d" pid prev i))
 
-  let update_store (state : State.t) (x : string) (v : Val.t) : State.t =
+  let update_store (state : State.t) (x : Var.t) (v : Val.t) : State.t =
     let store = State.get_store state in
     let () = Store.put store x v in
     let state' = State.set_store state store in
     state'
 
-  let eval_subst_list
-      (state : State.t)
-      (subst_lst : (string * (string * Expr.t) list) option) :
-      (string * (string * Val.t) list) option =
-    match subst_lst with
+  let eval_subst_list (state : State.t) = function
     | None -> None
     | Some (lab, subst_lst) ->
-        let subst_lst' : (string * Val.t) list =
+        let subst_lst' =
           List.map (fun (x, e) -> (x, State.eval_expr state e)) subst_lst
         in
         Some (lab, subst_lst')
@@ -517,8 +513,11 @@ struct
       | _ -> Res_list.vanish
 
     let eval_freshsvar x state =
-      let new_svar = Generators.fresh_svar () in
-      let state' = State.add_spec_vars state (SS.singleton new_svar) in
+      let new_svar = LVar.of_string @@ Generators.fresh_svar () in
+      let state' =
+        State.add_spec_vars state @@ Id.Sets.SubstSet.singleton
+        @@ (new_svar :> Id.substable Id.t)
+      in
       let v = Val.from_expr (LVar new_svar) |> Option.get in
       Res_list.return (update_store state' x v)
 
@@ -571,12 +570,10 @@ struct
         let params_card = List.length params in
         let args_card = List.length args in
         if params_card <> args_card then
-          raise
-            (Failure
-               (Printf.sprintf
-                  "Macro %s called with incorrect number of parameters: %d \
-                   instead of %d."
-                  macro.macro_name args_card params_card));
+          Fmt.failwith
+            "Macro %s called with incorrect number of parameters: %d instead \
+             of %d."
+            macro.macro_name args_card params_card;
         let subst = SVal.SSubst.init (List.combine params args) in
         let lcmds = macro.macro_definition in
         List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
@@ -1005,7 +1002,7 @@ struct
             m
               ~json:
                 [
-                  ("x", `String x);
+                  ("x", Var.to_yojson x);
                   ("a", `String a);
                   ("es", `List (List.map Expr.to_yojson es));
                 ]
@@ -1375,7 +1372,7 @@ struct
         DL.log ~v:true (fun m -> m "ECall");
         let pid =
           match pid with
-          | PVar pid -> pid
+          | PVar pid -> Var.str pid
           | Lit (String pid) -> pid
           | _ ->
               raise
@@ -1421,7 +1418,7 @@ struct
         } =
           eval_state
         in
-        let v_ret = Store.get store Names.return_variable in
+        let v_ret = Store.get store Id.return_variable in
         let result =
           match (v_ret, cs) with
           | None, _ -> raise (Failure "nm_ret_var not in store (normal return)")
@@ -1490,7 +1487,7 @@ struct
         } =
           eval_state
         in
-        let v_ret = Store.get store Names.return_variable in
+        let v_ret = Store.get store Id.return_variable in
         match (v_ret, cs) with
         | None, _ ->
             raise (Failure "Return variable not in store (error return) ")
@@ -1564,7 +1561,8 @@ struct
         | Assignment (x, e) ->
             DL.log ~v:true (fun m ->
                 m
-                  ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
+                  ~json:
+                    [ ("target", Var.to_yojson x); ("expr", Expr.to_yojson e) ]
                   "Assignment");
             let v = eval_expr e in
             let state' = update_store state x v in
@@ -1788,7 +1786,7 @@ struct
 
   @param ret_fun Function to transform the results
   @param prog GIL program
-  @param name Identifier of the procedure to be evaluated
+  @param name Id of the procedure to be evaluated
   @param params Parameters of the procedure to be evaluated
   @state state Current state
   @preds preds Current predicate set
@@ -2263,7 +2261,7 @@ struct
 
   @param ret_fun Function to transform the results
   @param prog GIL program
-  @param name Identifier of the procedure to be evaluated
+  @param name Id of the procedure to be evaluated
   @param params Parameters of the procedure to be evaluated
   @state state Current state
   @preds preds Current predicate set
@@ -2273,7 +2271,7 @@ struct
       (ret_fun : result_t -> 'a)
       (prog : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (state : State.t) : 'a cont_func =
     let () = Call_graph.add_proc call_graph name in
     L.normal (fun m ->
@@ -2295,8 +2293,8 @@ struct
     in
     let cs : Call_stack.t =
       Call_stack.push Call_stack.empty ~pid:name ~arguments ~loop_ids:[]
-        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
-        ()
+        ~ret_var:(Var.of_string "out") ~call_index:(-1) ~continue_index:(-1)
+        ~error_index:(-1) ()
     in
     let proc_body_index = 0 in
     let conf : CConf.t =
@@ -2328,7 +2326,7 @@ struct
   Evaluation of procedures
 
   @param prog GIL program
-  @param name Identifier of the procedure to be evaluated
+  @param name Id of the procedure to be evaluated
   @param params Parameters of the procedure to be evaluated
   @state state Current state
   @preds preds Current predicate set
@@ -2338,7 +2336,7 @@ struct
       (ret_fun : result_t -> 'a)
       (prog : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (state : State.t) : 'a list =
     let init_func = init_evaluate_proc ret_fun prog name params state in
     evaluate_cmd_iter init_func

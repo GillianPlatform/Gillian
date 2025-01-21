@@ -74,7 +74,7 @@ module type S = sig
     end
   end
 
-  type unfold_info_t = (string * string) list
+  type unfold_info_t = (LVar.t * LVar.t) list
 
   val produce_assertion :
     t -> SVal.SESubst.t -> Asrt.atom -> (t, err_t) Res_list.t

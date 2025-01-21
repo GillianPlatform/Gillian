@@ -1,26 +1,23 @@
-open Containers
 module L = Logging
 
 (** The [outs] type represents a list of learned outs, together
     with (optionally) the way of constructing them *)
 type outs = (Expr.t * Expr.t) list [@@deriving yojson, eq]
 
-let outs_pp =
-  Fmt.(
-    list ~sep:(Fmt.any "; ") (parens (pair ~sep:(Fmt.any ", ") Expr.pp Expr.pp)))
+let outs_pp = Fmt.(list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))
 
 (** The [mp_step] type represents a matching plan step,
     consisting of an assertion together with the possible
     learned outs *)
 type step = Asrt.atom * outs [@@deriving yojson, eq]
 
-let pp_step = Fmt.pair ~sep:(Fmt.any ", ") Asrt.pp_atom_full outs_pp
+let pp_step = Fmt.(pair ~sep:comma Asrt.pp_atom_full outs_pp)
 let pp_step_list = Fmt.Dump.list pp_step
 
-type label = string * SS.t [@@deriving eq, yojson]
+type label = string * LVar.Set.t [@@deriving eq, yojson]
 
-let pp_label ft (lab, ss) =
-  Fmt.pf ft "LABEL(%s): %a" lab (Fmt.Dump.iter SS.iter Fmt.nop Fmt.string) ss
+let pp_label ft ((lab, ss) : label) =
+  Fmt.pf ft "LABEL(%s): %a" lab Fmt.(Dump.iter LVar.Set.iter nop Id.pp) ss
 
 type post = Flag.t * Asrt.t list [@@deriving eq, yojson]
 
@@ -87,10 +84,7 @@ let minimise_matchables (kb : KB.t) : KB.t =
   KB.fold
     (fun u ac ->
       match u with
-      | UnOp (LstLen, e) -> (
-          match KB.mem e kb with
-          | true -> ac
-          | false -> KB.add u ac)
+      | UnOp (LstLen, e) when KB.mem e kb -> ac
       | _ -> KB.add u ac)
     kb KB.empty
 
@@ -321,13 +315,32 @@ let simple_ins_expr_collector =
 
     method! visit_expr exclude e =
       match e with
-      | (LVar s | PVar s | ALoc s) when not (SS.mem s exclude) ->
-          (KB.empty, KB.singleton e)
-      | UnOp (LstLen, ((PVar s | LVar s) as v)) when not (SS.mem s exclude) ->
+      | ALoc s when not @@ Id.Sets.SubstSet.mem (s :> Id.substable Id.t) exclude
+        -> (KB.empty, KB.singleton e)
+      | PVar s when not @@ Id.Sets.SubstSet.mem (s :> Id.substable Id.t) exclude
+        -> (KB.empty, KB.singleton e)
+      | LVar s when not @@ Id.Sets.SubstSet.mem (s :> Id.substable Id.t) exclude
+        -> (KB.empty, KB.singleton e)
+      | UnOp (LstLen, (PVar s as v))
+        when not (Id.Sets.SubstSet.mem (s :> Id.substable Id.t) exclude) ->
           (KB.singleton v, KB.empty)
-      | Exists (bt, e) | ForAll (bt, e) ->
+      | UnOp (LstLen, (LVar s as v))
+        when not (Id.Sets.SubstSet.mem (s :> Id.substable Id.t) exclude) ->
+          (KB.singleton v, KB.empty)
+      | Exists (bt, e) ->
           let exclude =
-            List.fold_left (fun acc (x, _) -> SS.add x acc) exclude bt
+            List.fold_left
+              (fun acc (x, _) ->
+                Id.Sets.SubstSet.add (x :> Id.substable Id.t) acc)
+              exclude bt
+          in
+          self#visit_expr exclude e
+      | ForAll (bt, e) ->
+          let exclude =
+            List.fold_left
+              (fun acc (x, _) ->
+                Id.Sets.SubstSet.add (x :> Id.substable Id.t) acc)
+              exclude bt
           in
           self#visit_expr exclude e
       | _ -> super#visit_expr exclude e
@@ -337,7 +350,9 @@ let simple_ins_expr_collector =
     for a given expression [e] *)
 let simple_ins_expr (e : Expr.t) : KB.t list =
   let open Expr in
-  let llens, others = simple_ins_expr_collector#visit_expr SS.empty e in
+  let llens, others =
+    simple_ins_expr_collector#visit_expr Id.Sets.SubstSet.empty e
+  in
   (* List lengths whose variables do not appear elsewhere *)
   let llens = Set.elements (Set.diff llens others) in
   (* Those we can learn by knowing the variable or the list length *)
@@ -390,7 +405,13 @@ let ins_and_outs_from_lists (kb : KB.t) (lei : Expr.t list) (leo : Expr.t list)
         m "Calculated ins: %a" Fmt.(brackets (list ~sep:semi kb_pp)) ins));
   let outs : outs =
     (* Trick to keep track of parameter order *)
-    let leo = List.mapi (fun i u -> (u, Expr.PVar (string_of_int i))) leo in
+    let leo =
+      List.mapi
+        (fun i u ->
+          let var = Var.of_string @@ string_of_int i in
+          (u, Expr.PVar var))
+        leo
+    in
     (* Outs that are matchables we learn immediately and add to knowledge base *)
     let kb' = KB.union kb (KB.of_list (snd (List.split leo))) in
     learn_expr_list kb' leo
@@ -536,10 +557,9 @@ let simplify_asrts ?(sorted = true) a =
     | Pure (BinOp (f1, And, f2)) -> aux (Pure f1) @ aux (Pure f2)
     | Pure _ | Pred _ | CorePred _ | Wand _ -> [ a ]
     | Types _ -> (
-        let a = Reduction.reduce_assertion [ a ] in
-        match a with
-        | [ Types les ] -> List.map (fun e -> Asrt.Types [ e ]) les
-        | _ -> List.concat_map aux a)
+        match Reduction.reduce_assertion [ a ] with
+        | [ Asrt.Types les ] -> List.map (fun e -> Asrt.Types [ e ]) les
+        | a -> List.concat_map aux a)
   in
   let atoms = List.concat_map aux a in
   if List.mem (Asrt.Pure (Lit (Bool false))) atoms then
@@ -643,8 +663,8 @@ let init
     (params : KB.t)
     (preds : (string, int list) Hashtbl.t)
     (asrts_posts :
-      (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
-    : (t, Asrt.atom list list) result =
+      (Asrt.t * ((string * LVar.Set.t) option * (Flag.t * Asrt.t list) option))
+      list) : (t, Asrt.atom list list) result =
   let known_matchables =
     match use_params with
     | None -> known_matchables
@@ -658,7 +678,7 @@ let init
           Option.fold
             ~some:(fun (_, existentials) ->
               let existentials =
-                List.map (fun x -> Expr.LVar x) (SS.elements existentials)
+                List.map (fun x -> Expr.LVar x) (LVar.Set.elements existentials)
               in
               KB.of_list existentials)
             ~none:KB.empty lab
@@ -723,7 +743,8 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
           KB.of_list (List.map (fun x -> Expr.PVar x) spec.spec_params)
         in
         let sspecs :
-            (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option))
+            (Asrt.t
+            * ((string * LVar.Set.t) option * (Flag.t * Asrt.t list) option))
             list =
           List.mapi
             (fun i (sspec : Spec.st) ->
@@ -732,7 +753,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
                     Fmt.(
                       option
                         (brackets
-                           (pair ~sep:(any ": ") string (list ~sep:comma string))))
+                           (pair ~sep:(any ": ") string (list ~sep:comma Id.pp))))
                     sspec.ss_label);
               ( sspec.ss_pre,
                 ( Spec.label_vars_to_set sspec.ss_label,
@@ -767,7 +788,8 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
           KB.of_list (List.map (fun x -> Expr.PVar x) lemma.lemma_params)
         in
         let sspecs :
-            (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option))
+            (Asrt.t
+            * ((string * LVar.Set.t) option * (Flag.t * Asrt.t list) option))
             list =
           List.map
             (fun spec ->
@@ -818,7 +840,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
           List.map
             (fun (lab, def) ->
               let lab' =
-                Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
+                Option.map (fun (s, vars) -> (s, LVar.Set.of_list vars)) lab
               in
               (def, (lab', None)))
             pred.pred_definitions
@@ -910,7 +932,7 @@ let pp_asrt
               let in_args = Pred.in_args pred.pred args in
               let out_params_args = List.combine out_params out_args in
               let pp_out_params_args fmt (x, e) =
-                Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e
+                Fmt.pf fmt "@[<h>%a: %a@]" Id.pp x Expr.pp e
               in
               Fmt.pf fmt "%s(@[<h>%a@])" name
                 (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
@@ -942,7 +964,7 @@ let pp_spec
   in
   let pp_sspec = pp_sspec ?preds_printer ~preds in
   Fmt.pf fmt "@[<v 2>spec %s (@[<h>%a@])@\n%a;@\n%a@]" spec.spec_name
-    Fmt.(list ~sep:comma string)
+    Fmt.(list ~sep:comma Id.pp)
     spec.spec_params
     Fmt.(list ~sep:(any "@\n") pp_sspec)
     normal_specs
@@ -961,7 +983,7 @@ let pp_normal_spec
   in
   let pp_sspec = pp_sspec ?preds_printer ~preds in
   Fmt.pf fmt "@[<v 2>spec %s (@[<h>%a@])@\n%a@]" spec.spec_name
-    Fmt.(list ~sep:comma string)
+    Fmt.(list ~sep:comma Id.pp)
     spec.spec_params
     Fmt.(list ~sep:(any "@\n") pp_sspec)
     normal_specs

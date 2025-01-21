@@ -7,13 +7,13 @@ type st = TypeDef__.single_spec = {
   ss_variant : Expr.t option;  (** Variant *)
   ss_flag : Flag.t;  (** Return flag *)
   ss_to_verify : bool;  (** Should the spec be verified? *)
-  ss_label : (string * string list) option;
+  ss_label : (string * Id.LVar.t list) option;
 }
 
 (** {b Full GIL specifications}. *)
 type t = TypeDef__.spec = {
   spec_name : string;  (** Procedure/spec name *)
-  spec_params : string list;  (** Procedure/spec parameters *)
+  spec_params : Id.Var.t list;  (** Procedure/spec parameters *)
   spec_sspecs : st list;  (** List of single specifications *)
   spec_normalised : bool;  (** If the spec is already normalised *)
   spec_incomplete : bool;  (** If the spec is incomplete *)
@@ -87,7 +87,7 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
   { spec with spec_sspecs = List.map pt_sspec spec.spec_sspecs }
 
 let label_vars_to_set lab =
-  Option.map (fun (l, vl) -> (l, Containers.SS.of_list vl)) lab
+  Option.map (fun (l, vl) -> (l, Id.LVar.Set.of_list vl)) lab
 
 let to_yojson = TypeDef__.spec_to_yojson
 let of_yojson = TypeDef__.spec_of_yojson
