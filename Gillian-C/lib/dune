@@ -6,8 +6,8 @@
  (modules annot_lexer))
 
 (library
- (package gillian-c)
  (name cgil_lib)
+ (public_name gillian-c.cgil_lib)
  (libraries
   gillian
   gillian.alcotest-runner

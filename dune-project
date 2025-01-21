@@ -103,3 +103,18 @@
    (= :version)))
  (synopsis
   "Gillian instantiation for Wisl, a small toy language for teaching and experimentation"))
+
+(package
+ (name transformers)
+ (sites
+  (share runtime))
+ (synopsis "Gillian instantiation using state model transformers, à la Iris")
+ (depends
+  (gillian
+   (= :version))
+  (gillian-c
+   (= :version))
+  (gillian-js
+   (= :version))
+  dune-site
+  printbox-text))
