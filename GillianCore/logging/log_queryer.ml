@@ -52,7 +52,7 @@ let rec get_match_results id =
 let resolve_command_and_matches id =
   let open Logging_constants.Content_type in
   let rec aux acc id type_ =
-    if type_ = cmd then (id, acc)
+    if type_ = cmd then (id, List.rev acc)
     else if type_ = assertion then
       let parent_id, parent_type, _ =
         match Log_database.get_parent_of id with

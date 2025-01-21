@@ -17,6 +17,7 @@ export type MapState = {
   selectedNodes: readonly string[];
   onNodeSelected: (id: string) => void;
   onNextStepSelected: (prev: NodePrev) => void;
+  ext: unknown;
 };
 
 export function useSEDAPMap(): MapState {
@@ -25,6 +26,7 @@ export function useSEDAPMap(): MapState {
   const [nodes, setNodes] = useState({} as Nodes);
   const [roots, setRoots] = useState({} as Roots);
   const [selectedNodes, setSelectedNodes] = useState([] as readonly string[]);
+  const [ext, setExt] = useState<unknown>(undefined);
 
   const handleMapUpdate = useCallback(
     (body: MapUpdateEventBody) => {
@@ -42,6 +44,7 @@ export function useSEDAPMap(): MapState {
         }
       });
       setNodes(newNodes);
+      setExt(body.ext);
       console.log("State updated", body);
     },
     [initialised, nodes],
@@ -76,5 +79,5 @@ export function useSEDAPMap(): MapState {
     debuggerCommand("stepSpecific", { stepId: prev.id, branchCase: prev.case });
   };
 
-  return { nodes, roots, selectedNodes, onNodeSelected, onNextStepSelected };
+  return { nodes, roots, selectedNodes, onNodeSelected, onNextStepSelected, ext };
 }

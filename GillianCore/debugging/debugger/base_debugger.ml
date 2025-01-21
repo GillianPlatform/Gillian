@@ -45,6 +45,8 @@ struct
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable proc_name : string;
     mutable root_created : bool; [@default false]
+    mutable selected_match_steps : (L.Report_id.t * L.Report_id.t) list;
+        [@default []]
     lifter_state : Lifter.t;
     report_state : L.Report_state.t;
     ext : 'ext;
@@ -64,8 +66,9 @@ struct
     all_nodes : (string, Sedap_types.Map_node.t) Hashtbl.t;
         [@default Hashtbl.create 0]
     changed_nodes : string Hashset.t; [@default Hashset.empty ()]
-    mutable extra_selected_steps : L.Report_id.t list; [@default []]
     roots : (string, string) Hashtbl.t; [@default Hashtbl.create 0]
+    matches : (L.Report_id.t, Match_map.t) Hashtbl.t;
+        [@default Hashtbl.create 0]
     ext : 'ext;
   }
   [@@deriving make]
@@ -244,6 +247,7 @@ struct
 
       let convert_match_map' state (matching : Match_map.matching) =
         let map = get_match_map matching.id state.debug_state in
+        let () = Hashtbl.add state.debug_state.matches matching.id map in
         let () = convert_match_root state matching map in
         let rec aux other_matches = function
           | [] -> other_matches
@@ -366,32 +370,65 @@ struct
              (fun acc (proc, id) -> String_map.add proc id acc)
              String_map.empty
 
-      let get_current_steps ?(clear = false) state : string list =
-        let from_procs =
-          Hashtbl.fold
-            (fun _ proc_state acc ->
-              match proc_state.cur_report_id with
-              | Some id -> show_id id :: acc
-              | None -> acc)
-            state.procs []
+      let get_current_steps state : string list =
+        Hashtbl.fold
+          (fun _ proc_state acc ->
+            let match_steps =
+              proc_state.selected_match_steps
+              |> List.map (fun (id, _) -> show_id id)
+            in
+            let acc' = match_steps @ acc in
+            match proc_state.cur_report_id with
+            | Some id -> show_id id :: acc'
+            | None -> acc')
+          state.procs []
+
+      let get_map_ext state : Yojson.Safe.t =
+        let proc_substs =
+          state.procs |> Hashtbl.to_seq
+          |> Seq.map (fun (proc_name, proc) ->
+                 let+ substs =
+                   let* assertion_id, match_id =
+                     List_utils.hd_opt proc.selected_match_steps
+                   in
+                   let* match_ =
+                     Hashtbl.find_opt state.debug_state.matches match_id
+                   in
+                   let* node = Hashtbl.find_opt match_.nodes assertion_id in
+                   let* substs =
+                     match node with
+                     | Match_map.Assertion (data, _) -> Some data.substitutions
+                     | _ -> None
+                   in
+                   let substs' =
+                     substs
+                     |> List.map @@ fun Match_map.{ assert_id; subst = a, b } ->
+                        `List
+                          [ `String (show_id assert_id); `String a; `String b ]
+                   in
+                   Some substs'
+                 in
+                 (proc_name, `List substs))
+          |> Seq.filter_map (fun x -> x)
+          |> List.of_seq
         in
-        let extra =
-          state.debug_state.extra_selected_steps |> List.map show_id
-        in
-        let () = if clear then state.debug_state.extra_selected_steps <- [] in
-        from_procs @ extra
+        let substs = `Assoc proc_substs in
+        `Assoc [ ("substs", substs) ]
 
       let get_map_update state =
         let nodes = get_changed_nodes ~clear:true state in
         let roots = Some (get_roots state) in
-        let current_steps = Some (get_current_steps ~clear:true state) in
-        Map_update_event_body.make ~nodes ~roots ~current_steps ()
+        let current_steps = Some (get_current_steps state) in
+        let ext = Some (get_map_ext state) in
+        Map_update_event_body.make ~nodes ~roots ~current_steps ~ext ()
 
       let get_full_map state =
         let nodes = get_all_nodes state in
         let roots = Some (get_roots state) in
         let current_steps = Some (get_current_steps state) in
-        Map_update_event_body.make ~reset:true ~nodes ~roots ~current_steps ()
+        let ext = Some (get_map_ext state) in
+        Map_update_event_body.make ~reset:true ~nodes ~roots ~current_steps ~ext
+          ()
 
       type debug_proc_state_view = {
         lifter_state : Yojson.Safe.t; [@key "lifterState"]
@@ -665,6 +702,7 @@ struct
       let f report_id cfg state =
         let cmd = get_cmd report_id in
         state.cur_report_id <- Some report_id;
+        state.selected_match_steps <- [];
         state.frames <-
           call_stack_to_frames cmd.callstack cmd.proc_line cfg.prog;
         let lifted_scopes, variables =
@@ -691,7 +729,7 @@ struct
       let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
       let** proc_state = get_proc_state ~cmd_id state in
       let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
-      state.debug_state.extra_selected_steps <- List.map fst matches
+      proc_state.selected_match_steps <- matches
 
     let handle_stop debug_state proc_state ?(is_end = false) id id' =
       let id =

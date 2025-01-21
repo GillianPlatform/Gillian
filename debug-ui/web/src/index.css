@@ -34,6 +34,8 @@ body {
 
 .sedap__nodeText {
   font-family: var(--vscode-editor-font-family);
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
 }
 
 .react-flow__edge-textbg {
