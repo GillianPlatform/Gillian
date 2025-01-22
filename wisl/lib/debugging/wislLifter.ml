@@ -836,7 +836,7 @@ struct
         let open WislLActions in
         match gil_cmd with
         | Some (Cmd.LAction (_, name, [ _; Expr.BinOp (PVar var, _, _) ]), _)
-          when name = str_ac GetCell -> Some var
+          when name = str_ac GetCell -> Some (Var.str var)
         | _ -> None)
 
   let free_error_to_string msg_prefix prev_annot gil_cmd wisl_ast =
@@ -855,9 +855,9 @@ struct
           let* cmd, _ = gil_cmd in
           match cmd with
           | Cmd.LAction (_, name, [ Expr.BinOp (PVar var, _, _) ])
-            when name = str_ac Dispose -> Some var
+            when name = str_ac Dispose -> Some (Var.str var)
           | Cmd.LAction (_, name, [ _; Expr.BinOp (PVar var, _, _) ])
-            when name = str_ac GetCell -> Some var
+            when name = str_ac GetCell -> Some (Var.str var)
           | _ -> None)
     in
     let var = Option.value ~default:"" var in
@@ -875,6 +875,7 @@ struct
             Fmt.str "%s at %a" msg_prefix Location.pp origin_loc)
 
   let get_previously_freed_annot loc =
+    let loc = Id.str loc in
     let annot = Logging.Log_queryer.get_previously_freed_annot loc in
     match annot with
     | None -> None
@@ -893,9 +894,9 @@ struct
     let core_pred, loc, offset = missing_resource_error_info in
     let default_err_msg =
       let prefix =
-        Fmt.str "Missing %s at location='%s'"
+        Fmt.str "Missing %s at location='%a'"
           (WislLActions.str_ga core_pred)
-          loc
+          Id.pp loc
       in
       match offset with
       | None -> prefix

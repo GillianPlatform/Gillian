@@ -1,6 +1,7 @@
 module L = Logging
 module Expr = Gillian.Gil_syntax.Expr
 open Jsil_syntax
+open Gil_syntax.Id
 
 (** Tables *)
 module SS = Containers.SS
@@ -8,24 +9,23 @@ module SS = Containers.SS
 let small_tbl_size = 1
 let medium_tbl_size = 1
 
-type var_to_fid_tbl_type = (string, string) Hashtbl.t
+type var_to_fid_tbl_type = (Var.t, string) Hashtbl.t
 type cc_tbl_type = (string, var_to_fid_tbl_type) Hashtbl.t
 
 type fun_tbl_type =
   ( string,
-    string * string list * JS_Parser.Syntax.exp option * bool * Spec.t option
-  )
+    string * Var.t list * JS_Parser.Syntax.exp option * bool * Spec.t option )
   Hashtbl.t
 
 type pre_fun_tbl_type =
   ( string,
     string
-    * string list
+    * Var.t list
     * JS_Parser.Syntax.exp option
     * bool
     * (JS_Parser.Syntax.annotation list
       * string list
-      * (string, string) Hashtbl.t) )
+      * (Var.t, string) Hashtbl.t) )
   Hashtbl.t
 
 type vis_tbl_type = (string, string list) Hashtbl.t
@@ -53,15 +53,15 @@ let initial_heap_pre_pred_name = "initialHeapPre"
 let initial_heap_post_pred_name = "initialHeapPost"
 let function_object_pred_name = "function_object"
 let standard_object_pred_name = "standardObject"
-let this_logic_var_name = "#this"
-let locGlobName = "$lg"
-let var_te = "x__te"
-let var_se = "x__se"
-let var_er = "x__er"
-let var_this = "x__this"
-let var_scope = "x__scope"
-let logic_var_scope = "#x__scope"
-let var_scope_final = "x__scope_f"
+let this_lvar = LVar.of_string "#this"
+let locGlobName = Loc.of_string "$lg"
+let var_te = Var.of_string "x__te"
+let var_se = Var.of_string "x__se"
+let var_er = Var.of_string "x__er"
+let var_this = Var.of_string "x__this"
+let var_scope = Var.of_string "x__scope"
+let logic_var_scope = LVar.of_string "#x__scope"
+let var_scope_final = Var.of_string "x__scope_f"
 let funobj_pred_name = "JSFunctionObject"
 let js_obj_internal_fields = [ "@proto"; "@class"; "@extensible" ]
 
@@ -110,7 +110,7 @@ let psi
     (cc_tbl : cc_tbl_type)
     (vis_tbl : vis_tbl_type)
     (fid : string)
-    (x : string) =
+    (x : Var.t) =
   let var_to_fid_tbl = get_scope_table cc_tbl fid in
   try
     let fid' = Hashtbl.find var_to_fid_tbl x in

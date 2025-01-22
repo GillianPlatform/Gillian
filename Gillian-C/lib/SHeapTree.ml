@@ -101,8 +101,8 @@ module Range = struct
     l < x && x < h
 
   let split_at (l, h) x = ((l, x), (x, h))
-  let lvars (a, b) = SS.union (Expr.lvars a) (Expr.lvars b)
-  let alocs (a, b) = SS.union (Expr.alocs a) (Expr.alocs b)
+  let lvars (a, b) = LVar.Set.union (Expr.lvars a) (Expr.lvars b)
+  let alocs (a, b) = ALoc.Set.union (Expr.alocs a) (Expr.alocs b)
   let substitution ~le_subst (a, b) = (le_subst a, le_subst b)
 end
 
@@ -510,12 +510,12 @@ module Node = struct
 
   let lvars = function
     | MemVal { mem_val = Single { value = e; _ }; _ } -> SVal.lvars e
-    | _ -> SS.empty
+    | _ -> LVar.Set.empty
 
   let alocs = function
     | MemVal { mem_val = Single { value = e; _ }; _ } -> SVal.alocs e
     | MemVal { mem_val = Array { values = Arr e; _ }; _ } -> Expr.alocs e
-    | _ -> SS.empty
+    | _ -> ALoc.Set.empty
 
   let substitution ~sval_subst ~svarr_subst n =
     let smv = function
@@ -1030,20 +1030,20 @@ module Tree = struct
     let span_lvars = Range.lvars span in
     let children_lvars =
       match children with
-      | Some (a, b) -> SS.union (lvars a) (lvars b)
-      | None -> SS.empty
+      | Some (a, b) -> LVar.Set.union (lvars a) (lvars b)
+      | None -> LVar.Set.empty
     in
-    SS.union (SS.union node_lvars span_lvars) children_lvars
+    LVar.Set.union (LVar.Set.union node_lvars span_lvars) children_lvars
 
   let rec alocs { node; span; children; _ } =
-    let node_lvars = Node.alocs node in
-    let span_lvars = Range.alocs span in
+    let node_alocs = Node.alocs node in
+    let span_alocs = Range.alocs span in
     let children_lvars =
       match children with
-      | Some (a, b) -> SS.union (alocs a) (alocs b)
-      | None -> SS.empty
+      | Some (a, b) -> ALoc.Set.union (alocs a) (alocs b)
+      | None -> ALoc.Set.empty
     in
-    SS.union (SS.union node_lvars span_lvars) children_lvars
+    ALoc.Set.union (ALoc.Set.union node_alocs span_alocs) children_lvars
 
   let rec assertions ~loc { node; span; children; _ } =
     let low, high = span in
@@ -1152,18 +1152,18 @@ let is_empty t =
 let freed = Freed
 
 let lvars = function
-  | Freed -> SS.empty
+  | Freed -> LVar.Set.empty
   | Tree { bounds; root } ->
-      SS.union
-        (Option.fold ~none:SS.empty ~some:Range.lvars bounds)
-        (Option.fold ~none:SS.empty ~some:Tree.lvars root)
+      LVar.Set.union
+        (Option.fold ~none:LVar.Set.empty ~some:Range.lvars bounds)
+        (Option.fold ~none:LVar.Set.empty ~some:Tree.lvars root)
 
 let alocs = function
-  | Freed -> SS.empty
+  | Freed -> ALoc.Set.empty
   | Tree { bounds; root } ->
-      SS.union
-        (Option.fold ~none:SS.empty ~some:Range.alocs bounds)
-        (Option.fold ~none:SS.empty ~some:Tree.alocs root)
+      ALoc.Set.union
+        (Option.fold ~none:ALoc.Set.empty ~some:Range.alocs bounds)
+        (Option.fold ~none:ALoc.Set.empty ~some:Tree.alocs root)
 
 let is_in_bounds range bounds =
   match bounds with
@@ -1586,7 +1586,7 @@ module Lift = struct
       ~loc
       t : Variable.t =
     match t with
-    | Freed -> make_node ~name:loc ~value:"Freed" ()
+    | Freed -> make_node ~name:(Id.str loc) ~value:"Freed" ()
     | Tree { bounds; root } ->
         let bounds =
           match bounds with
@@ -1601,5 +1601,6 @@ module Lift = struct
           | None -> make_node ~name:"Tree" ~value:"Not owned" ()
           | Some root -> Tree.Lift.as_variable ~make_node root
         in
-        make_node ~name:loc ~value:"Allocated" ~children:[ bounds; root ] ()
+        make_node ~name:(Id.str loc) ~value:"Allocated"
+          ~children:[ bounds; root ] ()
 end

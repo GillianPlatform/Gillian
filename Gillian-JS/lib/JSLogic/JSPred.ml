@@ -1,12 +1,13 @@
 open JSLogicCommon
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
+module Var = Gillian.Gil_syntax.Var
 module Pred = Jsil_syntax.Pred
 
 type t = {
   name : string;
   num_params : int;
-  params : (string * Type.t option) list;
+  params : (Var.t * Type.t option) list;
   ins : int list;
   definitions : ((string * string list) option * JSAsrt.t) list;
   facts : Expr.t list;

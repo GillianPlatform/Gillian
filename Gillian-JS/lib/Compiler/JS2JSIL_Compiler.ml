@@ -47,7 +47,7 @@ let fresh_switch_labels () =
   let default_lab = fresh_default_label () in
   let end_switch = fresh_end_switch_label () in
   let fresh_end_case_label, _ =
-    fresh_sth ("end_case_" ^ string_of_int !number_of_switches ^ "_")
+    fresh_sth_str ("end_case_" ^ string_of_int !number_of_switches ^ "_")
   in
   number_of_switches := !number_of_switches + 1;
   (b_cases_lab, default_lab, end_switch, fresh_end_case_label)
@@ -139,10 +139,7 @@ let rec get_continue_lab loop_list lab =
                 | Some lab_c -> lab_c
               else get_continue_lab rest lab))
 
-let filter_cur_jumps
-    (jumps : (string option * string * string) list)
-    loop_lab
-    include_no_lab =
+let filter_cur_jumps jumps loop_lab include_no_lab =
   let rec filter_cur_jumps_iter jumps inner_jumps outer_jumps =
     match jumps with
     | [] -> (List.rev inner_jumps, List.rev outer_jumps)
@@ -764,7 +761,7 @@ let annotate_cmds_top_level metadata cmds =
         x_is - the list of variables that may hold error values
   *)
 let rec translate_expr tr_ctx e :
-    (Annot.Basic.t * string option * LabCmd.t) list * Expr.t * string list =
+    (Annot.Basic.t * string option * LabCmd.t) list * Expr.t * Var.t list =
   let f = translate_expr tr_ctx in
 
   let find_var_er_index v : int option =
@@ -830,7 +827,7 @@ let rec translate_expr tr_ctx e :
           LCall
             ( x_sf,
               lit_str dynamicScoper,
-              [ PVar tr_ctx.tr_sc_var; lit_str x ],
+              [ PVar tr_ctx.tr_sc_var; lit_str_v x ],
               None,
               None )
     in
@@ -843,7 +840,10 @@ let rec translate_expr tr_ctx e :
            ( x_ref,
              EList
                [
-                 lit_refv; PVar x_sf; lit_str x; Lit (Bool tr_ctx.tr_strictness);
+                 lit_refv;
+                 PVar x_sf;
+                 lit_str_v x;
+                 Lit (Bool tr_ctx.tr_strictness);
                ] ))
     in
 
@@ -922,7 +922,7 @@ let rec translate_expr tr_ctx e :
           LCall
             ( x_sf,
               lit_str dynamicScoper,
-              [ PVar tr_ctx.tr_sc_var; lit_str x ],
+              [ PVar tr_ctx.tr_sc_var; lit_str_v x ],
               None,
               None )
     in
@@ -935,7 +935,10 @@ let rec translate_expr tr_ctx e :
            ( x_ref,
              EList
                [
-                 lit_refv; PVar x_sf; lit_str x; Lit (Bool tr_ctx.tr_strictness);
+                 lit_refv;
+                 PVar x_sf;
+                 lit_str_v x;
+                 Lit (Bool tr_ctx.tr_strictness);
                ] ))
     in
 
@@ -1100,6 +1103,7 @@ let rec translate_expr tr_ctx e :
            ] in
            let cmds = annotate_cmds cmds in
            cmds, PVar x_r, [] in *)
+      let v = Var.of_string v in
       let index = find_var_er_index v in
       match index with
       | (Some _ | None)
@@ -1121,7 +1125,7 @@ let rec translate_expr tr_ctx e :
                 LCall
                   ( x_1,
                     lit_str dynamicScoper,
-                    [ PVar tr_ctx.tr_sc_var; lit_str v ],
+                    [ PVar tr_ctx.tr_sc_var; lit_str_v v ],
                     None,
                     None )
           in
@@ -1135,7 +1139,7 @@ let rec translate_expr tr_ctx e :
                      [
                        lit_refv;
                        PVar x_1;
-                       lit_str v;
+                       lit_str_v v;
                        Lit (Bool tr_ctx.tr_strictness);
                      ] ))
           in
@@ -1156,7 +1160,7 @@ let rec translate_expr tr_ctx e :
             LCall
               ( x_1,
                 Lit (String hasPropertyName),
-                [ Lit (Loc locGlobName); Lit (String v) ],
+                [ Lit (Loc locGlobName); lit_str_v v ],
                 Some tr_ctx.tr_err_lab,
                 None )
           in
@@ -1179,7 +1183,7 @@ let rec translate_expr tr_ctx e :
                      [
                        lit_refv;
                        lit_loc locGlobName;
-                       lit_str v;
+                       lit_str_v v;
                        Lit (Bool tr_ctx.tr_strictness);
                      ] ))
           in
@@ -1194,7 +1198,7 @@ let rec translate_expr tr_ctx e :
                      [
                        lit_refv;
                        Lit Undefined;
-                       lit_str v;
+                       lit_str_v v;
                        Lit (Bool tr_ctx.tr_strictness);
                      ] ))
           in
@@ -2061,7 +2065,12 @@ let rec translate_expr tr_ctx e :
             List.fold_left
               (fun (cmds, errs) x ->
                 let new_cmds, x_expr, new_errs =
-                  f { e with JS_Parser.Syntax.exp_stx = JS_Parser.Syntax.Var x }
+                  f
+                    {
+                      e with
+                      JS_Parser.Syntax.exp_stx =
+                        JS_Parser.Syntax.Var (Var.str x);
+                    }
                 in
 
                 let x_v, cmd_gv_x, errs_x_v =
@@ -2070,7 +2079,7 @@ let rec translate_expr tr_ctx e :
                 SSubst.put subst (PVar x) (PVar x_v);
                 ( cmds @ new_cmds @ [ annotate_cmd cmd_gv_x None ],
                   errs @ new_errs @ errs_x_v ))
-              ([], []) (SS.elements xs)
+              ([], []) (Var.Set.elements xs)
           in
 
           let le = SSubst.subst_in_expr subst ~partial:true e' in
@@ -2099,7 +2108,12 @@ let rec translate_expr tr_ctx e :
             List.fold_left
               (fun (cmds, errs) x ->
                 let new_cmds, x_expr, new_errs =
-                  f { e with JS_Parser.Syntax.exp_stx = JS_Parser.Syntax.Var x }
+                  f
+                    {
+                      e with
+                      JS_Parser.Syntax.exp_stx =
+                        JS_Parser.Syntax.Var (Var.str x);
+                    }
                 in
                 let x_v, cmd_gv_x, errs_x_v =
                   make_get_value_call x_expr tr_ctx.tr_err_lab
@@ -2107,7 +2121,7 @@ let rec translate_expr tr_ctx e :
                 SSubst.put subst (PVar x) (PVar x_v);
                 ( cmds @ new_cmds @ [ annotate_cmd cmd_gv_x None ],
                   errs @ new_errs @ errs_x_v ))
-              ([], []) (SS.elements xs)
+              ([], []) (Var.Set.elements xs)
           in
 
           let le = SSubst.subst_in_expr subst ~partial:true e' in
@@ -2125,8 +2139,8 @@ let rec translate_expr tr_ctx e :
         | [] -> ()
         | _ -> raise (Failure "Invalid symbolic")
       in
-      let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LLogic (LCmd.FreshSVar x_v)) in
+      let x_v = Var.of_string @@ (Var.str @@ fresh_var ()) ^ "_v" in
+      let cmd1 = (metadata, None, LLogic (LCmd.FreshSVar (Var.str x_v))) in
       let x_v = PVar x_v in
       let cmd2 =
         ( metadata,
@@ -2156,8 +2170,8 @@ let rec translate_expr tr_ctx e :
         | [] -> ()
         | _ -> raise (Failure "Invalid symb_number")
       in
-      let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
+      let x_v = Var.of_string @@ (Var.str @@ fresh_var ()) ^ "_v" in
+      let cmd1 = (metadata, None, LLogic (FreshSVar (Var.str x_v))) in
       let x_v = PVar x_v in
       let cmd2 =
         (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.NumberType)))
@@ -2171,8 +2185,8 @@ let rec translate_expr tr_ctx e :
         | [] -> ()
         | _ -> raise (Failure "Invalid symb_string")
       in
-      let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
+      let x_v = Var.of_string @@ (Var.str @@ fresh_var ()) ^ "_v" in
+      let cmd1 = (metadata, None, LLogic (FreshSVar (Var.str x_v))) in
       let x_v = PVar x_v in
       let cmd2 =
         (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.StringType)))
@@ -2186,8 +2200,8 @@ let rec translate_expr tr_ctx e :
         | [] -> ()
         | _ -> raise (Failure "Invalid symb_bool")
       in
-      let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
+      let x_v = Var.of_string @@ (Var.str @@ fresh_var ()) ^ "_v" in
+      let cmd1 = (metadata, None, LLogic (FreshSVar (Var.str x_v))) in
       let x_v = PVar x_v in
       let cmd2 =
         (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.BooleanType)))
@@ -2372,7 +2386,11 @@ let rec translate_expr tr_ctx e :
         :: Lit (Bool tr_ctx.tr_strictness) :: x_args_gv
       in
       let cmd_execute_eval =
-        LECall (x_ecall, PVar "ExecuteEval", proc_args, Some tr_ctx.tr_err_lab)
+        LECall
+          ( x_ecall,
+            PVar (Var.of_string "ExecuteEval"),
+            proc_args,
+            Some tr_ctx.tr_err_lab )
       in
 
       (* x_fscope := [x_f_val, "@scope"]; *)
@@ -4060,6 +4078,7 @@ let rec translate_expr tr_ctx e :
               (Failure
                  "no empty variable declaration lists in expression contexts")
         | [ (v, eo) ] -> (
+            let v = Var.of_string v in
             match eo with
             | None ->
                 let x, new_cmds, new_errs = compile_var_dec_without_exp v in
@@ -4068,6 +4087,7 @@ let rec translate_expr tr_ctx e :
                 let new_cmds, x, new_errs = compile_var_dec v e in
                 (x, cmds @ new_cmds, errs @ new_errs))
         | (v, eo) :: rest_decs -> (
+            let v = Var.of_string v in
             match eo with
             | None -> loop rest_decs cmds errs
             | Some e ->
@@ -4150,7 +4170,7 @@ and translate_statement tr_ctx e =
           LCall
             ( x_sf,
               lit_str dynamicScoper,
-              [ PVar tr_ctx.tr_sc_var; lit_str x ],
+              [ PVar tr_ctx.tr_sc_var; lit_str_v x ],
               Some tr_ctx.tr_err_lab,
               None )
     in
@@ -4163,7 +4183,10 @@ and translate_statement tr_ctx e =
            ( x_ref,
              EList
                [
-                 lit_refv; PVar x_sf; lit_str x; Lit (Bool tr_ctx.tr_strictness);
+                 lit_refv;
+                 PVar x_sf;
+                 lit_str_v x;
+                 Lit (Bool tr_ctx.tr_strictness);
                ] ))
     in
 
@@ -5092,6 +5115,7 @@ and translate_statement tr_ctx e =
             match eo with
             | None -> loop rest_decs cmds errs
             | Some e ->
+                let v = Var.of_string v in
                 let new_cmds, _, new_errs = compile_var_dec v e in
                 loop rest_decs (cmds @ new_cmds) (errs @ new_errs))
       in
@@ -6426,7 +6450,7 @@ and translate_statement tr_ctx e =
 
         (* x_r := PHI(breaks_ab, x_ab, breaks_def, breaks_b, x_b) *)
         let x_r = fresh_var () in
-        let phi_args : string list =
+        let phi_args =
           cur_breaks_ab @ [ x_old_b ] @ cur_breaks_def @ cur_breaks_b @ [ x_b ]
         in
         let phi_args = List.map (fun x -> PVar x) phi_args in
@@ -6648,7 +6672,7 @@ let make_final_cmd vars final_lab final_var origin_loc =
   in
   (Annot.Basic.make_basic ~origin_loc (), Some final_lab, cmd_final)
 
-let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
+let translate_fun_decls (top_level : bool) (sc_var : Var.t) (cur_index : int) e
     =
   let f_decls = func_decls_in_exp e in
   let hoisted_fdecls =
@@ -6713,7 +6737,7 @@ let generate_main e strictness spec : EProc.t =
           (LBasic
              (Mutation
                 ( Lit (Loc locGlobName),
-                  Lit (String global_v),
+                  lit_str_v global_v,
                   Lit
                     (LList
                        [
@@ -6750,7 +6774,7 @@ let generate_main e strictness spec : EProc.t =
 
   (* x_ret := x_e *)
   let ret_ass =
-    annotate_cmd (LBasic (Assignment (Names.return_variable, x_e))) None
+    annotate_cmd (LBasic (Assignment (Id.return_variable, x_e))) None
   in
 
   let x_ignore = fresh_var () in
@@ -6789,7 +6813,7 @@ let generate_main e strictness spec : EProc.t =
   let lab_ret_cmd = annotate_cmd LReturnNormal (Some ctx.tr_ret_lab) in
 
   let cmd_err_phi_node =
-    make_final_cmd errs ctx.tr_err_lab Names.return_variable origin_loc
+    make_final_cmd errs ctx.tr_err_lab Id.return_variable origin_loc
   in
   let lab_err_cmd = annotate_cmd LReturnError None in
   let global_err_asrt = annotate_cmd (LLogic (LCmd.Assert Expr.false_)) None in
@@ -6848,7 +6872,7 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
     List.map
       (fun decl_var ->
         let cmd =
-          LBasic (Mutation (PVar x_er, Lit (String decl_var), Lit Undefined))
+          LBasic (Mutation (PVar x_er, lit_str_v decl_var, Lit Undefined))
         in
         annotate_cmd cmd None)
       new_fid_vars
@@ -6911,9 +6935,7 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
 
   (* x_ret := x_e *)
   let ret_ass =
-    annotate_cmd
-      (LBasic (Assignment (Names.return_variable, PVar x_final)))
-      None
+    annotate_cmd (LBasic (Assignment (Id.return_variable, PVar x_final))) None
   in
 
   (* lab_ret: skip *)
@@ -6921,7 +6943,7 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
 
   (* lab_err: x_error := PHI(errs, x_fake_ret) *)
   let cmd_error_phi =
-    make_final_cmd (errs @ errs_xe_v) ctx.tr_err_lab Names.return_variable
+    make_final_cmd (errs @ errs_xe_v) ctx.tr_err_lab Id.return_variable
       origin_loc
   in
   let lab_err_cmd = annotate_cmd LReturnError None in
@@ -6999,7 +7021,8 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
     List.map
       (fun param ->
         let cmd =
-          LBasic (Mutation (PVar var_er, Lit (String param), PVar param))
+          LBasic
+            (Mutation (PVar var_er, Lit (String (Var.str param)), PVar param))
         in
         annotate_cmd cmd None)
       params
@@ -7010,7 +7033,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
     List.map
       (fun decl_var ->
         let cmd =
-          LBasic (Mutation (PVar var_er, Lit (String decl_var), Lit Undefined))
+          LBasic (Mutation (PVar var_er, lit_str_v decl_var, Lit Undefined))
         in
         annotate_cmd cmd None)
       (var_decls e)
@@ -7089,7 +7112,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
 
   (* pre_lab_ret: x_return := PHI(...) *)
   let cmd_return_phi =
-    make_final_cmd rets new_ctx.tr_ret_lab Names.return_variable origin_loc
+    make_final_cmd rets new_ctx.tr_ret_lab Id.return_variable origin_loc
   in
 
   let x_ignore = fresh_var () in
@@ -7129,7 +7152,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
       (LCall
          ( x_ignore,
            Lit (String JS2JSIL_Helpers.deleteErrorObjects),
-           [ PVar Names.return_variable; PVar var_te; PVar var_se; PVar var_re ],
+           [ PVar Id.return_variable; PVar var_te; PVar var_se; PVar var_re ],
            None,
            None ))
       None
@@ -7141,7 +7164,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
   let cmds_restore_er_ret = annotate_cmds cmds_restore_er_ret in *)
   let errs = errs in
   let cmd_error_phi =
-    make_final_cmd errs new_ctx.tr_err_lab Names.return_variable origin_loc
+    make_final_cmd errs new_ctx.tr_err_lab Id.return_variable origin_loc
   in
   let cmd_err_final = annotate_cmd LReturnError None in
 
@@ -7196,9 +7219,9 @@ let js2jsil_eval
                   raise (Failure msg)
               in
               let f_params =
-                match f_params with
-                | "x__scope" :: "x__this" :: rest -> rest
-                | "x__scope" :: rest -> rest
+                match List.map Var.str f_params with
+                | "x__scope" :: "x__this" :: rest -> List.map Var.of_string rest
+                | "x__scope" :: rest -> List.map Var.of_string rest
                 | _ -> f_params
               in
               generate_proc f_body f_id f_params f_strictness vislist None
@@ -7248,9 +7271,9 @@ let js2jsil_function_constructor_prop
                     raise (Failure msg)
                 in
                 let f_params =
-                  match f_params with
-                  | "x__scope" :: "x__this" :: rest -> rest
-                  | "x__scope" :: rest -> rest
+                  match List.map Var.str f_params with
+                  | "x__scope" :: "x__this" :: _ -> List.tl @@ List.tl f_params
+                  | "x__scope" :: _ -> List.tl f_params
                   | _ -> f_params
                 in
                 generate_proc f_body f_id f_params f_strictness vis_fid None

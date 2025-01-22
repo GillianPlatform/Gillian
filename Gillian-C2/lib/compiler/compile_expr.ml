@@ -149,13 +149,13 @@ type access =
 [@@deriving show { with_path = false }]
 
 let write_list_member ~list ~index ~total_size e =
-  let list_e = Expr.PVar list in
+  let list_e = Expr.PVar (Var.of_string list) in
   let values =
     List.init total_size (fun i ->
         if index == i then e else Expr.list_nth list_e i)
   in
   let new_list = Expr.EList values in
-  Cmd.Assignment (list, new_list)
+  Cmd.Assignment (Var.of_string list, new_list)
 
 let dummy_access ~ctx type_ =
   if Ctx.is_zst_access ctx type_ then ZST
@@ -692,9 +692,12 @@ let rec lvalue_as_access ~ctx ~read (lvalue : GExpr.t) : access Cs.with_body =
     | Symbol x ->
         if Ctx.is_local ctx x then
           if not (Ctx.representable_in_store ctx lvalue.type_) then
-            Cs.return (InMemoryComposit { ptr = PVar x; type_ = lvalue.type_ })
+            Cs.return
+              (InMemoryComposit
+                 { ptr = PVar (Var.of_string x); type_ = lvalue.type_ })
           else if Ctx.in_memory ctx x then
-            Cs.return (InMemoryScalar { ptr = PVar x; loaded = None })
+            Cs.return
+              (InMemoryScalar { ptr = PVar (Var.of_string x); loaded = None })
           else (Direct x, [])
         else if Ctx.is_function_symbol ctx x then Cs.return (DirectFunction x)
         else
@@ -718,7 +721,8 @@ let rec lvalue_as_access ~ctx ~read (lvalue : GExpr.t) : access Cs.with_body =
               Cs.return (InMemoryComposit { ptr = ge; type_ = lvalue.type_ })
             else if read then
               let+ v = Memory.load_scalar ~ctx ge lvalue.type_ |> Cs.map_l b in
-              InMemoryScalar { ptr = ge; loaded = Some (PVar v) }
+              InMemoryScalar
+                { ptr = ge; loaded = Some (PVar (Var.of_string v)) }
             else Cs.return (InMemoryScalar { ptr = ge; loaded = None })
         | ByCopy _ | ByCompositValue _ ->
             Error.unexpected "Pointers should be scalars passed by value"
@@ -966,7 +970,7 @@ and poison ~ctx ~annot (lhs : GExpr.t) =
   let write =
     match access with
     | ZST -> Cmd.Skip
-    | Direct x -> Assignment (x, Lit Undefined)
+    | Direct x -> Assignment (Var.of_string x, Lit Undefined)
     | InMemoryScalar { ptr; _ } | InMemoryComposit { ptr; _ } ->
         Memory.poison ~ctx ~dst:ptr (Ctx.size_of ctx type_)
     | ListMember { list; index; total_size } ->
@@ -984,7 +988,7 @@ and compile_assign_val ~ctx ~annot ~lhs ~(rhs : Val_repr.t) =
     | ZST, _ ->
         Ok [ annot Cmd.Skip ]
         (* We need a command in case we try want to add a label *)
-    | Direct x, ByValue v -> Ok [ annot (Assignment (x, v)) ]
+    | Direct x, ByValue v -> Ok [ annot (Assignment (Var.of_string x, v)) ]
     | InMemoryScalar { ptr; _ }, ByValue v ->
         Ok [ annot (Memory.store_scalar ~ctx ptr v lhs.type_) ]
     | ( InMemoryComposit { ptr = ptr_access; type_ = type_access },
@@ -1090,13 +1094,13 @@ and compile_symbol ~ctx ~b expr =
     let* access = lvalue_as_access ~ctx ~read:true expr in
     match access with
     | ZST -> by_value (Lit Null)
-    | Direct x -> by_value (Expr.PVar x)
+    | Direct x -> by_value (Expr.PVar (Var.of_string x))
     | ListMember { list; index; _ } ->
-        by_value (Expr.list_nth (PVar list) index)
+        by_value (Expr.list_nth (PVar (Var.of_string list)) index)
     | InMemoryScalar { loaded = Some e; _ } -> by_value e
     | InMemoryScalar { loaded = None; ptr } ->
         let* var = Memory.load_scalar ~ctx ptr expr.type_ |> Cs.map_l b in
-        by_value (PVar var)
+        by_value (PVar (Var.of_string var))
     | InMemoryComposit { ptr; type_ } -> by_copy ptr type_
     | InMemoryFunction { symbol = Some sym; _ } ->
         Cs.return (Val_repr.Procedure (Expr.string sym))
@@ -1309,7 +1313,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
         let new_ptr = Memory.ptr_add ptr_to_read offset in
         if Ctx.representable_in_store ctx expr.type_ then
           let* var = Memory.load_scalar ~ctx new_ptr expr.type_ |> Cs.map_l b in
-          by_value (PVar var)
+          by_value (PVar (Var.of_string var))
         else by_copy new_ptr expr.type_
   | Struct elems -> (
       let () = log_type "Struct" in
@@ -1513,7 +1517,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
             | Procedure _ -> Error.code_error "Return value is a procedure")
         | None -> Cs.return ~app:[] (Expr.Lit Undefined)
       in
-      let variable = Utils.Names.return_variable in
+      let variable = Id.return_variable in
       s
       @ add_annot
           [
@@ -1530,11 +1534,11 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
       let lhs = GExpr.as_symbol glhs in
       (* ZSTs are just (GIL) Null values *)
       if Ctx.is_zst_access ctx ty then
-        let cmd = Cmd.Assignment (lhs, Lit Null) in
+        let cmd = Cmd.Assignment (Var.of_string @@ lhs, Lit Null) in
         [ b ~cmd_kind:(Normal true) cmd ] |> void
       else if not (Ctx.representable_in_store ctx ty) then
         let ptr, alloc_cmd = Memory.alloc_ptr ~ctx ty in
-        let assign = Cmd.Assignment (lhs, ptr) in
+        let assign = Cmd.Assignment (Var.of_string @@ lhs, ptr) in
         let write =
           match value with
           | None -> []
@@ -1553,7 +1557,7 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
         |> void
       else if Ctx.in_memory ctx lhs then
         let ptr, action_cmd = Memory.alloc_ptr ~ctx ty in
-        let assign = Cmd.Assignment (lhs, ptr) in
+        let assign = Cmd.Assignment (Var.of_string @@ lhs, ptr) in
         let pre, write =
           match value with
           | None -> ([], [])
@@ -1563,7 +1567,9 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
                 Val_repr.as_value ~error:Error.code_error
                   ~msg:"declaration initial value for in-memory scalar access" v
               in
-              let write = Memory.store_scalar ~ctx (Expr.PVar lhs) v ty in
+              let write =
+                Memory.store_scalar ~ctx (Expr.PVar (Var.of_string @@ lhs)) v ty
+              in
               (pre, [ b write ])
         in
         pre
@@ -1583,7 +1589,8 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
               (e, s)
           | None -> (Lit Undefined, [])
         in
-        s @ [ b ~cmd_kind:(Normal true) (Assignment (lhs, v)) ] |> void
+        s @ [ b ~cmd_kind:(Normal true) (Assignment (Var.of_string @@ lhs, v)) ]
+        |> void
   | SAssign { lhs; rhs } ->
       let () = log_kind "SAssign" in
       (* Special case: my patched Kani will comment "deinit" if this assignment
@@ -1612,7 +1619,8 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
           let write =
             match (access, v) with
             | ZST, _ -> []
-            | Direct x, ByValue v -> [ b (Cmd.Assignment (x, v)) ]
+            | Direct x, ByValue v ->
+                [ b (Cmd.Assignment (Var.of_string @@ x, v)) ]
             | InMemoryScalar { ptr; _ }, ByValue v ->
                 [ b (Memory.store_scalar ~ctx ptr v lvalue.type_) ]
             | InMemoryComposit { ptr = dst; type_ }, ByCopy { ptr = src; _ } ->

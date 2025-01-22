@@ -330,7 +330,7 @@ lit_target:
   | NAN                       { Literal.Num nan }
   | INFINITY                  { Literal.Num infinity }
   | STRING                    { Literal.String $1 }
-  | LOC                       { Literal.Loc $1 }
+  | LOC                       { Literal.Loc (Loc.of_string $1) }
   | type_target               { Literal.Type $1 }
   | LSTNIL                    { Literal.LList [] }
   | LSTOPEN LSTCLOSE          { Literal.LList [] }
@@ -406,10 +406,10 @@ expr_target:
   | lit=lit_target { Expr.Lit lit }
   | v = LVAR {
     let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
-    Expr.LVar v_imported
+    Expr.LVar (LVar.of_string v_imported)
   }
-  | ALOC { Expr.ALoc $1 }
-  | v = VAR { Expr.PVar v }
+  | ALOC { Expr.ALoc (ALoc.of_string $1) }
+  | v = program_variable_target { v }
   | e1=expr_target; bop=binop_target; e2=expr_target { Expr.BinOp (e1, bop, e2) } %prec binop_prec
   | e1=expr_target; LSTCONS; e2=expr_target { Expr.NOp (LstCat, [ EList [ e1 ]; e2 ]) }
   | e1=expr_target; GREATERTHAN;  e2=expr_target { Expr.BinOp (e2, FLessThan, e1) }
@@ -441,9 +441,9 @@ expr_target:
 
 lvar_type_target:
   | lvar = LVAR; COLON; the_type = type_target
-    { (lvar, Some the_type) }
+    { (LVar.of_string lvar, Some the_type) }
   | lvar = LVAR;
-    { (lvar, None) }
+    { (LVar.of_string lvar, None) }
 
 
 pure_assertion_target:
@@ -472,15 +472,18 @@ pure_assertion_target:
   | delimited(LBRACE, pure_assertion_target, RBRACE)
     { $1 }
 
+program_variable_name_target:
+  | v = VAR { Var.of_string v }
+
 program_variable_target:
-  | v = VAR { Expr.PVar v }
+  | v = program_variable_name_target { Expr.PVar v }
 
 logic_variable_target:
   v = LVAR
   {
     let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
-    Expr.LVar v_imported }
+    Expr.LVar (LVar.of_string v_imported) }
 
 type_env_pair_target:
   | lvar = logic_variable_target; COLON; the_type=type_target
@@ -579,7 +582,7 @@ logic_cmd_target:
      { LCmd.Branch fo }
 
 phi_target:
-  v = VAR; COLON; args = separated_list(COMMA, expr_target)
+  v = program_variable_name_target; COLON; args = separated_list(COMMA, expr_target)
     { (v, args) }
 
 call_with_target:
@@ -603,9 +606,9 @@ new_target:
 cmd_target:
   | SKIP
     { LabCmd.LBasic (Skip) }
-  | v=VAR; DEFEQ; e=expr_target
+  | v=program_variable_name_target; DEFEQ; e=expr_target
     { LabCmd.LBasic (Assignment (v, e)) }
-  | VAR; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
+  | program_variable_name_target; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
     {
       let loc, metadata = (match $5 with
       | Some (Some arg_a, Some arg_b) -> Some arg_a, Some arg_b
@@ -614,7 +617,7 @@ cmd_target:
       | _ -> None, None
       ) in
         LabCmd.LBasic (New ($1, loc, metadata)) }
-  | v=VAR; DEFEQ; LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET
+  | v=program_variable_name_target; DEFEQ; LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET
     { LabCmd.LBasic (Lookup (v, e1, e2)) }
   | LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET; DEFEQ; e3=expr_target
     { LabCmd.LBasic (Mutation (e1, e2, e3)) }
@@ -622,26 +625,26 @@ cmd_target:
     { LabCmd.LBasic (Delete (e1, e2)) }
   | DELETEOBJ; LBRACE; e1=expr_target; RBRACE
     { LabCmd.LBasic (DeleteObj (e1)) }
-  | v=VAR; DEFEQ; HASFIELD; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
+  | v=program_variable_name_target; DEFEQ; HASFIELD; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
     { LabCmd.LBasic (HasField (v, e1, e2)) }
-  | v = VAR; DEFEQ; GETFIELDS; LBRACE; e=expr_target; RBRACE
+  | v = program_variable_name_target; DEFEQ; GETFIELDS; LBRACE; e=expr_target; RBRACE
     { LabCmd.LBasic (GetFields (v, e)) }
-  | v = VAR; DEFEQ; METADATA; LBRACE; e=expr_target; RBRACE
+  | v = program_variable_name_target; DEFEQ; METADATA; LBRACE; e=expr_target; RBRACE
     { LabCmd.LBasic (MetaData (v, e)) }
   | GOTO; i=VAR
     { LabCmd.LGoto i }
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { LabCmd.LGuardedGoto (e, i, j) }
-  | v=VAR; DEFEQ; e=expr_target;
+  | v=program_variable_name_target; DEFEQ; e=expr_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
     { LabCmd.LCall (v, e, es, oi, subst) }
-  | v=VAR; DEFEQ; EXTERN; pname=VAR;
+  | v=program_variable_name_target; DEFEQ; EXTERN; pname=program_variable_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target)
-    { LabCmd.LECall (v, PVar pname, es, oi) }
-  | v=VAR; DEFEQ; APPLY;
+    { LabCmd.LECall (v, pname, es, oi) }
+  | v=program_variable_name_target; DEFEQ; APPLY;
     LBRACE; es=expr_target; RBRACE; oi = option(call_with_target)
     { LabCmd.LApply (v, es, oi) }
-  | v = VAR; DEFEQ; ARGUMENTS
+  | v = program_variable_name_target; DEFEQ; ARGUMENTS
     { (LabCmd.LArguments v) }
   | PHI; LBRACE; phi_args =separated_list(SCOLON, phi_target); RBRACE
     { match phi_args with
@@ -710,7 +713,7 @@ pre_post_target:
   { Spec.{ pre; posts; flag = Error; to_verify = true; label = lab_spec} }
 
 spec_head_target:
-  spec_name = VAR; LBRACE; spec_params = separated_list(COMMA, VAR); RBRACE
+  spec_name = VAR; LBRACE; spec_params = separated_list(COMMA, program_variable_name_target); RBRACE
   { (spec_name, spec_params) }
 
 spec_target:
@@ -732,7 +735,7 @@ spec_target:
 /* PROCEDURES */
 
 proc_head_target:
-  PROC; proc_name = VAR; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
+  PROC; proc_name = VAR; LBRACE; param_list = separated_list(COMMA, program_variable_name_target); RBRACE
   { (proc_name, param_list) }
 
 proc_target:
@@ -783,7 +786,7 @@ named_assertion_target:
 
 pred_param_target:
   (* Program variable with in-parameter status and optional type *)
-  | in_param = option(PLUS); v = VAR; t = option(preceded(COLON, type_target))
+  | in_param = option(PLUS); v = program_variable_name_target; t = option(preceded(COLON, type_target))
     { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
       (v, t), in_param }
 
@@ -989,7 +992,7 @@ js_lexpr_target:
     { e }
 (* _ *)
   | UNDERSCORE
-    { JSExpr.LVar (Javert_utils.Js_generators.fresh_lvar ()) }
+    { JSExpr.LVar (LVar.str @@ Javert_utils.Js_generators.fresh_lvar ()) }
 (* $$scope *)
   | SCOPELEXPR { JSExpr.Scope }
 

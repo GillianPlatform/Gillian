@@ -1,6 +1,8 @@
 type err_t = Symbol_not_found of string [@@deriving show, yojson]
 
+module Id := Gil_syntax.Id
 module StringMap : Map.S with type key = string
+module LocMap : Map.S with type key = Id.any_loc Id.t
 
 module Concrete : sig
   open Gil_syntax
@@ -12,23 +14,23 @@ module Concrete : sig
   val deserialize_def : Literal.t -> def
 
   type t = {
-    symb : string StringMap.t;  (** maps symbols to loc names *)
-    defs : def StringMap.t;  (** maps loc names to definitions *)
+    symb : Id.any_loc Id.t StringMap.t;  (** maps symbols to loc names *)
+    defs : def LocMap.t;  (** maps loc names to definitions *)
   }
 
   (** Finds a location name given symbol in the global environment *)
-  val find_symbol : t -> string -> (string, err_t) result
+  val find_symbol : t -> string -> (Id.any_loc Id.t, err_t) result
 
   (** Finds a definition given its location name in the global environment *)
-  val find_def : t -> string -> def
+  val find_def : t -> Id.any_loc Id.t -> def
 
   (** [set_symbol genv symbol locname ]
       Returns a new global environment where the symbol [symbol] is associated with the location [locname] *)
-  val set_symbol : t -> string -> string -> t
+  val set_symbol : t -> string -> Id.any_loc Id.t -> t
 
   (** [set_def genv locname def ]
       Returns a new global environment where the block [locname] is associated with the global definition [def] *)
-  val set_def : t -> string -> def -> t
+  val set_def : t -> Id.any_loc Id.t -> def -> t
 
   (** Empty global environment *)
   val empty : t
@@ -39,7 +41,7 @@ module Concrete : sig
   (** {3 Symbolic things} *)
 
   val substitution : Gillian.Symbolic.Subst.t -> t -> t
-  val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t
+  val assertions : t -> Id.any_loc Id.t list * Gillian.Gil_syntax.Asrt.t
 end
 
 module Symbolic : sig
@@ -52,15 +54,15 @@ module Symbolic : sig
   val deserialize_def : Expr.t -> def
 
   type t = {
-    symb : string StringMap.t;  (** maps symbols to loc names *)
-    defs : def StringMap.t;  (** maps loc names to definitions *)
+    symb : Id.any_loc Id.t StringMap.t;  (** maps symbols to loc names *)
+    defs : def LocMap.t;  (** maps loc names to definitions *)
   }
 
   (** Finds a location name given symbol in the global environment *)
-  val find_symbol : t -> string -> (string, err_t) result
+  val find_symbol : t -> string -> (Id.any_loc Id.t, err_t) result
 
   (** Finds a definition given its location name in the global environment *)
-  val find_def : t -> string -> def
+  val find_def : t -> Id.any_loc Id.t -> def
 
   (** [set_symbol genv symbol locname ]
       Returns a new global environment where the symbol [symbol] is associated with the location [locname] *)
@@ -68,7 +70,7 @@ module Symbolic : sig
 
   (** [set_def genv locname def ]
       Returns a new global environment where the block [locname] is associated with the global definition [def] *)
-  val set_def : t -> string -> def -> t Monadic.Delayed.t
+  val set_def : t -> Id.any_loc Id.t -> def -> t Monadic.Delayed.t
 
   (** Empty global environment *)
   val empty : t
@@ -79,5 +81,5 @@ module Symbolic : sig
   (** {3 Symbolic things} *)
 
   val substitution : Gillian.Symbolic.Subst.t -> t -> t
-  val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t
+  val assertions : t -> Id.any_loc Id.t list * Gillian.Gil_syntax.Asrt.t
 end

@@ -6,6 +6,7 @@ open JS2JSIL_Helpers
 open JS_Utils
 open Parsing
 module Flag = Gillian.Gil_syntax.Flag
+module Var = Gillian.Gil_syntax.Var
 
 exception CannotHappen
 exception No_Codename
@@ -21,7 +22,7 @@ let string_of_vtf_tbl (var_tbl : var_to_fid_tbl_type) =
   let var_tbl_str =
     Hashtbl.fold
       (fun v fid ac ->
-        let v_fid_pair_str = v ^ ": " ^ fid in
+        let v_fid_pair_str = Var.str v ^ ": " ^ fid in
         if ac = "" then v_fid_pair_str else ac ^ ", " ^ v_fid_pair_str)
       var_tbl ""
   in
@@ -38,7 +39,7 @@ let string_of_cc_tbl (cc_tbl : cc_tbl_type) =
 let update_fun_tbl
     (fun_tbl : pre_fun_tbl_type)
     (f_id : string)
-    (f_args : string list)
+    (f_args : Var.t list)
     (f_body : JS_Parser.Syntax.exp option)
     (f_strictness : bool)
     (annotations : JS_Parser.Syntax.annotation list)
@@ -52,7 +53,7 @@ let update_cc_tbl
     (cc_tbl : cc_tbl_type)
     (f_parent_id : string)
     (f_id : string)
-    (f_vars : string list) =
+    (f_vars : Var.t list) =
   let f_parent_var_table = get_scope_table cc_tbl f_parent_id in
   let new_f_tbl = Hashtbl.create 1 in
   Hashtbl.iter
@@ -66,7 +67,7 @@ let update_cc_tbl_single_var_er
     (cc_tbl : cc_tbl_type)
     (f_parent_id : string)
     (f_id : string)
-    (x : string) =
+    (x : Var.t) =
   let f_parent_var_table =
     try Hashtbl.find cc_tbl f_parent_id
     with _ ->
@@ -205,6 +206,7 @@ let closure_clarification
         let cur_annot = e.JS_Parser.Syntax.exp_annot in
         match e.exp_stx with
         | FunctionExp (strictness, f_name, args, fb) -> (
+            let args = List.map Var.of_string args in
             match f_name with
             | None ->
                 let new_f_id = get_codename e in
@@ -220,7 +222,8 @@ let closure_clarification
                 let new_f_id = get_codename e in
                 let new_f_id_outer = new_f_id ^ "_outer" in
                 let _ =
-                  update_cc_tbl_single_var_er cc_tbl f_id new_f_id_outer f_name
+                  update_cc_tbl_single_var_er cc_tbl f_id new_f_id_outer
+                    (Var.of_string f_name)
                 in
                 let new_f_tbl =
                   update_cc_tbl cc_tbl new_f_id_outer new_f_id
@@ -233,6 +236,7 @@ let closure_clarification
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
                 Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]))
         | Function (strictness, _, args, fb) ->
+            let args = List.map Var.of_string args in
             let new_f_id = get_codename e in
             let new_f_tbl =
               update_cc_tbl cc_tbl f_id new_f_id (get_all_vars_f fb args)
@@ -256,7 +260,9 @@ let closure_clarification
             let _ = f prev_state e1 in
             let _ = Option.map (f prev_state) e3 in
             let new_f_id = get_codename e in
-            let _ = update_cc_tbl_single_var_er cc_tbl f_id new_f_id x in
+            let _ =
+              update_cc_tbl_single_var_er cc_tbl f_id new_f_id (Var.of_string x)
+            in
             f (Some (new_f_id, visited_funs @ [ new_f_id ])) e2
         | _ -> [])
   in
@@ -394,7 +400,7 @@ let translate_lannots_in_exp
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (scope_var : string)
+    (scope_var : Var.t)
     (inside_stmt_compilation : bool)
     e =
   let is_e_expr = not (is_stmt e) in
@@ -451,7 +457,7 @@ let translate_invariant_in_exp
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (sc_var : string)
+    (sc_var : Var.t)
     (e : JS_Parser.Syntax.exp) : (Asrt.t * string list) option =
   let invariant =
     List.filter
@@ -481,7 +487,7 @@ let translate_single_func_specs
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (fun_args : string list)
+    (fun_args : Var.t list)
     (annotations : JS_Parser.Syntax.annotation list)
     (requires_flag : JS_Parser.Syntax.annotation_type)
     (ensures_normal_flag : JS_Parser.Syntax.annotation_type)
@@ -731,6 +737,7 @@ let get_them_functions
         let cur_annot = e.JS_Parser.Syntax.exp_annot in
         match e.exp_stx with
         | FunctionExp (strictness, f_name, args, fb) -> (
+            let args = List.map Var.of_string args in
             match f_name with
             | None ->
                 let new_f_id = get_codename e in
@@ -746,7 +753,8 @@ let get_them_functions
                 let new_f_id = get_codename e in
                 let new_f_id_outer = new_f_id ^ "_outer" in
                 let _ =
-                  update_cc_tbl_single_var_er cc_tbl f_id new_f_id_outer f_name
+                  update_cc_tbl_single_var_er cc_tbl f_id new_f_id_outer
+                    (Var.of_string f_name)
                 in
                 let new_f_tbl =
                   update_cc_tbl cc_tbl new_f_id_outer new_f_id
@@ -759,6 +767,7 @@ let get_them_functions
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
                 Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]))
         | Function (strictness, _, args, fb) ->
+            let args = List.map Var.of_string args in
             let new_f_id = get_codename e in
             let new_f_tbl =
               update_cc_tbl cc_tbl f_id new_f_id (get_all_vars_f fb args)
@@ -782,7 +791,9 @@ let get_them_functions
             let _ = f prev_state e1 in
             let _ = Option.map (f prev_state) e3 in
             let new_f_id = get_codename e in
-            let _ = update_cc_tbl_single_var_er cc_tbl f_id new_f_id x in
+            let _ =
+              update_cc_tbl_single_var_er cc_tbl f_id new_f_id (Var.of_string x)
+            in
             f (Some (new_f_id, visited_funs @ [ new_f_id ])) e2
         | _ -> [])
   in
@@ -794,7 +805,7 @@ let preprocess_eval
     (strictness : bool)
     (e : JS_Parser.Syntax.exp)
     (fid_parent : string)
-    (params : string list) =
+    (params : Var.t list) =
   (* let offset_converter x = 0 in *)
   let fid =
     if List.length params > 0 then fresh_anonymous ()

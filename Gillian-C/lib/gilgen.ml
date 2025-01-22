@@ -12,7 +12,7 @@ let true_name = ValueTranslation.true_name
 
 type context = {
   block_stack : string list;
-  local_env : string list;
+  local_env : Var.t list;
   gil_annot : Gil_logic_gen.gil_annots;
   exec_mode : Exec_mode.t;
   loop_stack : string list;
@@ -62,7 +62,7 @@ let internal_proc_of_unop uop =
 
 let trans_binop_expr ~fname binop te1 te2 =
   let call func =
-    let gvar = Generators.gen_str ~fname Prefix.gvar in
+    let gvar = Var.of_string @@ Generators.gen_str ~fname Prefix.gvar in
     ( [
         Cmd.Call (gvar, Expr.Lit (Literal.String func), [ te1; te2 ], None, None);
       ],
@@ -264,11 +264,11 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let gen_str = Generators.gen_str ~fname in
   let open Expr in
   match expr with
-  | Evar id -> ([], PVar (true_name id))
+  | Evar id -> ([], PVar (Var.of_string @@ true_name id))
   | Econst const -> ([], Lit (trans_const const))
   | Eload (compcert_chunk, expp) ->
       let cl, e = trans_expr expp in
-      let gvar = gen_str Prefix.gvar in
+      let gvar = Var.of_string @@ gen_str Prefix.gvar in
       let loadv = Expr.Lit (Literal.String Internal_Functions.loadv) in
 
       let chunk = to_gil_chunk clight_prog fname fid compcert_chunk expp in
@@ -279,7 +279,7 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
       (cl @ [ cmd ], Expr.PVar gvar)
   | Eunop (uop, e) ->
       let cl, e = trans_expr e in
-      let gvar = gen_str Prefix.gvar in
+      let gvar = Var.of_string @@ gen_str Prefix.gvar in
       let ip = internal_proc_of_unop uop in
       let call = Cmd.Call (gvar, Lit (Literal.String ip), [ e ], None, None) in
       (cl @ [ call ], PVar gvar)
@@ -294,8 +294,11 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
             ^ PrintCminor.name_of_binop binop)
       in
       (leading_e1 @ leading_e2 @ leading_binop, te)
-  | Eaddrof id when List.mem (true_name id) local_env ->
-      let res = EList [ nth (true_name id) 0; Lit (Literal.Int Z.zero) ] in
+  | Eaddrof id when List.mem (Var.of_string @@ true_name id) local_env ->
+      let res =
+        EList
+          [ nth (Var.of_string @@ true_name id) 0; Lit (Literal.Int Z.zero) ]
+      in
       ([], res)
   | Eaddrof id ->
       let name = true_name id in
@@ -331,7 +334,7 @@ let make_free_cmd fname var_list =
     | x :: r -> Expr.EList [ nth x 0; zero; nth x 1 ] :: make_blocks r
   in
   let freelist = Expr.Lit (Literal.String Internal_Functions.free_list) in
-  let gvar = Generators.gen_str ~fname Prefix.gvar in
+  let gvar = Var.of_string @@ Generators.gen_str ~fname Prefix.gvar in
   (* If there's nothing to free, we just don't create the command *)
   match make_blocks var_list with
   | [] -> None
@@ -339,8 +342,8 @@ let make_free_cmd fname var_list =
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
 let make_symb_gen ~fname ~ctx assigned_id type_string =
-  let gen_str = Generators.gen_str ~fname Prefix.gvar in
-  let assigned = true_name assigned_id in
+  let gen_str = Var.of_string @@ Generators.gen_str ~fname Prefix.gvar in
+  let assigned = Var.of_string @@ true_name assigned_id in
   let fresh_svar = Cmd.Logic (FreshSVar gen_str) in
   let gvar_val = Expr.PVar gen_str in
   let assume_val_t = Cmd.Logic (LCmd.AssumeType (gvar_val, Type.IntType)) in
@@ -393,7 +396,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
   | Sskip -> ([ (annot_ctx context, None, Cmd.Skip) ], [])
   | Sset (id, exp) ->
       let cmds, te = trans_expr exp in
-      let var_name = true_name id in
+      let var_name = Var.of_string @@ true_name id in
       let ncmd = Cmd.Assignment (var_name, te) in
       let lab_ncmd = (annot_ctx context, None, ncmd) in
       let cmds = add_annots ~ctx:context cmds @ [ lab_ncmd ] in
@@ -424,7 +427,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let bool_of_val =
         Expr.Lit (Literal.String Internal_Functions.bool_of_val)
       in
-      let texb = gen_str Prefix.gvar in
+      let texb = Var.of_string @@ gen_str Prefix.gvar in
       let bov = Cmd.Call (texb, bool_of_val, [ texp ], None, None) in
       let a_bov = (annot_ctx context, None, bov) in
       let guard = Cmd.GuardedGoto (PVar texb, then_lab, else_lab) in
@@ -475,7 +478,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let ret_assign =
         ( annot_ctx context,
           None,
-          Cmd.Assignment (Gillian.Utils.Names.return_variable, rexpr) )
+          Cmd.Assignment (Gil_syntax.Id.return_variable, rexpr) )
       in
       let freecmd_opt = make_free_cmd fname context.local_env in
       let return = (annot_ctx context, None, Cmd.ReturnNormal) in
@@ -514,7 +517,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let annot_addr_eval = add_annots ~ctx:context addr_eval_cmds in
       let annot_v_eval = add_annots ~ctx:context v_eval_cmds in
       let storev = Expr.Lit (Literal.String Internal_Functions.storev) in
-      let gvar = gen_str Prefix.gvar in
+      let gvar = Var.of_string @@ gen_str Prefix.gvar in
       let cmd =
         Cmd.Call (gvar, storev, [ chunk_expr; eaddr; ev ], None, None)
       in
@@ -538,7 +541,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       (make_symb_gen ~ctx:context id CConstants.VTypes.int_type, [])
   | Scall (None, _, ex, args) when is_printf_call ex ->
       let cmds, egil = List.split (List.map trans_expr args) in
-      let leftvar = gen_str Prefix.gvar in
+      let leftvar = Var.of_string @@ gen_str Prefix.gvar in
       let cmd =
         Cmd.ECall
           ( leftvar,
@@ -559,15 +562,15 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       in
       let leftvar =
         match optid with
-        | None -> gen_str Prefix.gvar
-        | Some id -> true_name id
+        | None -> Var.of_string @@ gen_str Prefix.gvar
+        | Some id -> Var.of_string @@ true_name id
       in
       let leading_fn, fn_expr = trans_expr ex in
       let leadings_params, trans_params =
         List.split (List.map trans_expr lexp)
       in
       let leading_params = List.concat leadings_params in
-      let fname_var = gen_str Prefix.gvar in
+      let fname_var = Var.of_string @@ gen_str Prefix.gvar in
       let s_get_function_name =
         Expr.Lit (Literal.String Internal_Functions.get_function_name)
       in
@@ -737,7 +740,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let al = ValueTranslation.int_of_z al in
       let cmds_dst, dst = trans_expr dst in
       let cmds_src, src = trans_expr src in
-      let temp = gen_str Prefix.gvar in
+      let temp = Var.of_string @@ gen_str Prefix.gvar in
       let call =
         Cmd.Call
           ( temp,
@@ -757,7 +760,7 @@ let empty_annot = Annot.make_basic ()
 let add_empty_annots l = List.map (fun a -> (empty_annot, None, a)) l
 
 let alloc_var fname (name, sz) =
-  let gvar = Generators.gen_str ~fname Prefix.gvar in
+  let gvar = Var.of_string @@ Generators.gen_str ~fname Prefix.gvar in
   let ocaml_size = ValueTranslation.gil_size_of_compcert sz in
   let expr_size = Expr.Lit (Int ocaml_size) in
   let alloc = LActions.(str_ac (AMem Alloc)) in
@@ -778,11 +781,13 @@ let trans_function
     fid =
   let { fn_sig = _; fn_params; fn_vars; fn_temps; fn_body } = fdef in
   (* Getting rid of the ids immediately *)
-  let fn_vars = List.map (fun (id, sz) -> (true_name id, sz)) fn_vars in
+  let fn_vars =
+    List.map (fun (id, sz) -> (Var.of_string @@ true_name id, sz)) fn_vars
+  in
   let context =
     {
       block_stack = [];
-      local_env = fst (List.split fn_vars);
+      local_env = List.map fst fn_vars;
       gil_annot;
       exec_mode;
       loop_stack = [];
@@ -793,13 +798,14 @@ let trans_function
       (fun temp ->
         ( empty_annot,
           None,
-          Cmd.Assignment (true_name temp, Expr.Lit Literal.Undefined) ))
+          Cmd.Assignment
+            (Var.of_string @@ true_name temp, Expr.Lit Literal.Undefined) ))
       fn_temps
   in
   let register_vars = List.concat (List.map (alloc_var fname) fn_vars) in
   let init_genv =
     if String.equal fname !Utils.Config.entry_point then
-      let gvar = Generators.gen_str ~fname Prefix.gvar in
+      let gvar = Var.of_string @@ Generators.gen_str ~fname Prefix.gvar in
       let expr_fn =
         Expr.Lit (Literal.String CConstants.Internal_Functions.initialize_genv)
       in
@@ -816,13 +822,15 @@ let trans_function
     | [ (a, b, c) ] ->
         [
           (a, b, c);
-          (Annot.make_basic (), None, Assignment ("ret", Expr.zero_i));
+          ( Annot.make_basic (),
+            None,
+            Assignment (Id.return_variable, Expr.zero_i) );
           (Annot.make_basic (), None, ReturnNormal);
         ]
     | a :: b -> a :: add_return b
   in
   let body_with_reg_and_ret = add_return body_with_registrations in
-  let params = List.map true_name fn_params in
+  let params = List.map (fun x -> Var.of_string @@ true_name x) fn_params in
   Proc.
     {
       proc_name = fname;
@@ -852,7 +860,7 @@ let set_global_var symbol v =
   let id_list_expr = Expr.Lit (Literal.LList init_data_list) in
   let setvar = CConstants.Internal_Functions.glob_set_var in
   Cmd.Call
-    ( "u",
+    ( Var.of_string "u",
       Lit (String setvar),
       [ loc; sz; id_list_expr; perm_string ],
       None,
@@ -1016,8 +1024,7 @@ let make_init_proc init_cmds =
     [
       ( empty_annot,
         None,
-        Cmd.Assignment
-          (Gillian.Utils.Names.return_variable, Expr.Lit Literal.Undefined) );
+        Cmd.Assignment (Id.return_variable, Expr.Lit Literal.Undefined) );
       (empty_annot, None, Cmd.ReturnNormal);
     ]
   in

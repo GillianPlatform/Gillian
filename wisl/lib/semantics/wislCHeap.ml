@@ -1,14 +1,14 @@
+open Gil_syntax
 open Gillian.Concrete
-module Literal = Gillian.Gil_syntax.Literal
 
-type t = (string * int, Values.t) Hashtbl.t
+type t = (Loc.t * int, Values.t) Hashtbl.t
 
 let init () = Hashtbl.create 1
 let get heap loc offset = Hashtbl.find_opt heap (loc, offset)
 let set heap loc offset value = Hashtbl.replace heap (loc, offset) value
 
 let alloc heap size =
-  let loc = Gillian.Utils.Generators.fresh_loc () in
+  let loc = Loc.alloc () in
   let rec aux current_offset =
     if current_offset < 0 then ()
     else
@@ -40,7 +40,7 @@ let get_beautiful_list heap =
     let rec aux rest =
       match rest with
       | [] -> [ (loc, [ (offset, value) ]) ]
-      | (locp, assocs) :: r when String.equal loc locp ->
+      | (locp, assocs) :: r when Id.equal loc locp ->
           (locp, insert (offset, value) assocs) :: r
       | a :: r -> a :: aux r
     in
@@ -50,11 +50,11 @@ let get_beautiful_list heap =
 
 let str heap =
   let vstr v = Format.asprintf "%a" Values.pp v in
-  let one_loc_str loc l =
+  let one_loc_str (loc : Loc.t) l =
     String.concat "\n"
       (List.map
          (fun (offset, value) ->
-           Printf.sprintf "(%s, %i) -> %s" loc offset (vstr value))
+           Fmt.str "(%a, %i) -> %s" Id.pp loc offset (vstr value))
          l)
   in
   let bl = get_beautiful_list heap in

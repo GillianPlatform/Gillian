@@ -1,4 +1,3 @@
-open Gillian.Utils
 open Gillian.Monadic
 open Gillian.Symbolic
 open Gil_syntax
@@ -179,7 +178,7 @@ module Make (S : MyMonadicSMemory.S) :
     (b', n')
 
   let lvars (b, n) =
-    let open Containers.SS in
+    let open LVar.Set in
     let lvars_map =
       ExpMap.fold
         (fun k v acc -> S.lvars v |> union (Expr.lvars k) |> union acc)
@@ -190,7 +189,7 @@ module Make (S : MyMonadicSMemory.S) :
     | None -> lvars_map
 
   let alocs (b, n) =
-    let open Containers.SS in
+    let open ALoc.Set in
     let alocs_map =
       ExpMap.fold
         (fun k v acc -> union (union (Expr.alocs k) (S.alocs v)) acc)

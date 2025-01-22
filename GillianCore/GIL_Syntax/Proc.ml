@@ -10,7 +10,7 @@ type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_source_path : string option;
   proc_internal : bool;
   proc_body : ('annot * 'label option * 'label Cmd.t) array;
-  proc_params : string list;
+  proc_params : Id.Var.t list;
   proc_spec : Spec.t option;
   proc_aliases : string list;
   proc_calls : string list;

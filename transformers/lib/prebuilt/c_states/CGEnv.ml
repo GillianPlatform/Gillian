@@ -26,8 +26,8 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
   (* Execute action *)
   let execute_action GetDef s args =
     match args with
-    | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> (
-        match Global_env.find_def_opt s loc with
+    | [ Expr.Lit (Loc loc) ] -> (
+        match Global_env.find_def_opt s (Loc.of_string @@ Id.str loc) with
         | Some def ->
             let v = Global_env.serialize_def def in
             DR.ok (s, [ Expr.Lit (Loc loc); Expr.Lit v ])
@@ -36,8 +36,11 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
                signal. *)
             if !Gillian.Utils.Config.under_approximation then Delayed.vanish ()
             else
-              Fmt.failwith "execute_genvgetdef: couldn't find %s\nGENV:\n%a" loc
-                Global_env.pp s)
+              Fmt.failwith "execute_genvgetdef: couldn't find %a\nGENV:\n%a"
+                Id.pp loc Global_env.pp s)
+    (* Again: are these two cases even relevant??
+       | [ Expr.ALoc loc ] -> fn loc
+       | [ Expr.LVar loc ] -> fn loc *)
     | _ -> failwith "Invalid arguments for GetDef"
 
   let consume () _ _ = failwith "Invalid C GEnv consume"
@@ -53,8 +56,8 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
   let assertions_others _ = []
   let can_fix () = false
   let get_fixes () = []
-  let lvars _ = Gillian.Utils.Containers.SS.empty
-  let alocs _ = Gillian.Utils.Containers.SS.empty
+  let lvars _ = LVar.Set.empty
+  let alocs _ = ALoc.Set.empty
   let substitution_in_place _ s = Delayed.return s
   let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
   let list_actions () = [ (GetDef, [], []) ]

@@ -6,7 +6,7 @@ val resolve : curr_pc:Pc.t -> 'a t -> 'a Branch.t list
 
 val return :
   ?learned:Expr.t list ->
-  ?learned_types:(Id.any_var Id.t * Type.t) list ->
+  ?learned_types:([< Id.any_var ] Id.t * Type.t) list ->
   'a ->
   'a t
 

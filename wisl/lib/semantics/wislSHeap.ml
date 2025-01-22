@@ -5,12 +5,16 @@ module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 open Gillian.Debugger.Utils
 
+type loc_t = Id.any_loc Id.t [@@deriving yojson]
+
+let pp_loc_t = Id.pp
+
 type err =
-  | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree of string
-  | UseAfterFree of string
+  | MissingResource of (WislLActions.ga * loc_t * Expr.t option)
+  | DoubleFree of loc_t
+  | UseAfterFree of loc_t
   | MemoryLeak
-  | OutOfBounds of (int option * string * Expr.t)
+  | OutOfBounds of (int option * loc_t * Expr.t)
   | InvalidLocation of Expr.t
 [@@deriving yojson, show]
 
@@ -51,9 +55,9 @@ module Block = struct
 
   let pp ~loc fmt block =
     match block with
-    | Freed -> Fmt.pf fmt "%s -> FREED" loc
+    | Freed -> Fmt.pf fmt "%a -> FREED" Id.pp loc
     | Allocated { data; bound } ->
-        Fmt.pf fmt "%s -> @[<v>BOUND: %a@ %a@]" loc
+        Fmt.pf fmt "%a -> @[<v>BOUND: %a@ %a@]" Id.pp loc
           (Fmt.option ~none:(Fmt.any "NONE") Fmt.int)
           bound
           (Fmt.braces @@ Fmt.vbox
@@ -63,16 +67,16 @@ module Block = struct
 
   let lvars block =
     match block with
-    | Freed -> SS.empty
+    | Freed -> LVar.Set.empty
     | Allocated { data; _ } -> SFVL.lvars data
 
   let alocs block =
     match block with
-    | Freed -> SS.empty
+    | Freed -> ALoc.Set.empty
     | Allocated { data; _ } -> SFVL.alocs data
 end
 
-type t = (string, Block.t) Hashtbl.t [@@deriving yojson]
+type t = (loc_t, Block.t) Hashtbl.t [@@deriving yojson]
 
 (* A symbolic heap is a map from location and offset to symbolic values *)
 
@@ -86,10 +90,10 @@ let copy heap = Hashtbl.copy heap
 
 (****** Types and functions for logging when blocks have been freed ********)
 
-type set_freed_info = { loc : string } [@@deriving yojson]
+type set_freed_info = { loc : loc_t } [@@deriving yojson]
 
 let set_freed_info_pp fmt set_freed =
-  Fmt.pf fmt "Set Freed at location %s" set_freed.loc
+  Fmt.pf fmt "Set Freed at location %a" Id.pp set_freed.loc
 
 let set_freed_with_logging heap loc =
   let set_freed_info = { loc } in
@@ -114,8 +118,8 @@ let alloc (heap : t) size =
   let l = get_list (size - 1) in
   let sfvl = SFVL.of_list l in
   let block = Block.Allocated { data = sfvl; bound = Some size } in
-  let () = Hashtbl.replace heap loc block in
-  loc
+  let () = Hashtbl.replace heap (loc :> loc_t) block in
+  (loc :> loc_t)
 
 let dispose (heap : t) loc =
   match Hashtbl.find_opt heap loc with
@@ -264,8 +268,7 @@ let merge_loc (heap : t) new_loc old_loc : unit =
           let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
           Hashtbl.remove heap old_loc)
 
-let substitution_in_place subst heap :
-    (t * Expr.Set.t * (string * Type.t) list) list =
+let substitution_in_place subst heap =
   (* First we replace in the offset and values using fvl *)
   let () =
     Hashtbl.iter
@@ -274,48 +277,41 @@ let substitution_in_place subst heap :
       heap
   in
   (* Then we replace within the locations themselves *)
-  let aloc_subst =
-    Subst.filter subst (fun var _ ->
-        match var with
-        | ALoc _ -> true
-        | _ -> false)
-  in
-  Subst.iter aloc_subst (fun aloc new_loc ->
-      let aloc =
-        match aloc with
-        | ALoc loc -> loc
-        | _ -> raise (Failure "Impossible by construction")
-      in
-      let new_loc_str =
-        match new_loc with
-        | Expr.Lit (Literal.Loc loc) -> loc
-        | Expr.ALoc loc -> loc
-        | _ ->
-            raise
-              (Failure
-                 (Printf.sprintf "Heap substitution fail for loc: %s"
-                    ((WPrettyUtils.to_str Expr.pp) new_loc)))
-      in
-      merge_loc heap new_loc_str aloc);
+  subst |> Subst.to_list
+  |> List.filter_map (fun (from, subst_to) ->
+         match from with
+         | Expr.ALoc a -> Some ((a :> loc_t), subst_to)
+         | _ -> None)
+  |> List.iter (fun (aloc, new_loc) ->
+         let new_loc =
+           match new_loc with
+           | Expr.Lit (Literal.Loc loc) -> (loc :> loc_t)
+           | Expr.ALoc loc -> (loc :> loc_t)
+           | _ ->
+               Fmt.failwith "Heap substitution fail for loc: %s"
+                 ((WPrettyUtils.to_str Expr.pp) new_loc)
+         in
+         merge_loc heap new_loc aloc);
   [ (heap, Expr.Set.empty, []) ]
 
 let assertions heap =
   Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
 
-let lvars heap : SS.t =
+let lvars heap : LVar.Set.t =
   Hashtbl.fold
-    (fun _ block acc -> SS.union (Block.lvars block) acc)
-    heap SS.empty
+    (fun _ block acc -> LVar.Set.union (Block.lvars block) acc)
+    heap LVar.Set.empty
 
-let alocs heap : SS.t =
+let alocs heap : ALoc.Set.t =
   Hashtbl.fold
-    (fun loc block acc ->
-      SS.union
-        (SS.union (Block.alocs block) acc)
-        (match Gillian.Utils.Names.is_aloc_name loc with
-        | true -> SS.singleton loc
-        | false -> SS.empty))
-    heap SS.empty
+    (fun loc block ->
+      ALoc.Set.union
+      @@ ALoc.Set.union (Block.alocs block)
+      @@
+      match Id.as_aloc loc with
+      | Some loc -> ALoc.Set.singleton loc
+      | None -> ALoc.Set.empty)
+    heap ALoc.Set.empty
 
 (***** small things useful for printing ******)
 
@@ -328,6 +324,7 @@ let pp fmt heap =
 let get_store_vars store is_gil_file =
   List.filter_map
     (fun (var, (value : Gil_syntax.Expr.t)) ->
+      let var = Var.str var in
       if (not is_gil_file) && Str.string_match (Str.regexp "gvar") var 0 then
         None
       else
@@ -342,8 +339,8 @@ let get_store_vars store is_gil_file =
         in
         let value =
           match value with
-          | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
-            -> match_offset rest loc Fmt.string
+          | Expr.EList (Lit (Loc loc) :: rest) -> match_offset rest loc Id.pp
+          | Expr.EList (LVar loc :: rest) -> match_offset rest loc Id.pp
           | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
         in
         Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
@@ -378,7 +375,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   smemory |> Hashtbl.to_seq
   |> Seq.map (fun (loc, blocks) ->
          match blocks with
-         | Block.Freed -> Variable.create_leaf loc "freed" ()
+         | Block.Freed -> Variable.create_leaf (Id.str loc) "freed" ()
          | Allocated { data; bound } ->
              let bound =
                match bound with
@@ -394,7 +391,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
              let cells = Variable.create_node "cells" cells_id () in
              let loc_id = get_new_scope_id () in
              let () = Hashtbl.replace variables loc_id [ bound; cells ] in
-             Variable.create_node loc loc_id ~value:"allocated" ())
+             Variable.create_node (Id.str loc) loc_id ~value:"allocated" ())
   |> List.of_seq
 
 let add_debugger_variables
@@ -426,22 +423,25 @@ let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
 let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
   let forgettables =
     Hashtbl.fold
-      (fun (aloc : string) (block : Block.t) forgettables ->
+      (fun aloc (block : Block.t) forgettables ->
         match block with
         | Freed -> forgettables
         | Allocated { data; bound } -> (
+            (* TODO: why do we not check if it's an ALoc here? Why assume?  *)
+            let aloc = ALoc.of_string @@ Id.str aloc in
             match
               (SFVL.is_empty data, bound, Expr.Set.mem (ALoc aloc) keep)
             with
             | true, None, false ->
-                let () = Hashtbl.remove heap aloc in
+                let () = Hashtbl.remove heap (aloc :> loc_t) in
                 Expr.Set.add (Expr.ALoc aloc) forgettables
             | _ -> forgettables))
       heap Expr.Set.empty
   in
   let keep =
     Hashtbl.fold
-      (fun (aloc : string) (block : Block.t) keep ->
+      (fun aloc (block : Block.t) keep ->
+        let aloc = ALoc.of_string @@ Id.str aloc in
         let keep = Expr.Set.add (ALoc aloc) keep in
         match block with
         | Freed -> keep
@@ -450,13 +450,13 @@ let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
               Expr.Set.of_list
                 (List.map
                    (fun x -> Expr.ALoc x)
-                   (SS.elements (SFVL.alocs data)))
+                   (ALoc.Set.elements (SFVL.alocs data)))
             in
             let data_lvars =
               Expr.Set.of_list
                 (List.map
                    (fun x -> Expr.LVar x)
-                   (SS.elements (SFVL.lvars data)))
+                   (LVar.Set.elements (SFVL.lvars data)))
             in
             Expr.Set.union keep (Expr.Set.union data_alocs data_lvars))
       heap keep

@@ -34,8 +34,8 @@ val pp_full : t Fmt.t
 val empty : t
 val freed : t
 val is_empty : t -> bool
-val lvars : t -> SS.t
-val alocs : t -> SS.t
+val lvars : t -> LVar.Set.t
+val alocs : t -> ALoc.Set.t
 val load_bounds : t -> Range.t or_error
 val cons_bounds : t -> (Range.t * t) or_error
 val prod_bounds : t -> Range.t -> t or_error
@@ -74,7 +74,7 @@ val weak_valid_pointer : t -> Expr.t -> bool d_or_error
     [dst_tree] after modification *)
 val move : t -> Expr.t -> t -> Expr.t -> Expr.t -> t d_or_error
 
-val assertions : loc:string -> t -> Asrt.t
+val assertions : loc:Id.any_loc Id.t -> t -> Asrt.t
 
 val substitution :
   le_subst:(Expr.t -> Expr.t) ->
@@ -95,7 +95,7 @@ module Lift : sig
       ?children:Variable.t list ->
       unit ->
       Variable.t) ->
-    loc:string ->
+    loc:Id.any_loc Id.t ->
     t ->
     Variable.t
 end

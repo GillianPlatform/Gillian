@@ -4,8 +4,8 @@ open Names
 open SVal
 module L = Logging
 
-type k = Id.any_var Id.t
-type t = (Id.any_var Id.t, Type.t) Hashtbl.t [@@deriving yojson]
+type k = Id.any_var Id.t [@@deriving yojson]
+type t = (k, Type.t) Hashtbl.t [@@deriving yojson]
 
 let as_hashtbl x = x
 

@@ -15,6 +15,13 @@ let return_variable = Names.return_variable
 let str : 'a t -> string = Fun.id
 let equal : 'a t -> 'b t -> bool = String.equal
 let pp fmt (i : 'a t) = Fmt.pf fmt "%s" i
+let compare = String.compare
+
+let of_yojson' = function
+  | `String s -> Ok s
+  | _ -> Error "Id.of_yojson: expected string"
+
+let to_yojson' s = `String s
 
 let as_lvars (vars : any_var t list) : lvar t list option =
   if List.for_all Names.is_lvar_name vars then Some vars else None

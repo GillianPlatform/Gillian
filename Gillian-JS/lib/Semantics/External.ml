@@ -173,9 +173,10 @@ struct
                 | JS_Parser.Syntax.Function
                     (strictness, Some "THISISANELABORATENAME", params, body) ->
                     let cur_proc_id = Call_stack.get_cur_proc_id cs in
+                    let params_var = List.map Gil_syntax.Var.of_string params in
                     let new_proc =
                       JS2JSIL_Compiler.js2jsil_function_constructor_prop prog
-                        cur_proc_id params strictness body
+                        cur_proc_id params_var strictness body
                     in
                     let fun_name = String new_proc.proc_name in
                     let params = LList (List.map (fun x -> String x) params) in
@@ -206,7 +207,7 @@ struct
       (state : State.t)
       (cs : Call_stack.t)
       (i : int)
-      (x : string)
+      (x : Gil_syntax.Var.t)
       (pid : string)
       (v_args : Val.t list)
       (j : int option) =

@@ -3,7 +3,6 @@
 (***************************************************************)
 
 open Id
-module SS = Containers.SS
 
 type folding_info = string * (LVar.t * Expr.t) list [@@deriving yojson]
 type unfold_info = (string * string) list [@@deriving yojson]

@@ -112,8 +112,8 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     let+ s2' = S2.substitution_in_place st s2 in
     (s1', s2')
 
-  let lvars (s1, s2) = Containers.SS.union (S1.lvars s1) (S2.lvars s2)
-  let alocs (s1, s2) = Containers.SS.union (S1.alocs s1) (S2.alocs s2)
+  let lvars (s1, s2) = Gil_syntax.LVar.Set.union (S1.lvars s1) (S2.lvars s2)
+  let alocs (s1, s2) = Gil_syntax.ALoc.Set.union (S1.alocs s1) (S2.alocs s2)
   let lift_corepred_1 (p, i, o) = (P1 p, i, o)
   let lift_corepred_2 (p, i, o) = (P2 p, i, o)
 

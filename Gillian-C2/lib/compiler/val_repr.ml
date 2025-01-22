@@ -51,7 +51,7 @@ let same_kind a b =
       GType.equal typea typeb
   | _ -> false
 
-let copy_into (v : t) (x : string) : t Cs.with_cmds =
+let copy_into (v : t) (x : Var.t) : t Cs.with_cmds =
   match v with
   | Procedure e ->
       let cmd = Cmd.Assignment (x, e) in

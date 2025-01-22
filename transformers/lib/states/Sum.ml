@@ -1,4 +1,3 @@
-open Gillian.Utils
 open Gillian.Monadic
 open MyUtils
 module DR = Delayed_result
@@ -159,12 +158,12 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
   let lvars = function
     | S1 s1 -> S1.lvars s1
     | S2 s2 -> S2.lvars s2
-    | None -> Containers.SS.empty
+    | None -> Gil_syntax.LVar.Set.empty
 
   let alocs = function
     | S1 s1 -> S1.alocs s1
     | S2 s2 -> S2.alocs s2
-    | None -> Containers.SS.empty
+    | None -> Gil_syntax.ALoc.Set.empty
 
   let lift_corepred_1 (p, i, o) = (P1 p, i, o)
   let lift_corepred_2 (p, i, o) = (P2 p, i, o)

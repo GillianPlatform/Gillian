@@ -18,16 +18,16 @@ let rec js2jsil (scope_le : Expr.t option) (le : t) : Expr.t =
   let fe = js2jsil scope_le in
   match le with
   | Lit lit -> Expr.Lit lit
-  | LVar x -> Expr.LVar x
-  | ALoc l -> Expr.ALoc l
-  | PVar x -> Expr.PVar x
+  | LVar x -> Expr.LVar (LVar.of_string x)
+  | ALoc l -> Expr.ALoc (ALoc.of_string l)
+  | PVar x -> Expr.PVar (Var.of_string x)
   | UnOp (op, le) -> Expr.UnOp (op, fe le)
   | BinOp (le1, op, le2) -> Expr.BinOp (fe le1, op, fe le2)
   | LstSub (le1, le2, le3) -> Expr.LstSub (fe le1, fe le2, fe le3)
   | NOp (op, les) -> Expr.NOp (op, List.map fe les)
   | EList les -> Expr.EList (List.map fe les)
   | ESet les -> Expr.ESet (List.map fe les)
-  | This -> Expr.LVar JSLogicCommon.this_logic_var_name
+  | This -> Expr.LVar JSLogicCommon.this_lvar
   | Scope -> (
       match scope_le with
       | None -> raise (Failure "DEATH: js2jsil_lexpr")

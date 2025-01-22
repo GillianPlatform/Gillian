@@ -1,7 +1,6 @@
 (** {b GIL logic commands}. *)
 
 open Id
-module SS = Containers.SS
 
 type t = TypeDef__.lcmd =
   | If of Expr.t * t list * t list  (** If-then-else     *)

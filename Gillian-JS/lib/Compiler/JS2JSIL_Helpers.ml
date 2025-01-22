@@ -106,13 +106,13 @@ let _extensiblePropName = "@extensible"
 let _internalProtoFieldName = "@proto"
 let _erFlagPropName = "@er"
 let locGlobName = Jslogic.JSLogicCommon.locGlobName
-let locObjPrototype = "$lobj_proto"
-let locFunObjPrototype = "$lfun_proto"
-let locArrPrototype = "$larr_proto"
-let locTErrPrototype = "$lterr_proto"
-let locSErrPrototype = "$lserr_proto"
-let locRErrPrototype = "$lrerr_proto"
-let locErrPrototype = "$lerr_proto"
+let locObjPrototype = Loc.of_string "$lobj_proto"
+let locFunObjPrototype = Loc.of_string "$lfun_proto"
+let locArrPrototype = Loc.of_string "$larr_proto"
+let locTErrPrototype = Loc.of_string "$lterr_proto"
+let locSErrPrototype = Loc.of_string "$lserr_proto"
+let locRErrPrototype = Loc.of_string "$lrerr_proto"
+let locErrPrototype = Loc.of_string "$lerr_proto"
 let toBooleanName = "i__toBoolean"
 
 (* 9.2               *)
@@ -190,14 +190,14 @@ let deleteErrorObjects = "i__deleteErrors"
 
 let var_this = Jslogic.JSLogicCommon.var_this
 let var_scope = Jslogic.JSLogicCommon.var_scope
-let var_scope_final = "x__scope_f"
+let var_scope_final = Var.of_string "x__scope_f"
 let var_se = Jslogic.JSLogicCommon.var_se
 let var_te = Jslogic.JSLogicCommon.var_te
-let var_re = "x__re"
-let var_args = "x__args"
-let var_er = "x__er"
-let var_er_metadata = "x__er_m"
-let var_sc_first = "x__sc_fst"
+let var_re = Var.of_string "x__re"
+let var_args = Var.of_string "x__args"
+let var_er = Var.of_string "x__er"
+let var_er_metadata = Var.of_string "x__er_m"
+let var_sc_first = Var.of_string "x__sc_fst"
 
 let js2jsil_spec_vars =
   [ var_this; var_scope; var_scope_final; var_se; var_te; var_er ]
@@ -212,7 +212,7 @@ let reserved_vars =
     var_er;
     var_er_metadata;
     var_sc_first;
-    Names.return_variable;
+    Id.return_variable;
   ]
 
 let main_fid = !Config.entry_point
@@ -224,6 +224,7 @@ let pi_predicate_name = "Pi"
 let lit_num n = Expr.Lit (Num n)
 
 let lit_str s = Expr.Lit (String s)
+let lit_str_v s = Expr.Lit (String (Var.str s))
 let lit_loc l = Expr.Lit (Loc l)
 let lit_typ t = Expr.Lit (Type t)
 let lit_refv = lit_str "v"
@@ -233,9 +234,22 @@ let base r = Expr.BinOp (r, LstNth, lit_num 1.)
 let field r = Expr.BinOp (r, LstNth, lit_num 2.)
 
 (**
- *  Fresh identifiers
+ *  Fresh identifiers (Var.t)
  *)
-let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
+let fresh_sth (name : string) : (unit -> Var.t) * (unit -> unit) =
+  let counter = ref 0 in
+  let f () =
+    let v = name ^ string_of_int !counter in
+    counter := !counter + 1;
+    Var.of_string v
+  in
+  let r () = counter := 0 in
+  (f, r)
+
+(**
+ *  Fresh identifiers (string)
+ *)
+let fresh_sth_str (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
   let f () =
     let v = name ^ string_of_int !counter in
@@ -258,30 +272,32 @@ let fresh_desc_var, reset_desc_var = fresh_sth "x_desc_"
 let fresh_body_var, reset_body_var = fresh_sth "x_body_"
 let fresh_fscope_var, reset_fscope_var = fresh_sth "x_fscope_"
 let fresh_xfoundb_var, reset_xfoundb_var = fresh_sth "x_found_b_"
-let fresh_label, reset_label = fresh_sth "lab_"
-let fresh_next_label, reset_next_label = fresh_sth "next_"
-let fresh_then_label, reset_then_label = fresh_sth "then_"
-let fresh_else_label, reset_else_label = fresh_sth "else_"
-let fresh_endif_label, reset_endif_label = fresh_sth "fi_"
-let fresh_end_label, reset_end_label = fresh_sth "end_"
-let fresh_end_switch_label, reset_end_switch_label = fresh_sth "end_switch_"
-let fresh_end_case_label, reset_end_case_label = fresh_sth "end_case_"
-let fresh_default_label, reset_default_label = fresh_sth "default_"
-let fresh_b_cases_label, reset_b_cases_label = fresh_sth "b_cases_"
-let fresh_logical_variable, reset_logical_variable = fresh_sth "#x"
-let fresh_break_label, reset_break_label = fresh_sth "break_"
-let fresh_loop_head_label, reset_loop_head_label = fresh_sth "loop_h_"
-let fresh_loop_cont_label, reset_loop_cont_label = fresh_sth "loop_c_"
-let fresh_loop_guard_label, reset_loop_guard_label = fresh_sth "loop_g_"
-let fresh_loop_body_label, reset_loop_body_label = fresh_sth "loop_b_"
-let fresh_loop_end_label, reset_loop_end_label = fresh_sth "loop_e_"
-let fresh_loop_identifier, reset_loop_identifier = fresh_sth "loop_id_"
-let fresh_tcf_finally_label, reset_tcf_finally_label = fresh_sth "finally_"
-let fresh_tcf_end_label, reset_tcf_end_label = fresh_sth "end_tcf_"
-let fresh_tcf_err_try_label, reset_tcf_err_try_label = fresh_sth "err_tcf_t_"
+let fresh_label, reset_label = fresh_sth_str "lab_"
+let fresh_next_label, reset_next_label = fresh_sth_str "next_"
+let fresh_then_label, reset_then_label = fresh_sth_str "then_"
+let fresh_else_label, reset_else_label = fresh_sth_str "else_"
+let fresh_endif_label, reset_endif_label = fresh_sth_str "fi_"
+let fresh_end_label, reset_end_label = fresh_sth_str "end_"
+let fresh_end_switch_label, reset_end_switch_label = fresh_sth_str "end_switch_"
+let fresh_end_case_label, reset_end_case_label = fresh_sth_str "end_case_"
+let fresh_default_label, reset_default_label = fresh_sth_str "default_"
+let fresh_b_cases_label, reset_b_cases_label = fresh_sth_str "b_cases_"
+let fresh_logical_variable, reset_logical_variable = fresh_sth_str "#x"
+let fresh_break_label, reset_break_label = fresh_sth_str "break_"
+let fresh_loop_head_label, reset_loop_head_label = fresh_sth_str "loop_h_"
+let fresh_loop_cont_label, reset_loop_cont_label = fresh_sth_str "loop_c_"
+let fresh_loop_guard_label, reset_loop_guard_label = fresh_sth_str "loop_g_"
+let fresh_loop_body_label, reset_loop_body_label = fresh_sth_str "loop_b_"
+let fresh_loop_end_label, reset_loop_end_label = fresh_sth_str "loop_e_"
+let fresh_loop_identifier, reset_loop_identifier = fresh_sth_str "loop_id_"
+let fresh_tcf_finally_label, reset_tcf_finally_label = fresh_sth_str "finally_"
+let fresh_tcf_end_label, reset_tcf_end_label = fresh_sth_str "end_tcf_"
+
+let fresh_tcf_err_try_label, reset_tcf_err_try_label =
+  fresh_sth_str "err_tcf_t_"
 
 let fresh_tcf_err_catch_label, reset_tcf_err_catch_label =
-  fresh_sth "err_tcf_c_"
+  fresh_sth_str "err_tcf_c_"
 
 let fresh_tcf_ret, reset_tcf_ret = fresh_sth "ret_tcf_"
 
@@ -301,10 +317,10 @@ let fresh_tcf_vars () =
   let end_l = fresh_tcf_end_label () in
   let finally = fresh_tcf_finally_label () in
   let fresh_abnormal_finally, _ =
-    fresh_sth ("abnormal_finally_" ^ string_of_int !number_of_tcfs ^ "_")
+    fresh_sth_str ("abnormal_finally_" ^ string_of_int !number_of_tcfs ^ "_")
   in
   number_of_tcfs := !number_of_tcfs + 1;
-  let ret = fresh_tcf_ret () in
+  let ret = Var.str @@ fresh_tcf_ret () in
   (err1, err2, finally, end_l, fresh_abnormal_finally, ret)
 
 let fresh_name =
@@ -329,48 +345,24 @@ let fresh_named_eval n : string = fresh_name ("___$eval___" ^ n ^ "_")
 let is_get_value_var x =
   match (x : Expr.t) with
   | PVar x_name ->
-      let x_name_len = String.length x_name in
-      if x_name_len > 2 && String.sub x_name (x_name_len - 2) 2 = "_v" then
+      let x_name_s = Var.str x_name in
+      let x_name_len = String.length x_name_s in
+      if x_name_len > 2 && String.sub x_name_s (x_name_len - 2) 2 = "_v" then
         Some x_name
       else None
   | _ -> None
 
-let val_var_of_var x =
-  match (x : Expr.t) with
-  | PVar x_name -> x_name ^ "_v"
-  | Lit _ -> fresh_var () ^ "_v"
-  | _ -> raise (Failure "val_var_of_var expects a variable or a literal")
+let add_suffix suffix fn_name : Expr.t -> Var.t = function
+  | PVar x -> Var.of_string (Var.str x ^ suffix)
+  | Lit _ -> Var.of_string ((Var.str @@ fresh_var ()) ^ suffix)
+  | _ -> Fmt.failwith "%s expects a variable or a literal" fn_name
 
-let number_var_of_var x =
-  match (x : Expr.t) with
-  | PVar x_name -> x_name ^ "_n"
-  | Lit _ -> fresh_var () ^ "_n"
-  | _ -> raise (Failure "number_var_of_var expects a variable")
-
-let boolean_var_of_var x =
-  match (x : Expr.t) with
-  | PVar x_name -> x_name ^ "_b"
-  | Lit _ -> fresh_var () ^ "_b"
-  | _ -> raise (Failure "boolean_var_of_var expects a variable")
-
-let primitive_var_of_var x =
-  match (x : Expr.t) with
-  | PVar x_name -> x_name ^ "_p"
-  | Lit _ -> fresh_var () ^ "_p"
-  | _ -> raise (Failure "primitive_var_of_var expects a variable")
-
-let string_var_of_var x =
-  match (x : Expr.t) with
-  | PVar x_name -> x_name ^ "_s"
-  | Lit _ -> fresh_var () ^ "_s"
-  | _ -> raise (Failure "string_var_of_var expects a variable")
-
-let i32_var_of_var x =
-  match (x : Expr.t) with
-  | PVar x_name -> x_name ^ "_i32"
-  | Lit _ -> fresh_var () ^ "_i32"
-  | _ -> raise (Failure "string_var_of_var expects a variable")
-
+let val_var_of_var = add_suffix "_v" "val_var_of_var"
+let number_var_of_var = add_suffix "_n" "number_var_of_var"
+let boolean_var_of_var = add_suffix "_b" "boolean_var_of_var"
+let primitive_var_of_var = add_suffix "_p" "primitive_var_of_var"
+let string_var_of_var = add_suffix "_s" "string_var_of_var"
+let i32_var_of_var = add_suffix "_i32" "string_var_of_var"
 let fresh_err_label, reset_err_label = fresh_sth "err_"
 let fresh_ret_label, reset_ret_label = fresh_sth "ret_"
 
@@ -379,7 +371,7 @@ type loop_list_type = (string option * string * string option * bool) list
 type translation_context = {
   tr_fid : string;
   tr_er_fid : string;
-  tr_sc_var : string;
+  tr_sc_var : Var.t;
   tr_vis_list : string list;
   tr_loop_list : loop_list_type;
   tr_loops : string list;

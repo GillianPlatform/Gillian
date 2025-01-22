@@ -7,7 +7,8 @@ module Expr = Gillian.Gil_syntax.Expr
 type t = {
   name : string;  (** Name of the predicate  *)
   num_params : int;  (** Number of parameters   *)
-  params : (string * Type.t option) list;  (** Actual parameters      *)
+  params : (Gil_syntax.Var.t * Type.t option) list;
+      (** Actual parameters      *)
   ins : int list;  (** Ins                    *)
   definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
@@ -32,9 +33,10 @@ let pp fmt pred =
   let params_with_info =
     if exist_ins then
       List.mapi
-        (fun i (v, t) -> ((if List.mem i ins then "+" else "") ^ v, t))
+        (fun i (v, t) ->
+          ((if List.mem i ins then "+" else "") ^ Gil_syntax.Var.str v, t))
         params
-    else params
+    else List.map (fun (v, t) -> (Gil_syntax.Var.str v, t)) params
   in
   let pp_param fmt (v, t) =
     match t with

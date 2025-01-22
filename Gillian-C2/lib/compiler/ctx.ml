@@ -110,7 +110,7 @@ type t = {
   exec_mode : Kutils.Exec_mode.t;
   machine : Machine_model.t;
   prog : Program.t;
-  fresh_v : unit -> string;
+  fresh_v : unit -> Gil_syntax.Var.t;
   in_memory : string Hashset.t;
   locals : (string, Local.t) Hashtbl.t;
   allocated_temps : Local.t Hashset.t;
@@ -136,7 +136,11 @@ let make ~exec_mode ~machine ~prog ~harness () =
   }
 
 let with_new_generators t =
-  { t with fresh_v = Generators.temp_var (); fresh_lab = Generators.label () }
+  {
+    t with
+    fresh_v = (fun () -> Gil_syntax.Var.of_string @@ Generators.temp_var () ());
+    fresh_lab = Generators.label ();
+  }
 
 let fresh_v t = t.fresh_v ()
 let fresh_lab t = t.fresh_lab ()
@@ -200,7 +204,7 @@ let with_entering_body ctx ~body ~params ~location =
         p.identifier)
     params;
   let allocated_temps = Hashset.empty ~size:32 () in
-  let fresh_v = Generators.temp_var () in
+  let fresh_v () = Gil_syntax.Var.of_string @@ Generators.temp_var () () in
   { ctx with in_memory; locals; fresh_v; allocated_temps }
 
 let archi ctx : Archi.t =

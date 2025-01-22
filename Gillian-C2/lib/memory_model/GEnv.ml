@@ -1,6 +1,16 @@
 type err_t = Symbol_not_found of string [@@deriving show, yojson]
 
+module Id = Gil_syntax.Id
 module StringMap = Map.Make (String)
+
+module LocMap = Map.Make (struct
+  include Id
+
+  type nonrec t = any_loc Id.t
+
+  let of_yojson = of_yojson'
+  let to_yojson = to_yojson'
+end)
 
 module Make (Def_value : sig
   type t
@@ -20,11 +30,11 @@ end) (Delayed_hack : sig
 
   val return :
     ?learned:Gil_syntax.Expr.t list ->
-    ?learned_types:(string * Gil_syntax.Type.t) list ->
+    ?learned_types:(Id.any_var Id.t * Gil_syntax.Type.t) list ->
     'a ->
     'a t
 
-  val resolve_or_create_lt : Def_value.lt -> string t
+  val resolve_or_create_lt : Def_value.lt -> Id.any_loc Id.t t
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
 end) =
 struct
@@ -40,11 +50,9 @@ struct
   type def = FunDef of Def_value.t | GlobVar of Def_value.t
 
   type t = {
-    symb : string StringMap.t;  (** maps symbols to loc names *)
-    defs : def StringMap.t;  (** maps loc names to definitions *)
+    symb : Id.any_loc Id.t StringMap.t;  (** maps symbols to loc names *)
+    defs : def LocMap.t;  (** maps loc names to definitions *)
   }
-
-  let find_opt x s = try Some (StringMap.find x s) with Not_found -> None
 
   let find_symbol genv sym =
     try Ok (StringMap.find sym genv.symb)
@@ -64,11 +72,11 @@ struct
       let symb = StringMap.add sym block genv.symb in
       { genv with symb }
 
-  let find_def genv block = StringMap.find block genv.defs
+  let find_def genv block = LocMap.find block genv.defs
 
   let set_def genv block def =
     try
-      let cur_def = StringMap.find block genv.defs in
+      let cur_def = LocMap.find block genv.defs in
       match (def, cur_def) with
       | GlobVar a, GlobVar b | FunDef a, FunDef b ->
           let open Delayed_hack in
@@ -77,10 +85,10 @@ struct
           failwith
             "Equality between a global variable and a function definition"
     with Not_found ->
-      let defs = StringMap.add block def genv.defs in
+      let defs = LocMap.add block def genv.defs in
       Delayed_hack.return { genv with defs }
 
-  let empty = { symb = StringMap.empty; defs = StringMap.empty }
+  let empty = { symb = StringMap.empty; defs = LocMap.empty }
 
   (** Serialization of definitions *)
   let serialize_def def =
@@ -119,8 +127,8 @@ struct
     let pp_one ft s l =
       try
         let d = find_def genv l in
-        Format.fprintf ft "'%s' -> %s -> %a@\n" s l pp_def d
-      with Not_found -> Format.fprintf ft "'%s' -> %s -> UNKNOWN@\n" s l
+        Format.fprintf ft "'%s' -> %a -> %a@\n" s Id.pp l pp_def d
+      with Not_found -> Format.fprintf ft "'%s' -> %a -> UNKNOWN@\n" s Id.pp l
     in
     if !Kconfig.hide_genv then Format.fprintf fmt "{@[<v 2>@\nHIDDEN@]@\n}"
     else
@@ -147,43 +155,33 @@ struct
           GlobVar substituted
     in
     let with_substituted_defs =
-      { genv with defs = StringMap.map substitute_in_def genv.defs }
-    in
-    let aloc_subst =
-      Subst.filter subst (fun var _ ->
-          match var with
-          | ALoc _ -> true
-          | _ -> false)
+      { genv with defs = LocMap.map substitute_in_def genv.defs }
     in
     let rename_val old_loc new_loc map =
-      StringMap.map (fun k -> if String.equal old_loc k then new_loc else k) map
+      StringMap.map (fun k -> if Id.equal old_loc k then new_loc else k) map
     in
     let rename_key old_loc new_loc map =
-      match find_opt old_loc map with
+      match LocMap.find_opt old_loc map with
       | None -> map
-      | Some d -> StringMap.add new_loc d (StringMap.remove old_loc map)
+      | Some d -> LocMap.add new_loc d (LocMap.remove old_loc map)
     in
     (* Then we substitute the locations *)
-    Subst.fold aloc_subst
-      (fun old_loc new_loc cgenv ->
-        let old_loc =
-          match old_loc with
-          | ALoc loc -> loc
-          | _ -> raise (Failure "Impossible by construction")
-        in
-        let new_loc =
-          match new_loc with
-          | Lit (Loc loc) | ALoc loc -> loc
-          | _ ->
-              failwith
-                (Format.asprintf "Heap substitution failed for loc : %a" Expr.pp
-                   new_loc)
-        in
-        {
-          symb = rename_val old_loc new_loc cgenv.symb;
-          defs = rename_key old_loc new_loc cgenv.defs;
-        })
-      with_substituted_defs
+    Subst.to_list subst
+    |> List.filter_map (function
+         | Expr.ALoc aloc, Expr.Lit (Loc after) ->
+             Some ((aloc :> Id.any_loc Id.t), (after :> Id.any_loc Id.t))
+         | Expr.ALoc aloc, Expr.ALoc after ->
+             Some ((aloc :> Id.any_loc Id.t), (after :> Id.any_loc Id.t))
+         | Expr.ALoc aloc, after ->
+             Fmt.failwith "Heap substitution failed for loc : %a" Expr.pp after
+         | _ -> None)
+    |> List.fold_left
+         (fun cgenv (old_loc, new_loc) ->
+           {
+             symb = rename_val old_loc new_loc cgenv.symb;
+             defs = rename_key old_loc new_loc cgenv.defs;
+           })
+         with_substituted_defs
 
   (** This function returns the assertions as well as a list of
       locations corresponding to functions declaration, so that memory knows not
@@ -220,7 +218,7 @@ module Concrete =
 
       type t = string
       type vt = Literal.t
-      type lt = string
+      type lt = Id.any_loc Id.t
 
       let pp = Fmt.string
       let to_expr s = Expr.Lit (String s)
@@ -238,7 +236,7 @@ module Concrete =
         | Literal.LList ll -> Expr.EList (List.map vt_to_expr ll)
         | l -> Lit l
 
-      let of_lt x = x
+      let of_lt x = Id.str x
     end)
     (struct
       type 'a t = 'a
@@ -283,7 +281,7 @@ module Symbolic =
         let open Gil_syntax.Expr.Infix in
         [ a == b ]
 
-      let resolve_or_create_lt lvar_loc : string t =
+      let resolve_or_create_lt lvar_loc : Id.any_loc Id.t t =
         let open Syntax in
         let* loc_name = resolve_loc lvar_loc in
         match loc_name with
@@ -291,11 +289,11 @@ module Symbolic =
             let new_loc_name = Gil_syntax.ALoc.alloc () in
             let learned = lvar_loc #== (ALoc new_loc_name) in
             Logging.verbose (fun fmt ->
-                fmt "Couldn't resolve loc %a, created %s" Gil_syntax.Expr.pp
-                  lvar_loc new_loc_name);
-            return ~learned new_loc_name
+                fmt "Couldn't resolve loc %a, created %a" Gil_syntax.Expr.pp
+                  lvar_loc Id.pp new_loc_name);
+            return ~learned (new_loc_name :> Id.any_loc Id.t)
         | Some l ->
             Logging.verbose (fun fmt ->
-                fmt "Resolved %a as %s" Gil_syntax.Expr.pp lvar_loc l);
+                fmt "Resolved %a as %a" Gil_syntax.Expr.pp lvar_loc Id.pp l);
             return l
     end)

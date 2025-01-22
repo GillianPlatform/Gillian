@@ -5,7 +5,6 @@
 (**************************************************************)
 (**************************************************************)
 
-module SS = Containers.SS
 open Id
 
 type logic_bindings_t = string * (Id.LVar.t * Expr.t) list [@@deriving yojson]
@@ -25,7 +24,7 @@ type 'label t = 'label TypeDef__.cmd =
   | Apply of Var.t * Expr.t * 'label option
       (** Application-style procedure call  *)
   | Arguments of Var.t  (** Arguments of the current function *)
-  | PhiAssignment of (string * Expr.t list) list  (** PHI assignment      *)
+  | PhiAssignment of (Var.t * Expr.t list) list  (** PHI assignment      *)
   | ReturnNormal  (** Normal return       *)
   | ReturnError  (** Error return        *)
   | Fail of string * Expr.t list  (** Failure             *)

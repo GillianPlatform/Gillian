@@ -2,20 +2,21 @@ open Gillian.Symbolic
 open Gil_syntax
 open Gillian.Debugger.Utils
 
+type loc_t := Id.any_loc Id.t
 type t [@@deriving yojson]
 
 type err =
-  | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree of string
-  | UseAfterFree of string
+  | MissingResource of (WislLActions.ga * loc_t * Expr.t option)
+  | DoubleFree of loc_t
+  | UseAfterFree of loc_t
   | MemoryLeak
-  | OutOfBounds of (int option * string * Expr.t)
+  | OutOfBounds of (int option * loc_t * Expr.t)
   | InvalidLocation of Expr.t
 [@@deriving yojson, show]
 
 val init : unit -> t
-val alloc : t -> int -> string
-val dispose : t -> string -> (unit, err) Result.t
+val alloc : t -> int -> loc_t
+val dispose : t -> loc_t -> (unit, err) Result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 val is_empty : t -> bool
 
@@ -23,43 +24,40 @@ val get_cell :
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
-  string ->
+  loc_t ->
   Expr.t ->
-  (string * Expr.t * Expr.t, err) result
+  (loc_t * Expr.t * Expr.t, err) result
 
 val set_cell :
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
-  string ->
+  loc_t ->
   Expr.t ->
   Expr.t ->
   (unit, err) result
 
-val rem_cell : t -> string -> Expr.t -> (unit, err) result
-val get_bound : t -> string -> (int, err) result
-val set_bound : t -> string -> int -> (unit, err) result
-val rem_bound : t -> string -> (unit, err) result
-val get_freed : t -> string -> (unit, err) result
-val set_freed : t -> string -> unit
-val rem_freed : t -> string -> (unit, err) result
+val rem_cell : t -> loc_t -> Expr.t -> (unit, err) result
+val get_bound : t -> loc_t -> (int, err) result
+val set_bound : t -> loc_t -> int -> (unit, err) result
+val rem_bound : t -> loc_t -> (unit, err) result
+val get_freed : t -> loc_t -> (unit, err) result
+val set_freed : t -> loc_t -> unit
+val rem_freed : t -> loc_t -> (unit, err) result
 val pp : t Fmt.t
 val copy : t -> t
-val lvars : t -> SS.t
-val alocs : t -> SS.t
+val lvars : t -> LVar.Set.t
+val alocs : t -> ALoc.Set.t
 
 val substitution_in_place :
   Gillian.Symbolic.Subst.t ->
   t ->
-  (t
-  * Gillian.Gil_syntax.Expr.Set.t
-  * (string * Gillian.Gil_syntax.Type.t) list)
-  list
+  (t * Expr.Set.t * (Id.any_var Id.t * Type.t) list) list
 
-val assertions : t -> Gillian.Gil_syntax.Asrt.t
+val assertions : t -> Asrt.t
 
 val add_debugger_variables :
-  store:(string * Gillian.Gil_syntax.Expr.t) list ->
+  store:(Var.t * Expr.t) list ->
   memory:t ->
   is_gil_file:bool ->
   get_new_scope_id:(unit -> int) ->

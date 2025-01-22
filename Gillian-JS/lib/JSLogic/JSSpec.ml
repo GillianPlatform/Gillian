@@ -9,7 +9,7 @@ type st = {
   label : (string * SS.t) option;
 }
 
-type t = { name : string; params : string list; sspecs : st list }
+type t = { name : string; params : Var.t list; sspecs : st list }
 
 let js2jsil_st
     (pre : JSAsrt.t)
@@ -18,7 +18,7 @@ let js2jsil_st
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (params : string list) : Asrt.t * Asrt.t list =
+    (params : Gil_syntax.Var.t list) : Asrt.t * Asrt.t list =
   let vis_list = get_vis_list vis_tbl fid in
 
   let scope_chain_list = vislist_2_les vis_list (List.length vis_list - 1) in
@@ -64,7 +64,7 @@ let js2jsil_st
 
   (*  x__this == #this                *)
   let a_this =
-    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_logic_var_name))
+    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_lvar))
   in
   (*  x__scope == {{ #x1, ..., #xn }} *)
   let a_scope =

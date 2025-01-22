@@ -54,7 +54,7 @@ let error_has_proto str ret_val ret_state =
     get_cell ret_state md proto_name
   in
   match final_proto with
-  | Some (Loc s) when String.equal s str -> true
+  | Some (Loc s) when String.equal (Gil_syntax.Loc.str s) str -> true
   | _ -> false
 
 let is_syntax_error = error_has_proto "$lserr_proto"

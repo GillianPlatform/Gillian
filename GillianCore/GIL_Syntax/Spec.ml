@@ -1,5 +1,3 @@
-module SS = Containers.SS
-
 (** {b Single GIL specifications}. *)
 type st = TypeDef__.single_spec = {
   ss_pre : Asrt.t;  (** Precondition *)

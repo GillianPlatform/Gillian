@@ -1,4 +1,4 @@
-open Gillian.Utils
+open Gil_syntax
 open Gillian.Monadic
 open Gillian.Symbolic
 module DR = Delayed_result
@@ -148,11 +148,11 @@ module Make (S : MyMonadicSMemory.S) :
 
   let lvars = function
     | SubState s -> S.lvars s
-    | _ -> Containers.SS.empty
+    | _ -> LVar.Set.empty
 
   let alocs = function
     | SubState s -> S.alocs s
-    | _ -> Containers.SS.empty
+    | _ -> ALoc.Set.empty
 
   let lift_corepred (p, i, o) = (SubPred p, i, o)
 

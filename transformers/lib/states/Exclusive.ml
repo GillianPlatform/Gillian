@@ -79,11 +79,11 @@ let instantiate = function
   | _ -> failwith "Invalid Excl instantiation"
 
 let lvars = function
-  | None -> Containers.SS.empty
+  | None -> LVar.Set.empty
   | Some v -> Expr.lvars v
 
 let alocs = function
-  | None -> Containers.SS.empty
+  | None -> ALoc.Set.empty
   | Some v -> Expr.alocs v
 
 let assertions = function
@@ -95,4 +95,9 @@ let get_recovery_tactic _ = Recovery_tactic.none
 let can_fix MissingState = true
 
 let get_fixes MissingState =
-  [ [ MyAsrt.CorePred (Ex, [], [ LVar (Generators.fresh_svar ()) ]) ] ]
+  [
+    [
+      MyAsrt.CorePred
+        (Ex, [], [ LVar (LVar.of_string @@ Generators.fresh_svar ()) ]);
+    ];
+  ]

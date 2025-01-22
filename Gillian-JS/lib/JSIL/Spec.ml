@@ -2,6 +2,7 @@ module SSubst = Gillian.Symbolic.Subst
 module SVal = Gillian.Symbolic.Values
 module Flag = Gillian.Gil_syntax.Flag
 module Expr = Gillian.Gil_syntax.Expr
+module Var = Gillian.Gil_syntax.Var
 module SS = Containers.SS
 
 (** {b Single JSIL specifications}. *)
@@ -16,7 +17,7 @@ type st = {
 (** {b Full JSIL specifications}. *)
 type t = {
   name : string;  (** Procedure/spec name *)
-  params : string list;  (** Procedure/spec parameters *)
+  params : Var.t list;  (** Procedure/spec parameters *)
   sspecs : st list;  (** List of single specifications *)
   normalised : bool;  (** If the spec is already normalised *)
   incomplete : bool;  (** If the spec is incomplete *)
@@ -34,7 +35,7 @@ let s_init
 
 let init
     (name : string)
-    (params : string list)
+    (params : Var.t list)
     (sspecs : st list)
     (normalised : bool)
     (incomplete : bool)
@@ -44,7 +45,7 @@ let init
 let extend (spec : t) (sspecs : st list) : t =
   { spec with sspecs = sspecs @ spec.sspecs }
 
-let get_params (spec : t) : string list = spec.params
+let get_params (spec : t) : Var.t list = spec.params
 
 let pp_sspec fmt sspec =
   let pp_lab fmt' (lab, exs) =
@@ -66,7 +67,7 @@ let pp fmt spec =
   in
   Fmt.pf fmt "@[<hov 2>@[<h>%a spec %s(%a)@]@\n%a@]" pp_incomplete
     spec.incomplete spec.name
-    (Fmt.list ~sep:Fmt.comma Fmt.string)
+    (Fmt.list ~sep:Fmt.comma Var.pp)
     spec.params
     (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_sspec)
     spec.sspecs

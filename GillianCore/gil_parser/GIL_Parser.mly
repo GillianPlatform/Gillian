@@ -291,7 +291,7 @@ proc_name:
   | proc_name = STRING { proc_name }
 
 proc_head_target:
-  PROC; proc_name = proc_name; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
+  PROC; proc_name = proc_name; LBRACE; param_list = separated_list(COMMA, program_variable_target); RBRACE
     { (proc_name, param_list) }
 ;
 

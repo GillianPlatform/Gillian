@@ -13,7 +13,10 @@ module Id : sig
   val return_variable : var t
   val str : 'a t -> string
   val equal : 'a t -> 'b t -> bool
+  val compare : 'a t -> 'a t -> int
   val pp : 'a t Fmt.t
+  val of_yojson' : Yojson.Safe.t -> ('a t, string) result
+  val to_yojson' : 'a t -> Yojson.Safe.t
   val as_lvars : any_var t list -> lvar t list option
   val as_aloc : any_loc t -> aloc t option
 
@@ -392,7 +395,7 @@ module Expr : sig
     (** Booleans *)
 
     val not : t -> t
-    val forall : (string * Type.t option) list -> t -> t
+    val forall : (LVar.t * Type.t option) list -> t -> t
     val ( == ) : t -> t -> t
     val ( && ) : t -> t -> t
     val ( || ) : t -> t -> t
@@ -965,7 +968,7 @@ module Proc : sig
     proc_source_path : string option;
     proc_internal : bool;
     proc_body : ('annot * 'label option * 'label Cmd.t) array;
-    proc_params : string list;
+    proc_params : Var.t list;
     proc_spec : Spec.t option;
     proc_aliases : string list;
     proc_calls : string list;
