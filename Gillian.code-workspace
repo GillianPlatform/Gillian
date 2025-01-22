@@ -21,17 +21,9 @@
 			"path": "Gillian-C2"
 		},
 		{
-			"name": "Debugger Extension",
-			"path": "debug-ui",
-		},
-		{
-			"name": "Debugger UI",
-			"path": "debug-ui/web"
-		},
-		{
 			"name": "Gillian (root)",
 			"path": "."
-		},
+		}
 	],
 	"settings": {
 		"files.associations": {
