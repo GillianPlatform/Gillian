@@ -1,10 +1,12 @@
 open Gillian
 open Gillian.Utils
-open Llvm_memory_model
-module SMemory = Monadic.MonadicSMemory.Lift (MonadicSMemory)
+open Gil_syntax
+open Llvm_memory_model.Memories
+
+module DummyParserAndCompiler = ParserAndCompiler.Dummy
 
 module Outcome =
-  Bulk.Outcome.Make_Symbolic (SMemory) (NoopParser)
+  Bulk.Outcome.Make_Symbolic (SMemory) ( DummyParserAndCompiler)
     (General.External.Dummy (Gil_syntax.Annot.Basic))
 
 module Suite = struct

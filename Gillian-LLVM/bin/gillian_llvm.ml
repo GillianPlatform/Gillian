@@ -1,5 +1,5 @@
 open Llvm_memory_model
-module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
+module SMemory = Memories.SMemory
 module Init_data = Gillian.General.Init_data.Dummy
 module DummyParserAndCompiler = ParserAndCompiler.Dummy
 
@@ -87,9 +87,9 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
 end
 
 module CLI =
-  Gillian.Command_line.Make (Init_data) (CMemory) (SMemory)
+  Gillian.Command_line.Make (Init_data) (States.Cmemory.Make(Init_data)) (SMemory)
     (DummyParserAndCompiler)
-    (External.M)
+    (LLVM.ExternalSemantics)
     (struct
       let runners : Gillian.Bulk.Runner.t list =
         [ (module Gillian_llvm_lib.SRunner) ]
