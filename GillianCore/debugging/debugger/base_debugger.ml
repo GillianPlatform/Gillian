@@ -370,18 +370,27 @@ struct
              (fun acc (proc, id) -> String_map.add proc id acc)
              String_map.empty
 
-      let get_current_steps state : string list =
-        Hashtbl.fold
-          (fun _ proc_state acc ->
-            let match_steps =
-              proc_state.selected_match_steps
-              |> List.map (fun (id, _) -> show_id id)
-            in
-            let acc' = match_steps @ acc in
-            match proc_state.cur_report_id with
-            | Some id -> show_id id :: acc'
-            | None -> acc')
-          state.procs []
+      let get_current_steps state : Map_update_event_body.Current_steps.t =
+        let p, s =
+          Hashtbl.fold
+            (fun _ proc_state (p, s) ->
+              let match_steps =
+                proc_state.selected_match_steps
+                |> List.map (fun (id, _) -> show_id id)
+              in
+              let cur_id =
+                proc_state.cur_report_id |> Option.map show_id |> Option.to_list
+              in
+              let p', s' =
+                match match_steps with
+                | asrt_id :: match_steps' -> ([ asrt_id ], cur_id @ match_steps')
+                | [] -> (cur_id, match_steps)
+              in
+              (p' @ p, s' @ s))
+            state.procs ([], [])
+        in
+        Map_update_event_body.Current_steps.make ~primary:(Some p)
+          ~secondary:(Some s) ()
 
       let get_map_ext state : Yojson.Safe.t =
         let proc_substs =
