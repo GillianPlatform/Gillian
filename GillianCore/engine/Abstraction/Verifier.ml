@@ -136,8 +136,7 @@ struct
       let lvars =
         LVar.Set.fold
           (fun x acc ->
-            if Names.is_spec_var_name (LVar.str x) then
-              Expr.Set.add (Expr.LVar x) acc
+            if LVar.is_spec_var_name x then Expr.Set.add (Expr.LVar x) acc
             else acc)
           (Asrt.lvars pre) Expr.Set.empty
       in

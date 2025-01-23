@@ -12,8 +12,7 @@ let substitution_in_place ?(subst_all = false) (subst : SESubst.t) (x : t) :
     if not subst_all then
       SESubst.filter_in_place store_subst (fun u le ->
           match (u, le) with
-          | LVar x, LVar _ when Names.is_spec_var_name @@ LVar.str x ->
-              Some (LVar x)
+          | LVar x, LVar _ when LVar.is_spec_var_name x -> Some (LVar x)
           | _ -> Some le);
 
     filter_map_inplace x (fun _ value ->

@@ -531,8 +531,7 @@ let simplify_pfs_and_gamma
                 | UnOp (LstLen, LVar x), UnOp (LstLen, LVar y) when x <> y ->
                     let x, y =
                       match
-                        ( Names.is_spec_var_name (Id.str x),
-                          Names.is_spec_var_name (Id.str y) )
+                        (LVar.is_spec_var_name x, LVar.is_spec_var_name y)
                       with
                       | true, false -> (x, y)
                       | false, true -> (y, x)
@@ -587,8 +586,8 @@ let simplify_pfs_and_gamma
                           | false, true -> (v, le)
                           | false, false ->
                               if
-                                Names.is_spec_var_name (Id.str v)
-                                && not (Names.is_spec_var_name (Id.str w))
+                                LVar.is_spec_var_name v
+                                && not (LVar.is_spec_var_name w)
                               then (w, LVar v)
                               else (v, le))
                       | _ -> (v, le)

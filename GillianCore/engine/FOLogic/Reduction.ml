@@ -2809,10 +2809,8 @@ let reduce_assertion_loop
 let extract_lvar_equalities : Asrt.t -> (LVar.t * Expr.t) list =
   List.filter_map @@ function
   | Asrt.Pure (BinOp (LVar x, Equal, v) | BinOp (v, Equal, LVar x)) ->
-      if
-        Names.is_lvar_name (LVar.str x)
-        && not (Names.is_spec_var_name (LVar.str x))
-      then Some (x, v)
+      if Names.is_lvar_name (LVar.str x) && not (LVar.is_spec_var_name x) then
+        Some (x, v)
       else None
   | _ -> None
 

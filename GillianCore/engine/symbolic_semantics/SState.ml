@@ -677,7 +677,7 @@ module Make (SMemory : SMemory.S) :
         (fun (acc : vt Recovery_tactic.t) -> function
           | BinOp ((ALoc _ as loc), Equal, LVar x)
           | BinOp (LVar x, Equal, (ALoc _ as loc))
-            when Names.is_spec_var_name @@ LVar.str x ->
+            when LVar.is_spec_var_name x ->
               let try_fold =
                 Option.map
                   (fun l -> if List.mem loc l then Expr.LVar x :: l else l)

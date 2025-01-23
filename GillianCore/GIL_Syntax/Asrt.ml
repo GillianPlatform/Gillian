@@ -46,7 +46,7 @@ let prioritise (a1 : atom) (a2 : atom) =
     | PVar _, _ -> -1
     | _, PVar _ -> 1
     | LVar v, LVar v' -> (
-        match (Names.is_spec_var_name v, Names.is_spec_var_name v') with
+        match (Id.LVar.is_spec_var_name v, Id.LVar.is_spec_var_name v') with
         | true, true -> 0
         | true, false -> -1
         | false, true -> 1

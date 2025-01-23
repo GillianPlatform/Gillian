@@ -801,12 +801,10 @@ module Make (SPState : PState.S) = struct
     let find_spec_var_eqs (a : Asrt.atom) =
       match a with
       | Pure (BinOp (LVar x, Equal, LVar y))
-        when (is_spec_var_name @@ LVar.str x)
-             && not (is_spec_var_name @@ LVar.str y) ->
+        when LVar.is_spec_var_name x && not (LVar.is_spec_var_name y) ->
           SESubst.put subst (LVar y) (LVar x)
       | Pure (BinOp (LVar x, Equal, LVar y))
-        when (is_spec_var_name @@ LVar.str y)
-             && not (is_spec_var_name @@ LVar.str x) ->
+        when LVar.is_spec_var_name y && not (LVar.is_spec_var_name x) ->
           SESubst.put subst (LVar x) (LVar y)
       | _ -> ()
     in
@@ -821,9 +819,7 @@ module Make (SPState : PState.S) = struct
       (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
     let falsePFs pfs = PFS.mem pfs Expr.false_ in
     let a = normalise_a_bit a in
-    let svars =
-      LVar.Set.filter (fun v -> is_spec_var_name @@ LVar.str v) (Asrt.lvars a)
-    in
+    let svars = LVar.Set.filter LVar.is_spec_var_name (Asrt.lvars a) in
     L.verbose (fun m ->
         m "@[<v 2>Normalising assertion:@ %a@]@ svars: @[<h>%a@]" Asrt.pp a
           (Fmt.iter ~sep:Fmt.comma LVar.Set.iter Id.pp)

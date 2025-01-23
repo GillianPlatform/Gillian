@@ -49,9 +49,13 @@ module ALoc = Make (struct
   let prefix = Names.aloc_prefix
 end)
 
-module LVar = Make (struct
-  let prefix = Names.lvar_prefix
-end)
+module LVar = struct
+  include Make (struct
+    let prefix = Names.lvar_prefix
+  end)
+
+  let is_spec_var_name = Names.is_spec_var_name
+end
 
 module Var = Make (struct
   let prefix = Names.pvar_prefix

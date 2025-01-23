@@ -48,7 +48,11 @@ module Id : sig
 
   (** @canonical Gillian.Gil_syntax.Id.LVar
         Allocator for GIL logical variables *)
-  module LVar : Id with type t = lvar t
+  module LVar : sig
+    include Id with type t = lvar t
+
+    val is_spec_var_name : t -> bool
+  end
 
   module Sets : sig
     (** Set of substitutable identifiers *)
