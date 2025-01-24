@@ -65,6 +65,7 @@ val poison : t -> Expr.t -> Expr.t -> t d_or_error
 val zero_init : t -> Expr.t -> Expr.t -> t d_or_error
 val load : t -> Chunk.t -> Expr.t -> (SVal.t * t) d_or_error
 val free : t -> Expr.t -> Expr.t -> t d_or_error
+val is_exclusively_owned : t -> Expr.t -> Expr.t -> bool Delayed.t
 val drop_perm : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 val get_perm_at : t -> Expr.t -> Perm.t option d_or_error
 val weak_valid_pointer : t -> Expr.t -> bool d_or_error

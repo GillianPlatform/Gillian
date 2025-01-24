@@ -1229,6 +1229,9 @@ let free t low high =
                  "Freeing only part of an object (this might need fixing in \
                   the MM)"))
 
+let is_exclusively_owned tree low high : bool Delayed.t =
+  Delayed.map (free tree low high) (fun _ -> true)
+
 let cons_single t low chunk =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in

@@ -113,15 +113,77 @@ module M = struct
     | _, _ -> failwith "Invalid consume call"
 
   (** Produce a predicate with the given ins and outs *)
-  val produce : pred -> t -> Expr.t list -> t Delayed.t
+  let produce (pred : pred) (s : t) (insouts : Expr.t list) : t Delayed.t =
+    let open Delayed.Syntax in
+    let open DR.Syntax in
+    let open Delayed.Syntax in
+    let filter_errors dr =
+      Delayed.bind dr (fun res ->
+          match res with
+          | Ok res -> Delayed.return res
+          | Error err ->
+              Logging.tmi (fun m -> m "Filtering error branch: %a" pp_err err);
+              Delayed.vanish ())
+    in
+    match (pred, insouts) with
+    | ( Single,
+        [
+          ofs;
+          Expr.Lit (String chunk_string);
+          sval_e;
+          Expr.Lit (String perm_string);
+        ] ) ->
+        let perm = Perm.of_string perm_string in
+        let chunk = Chunk.of_string chunk_string in
+        let sval = SVal.make ~chunk ~value:sval_e in
+        prod_single s ofs chunk sval perm |> filter_errors
+    | ( Array,
+        [
+          ofs;
+          size;
+          Expr.Lit (String chunk_string);
+          arr_e;
+          Expr.Lit (String perm_string);
+        ] ) ->
+        let perm = Perm.of_string perm_string in
+        let chunk = Chunk.of_string chunk_string in
+        let arr = SVArray.make ~chunk ~values:arr_e in
+        prod_array s ofs size chunk arr perm |> filter_errors
+    | Hole, [ low; high; Expr.Lit (String perm_string) ] ->
+        let perm = Perm.of_string perm_string in
+        prod_hole s low high perm |> filter_errors
+    | Zeros, [ low; high; Expr.Lit (String perm_string) ] ->
+        let perm = Perm.of_string perm_string in
+        prod_zeros s low high perm |> filter_errors
+    | Bounds, [ bounds_e ] ->
+        let bounds =
+          match bounds_e with
+          | Expr.EList [ low; high ] -> (low, high)
+          | Lit (LList [ low; high ]) -> (Lit low, Lit high)
+          | _ -> failwith "set_bounds wrong param"
+        in
+        prod_bounds s bounds |> DR.of_result |> filter_errors
+    | _, _ -> failwith "Invalid produce call"
 
   (** Compose two states together *)
-  val compose : t -> t -> t Delayed.t
+  let compose s1 s2 =
+    let open Delayed.Syntax in
+    let* res = merge ~old_tree:s1 ~new_tree:s2 in
+    match res with
+    | Ok s' -> Delayed.return s'
+    | Error e ->
+        Logging.verbose (fun fmt ->
+            fmt "Vanishing on compose error: %a" pp_err_t e);
+        Delayed.vanish ()
 
   (** For Freeable: if a state can be freed. Must only be true if no non-empty state can
    be composed with the state. The Expr list is irrelevant; it's required because of Gillian-C. *)
-  val is_exclusively_owned : t -> Expr.t list -> bool Delayed.t
-
+  let is_exclusively_owned tree e =
+    let open Delayed.Syntax in
+    match e with
+    | [ low; high ] ->
+      SHeapTree.is_exclusively_owned tree low high
+    | _ -> Delayed.return false
   (** If this state is observably empty. *)
   val is_empty : t -> bool
 
