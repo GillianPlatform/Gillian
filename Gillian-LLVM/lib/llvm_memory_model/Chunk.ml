@@ -1,55 +1,39 @@
+type t = IntegerChunk of int | F32 | F64 [@@deriving eq, yojson]
+type components = Float of { bit_width : int } | Int of { bit_width : int }
 
-let pointer_width = ref 64
-
-type t =
-  | Mint of int
-  | Mfloat32
-  | Mfloat64
-  | Mptr
-[@@deriving eq, yojson]
-
-(* Physical equality: values should be decoded the same way *)
-let phy_equal a b =
-  match (a, b) with
-  | Mint w1, Mint w2 -> w1 = w2
-  | Mfloat32, Mfloat32 | Mfloat64, Mfloat64 | Mptr, Mptr -> true
-  | Mint w, Mptr -> w = !pointer_width
-  | Mptr, Mint w -> w = !pointer_width
-  | _ -> false
+let to_string = function
+  | IntegerChunk i -> "i-" ^ Int.to_string i
+  | F32 -> "f32"
+  | F64 -> "f64"
 
 let of_string = function
-  | "float32" -> Mfloat32
-  | "float64" -> Mfloat64
-  | "ptr" -> Mptr
+  | "f32" -> F32
+  | "f64" -> F64
   | x ->
       let lst = String.split_on_char '-' x in
       if List.length lst = 2 && String.equal (List.hd lst) "i" then
         let st = List.nth lst 1 in
-        Mint (int_of_string st)
+        IntegerChunk (int_of_string st)
       else failwith ("invalid chunk " ^ x)
 
-let to_string = function
-  | Mint i -> "i-" ^ Int.to_string i
-  | Mfloat32 -> "float32"
-  | Mfloat64 -> "float64"
-  | Mptr -> "ptr"
-
-
-let pp fmt chunk = Fmt.pf fmt "%s" (to_string chunk)
 let size = function
-  | Mint i -> i / 8
-  | Mfloat32 -> 4
-  | Mfloat64 -> 8
-  | Mptr -> !pointer_width / 8
+  | IntegerChunk i -> i / 8
+  | F32 -> 4
+  | F64 -> 8
 
-let size_expr chunk = Gil_syntax.Expr.int (size chunk)
+let align = function
+  | IntegerChunk i -> i / 8
+  | F32 -> 4
+  | F64 -> 8
 
-let align chunk =
-  (raise (Failure "align not implemented"))
+let to_components chunk =
+  match chunk with
+  | IntegerChunk w -> Int { bit_width = w }
+  | F32 -> Float { bit_width = 32 }
+  | F64 -> Float { bit_width = 64 }
 
-let ptr = Mptr
+let is_int = function
+  | IntegerChunk _ -> true
+  | F32 | F64 -> false
 
-let could_be_ptr = function
-  | Mptr -> true
-  | Mint w -> w = !pointer_width
-  | _ -> false
+let i8 = IntegerChunk 8

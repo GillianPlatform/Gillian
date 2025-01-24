@@ -1,12 +1,11 @@
 (library
  (name llvm_memory_model)
  (libraries
-  states
   gillian
   gillian.ppx_sat.runtime
-  gillian-js.js2jsil_lib
-  gillian-js.semantics
-  gillian-c.cgil_lib
-  ppx_deriving_yojson.runtime)
+  ppx_deriving_yojson.runtime
+  ppx_deriving.runtime
+  printbox-text ; we want to get rid of printbox as a dependency
+  states)
  (preprocess
-  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson)))
+  (pps gillian.ppx_sat ppx_deriving_yojson ppx_deriving.std)))

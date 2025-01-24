@@ -1,7 +1,7 @@
+(*
 open Gil_syntax
 open Gillian.Monadic
 module DR = Delayed_result
-module Global_env = Cgil_lib.Global_env
 
 let init_data = ref Global_env.empty
 let set_init_data d = init_data := d
@@ -60,3 +60,4 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
   let list_actions () = [ (GetDef, [], []) ]
   let list_preds () = []
 end
+*)

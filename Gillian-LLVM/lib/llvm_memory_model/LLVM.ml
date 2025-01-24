@@ -3,12 +3,9 @@ open Gil_syntax
 
 module Delayed = Gillian.Monadic.Delayed
 module DR = Gillian.Monadic.Delayed_result
-module Global_env = Cgil_lib.Global_env
 
 (* Import C-specific constructs *)
-module BlockTree = BlockTree.M
-module CGEnvM = CGEnv.M
-
+module BlockTree = SHeapTree
 (* Base memories *)
 module BaseBlock = Freeable (BlockTree)
 
@@ -128,16 +125,9 @@ end
 module Wrap (S : C_PMapType) = struct
   module CMapMemory = ExtendMemory (S)
 
-  include
-    Product
-      (struct
-        let id1 = "mem_"
-        let id2 = "genv_"
-      end)
-      (CMapMemory)
-      (CGEnvM)
+  include CMapMemory
 
-  let pp f (s1, _) = CMapMemory.pp f s1
+  let pp f s1 = CMapMemory.pp f s1
 end
 
 module MonadicSMemory_Base = Wrap (BaseMemory)
@@ -148,7 +138,7 @@ module ParserAndCompiler = ParserAndCompiler.Dummy
 module ExternalSemantics =
   Gillian.General.External.Dummy (ParserAndCompiler.Annot)
 
-module InitData = Cgil_lib.Global_env
+module InitData = Global_env
 
 module MyInitData = struct
   type t = unit
