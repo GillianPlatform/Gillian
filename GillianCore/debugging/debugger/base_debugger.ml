@@ -323,7 +323,7 @@ struct
         Map_node.make ~id ~aliases ~submaps ~next ~options () |> add_node state
 
       let add_root proc root_id state =
-        let id = "proc " ^ proc in
+        let id = "proc__" ^ proc in
         let next = Map_node_next.Single { id = Some (show_id root_id) } in
         let options =
           Map_node_options.Root
