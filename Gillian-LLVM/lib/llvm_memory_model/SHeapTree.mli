@@ -74,8 +74,8 @@ val weak_valid_pointer : t -> Expr.t -> bool d_or_error
     [dst_tree] after modification *)
 val move : t -> Expr.t -> t -> Expr.t -> Expr.t -> t d_or_error
 
-val assertions : t -> Asrt.t
-val assertions_others : t -> Asrt.t
+val assertions : t -> (LActions.ga * Expr.t list * Expr.t list) list
+val assertions_others : t -> (LActions.ga * Expr.t list * Expr.t list) list
 
 val substitution :
   le_subst:(Expr.t -> Expr.t) ->
