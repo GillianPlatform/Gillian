@@ -5,6 +5,7 @@ module SVal : sig
   type t [@@deriving yojson]
 
   val make : chunk:Chunk.t -> value:Gil_syntax.Expr.t -> t
+  val is_concrete : t -> bool
   val pp : Format.formatter -> t -> unit
   val alocs : t -> SS.t
   val lvars : t -> SS.t
@@ -24,6 +25,7 @@ module SVArray : sig
   type t [@@deriving yojson]
 
   val make : chunk:Chunk.t -> values:Expr.t -> t
+  val is_concrete : t -> bool
   val alocs : t -> SS.t
   val lvars : t -> SS.t
   val reduce : t -> t Monadic.Delayed.t

@@ -14,6 +14,7 @@ module SVal = struct
   let lvars v = Expr.lvars v.value
   let substitution ~le_subst v = { v with value = le_subst v.value }
   let leak t = (t.chunk, t.value)
+  let is_concrete v = Expr.is_concrete v.value
 
   let reduce v =
     let open Delayed.Syntax in
@@ -153,6 +154,7 @@ end
 module SVArray = struct
   type t = { values : Expr.t; chunk : Chunk.t } [@@deriving yojson]
 
+  let is_concrete v = Expr.is_concrete v.values
   let make ~chunk ~values = { values; chunk }
   let alocs v = Expr.alocs v.values
   let lvars v = Expr.lvars v.values

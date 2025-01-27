@@ -4,6 +4,7 @@ open Gil_syntax
 open Gillian.Monadic
 module DR = Delayed_result
 open SVal
+module Subst = Gillian.Symbolic.Subst
 
 module M = struct
   open LActions
@@ -185,50 +186,74 @@ module M = struct
       SHeapTree.is_exclusively_owned tree low high
     | _ -> Delayed.return false
   (** If this state is observably empty. *)
-  val is_empty : t -> bool
+  let is_empty = SHeapTree.is_empty
 
   (** If this state is entirely made up of concrete expressions. *)
-  val is_concrete : t -> bool
+  let is_concrete = SHeapTree.is_concrete
 
   (** Instantiates this state with a list of arguments. This is used by PMap, either in
     static mode with the 'instantiate' action, or in dynamic mode when accessing
     a missing index. *)
-  val instantiate : Expr.t list -> t * Expr.t list
+    let instantiate = function
+    | [ low; high ] ->
+        SHeapTree.instantiate low high
+    | _ -> failwith "BlockTree: Invalid instantiate arguments"
 
   (** The list of core predicates corresponding to the state. *)
-  val assertions : t -> (pred * Expr.t list * Expr.t list) list
+  let assertions tree =
+        SHeapTree.assertions tree
+
 
   (** The list of assertions that aren't core predicates corresponding to the state. *)
-  val assertions_others : t -> Asrt.atom list
+  let assertions_others tree = SHeapTree.assertions_others tree
 
   (** If the error can be fixed *)
-  val can_fix : err_t -> bool
+  let can_fix _ = failwith "BlockTree: can_fix not implemented"
+    
 
   (** Get the fixes for an error, as a list of fixes -- a fix is a list of core predicates
     to produce onto the state. *)
-  val get_fixes : err_t -> pred MyAsrt.t list list
+  let get_fixes _ = failwith "BlockTree: get_fixes not implemented"
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding predicates *)
-  val get_recovery_tactic : err_t -> Expr.t Recovery_tactic.t
+  let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
 
   (** The set of logical variables in the state *)
-  val lvars : t -> Containers.SS.t
+  let lvars tree = SHeapTree.lvars tree
 
   (** The set of abstract locations in the state *)
-  val alocs : t -> Containers.SS.t
+  let alocs tree = SHeapTree.alocs tree
 
   (** Applies a substitution to the state. This can branch, eg. when attempting to resolve
     equality of expressions. *)
-  val substitution_in_place : Subst.t -> t -> t Delayed.t
+  let substitution_in_place subst tree =
+    let le_subst = Subst.subst_in_expr subst ~partial:true in
+    let sval_subst = SVal.substitution ~le_subst in
+    let svarr_subst = SVArray.subst ~le_subst in
+    substitution ~le_subst ~sval_subst ~svarr_subst tree |> Delayed.return
 
   (** Pretty print the state *)
-  val pp : Format.formatter -> t -> unit
+  let pp fmt tree = SHeapTree.pp_full fmt tree
 
   (* Debug *)
 
   (** (Debug only) Return all available (action * arguments * outputs) *)
-  val list_actions : unit -> (action * string list * string list) list
+  let list_actions _ =
+    [
+      (DropPerm, [ "?" ], [ "?" ]);
+      (GetCurPerm, [ "?" ], [ "?" ]);
+      (WeakValidPointer, [ "?" ], [ "?" ]);
+      (Store, [ "?" ], [ "?" ]);
+      (Load, [ "?" ], [ "?" ]);
+    ]
 
   (** (Debug only) Return all available (predicates * ins * outs) *)
-  val list_preds : unit -> (pred * string list * string list) list
+  let list_preds _ =
+    [
+      (Single, [ "?" ], [ "?" ]);
+      (Array, [ "?" ], [ "?" ]);
+      (Hole, [ "?" ], [ "?" ]);
+      (Zeros, [ "?" ], [ "?" ]);
+      (Bounds, [ "?" ], [ "?" ]);
+    ]
 end

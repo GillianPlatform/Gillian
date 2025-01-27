@@ -32,8 +32,8 @@ type t [@@deriving yojson]
 val pp : t Fmt.t
 val pp_full : t Fmt.t
 val empty : t
-val freed : t
 val is_empty : t -> bool
+val is_concrete : t -> bool
 val lvars : t -> SS.t
 val alocs : t -> SS.t
 val load_bounds : t -> Range.t or_error
@@ -54,17 +54,16 @@ val cons_array :
 val prod_array :
   t -> Expr.t -> Expr.t -> Chunk.t -> SVArray.t -> Perm.t -> t d_or_error
 
+val instantiate : Expr.t -> Expr.t -> t
 val cons_hole : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
 val prod_hole : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 val cons_zeros : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
 val prod_zeros : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
-val get_freed : t -> unit or_error
 val alloc : Expr.t -> Expr.t -> t
 val store : t -> Chunk.t -> Expr.t -> SVal.t -> t d_or_error
 val poison : t -> Expr.t -> Expr.t -> t d_or_error
 val zero_init : t -> Expr.t -> Expr.t -> t d_or_error
 val load : t -> Chunk.t -> Expr.t -> (SVal.t * t) d_or_error
-val free : t -> Expr.t -> Expr.t -> t d_or_error
 val is_exclusively_owned : t -> Expr.t -> Expr.t -> bool Delayed.t
 val drop_perm : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 val get_perm_at : t -> Expr.t -> Perm.t option d_or_error
@@ -75,7 +74,8 @@ val weak_valid_pointer : t -> Expr.t -> bool d_or_error
     [dst_tree] after modification *)
 val move : t -> Expr.t -> t -> Expr.t -> Expr.t -> t d_or_error
 
-val assertions : loc:string -> t -> Asrt.t
+val assertions : t -> Asrt.t
+val assertions_others : t -> Asrt.t
 
 val substitution :
   le_subst:(Expr.t -> Expr.t) ->
