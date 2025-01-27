@@ -1,11 +1,11 @@
 open Utils
 open Gil_syntax
-
 module Delayed = Gillian.Monadic.Delayed
 module DR = Gillian.Monadic.Delayed_result
 
 (* Import C-specific constructs *)
-module BlockTree = SHeapTree
+module BlockTree = BlockTree.M
+
 (* Base memories *)
 module BaseBlock = Freeable (BlockTree)
 
@@ -124,7 +124,6 @@ end
 
 module Wrap (S : C_PMapType) = struct
   module CMapMemory = ExtendMemory (S)
-
   include CMapMemory
 
   let pp f s1 = CMapMemory.pp f s1
@@ -137,8 +136,6 @@ module ParserAndCompiler = ParserAndCompiler.Dummy
 
 module ExternalSemantics =
   Gillian.General.External.Dummy (ParserAndCompiler.Annot)
-
-module InitData = Global_env
 
 module MyInitData = struct
   type t = unit

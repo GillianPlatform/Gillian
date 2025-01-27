@@ -182,9 +182,11 @@ module M = struct
   let is_exclusively_owned tree e =
     let open Delayed.Syntax in
     match e with
-    | [ low; high ] ->
-      SHeapTree.is_exclusively_owned tree low high
+    | [ low; high ] -> SHeapTree.is_exclusively_owned tree low high
     | _ -> Delayed.return false
+
+  let empty _ = SHeapTree.empty
+
   (** If this state is observably empty. *)
   let is_empty = SHeapTree.is_empty
 
@@ -194,22 +196,21 @@ module M = struct
   (** Instantiates this state with a list of arguments. This is used by PMap, either in
     static mode with the 'instantiate' action, or in dynamic mode when accessing
     a missing index. *)
-    let instantiate = function
+  let instantiate = function
     | [ low; high ] ->
-        SHeapTree.instantiate low high
+        let tree = SHeapTree.instantiate low high in
+        (tree, [])
     | _ -> failwith "BlockTree: Invalid instantiate arguments"
 
   (** The list of core predicates corresponding to the state. *)
-  let assertions tree =
-        SHeapTree.assertions tree
-
+  let assertions tree = SHeapTree.assertions tree
 
   (** The list of assertions that aren't core predicates corresponding to the state. *)
-  let assertions_others tree = SHeapTree.assertions_others tree
+  let assertions_others tree =
+    failwith "BlockTree: assertions_others not implemented"
 
   (** If the error can be fixed *)
   let can_fix _ = failwith "BlockTree: can_fix not implemented"
-    
 
   (** Get the fixes for an error, as a list of fixes -- a fix is a list of core predicates
     to produce onto the state. *)
@@ -231,6 +232,14 @@ module M = struct
     let sval_subst = SVal.substitution ~le_subst in
     let svarr_subst = SVArray.subst ~le_subst in
     substitution ~le_subst ~sval_subst ~svarr_subst tree |> Delayed.return
+
+  let move
+      (dst_tree : t)
+      (dst_ofs : Expr.t)
+      (src_tree : t)
+      (src_ofs : Expr.t)
+      (size : Expr.t) =
+    SHeapTree.move dst_tree dst_ofs src_tree src_ofs size
 
   (** Pretty print the state *)
   let pp fmt tree = SHeapTree.pp_full fmt tree

@@ -1,11 +1,10 @@
-
 open Gillian
 
 module LLVM_Base = struct
   module MonadicSMemory = LLVM.MonadicSMemory_Base
-  module ParserAndCompiler = Cgil_lib.CParserAndCompiler
+  module ParserAndCompiler = Gillian.ParserAndCompiler.Dummy
   module ExternalSemantics = LLVM.ExternalSemantics
-  module InitData = Cgil_lib.Global_env
+  module InitData = LLVM.MyInitData
   module MyInitData = LLVM.MyInitData
 end
 
@@ -19,7 +18,7 @@ module LLVM_Split = struct
   module MonadicSMemory = LLVM.MonadicSMemory_Split
 end
 
-
-module DefaultMem = States.MyMonadicSMemory.Make (LLVM_ALoc.MonadicSMemory) (LLVM.MyInitData)
+module DefaultMem =
+  States.MyMonadicSMemory.Make (LLVM_ALoc.MonadicSMemory) (LLVM.MyInitData)
 
 module SMemory = Monadic.MonadicSMemory.Lift (DefaultMem)
