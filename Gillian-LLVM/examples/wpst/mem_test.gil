@@ -23,10 +23,18 @@ proc main() {
 
     sum0 := bvadd(Bitvector(x,32i), Bitvector(y,32i): 32i);
     sum1 := bvadd(Bitvector(newx,32i), Bitvector(newy,32i): 32i);
+    ptrptr_l := [alloc](0i, 4i);
+    ptrptr := l-nth(ptrptr_l, 0i);
     xptr_l := [alloc](0i, 32i);
     xptr := l-nth(xptr_l, 0i);
+    xptr_with_offset := {{ xptr, 0i }};
+    b := [store]("i-32", ptrptr, 0i, xptr_with_offset);
     a := [store]("i-32", xptr, 0i, sum0);
-    rtt_l := [load]("i-32", xptr, 0i);
+    xptr2_l := [load]("i-32", ptrptr, 0i);
+    xptr2_with_offset := l-nth(xptr2_l, 0i);
+    xptr2 := l-nth(xptr2_with_offset, 0i);
+    xptr2_offset := l-nth(xptr2_with_offset, 1i);
+    rtt_l := [load]("i-32", xptr2, xptr2_offset);
     rtt := l-nth(rtt_l, 0i);
     assert((!(bvult(Bitvector(sum1, 32i), Bitvector(sum0, 32i):))));
     assert((rtt == sum1));
