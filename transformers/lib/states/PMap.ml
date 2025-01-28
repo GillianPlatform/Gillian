@@ -224,6 +224,8 @@ struct
         let+ r = S.execute_action action ss args in
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
+        Logging.verbose (fun fmt ->
+            fmt "AFTER EXECUTING ACTION WITH: %a" S.pp ss');
         let s' = set ~idx ~idx' ss' s in
         (s', idx' :: v)
     | Alloc, args ->
@@ -479,6 +481,8 @@ struct
         let+ r = S.execute_action action ss args in
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
+        Logging.verbose (fun fmt ->
+            fmt "AFTER EXECUTING ACTION WITH: %a" S.pp ss');
         let s' = set ~idx ~idx' ss' s in
         (s', idx' :: v)
     | Alloc, args ->

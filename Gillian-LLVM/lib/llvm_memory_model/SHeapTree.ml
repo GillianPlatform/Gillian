@@ -1207,7 +1207,7 @@ let rem_bounds t =
 
 let with_root_opt t root =
   match t with
-  | { bounds = Some bounds; root } -> Ok { root; bounds = Some bounds }
+  | { bounds = Some bounds; _ } -> Ok { root; bounds = Some bounds }
   | { bounds = None; _ } -> Error MissingResource
 
 let with_root t root = with_root_opt t (Some root)
