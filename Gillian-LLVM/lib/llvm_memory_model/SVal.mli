@@ -19,6 +19,7 @@ module SVal : sig
   val any_of_chunk : Chunk.t -> t Monadic.Delayed.t
   val leak : t -> Chunk.t * Expr.t
   val leak_chunk : t -> Chunk.t
+  val assertions_others : t -> Asrt.atom list
 end
 
 module SVArray : sig
@@ -75,5 +76,6 @@ module SVArray : sig
   (* [append_same_chunk arr el] is [concat_same_chunk arr (singleting el)] *)
   val append_same_chunk : t -> SVal.t -> t option
   val to_gil_expr : size:Expr.t -> chunk:Chunk.t -> t -> Gil_syntax.Expr.t
+  val assertions_others : low:Expr.t -> high:Expr.t -> t -> Asrt.atom list
   val subst : le_subst:(Gil_syntax.Expr.t -> Gil_syntax.Expr.t) -> t -> t
 end

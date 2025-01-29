@@ -1,5 +1,5 @@
 
-
+bispec split_vector(x) : [[types(x : Bitvector(32i))]]
 proc split_vector(x) {
     xtopslice := extract(31i, 16i, Bitvector(x, 32i): 16i);
     xbotslice := extract(15i, 0i, Bitvector(x, 32i): 16i);
@@ -7,7 +7,7 @@ proc split_vector(x) {
     return
 };
 
-
+bispec main() : [[emp]]
 proc main() {
     x := fresh_svar();
     y := fresh_svar();

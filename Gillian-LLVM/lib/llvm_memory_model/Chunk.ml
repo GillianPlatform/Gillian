@@ -1,3 +1,5 @@
+open Gillian.Gil_syntax
+
 type t = IntegerChunk of int | F32 | F64 [@@deriving eq, yojson]
 type components = Float of { bit_width : int } | Int of { bit_width : int }
 
@@ -37,3 +39,11 @@ let is_int = function
   | F32 | F64 -> false
 
 let i8 = IntegerChunk 8
+
+(* TODO(Ian): should we somehow know if this is a pointer chunk? *)
+let type_of curr_chunk =
+  match curr_chunk with
+  | IntegerChunk i ->
+      if Llvmconfig.ptr_width () = i then None else Some (Type.BvType i)
+  | F32 -> Some Type.NumberType
+  | F64 -> Some Type.NumberType

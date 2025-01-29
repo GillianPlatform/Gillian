@@ -149,6 +149,11 @@ module SVal = struct
     in
     let expr = Expr.bv_concat bytes in
     make ~chunk ~value:expr |> Delayed.return
+
+  let assertions_others t =
+    let open Expr.Infix in
+    Option.fold (Chunk.type_of t.chunk) ~none:[] ~some:(fun x ->
+        [ Asrt.Pure (Expr.typeof t.value == Expr.type_ x) ])
 end
 
 module SVArray = struct
@@ -406,6 +411,16 @@ module SVArray = struct
 
   (* It's unclear what I'm going to do with
      this. I don't know how to ensure that size is always the right hing.*)
+
+  let assertions_others ~(low : Expr.t) ~(high : Expr.t) (arr : t) =
+    let chunk_size = Chunk.size arr.chunk |> Expr.int in
+    let open Expr.Infix in
+    let size = (high - low) / chunk_size in
+    [
+      Asrt.Pure (Expr.list_length arr.values == size);
+      Asrt.Pure (Expr.typeof arr.values == Expr.type_ Type.ListType);
+    ]
+
   let to_gil_expr ~size:_ ~chunk t =
     if Chunk.equal t.chunk chunk then t.values
     else

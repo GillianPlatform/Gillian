@@ -1057,27 +1057,18 @@ module Tree = struct
         [ Preds.Core.array ~ofs:low ~perm ~chunk ~size:total_size ~sval_arr ]
 
   let rec assertions_others { node; span; children; _ } =
-    raise (Failure "TODO not impelmented... im not sure here")
-  (*match node with
+    let low, high = span in
+    match node with
     | NotOwned Totally -> []
     | NotOwned Partially | MemVal { mem_val = Poisoned Partially; _ } ->
         let left, right = Option.get children in
         assertions_others left @ assertions_others right
     | MemVal { mem_val = Poisoned Totally; _ } -> []
     | MemVal { mem_val = Zeros; _ } -> []
-    | MemVal { mem_val = Single value; _ } ->
-        let _, types = SVal.to_gil_expr value in
-        List.map
-          (fun (x, t) -> Asrt.Pure Expr.Infix.(Expr.typeof x == Expr.type_ t))
-          types
-    | MemVal { mem_val = Array { chunk; values }; _ } -> (
-        match values with
-        | AllUndef | AllZeros -> []
-        | array ->
-            let _, learned =
-              SVArr.to_gil_expr_undelayed ~range:span array ~chunk
-            in
-            List.map (fun x -> Asrt.Pure x) learned)*)
+    | MemVal { mem_val = LazyValue; _ } -> []
+    | MemVal { mem_val = Single value; _ } -> SVal.assertions_others value
+    | MemVal { mem_val = Array svarr; _ } ->
+        SVArr.assertions_others ~low ~high svarr
 
   let rec substitution
       ~svarr_subst
@@ -1582,7 +1573,8 @@ module Lift = struct
         make_node ~name:loc ~value:"Allocated" ~children:[ bounds; root ] ()
 end
 
-let assertions_others _ = failwith "perm: assertion_others not implemented"
+let assertions_others t =
+  Option.fold t.root ~some:Tree.assertions_others ~none:[]
 
 let instantiate low high =
   {

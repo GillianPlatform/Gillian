@@ -12,10 +12,10 @@ let ptr64 () =
   | Arch64 -> true
   | Arch32 -> false
 
-let ptr_chunk () : Chunk.t =
+let ptr_width () : int =
   match !archi with
-  | Arch64 -> IntegerChunk 64
-  | Arch32 -> IntegerChunk 32
+  | Arch64 -> 64
+  | Arch32 -> 32
 
 let nondet_on_missing = ref true
 let print_unhandled = ref false

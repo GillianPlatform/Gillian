@@ -206,9 +206,8 @@ module M = struct
   let assertions tree = SHeapTree.assertions tree
 
   (** The list of assertions that aren't core predicates corresponding to the state. *)
-  let assertions_others tree =
-    failwith "BlockTree: assertions_others not implemented"
-
+  let assertions_others tree : Asrt.atom list =
+    SHeapTree.assertions_others tree 
   (** If the error can be fixed *)
   let can_fix _ = failwith "BlockTree: can_fix not implemented"
 
