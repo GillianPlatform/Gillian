@@ -42,8 +42,13 @@ let i8 = IntegerChunk 8
 
 (* TODO(Ian): should we somehow know if this is a pointer chunk? *)
 let type_of curr_chunk =
-  match curr_chunk with
-  | IntegerChunk i ->
-      if Llvmconfig.ptr_width () = i then None else Some (Type.BvType i)
-  | F32 -> Some Type.NumberType
-  | F64 -> Some Type.NumberType
+  Logging.tmi (fun m -> m "type_of: %s" (to_string curr_chunk));
+  let res =
+    match curr_chunk with
+    | IntegerChunk i ->
+        if Llvmconfig.ptr_width () = i then None else Some (Type.BvType i)
+    | F32 -> Some Type.NumberType
+    | F64 -> Some Type.NumberType
+  in
+  Logging.tmi (fun m -> m "type_of: %a" (Fmt.option Type.pp) res);
+  res

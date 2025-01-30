@@ -73,7 +73,16 @@ module SVal = struct
     let learned_types, learned =
       match chunk with
       | IntegerChunk i ->
-          let learned_types = [ (lvar, Type.BvType i) ] in
+          let learned_types =
+            if i <> Llvmconfig.ptr_width () then [ (lvar, Type.BvType i) ]
+            else []
+          in
+          let () =
+            Logging.tmi (fun m ->
+                m "Learned types: %a"
+                  (Fmt.list ~sep:Fmt.comma (Fmt.pair Fmt.string Type.pp))
+                  learned_types)
+          in
           (* TODO(Ian): since we already havea bv type sitting there it should be fine right?*)
           let learned = [] in
           (learned_types, learned)
