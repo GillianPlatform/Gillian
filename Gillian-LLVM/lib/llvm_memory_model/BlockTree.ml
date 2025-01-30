@@ -72,6 +72,7 @@ module M = struct
         (s', [])
     | Store, [ Expr.Lit (String chunk_name); ofs; value ] ->
         let chunk = Chunk.of_string chunk_name in
+        (* TODO(Ian): This is unsound we are making an SVal with an arbitrary chunk*)
         let sval = SVal.make ~chunk ~value in
         let++ s' = store s chunk ofs sval in
         (s', [])
