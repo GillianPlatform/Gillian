@@ -63,6 +63,7 @@ module SVal = struct
     let make value = make ~chunk ~value in
     match chunk with
     | IntegerChunk w -> make (Expr.zero_bv w)
+    | IntegerOrPtrChunk -> make (Expr.zero_bv (Llvmconfig.ptr_width ()))
     | F32 -> make (Lit (Num 0.))
     | F64 -> make (Lit (Num 0.))
 
@@ -73,19 +74,11 @@ module SVal = struct
     let learned_types, learned =
       match chunk with
       | IntegerChunk i ->
-          let learned_types =
-            if i <> Llvmconfig.ptr_width () then [ (lvar, Type.BvType i) ]
-            else []
-          in
-          let () =
-            Logging.tmi (fun m ->
-                m "Learned types: %a"
-                  (Fmt.list ~sep:Fmt.comma (Fmt.pair Fmt.string Type.pp))
-                  learned_types)
-          in
+          let learned_types = [ (lvar, Type.BvType i) ] in
           (* TODO(Ian): since we already havea bv type sitting there it should be fine right?*)
           let learned = [] in
           (learned_types, learned)
+      | IntegerOrPtrChunk -> ([], [])
       | F32 | F64 ->
           let learned_types = [ (lvar, Type.NumberType) ] in
           let learned = [] in
@@ -96,6 +89,15 @@ module SVal = struct
   let reencode ~(chunk : Chunk.t) (v : t) =
     let open Delayed.Syntax in
     match (Chunk.to_components v.chunk, Chunk.to_components chunk) with
+    | Ptr, Ptr -> Delayed.return v
+    | Ptr, Float _ | Float _, Ptr ->
+        failwith "Trying to convert between ptr and float, unhandled"
+    | Int { bit_width = w }, Ptr | Ptr, Int { bit_width = w } ->
+        if Int.equal w (Llvmconfig.ptr_width ()) then (
+          Logging.normal (fun m ->
+              m "Warning: over-approximating ptr to int type punning");
+          any_of_chunk chunk)
+        else failwith "Trying to convert between non pointer sized int and Ptr"
     | Int _, Float _ | Float _, Int _ ->
         if sure_is_zero v then Delayed.return (zero_of_chunk chunk)
         else
@@ -162,7 +164,11 @@ module SVal = struct
   let assertions_others t =
     let open Expr.Infix in
     Option.fold (Chunk.type_of t.chunk) ~none:[] ~some:(fun x ->
-        [ Asrt.Pure (Expr.typeof t.value == Expr.type_ x) ])
+        List.fold_left
+          (fun curr ty ->
+            Expr.BinOp (curr, BinOp.Or, Expr.typeof t.value == Expr.type_ ty))
+          Expr.true_ x
+        |> fun x -> [ Asrt.Pure x ])
 end
 
 module SVArray = struct
@@ -291,6 +297,18 @@ module SVArray = struct
   let decode_sval_into ~chunk (sval : SVal.t) =
     let open Delayed.Syntax in
     match (Chunk.to_components sval.chunk, Chunk.to_components chunk) with
+    | Ptr, Ptr -> Delayed.return (singleton sval)
+    | Ptr, Float _ | Float _, Ptr ->
+        failwith "Trying to convert between ptr and float, unhandled"
+    | Int { bit_width = from }, Ptr | Ptr, Int { bit_width = from } ->
+        if Int.equal from (Llvmconfig.ptr_width ()) then
+          let () =
+            Logging.normal (fun m ->
+                m "Warning: over-approximating ptr to int type punning")
+          in
+          let+ sval = SVal.any_of_chunk chunk in
+          singleton sval
+        else failwith "Trying to convert between non pointer sized int and Ptr"
     | Float { bit_width = from }, Float { bit_width = into } ->
         if from < into then
           failwith
@@ -349,6 +367,20 @@ module SVArray = struct
     in
     let open Delayed.Syntax in
     match (Chunk.to_components arr.chunk, Chunk.to_components chunk) with
+    | Ptr, Ptr -> Delayed.return (get_exactly_one arr)
+    | Ptr, Float _ | Float _, Ptr ->
+        failwith "Trying to convert between ptr and float, unhandled"
+    | Int { bit_width = from }, Ptr | Ptr, Int { bit_width = from } ->
+        if Int.equal from (Llvmconfig.ptr_width ()) then
+          let () =
+            Logging.normal (fun m ->
+                m "Warning: over-approximating ptr to int type punning")
+          in
+          SVal.any_of_chunk chunk
+        else
+          failwith
+            "Trying to convert between non pointer sized int we dont currently \
+             support this and Ptr"
     | Int _, Float _ | Float _, Int _ ->
         if sure_is_all_zeros arr then Delayed.return (SVal.zero_of_chunk chunk)
         else
