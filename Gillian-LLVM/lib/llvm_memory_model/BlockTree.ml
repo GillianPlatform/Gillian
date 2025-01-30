@@ -79,8 +79,8 @@ module M = struct
         let chunk = Chunk.of_string chunk_name in
         Logging.tmi (fun m -> m "Loading");
         let** value, s' = load s chunk ofs in
-        let gil_value = SVal.to_gil_expr ~chunk value in
-        DR.ok (s', [ gil_value ])
+        let+ gil_value = SVal.to_gil_expr ~chunk value in
+        Ok (s', [ gil_value ])
     | _, _ -> fail_ungracefully (action_to_str act) ins
 
   (** Consume a predicate with the given ins *)
@@ -92,9 +92,9 @@ module M = struct
     | Single, [ ofs; Expr.Lit (String chunk_string) ] ->
         let chunk = Chunk.of_string chunk_string in
         let** sval, perm, s' = cons_single s ofs chunk in
-        let sval_e = SVal.to_gil_expr ~chunk sval in
+        let+ sval_e = SVal.to_gil_expr ~chunk sval in
         let perm_string = Perm.opt_to_string perm in
-        DR.ok (s', [ sval_e; Expr.Lit (String perm_string) ])
+        Ok (s', [ sval_e; Expr.Lit (String perm_string) ])
     | Array, [ ofs; size; Expr.Lit (String chunk_string) ] ->
         let chunk = Chunk.of_string chunk_string in
         let** array, perm, s' = cons_array s ofs size chunk in

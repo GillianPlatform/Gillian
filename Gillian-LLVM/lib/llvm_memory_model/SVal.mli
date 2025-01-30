@@ -1,5 +1,6 @@
 open Gillian.Utils.Prelude
 open Gil_syntax
+open Monadic
 
 module SVal : sig
   type t [@@deriving yojson]
@@ -13,7 +14,7 @@ module SVal : sig
   val substitution : le_subst:(Expr.t -> Expr.t) -> t -> t
   val syntactic_equal : t -> t -> bool
   val reencode : chunk:Chunk.t -> t -> t Monadic.Delayed.t
-  val to_gil_expr : chunk:Chunk.t -> t -> Gil_syntax.Expr.t
+  val to_gil_expr : chunk:Chunk.t -> t -> Gil_syntax.Expr.t Delayed.t
   val reduce : t -> t Monadic.Delayed.t
   val zero_of_chunk : Chunk.t -> t
   val any_of_chunk : Chunk.t -> t Monadic.Delayed.t

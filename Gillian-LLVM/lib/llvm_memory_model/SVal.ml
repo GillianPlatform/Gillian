@@ -54,7 +54,25 @@ module SVal = struct
   let pp ft t = Fmt.pf ft "(%a : %s)" Expr.pp t.value (Chunk.to_string t.chunk)
 
   let to_gil_expr ~chunk t =
-    if Chunk.equal chunk t.chunk then t.value
+    if Chunk.equal chunk t.chunk then
+      let type_expr e1 ty =
+        let open Expr.Infix in
+        Expr.BinOp (e1, Equal, Expr.typeof e1 == Expr.type_ ty)
+      in
+      let learned =
+        match chunk with
+        | IntegerChunk w -> [ type_expr t.value (Type.BvType w) ]
+        | IntegerOrPtrChunk ->
+            [
+              Expr.BinOp
+                ( type_expr t.value (Type.BvType (Llvmconfig.ptr_width ())),
+                  Or,
+                  type_expr t.value Type.ListType );
+            ]
+        | F32 -> [ type_expr t.value Type.NumberType ]
+        | F64 -> [ type_expr t.value Type.NumberType ]
+      in
+      Delayed.return ~learned t.value
     else
       Fmt.failwith "to_gil_expr: chunk mismatch: %s vs %s"
         (Chunk.to_string chunk) (Chunk.to_string t.chunk)
