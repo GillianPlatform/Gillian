@@ -3,12 +3,17 @@ open Gillian.Utils.Containers
 open Monadic
 open SVal
 
+type missingResourceType =
+  | Unfixable
+  | Fixable of { is_store : bool; low : Expr.t; chunk : Chunk.t }
+[@@deriving show, yojson]
+
 type err =
   | UseAfterFree
   | BufferOverrun
   | InsufficientPermission of { required : Perm.t; actual : Perm.t }
   | InvalidAlignment of { alignment : int; offset : Expr.t }
-  | MissingResource
+  | MissingResource of missingResourceType
   | Unhandled of string
   | WrongMemVal
   | MemoryNotFreed
@@ -37,7 +42,7 @@ val is_concrete : t -> bool
 val lvars : t -> SS.t
 val alocs : t -> SS.t
 val load_bounds : t -> Range.t or_error
-val cons_bounds : t -> (Range.t * t) or_error
+val cons_bounds : t -> (Range.t option * t) or_error
 val prod_bounds : t -> Range.t -> t or_error
 
 val cons_single :

@@ -1,6 +1,6 @@
 open Gillian.Gil_syntax
 
-type t = IntegerChunk of int | F32 | F64 [@@deriving eq, yojson]
+type t = IntegerChunk of int | F32 | F64 [@@deriving show, eq, yojson]
 type components = Float of { bit_width : int } | Int of { bit_width : int }
 
 let to_string = function

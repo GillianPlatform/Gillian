@@ -1,0 +1,17 @@
+
+bispec load_a_ptr(x) : [[types(x : List); ((l-len x) == 2i)]]
+proc load_a_ptr(x) {
+    ptr_offset := l-nth(x, 1i);
+    ptr_label := l-nth(x, 0i);
+
+    ptr_l := [load]("i-32", ptr_label, ptr_offset);
+    ptr2_l := l-nth(ptr_l, 0i);
+
+    ptr2_label := l-nth(ptr2_l, 0i);
+    ptr2_offset := l-nth(ptr2_l, 1i);
+
+    loaded_integer := [load]("i-32", ptr2_label, ptr2_offset);
+    ret := l-nth(loaded_integer, 0i);
+
+    return
+};

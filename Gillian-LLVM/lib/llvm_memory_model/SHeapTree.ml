@@ -9,12 +9,17 @@ open SVal
 
 let log_string s = Logging.verbose (fun fmt -> fmt "SHEAPTREE CHECKING: %s" s)
 
+type missingResourceType =
+  | Unfixable
+  | Fixable of { is_store : bool; low : Expr.t; chunk : Chunk.t }
+[@@deriving show, yojson]
+
 type err =
   | UseAfterFree
   | BufferOverrun
   | InsufficientPermission of { required : Perm.t; actual : Perm.t }
   | InvalidAlignment of { alignment : int; offset : Expr.t }
-  | MissingResource
+  | MissingResource of missingResourceType
   | Unhandled of string
   | WrongMemVal
   | MemoryNotFreed
@@ -32,7 +37,8 @@ let pp_err fmt = function
   | InvalidAlignment { alignment; offset } ->
       Fmt.pf fmt "Invalid alignment: %d should divide %a" alignment Expr.pp
         offset
-  | MissingResource -> Fmt.pf fmt "MissingResource"
+  | MissingResource ty ->
+      Fmt.pf fmt "MissingResource %s" (show_missingResourceType ty)
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
   | WrongMemVal -> Fmt.pf fmt "WrongMemVal"
   | MemoryNotFreed -> Fmt.pf fmt "MemoryNotFreed"
@@ -40,7 +46,7 @@ let pp_err fmt = function
 
 let err_equal a b =
   match (a, b) with
-  | MissingResource, MissingResource -> true
+  | MissingResource ty1, MissingResource ty2 -> failwith "Not implemented"
   | UseAfterFree, UseAfterFree -> true
   | BufferOverrun, BufferOverrun -> true
   | ( InsufficientPermission { required = ra; actual = aa },
@@ -200,7 +206,7 @@ module Node = struct
     | None -> Ok ()
     | Some required -> (
         match node with
-        | NotOwned _ -> Error MissingResource
+        | NotOwned _ -> Error (MissingResource Unfixable)
         | MemVal { min_perm = actual; _ } ->
             let open Perm.Infix in
             if actual >=% required then Ok ()
@@ -208,7 +214,7 @@ module Node = struct
 
   let exact_perm = function
     | NotOwned Partially -> `KeepLooking
-    | NotOwned Totally -> `StopLooking (Error MissingResource)
+    | NotOwned Totally -> `StopLooking (Error (MissingResource Unfixable))
     | MemVal { exact_perm = None; _ } -> `KeepLooking
     | MemVal { exact_perm = Some x; _ } -> `StopLooking (Ok x)
 
@@ -387,11 +393,13 @@ module Node = struct
             | Some arr -> array arr
             | None -> lazy_value))
 
-  let decode ~chunk t =
+  let decode ~low ~chunk t =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match t with
-    | NotOwned _ -> DR.error MissingResource
+    | NotOwned Partially -> DR.error (MissingResource Unfixable)
+    | NotOwned Totally ->
+        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
     | MemVal { mem_val = Poisoned _; exact_perm; _ } -> DR.error LoadingPoison
     | MemVal { mem_val = Zeros; exact_perm; _ } ->
         DR.ok (SVal.zero_of_chunk chunk, exact_perm)
@@ -408,7 +416,7 @@ module Node = struct
     let open Delayed.Syntax in
     let open DR.Syntax in
     match t with
-    | NotOwned _ -> DR.error MissingResource
+    | NotOwned _ -> DR.error (MissingResource Unfixable)
     | MemVal { mem_val = Poisoned _; exact_perm; _ } -> DR.error LoadingPoison
     | MemVal { mem_val = Zeros; exact_perm; _ } ->
         let+ arr = SVArr.make_zeros ~chunk ~size in
@@ -718,6 +726,7 @@ module Tree = struct
       then (
         log_string "Range does equal span, replacing.";
         let++ new_tree = replace_node t in
+        log_string "Range does equal span, replacing done.";
         (t, new_tree))
       else
         match t.children with
@@ -869,7 +878,7 @@ module Tree = struct
     let node = framed.node in
     Logging.tmi (fun m ->
         m "GET_SINGLE GOT THE FOLLOWING NODE: %a" Node.pp node);
-    let++ sval, perm = Node.decode ~chunk node in
+    let++ sval, perm = Node.decode ~low ~chunk node in
     (sval, perm, tree)
 
   let prod_single
@@ -880,6 +889,7 @@ module Tree = struct
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
+    Logging.tmi (fun m -> m "PROD_SINGLE");
     let replace_node _ =
       let leaf = sval_leaf ~low ~chunk ~value:sval ~perm in
       DR.ok leaf
@@ -887,15 +897,19 @@ module Tree = struct
     let rebuild_parent = of_children in
     let range = Range.of_low_and_chunk low chunk in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
+    Logging.tmi (fun m -> m "DONE_PROD_SINGLE");
     t
 
   let load (t : t) (low : Expr.t) (chunk : Chunk.t) : (SVal.t * t, err) DR.t =
+    Logging.tmi (fun m -> m "LOADING");
     let open DR.Syntax in
     let open Perm.Infix in
     let range = Range.of_low_and_chunk low chunk in
     let replace_node node =
       match node.node with
-      | Node.NotOwned _ -> DR.error MissingResource
+      | Node.NotOwned Partially -> DR.error (MissingResource Unfixable)
+      | Node.NotOwned Totally ->
+          DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
       | MemVal { min_perm; _ } ->
           if min_perm >=% Readable then DR.ok node
           else
@@ -904,7 +918,7 @@ module Tree = struct
     in
     let rebuild_parent = with_children in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
-    let++ sval, _ = Node.decode ~chunk framed.node in
+    let++ sval, _ = Node.decode ~low ~chunk framed.node in
     (sval, tree)
 
   let store (t : t) (low : Expr.t) (chunk : Chunk.t) (sval : SVal.t) :
@@ -915,7 +929,9 @@ module Tree = struct
     let range = Range.of_low_and_chunk low chunk in
     let replace_node node =
       match node.node with
-      | NotOwned _ -> DR.error MissingResource
+      | NotOwned Totally ->
+          DR.error (MissingResource (Fixable { is_store = true; low; chunk }))
+      | NotOwned Partially -> DR.error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Writable then
             let leaf = sval_leaf ~low ~chunk ~value:sval ~perm:min_perm in
@@ -933,7 +949,7 @@ module Tree = struct
     let open Perm.Infix in
     let replace_node node =
       match node.node with
-      | NotOwned _ -> DR.error MissingResource
+      | NotOwned _ -> DR.error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Writable then DR.ok (zeros ~perm:min_perm range)
           else
@@ -949,7 +965,7 @@ module Tree = struct
     let open Perm.Infix in
     let replace_node node =
       match node.node with
-      | NotOwned _ -> DR.error MissingResource
+      | NotOwned _ -> DR.error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Writable then DR.ok (poisoned ~perm:min_perm range)
           else
@@ -975,7 +991,7 @@ module Tree = struct
           else rec_call right
     in
     if%sat Range.is_inside range span then rec_call tree
-    else DR.error MissingResource
+    else DR.error (MissingResource Unfixable)
 
   let weak_valid_pointer (tree : t) (ofs : Expr.t) : (bool, err) DR.t =
     let open Delayed.Syntax in
@@ -1001,7 +1017,7 @@ module Tree = struct
     let range = Range.make low high in
     let replace_node node =
       match node.node with
-      | NotOwned _ -> DR.error MissingResource
+      | NotOwned _ -> DR.error (MissingResource Unfixable)
       | MemVal { min_perm = Freeable; _ } -> DR.ok (rec_set_perm node)
       | MemVal { min_perm; _ } ->
           DR.error
@@ -1154,7 +1170,7 @@ let get_perm_at t ofs =
       in
       if%sat is_in_bounds then
         match root with
-        | None -> DR.error MissingResource
+        | None -> DR.error (MissingResource Unfixable)
         | Some root ->
             let++ perm = Tree.get_perm_at root ofs in
             Some perm
@@ -1172,7 +1188,7 @@ let weak_valid_pointer (t : t) (ofs : Expr.t) : (bool, err) DR.t =
       if%sat is_sure_false bounds ofs then DR.ok false
       else
         match root with
-        | None -> DR.error MissingResource
+        | None -> DR.error (MissingResource Unfixable)
         | Some root -> Tree.weak_valid_pointer root ofs)
 
 let get_bounds = function
@@ -1180,27 +1196,20 @@ let get_bounds = function
 
 let load_bounds = function
   | { bounds = Some bounds; _ } -> Ok bounds
-  | { bounds = None; _ } -> Error MissingResource
+  | { bounds = None; _ } -> Error (MissingResource Unfixable)
 
 let cons_bounds = function
-  | { bounds = Some bounds; root } -> Ok (bounds, { root; bounds = None })
-  | { bounds = None; _ } -> Error MissingResource
+  | { bounds; root } -> Ok (bounds, { root; bounds = None })
 
 let prod_bounds t bounds =
   match t with
-  | { bounds = Some bounds; root } -> Ok { root; bounds = Some bounds }
-  | { bounds = None; _ } -> Error MissingResource
+  | { bounds = _; root } -> Ok { root; bounds = Some bounds }
 
 let rem_bounds t =
   match t with
-  | { bounds = Some bounds; root } -> Ok { root; bounds = None }
-  | { bounds = None; _ } -> Error MissingResource
+  | { bounds = _; root } -> Ok { root; bounds = None }
 
-let with_root_opt t root =
-  match t with
-  | { bounds = Some bounds; _ } -> Ok { root; bounds = Some bounds }
-  | { bounds = None; _ } -> Error MissingResource
-
+let with_root_opt t root = Ok { t with root }
 let with_root t root = with_root_opt t (Some root)
 
 let alloc low high =
@@ -1212,7 +1221,7 @@ let drop_perm t low high new_perm =
   match t with
   | { bounds; root } -> (
       match root with
-      | None -> DR.error MissingResource
+      | None -> DR.error (MissingResource Unfixable)
       | Some tree ->
           let++ new_root = Tree.drop_perm tree low high new_perm in
           { root = Some new_root; bounds })
@@ -1222,12 +1231,12 @@ let is_exclusively_owned_helper t low high =
   let** bounds = DR.of_result (get_bounds t) in
   match t with
   (* Can't free something already freed *)
-  | { bounds = None; _ } -> DR.error MissingResource
+  | { bounds = None; _ } -> DR.error (MissingResource Unfixable)
   | { bounds = Some bounds; root } ->
       (* Can only free if entirely freeable *)
       if%ent Range.is_equal (low, high) bounds then
         match root with
-        | None -> DR.error MissingResource
+        | None -> DR.error (MissingResource Unfixable)
         | Some root ->
             let+* node, _ = Tree.cons_node root (low, high) in
             Result.map (fun () -> true) (Node.check_perm (Some Freeable) node)
@@ -1246,7 +1255,8 @@ let cons_single t low chunk =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None ->
+        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
     | Some root ->
         let** value, perm, root_framed = Tree.get_single root low chunk in
         let++ wroot = DR.of_result (with_root t root_framed) in
@@ -1274,7 +1284,7 @@ let get_array t low size chunk =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** array, perm, root_framed = Tree.get_array root low chunk size in
         let++ wroot = DR.of_result (with_root t root_framed) in
@@ -1285,11 +1295,11 @@ let cons_array t low size chunk =
   let open DR.Syntax in
   let range = Range.of_low_chunk_and_size low chunk size in
   match t with
-  | { bounds = None; _ } -> DR.error MissingResource
+  | { bounds = None; _ } -> DR.error (MissingResource Unfixable)
   | { bounds = Some bounds; root } ->
       if%sat is_in_bounds range (Some bounds) then
         match root with
-        | None -> DR.error MissingResource
+        | None -> DR.error (MissingResource Unfixable)
         | Some root ->
             let** array, perm, root_framed =
               Tree.cons_array root low chunk size
@@ -1319,14 +1329,14 @@ let cons_simple_mem_val ~expected_mem_val t low high =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** node, root_framed = Tree.cons_node root range in
         let res =
           match node with
           | MemVal { mem_val; exact_perm = perm; _ }
             when expected_mem_val mem_val -> Ok perm
-          | NotOwned _ -> Error MissingResource
+          | NotOwned _ -> Error (MissingResource Unfixable)
           | _ -> Error WrongMemVal
         in
         let++ wroot =
@@ -1384,7 +1394,9 @@ let load t chunk ofs =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None ->
+        DR.error
+          (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
     | Some root ->
         let** value, root = Tree.load root ofs chunk in
         let++ wroot = DR.of_result (with_root t root) in
@@ -1399,7 +1411,7 @@ let store t chunk ofs value =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** root = Tree.store root ofs chunk value in
         DR.of_result (with_root t root)
@@ -1412,7 +1424,7 @@ let zero_init t ofs size =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** root = Tree.zero_init root range in
         DR.of_result (with_root t root)
@@ -1425,7 +1437,7 @@ let poison t ofs size =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error MissingResource
+    | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** root = Tree.poison root range in
         DR.of_result (with_root t root)
@@ -1441,7 +1453,7 @@ let move dst_tree dst_ofs src_tree src_ofs size =
   if%sat is_in_bounds src_range src_span then
     let** src_root = DR.of_result (get_root src_tree) in
     match src_root with
-    | None -> DR.error MissingResource
+    | None -> DR.error (MissingResource Unfixable)
     | Some src_root ->
         let** framed, _ =
           Tree.frame_range src_root
@@ -1451,20 +1463,20 @@ let move dst_tree dst_ofs src_tree src_ofs size =
         in
         let** () =
           match framed.node with
-          | NotOwned _ -> DR.error MissingResource
+          | NotOwned _ -> DR.error (MissingResource Unfixable)
           | _ -> DR.ok ()
         in
         let** dst_span = DR.of_result (get_bounds dst_tree) in
         if%sat is_in_bounds dst_range dst_span then
           let** dst_root = DR.of_result (get_root dst_tree) in
           match dst_root with
-          | None -> DR.error MissingResource
+          | None -> DR.error (MissingResource Unfixable)
           | Some dst_root ->
               let** _, new_dst_root =
                 Tree.frame_range dst_root
                   ~replace_node:(fun current ->
                     match current.node with
-                    | NotOwned _ -> DR.error MissingResource
+                    | NotOwned _ -> DR.error (MissingResource Unfixable)
                     | _ -> DR.ok (Tree.realign framed dst_ofs))
                   ~rebuild_parent:Tree.of_children dst_range
               in

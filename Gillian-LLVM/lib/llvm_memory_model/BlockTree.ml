@@ -5,6 +5,7 @@ open Gillian.Monadic
 module DR = Delayed_result
 open SVal
 module Subst = Gillian.Symbolic.Subst
+open States
 
 module M = struct
   open LActions
@@ -76,6 +77,7 @@ module M = struct
         (s', [])
     | Load, [ Expr.Lit (String chunk_name); ofs ] ->
         let chunk = Chunk.of_string chunk_name in
+        Logging.tmi (fun m -> m "Loading");
         let** value, s' = load s chunk ofs in
         let gil_value = SVal.to_gil_expr ~chunk value in
         DR.ok (s', [ gil_value ])
@@ -108,8 +110,12 @@ module M = struct
         let perm_e = Expr.Lit (String (Perm.opt_to_string perm)) in
         DR.ok (s', [ perm_e ])
     | Bounds, [] ->
-        let++ (low, high), s' = cons_bounds s |> DR.of_result in
-        let bounds_e = Expr.EList [ low; high ] in
+        let++ bounds, s' = cons_bounds s |> DR.of_result in
+        let bounds_e =
+          match bounds with
+          | None -> Expr.Lit Null
+          | Some (low, high) -> Expr.EList [ low; high ]
+        in
         (s', [ bounds_e ])
     | _, _ -> failwith "Invalid consume call"
 
@@ -206,14 +212,34 @@ module M = struct
   let assertions tree = SHeapTree.assertions tree
 
   (** The list of assertions that aren't core predicates corresponding to the state. *)
-  let assertions_others tree : Asrt.atom list =
-    SHeapTree.assertions_others tree 
+  let assertions_others tree : Asrt.atom list = SHeapTree.assertions_others tree
+
   (** If the error can be fixed *)
-  let can_fix _ = failwith "BlockTree: can_fix not implemented"
+  let can_fix (e : err_t) =
+    match e with
+    | MissingResource _ -> true
+    | _ -> false
 
   (** Get the fixes for an error, as a list of fixes -- a fix is a list of core predicates
     to produce onto the state. *)
-  let get_fixes _ = failwith "BlockTree: get_fixes not implemented"
+  let get_fixes e =
+    Logging.tmi (fun m -> m "Getting fixes for %a" pp_err e);
+    match e with
+    | MissingResource (Fixable { is_store; low = ofs; chunk }) -> (
+        Logging.tmi (fun m -> m "Fixable");
+        let freeable_perm = Perm.to_string Perm.Freeable |> Expr.string in
+        let chunk_as_expr = Chunk.to_string chunk |> Expr.string in
+        let new_var1 = Expr.LVar (LVar.alloc ()) in
+        match chunk with
+        | IntegerChunk w ->
+            [
+              [
+                MyAsrt.CorePred
+                  (Single, [ ofs; chunk_as_expr ], [ new_var1; freeable_perm ]);
+              ];
+            ]
+        | _ -> [])
+    | _ -> []
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding predicates *)
   let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
