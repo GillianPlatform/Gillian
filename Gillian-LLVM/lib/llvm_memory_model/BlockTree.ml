@@ -226,20 +226,17 @@ module M = struct
   let get_fixes e =
     Logging.tmi (fun m -> m "Getting fixes for %a" pp_err e);
     match e with
-    | MissingResource (Fixable { is_store; low = ofs; chunk }) -> (
+    | MissingResource (Fixable { is_store; low = ofs; chunk }) ->
         Logging.tmi (fun m -> m "Fixable");
         let freeable_perm = Perm.to_string Perm.Freeable |> Expr.string in
         let chunk_as_expr = Chunk.to_string chunk |> Expr.string in
         let new_var1 = Expr.LVar (LVar.alloc ()) in
-        match chunk with
-        | IntegerChunk w ->
-            [
-              [
-                MyAsrt.CorePred
-                  (Single, [ ofs; chunk_as_expr ], [ new_var1; freeable_perm ]);
-              ];
-            ]
-        | _ -> [])
+        [
+          [
+            MyAsrt.CorePred
+              (Single, [ ofs; chunk_as_expr ], [ new_var1; freeable_perm ]);
+          ];
+        ]
     | _ -> []
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding predicates *)

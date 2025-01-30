@@ -57,7 +57,7 @@ module SVal = struct
     if Chunk.equal chunk t.chunk then
       let type_expr e1 ty =
         let open Expr.Infix in
-        Expr.BinOp (e1, Equal, Expr.typeof e1 == Expr.type_ ty)
+        Expr.BinOp (Expr.typeof e1, Equal, Expr.type_ ty)
       in
       let learned =
         match chunk with
