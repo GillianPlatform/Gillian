@@ -364,11 +364,10 @@ struct
         in
         nodes
 
-      let get_roots state =
+      let get_roots state : Map_root.t list =
         state.debug_state.roots |> Hashtbl.to_seq
-        |> Seq.fold_left
-             (fun acc (proc, id) -> String_map.add proc id acc)
-             String_map.empty
+        |> Seq.map (fun (proc, id) -> Map_root.{ name = proc; id })
+        |> List.of_seq
 
       let get_current_steps state : Map_update_event_body.Current_steps.t =
         let p, s =
@@ -426,14 +425,14 @@ struct
 
       let get_map_update state =
         let nodes = get_changed_nodes ~clear:true state in
-        let roots = Some (get_roots state) in
+        let roots = get_roots state in
         let current_steps = Some (get_current_steps state) in
         let ext = Some (get_map_ext state) in
         Map_update_event_body.make ~nodes ~roots ~current_steps ~ext ()
 
       let get_full_map state =
         let nodes = get_all_nodes state in
-        let roots = Some (get_roots state) in
+        let roots = get_roots state in
         let current_steps = Some (get_current_steps state) in
         let ext = Some (get_map_ext state) in
         Map_update_event_body.make ~reset:true ~nodes ~roots ~current_steps ~ext
