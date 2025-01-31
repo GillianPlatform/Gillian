@@ -6,6 +6,7 @@ module SVal : sig
   type t [@@deriving yojson]
 
   val make : chunk:Chunk.t -> value:Gil_syntax.Expr.t -> t
+  val create_sval : Gil_syntax.Expr.t -> t Delayed.t
   val is_concrete : t -> bool
   val pp : Format.formatter -> t -> unit
   val alocs : t -> SS.t

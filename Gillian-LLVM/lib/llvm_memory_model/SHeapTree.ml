@@ -430,9 +430,11 @@ module Node = struct
     | MemVal { mem_val = LazyValue; _ } ->
         failwith "unimplmented: decoding lazy value"
 
-  let single ~(perm : Perm.t) ~chunk (sval : SVal.t) : t =
-    let mem_val = Single sval in
-    MemVal { exact_perm = Some perm; min_perm = perm; mem_val }
+  let single ~(perm : Perm.t) ~chunk (sval : SVal.t) : t Delayed.t =
+    let open Delayed.Syntax in
+    let* encoded_sval = SVal.reencode ~chunk sval in
+    let mem_val = Single encoded_sval in
+    Delayed.return (MemVal { exact_perm = Some perm; min_perm = perm; mem_val })
 
   let array ~(perm : Perm.t) ~(chunk : Chunk.t) (sarr : SVArr.t) =
     let mem_val = Array sarr in
@@ -579,9 +581,9 @@ module Tree = struct
 
   let sval_leaf ~low ~perm ~value ~chunk =
     let open Delayed.Syntax in
-    let node = Node.single ~perm ~chunk value in
+    let* node = Node.single ~perm ~chunk value in
     let span = Range.of_low_and_chunk low chunk in
-    make ~node ~span ()
+    Delayed.return (make ~node ~span ())
 
   let sarr_leaf ~low ~perm ~size ~array ~chunk =
     let node = Node.array ~perm ~chunk array in
@@ -891,7 +893,7 @@ module Tree = struct
     let open Delayed.Syntax in
     Logging.tmi (fun m -> m "PROD_SINGLE");
     let replace_node _ =
-      let leaf = sval_leaf ~low ~chunk ~value:sval ~perm in
+      let* leaf = sval_leaf ~low ~chunk ~value:sval ~perm in
       DR.ok leaf
     in
     let rebuild_parent = of_children in
@@ -934,7 +936,7 @@ module Tree = struct
       | NotOwned Partially -> DR.error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Writable then
-            let leaf = sval_leaf ~low ~chunk ~value:sval ~perm:min_perm in
+            let* leaf = sval_leaf ~low ~chunk ~value:sval ~perm:min_perm in
             DR.ok leaf
           else
             DR.error

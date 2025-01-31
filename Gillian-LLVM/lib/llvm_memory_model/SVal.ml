@@ -16,6 +16,24 @@ module SVal = struct
   let leak t = (t.chunk, t.value)
   let is_concrete v = Expr.is_concrete v.value
 
+  let vanish_or_fail_on_none f e fail_string =
+    match e with
+    | Some e -> Delayed.return (f e)
+    | None ->
+        if !Gillian.Utils.Config.under_approximation then Delayed.vanish ()
+        else failwith fail_string
+
+  let create_sval e =
+    let open Delayed.Syntax in
+    let* runtimetype = LLVMRuntimeTypes.type_of_expr e in
+    vanish_or_fail_on_none
+      (fun runtimetype ->
+        make
+          ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype)
+          ~value:(Expr.list_nth e 1))
+      runtimetype
+      (Format.asprintf "Expression is not a valid symbolic value: %a" Expr.pp e)
+
   let reduce v =
     let open Delayed.Syntax in
     let+ value = Delayed.reduce v.value in
@@ -59,20 +77,35 @@ module SVal = struct
         let open Expr.Infix in
         Expr.BinOp (Expr.typeof e1, Equal, Expr.type_ ty)
       in
-      let learned =
+      let* learned, rtype =
         match chunk with
-        | IntegerChunk w -> [ type_expr t.value (Type.BvType w) ]
+        | IntegerChunk w ->
+            let learned = [ type_expr t.value (Type.BvType w) ] in
+            Delayed.return (learned, LLVMRuntimeTypes.Int w)
         | IntegerOrPtrChunk ->
-            [
-              Expr.BinOp
-                ( type_expr t.value (Type.BvType (Llvmconfig.ptr_width ())),
-                  Or,
-                  type_expr t.value Type.ListType );
-            ]
-        | F32 -> [ type_expr t.value Type.NumberType ]
-        | F64 -> [ type_expr t.value Type.NumberType ]
+            let* rtype = LLVMRuntimeTypes.type_of_expr t.value in
+            vanish_or_fail_on_none
+              (fun runtimetype ->
+                let learned =
+                  [
+                    type_expr t.value
+                      (LLVMRuntimeTypes.rtype_to_gil_type runtimetype);
+                  ]
+                in
+                (learned, runtimetype))
+              rtype
+              (Format.asprintf "Expression is not a valid symbolic value: %a"
+                 Expr.pp t.value)
+        | F32 ->
+            let learned = [ type_expr t.value Type.NumberType ] in
+            Delayed.return (learned, LLVMRuntimeTypes.F32)
+        | F64 ->
+            let learned = [ type_expr t.value Type.NumberType ] in
+            Delayed.return (learned, LLVMRuntimeTypes.F64)
       in
-      Delayed.return ~learned t.value
+      Delayed.return ~learned
+        (Expr.list
+           [ Expr.string (LLVMRuntimeTypes.type_to_string rtype); t.value ])
     else
       Fmt.failwith "to_gil_expr: chunk mismatch: %s vs %s"
         (Chunk.to_string chunk) (Chunk.to_string t.chunk)
