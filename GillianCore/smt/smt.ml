@@ -1123,6 +1123,7 @@ let lift_model
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
   let () = reset_solver () in
+  perform_decls ();
   let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
