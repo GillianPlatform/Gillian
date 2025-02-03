@@ -69,6 +69,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token FALSE
 %token <float> FLOAT
 %token <Z.t> INTEGER
+%token <Z.t * int> BITVECTOR
 %token NAN
 %token INFINITY
 %token <string> STRING
@@ -1224,6 +1225,7 @@ lit_target:
   | FALSE                     { Literal.Bool false }
   | FLOAT                     { Literal.Num $1 }
   | n = INTEGER               { Literal.Int n }
+  | t = BITVECTOR             { Literal.LBitvector t }
   | NAN                       { Literal.Num nan }
   | INFINITY                  { Literal.Num infinity }
   | STRING                    { Literal.String $1 }

@@ -28,6 +28,7 @@ let rec equal la lb =
   | String sl, String sr | Loc sl, Loc sr -> String.equal sl sr
   | Type tl, Type tr -> Type.equal tl tr
   | LList ll, LList lr -> List.for_all2 equal ll lr
+  | LBitvector (vl, wl), LBitvector (vr, wr) -> Z.equal vl vr && Int.equal wl wr
   | _ -> false
 
 let to_yojson = TypeDef__.literal_to_yojson
@@ -48,7 +49,7 @@ let rec pp fmt x =
   | Loc loc -> Fmt.string fmt loc
   | Type t -> Fmt.string fmt (Type.str t)
   | LList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
-  | LBitvector (v, w) -> Fmt.pf fmt "%ab%d" Z.pp_print v w
+  | LBitvector (v, w) -> Fmt.pf fmt "%av%d" Z.pp_print v w
 
 (** Typing *)
 let type_of (x : t) : Type.t =
