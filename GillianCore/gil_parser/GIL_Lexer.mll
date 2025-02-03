@@ -146,11 +146,13 @@
 }
 
 let digit = ['0'-'9']
+let hexdigit = ['0'-'9''a'-'f''A'-'F']
 let letter = ['a'-'z''A'-'Z']
 let identifier = letter(letter|digit|'_')*
 
 let float = '-'? digit+ ('.' digit*)?
 let int = '-'? digit+ 'i'
+let bv = "0x" hexdigit+ 'v' digit+
 
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
@@ -312,6 +314,11 @@ rule read = parse
                            let s_n = String.sub s 0 ((String.length s) - 1) in
                            let n = Z.of_string s_n in
                            GIL_Parser.INTEGER n }
+  | bv                   { let s = Lexing.lexeme lexbuf in
+                           let l = String.split_on_char 'v' s in
+                           let n = Z.of_string (List.nth l 0) in
+                           let w = int_of_string (List.nth l 1) in
+                           GIL_Parser.BITVECTOR (n, w) }
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                            GIL_Parser.FLOAT n }
   | '"'                  { read_string (Buffer.create 32) lexbuf }
