@@ -35,8 +35,13 @@ module Expectations = struct
   type category = Suite.category
   type info = Suite.info
 
-  let expectation (expect : matcher) _ outcome =
-    expect.finish_in_normal_mode AllOfThem outcome
+  let expectation (expect : matcher) (test : (info, string) Bulk.Test.t) outcome
+      =
+    let cat = test.category in
+    match cat with
+    | "fail" -> expect.finish_in_fail outcome
+    | "succeed" -> expect.finish_in_normal_mode AllOfThem outcome
+    | _ -> failwith "Unknown category"
 end
 
 include Alcotest_runner.AlcotestRunner.Make (Outcome) (Suite) (Expectations)

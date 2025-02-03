@@ -6,6 +6,7 @@ module Make (Outcome : Bulk.Outcome.S) = struct
       (Outcome.ParserAndCompiler.err -> bool) ->
       Outcome.t ->
       unit;
+    finish_in_fail : Outcome.t -> unit;
     fail_at_exec : Outcome.t -> unit;
     finish_in_error_mode : BranchReasoning.branches -> Outcome.t -> unit;
     finish_in_error_mode_with :

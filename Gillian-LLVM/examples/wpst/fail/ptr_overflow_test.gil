@@ -1,0 +1,12 @@
+proc main() {
+    x := fresh_svar();
+    assume_type(x, Bitvector(64i));
+    xval := {{ "int-64", x}};
+    ptr_l := [alloc](0i, 4i);
+    ptr_label := l-nth(ptr_l, 0i);
+    a := [store]("i-64", ptr_label, 0i, xval);
+    b := [load]("i-64", ptr_label, 0i);
+    value := l-nth(b, 0i);
+    ret := l-nth(value, 1i);
+    return
+};
