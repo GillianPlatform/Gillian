@@ -49,7 +49,7 @@ let rec pp fmt x =
   | Loc loc -> Fmt.string fmt loc
   | Type t -> Fmt.string fmt (Type.str t)
   | LList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
-  | LBitvector (v, w) -> Fmt.pf fmt "%av%d" Z.pp_print v w
+  | LBitvector (v, w) -> Fmt.pf fmt "0x%sv%d" (Z.format "%x" v) w
 
 (** Typing *)
 let type_of (x : t) : Type.t =

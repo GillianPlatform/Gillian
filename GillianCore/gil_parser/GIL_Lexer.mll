@@ -146,12 +146,13 @@
 }
 
 let digit = ['0'-'9']
+let hexdigit = ['0'-'9''a'-'f''A'-'F']
 let letter = ['a'-'z''A'-'Z']
 let identifier = letter(letter|digit|'_')*
 
 let float = '-'? digit+ ('.' digit*)?
 let int = '-'? digit+ 'i'
-let bv = '-'? digit+ 'v' digit+
+let bv = "0x" hexdigit+ 'v' digit+
 
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
