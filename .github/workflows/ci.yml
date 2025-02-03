@@ -55,7 +55,7 @@ jobs:
       - name: Basic tests
         run: opam exec -- dune test
       - name: Gillian-LLVM Tests
-        run: opam exec -- dune exec gillian-llvm  -- bulk-wpst Gillian-LLVM/examples
+        run: opam exec -- dune exec gillian-llvm  -- bulk-wpst Gillian-LLVM/examples/wpst
       - name: Wisl checks
         run: "opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh"
       - name: Format checking
