@@ -931,7 +931,10 @@ struct
           let args = build_args v_args params in
 
           let is_internal_proc proc_name =
-            (Prog.get_proc_exn prog.prog proc_name).proc_internal
+            Prog.get_proc prog.prog proc_name
+            |> Option.map (fun x ->
+                   let open Proc in
+                   x.proc_internal)
           in
 
           let symb_exec_proc =
@@ -959,7 +962,7 @@ struct
               (* In bi-abduction, reached max depth of recursive calls *)
               | _, _, true -> []
               (* In bi-abduction, recursive call *)
-              | true, false, _ -> symb_exec_proc ()
+              | true, Some false, _ -> symb_exec_proc ()
               (* TODO: When JS internals work
                  | true, false, false
                    when List.length
