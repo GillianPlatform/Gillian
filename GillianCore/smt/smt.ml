@@ -15,6 +15,7 @@ let z3_config =
     ("timeout", "30000");
   ]
 
+let _debug_z3 = { z3 with log = printf_log }
 let solver = new_solver z3
 let cmd s = ack_command solver s
 let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
@@ -1030,18 +1031,18 @@ let reset_solver () =
   ()
 
 let perform_decls _ =
-  let bv_decl, _ = BvLiteral.decl_data_type () in
+  let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
   let () =
     L.verbose (fun m -> m "Performing decls %a" Sexplib.Sexp.pp_hum bv_decl)
   in
-  (*let () =
-      L.verbose (fun m ->
-          m "Performing recogs %a"
-            (Fmt.list ~sep:Fmt.sp Sexplib.Sexp.pp_hum)
-            bv_recogs)
-    in*)
+  let () =
+    L.verbose (fun m ->
+        m "Performing recogs %a"
+          (Fmt.list ~sep:Fmt.sp Sexplib.Sexp.pp_hum)
+          bv_recogs)
+  in
   let decls = List.rev !init_decls in
-  [ bv_decl ] @ decls
+  (bv_decl :: bv_recogs) @ decls
   |> List.iter (fun decl ->
          L.verbose (fun m ->
              m "Performing decl %s" (Sexplib.Sexp.to_string decl));
