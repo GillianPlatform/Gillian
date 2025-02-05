@@ -28,9 +28,7 @@ module SVal = struct
     let* runtimetype = LLVMRuntimeTypes.type_of_expr e in
     vanish_or_fail_on_none
       (fun runtimetype ->
-        make
-          ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype)
-          ~value:(Expr.list_nth e 1))
+        make ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype) ~value:e)
       runtimetype
       (Format.asprintf "Expression is not a valid symbolic value: %a" Expr.pp e)
 
@@ -77,10 +75,11 @@ module SVal = struct
         let open Expr.Infix in
         Expr.BinOp (Expr.typeof e1, Equal, Expr.type_ ty)
       in
-      let* learned, rtype =
+      let* learned, _ =
+        let act_value = Expr.list_nth t.value 1 in
         match chunk with
         | IntegerChunk w ->
-            let learned = [ type_expr t.value (Type.BvType w) ] in
+            let learned = [ type_expr act_value (Type.BvType w) ] in
             Delayed.return (learned, LLVMRuntimeTypes.Int w)
         | IntegerOrPtrChunk ->
             let* rtype = LLVMRuntimeTypes.type_of_expr t.value in
@@ -88,7 +87,7 @@ module SVal = struct
               (fun runtimetype ->
                 let learned =
                   [
-                    type_expr t.value
+                    type_expr act_value
                       (LLVMRuntimeTypes.rtype_to_gil_type runtimetype);
                   ]
                 in
@@ -97,15 +96,13 @@ module SVal = struct
               (Format.asprintf "Expression is not a valid symbolic value: %a"
                  Expr.pp t.value)
         | F32 ->
-            let learned = [ type_expr t.value Type.NumberType ] in
+            let learned = [ type_expr act_value Type.NumberType ] in
             Delayed.return (learned, LLVMRuntimeTypes.F32)
         | F64 ->
-            let learned = [ type_expr t.value Type.NumberType ] in
+            let learned = [ type_expr act_value Type.NumberType ] in
             Delayed.return (learned, LLVMRuntimeTypes.F64)
       in
-      Delayed.return ~learned
-        (Expr.list
-           [ Expr.string (LLVMRuntimeTypes.type_to_string rtype); t.value ])
+      Delayed.return ~learned t.value
     else
       Fmt.failwith "to_gil_expr: chunk mismatch: %s vs %s"
         (Chunk.to_string chunk) (Chunk.to_string t.chunk)
