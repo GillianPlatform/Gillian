@@ -1031,6 +1031,9 @@ let reset_solver () =
 
 let perform_decls _ =
   let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
+  let () =
+    L.verbose (fun m -> m "Performing decls %a" Sexplib.Sexp.pp_hum bv_decl)
+  in
   let decls = List.rev !init_decls in
   (bv_decl :: bv_recogs) @ decls |> List.iter (fun decl -> cmd decl)
 

@@ -1,4 +1,4 @@
-axiomatic spec foo(x) [[(not(typeOf(x) == Int /\ (x==1i)))]] [[emp]] normal
+axiomatic spec foo(x) [[(not(typeOf(x) == Bitvector(64i) /\ (x==0x1v64)))]] [[(ret == 1i)]] normal
 
 bispec load_a_ptr(x) : [[types(x : List) * ((l-len x) == 2i)]]
 proc load_a_ptr(x) {
@@ -9,7 +9,7 @@ proc load_a_ptr(x) {
     ivalue := l-nth(ptr_l, 0i);
     assert(((l-nth(ivalue, 0i) == "int-64" /\ typeOf(l-nth(ivalue, 1i)) == Bitvector(64i))
      \/ (l-nth(ivalue, 0i) == "ptr" /\ typeOf(l-nth(ivalue, 1i)) == List)));
-    i := l-nth(ivalue, 0i);
+    i := l-nth(ivalue, 1i);
     ret := "foo"(i);
     return
 };
