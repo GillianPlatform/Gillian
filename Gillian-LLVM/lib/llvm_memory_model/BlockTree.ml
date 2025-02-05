@@ -230,14 +230,17 @@ module M = struct
         Logging.tmi (fun m -> m "Fixable");
         let freeable_perm = Perm.to_string Perm.Freeable |> Expr.string in
         let chunk_as_expr = Chunk.to_string chunk |> Expr.string in
-        let new_var1 = Expr.LVar (LVar.alloc ()) in
-        [
+        let possible_fix_types = SVal.any_of_chunk_reified chunk in
+        let make_branch (expr, learned_types) =
           [
             MyAsrt.CorePred
-              (Single, [ ofs; chunk_as_expr ], [ new_var1; freeable_perm ]);
-            MyAsrt.Types [ (new_var1, Type.ObjectType) ];
-          ];
-        ]
+              (Single, [ ofs; chunk_as_expr ], [ expr; freeable_perm ]);
+            MyAsrt.Types
+              (List.map (fun (v, t) -> (Expr.LVar v, t)) learned_types);
+          ]
+        in
+
+        List.map make_branch possible_fix_types
     | _ -> []
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding predicates *)
