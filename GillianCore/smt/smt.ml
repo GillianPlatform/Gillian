@@ -16,7 +16,7 @@ let z3_config =
   ]
 
 let _debug_z3 = { z3 with log = printf_log }
-let solver = new_solver z3
+let solver = new_solver _debug_z3
 let cmd s = ack_command solver s
 let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
 
@@ -445,7 +445,7 @@ module Encoding = struct
           | ListType -> List.construct
           | BvType w ->
               let module M = (val BvLiteral.make_mod w) in
-              M.construct
+              fun x -> Bv.construct (M.construct x)
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
