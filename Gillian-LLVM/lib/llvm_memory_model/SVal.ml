@@ -118,24 +118,29 @@ module SVal = struct
     | F32 -> make (Lit (Num 0.))
     | F64 -> make (Lit (Num 0.))
 
+  let any_of_chunk_reified (chunk : Chunk.t) :
+      (Expr.t * (string * Type.t) list) list =
+    let types = LLVMRuntimeTypes.chunk_to_type chunk in
+    let make_branch (ty : LLVMRuntimeTypes.t) =
+      let lvar = LVar.alloc () in
+      let learned_types = [ (lvar, LLVMRuntimeTypes.rtype_to_gil_type ty) ] in
+      let expr =
+        Expr.list
+          [ Expr.string (LLVMRuntimeTypes.type_to_string ty); Expr.LVar lvar ]
+      in
+      (expr, learned_types)
+    in
+    List.map make_branch types
+
   let any_of_chunk (chunk : Chunk.t) : t Delayed.t =
     let make value = make ~chunk ~value in
-    let lvar = LVar.alloc () in
-    let lvar_e = Expr.LVar lvar in
-    let learned_types, learned =
-      match chunk with
-      | IntegerChunk i ->
-          let learned_types = [ (lvar, Type.BvType i) ] in
-          (* TODO(Ian): since we already havea bv type sitting there it should be fine right?*)
-          let learned = [] in
-          (learned_types, learned)
-      | IntegerOrPtrChunk -> ([], [])
-      | F32 | F64 ->
-          let learned_types = [ (lvar, Type.NumberType) ] in
-          let learned = [] in
-          (learned_types, learned)
+    let branches =
+      any_of_chunk_reified chunk
+      |> List.map (fun (exprs, learned_types) ->
+             let learned = [] in
+             Delayed.return ~learned_types ~learned (make exprs))
     in
-    Delayed.return ~learned_types ~learned (make lvar_e)
+    Delayed.branches branches
 
   let reencode ~(chunk : Chunk.t) (v : t) =
     let open Delayed.Syntax in

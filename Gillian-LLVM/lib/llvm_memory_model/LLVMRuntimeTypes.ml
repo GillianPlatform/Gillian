@@ -11,6 +11,12 @@ let type_to_chunk = function
   | F64 -> Chunk.F64
   | Ptr -> Chunk.IntegerOrPtrChunk
 
+let chunk_to_type = function
+  | Chunk.IntegerChunk w -> [ Int w ]
+  | Chunk.F32 -> [ F32 ]
+  | Chunk.F64 -> [ F64 ]
+  | Chunk.IntegerOrPtrChunk -> [ Ptr; Int (Llvmconfig.ptr_width ()) ]
+
 let type_to_string = function
   | Int w -> "int-" ^ string_of_int w
   | F32 -> "float"

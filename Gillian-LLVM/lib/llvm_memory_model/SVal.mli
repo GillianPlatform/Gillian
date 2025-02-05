@@ -19,6 +19,7 @@ module SVal : sig
   val reduce : t -> t Monadic.Delayed.t
   val zero_of_chunk : Chunk.t -> t
   val any_of_chunk : Chunk.t -> t Monadic.Delayed.t
+  val any_of_chunk_reified : Chunk.t -> (Expr.t * (string * Type.t) list) list
   val leak : t -> Chunk.t * Expr.t
   val leak_chunk : t -> Chunk.t
   val assertions_others : t -> Asrt.atom list

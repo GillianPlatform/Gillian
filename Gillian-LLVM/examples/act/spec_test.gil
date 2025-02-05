@@ -1,0 +1,20 @@
+
+
+(*axiomatic spec foo(x) [[(not(typeOf(x) == Int /\ (x==1i)))]] [[emp]] normal
+*)
+
+bispec load_a_ptr(x) : [[types(x : List) * ((l-len x) == 2i)]]
+proc load_a_ptr(x) {
+    ptr_offset := l-nth(x, 1i);
+    ptr_label := l-nth(x, 0i);
+
+    ptr_l := [load]("i-or-ptr", ptr_label, ptr_offset);
+    assert((true));
+    (*ivalue := l-nth(ptr_l, 0i);
+    assert(((l-nth(ptr_l, 0i) == "int-64" /\ typeOf(l-nth(ptr_l, 1i)) == Int)
+     \/ (l-nth(ptr_l, 0i) == "ptr" /\ typeOf(l-nth(ptr_l, 1i)) == List)));
+    i := l-nth(ivalue, 0i);*)
+    ret := 1i;
+
+    return
+};

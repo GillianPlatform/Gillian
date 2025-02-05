@@ -235,6 +235,7 @@ module M = struct
           [
             MyAsrt.CorePred
               (Single, [ ofs; chunk_as_expr ], [ new_var1; freeable_perm ]);
+            MyAsrt.Types [ (new_var1, Type.ObjectType) ];
           ];
         ]
     | _ -> []
