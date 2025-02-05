@@ -215,17 +215,28 @@ module BvLiteral = struct
   let make_mod (width : int) =
     Variant.un (name width) (accessor width) (t_bits width)
 
+  let get_mods _ =
+    let needed_widths = !defined_bv_variants |> List.sort_uniq Int.compare in
+    L.verbose (fun m ->
+        m "BV variants: %a" (Fmt.list ~sep:Fmt.sp Fmt.int) needed_widths);
+    List.map
+      (fun x ->
+        let module S = (val make_mod x) in
+        (x, (module S : Variant.Unary)))
+      needed_widths
+
+  let make_lit_recognizers _ : (int * string) list =
+    let mods = get_mods () in
+    List.map (fun (x, (module S : Variant.Unary)) -> (x, S.recognizer)) mods
+
   let decl_data_type _ =
-    let mods =
-      List.map
-        (fun x ->
-          let module S = (val make_mod x) in
-          (module S : Variant.S))
-        (!defined_bv_variants |> List.sort_uniq Int.compare)
-    in
+    let mods = get_mods () in
     let mods_with_nop_constructor =
       let module M = (val Variant.nul "BVNoop") in
-      (module M : Variant.S) :: mods
+      (module M : Variant.S)
+      :: List.map
+           (fun (x, (module S : Variant.Unary)) -> (module S : Variant.S))
+           mods
     in
 
     create_datatype lit_name [] mods_with_nop_constructor
@@ -237,6 +248,8 @@ module Lit_operations = struct
   let gil_literal_name = "GIL_Literal"
   let t_gil_literal = atom gil_literal_name
 
+  module L = List
+  module T = Type
   module Undefined = (val nul "Undefined" : Nullary)
   module Null = (val nul "Null" : Nullary)
   module Empty = (val nul "Empty" : Nullary)
@@ -249,6 +262,13 @@ module Lit_operations = struct
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
   module Bv = (val un "Bv" "bv_value" BvLiteral.t_lit_name : Unary)
   module None = (val nul "None" : Nullary)
+
+  let bv_recognizer_name w = Printf.sprintf "GIL_BVRecognizer_%d" w
+  let recog_bv w arg = atom (bv_recognizer_name w) <| arg
+
+  let bv_guards _ =
+    let mods = BvLiteral.get_mods () in
+    L.map (fun (x, (module S : Variant.Unary)) -> (recog_bv x, T.BvType x)) mods
 
   let _ =
     mk_datatype gil_literal_name []
@@ -266,6 +286,23 @@ module Lit_operations = struct
         (module None : Variant.S);
         (module Bv : Variant.S);
       ]
+
+  let declare_bv_recognizers _ =
+    let mods = BvLiteral.get_mods () in
+    L.map
+      (fun (x, (module S : Variant.Unary)) ->
+        let name_of_candidate = "x" in
+        let candidate = atom name_of_candidate in
+        define_fun (bv_recognizer_name x)
+          [ (name_of_candidate, atom gil_literal_name) ]
+          t_bool
+          (list
+             [
+               atom "and";
+               Bv.recognize candidate;
+               S.recognize (Bv.access candidate);
+             ]))
+      mods
 end
 
 let t_gil_literal = Lit_operations.t_gil_literal
@@ -338,7 +375,9 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
-    | BvType w -> Type_operations.Bv.construct (nat_k w)
+    | BvType w ->
+        defined_bv_variants := w :: !defined_bv_variants;
+        Type_operations.Bv.construct (nat_k w)
   with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
@@ -483,7 +522,7 @@ end
 
 let typeof_simple e =
   let open Type in
-  let guards =
+  let guards_non_bv =
     Lit_operations.
       [
         (Null.recognize, NullType);
@@ -499,6 +538,8 @@ let typeof_simple e =
         (List.recognize, ListType);
       ]
   in
+  let guards_bv = Lit_operations.bv_guards () in
+  let guards = guards_non_bv @ guards_bv in
   List.fold_left
     (fun acc (guard, typ) -> ite (guard e) (encode_type typ) acc)
     (encode_type UndefinedType)
@@ -1032,6 +1073,7 @@ let reset_solver () =
 
 let perform_decls _ =
   let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
+  let bv_refined_recogs = Lit_operations.declare_bv_recognizers () in
   let () =
     L.verbose (fun m -> m "Performing decls %a" Sexplib.Sexp.pp_hum bv_decl)
   in
@@ -1042,7 +1084,7 @@ let perform_decls _ =
           bv_recogs)
   in
   let decls = List.rev !init_decls in
-  (bv_decl :: bv_recogs) @ decls
+  (bv_decl :: bv_recogs) @ decls @ bv_refined_recogs
   |> List.iter (fun decl ->
          L.verbose (fun m ->
              m "Performing decl %s" (Sexplib.Sexp.to_string decl));
