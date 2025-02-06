@@ -2567,6 +2567,10 @@ let rec reduce_formula_loop
           Eq (e, Lit (Num 0.))
       | Eq (BinOp (Lit (Int x), ITimes, e), Lit (Int z))
         when Z.equal z Z.zero && not (Z.equal x Z.zero) -> Eq (e, Expr.zero_i)
+      | Eq (lst, NOp (LstCat, [Expr.EList [ head ]; Expr.UnOp (Cdr, lst')])) when Expr.equal lst lst' ->
+        (* lst == ([head] @ (cdr lst)) *)
+          let open Formula.Infix in
+          head #== (Expr.list_nth lst 0)
       | Eq (Lit (LList ll), Lit (LList lr)) -> if ll = lr then True else False
       | Eq (EList le, Lit (LList ll)) | Eq (Lit (LList ll), EList le) ->
           if List.length ll <> List.length le then False
