@@ -1,15 +1,13 @@
-(*axiomatic spec foo(x) [[(not(typeOf(x) == Bitvector(64i) /\ (x==0x1v64)))]] [[(ret == 1i)]] normal*)
-(*axiomatic spec foo(x) [[((typeOf(x) == Bitvector(64i) /\ (x==0x1v64)))]] [[emp]] error *)
 
+axiomatic spec foo(x) [[((typeOf(x) == Bitvector(64i) /\ (x==0x1v64)))]] [[emp]] bug
 
-bispec foo(x) : [[emp]]
+bispec foo(x) : [[((typeOf(x) == Bitvector(64i) /\ (x==0x2v64)))]]
 proc foo(x) {
-    assert((typeOf(x) == Bitvector(64i) \/ not(typeOf(x) == Bitvector(64i))));
     ret := 1i;
     return
 };
 
-(*
+
 bispec load_a_ptr(x) : [[types(x : List) * ((l-len x) == 2i)]]
 proc load_a_ptr(x) {
     ptr_offset := l-nth(x, 1i);
@@ -22,4 +20,4 @@ proc load_a_ptr(x) {
     i := l-nth(ivalue, 1i);
     ret := "foo"(i);
     return
-};*)
+};

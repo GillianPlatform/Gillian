@@ -231,6 +231,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token VARIANT
 %token NORMAL
 %token ERROR
+%token BUG
 %token FAIL
 %token TRUSTED
 (* Procedure definition keywords *)
@@ -839,6 +840,7 @@ g_mult_spec_line:
 g_spec_kind:
   | NORMAL { Flag.Normal }
   | ERROR { Flag.Error }
+  | BUG { Flag.Bug }
 
 g_sspec_target:
 (* {trusted} [spec_name: #bla, #ble, #bli] [[ .... ]] [[ .... ]] flag *)

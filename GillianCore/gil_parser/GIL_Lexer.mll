@@ -134,6 +134,7 @@
         "normal",       GIL_Parser.NORMAL;
         "error",        GIL_Parser.ERROR;
         "fail",         GIL_Parser.FAIL;
+        "bug",          GIL_Parser.BUG;
         "trusted",      GIL_Parser.TRUSTED;
 
         (* Procedure definition keywords *)
