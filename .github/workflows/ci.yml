@@ -171,7 +171,10 @@ jobs:
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: install CBMC
-        run: sudo apt install cbmc -y
+        run: |
+          curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb
+          sudo dpkg -i cbmc.deb
+          rm cbmc.deb
       - name: Checkout project
         uses: actions/checkout@v3
         with:
