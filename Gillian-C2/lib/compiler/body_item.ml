@@ -1,4 +1,5 @@
 open Gil_syntax
+open Utils
 
 type t = C2_annot.t * string option * string Cmd.t [@@deriving eq]
 

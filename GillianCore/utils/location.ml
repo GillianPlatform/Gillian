@@ -1,3 +1,5 @@
+(** Representation of a location in a source file *)
+
 type position = { pos_line : int; pos_column : int } [@@deriving yojson, eq]
 
 type t = { loc_start : position; loc_end : position; loc_source : string }
