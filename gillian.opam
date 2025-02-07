@@ -12,7 +12,7 @@ depends: [
   "ocaml" {>= "5.1.0"}
   "alcotest" {= "1.0.1"}
   "cmdliner" {>= "1.1.1"}
-  "dap" {= "1.0.6"}
+  "sedap"
   "fmt" {>= "0.8.8"}
   "memtrace" {= "0.2.3"}
   "menhir" {= "20231231"}
@@ -44,5 +44,6 @@ build: [
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
 pin-depends: [
-  "simple_smt.~dev" "git+https://github.com/NatKarmios/simple-smt-ocaml#94a891e7fb552ecaff57bbe5b9f4e4e5c1aed145"
+  ["simple_smt.~dev" "git+https://github.com/NatKarmios/simple-smt-ocaml#94a891e7fb552ecaff57bbe5b9f4e4e5c1aed145"]
+  ["sedap.~dev" "git+https://github.com/GillianPlatform/ocaml-sedap#1946f1e263cde969952b64dfa314860c33251420"]
 ]

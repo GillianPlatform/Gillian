@@ -1,4 +1,4 @@
-open Debug_protocol_ext
+open Protocol
 
 (**/**)
 
@@ -7,9 +7,7 @@ module DL = Debugger_log
 (**/**)
 
 module Make (Debugger : Debugger.S) = struct
-  open Custom_events (Debugger)
-
-  let run launch_args dbg rpc =
+  let run { launch_args; dbg; rpc; send_stopped_events; _ } =
     let promise, resolver = Lwt.task () in
     Lwt.pause ();%lwt
     let send_initialize_event () =
@@ -34,7 +32,7 @@ module Make (Debugger : Debugger.S) = struct
                 Stopped_event.Payload.(
                   make ~reason:Stopped_event.Payload.Reason.Exception
                     ~thread_id:(Some 0) ())
-          | reason -> send_stopped_events dbg rpc reason
+          | reason -> send_stopped_events reason
         else
           Debug_rpc.send_event rpc
             (module Stopped_event)

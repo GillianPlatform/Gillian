@@ -3,7 +3,7 @@ open WSyntax
 open Gil_syntax
 module L = Logging
 module DL = Debugger_log
-module Exec_map = Debugger.Utils.Exec_map
+open Debugger.Utils
 open Syntaxes.Option
 open Syntaxes.Result_of_option
 open Utils
@@ -82,7 +82,7 @@ struct
     id : id;
     all_ids : id list;
     display : string;
-    matches : matching list;
+    matches : Match_map.matching list;
     errors : string list;
     submap : id submap;
     loc : string * int;
@@ -118,7 +118,7 @@ struct
       all_ids : (id * (Branch_case.kind option * Branch_case.case)) Ext_list.t;
       unexplored_paths : (id * Gil_branch_case.t option) Stack.t;
       ends : (Branch_case.case * branch_data) Ext_list.t;
-      matches : matching Ext_list.t;
+      matches : Match_map.matching Ext_list.t;
       errors : string Ext_list.t;
       mutable canonical_data : canonical_cmd_data option;
       mutable nest_kind : nest_kind option;
@@ -148,7 +148,7 @@ struct
       id : id;
       all_ids : id list;
       display : string;
-      matches : matching list;
+      matches : Match_map.matching list;
       errors : string list;
       next_kind : (Branch_case.t, branch_data) next_kind;
       submap : id submap;
@@ -496,6 +496,31 @@ struct
 
   let dump = to_yojson
 
+  let package_case case =
+    let json = Branch_case.to_yojson case in
+    let display = Branch_case.display case in
+    (json, display)
+
+  let package_data { id; all_ids; display; matches; errors; submap; _ } =
+    Packaged.{ id; all_ids; display; matches; errors; submap }
+
+  let package_node { data : cmd_data; next } =
+    let data = package_data data in
+    let next =
+      match next with
+      | None -> None
+      | Some (Single (next, _)) -> Some (Single (next, ""))
+      | Some (Branch nexts) ->
+          let nexts =
+            nexts
+            |> List.map (fun (case, (next, _)) ->
+                   let case, bdata = package_case case in
+                   (case, (next, bdata)))
+          in
+          Some (Branch nexts)
+    in
+    { data; next }
+
   module Insert_new_cmd = struct
     let failwith ~state ~finished_partial msg =
       DL.failwith
@@ -530,11 +555,19 @@ struct
                     pp_id caller_id
             in
             match new_next with
-            | Ok next -> ({ node with next }, Ok ())
+            | Ok next ->
+                let node = { node with next } in
+                (node, Ok node)
             | Error e -> (node, Error e))
       in
       match result with
-      | Some r -> r
+      | Some r ->
+          let++ new_node = r in
+          let () =
+            Effect.perform
+              (Node_updated (caller_id, Some (package_node new_node)))
+          in
+          ()
       | None ->
           Fmt.error "update_caller_branches - caller %a not found" pp_id
             caller_id
@@ -605,43 +638,58 @@ struct
       { data; next }
 
     let insert_as_next ~state ~prev_id ?case new_id =
-      map_node_extra_exn state.map prev_id (fun prev ->
-          let new_next =
-            let** next =
-              match prev.next with
-              | Some next -> Ok next
-              | None -> Error "trying to insert next of final cmd!"
+      let++ new_prev =
+        map_node_extra_exn state.map prev_id (fun prev ->
+            let new_next =
+              let** next =
+                match prev.next with
+                | Some next -> Ok next
+                | None -> Error "trying to insert next of final cmd!"
+              in
+              match (next, case) with
+              | Single _, Some _ ->
+                  Error "trying to insert to non-branch cmd with branch"
+              | Branch _, None ->
+                  Error "trying to insert to branch cmd with no branch"
+              | Single (Some _, _), _ -> Error "duplicate insertion"
+              | Single (None, bdata), None ->
+                  Ok (Some (Single (Some new_id, bdata)))
+              | Branch nexts, Some case -> (
+                  match List.assoc_opt case nexts with
+                  | None -> Error "case not found"
+                  | Some (Some _, _) -> Error "duplicate insertion"
+                  | Some (None, bdata) ->
+                      let nexts =
+                        List_utils.assoc_replace case (Some new_id, bdata) nexts
+                      in
+                      Ok (Some (Branch nexts)))
             in
-            match (next, case) with
-            | Single _, Some _ ->
-                Error "trying to insert to non-branch cmd with branch"
-            | Branch _, None ->
-                Error "trying to insert to branch cmd with no branch"
-            | Single (Some _, _), _ -> Error "duplicate insertion"
-            | Single (None, bdata), None ->
-                Ok (Some (Single (Some new_id, bdata)))
-            | Branch nexts, Some case -> (
-                match List.assoc_opt case nexts with
-                | None -> Error "case not found"
-                | Some (Some _, _) -> Error "duplicate insertion"
-                | Some (None, bdata) ->
-                    let nexts =
-                      List_utils.assoc_replace case (Some new_id, bdata) nexts
-                    in
-                    Ok (Some (Branch nexts)))
-          in
-          match new_next with
-          | Ok next -> ({ prev with next }, Ok ())
-          | Error e ->
-              (prev, Fmt.error "insert_as_next (%a) - %s" pp_id prev_id e))
+            match new_next with
+            | Ok next ->
+                let prev = { prev with next } in
+                (prev, Ok prev)
+            | Error e ->
+                (prev, Fmt.error "insert_as_next (%a) - %s" pp_id prev_id e))
+      in
+      let () =
+        Effect.perform (Node_updated (prev_id, Some (package_node new_prev)))
+      in
+      ()
 
     let insert_as_submap ~state ~parent_id new_id =
-      map_node_extra_exn state.map parent_id (fun parent ->
-          match parent.data.submap with
-          | Proc _ | Submap _ -> (parent, Error "duplicate submaps!")
-          | NoSubmap ->
-              let data = { parent.data with submap = Submap new_id } in
-              ({ parent with data }, Ok ()))
+      let++ parent =
+        map_node_extra_exn state.map parent_id (fun parent ->
+            match parent.data.submap with
+            | Proc _ | Submap _ -> (parent, Error "duplicate submaps!")
+            | NoSubmap ->
+                let data = { parent.data with submap = Submap new_id } in
+                let parent = { parent with data } in
+                (parent, Ok parent))
+      in
+      let () =
+        Effect.perform (Node_updated (parent_id, Some (package_node parent)))
+      in
+      ()
 
     let insert_to_empty_map ~state ~prev ~stack_direction new_cmd =
       let- () =
@@ -698,6 +746,9 @@ struct
         let new_cmd = make_new_cmd ~func_return_label finished_partial in
         let** new_cmd = insert_cmd ~state ~prev ~stack_direction new_cmd in
         let () = insert state.map ~id ~all_ids new_cmd in
+        let () =
+          Effect.perform (Node_updated (id, Some (package_node new_cmd)))
+        in
         Ok new_cmd
       in
       Result_utils.or_else (failwith ~state ~finished_partial) r
@@ -779,36 +830,6 @@ struct
   end
 
   let init_or_handle = Init_or_handle.f
-  let get_gil_map _ = failwith "get_gil_map: not implemented!"
-
-  let package_case case =
-    let json = Branch_case.to_yojson case in
-    let display = Branch_case.display case in
-    (json, display)
-
-  let package_data { id; all_ids; display; matches; errors; submap; _ } =
-    Packaged.{ id; all_ids; display; matches; errors; submap }
-
-  let package_node { data : cmd_data; next } =
-    let data = package_data data in
-    let next =
-      match next with
-      | None -> None
-      | Some (Single (next, _)) -> Some (Single (next, ""))
-      | Some (Branch nexts) ->
-          let nexts =
-            nexts
-            |> List.map (fun (case, (next, _)) ->
-                   let case, bdata = package_case case in
-                   (case, (next, bdata)))
-          in
-          Some (Branch nexts)
-    in
-    { data; next }
-
-  let package = Packaged.package Fun.id package_node
-  let get_lifted_map_exn { map; _ } = package map
-  let get_lifted_map state = Some (get_lifted_map_exn state)
   let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 

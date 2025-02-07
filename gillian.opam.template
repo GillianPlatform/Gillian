@@ -1,3 +1,4 @@
 pin-depends: [
-  "simple_smt.~dev" "git+https://github.com/NatKarmios/simple-smt-ocaml#94a891e7fb552ecaff57bbe5b9f4e4e5c1aed145"
+  ["simple_smt.~dev" "git+https://github.com/NatKarmios/simple-smt-ocaml#94a891e7fb552ecaff57bbe5b9f4e4e5c1aed145"]
+  ["sedap.~dev" "git+https://github.com/GillianPlatform/ocaml-sedap#1946f1e263cde969952b64dfa314860c33251420"]
 ]

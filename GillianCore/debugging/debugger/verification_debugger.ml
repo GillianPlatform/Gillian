@@ -106,12 +106,12 @@ struct
         in
         match match_ with
         | None -> []
-        | Some (id, kind, result) -> [ Exec_map.{ id; kind; result } ]
+        | Some (id, kind, result) -> [ Match_map.{ id; kind; result } ]
 
       let match_final_cmd prev_id ~proc_name result debug_state =
         match f result proc_name prev_id debug_state with
         | None -> []
-        | Some (id, kind, result) -> [ Exec_map.{ id; kind; result } ]
+        | Some (id, kind, result) -> [ Match_map.{ id; kind; result } ]
 
       let get_match_map match_id debug_state =
         let ext = debug_state.ext in

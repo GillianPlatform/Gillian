@@ -9,3 +9,4 @@ let next =
 
 let equal = Int64.equal
 let pp = Fmt.int64
+let of_string_opt = Int64.of_string_opt

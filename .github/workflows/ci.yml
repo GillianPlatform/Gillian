@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Installing Python prerequisites
@@ -91,7 +91,7 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Checkout project
@@ -129,7 +129,7 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Checkout project
@@ -167,11 +167,14 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: install CBMC
-        run: sudo apt install cbmc -y
+        run: |
+          curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb
+          sudo dpkg -i cbmc.deb
+          rm cbmc.deb
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -205,7 +208,7 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Checkout project
@@ -239,7 +242,7 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: checkout project
@@ -274,7 +277,7 @@ jobs:
   #       uses: cda-tum/setup-z3@v1
   #       env:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #     - uses: ocaml/setup-ocaml@v2
+  #     - uses: ocaml/setup-ocaml@v3
   #       with:
   #         ocaml-compiler: "ocaml-variants.5.2.0+options"
   #     - name: Checkout project

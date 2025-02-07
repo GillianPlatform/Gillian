@@ -346,7 +346,7 @@ module Make (State : SState.S) :
 
     let open Res_list.Syntax in
     let open Syntaxes.List in
-    let res = SMatcher.match_ astate' subst mp FunctionCall in
+    let res = SMatcher.match_ astate' subst mp (FunctionCall name) in
     if List.find_opt Result.is_error res |> Option.is_some then
       L.normal (fun m ->
           m "WARNING: Failed to match against the precondition of procedure %s"

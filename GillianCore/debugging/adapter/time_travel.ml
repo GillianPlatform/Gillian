@@ -1,4 +1,4 @@
-open Debug_protocol_ext
+open Protocol
 
 (**/**)
 
@@ -7,11 +7,7 @@ module DL = Debugger_log
 (**/**)
 
 module Make (Debugger : Debugger.S) = struct
-  open Custom_events (Debugger)
-  open Custom_commands (Debugger)
-
-  let run dbg rpc =
-    let send_stopped_events = send_stopped_events dbg rpc in
+  let run { dbg; rpc; send_stopped_events; _ } =
     let promise, _ = Lwt.task () in
     Lwt.pause ();%lwt
     DL.set_rpc_command_handler rpc ~name:"Continue"
@@ -47,33 +43,29 @@ module Make (Debugger : Debugger.S) = struct
         send_stopped_events stop_reason);
     DL.set_rpc_command_handler rpc ~name:"Jump"
       (module Jump_command)
-      (fun { id } ->
+      (fun { step_id } ->
+        let id =
+          match Logging.Report_id.of_string_opt step_id with
+          | Some id -> id
+          | None -> raise (Failure "Invalid step id")
+        in
         match dbg |> Debugger.jump_to_id id with
-        | Error e ->
-            Lwt.return
-              (Jump_command.Result.make ~success:false ~err:(Some e) ())
+        | Error e -> raise (Failure e)
         | Ok () ->
             send_stopped_events Step;%lwt
-            Lwt.return (Jump_command.Result.make ~success:true ()));
+            Lwt.return ());
     DL.set_rpc_command_handler rpc ~name:"Step specific"
       (module Step_specific_command)
-      (fun { prev_id; branch_case } ->
+      (fun { step_id; branch_case } ->
+        let prev_id =
+          match Logging.Report_id.of_string_opt step_id with
+          | Some id -> id
+          | None -> raise (Failure "Invalid step id")
+        in
         match dbg |> Debugger.step_specific branch_case prev_id with
-        | Error e ->
-            Lwt.return
-              (Step_specific_command.Result.make ~success:false ~err:(Some e) ())
+        | Error e -> raise (Failure e)
         | Ok stop_reason ->
             send_stopped_events stop_reason;%lwt
-            Lwt.return (Step_specific_command.Result.make ~success:true ()));
-    DL.set_rpc_command_handler rpc ~name:"Start proc"
-      (module Start_proc_command)
-      (fun { proc_name } ->
-        match dbg |> Debugger.start_proc proc_name with
-        | Error e ->
-            Lwt.return
-              (Start_proc_command.Result.make ~success:false ~err:(Some e) ())
-        | Ok stop_reason ->
-            send_stopped_events stop_reason;%lwt
-            Lwt.return (Start_proc_command.Result.make ~success:true ()));
+            Lwt.return ());
     Lwt.join [ promise ]
 end

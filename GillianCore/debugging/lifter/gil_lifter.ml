@@ -23,7 +23,7 @@ functor
     type cmd_data = {
       id : id;
       display : string;
-      matches : matching list;
+      matches : Match_map.matching list;
       errors : string list;
       submap : id submap;
       branch_path : branch_path;
@@ -62,6 +62,39 @@ functor
       let head = List.hd cs in
       head.pid
 
+    let package_node { data : cmd_data; next } =
+      let data =
+        Packaged.
+          {
+            id = data.id;
+            all_ids = [ data.id ];
+            display = data.display;
+            matches = data.matches;
+            errors = data.errors;
+            submap = data.submap;
+          }
+      in
+      let next =
+        match next with
+        | Some (Single (next, ())) -> Some (Single (next, ""))
+        | Some (Branch nexts) ->
+            let nexts =
+              List.map
+                (fun (case, (next, ())) ->
+                  let case, bdata = Packaged.package_gil_case case in
+                  (case, (next, bdata)))
+                nexts
+            in
+            Some (Branch nexts)
+        | None -> None
+      in
+      { data; next }
+
+    let insert_cmd map id node =
+      let () = Effect.perform (Node_updated (id, Some (package_node node))) in
+      let () = Hashtbl.replace map.entries id (Node node) in
+      ()
+
     let new_cmd
         ?(submap = NoSubmap)
         ~parent
@@ -97,7 +130,7 @@ functor
         | Zero -> None
       in
       let node = { data; next } in
-      Hashtbl.replace map.entries id (Node node);
+      let () = insert_cmd map id node in
       node
 
     let should_skip_cmd (exec_data : cmd_report executed_cmd_data) state : bool
@@ -155,47 +188,12 @@ functor
         | None -> failwith "can't insert to final cmd"
       in
       let prev' = { prev with next = Some new_next } in
-      let () = Hashtbl.replace map.entries prev.data.id (Node prev') in
+      let () = insert_cmd map prev.data.id prev' in
       new_cmd
 
     let handle_cmd prev_id branch_case exec_data state =
       let _ = consume_cmd prev_id branch_case exec_data state in
       ()
-
-    let package_node { data : cmd_data; next } =
-      let data =
-        Packaged.
-          {
-            id = data.id;
-            all_ids = [ data.id ];
-            display = data.display;
-            matches = data.matches;
-            errors = data.errors;
-            submap = data.submap;
-          }
-      in
-      let next =
-        match next with
-        | Some (Single (next, ())) -> Some (Single (next, ""))
-        | Some (Branch nexts) ->
-            let nexts =
-              List.map
-                (fun (case, (next, ())) ->
-                  let case, bdata = Packaged.package_gil_case case in
-                  (case, (next, bdata)))
-                nexts
-            in
-            Some (Branch nexts)
-        | None -> None
-      in
-      { data; next }
-
-    let package = Packaged.package Fun.id package_node
-    let get_gil_map state = package state.map
-    let get_lifted_map _ = None
-
-    let get_lifted_map_exn _ =
-      failwith "get_lifted_map not implemented for GIL lifter"
 
     let get_matches_at_id id state = (get_exn state.map id).data.matches
     let path_of_id id state = (get_exn state.map id).data.branch_path

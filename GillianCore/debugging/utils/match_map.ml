@@ -74,7 +74,12 @@ functor
             "Match_map.build_seg: report %a (child of assertion %a) has type \
              %s (expected %s)!"
             L.Report_id.pp child_id L.Report_id.pp id type_ Content_type.match_;
-        (child_id, result_of_id child_id)
+        let p =
+          match asrt_report.step with
+          | Pred (p, _), _ -> p
+          | _ -> assertion
+        in
+        { id = child_id; kind = Fold p; result = result_of_id child_id }
       in
       { id; fold; assertion; substitutions }
 

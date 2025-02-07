@@ -1,6 +1,5 @@
 include Gil_fallback_lifter_intf
 open Lifter
-open Syntaxes.Option
 
 module Make : Make =
 functor
@@ -53,16 +52,6 @@ functor
           -> cmd_report executed_cmd_data Effect.t
 
     let dump = to_yojson
-    let get_gil_map state = state.gil |> Gil_lifter.get_gil_map
-
-    let get_lifted_map state =
-      let* tl = state.tl in
-      tl |> TLLifter.get_lifted_map
-
-    let get_lifted_map_exn state =
-      match get_lifted_map state with
-      | None -> failwith "Can't get lifted map!"
-      | Some map -> map
 
     let get_matches_at_id id { gil; tl; _ } =
       match tl with

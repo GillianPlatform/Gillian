@@ -7,6 +7,7 @@
   str
   fmt.tty
   engine
+  sedap.types
   gil_syntax
   incrementalAnalysis
   logging

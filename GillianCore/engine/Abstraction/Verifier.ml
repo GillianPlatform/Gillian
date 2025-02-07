@@ -425,7 +425,7 @@ struct
         m "Analyse result: About to match one postcondition of %s. post: %a"
           test.name MP.pp test.post_mp);
     let matching_result =
-      SPState.matches state subst test.post_mp Matcher.Postcondition
+      SPState.matches state subst test.post_mp (Postcondition test.name)
     in
     L.normal (fun m ->
         m "Analysis result: Postcondition %a"
