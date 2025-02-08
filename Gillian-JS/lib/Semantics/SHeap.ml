@@ -4,18 +4,24 @@ open Gillian.Gil_syntax
 open Javert_utils
 module SSubst = Gillian.Symbolic.Subst
 module L = Logging
+module LocSet = Id.Sets.LocSet
+
+type loc_t = Id.any_loc Id.t
+
+let loc_t_of_yojson = Id.of_yojson'
+let loc_t_to_yojson = Id.to_yojson'
 
 type s_object = (SFVL.t * Expr.t option) * Expr.t option
 
 type t = {
-  cfvl : (string, SFVL.t) Hashtbl.t;
-  cdom : (string, Expr.t option) Hashtbl.t;
-  cmet : (string, Expr.t option) Hashtbl.t;
-  sfvl : (string, SFVL.t) Hashtbl.t;
-  sdom : (string, Expr.t option) Hashtbl.t;
-  smet : (string, Expr.t option) Hashtbl.t;
-  cdmn : SS.t ref;
-  sdmn : SS.t ref;
+  cfvl : (loc_t, SFVL.t) Hashtbl.t;
+  cdom : (loc_t, Expr.t option) Hashtbl.t;
+  cmet : (loc_t, Expr.t option) Hashtbl.t;
+  sfvl : (loc_t, SFVL.t) Hashtbl.t;
+  sdom : (loc_t, Expr.t option) Hashtbl.t;
+  smet : (loc_t, Expr.t option) Hashtbl.t;
+  cdmn : LocSet.t ref;
+  sdmn : LocSet.t ref;
 }
 [@@deriving yojson]
 
@@ -31,30 +37,30 @@ let merge (a : 't option) (b : 't option) (f : 't -> 't -> 't) : 't option =
   | None, b -> b
   | Some a, Some b -> Some (f a b)
 
-let get_fvl (heap : t) (loc : string) : SFVL.t option =
+let get_fvl (heap : t) (loc : loc_t) : SFVL.t option =
   let cfvl = Hashtbl.find_opt heap.cfvl loc in
   let sfvl = Hashtbl.find_opt heap.sfvl loc in
   merge cfvl sfvl SFVL.union
 
-let get_dom (heap : t) (loc : string) : Expr.t option =
+let get_dom (heap : t) (loc : loc_t) : Expr.t option =
   let cdom = Option.value ~default:None (Hashtbl.find_opt heap.cdom loc) in
   let sdom = Option.value ~default:None (Hashtbl.find_opt heap.sdom loc) in
   merge cdom sdom (fun _ _ ->
       raise
         (Failure "Domain in both the concrete and symbolic part of the heap."))
 
-let get_met (heap : t) (loc : string) : Expr.t option =
+let get_met (heap : t) (loc : loc_t) : Expr.t option =
   let cmet = Option.value ~default:None (Hashtbl.find_opt heap.cmet loc) in
   let smet = Option.value ~default:None (Hashtbl.find_opt heap.smet loc) in
   merge cmet smet (fun _ _ ->
       raise
         (Failure "MetaData in both the concrete and symbolic part of the heap."))
 
-let set_fvl (heap : t) (loc : string) (fvl : SFVL.t) : unit =
+let set_fvl (heap : t) (loc : loc_t) (fvl : SFVL.t) : unit =
   Hashtbl.remove heap.cfvl loc;
   Hashtbl.remove heap.sfvl loc;
-  heap.cdmn := Var.Set.remove loc !(heap.cdmn);
-  heap.sdmn := Var.Set.remove loc !(heap.sdmn);
+  heap.cdmn := LocSet.remove loc !(heap.cdmn);
+  heap.sdmn := LocSet.remove loc !(heap.sdmn);
 
   let cfvl, sfvl =
     SFVL.partition (fun prop value -> is_c value && is_c prop) fvl
@@ -63,22 +69,22 @@ let set_fvl (heap : t) (loc : string) (fvl : SFVL.t) : unit =
   | true, true ->
       Hashtbl.replace heap.cfvl loc SFVL.empty;
       Hashtbl.remove heap.sfvl loc;
-      heap.cdmn := Var.Set.add loc !(heap.cdmn)
+      heap.cdmn := LocSet.add loc !(heap.cdmn)
   | true, false ->
       Hashtbl.remove heap.cfvl loc;
       Hashtbl.replace heap.sfvl loc sfvl;
-      heap.cdmn := Var.Set.add loc !(heap.cdmn)
+      heap.cdmn := LocSet.add loc !(heap.cdmn)
   | false, true ->
       Hashtbl.replace heap.cfvl loc cfvl;
       Hashtbl.remove heap.sfvl loc;
-      heap.sdmn := Var.Set.add loc !(heap.sdmn)
+      heap.sdmn := LocSet.add loc !(heap.sdmn)
   | false, false ->
       Hashtbl.replace heap.cfvl loc cfvl;
       Hashtbl.replace heap.sfvl loc sfvl;
-      heap.cdmn := Var.Set.add loc !(heap.cdmn);
-      heap.sdmn := Var.Set.add loc !(heap.sdmn)
+      heap.cdmn := LocSet.add loc !(heap.cdmn);
+      heap.sdmn := LocSet.add loc !(heap.sdmn)
 
-let set_dom (heap : t) (loc : string) (dom : Expr.t option) : unit =
+let set_dom (heap : t) (loc : loc_t) (dom : Expr.t option) : unit =
   Hashtbl.remove heap.cdom loc;
   Hashtbl.remove heap.sdom loc;
   let add, rem =
@@ -89,7 +95,7 @@ let set_dom (heap : t) (loc : string) (dom : Expr.t option) : unit =
   Hashtbl.replace add loc dom;
   Hashtbl.remove rem loc
 
-let set_met (heap : t) (loc : string) (met : Expr.t option) : unit =
+let set_met (heap : t) (loc : loc_t) (met : Expr.t option) : unit =
   Hashtbl.remove heap.cmet loc;
   Hashtbl.remove heap.smet loc;
   let add, rem =
@@ -115,24 +121,24 @@ let init () : t =
     sdom = Hashtbl.create big_tbl_size;
     cmet = Hashtbl.create big_tbl_size;
     smet = Hashtbl.create big_tbl_size;
-    cdmn = ref SS.empty;
-    sdmn = ref SS.empty;
+    cdmn = ref LocSet.empty;
+    sdmn = ref LocSet.empty;
   }
 
 (** Symbolic heap read heap(loc) *)
-let get (heap : t) (loc : string) : s_object option =
+let get (heap : t) (loc : loc_t) : s_object option =
   Option.map
     (fun sfvl -> ((sfvl, get_dom heap loc), get_met heap loc))
     (get_fvl heap loc)
 
 (** Symbolic heap read heap(loc) with the normal new obj default *)
-let get_with_default (heap : t) (loc : string) : s_object =
+let get_with_default (heap : t) (loc : loc_t) : s_object =
   Option.value ~default:((SFVL.empty, None), None) (get heap loc)
 
 (** Symbolic heap set heap(loc) is assigned to fv_list *)
 let set
     (heap : t)
-    (loc : string)
+    (loc : loc_t)
     (fv_list : SFVL.t)
     (dom : Expr.t option)
     (metadata : Expr.t option) : unit =
@@ -141,10 +147,10 @@ let set
   set_met heap loc metadata
 
 (** Symbolic heap put heap (loc, (perm, field)) is assigned to value *)
-let set_fv_pair (heap : t) (loc : string) (field : Expr.t) (value : Expr.t) :
+let set_fv_pair (heap : t) (loc : loc_t) (field : Expr.t) (value : Expr.t) :
     unit =
-  heap.cdmn := Var.Set.remove loc !(heap.cdmn);
-  heap.sdmn := Var.Set.remove loc !(heap.sdmn);
+  heap.cdmn := LocSet.remove loc !(heap.cdmn);
+  heap.sdmn := LocSet.remove loc !(heap.sdmn);
   let add, sadd, rem =
     if is_c field && is_c value then (heap.cfvl, heap.cdmn, heap.sfvl)
     else (heap.sfvl, heap.sdmn, heap.cfvl)
@@ -157,14 +163,14 @@ let set_fv_pair (heap : t) (loc : string) (field : Expr.t) (value : Expr.t) :
     SFVL.remove field
       (Option.value ~default:SFVL.empty (Hashtbl.find_opt rem loc))
   in
-  sadd := Var.Set.add loc !sadd;
+  sadd := LocSet.add loc !sadd;
   Hashtbl.replace add loc fvadd;
   if fvrem = SFVL.empty then Hashtbl.remove rem loc
   else Hashtbl.replace rem loc fvrem
 
 let init_object
     (heap : t)
-    (loc : string)
+    (loc : loc_t)
     ?is_empty:(ie = false)
     (mtdt : Expr.t option) : unit =
   if Hashtbl.mem heap.cfvl loc || Hashtbl.mem heap.sfvl loc then
@@ -173,24 +179,24 @@ let init_object
     let dom : Expr.t option = if ie then None else Some (ESet []) in
     set heap loc SFVL.empty dom mtdt
 
-let has_loc (heap : t) (loc : string) : bool =
+let has_loc (heap : t) (loc : loc_t) : bool =
   Hashtbl.mem heap.cfvl loc || Hashtbl.mem heap.sfvl loc
 
 (** Removes the fv-list associated with --loc-- in --heap-- *)
-let remove (heap : t) (loc : string) : unit =
+let remove (heap : t) (loc : loc_t) : unit =
   Hashtbl.remove heap.cfvl loc;
   Hashtbl.remove heap.sfvl loc;
   Hashtbl.remove heap.cdom loc;
   Hashtbl.remove heap.sdom loc;
   Hashtbl.remove heap.cmet loc;
   Hashtbl.remove heap.smet loc;
-  heap.cdmn := Var.Set.remove loc !(heap.cdmn);
-  heap.sdmn := Var.Set.remove loc !(heap.sdmn)
+  heap.cdmn := LocSet.remove loc !(heap.cdmn);
+  heap.sdmn := LocSet.remove loc !(heap.sdmn)
 
 (** Retrieves the domain of --heap-- *)
-let domain (heap : t) : SS.t = SS.union !(heap.cdmn) !(heap.sdmn)
+let domain (heap : t) : LocSet.t = LocSet.union !(heap.cdmn) !(heap.sdmn)
 
-let cdomain (heap : t) : SS.t = !(heap.cdmn)
+let cdomain (heap : t) : LocSet.t = !(heap.cdmn)
 
 (** Returns a copy of --heap-- *)
 let copy (heap : t) : t =
@@ -205,10 +211,10 @@ let copy (heap : t) : t =
     sdmn = ref !(heap.sdmn);
   }
 
-let merge_loc (heap : t) (new_loc : string) (old_loc : string) : unit =
+let merge_loc (heap : t) (new_loc : loc_t) (old_loc : loc_t) : unit =
   let domain = domain heap in
   let cfvl, sfvl, dom, met =
-    match SS.mem new_loc domain with
+    match LocSet.mem new_loc domain with
     | true ->
         (* Merge field-value lists *)
         let ocvfl, osfvl =
@@ -258,7 +264,7 @@ let merge_loc (heap : t) (new_loc : string) (old_loc : string) : unit =
 (** Modifies --heap-- in place updating it to subst(heap) *)
 let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
   (* If the substitution is empty, there is nothing to be done *)
-  if not (SSubst.domain subst None = Expr.Set.empty) then (
+  if not (SSubst.domain subst = Expr.Set.empty) then (
     (* The substitution is not empty *)
     let le_subst = SSubst.subst_in_expr subst ~partial:true in
 
@@ -317,34 +323,27 @@ let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
     SSubst.iter aloc_subst (fun aloc new_loc ->
         let aloc =
           match aloc with
-          | ALoc loc -> loc
+          | ALoc loc -> (loc :> loc_t)
           | _ -> raise (Failure "Impossible by construction")
         in
         let new_loc =
           match (new_loc : Expr.t) with
-          | Lit (Loc loc) -> loc
-          | ALoc loc -> loc
+          | Lit (Loc loc) -> (loc :> loc_t)
+          | ALoc loc -> (loc :> loc_t)
           | _ ->
-              raise
-                (Failure
-                   (Printf.sprintf "Heap substitution fail for loc: %s"
-                      ((Fmt.to_to_string Expr.pp) new_loc)))
+              Fmt.failwith "Heap substitution fail for loc: %a" Expr.pp new_loc
         in
         merge_loc heap new_loc aloc))
 
 (** Returns the serialization of --heap-- as a list *)
-let to_list (heap : t) : (string * s_object) list =
+let to_list (heap : t) : (loc_t * s_object) list =
   let domain = domain heap in
-  SS.fold (fun loc ac -> (loc, Option.get (get heap loc)) :: ac) domain []
+  LocSet.fold (fun loc ac -> (loc, Option.get (get heap loc)) :: ac) domain []
 
 (** converts a symbolic heap to a list of assertions *)
 let assertions (heap : t) : Asrt.t =
-  let make_loc_lexpr loc =
-    if Names.is_aloc_name loc then Expr.ALoc loc else Expr.Lit (Loc loc)
-  in
-
   let assertions_of_object (loc, ((fv_list, domain), metadata)) =
-    let le_loc = make_loc_lexpr loc in
+    let le_loc = Expr.loc_from_loc_name loc in
     let fv_assertions = SFVL.assertions le_loc fv_list in
     let domain =
       Option.fold
@@ -361,7 +360,7 @@ let assertions (heap : t) : Asrt.t =
 
   to_list heap |> List.concat_map assertions_of_object |> List.sort Asrt.compare
 
-let wf_assertions_of_obj (heap : t) (loc : string) : Expr.t list =
+let wf_assertions_of_obj (heap : t) (loc : loc_t) : Expr.t list =
   let cfvl =
     Option.value ~default:SFVL.empty (Hashtbl.find_opt heap.cfvl loc)
   in
@@ -376,7 +375,7 @@ let wf_assertions_of_obj (heap : t) (loc : string) : Expr.t list =
 
 let wf_assertions (heap : t) : Expr.t list =
   let domain = domain heap in
-  SS.fold (fun loc ac -> wf_assertions_of_obj heap loc @ ac) domain []
+  LocSet.fold (fun loc ac -> wf_assertions_of_obj heap loc @ ac) domain []
 
 let is_well_formed (heap : t) : unit =
   let cfvl =
@@ -397,39 +396,34 @@ let is_well_formed (heap : t) : unit =
   if not sfvl then
     raise (Failure "Concreteness in the symbolic part of the heap");
   let dom_kept = domain heap in
-  let dom_calc_1 =
-    SS.union
-      (Hashtbl.fold (fun v _ ac -> SS.add v ac) heap.cfvl SS.empty)
-      (Hashtbl.fold (fun v _ ac -> SS.add v ac) heap.sfvl SS.empty)
+  let fold cset sset =
+    LocSet.union
+      (Hashtbl.fold (fun v _ ac -> LocSet.add v ac) cset LocSet.empty)
+      (Hashtbl.fold (fun v _ ac -> LocSet.add v ac) sset LocSet.empty)
   in
-  let dom_calc_2 =
-    SS.union
-      (Hashtbl.fold (fun v _ ac -> SS.add v ac) heap.cdom SS.empty)
-      (Hashtbl.fold (fun v _ ac -> SS.add v ac) heap.sdom SS.empty)
-  in
-  let dom_calc_3 =
-    SS.union
-      (Hashtbl.fold (fun v _ ac -> SS.add v ac) heap.cmet SS.empty)
-      (Hashtbl.fold (fun v _ ac -> SS.add v ac) heap.smet SS.empty)
-  in
-  let dom_calc = SS.union dom_calc_1 (SS.union dom_calc_2 dom_calc_3) in
-  if SS.elements dom_kept <> SS.elements dom_calc then
+  let dom_calc_1 = fold heap.cfvl heap.sfvl in
+  let dom_calc_2 = fold heap.cdom heap.sdom in
+  let dom_calc_3 = fold heap.cmet heap.smet in
+  let dom_calc = LocSet.union dom_calc_1 (LocSet.union dom_calc_2 dom_calc_3) in
+  if LocSet.elements dom_kept <> LocSet.elements dom_calc then
     let msg =
-      Printf.sprintf "Domain mismatch:\n%s\n%s"
-        (String.concat ", " (SS.elements dom_kept))
-        (String.concat ", " (SS.elements dom_calc))
+      Fmt.str "Domain mismatch:\n%a\n%a"
+        Fmt.(iter ~sep:comma LocSet.iter Id.pp)
+        dom_kept
+        Fmt.(iter ~sep:comma LocSet.iter Id.pp)
+        dom_calc
     in
     L.fail msg
 
 let pp ft heap =
   let open Fmt in
-  let sorted_locs = SS.elements (domain heap) in
+  let sorted_locs = LocSet.elements (domain heap) in
   let sorted_locs_with_vals =
     List.map (fun loc -> (loc, Option.get (get heap loc))) sorted_locs
   in
   let pp_one ft (loc, ((fv_pairs, domain), metadata)) =
-    pf ft "@[%s |-> [ @[%a@] | @[%a@] ] with metadata %a@]" loc SFVL.pp fv_pairs
-      (option Expr.pp) domain
+    pf ft "@[%a |-> [ @[%a@] | @[%a@] ] with metadata %a@]" Id.pp loc SFVL.pp
+      fv_pairs (option Expr.pp) domain
       (option ~none:(any "unknown") Expr.pp)
       metadata
   in
@@ -438,29 +432,31 @@ let pp ft heap =
 let get_print_info locs heap =
   let domain = domain heap in
   let metadata_locs =
-    SS.fold
+    LocSet.fold
       (fun loc locs ->
         match get_met heap loc with
-        | (Some (Lit (Loc x)) | Some (ALoc x)) when SS.mem x domain ->
-            SS.add x locs
+        | Some (Lit (Loc x)) when LocSet.mem (x :> loc_t) domain ->
+            LocSet.add (x :> loc_t) locs
+        | Some (ALoc x) when LocSet.mem (x :> loc_t) domain ->
+            LocSet.add (x :> loc_t) locs
         | _ -> locs)
-      locs SS.empty
+      locs LocSet.empty
   in
   (* TODO: Traverse locations and collect info about other locations and lvars *)
-  (SS.empty, metadata_locs)
+  (LVar.Set.empty, metadata_locs)
 
 let pp_by_need locs ft heap =
   let domain = domain heap in
-  let existent_locs = SS.inter locs domain in
+  let existent_locs = LocSet.inter locs domain in
   let sorted_locs_with_vals =
     List.map
       (fun loc -> (loc, Option.get (get heap loc)))
-      (SS.elements existent_locs)
+      (LocSet.elements existent_locs)
   in
   let open Fmt in
   let pp_one ft (loc, ((fv_pairs, domain), metadata)) =
-    pf ft "@[%s |-> [ @[%a@] | @[%a@] ] with metadata %a@]" loc SFVL.pp fv_pairs
-      (option Expr.pp) domain
+    pf ft "@[%a |-> [ @[%a@] | @[%a@] ] with metadata %a@]" Id.pp loc SFVL.pp
+      fv_pairs (option Expr.pp) domain
       (option ~none:(any "unknown") Expr.pp)
       metadata
   in
@@ -474,9 +470,7 @@ let get_inv_metadata (heap : t) : (Expr.t, Expr.t) Hashtbl.t =
         match e_metadata with
         | None -> ()
         | Some e_metadata ->
-            let loc_e =
-              if Names.is_lloc_name loc then Expr.Lit (Loc loc) else ALoc loc
-            in
+            let loc_e = Expr.loc_from_loc_name loc in
             Hashtbl.add inv_metadata e_metadata loc_e)
       mt
   in
@@ -485,7 +479,7 @@ let get_inv_metadata (heap : t) : (Expr.t, Expr.t) Hashtbl.t =
   inv_metadata
 
 let clean_up (heap : t) : unit =
-  SS.iter
+  LocSet.iter
     (fun loc ->
       match has_loc heap loc with
       | false -> ()
@@ -495,42 +489,32 @@ let clean_up (heap : t) : unit =
           | true, None -> (
               remove heap loc;
               match met with
-              | Some (ALoc loc) | Some (Lit (Loc loc)) -> remove heap loc
+              | Some (ALoc loc) -> remove heap (loc :> loc_t)
+              | Some (Lit (Loc loc)) -> remove heap (loc :> loc_t)
               | _ -> ())
           | _, _ -> ()))
     (domain heap)
 
-let lvars (heap : t) : Var.Set.t =
-  let lvars_fvl =
-    Hashtbl.fold
-      (fun _ fvl ac -> Var.Set.union (SFVL.lvars fvl) ac)
-      heap.sfvl Var.Set.empty
-  in
-  let lvars_dom =
-    Hashtbl.fold
-      (fun _ oe ac ->
-        let voe = Option.fold ~some:Expr.lvars ~none:Var.Set.empty oe in
-        Var.Set.union voe ac)
-      heap.sdom Var.Set.empty
-  in
-  let lvars_met =
-    Hashtbl.fold
-      (fun _ oe ac ->
-        let voe = Option.fold ~some:Expr.lvars ~none:Var.Set.empty oe in
-        Var.Set.union voe ac)
-      heap.smet Var.Set.empty
-  in
-  List.fold_left SS.union Var.Set.empty [ lvars_fvl; lvars_met; lvars_dom ]
-
-let alocs (heap : t) : Var.Set.t =
-  let union = Var.Set.union in
-  Var.Set.empty
-  |> Hashtbl.fold (fun _ fvl ac -> Var.Set.union (SFVL.alocs fvl) ac) heap.sfvl
+let lvars (heap : t) : LVar.Set.t =
+  LVar.Set.empty
+  |> Hashtbl.fold (fun _ fvl ac -> LVar.Set.union (SFVL.lvars fvl) ac) heap.sfvl
   |> Hashtbl.fold
-       (fun _ oe ac ->
-         Option.fold ~some:(fun oe -> union (Expr.alocs oe) ac) ~none:ac oe)
+       (fun _ oe ->
+         LVar.Set.union @@ Option.fold ~some:Expr.lvars ~none:LVar.Set.empty oe)
        heap.sdom
   |> Hashtbl.fold
-       (fun _ oe ac ->
-         Option.fold ~some:(fun oe -> union (Expr.alocs oe) ac) ~none:ac oe)
+       (fun _ oe ->
+         LVar.Set.union @@ Option.fold ~some:Expr.lvars ~none:LVar.Set.empty oe)
+       heap.smet
+
+let alocs (heap : t) : ALoc.Set.t =
+  ALoc.Set.empty
+  |> Hashtbl.fold (fun _ fvl ac -> ALoc.Set.union (SFVL.alocs fvl) ac) heap.sfvl
+  |> Hashtbl.fold
+       (fun _ oe ->
+         ALoc.Set.union @@ Option.fold ~some:Expr.alocs ~none:ALoc.Set.empty oe)
+       heap.sdom
+  |> Hashtbl.fold
+       (fun _ oe ->
+         ALoc.Set.union @@ Option.fold ~some:Expr.alocs ~none:ALoc.Set.empty oe)
        heap.smet

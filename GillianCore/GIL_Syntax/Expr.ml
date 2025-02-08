@@ -1,9 +1,10 @@
 open Names
+open Id
 
 (** GIL Expressions *)
 type t = TypeDef__.expr =
   | Lit of Literal.t  (** GIL literals           *)
-  | PVar of string  (** GIL program variables  *)
+  | PVar of Var.t  (** GIL program variables  *)
   | LVar of LVar.t  (** GIL logical variables  *)
   | ALoc of string  (** GIL abstract locations *)
   | UnOp of UnOp.t * t  (** Unary operators         *)
@@ -12,9 +13,9 @@ type t = TypeDef__.expr =
   | NOp of NOp.t * t list  (** n-ary operators         *)
   | EList of t list  (** Lists of expressions    *)
   | ESet of t list  (** Sets of expressions     *)
-  | Exists of (string * Type.t option) list * t
+  | Exists of (LVar.t * Type.t option) list * t
       (** Existential quantification. *)
-  | ForAll of (string * Type.t option) list * t
+  | ForAll of (LVar.t * Type.t option) list * t
       (** Universal quantification. *)
 [@@deriving eq, ord]
 
@@ -447,19 +448,17 @@ let to_literal = function
   | _ -> None
 
 (** Get all the logical variables in --e-- *)
-let lvars : t -> SS.t = Visitors.Collectors.lvar_collector#visit_expr SS.empty
+let lvars : t -> LVar.Set.t =
+  Visitors.Collectors.lvar_collector#visit_expr LVar.Set.empty
 
 (** Get all the abstract locations in --e-- *)
-let alocs : t -> SS.t = Visitors.Collectors.aloc_collector#visit_expr ()
+let alocs : t -> ALoc.Set.t = Visitors.Collectors.aloc_collector#visit_expr ()
 
 (** Get all the concrete locations in --e-- *)
-let clocs : t -> SS.t = Visitors.Collectors.cloc_collector#visit_expr ()
+let clocs : t -> Loc.Set.t = Visitors.Collectors.cloc_collector#visit_expr ()
 
-let locs : t -> SS.t = Visitors.Collectors.loc_collector#visit_expr ()
-
-(** Get all substitutables in --e-- *)
-let substitutables : t -> SS.t =
-  Visitors.Collectors.substitutable_collector#visit_expr ()
+(** Get all the concrete and abstract locations in --e-- *)
+let locs : t -> Sets.LocSet.t = Visitors.Collectors.loc_collector#visit_expr ()
 
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
@@ -481,9 +480,6 @@ let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z
   | _ -> false
 
-(** Get all the variables in --e-- *)
-let vars : t -> SS.t = Visitors.Collectors.var_collector#visit_expr ()
-
 (** Are all expressions in the list literals? *)
 let all_literals =
   List.for_all (function
@@ -501,14 +497,14 @@ let rec from_lit_list (lit : Literal.t) : t =
 let lists (le : t) : t list =
   Visitors.Collectors.list_collector#visit_expr () le
 
-let subst_clocs (subst : string -> t) (e : t) : t =
-  (new Visitors.Substs.subst_clocs subst)#visit_expr () e
+let subst_clocs (subst : Id.Loc.t -> t) : t -> t =
+  (new Visitors.Substs.subst_clocs subst)#visit_expr ()
 
-let from_var_name (var_name : string) : t =
-  if is_aloc_name var_name then ALoc var_name
-  else if is_lvar_name var_name then LVar var_name
-  else if is_pvar_name var_name then PVar var_name
-  else Fmt.failwith "Invalid var name : %s" var_name
+let var_to_expr (x : [< Id.substable ] Id.t) : t =
+  if Names.is_lvar_name x then LVar x
+  else if is_aloc_name x then ALoc x
+  else if is_pvar_name x then PVar x
+  else raise (Failure ("var_to_expr: Impossible matchable: " ^ x))
 
 let loc_from_loc_name (loc_name : string) : t =
   if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
@@ -585,13 +581,7 @@ let base_elements (expr : t) : t list =
   in
   v#visit_expr () expr
 
-let pvars : t -> SS.t = Visitors.Collectors.pvar_collector#visit_expr ()
-
-let var_to_expr (x : string) : t =
-  if Names.is_lvar_name x then LVar x
-  else if is_aloc_name x then ALoc x
-  else if is_pvar_name x then PVar x
-  else raise (Failure ("var_to_expr: Impossible matchable: " ^ x))
+let pvars : t -> Var.Set.t = Visitors.Collectors.pvar_collector#visit_expr ()
 
 let is_matchable = function
   | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->

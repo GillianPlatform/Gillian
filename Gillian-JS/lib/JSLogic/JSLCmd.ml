@@ -21,7 +21,7 @@ let rec js2jsil
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (scope_var : string)
+    (scope_var : Gil_syntax.Var.t)
     (logic_cmd : t) : LCmd.t list =
   let f = js2jsil cc_tbl vis_tbl fun_tbl fid scope_var in
   let fe = JSExpr.js2jsil None in

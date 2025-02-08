@@ -262,9 +262,11 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %type <(Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
 %type <Expr.t> top_level_expr_target
 
+%type <LVar.t> just_logic_variable_target
+
 %type <Spec.st> g_sspec_target
 %type <Asrt.t>  top_level_g_assertion_target
-%type <string * string list> lab_spec_target
+%type <string * LVar.t list> lab_spec_target
 
 %start gmain_target
 %start top_level_expr_target
@@ -289,7 +291,7 @@ proc_name:
   | proc_name = STRING { proc_name }
 
 proc_head_target:
-  PROC; proc_name = proc_name; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
+  PROC; proc_name = proc_name; LBRACE; param_list = separated_list(COMMA, program_variable_target); RBRACE
     { (proc_name, param_list) }
 ;
 
@@ -301,11 +303,11 @@ use_subst_target:
 ;
 
 lvar_le_pair_target:
-  lv = LVAR; COLON; e=expr_target { (lv, e )}
+  lv = just_logic_variable_target; COLON; e=expr_target { (lv, e )}
 ;
 
 phi_target:
-  v = VAR; COLON; args = separated_list(COMMA, expr_target)
+  v = program_variable_target; COLON; args = separated_list(COMMA, expr_target)
     { (v, args) }
 
 call_with_target:
@@ -319,13 +321,13 @@ call_with_target:
 assertion_id_target:
   | LBRACKET; v=VAR; RBRACKET
       { (v, []) }
-  | LBRACKET; v=VAR; COLON; lvars=separated_nonempty_list(COMMA, LVAR); RBRACKET
+  | LBRACKET; v=VAR; COLON; lvars=separated_nonempty_list(COMMA, just_logic_variable_target); RBRACKET
       { (v, lvars) }
 ;
 
 pred_param_target:
   (* Program variable with in-parameter status and optional type *)
-  | in_param = option(FPLUS); v = VAR; t = option(preceded(COLON, type_target))
+  | in_param = option(FPLUS); v = program_variable_target; t = option(preceded(COLON, type_target))
     { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
       (v, t), in_param }
 ;
@@ -356,10 +358,10 @@ atomic_expr_target:
     { lvar }
 (* Abstract locations are *normally* computed on normalisation *)
   | ALOC
-    { Expr.ALoc $1 }
+    { Expr.ALoc (ALoc.of_string $1) }
 (* Program variable (including the special variable "ret") *)
   | pvar = program_variable_target
-    { pvar }
+    { Expr.PVar pvar }
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE
      { Expr.EList exprlist }
@@ -535,12 +537,12 @@ top_level_expr_target:
 ;
 
 var_and_le_target:
-  | LBRACE; lvar = LVAR; DEFEQ; le = expr_target; RBRACE;
+  | LBRACE; lvar = just_logic_variable_target; DEFEQ; le = expr_target; RBRACE;
     { (lvar, le) }
 ;
 
 var_and_var_target:
-  | LBRACE; lvar1 = LVAR; DEFEQ; lvar2 = LVAR; RBRACE;
+  | LBRACE; lvar1 = just_logic_variable_target; DEFEQ; lvar2 = just_logic_variable_target; RBRACE;
     { (lvar1, lvar2) }
 ;
 
@@ -680,10 +682,10 @@ gcmd_target:
 (* skip *)
   | SKIP { Cmd.Skip }
 (* x := [laction](e1, ..., en) *)
-  | v=VAR; DEFEQ; LBRACKET; laction=VAR; RBRACKET; LBRACE; es=separated_list(COMMA, expr_target); RBRACE
+  | v=program_variable_target; DEFEQ; LBRACKET; laction=VAR; RBRACKET; LBRACE; es=separated_list(COMMA, expr_target); RBRACE
     { Cmd.LAction(v, laction, es) }
 (* x := e *)
-  | v=VAR; DEFEQ; e=expr_target
+  | v=program_variable_target; DEFEQ; e=expr_target
     { Cmd.Assignment (v, e) }
 (* goto i *)
   | GOTO; i=VAR
@@ -692,22 +694,22 @@ gcmd_target:
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { Cmd.GuardedGoto (e, i, j) }
 (* x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble] *)
-  | v=VAR; DEFEQ; e=expr_target;
+  | v=program_variable_target; DEFEQ; e=expr_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
     {
       Cmd.Call (v, e, es, oi, subst)
     }
 (* x := e(e1, ..., en) with j *)
-  | v=VAR; DEFEQ; EXTERN; pname=VAR;
+  | v=program_variable_target; DEFEQ; EXTERN; pname=program_variable_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target)
     {
       Cmd.ECall (v, PVar pname, es, oi) }
 (* x := apply (e1, ..., en) with j *)
-  | v=VAR; DEFEQ; APPLY;
+  | v=program_variable_target; DEFEQ; APPLY;
     LBRACE; es=expr_target; RBRACE; oi = option(call_with_target)
     { Cmd.Apply (v, es, oi) }
 (* x := args *)
-  | v = VAR; DEFEQ; ARGUMENTS
+  | v = program_variable_target; DEFEQ; ARGUMENTS
     { Cmd.Arguments v }
 (* x := PHI(e1, e2, ... en); *)
   | PHI; LBRACE; phi_args =separated_list(SCOLON, phi_target); RBRACE
@@ -908,7 +910,7 @@ g_logic_cmd_target:
 
 
   (* x := e *)
-  | v=VAR; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
+  | v=program_variable_target; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
     { LCmd.FreshSVar (v) }
 
 (* branch (fo) *)
@@ -986,7 +988,7 @@ variant_target:
 
 
 lemma_head_target:
-  lemma_name = proc_name; LBRACE; lemma_params = separated_list(COMMA, VAR); RBRACE
+  lemma_name = proc_name; LBRACE; lemma_params = separated_list(COMMA, program_variable_target); RBRACE
   {
     (lemma_name, lemma_params)
   }
@@ -1063,21 +1065,21 @@ macro_head_target:
 
 (* <spec_name: #bla, #ble, #bli> *)
 lab_spec_target:
-  | FLT; sspec_name = VAR; COLON; lvars = separated_list (COMMA, LVAR); FGT
+  | FLT; sspec_name = VAR; COLON; lvars = separated_list (COMMA, just_logic_variable_target); FGT
     { (sspec_name, lvars) }
   | FLT; sspec_name = VAR; FGT
     { (sspec_name, []) }
 ;
 
 spec_head_target:
-  spec_name = proc_name; LBRACE; spec_params = separated_list(COMMA, VAR); RBRACE
+  spec_name = proc_name; LBRACE; spec_params = separated_list(COMMA, program_variable_target); RBRACE
   { (* enter_specs spec_params; *)
     (spec_name, spec_params)
   }
 ;
 
 macro_head_def_target:
- | name = VAR; LBRACE; params = separated_list(COMMA, VAR); RBRACE
+ | name = VAR; LBRACE; params = separated_list(COMMA, program_variable_target); RBRACE
    { (name, params) }
 ;
 
@@ -1094,8 +1096,8 @@ unfold_info_target:
 ;
 
 lvar_or_pvar:
-  | LVAR { $1 }
-  | VAR  { $1 }
+  | just_logic_variable_target { ($1 :> [ `LVar | `Var ] Id.t) }
+  | program_variable_target  { ($1 :> [ `LVar | `Var ] Id.t) }
 
 binders_target:
   | LBRACKET; BIND; COLON; xs = separated_list(COMMA, lvar_or_pvar); RBRACKET
@@ -1103,7 +1105,7 @@ binders_target:
 ;
 
 existentials_target:
-  | LBRACKET; EXISTENTIALS; COLON; xs = separated_list(COMMA, LVAR); RBRACKET
+  | LBRACKET; EXISTENTIALS; COLON; xs = separated_list(COMMA, just_logic_variable_target); RBRACKET
     { xs }
 ;
 
@@ -1126,16 +1128,16 @@ logic_variable_target:
   {
     let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
-    Expr.LVar v_imported }
+    Expr.LVar (LVar.of_string v_imported) }
 ;
 
 just_logic_variable_target:
   v = LVAR
-  { (* validate_lvar v; *) v }
+  { (* validate_lvar v; *) LVar.of_string v }
 
 program_variable_target:
   | v = VAR
-    { (* let _ = validate_pvar v in *) Expr.PVar v }
+    { (* let _ = validate_pvar v in *) Var.of_string v }
 ;
 
 (********* COMMON *********)
@@ -1152,7 +1154,7 @@ lit_target:
   | NAN                       { Literal.Num nan }
   | INFINITY                  { Literal.Num infinity }
   | STRING                    { Literal.String $1 }
-  | LOC                       { Literal.Loc $1 }
+  | LOC                       { Literal.Loc (Loc.of_string $1) }
   | type_target               { Literal.Type $1 }
   | LSTNIL                    { Literal.LList [] }
   | LSTOPEN LSTCLOSE          { Literal.LList [] }

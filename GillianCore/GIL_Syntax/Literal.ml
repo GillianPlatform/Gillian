@@ -2,6 +2,8 @@
 	GIL Literals
 *)
 
+type loc = string [@@deriving ord]
+
 type t = TypeDef__.literal =
   | Undefined  (** The literal [undefined] *)
   | Null  (** The literal [null] *)
@@ -11,7 +13,7 @@ type t = TypeDef__.literal =
   | Int of Z.t  (** GIL integers *)
   | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
   | String of string  (** GIL strings *)
-  | Loc of string  (** GIL object locations *)
+  | Loc of loc  (** GIL object locations *)
   | Type of Type.t  (** GIL types ({!type:Type.t}) *)
   | LList of t list  (** Lists of GIL literals *)
   | Nono

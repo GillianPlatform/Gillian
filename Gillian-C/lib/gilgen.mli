@@ -21,7 +21,7 @@ val trans_program :
   ?gil_annot:Gil_logic_gen.gil_annots ->
   clight_prog:Clight.program ->
   filepath:string ->
-  mangled_syms:(string, string) Hashtbl.t ->
+  mangled_syms:(Loc.t, Loc.t) Hashtbl.t ->
   Csharpminor.program ->
   (Annot.Basic.t, string) Prog.t * compilation_data
 
@@ -29,7 +29,7 @@ val trans_program_with_annots :
   exec_mode:Exec_mode.t ->
   clight_prog:Clight.program ->
   filepath:string ->
-  mangled_syms:(string, string) Hashtbl.t ->
+  mangled_syms:(Loc.t, Loc.t) Hashtbl.t ->
   Csharpminor.program ->
   CLogic.CProg.t ->
   (Annot.Basic.t, string) Prog.t * compilation_data

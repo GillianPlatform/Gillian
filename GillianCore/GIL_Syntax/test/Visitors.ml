@@ -34,6 +34,10 @@ let test_expr_base_elements () =
     "The base elements of a list of undefined is that list"
     (base_elements lit_list)
     (List.map (fun x -> Lit x) inner);
+
+  let pvar = Var.alloc () in
+  let lvar = LVar.alloc () in
+  let aloc = ALoc.alloc () in
   let rec_expr_list =
     EList
       [
@@ -41,14 +45,14 @@ let test_expr_base_elements () =
         EList
           [
             Lit (LList [ Bool false ]);
-            BinOp (UnOp (Not, Lit (Num 32.)), FPlus, PVar "b");
+            BinOp (UnOp (Not, Lit (Num 32.)), FPlus, PVar pvar);
           ];
-        LVar "a";
-        ALoc "e";
+        LVar lvar;
+        ALoc aloc;
       ]
   in
   let expected =
-    [ Lit Undefined; Lit (Bool false); Lit (Num 32.); LVar "a"; ALoc "e" ]
+    [ Lit Undefined; Lit (Bool false); Lit (Num 32.); LVar lvar; ALoc aloc ]
   in
   Alcotest.check list_expr "Get base elements in recursive list"
     (base_elements rec_expr_list)

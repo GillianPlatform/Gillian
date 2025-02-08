@@ -1,3 +1,93 @@
+module Id : sig
+  type +'a t
+  and loc = [ `Loc ]
+  and aloc = [ `ALoc ]
+  and var = [ `Var ]
+  and lvar = [ `LVar ] [@@deriving yojson]
+
+  type any_var = [ var | lvar ]
+  and any_loc = [ loc | aloc ]
+  and any = [ loc | aloc | var | lvar ]
+  and substable = [ aloc | var | lvar ] [@@deriving yojson]
+
+  val return_variable : var t
+  val str : 'a t -> string
+  val equal : 'a t -> 'b t -> bool
+  val compare : 'a t -> 'a t -> int
+  val pp : 'a t Fmt.t
+  val of_yojson' : Yojson.Safe.t -> ('a t, string) result
+  val to_yojson' : 'a t -> Yojson.Safe.t
+  val as_lvars : any_var t list -> lvar t list option
+  val as_aloc : any_loc t -> aloc t option
+
+  module type SetYoJson := sig
+    include Set.S
+
+    val to_yojson : t -> Yojson.Safe.t
+    val of_yojson : Yojson.Safe.t -> (t, string) result
+  end
+
+  module type Id := sig
+    (** @inline *)
+    include Allocators.S_with_stringify
+
+    module Set : SetYoJson with type elt = t
+  end
+
+  (** @canonical Gillian.Gil_syntax.Id.Loc
+      Allocator for GIL concrete locations *)
+  module Loc : Id with type t = loc t
+
+  (** @canonical Gillian.Gil_syntax.Id.ALoc
+        Allocator for GIL abstract locations *)
+  module ALoc : Id with type t = aloc t
+
+  (** @canonical Gillian.Gil_syntax.Id.Var
+        Allocator for GIL concrete variables *)
+  module Var : Id with type t = var t
+
+  (** @canonical Gillian.Gil_syntax.Id.LVar
+        Allocator for GIL logical variables *)
+  module LVar : sig
+    include Id with type t = lvar t
+
+    val is_spec_var_name : t -> bool
+  end
+
+  module Sets : sig
+    (** Set of substitutable identifiers *)
+    module SubstSet : SetYoJson with type elt = substable t
+
+    (** Set of concrete and abstract locations *)
+    module LocSet : SetYoJson with type elt = any_loc t
+
+    (** Set of program and logical variables *)
+    module VarSet : SetYoJson with type elt = any_var t
+
+    val pvar_to_varset : Var.Set.t -> VarSet.t
+    val lvar_to_varset : LVar.Set.t -> VarSet.t
+    val pvar_to_subst : Var.Set.t -> SubstSet.t
+    val lvar_to_subst : LVar.Set.t -> SubstSet.t
+    val aloc_to_subst : ALoc.Set.t -> SubstSet.t
+    val aloc_to_loc : ALoc.Set.t -> LocSet.t
+
+    (** @deprecated *)
+    val substset_to_lvar : SubstSet.t -> LVar.Set.t
+  end
+end
+
+(** @canonical Gillian.Gil_syntax.Loc *)
+module Loc = Id.Loc
+
+(** @canonical Gillian.Gil_syntax.ALoc *)
+module ALoc = Id.ALoc
+
+(** @canonical Gillian.Gil_syntax.Var *)
+module Var = Id.Var
+
+(** @canonical Gillian.Gil_syntax.LVar *)
+module LVar = Id.LVar
+
 (** @canonical Gillian.Gil_syntax.Location *)
 module Location : sig
   (** Representation of a location in a source file *)
@@ -10,33 +100,6 @@ module Location : sig
   val none : t
   val pp : t Fmt.t
   val pp_log_opt : Format.formatter -> t option -> unit
-end
-
-(** @canonical Gillian.Gil_syntax.LVar *)
-module LVar : sig
-  (** Allocator for logical variable names *)
-
-  (** @inline *)
-  include Allocators.S with type t = string
-end
-
-(** @canonical Gillian.Gil_syntax.ALoc *)
-module ALoc : sig
-  (** Allocator for (sybolic) memory locations *)
-
-  (** @inline *)
-  include Allocators.S with type t = string
-end
-
-(** @canonical Gillian.Gil_syntax.Var *)
-module Var : sig
-  (** GIL Variables *)
-
-  type t = string [@@deriving yojson, show]
-
-  module Set : module type of Containers.SS
-
-  val str : t -> string
 end
 
 (** @canonical Gillian.Gil_syntax.Constant *)
@@ -97,7 +160,7 @@ module Literal : sig
     | Int of Z.t  (** GIL integers: TODO: understand size *)
     | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
     | String of string  (** GIL strings *)
-    | Loc of string  (** GIL locations (uninterpreted symbols) *)
+    | Loc of Loc.t  (** GIL locations (uninterpreted symbols) *)
     | Type of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
@@ -252,18 +315,18 @@ module Expr : sig
 
   type t =
     | Lit of Literal.t  (** GIL literals *)
-    | PVar of string  (** GIL program variables *)
-    | LVar of string  (** GIL logical variables (interpreted symbols) *)
-    | ALoc of string  (** GIL abstract locations (uninterpreted symbols) *)
+    | PVar of Var.t  (** GIL program variables *)
+    | LVar of LVar.t  (** GIL logical variables (interpreted symbols) *)
+    | ALoc of ALoc.t  (** GIL abstract locations (uninterpreted symbols) *)
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)
     | NOp of NOp.t * t list  (** n-ary operators ({!type:NOp.t}) *)
     | EList of t list  (** Lists of expressions *)
     | ESet of t list  (** Sets of expressions *)
-    | Exists of (string * Type.t option) list * t
+    | Exists of (LVar.t * Type.t option) list * t
         (** Existential quantification. *)
-    | ForAll of (string * Type.t option) list * t
+    | ForAll of (LVar.t * Type.t option) list * t
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -336,7 +399,7 @@ module Expr : sig
     (** Booleans *)
 
     val not : t -> t
-    val forall : (string * Type.t option) list -> t -> t
+    val forall : (LVar.t * Type.t option) list -> t -> t
     val ( == ) : t -> t -> t
     val ( && ) : t -> t -> t
     val ( || ) : t -> t -> t
@@ -377,22 +440,19 @@ module Expr : sig
   val from_list : t list -> t
 
   (** [lvars e] returns all logical variables in [e] *)
-  val lvars : t -> SS.t
+  val lvars : t -> LVar.Set.t
 
   (** [pvars e] returns all program variables in [e] *)
-  val pvars : t -> SS.t
+  val pvars : t -> Var.Set.t
 
   (** [alocs e] returns all abstract locations in [e] *)
-  val alocs : t -> SS.t
+  val alocs : t -> ALoc.Set.t
 
   (** [clocs e] returns all concrete locations in [e] *)
-  val clocs : t -> SS.t
+  val clocs : t -> Loc.Set.t
 
   (** [locs e] returns all concrete and abstract locations in [e] *)
-  val locs : t -> SS.t
-
-  (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
-  val vars : t -> SS.t
+  val locs : t -> Id.Sets.LocSet.t
 
   (** [push_in_negations e] pushes all negations in e "downwards", recursively *)
   val push_in_negations : t -> t
@@ -402,9 +462,6 @@ module Expr : sig
 
   (** Returns if this expression is a boolean expression, recursively. *)
   val is_boolean_expr : t -> bool
-
-  (** [substitutables e] returns all lvars and alocs *)
-  val substitutables : t -> SS.t
 
   (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc *)
   val is_concrete : t -> bool
@@ -419,14 +476,10 @@ module Expr : sig
   val lists : t -> t list
 
   (** [subst_clocs subst e] substitutes expressions of the form [Lit (Loc l)] with [subst l] in [e] *)
-  val subst_clocs : (string -> t) -> t -> t
+  val subst_clocs : (Id.loc Id.t -> t) -> t -> t
 
-  (** [from_var_name var] returns either an aloc, an lvar or a pvar if [var] name matches one of these types
-    (see {!Utils.Names.is_aloc_name}, {!Utils.Names.is_lvar_name} and {!Utils.Names.is_pvar_name}) *)
-  val from_var_name : string -> t
-
-  (** [loc_from_loc_name loc] Has the same behaviour as [from_var_name] except that it returns either an [ALoc loc] or a [Lit (Loc loc)] *)
-  val loc_from_loc_name : string -> t
+  (** [loc_from_loc_name loc] Has the same behaviour as [var_to_expr] except that it returns either an [ALoc loc] or a [Lit (Loc loc)] *)
+  val loc_from_loc_name : [< Id.any_loc ] Id.t -> t
 
   (** [subst_expr_for_expr ~to_subst ~subst_with expr] substitutes every occurence of the expression [to_subst] with the expression [subst_with] in [expr] *)
   val subst_expr_for_expr : to_subst:t -> subst_with:t -> t -> t
@@ -435,8 +488,9 @@ module Expr : sig
       abstract locations, and non-list literals in [e] *)
   val base_elements : t -> t list
 
-  (** [var_to_expr x] returns the expression representing the program/logical variable or abstract location [x] *)
-  val var_to_expr : string -> t
+  (** [var_to_expr x] returns the expression representing the program/logical variable or abstract location [x]
+  (see {!Utils.Names.is_aloc_name}, {!Utils.Names.is_lvar_name} and {!Utils.Names.is_pvar_name}) *)
+  val var_to_expr : [< Id.substable ] Id.t -> t
 
   (** [is_matchable x] returns whether or not the expression [e] is matchable *)
   val is_matchable : t -> bool
@@ -471,19 +525,19 @@ module Asrt : sig
   val map : (Expr.t -> Expr.t) -> t -> t
 
   (** Get all the logical variables in [a] *)
-  val lvars : t -> SS.t
+  val lvars : t -> LVar.Set.t
 
   (** Get all the program variables in [a] *)
-  val pvars : t -> SS.t
+  val pvars : t -> Var.Set.t
 
   (** Get all the abstract locations in [a] *)
-  val alocs : t -> SS.t
+  val alocs : t -> ALoc.Set.t
 
   (** Get all the concrete locations in [a] *)
-  val clocs : t -> SS.t
+  val clocs : t -> Loc.Set.t
 
   (** Get all locations in [a] *)
-  val locs : t -> SS.t
+  val locs : t -> Id.Sets.LocSet.t
 
   (** Returns a list with the names of the predicates that occur in [a] *)
   val pred_names : t -> string list
@@ -510,7 +564,7 @@ module Asrt : sig
   val pp_atom_full : Format.formatter -> atom -> unit
 
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
-  val subst_clocs : (string -> Expr.t) -> t -> t
+  val subst_clocs : (Id.Loc.t -> Expr.t) -> t -> t
 
   (** [subst_expr_for_expr ~to_subst ~subst_with a] substitutes every occurence of the expression [to_subst] with the expression [subst_with] in [a] *)
   val subst_expr_for_expr : to_subst:Expr.t -> subst_with:Expr.t -> t -> t
@@ -523,18 +577,21 @@ end
 module SLCmd : sig
   (** GIL Separation-Logic Commands *)
 
+  type logic_bindings_t := string * (LVar.t * Expr.t) list
+
   type t =
-    | Fold of string * Expr.t list * (string * (string * Expr.t) list) option
+    | Fold of string * Expr.t list * logic_bindings_t option
         (** Fold predicate *)
-    | Unfold of string * Expr.t list * (string * string) list option * bool
+    | Unfold of string * Expr.t list * (LVar.t * LVar.t) list option * bool
         (** Unfold predicate *)
     | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand packaging *)
     | GUnfold of string  (** Global Unfold *)
-    | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
-    | SepAssert of Asrt.t * string list  (** Assert *)
-    | Invariant of Asrt.t * string list  (** Invariant *)
-    | Consume of Asrt.t * string list
+    | ApplyLem of string * Expr.t list * Id.any_var Id.t list
+        (** Apply lemma *)
+    | SepAssert of Asrt.t * Id.any_var Id.t list  (** Assert *)
+    | Invariant of Asrt.t * Id.any_var Id.t list  (** Invariant *)
+    | Consume of Asrt.t * Id.any_var Id.t list
     | Produce of Asrt.t
     | SymbExec
 
@@ -542,9 +599,9 @@ module SLCmd : sig
   val map : (Asrt.t -> Asrt.t) -> (Expr.t -> Expr.t) -> t -> t
 
   (** Pretty-printer of folding info *)
-  val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
+  val pp_folding_info : Cmd.logic_bindings_t option Fmt.t
 
-  val pp_unfold_info : (string * string) list option Fmt.t
+  val pp_unfold_info : (LVar.t * LVar.t) list option Fmt.t
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
@@ -561,7 +618,7 @@ module LCmd : sig
     | Assert of Expr.t  (** Assert *)
     | Assume of Expr.t  (** Assume *)
     | AssumeType of Expr.t * Type.t  (** Assume Type *)
-    | FreshSVar of string  (** x := fresh_svar() *)
+    | FreshSVar of Var.t  (** x := fresh_svar() *)
     | SL of SLCmd.t  (** Separation-logic command *)
 
   (** @deprecated Use {!Visitors.endo} instead *)
@@ -576,24 +633,24 @@ module Cmd : sig
   (** GIL Commands *)
 
   (** Optional bindings for procedure calls *)
-  type logic_bindings_t = string * (string * Expr.t) list
+  type logic_bindings_t = string * (LVar.t * Expr.t) list
 
   type 'label t =
     | Skip  (** Skip *)
-    | Assignment of string * Expr.t  (** Variable Assignment *)
-    | LAction of string * string * Expr.t list  (** Action *)
+    | Assignment of Var.t * Expr.t  (** Variable Assignment *)
+    | LAction of Var.t * string * Expr.t list  (** Action *)
     | Logic of LCmd.t  (** Logic commands *)
     | Goto of 'label  (** Unconditional goto *)
     | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
     | Call of
-        string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
+        Var.t * Expr.t * Expr.t list * 'label option * logic_bindings_t option
         (** Procedure call *)
-    | ECall of string * Expr.t * Expr.t list * 'label option
+    | ECall of Var.t * Expr.t * Expr.t list * 'label option
         (** External Procedure call *)
-    | Apply of string * Expr.t * 'label option
+    | Apply of Var.t * Expr.t * 'label option
         (** Application-style procedure call *)
-    | Arguments of string  (** Arguments of the currently executing function *)
-    | PhiAssignment of (string * Expr.t list) list  (** PHI-assignment *)
+    | Arguments of Var.t  (** Arguments of the currently executing function *)
+    | PhiAssignment of (Var.t * Expr.t list) list  (** PHI-assignment *)
     | ReturnNormal  (** Normal return *)
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
@@ -612,13 +669,13 @@ module Cmd : sig
   val successors : int t -> int -> int list
 
   (** Program variable collector *)
-  val pvars : 'a t -> Containers.SS.t
+  val pvars : 'a t -> Var.Set.t
 
   (** Logical variable collector *)
-  val lvars : 'a t -> Containers.SS.t
+  val lvars : 'a t -> LVar.Set.t
 
   (** Location collector *)
-  val locs : 'a t -> Containers.SS.t
+  val locs : 'a t -> Id.Sets.LocSet.t
 end
 
 (** @canonical Gillian.Gil_syntax.Pred *)
@@ -630,10 +687,10 @@ module Pred : sig
     pred_source_path : string option;
     pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
-    pred_params : (string * Type.t option) list;
+    pred_params : (Var.t * Type.t option) list;
         (** Parameter names and (optional) types *)
     pred_ins : int list;  (** Ins *)
-    pred_definitions : ((string * string list) option * Asrt.t) list;
+    pred_definitions : ((string * LVar.t list) option * Asrt.t) list;
         (** Predicate definitions *)
     pred_facts : Expr.t list;  (** Facts that hold for every definition *)
     pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
@@ -650,13 +707,13 @@ module Pred : sig
   val ins_and_outs : t -> Utils.Containers.SI.t * Utils.Containers.SI.t
 
   (** Returns the names of in-parameters *)
-  val in_params : t -> string list
+  val in_params : t -> Var.t list
 
   (** Returns the in-parameters given all parameters *)
   val in_args : t -> 'a list -> 'a list
 
-  (** Returns the names of in-parameters *)
-  val out_params : t -> string list
+  (** Returns the names of out-parameters *)
+  val out_params : t -> Var.t list
 
   (** Returns the out-parameters given all parameters *)
   val out_args : t -> 'a list -> 'a list
@@ -718,11 +775,11 @@ module Lemma : sig
     lemma_name : string;  (** Name *)
     lemma_source_path : string option;
     lemma_internal : bool;
-    lemma_params : string list;  (** Parameters *)
+    lemma_params : Var.t list;  (** Parameters *)
     lemma_specs : spec list;  (** Specs of the Lemma *)
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
-    lemma_existentials : string list; (* Existentials *)
+    lemma_existentials : LVar.t list; (* Existentials *)
   }
 
   (** Pretty-printer *)
@@ -741,7 +798,7 @@ module Macro : sig
 
   type t = {
     macro_name : string;  (** Name of the macro *)
-    macro_params : string list;  (** Actual parameters *)
+    macro_params : Var.t list;  (** Actual parameters *)
     macro_definition : LCmd.t list;  (** Macro definition *)
   }
 
@@ -782,13 +839,13 @@ module Spec : sig
     ss_variant : Expr.t option;  (** Variant *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
-    ss_label : (string * string list) option;
+    ss_label : (string * Id.LVar.t list) option;
   }
 
   (** Full specification *)
   type t = {
     spec_name : string;  (** Procedure/spec name *)
-    spec_params : string list;  (** Procedure/spec parameters *)
+    spec_params : Var.t list;  (** Procedure/spec parameters *)
     spec_sspecs : st list;  (** List of single specifications *)
     spec_normalised : bool;  (** If the spec is already normalised *)
     spec_incomplete : bool;  (**  If the spec is incomplete *)
@@ -806,13 +863,13 @@ module Spec : sig
     st
 
   (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
-  val init : string -> string list -> st list -> bool -> bool -> bool -> t
+  val init : string -> Var.t list -> st list -> bool -> bool -> bool -> t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
 
   (** Return the list of parameters of a Spec *)
-  val get_params : t -> string list
+  val get_params : t -> Var.t list
 
   val pp_sspec : Format.formatter -> st -> unit
   val pp : Format.formatter -> t -> unit
@@ -822,9 +879,7 @@ module Spec : sig
 
   (** @deprecated For legacy purposes, some functions use string sets instead of string list existentials.
     This function allows for a smooth translation *)
-  val label_vars_to_set :
-    ('a * Utils.Containers.SS.elt list) option ->
-    ('a * Utils.Containers.SS.t) option
+  val label_vars_to_set : ('a * LVar.t list) option -> ('a * LVar.Set.t) option
 
   (** {3 Serialization} *)
 
@@ -839,14 +894,14 @@ module BiSpec : sig
 
   type t = {
     bispec_name : string;  (** Procedure/spec name *)
-    bispec_params : string list;  (** Procedure/spec parameters *)
+    bispec_params : Var.t list;  (** Procedure/spec parameters *)
     bispec_pres : Asrt.t list;  (** Possible preconditions *)
     bispec_normalised : bool;  (** If the spec is already normalised *)
   }
 
   type t_tbl = (string, t) Hashtbl.t
 
-  val init : string -> string list -> Asrt.t list -> bool -> t
+  val init : string -> Var.t list -> Asrt.t list -> bool -> t
   val init_tbl : unit -> t_tbl
 
   (** Pretty-printer *)
@@ -917,7 +972,7 @@ module Proc : sig
     proc_source_path : string option;
     proc_internal : bool;
     proc_body : ('annot * 'label option * 'label Cmd.t) array;
-    proc_params : string list;
+    proc_params : Var.t list;
     proc_spec : Spec.t option;
     proc_aliases : string list;
     proc_calls : string list;
@@ -925,7 +980,7 @@ module Proc : sig
   [@@deriving yojson]
 
   (** Gets the parameters of the procedure *)
-  val get_params : ('a, 'b) t -> string list
+  val get_params : ('a, 'b) t -> Var.t list
 
   (** If the [show_labels] flag is true, the labels will be written before the command they correspond to *)
   val pp :
@@ -1120,7 +1175,7 @@ module Visitors : sig
     constraint
     'b = < visit_'annot : 'c -> 'd -> 'd
          ; visit_'label : 'c -> 'f -> 'f
-         ; visit_ALoc : 'c -> Expr.t -> string -> Expr.t
+         ; visit_ALoc : 'c -> Expr.t -> ALoc.t -> Expr.t
          ; visit_And : 'c -> BinOp.t -> BinOp.t
          ; visit_Impl : 'c -> BinOp.t -> BinOp.t
          ; visit_Apply :
@@ -1154,7 +1209,7 @@ module Visitors : sig
              Expr.t ->
              Expr.t list ->
              'f option ->
-             (string * (string * Expr.t) list) option ->
+             Cmd.logic_bindings_t option ->
              'f Cmd.t
          ; visit_Car : 'c -> UnOp.t -> UnOp.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
@@ -1170,7 +1225,7 @@ module Visitors : sig
          ; visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
          ; visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
          ; visit_Exists :
-             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+             'c -> Expr.t -> (LVar.t * Type.t option) list -> Expr.t -> Expr.t
          ; visit_Emp : 'c -> Asrt.atom -> Asrt.atom
          ; visit_Empty : 'c -> Literal.t -> Literal.t
          ; visit_EmptyType : 'c -> Type.t -> Type.t
@@ -1183,7 +1238,7 @@ module Visitors : sig
          ; visit_FMinus : 'c -> BinOp.t -> BinOp.t
          ; visit_FMod : 'c -> BinOp.t -> BinOp.t
          ; visit_ForAll :
-             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+             'c -> Expr.t -> (LVar.t * Type.t option) list -> Expr.t -> Expr.t
          ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
          ; visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
@@ -1193,7 +1248,7 @@ module Visitors : sig
              SLCmd.t ->
              string ->
              Expr.t list ->
-             (string * (string * Expr.t) list) option ->
+             Cmd.logic_bindings_t option ->
              SLCmd.t
          ; visit_CorePred :
              'c ->
@@ -1229,14 +1284,14 @@ module Visitors : sig
          ; visit_LAction :
              'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
          ; visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
-         ; visit_LVar : 'c -> Expr.t -> string -> Expr.t
+         ; visit_LVar : 'c -> Expr.t -> LVar.t -> Expr.t
          ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
          ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_IsInt : 'c -> UnOp.t -> UnOp.t
          ; visit_ListType : 'c -> Type.t -> Type.t
          ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
-         ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
+         ; visit_Loc : 'c -> Literal.t -> Loc.t -> Literal.t
          ; visit_LocalTime : 'c -> Constant.t -> Constant.t
          ; visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
          ; visit_LstCat : 'c -> NOp.t -> NOp.t
@@ -1277,9 +1332,9 @@ module Visitors : sig
          ; visit_NumberType : 'c -> Type.t -> Type.t
          ; visit_ObjectType : 'c -> Type.t -> Type.t
          ; visit_Or : 'c -> BinOp.t -> BinOp.t
-         ; visit_PVar : 'c -> Expr.t -> string -> Expr.t
+         ; visit_PVar : 'c -> Expr.t -> Var.t -> Expr.t
          ; visit_PhiAssignment :
-             'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
+             'c -> 'f Cmd.t -> (Var.t * Expr.t list) list -> 'f Cmd.t
          ; visit_Pi : 'c -> Constant.t -> Constant.t
          ; visit_Pred : 'c -> Asrt.atom -> string -> Expr.t list -> Asrt.atom
          ; visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
@@ -1299,7 +1354,7 @@ module Visitors : sig
          ; visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
-         ; visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
+         ; visit_FreshSVar : 'c -> LCmd.t -> Var.t -> LCmd.t
          ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
          ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
          ; visit_StrLess : 'c -> BinOp.t -> BinOp.t
@@ -1343,10 +1398,7 @@ module Visitors : sig
          ; visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_assertion_atom : 'c -> Asrt.atom -> Asrt.atom
          ; visit_assertion : 'c -> Asrt.t -> Asrt.t
-         ; visit_bindings :
-             'c ->
-             string * (string * Expr.t) list ->
-             string * (string * Expr.t) list
+         ; visit_bindings : 'c -> Cmd.logic_bindings_t -> Cmd.logic_bindings_t
          ; visit_binop : 'c -> BinOp.t -> BinOp.t
          ; visit_bispec : 'c -> BiSpec.t -> BiSpec.t
          ; visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1370,7 +1422,7 @@ module Visitors : sig
 
     method visit_'annot : 'c -> 'd -> 'd
     method visit_'label : 'c -> 'f -> 'f
-    method visit_ALoc : 'c -> Expr.t -> string -> Expr.t
+    method visit_ALoc : 'c -> Expr.t -> ALoc.t -> Expr.t
     method visit_And : 'c -> BinOp.t -> BinOp.t
     method visit_Impl : 'c -> BinOp.t -> BinOp.t
 
@@ -1408,7 +1460,7 @@ module Visitors : sig
       Expr.t ->
       Expr.t list ->
       'f option ->
-      (string * (string * Expr.t) list) option ->
+      Cmd.logic_bindings_t option ->
       'f Cmd.t
 
     method visit_Car : 'c -> UnOp.t -> UnOp.t
@@ -1422,7 +1474,7 @@ module Visitors : sig
     method visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
 
     method visit_Exists :
-      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+      'c -> Expr.t -> (LVar.t * Type.t option) list -> Expr.t -> Expr.t
 
     method visit_Emp : 'c -> Asrt.atom -> Asrt.atom
     method visit_Empty : 'c -> Literal.t -> Literal.t
@@ -1445,11 +1497,11 @@ module Visitors : sig
       SLCmd.t ->
       string ->
       Expr.t list ->
-      (string * (string * Expr.t) list) option ->
+      Cmd.logic_bindings_t option ->
       SLCmd.t
 
     method visit_ForAll :
-      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+      'c -> Expr.t -> (LVar.t * Type.t option) list -> Expr.t -> Expr.t
 
     method visit_CorePred :
       'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
@@ -1486,14 +1538,14 @@ module Visitors : sig
       'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
 
     method visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
-    method visit_LVar : 'c -> Expr.t -> string -> Expr.t
+    method visit_LVar : 'c -> Expr.t -> LVar.t -> Expr.t
     method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
     method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
     method visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
     method visit_IsInt : 'c -> UnOp.t -> UnOp.t
     method visit_ListType : 'c -> Type.t -> Type.t
     method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
-    method visit_Loc : 'c -> Literal.t -> string -> Literal.t
+    method visit_Loc : 'c -> Literal.t -> Loc.t -> Literal.t
     method visit_LocalTime : 'c -> Constant.t -> Constant.t
     method visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
     method visit_LstCat : 'c -> NOp.t -> NOp.t
@@ -1534,10 +1586,10 @@ module Visitors : sig
     method visit_NumberType : 'c -> Type.t -> Type.t
     method visit_ObjectType : 'c -> Type.t -> Type.t
     method visit_Or : 'c -> BinOp.t -> BinOp.t
-    method visit_PVar : 'c -> Expr.t -> string -> Expr.t
+    method visit_PVar : 'c -> Expr.t -> Var.t -> Expr.t
 
     method visit_PhiAssignment :
-      'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
+      'c -> 'f Cmd.t -> (Var.t * Expr.t list) list -> 'f Cmd.t
 
     method visit_Pi : 'c -> Constant.t -> Constant.t
     method visit_Pred : 'c -> Asrt.atom -> string -> Expr.t list -> Asrt.atom
@@ -1558,7 +1610,7 @@ module Visitors : sig
     method visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
     method visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
     method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
-    method visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
+    method visit_FreshSVar : 'c -> LCmd.t -> Var.t -> LCmd.t
     method visit_StrCat : 'c -> BinOp.t -> BinOp.t
     method visit_StrLen : 'c -> UnOp.t -> UnOp.t
     method visit_StrLess : 'c -> BinOp.t -> BinOp.t
@@ -1605,10 +1657,7 @@ module Visitors : sig
 
     method visit_assertion_atom : 'c -> Asrt.atom -> Asrt.atom
     method visit_assertion : 'c -> Asrt.t -> Asrt.t
-
-    method visit_bindings :
-      'c -> string * (string * Expr.t) list -> string * (string * Expr.t) list
-
+    method visit_bindings : 'c -> Cmd.logic_bindings_t -> Cmd.logic_bindings_t
     method visit_binop : 'c -> BinOp.t -> BinOp.t
     method visit_bispec : 'c -> BiSpec.t -> BiSpec.t
     method private visit_bool : 'env. 'env -> bool -> bool
@@ -1699,7 +1748,7 @@ module Visitors : sig
              Expr.t ->
              Expr.t list ->
              'g option ->
-             (string * (string * Expr.t) list) option ->
+             Cmd.logic_bindings_t option ->
              'f
          ; visit_Car : 'c -> 'f
          ; visit_Cdr : 'c -> 'f
@@ -1710,7 +1759,7 @@ module Visitors : sig
              'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
          ; visit_EList : 'c -> Expr.t list -> 'f
          ; visit_ESet : 'c -> Expr.t list -> 'f
-         ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_Exists : 'c -> (LVar.t * Type.t option) list -> Expr.t -> 'f
          ; visit_Emp : 'c -> 'f
          ; visit_Empty : 'c -> 'f
          ; visit_EmptyType : 'c -> 'f
@@ -1719,12 +1768,8 @@ module Visitors : sig
          ; visit_Error : 'c -> 'f
          ; visit_Fail : 'c -> string -> Expr.t list -> 'f
          ; visit_Fold :
-             'c ->
-             string ->
-             Expr.t list ->
-             (string * (string * Expr.t) list) option ->
-             'f
-         ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+             'c -> string -> Expr.t list -> Cmd.logic_bindings_t option -> 'f
+         ; visit_ForAll : 'c -> (LVar.t * Type.t option) list -> Expr.t -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
@@ -1747,7 +1792,7 @@ module Visitors : sig
          ; visit_FLessThanEqual : 'c -> 'f
          ; visit_ListType : 'c -> 'f
          ; visit_Lit : 'c -> Literal.t -> 'f
-         ; visit_Loc : 'c -> string -> 'f
+         ; visit_Loc : 'c -> Loc.t -> 'f
          ; visit_LocalTime : 'c -> 'f
          ; visit_Logic : 'c -> LCmd.t -> 'f
          ; visit_LstCat : 'c -> 'f
@@ -1794,8 +1839,8 @@ module Visitors : sig
          ; visit_NumberType : 'c -> 'f
          ; visit_ObjectType : 'c -> 'f
          ; visit_Or : 'c -> 'f
-         ; visit_PVar : 'c -> string -> 'f
-         ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
+         ; visit_PVar : 'c -> Var.t -> 'f
+         ; visit_PhiAssignment : 'c -> (Var.t * Expr.t list) list -> 'f
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
@@ -1817,7 +1862,7 @@ module Visitors : sig
          ; visit_SignedRightShiftL : 'c -> 'f
          ; visit_SignedRightShiftF : 'c -> 'f
          ; visit_Skip : 'c -> 'f
-         ; visit_FreshSVar : 'c -> string -> 'f
+         ; visit_FreshSVar : 'c -> Var.t -> 'f
          ; visit_StrCat : 'c -> 'f
          ; visit_StrLen : 'c -> 'f
          ; visit_StrLess : 'c -> 'f
@@ -1860,7 +1905,7 @@ module Visitors : sig
          ; visit_UnsignedRightShiftF : 'c -> 'f
          ; visit_assertion_atom : 'c -> Asrt.atom -> 'f
          ; visit_assertion : 'c -> Asrt.t -> 'f
-         ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
+         ; visit_bindings : 'c -> Cmd.logic_bindings_t -> 'f
          ; visit_binop : 'c -> BinOp.t -> 'f
          ; visit_bispec : 'c -> BiSpec.t -> 'f
          ; visit_cmd : 'c -> 'g Cmd.t -> 'f
@@ -1917,7 +1962,7 @@ module Visitors : sig
       Expr.t ->
       Expr.t list ->
       'g option ->
-      (string * (string * Expr.t) list) option ->
+      Cmd.logic_bindings_t option ->
       'f
 
     method visit_Car : 'c -> 'f
@@ -1931,7 +1976,7 @@ module Visitors : sig
 
     method visit_EList : 'c -> Expr.t list -> 'f
     method visit_ESet : 'c -> Expr.t list -> 'f
-    method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_Exists : 'c -> (LVar.t * Type.t option) list -> Expr.t -> 'f
     method visit_Emp : 'c -> 'f
     method visit_Empty : 'c -> 'f
     method visit_EmptyType : 'c -> 'f
@@ -1941,13 +1986,9 @@ module Visitors : sig
     method visit_Fail : 'c -> string -> Expr.t list -> 'f
 
     method visit_Fold :
-      'c ->
-      string ->
-      Expr.t list ->
-      (string * (string * Expr.t) list) option ->
-      'f
+      'c -> string -> Expr.t list -> Cmd.logic_bindings_t option -> 'f
 
-    method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_ForAll : 'c -> (LVar.t * Type.t option) list -> Expr.t -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
@@ -1970,7 +2011,7 @@ module Visitors : sig
     method visit_FLessThanEqual : 'c -> 'f
     method visit_ListType : 'c -> 'f
     method visit_Lit : 'c -> Literal.t -> 'f
-    method visit_Loc : 'c -> string -> 'f
+    method visit_Loc : 'c -> Loc.t -> 'f
     method visit_LocalTime : 'c -> 'f
     method visit_Logic : 'c -> LCmd.t -> 'f
     method visit_LstCat : 'c -> 'f
@@ -2017,8 +2058,8 @@ module Visitors : sig
     method visit_NumberType : 'c -> 'f
     method visit_ObjectType : 'c -> 'f
     method visit_Or : 'c -> 'f
-    method visit_PVar : 'c -> string -> 'f
-    method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
+    method visit_PVar : 'c -> Var.t -> 'f
+    method visit_PhiAssignment : 'c -> (Var.t * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
@@ -2040,7 +2081,7 @@ module Visitors : sig
     method visit_SignedRightShiftL : 'c -> 'f
     method visit_SignedRightShiftF : 'c -> 'f
     method visit_Skip : 'c -> 'f
-    method visit_FreshSVar : 'c -> string -> 'f
+    method visit_FreshSVar : 'c -> Var.t -> 'f
     method visit_StrCat : 'c -> 'f
     method visit_StrLen : 'c -> 'f
     method visit_StrLess : 'c -> 'f
@@ -2081,7 +2122,7 @@ module Visitors : sig
     method visit_UnsignedRightShiftF : 'c -> 'f
     method visit_assertion_atom : 'c -> Asrt.atom -> 'f
     method visit_assertion : 'c -> Asrt.t -> 'f
-    method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
+    method visit_bindings : 'c -> Cmd.logic_bindings_t -> 'f
     method visit_binop : 'c -> BinOp.t -> 'f
     method visit_bispec : 'c -> BiSpec.t -> 'f
     method visit_cmd : 'c -> 'g Cmd.t -> 'f
@@ -2108,7 +2149,7 @@ module Visitors : sig
     constraint
     'b = < visit_'annot : 'c -> 'd -> unit
          ; visit_'label : 'c -> 'f -> unit
-         ; visit_ALoc : 'c -> string -> unit
+         ; visit_ALoc : 'c -> ALoc.t -> unit
          ; visit_And : 'c -> unit
          ; visit_Impl : 'c -> unit
          ; visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
@@ -2148,7 +2189,7 @@ module Visitors : sig
              'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
          ; visit_EList : 'c -> Expr.t list -> unit
          ; visit_ESet : 'c -> Expr.t list -> unit
-         ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
+         ; visit_Exists : 'c -> (LVar.t * Type.t option) list -> Expr.t -> unit
          ; visit_Emp : 'c -> unit
          ; visit_Empty : 'c -> unit
          ; visit_EmptyType : 'c -> unit
@@ -2165,12 +2206,8 @@ module Visitors : sig
          ; visit_FUnaryMinus : 'c -> unit
          ; visit_Fail : 'c -> string -> Expr.t list -> unit
          ; visit_Fold :
-             'c ->
-             string ->
-             Expr.t list ->
-             (string * (string * Expr.t) list) option ->
-             unit
-         ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
+             'c -> string -> Expr.t list -> Cmd.logic_bindings_t option -> unit
+         ; visit_ForAll : 'c -> (LVar.t * Type.t option) list -> Expr.t -> unit
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_Wand :
              'c -> string * Expr.t list -> string * Expr.t list -> unit
@@ -2193,14 +2230,14 @@ module Visitors : sig
          ; visit_Produce : 'c -> Asrt.t -> unit
          ; visit_LAction : 'c -> string -> string -> Expr.t list -> unit
          ; visit_LList : 'c -> Literal.t list -> unit
-         ; visit_LVar : 'c -> string -> unit
+         ; visit_LVar : 'c -> LVar.t -> unit
          ; visit_LeftShift : 'c -> unit
          ; visit_LeftShiftL : 'c -> unit
          ; visit_LeftShiftF : 'c -> unit
          ; visit_IsInt : 'c -> unit
          ; visit_ListType : 'c -> unit
          ; visit_Lit : 'c -> Literal.t -> unit
-         ; visit_Loc : 'c -> string -> unit
+         ; visit_Loc : 'c -> Loc.t -> unit
          ; visit_LocalTime : 'c -> unit
          ; visit_Logic : 'c -> LCmd.t -> unit
          ; visit_LstCat : 'c -> unit
@@ -2241,8 +2278,8 @@ module Visitors : sig
          ; visit_NumberType : 'c -> unit
          ; visit_ObjectType : 'c -> unit
          ; visit_Or : 'c -> unit
-         ; visit_PVar : 'c -> string -> unit
-         ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
+         ; visit_PVar : 'c -> Var.t -> unit
+         ; visit_PhiAssignment : 'c -> (Var.t * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
          ; visit_Pred : 'c -> string -> Expr.t list -> unit
          ; visit_Pure : 'c -> Expr.t -> unit
@@ -2262,7 +2299,7 @@ module Visitors : sig
          ; visit_SignedRightShiftL : 'c -> unit
          ; visit_SignedRightShiftF : 'c -> unit
          ; visit_Skip : 'c -> unit
-         ; visit_FreshSVar : 'c -> string -> unit
+         ; visit_FreshSVar : 'c -> Var.t -> unit
          ; visit_StrCat : 'c -> unit
          ; visit_StrLen : 'c -> unit
          ; visit_StrLess : 'c -> unit
@@ -2300,7 +2337,7 @@ module Visitors : sig
          ; visit_UnsignedRightShiftF : 'c -> unit
          ; visit_assertion_atom : 'c -> Asrt.atom -> unit
          ; visit_assertion : 'c -> Asrt.t -> unit
-         ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
+         ; visit_bindings : 'c -> Cmd.logic_bindings_t -> unit
          ; visit_binop : 'c -> BinOp.t -> unit
          ; visit_bispec : 'c -> BiSpec.t -> unit
          ; visit_cmd : 'c -> 'f Cmd.t -> unit
@@ -2324,7 +2361,7 @@ module Visitors : sig
 
     method visit_'annot : 'c -> 'd -> unit
     method visit_'label : 'c -> 'f -> unit
-    method visit_ALoc : 'c -> string -> unit
+    method visit_ALoc : 'c -> ALoc.t -> unit
     method visit_And : 'c -> unit
     method visit_Impl : 'c -> unit
     method visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
@@ -2356,7 +2393,7 @@ module Visitors : sig
       Expr.t ->
       Expr.t list ->
       'f option ->
-      (string * (string * Expr.t) list) option ->
+      Cmd.logic_bindings_t option ->
       unit
 
     method visit_Car : 'c -> unit
@@ -2368,7 +2405,7 @@ module Visitors : sig
 
     method visit_EList : 'c -> Expr.t list -> unit
     method visit_ESet : 'c -> Expr.t list -> unit
-    method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
+    method visit_Exists : 'c -> (LVar.t * Type.t option) list -> Expr.t -> unit
     method visit_Emp : 'c -> unit
     method visit_Empty : 'c -> unit
     method visit_EmptyType : 'c -> unit
@@ -2386,13 +2423,9 @@ module Visitors : sig
     method visit_Fail : 'c -> string -> Expr.t list -> unit
 
     method visit_Fold :
-      'c ->
-      string ->
-      Expr.t list ->
-      (string * (string * Expr.t) list) option ->
-      unit
+      'c -> string -> Expr.t list -> Cmd.logic_bindings_t option -> unit
 
-    method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
+    method visit_ForAll : 'c -> (LVar.t * Type.t option) list -> Expr.t -> unit
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
 
     method visit_Wand :
@@ -2417,14 +2450,14 @@ module Visitors : sig
     method visit_Produce : 'c -> Asrt.t -> unit
     method visit_LAction : 'c -> string -> string -> Expr.t list -> unit
     method visit_LList : 'c -> Literal.t list -> unit
-    method visit_LVar : 'c -> string -> unit
+    method visit_LVar : 'c -> LVar.t -> unit
     method visit_LeftShift : 'c -> unit
     method visit_LeftShiftL : 'c -> unit
     method visit_LeftShiftF : 'c -> unit
     method visit_IsInt : 'c -> unit
     method visit_ListType : 'c -> unit
     method visit_Lit : 'c -> Literal.t -> unit
-    method visit_Loc : 'c -> string -> unit
+    method visit_Loc : 'c -> Loc.t -> unit
     method visit_LocalTime : 'c -> unit
     method visit_Logic : 'c -> LCmd.t -> unit
     method visit_LstCat : 'c -> unit
@@ -2465,8 +2498,8 @@ module Visitors : sig
     method visit_NumberType : 'c -> unit
     method visit_ObjectType : 'c -> unit
     method visit_Or : 'c -> unit
-    method visit_PVar : 'c -> string -> unit
-    method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
+    method visit_PVar : 'c -> Var.t -> unit
+    method visit_PhiAssignment : 'c -> (Var.t * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit
     method visit_Pred : 'c -> string -> Expr.t list -> unit
     method visit_Pure : 'c -> Expr.t -> unit
@@ -2486,7 +2519,7 @@ module Visitors : sig
     method visit_SignedRightShiftL : 'c -> unit
     method visit_SignedRightShiftF : 'c -> unit
     method visit_Skip : 'c -> unit
-    method visit_FreshSVar : 'c -> string -> unit
+    method visit_FreshSVar : 'c -> Var.t -> unit
     method visit_StrCat : 'c -> unit
     method visit_StrLen : 'c -> unit
     method visit_StrLess : 'c -> unit
@@ -2531,7 +2564,7 @@ module Visitors : sig
 
     method visit_assertion_atom : 'c -> Asrt.atom -> unit
     method visit_assertion : 'c -> Asrt.t -> unit
-    method visit_bindings : 'c -> string * (string * Expr.t) list -> unit
+    method visit_bindings : 'c -> Cmd.logic_bindings_t -> unit
     method visit_binop : 'c -> BinOp.t -> unit
     method visit_bispec : 'c -> BiSpec.t -> unit
     method private visit_bool : 'env. 'env -> bool -> unit

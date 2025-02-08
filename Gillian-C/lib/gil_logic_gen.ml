@@ -10,8 +10,8 @@ open Expr.Infix
 
 let id_of_string = Camlcoq.intern_string
 let true_name = Camlcoq.extern_atom
-let loc_param_name = "loc"
-let ofs_param_name = "ofs"
+let loc_param_name = Var.of_string "loc"
+let ofs_param_name = Var.of_string "ofs"
 
 let pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "struct_" ^ struct_name
@@ -24,7 +24,7 @@ let opt_rec_pred_name_of_struct struct_name =
 
 let fresh_lvar ?(fname = "") () =
   let pre = "_lvar_i_" in
-  Generators.gen_str ~fname pre
+  LVar.of_string @@ Generators.gen_str ~fname pre
 
 let rec split3_expr_comp = function
   | [] -> ([], [], [])
@@ -121,7 +121,7 @@ let assert_of_member cenv members id typ =
   let field_name = true_name id in
   let pvloc = Expr.PVar loc_param_name in
   let pvofs = Expr.PVar ofs_param_name in
-  let pvmember = Expr.PVar field_name in
+  let pvmember = Expr.PVar (Var.of_string field_name) in
   let fo =
     match field_offset cenv id members with
     | Errors.OK (f, Full) -> Expr.int_z (ValueTranslation.int_of_z f)
@@ -139,7 +139,8 @@ let assert_of_member cenv members id typ =
       in
       let args_without_ins =
         List.init arg_number (fun k ->
-            Expr.LVar ("i__" ^ field_name ^ "_" ^ string_of_int k))
+            Expr.LVar
+              (LVar.of_string ("i__" ^ field_name ^ "_" ^ string_of_int k)))
       in
       let list_is_components = pvmember #== (Expr.list args_without_ins) in
       let ofs = Expr.Infix.(pvofs + fo) in
@@ -160,7 +161,7 @@ let assert_of_member cenv members id typ =
       ]
   | _ ->
       let mk t v = Expr.list [ Expr.string t; v ] in
-      let field_val_name = "i__" ^ field_name ^ "_v" in
+      let field_val_name = LVar.of_string ("i__" ^ field_name ^ "_v") in
       let lvval = Expr.LVar field_val_name in
       let e_to_use, getter_or_type_pred =
         let open Internal_Predicates in
@@ -173,9 +174,8 @@ let assert_of_member cenv members id typ =
             (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
         | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
         | _ ->
-            failwith
-              (Printf.sprintf "unhandled struct field type for now : %s"
-                 (PrintCsyntax.name_cdecl field_name typ))
+            Fmt.failwith "unhandled struct field type for now : %s"
+              (PrintCsyntax.name_cdecl field_name typ)
       in
       let chunk =
         match access_mode_by_value typ with
@@ -221,7 +221,8 @@ let gen_pred_of_struct cenv ann struct_name =
   let struct_params =
     comp.co_members
     |> List.map @@ function
-       | Member_plain (i, _) -> (true_name i, Some Type.ListType)
+       | Member_plain (i, _) ->
+           (Var.of_string @@ true_name i, Some Type.ListType)
        | Member_bitfield _ -> failwith "Unsupported bitfield members"
   in
   let pred_params = first_params @ struct_params in
@@ -302,9 +303,9 @@ let trans_nop : CNOp.t -> NOp.t = function
   | SetUnion -> SetUnion
 
 let trans_simpl_expr : CSimplExpr.t -> Expr.t = function
-  | PVar s -> PVar s
-  | LVar s -> LVar s
-  | Loc s -> Lit (Loc s)
+  | PVar s -> PVar (Var.of_string s)
+  | LVar s -> LVar (LVar.of_string s)
+  | Loc s -> Lit (Loc (Loc.of_string s))
   | Int i -> Lit (Int i)
   | Bool b -> Lit (Bool b)
   | String s -> Lit (String s)
@@ -312,7 +313,7 @@ let trans_simpl_expr : CSimplExpr.t -> Expr.t = function
 (* The first element of the result should be a pure assertion : either a formula, or overlapping assertions,
    The second element is the list of created variables, the third is the expression to be used
 *)
-let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
+let trans_sval (sv : CSVal.t) : Asrt.t * [< Id.any_var ] Id.t list * Expr.t =
   let open CConstants.VTypes in
   let mk str v = Expr.EList [ Expr.Lit (String str); v ] in
   let tnum = types Type.NumberType in
@@ -342,7 +343,7 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
 
 (** Returns assertions that are necessary to define the expression,
       the created variable for binding when necessary, and the used expression *)
-let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
+let rec trans_expr (e : CExpr.t) : Asrt.t * [< Id.any_var ] Id.t list * Expr.t =
   match e with
   | CExpr.SExpr se -> ([], [], trans_simpl_expr se)
   | SVal sv -> trans_sval sv
@@ -389,7 +390,8 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
       let a3, v3, len = trans_expr len in
       (a1 @ a2 @ a3, v1 @ v2 @ v3, Expr.list_sub ~lst ~start ~size:len)
 
-let rec trans_form : CFormula.t -> Asrt.t * Var.t list * Expr.t = function
+let rec trans_form : CFormula.t -> Asrt.t * [< Id.any_var ] Id.t list * Expr.t =
+  function
   | True -> ([], [], Expr.true_)
   | False -> ([], [], Expr.false_)
   | Eq (ce1, ce2) ->
@@ -425,6 +427,7 @@ let rec trans_form : CFormula.t -> Asrt.t * Var.t list * Expr.t = function
       (a1 @ a2, v1 @ v2, fp1 ==> fp2)
   | ForAll (lvts, f) ->
       let a, v, fp = trans_form f in
+      let lvts = List.map (fun (x, t) -> (LVar.of_string x, t)) lvts in
       (a, v, ForAll (lvts, fp))
 
 let malloc_chunk_asrt loc beg_ofs struct_sz =
@@ -597,7 +600,7 @@ let rec trans_lcmd ~fname ~ann lcmd =
   let trans_asrt = trans_asrt ~fname ~ann in
   let make_assert ~bindings = function
     | [] | [ Asrt.Emp ] -> []
-    | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
+    | a -> [ LCmd.SL (SepAssert (a, (bindings :> Id.any_var Id.t list))) ]
   in
   match lcmd with
   | CLCmd.Apply (pn, el) ->
@@ -607,12 +610,19 @@ let rec trans_lcmd ~fname ~ann lcmd =
       let aps, bindings, gel = split3_expr_comp (List.map trans_expr el) in
       `Normal (make_assert ~bindings aps @ [ SL (Fold (pn, gel, None)) ])
   | Unfold { pred; params; bindings; recursive } ->
+      let bindings =
+        Option.map
+          (List.map (fun (l, r) -> (LVar.of_string l, LVar.of_string r)))
+          bindings
+      in
       let ap, vs, gel = split3_expr_comp (List.map trans_expr params) in
       `Normal
         (make_assert ~bindings:vs ap
         @ [ SL (Unfold (pred, gel, bindings, recursive)) ])
   | Unfold_all pred_name -> `Normal [ SL (GUnfold pred_name) ]
-  | Assert (a, ex) -> `Normal [ SL (SepAssert (trans_asrt a, ex)) ]
+  | Assert (a, ex) ->
+      let ex = List.map LVar.of_string ex in
+      `Normal [ SL (SepAssert (trans_asrt a, (ex :> Id.any_var Id.t list))) ]
   | Branch f ->
       let to_assert, bindings, f_gil = trans_form f in
       `Normal (make_assert ~bindings to_assert @ [ Branch f_gil ])
@@ -628,8 +638,9 @@ let rec trans_lcmd ~fname ~ann lcmd =
       let gcl2 = List.concat_map trans_normal_lcmd cl2 in
       `Normal (make_assert ~bindings:vs f @ [ If (ge, gcl1, gcl2) ])
   | Invariant { bindings; assertion } ->
+      let bindings = List.map LVar.of_string bindings in
       let asrt = trans_asrt assertion in
-      `Invariant (SLCmd.Invariant (asrt, bindings))
+      `Invariant (SLCmd.Invariant (asrt, (bindings :> Id.any_var Id.t list)))
   | SymbExec -> `Normal [ SL SymbExec ]
 
 let trans_asrt_annot da =
@@ -637,6 +648,7 @@ let trans_asrt_annot da =
   let exs, typsb =
     existentials
     |> ( List.map @@ fun (ex, topt) ->
+         let ex = LVar.of_string ex in
          match topt with
          | None -> (ex, Asrt.Emp)
          | Some t -> (ex, types t (Expr.LVar ex)) )
@@ -654,6 +666,7 @@ let trans_abs_pred ~filepath cl_pred =
         } =
     cl_pred
   in
+  let pred_params = List.map (fun (x, t) -> (Var.of_string x, t)) pred_params in
   let pred_num_params = List.length pred_params in
   Pred.
     {
@@ -684,6 +697,7 @@ let trans_pred ~ann ~filepath cl_pred =
         } =
     cl_pred
   in
+  let pred_params = List.map (fun (x, t) -> (Var.of_string x, t)) pred_params in
   let pred_num_params = List.length pred_params in
   let pred_definitions =
     List.map
@@ -765,7 +779,7 @@ let trans_lemma ~ann ~filepath lemma =
   Lemma.
     {
       lemma_name = name;
-      lemma_params = params;
+      lemma_params = List.map Var.of_string params;
       lemma_source_path = Some filepath;
       lemma_existentials = [];
       lemma_internal = false;
@@ -780,7 +794,7 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
     Spec.
       {
         spec_name = fname;
-        spec_params = params;
+        spec_params = List.map Var.of_string params;
         spec_sspecs = List.map (trans_sspec ~ann fname) sspecs;
         spec_normalised = false;
         spec_incomplete = false;
@@ -886,14 +900,10 @@ let predicate_from_triple (e, csmt, ct) =
   | AST.Tsingle, _ -> pred is_single
   | AST.Tfloat, _ -> pred is_float
   | _ ->
-      failwith
-        (Printf.sprintf
-           "Don't know how to handle the following type as a bispec function \
-            parameter %s"
-           (PrintAST.name_of_type csmt))
-
-let simple_predicate_from_triple (pn, _, _) =
-  Asrt.Pure (BinOp (Expr.PVar pn, Equal, Expr.LVar ("" ^ pn)))
+      Fmt.failwith
+        "Don't know how to handle the following type as a bispec function \
+         parameter %s"
+        (PrintAST.name_of_type csmt)
 
 let generate_bispec clight_prog fname ident f =
   let rec combine a b c =
@@ -907,11 +917,12 @@ let generate_bispec clight_prog fname ident f =
   let true_params = List.map true_name params in
   let clight_fun = get_clight_fun clight_prog ident in
   let cligh_params = clight_fun.Clight.fn_params in
-  let mk_lvar x = Expr.LVar ("" ^ x) in
+  let mk_lvar x = Expr.LVar (LVar.of_string x) in
   let lvars = List.map mk_lvar true_params in
   let equalities =
     List.map
-      (fun x -> Asrt.Pure (Expr.BinOp (Expr.PVar x, Equal, mk_lvar x)))
+      (fun x ->
+        Asrt.Pure (Expr.BinOp (Expr.PVar (Var.of_string x), Equal, mk_lvar x)))
       true_params
   in
   (* Right now, triples are : (param_name, csharpminor type, c type)
@@ -922,7 +933,7 @@ let generate_bispec clight_prog fname ident f =
   BiSpec.
     {
       bispec_name = fname;
-      bispec_params = true_params;
+      bispec_params = List.map Var.of_string true_params;
       bispec_pres = [ pre ];
       bispec_normalised = false;
     }

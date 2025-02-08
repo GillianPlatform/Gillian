@@ -6,7 +6,7 @@ include
      and type init_data = unit
 
 val add_debugger_variables :
-  store:(string * Gillian.Gil_syntax.Expr.t) list ->
+  store:(Gillian.Gil_syntax.Var.t * Gillian.Gil_syntax.Expr.t) list ->
   memory:t ->
   is_gil_file:bool ->
   get_new_scope_id:(unit -> int) ->

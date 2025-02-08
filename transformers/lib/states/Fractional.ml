@@ -1,4 +1,3 @@
-open Gillian.Utils
 open Gillian.Monadic
 open Gillian.Symbolic
 open Gil_syntax
@@ -99,11 +98,11 @@ let instantiate = function
   | _ -> failwith "Invalid Fractional instantiation"
 
 let lvars = function
-  | None -> Containers.SS.empty
+  | None -> LVar.Set.empty
   | Some (v, _) -> Expr.lvars v
 
 let alocs = function
-  | None -> Containers.SS.empty
+  | None -> ALoc.Set.empty
   | Some (v, _) -> Expr.alocs v
 
 let assertions = function

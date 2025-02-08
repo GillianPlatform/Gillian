@@ -33,9 +33,10 @@ let is_true = function
   | Sexplib.Sexp.Atom "true" -> true
   | _ -> false
 
-type typenv = (string, Type.t) Hashtbl.t
+type typenv = (Id.any_var Id.t, Type.t) Hashtbl.t
 
-let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
+let pp_typenv : typenv Fmt.t =
+  Fmt.(Dump.hashtbl Id.pp (Fmt.of_to_string Type.str))
 
 let encoding_cache : (Expr.Set.t, sexp list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
@@ -53,19 +54,17 @@ let quant q (vars : (sexp * sexp) list) (s : sexp) : sexp =
 
 let forall' = quant "forall"
 
-let forall (vars : (string * sexp) list) (s : sexp) : sexp =
-  let vars =
-    vars |> List.map (fun (v, t) -> (atom (sanitize_identifier v), t))
-  in
-  forall' vars s
+let forall (vars : (LVar.t * sexp) list) : sexp -> sexp =
+  vars
+  |> List.map (fun (v, t) -> (atom @@ sanitize_identifier @@ LVar.str v, t))
+  |> forall'
 
 let exists' = quant "exists"
 
-let exists (vars : (string * sexp) list) (s : sexp) : sexp =
-  let vars =
-    vars |> List.map (fun (v, t) -> (atom (sanitize_identifier v), t))
-  in
-  exists' vars s
+let exists (vars : (LVar.t * sexp) list) : sexp -> sexp =
+  vars
+  |> List.map (fun (v, t) -> (atom @@ sanitize_identifier @@ LVar.str v, t))
+  |> exists'
 
 let t_seq t = list [ atom "Seq"; t ]
 let seq_len s = atom "seq.len" <| s
@@ -508,7 +507,7 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
     | Int i -> int_zk i >- IntType
     | Num n -> real_k (Q.of_float n) >- NumberType
     | String s -> encode_string s >- StringType
-    | Loc l -> encode_string l >- ObjectType
+    | Loc l -> encode_string (Loc.str l) >- ObjectType
     | Type t -> encode_type t >- TypeType
     | LList lits ->
         let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
@@ -619,7 +618,7 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       (* If we only use an LVar as an argument to llen, then encode it as an uninterpreted function. *)
       let enc =
         match e with
-        | Expr.LVar l when SS.mem l llen_lvars -> llen <| get_list le
+        | Expr.LVar l when LVar.Set.mem l llen_lvars -> llen <| get_list le
         | _ -> seq_len (get_list le)
       in
       enc >- IntType
@@ -667,8 +666,8 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
 let encode_quantified_expr
     ~(encode_expr :
        gamma:typenv ->
-       llen_lvars:SS.t ->
-       list_elem_vars:SS.t ->
+       llen_lvars:LVar.Set.t ->
+       list_elem_vars:LVar.Set.t ->
        'a ->
        Encoding.t)
     ~mk_quant
@@ -692,8 +691,8 @@ let encode_quantified_expr
     quantified_vars
     |> List.iter (fun (x, typ) ->
            match typ with
-           | None -> Hashtbl.remove gamma x
-           | Some typ -> Hashtbl.replace gamma x typ)
+           | None -> Hashtbl.remove gamma (x :> Id.any_var Id.t)
+           | Some typ -> Hashtbl.replace gamma (x :> Id.any_var Id.t) typ)
   in
   (* Not the same gamma now!*)
   let encoded_assertion, consts, extra_asrts =
@@ -716,15 +715,17 @@ let encode_quantified_expr
   let () =
     consts
     |> Hashtbl.filter_map_inplace (fun c () ->
-           if List.mem c quantified_vars then None else Some ())
+           if List.exists (fun (var, t) -> (Id.str var, t) = c) quantified_vars
+           then None
+           else Some ())
   in
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
 let rec encode_logical_expression
     ~(gamma : typenv)
-    ~(llen_lvars : SS.t)
-    ~(list_elem_vars : SS.t)
+    ~(llen_lvars : LVar.Set.t)
+    ~(list_elem_vars : LVar.Set.t)
     (le : Expr.t) : Encoding.t =
   let open Encoding in
   let f = encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars in
@@ -733,14 +734,15 @@ let rec encode_logical_expression
   | Lit lit -> encode_lit lit
   | LVar var ->
       let kind, typ =
-        match Hashtbl.find_opt gamma var with
+        match Hashtbl.find_opt gamma (var :> Id.any_var Id.t) with
         | Some typ -> (Native typ, native_sort_of_type typ)
         | None ->
-            if SS.mem var list_elem_vars then (Simple_wrapped, t_gil_literal)
+            if LVar.Set.mem var list_elem_vars then
+              (Simple_wrapped, t_gil_literal)
             else (Extended_wrapped, t_gil_ext_literal)
       in
-      make_const ~typ kind var
-  | ALoc var -> native_const ObjectType var
+      make_const ~typ kind @@ LVar.str var
+  | ALoc var -> native_const ObjectType @@ ALoc.str var
   | PVar _ -> failwith "HORROR: Program variable in pure formula"
   | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
@@ -776,8 +778,8 @@ let rec encode_logical_expression
 
 let encode_assertion_top_level
     ~(gamma : typenv)
-    ~(llen_lvars : SS.t)
-    ~(list_elem_vars : SS.t)
+    ~(llen_lvars : LVar.Set.t)
+    ~(list_elem_vars : LVar.Set.t)
     (a : Expr.t) : Encoding.t =
   try
     encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
@@ -791,39 +793,40 @@ let encode_assertion_top_level
     let () = L.print_to_all msg in
     raise e
 
-let lvars_only_in_llen (fs : Expr.Set.t) : SS.t =
+let lvars_only_in_llen (fs : Expr.Set.t) : LVar.Set.t =
   let inspector =
     object
       inherit [_] Visitors.iter as super
-      val mutable llen_vars = SS.empty
-      val mutable other_vars = SS.empty
-      method get_diff = SS.diff llen_vars other_vars
+      val mutable llen_vars = LVar.Set.empty
+      val mutable other_vars = LVar.Set.empty
+      method get_diff = LVar.Set.diff llen_vars other_vars
 
       method! visit_expr () e =
         match e with
-        | UnOp (UnOp.LstLen, Expr.LVar l) -> llen_vars <- SS.add l llen_vars
-        | LVar l -> other_vars <- SS.add l other_vars
+        | UnOp (LstLen, LVar l) -> llen_vars <- LVar.Set.add l llen_vars
+        | LVar l -> other_vars <- LVar.Set.add l other_vars
         | _ -> super#visit_expr () e
     end
   in
   fs |> Expr.Set.iter (inspector#visit_expr ());
   inspector#get_diff
 
-let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
+let lvars_as_list_elements (assertions : Expr.Set.t) : LVar.Set.t =
   let collector =
     object (self)
       inherit [_] Visitors.reduce
-      inherit Visitors.Utils.ss_monoid
+      method private zero = LVar.Set.empty
+      method private plus = LVar.Set.union
 
       method! visit_ForAll (exclude, is_in_list) binders f =
         (* Quantified variables need to be excluded *)
         let univ_quant = List.to_seq binders |> Seq.map fst in
-        let exclude = Containers.SS.add_seq univ_quant exclude in
+        let exclude = LVar.Set.add_seq univ_quant exclude in
         self#visit_expr (exclude, is_in_list) f
 
       method! visit_Exists (exclude, is_in_list) binders e =
         let exist_quants = List.to_seq binders |> Seq.map fst in
-        let exclude = Containers.SS.add_seq exist_quants exclude in
+        let exclude = LVar.Set.add_seq exist_quants exclude in
         self#visit_expr (exclude, is_in_list) e
 
       method! visit_EList (exclude, _) es =
@@ -831,18 +834,15 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
           (fun acc e ->
             match e with
             | Expr.LVar x ->
-                if not (Containers.SS.mem x exclude) then
-                  Containers.SS.add x acc
-                else acc
+                if not (LVar.Set.mem x exclude) then LVar.Set.add x acc else acc
             | _ ->
                 let inner = self#visit_expr (exclude, true) e in
-                Containers.SS.union acc inner)
-          Containers.SS.empty es
+                LVar.Set.union acc inner)
+          LVar.Set.empty es
 
       method! visit_LVar (exclude, is_in_list) x =
-        if is_in_list && not (Containers.SS.mem x exclude) then
-          Containers.SS.singleton x
-        else Containers.SS.empty
+        if is_in_list && not (LVar.Set.mem x exclude) then LVar.Set.singleton x
+        else LVar.Set.empty
 
       method! visit_'label _ (_ : int) = self#zero
       method! visit_'annot _ () = self#zero
@@ -850,9 +850,9 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
   in
   Expr.Set.fold
     (fun f acc ->
-      let new_lvars = collector#visit_expr (SS.empty, false) f in
-      SS.union new_lvars acc)
-    assertions SS.empty
+      let new_lvars = collector#visit_expr (LVar.Set.empty, false) f in
+      LVar.Set.union new_lvars acc)
+    assertions LVar.Set.empty
 
 let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
   let open Encoding in
@@ -1008,14 +1008,14 @@ let is_sat (fs : Expr.Set.t) (gamma : typenv) : bool =
 let lift_model
     (model : sexp)
     (gamma : typenv)
-    (subst_update : string -> Expr.t -> unit)
-    (target_vars : Expr.Set.t) : unit =
+    (subst_update : LVar.t -> Expr.t -> unit)
+    (target_vars : LVar.Set.t) : unit =
   let () = reset_solver () in
   let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
     try
-      let x = x |> sanitize_identifier |> atom in
+      let x = x |> Id.str |> sanitize_identifier |> atom in
       model_eval x |> Option.some
     with UnexpectedSolverResponse _ -> None
   in
@@ -1028,8 +1028,8 @@ let lift_model
     try Some (to_z n) with UnexpectedSolverResponse _ -> None
   in
 
-  let lift_val (x : string) : Literal.t option =
-    let* gil_type = Hashtbl.find_opt gamma x in
+  let lift_val (x : [< Id.any_var ] Id.t) : Literal.t option =
+    let* gil_type = Hashtbl.find_opt gamma (x :> Id.any_var Id.t) in
     let* v = get_val x in
     match gil_type with
     | NumberType ->
@@ -1047,24 +1047,13 @@ let lift_model
 
   let () = L.verbose (fun m -> m "Inside lift_model") in
   target_vars
-  |> Expr.Set.iter (fun x ->
-         let x =
-           match x with
-           | LVar x -> x
-           | _ ->
-               failwith "INTERNAL ERROR: SMT lifting of a non-logical variable"
-         in
+  |> LVar.Set.iter (fun x ->
          let v = lift_val x in
-         let () =
-           L.verbose (fun m ->
-               let binding =
-                 v
-                 |> Option.fold
-                      ~some:(Fmt.to_to_string Literal.pp)
-                      ~none:"NO BINDING!"
-               in
-               m "SMT binding for %s: %s\n" x binding)
-         in
+         L.verbose (fun m ->
+             let binding_pp =
+               Fmt.option ~none:(Fmt.any "NO BINDING!") Literal.pp
+             in
+             m "SMT binding for %a: %a\n" Id.pp x binding_pp v);
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
 
 let () =

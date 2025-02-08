@@ -94,7 +94,7 @@ struct
   type t = {
     name : string;
     id : int * int;
-    params : string list;
+    params : Var.t list;
     pre_state : SPState.t;
     post_mp : MP.t;
     flag : Flag.t option;
@@ -123,24 +123,24 @@ struct
       (preds : (string, MP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (id : int)
       (pre : Asrt.t)
       (posts : Asrt.t list)
       (variant : Expr.t option)
       (flag : Flag.t option)
-      (label : (string * SS.t) option)
+      (label : (string * LVar.Set.t) option)
       (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
     let test_of_normalised_state id' (ss_pre, subst) =
       (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
       let lvars =
-        SS.fold
+        LVar.Set.fold
           (fun x acc ->
-            if Names.is_spec_var_name x then Expr.Set.add (Expr.LVar x) acc
+            if LVar.is_spec_var_name x then Expr.Set.add (Expr.LVar x) acc
             else acc)
           (Asrt.lvars pre) Expr.Set.empty
       in
-      let subst_dom = SSubst.domain subst None in
+      let subst_dom = SSubst.domain subst in
       let alocs =
         SSubst.fold subst
           (fun _ v_val acc ->
@@ -166,7 +166,7 @@ struct
             name
             Fmt.(
               option ~none:(any "None") (fun ft (s, e) ->
-                  Fmt.pf ft "[ %s; %a ]" s (iter ~sep:comma SS.iter string) e))
+                  pf ft "[ %s; %a ]" s (iter ~sep:comma LVar.Set.iter Id.pp) e))
             label
             Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
             spec_vars Asrt.pp pre SPState.pp ss_pre SSubst.pp subst
@@ -202,13 +202,13 @@ struct
             Expr.Set.empty params
         in
         let known_matchables =
-          Expr.Set.add (PVar Names.return_variable)
+          Expr.Set.add (PVar Id.return_variable)
             (Expr.Set.union pvar_params spec_vars)
         in
         let existentials =
           Option.fold ~none:Expr.Set.empty
             ~some:(fun (_, exs) ->
-              SS.fold
+              LVar.Set.fold
                 (fun x acc -> Expr.Set.add (LVar x) acc)
                 exs Expr.Set.empty)
             label
@@ -255,7 +255,7 @@ struct
       (* Step 1 - normalise the precondition *)
       match
         Normaliser.normalise_assertion ~init_data ~pred_defs:preds
-          ~pvars:(SS.of_list params) pre
+          ~pvars:(Var.Set.of_list params) pre
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
@@ -287,7 +287,7 @@ struct
       (preds : MP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (id : int)
       (sspec : Spec.st) : (t option * Spec.st option) list =
     let ( let+ ) x f = List.map f x in
@@ -417,9 +417,9 @@ struct
     (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
     List.iter
       (fun x ->
-        if not (SSubst.mem subst (LVar x)) then
-          SSubst.add subst (LVar x) (LVar x))
-      (SS.elements (SPState.get_spec_vars state));
+        let var = Expr.LVar (LVar.of_string (Id.str x)) in
+        if not (SSubst.mem subst var) then SSubst.add subst var var)
+      (Id.Sets.SubstSet.elements (SPState.get_spec_vars state));
 
     L.verbose (fun m ->
         m "Analyse result: About to match one postcondition of %s. post: %a"
@@ -491,7 +491,7 @@ struct
               let store = SPState.get_store final_state in
               let () =
                 SStore.filter_map_inplace store (fun x v ->
-                    if x = Names.return_variable then Some v else None)
+                    if x = Id.return_variable then Some v else None)
               in
               let subst = make_post_subst test final_state in
               if analyse_result subst test final_state then (

@@ -39,7 +39,7 @@ struct
       (state : State.t)
       (cs : Call_stack.t)
       (i : int)
-      (x : string)
+      (x : Var.t)
       (pid : string)
       (v_args : Val.t list)
       (j : int option) =

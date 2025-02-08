@@ -11,8 +11,6 @@ type field_value = Expr.t [@@deriving yojson]
 (* Definition *)
 type t = field_value Expr.Map.t [@@deriving yojson]
 
-let gsbsts = Expr.substitutables
-
 (* Printing *)
 let pp ft sfvl =
   let open Fmt in
@@ -77,18 +75,19 @@ let add_with_test
   add actual_ofs new_val sfvl
 
 (** Returns the logical variables occuring in --sfvl-- *)
-let lvars (sfvl : t) : SS.t =
+let lvars (sfvl : t) : LVar.Set.t =
   let gllv = Expr.lvars in
   Expr.Map.fold
-    (fun e_field e_val ac -> SS.union ac (SS.union (gllv e_field) (gllv e_val)))
-    sfvl SS.empty
+    (fun e_field e_val ac ->
+      LVar.Set.union ac (LVar.Set.union (gllv e_field) (gllv e_val)))
+    sfvl LVar.Set.empty
 
 (** Returns the abstract locations occuring in --sfvl-- *)
-let alocs (sfvl : t) : SS.t =
+let alocs (sfvl : t) : ALoc.Set.t =
   Expr.Map.fold
     (fun e_field e_val ac ->
-      SS.union ac (SS.union (Expr.alocs e_field) (Expr.alocs e_val)))
-    sfvl SS.empty
+      ALoc.Set.union ac (ALoc.Set.union (Expr.alocs e_field) (Expr.alocs e_val)))
+    sfvl ALoc.Set.empty
 
 (* Substitution *)
 let substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t =

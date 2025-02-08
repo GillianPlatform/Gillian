@@ -6,6 +6,13 @@
 
 (** @canonical Gillian.General.Subst.S *)
 module type S = sig
+  type +'a id := 'a Id.t
+
+  (** Type of GIL variable and abstract location names  *)
+  type keys := Id.substable
+
+  type kt := keys id
+
   (** Type of GIL values *)
   type vt
 
@@ -13,7 +20,7 @@ module type S = sig
   type t
 
   (** Substitution constructor, with a list of bindings of the form (variable, value) *)
-  val init : (Var.t * vt) list -> t
+  val init : ([< keys ] id * vt) list -> t
 
   (** Is the substitution empty? *)
   val is_empty : t -> bool
@@ -22,43 +29,43 @@ module type S = sig
   val clear : t -> unit
 
   (** Domain of the substitution *)
-  val domain : t -> (Var.t -> bool) option -> Var.Set.t
+  val domain : t -> (kt -> bool) option -> Id.Sets.SubstSet.t
 
   (** Range of the substitution *)
   val range : t -> vt list
 
   (** Substitution lookup *)
-  val get : t -> Var.t -> vt option
+  val get : t -> kt -> vt option
 
   (** Substitution incremental update *)
-  val add : t -> Var.t -> vt -> unit
+  val add : t -> kt -> vt -> unit
 
   (** Substitution update *)
-  val put : t -> Var.t -> vt -> unit
+  val put : t -> kt -> vt -> unit
 
   (** Substitution membership *)
-  val mem : t -> Var.t -> bool
+  val mem : t -> kt -> bool
 
   (** Substitution copy *)
   val copy : t -> t
 
   (** Substitution extension with a list of bindings *)
-  val extend : t -> (Var.t * vt) list -> unit
+  val extend : t -> (kt * vt) list -> unit
 
   (** Substution merge into left *)
   val merge_left : t -> t -> unit
 
   (** Substitution filter *)
-  val filter : t -> (Var.t -> vt -> bool) -> t
+  val filter : t -> (kt -> vt -> bool) -> t
 
   (** Substitution variable filter *)
-  val projection : t -> Var.Set.t -> t
+  val projection : t -> Id.Sets.SubstSet.t -> t
 
   (** Substitution iterator *)
-  val iter : t -> (Var.t -> vt -> unit) -> unit
+  val iter : t -> (kt -> vt -> unit) -> unit
 
   (** Substitution fold *)
-  val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
+  val fold : t -> (kt -> vt -> 'a -> 'a) -> 'a -> 'a
 
   (** Pretty Printer *)
   val pp : Format.formatter -> t -> unit
@@ -66,10 +73,10 @@ module type S = sig
   (** Full pretty Printer *)
   val full_pp : Format.formatter -> t -> unit
 
-  val filter_in_place : t -> (Var.t -> vt -> vt option) -> unit
+  val filter_in_place : t -> (kt -> vt -> vt option) -> unit
 
   (** Convert substitution to list *)
-  val to_list : t -> (Var.t * vt) list
+  val to_list : t -> (kt * vt) list
 
   (** Substitution inside a logical expression *)
   val subst_in_expr : t -> partial:bool -> Expr.t -> Expr.t
@@ -85,11 +92,14 @@ end
 module Make (Val : Val.S) : S with type vt = Val.t = struct
   module L = Logging
 
+  type ktv = Id.substable
+  type kt = ktv Id.t
+
   (** Type of GIL values *)
   type vt = Val.t
 
   (** Type of GIL substitutions, implemented as hashtables *)
-  type t = (Var.t, vt) Hashtbl.t
+  type t = (kt, vt) Hashtbl.t
 
   (**
     Substitution constructor
@@ -97,9 +107,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param vars_les Bindings of the form (variable, value)
     @return Substitution with the given bindings
   *)
-  let init (vars_les : (Var.t * vt) list) : t =
+  let init (vars_les : ([< ktv ] Id.t * vt) list) : t =
     let subst = Hashtbl.create Config.big_tbl_size in
-    List.iter (fun (v, v_val) -> Hashtbl.replace subst v v_val) vars_les;
+    List.iter (fun (v, v_val) -> Hashtbl.replace subst (v :> kt) v_val) vars_les;
     subst
 
   let clear (subst : t) : unit = Hashtbl.clear subst
@@ -111,15 +121,16 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param filter_out Optional filtering function
     @return Domain of the (filtered) substitution
   *)
-  let domain (subst : t) (filter_out : (Var.t -> bool) option) : Var.Set.t =
+  let domain (subst : t) (filter_out : (kt -> bool) option) : Id.Sets.SubstSet.t
+      =
     let filter =
       match filter_out with
       | Some filter -> filter
       | None -> fun _ -> false
     in
     Hashtbl.fold
-      (fun k _ ac -> if filter k then ac else Var.Set.add k ac)
-      subst Var.Set.empty
+      (fun k _ ac -> if filter k then ac else Id.Sets.SubstSet.add k ac)
+      subst Id.Sets.SubstSet.empty
 
   (**
     Substitution range
@@ -137,7 +148,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @return Resulting (optional) value
   *)
-  let get (subst : t) (x : Var.t) : vt option = Hashtbl.find_opt subst x
+  let get (subst : t) (x : kt) : vt option = Hashtbl.find_opt subst x
 
   (**
     Substitution incremental update
@@ -146,7 +157,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @param v Target value
   *)
-  let add (subst : t) (x : Var.t) (v : vt) : unit = Hashtbl.add subst x v
+  let add (subst : t) (x : kt) (v : vt) : unit = Hashtbl.add subst x v
 
   (**
     Substitution update
@@ -155,7 +166,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @param v Target value
   *)
-  let put (subst : t) (x : Var.t) (v : vt) : unit = Hashtbl.replace subst x v
+  let put (subst : t) (x : kt) (v : vt) : unit = Hashtbl.replace subst x v
 
   (**
     Substitution membership
@@ -164,7 +175,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @return Returns true if the variable is in the domain of the substitution, and false otherwise
   *)
-  let mem (subst : t) (x : Var.t) : bool = Hashtbl.mem subst x
+  let mem (subst : t) (x : kt) : bool = Hashtbl.mem subst x
 
   (**
     Substitution copy
@@ -180,7 +191,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store Target substitution
     @param extend
   *)
-  let extend (subst : t) (vars_les : (Var.t * vt) list) : unit =
+  let extend (subst : t) (vars_les : (kt * vt) list) : unit =
     List.iter (fun (v, v_val) -> Hashtbl.replace subst v v_val) vars_les
 
   (**
@@ -189,7 +200,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param subst Target substitution
     @param f Iterator function
   *)
-  let iter (subst : t) (f : Var.t -> vt -> unit) : unit = Hashtbl.iter f subst
+  let iter (subst : t) (f : kt -> vt -> unit) : unit = Hashtbl.iter f subst
 
   (**
     Substitution fold
@@ -216,7 +227,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param filter Filtering function
     @return The new, filtered substitution
   *)
-  let filter (subst : t) (filter : Var.t -> vt -> bool) : t =
+  let filter (subst : t) (filter : kt -> vt -> bool) : t =
     let new_subst = copy subst in
     Hashtbl.filter_map_inplace
       (fun v v_val ->
@@ -233,8 +244,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param vars Variables to save
     @return The new, filtered substitution
   *)
-  let projection (subst : t) (vars : Var.Set.t) : t =
-    filter subst (fun x _ -> Var.Set.mem x vars)
+  let projection (subst : t) (vars : Id.Sets.SubstSet.t) : t =
+    filter subst (fun x _ -> Id.Sets.SubstSet.mem x vars)
 
   (**
     Substitution pretty_printer
@@ -244,7 +255,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return unit
   *)
   let pp fmt (subst : t) =
-    let pp_pair fmt (v, v_val) = Fmt.pf fmt "@[<h>(%s: %a)@]" v Val.pp v_val in
+    let pp_pair fmt (v, v_val) =
+      Fmt.pf fmt "@[<h>(%a: %a)@]" Id.pp v Val.pp v_val
+    in
     Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
 
   (**
@@ -256,7 +269,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   *)
   let full_pp fmt (subst : t) =
     let pp_pair fmt (v, v_val) =
-      Fmt.pf fmt "@[<h>(%s: %a)@]" v Val.full_pp v_val
+      Fmt.pf fmt "@[<h>(%a: %a)@]" Id.pp v Val.full_pp v_val
     in
     Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
 
@@ -267,7 +280,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param filter Filtering function
     @return Filtered substitution
   *)
-  let filter_in_place (subst : t) (filter : Var.t -> vt -> vt option) : unit =
+  let filter_in_place (subst : t) (filter : kt -> vt -> vt option) : unit =
     Hashtbl.filter_map_inplace filter subst
 
   (**
@@ -276,7 +289,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @params subst Target substitution
     @return List of bindings of the form (variable, value)
   *)
-  let to_list (subst : t) : (Var.t * vt) list =
+  let to_list (subst : t) : (kt * vt) list =
     Hashtbl.fold (fun v v_val ac -> (v, v_val) :: ac) subst []
 
   (**
@@ -287,10 +300,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Expression resulting from the substitution, with fresh locations created.
   *)
   let subst_in_expr (subst : t) ~(partial : bool) (le : Expr.t) : Expr.t =
-    let find_in_subst
-        (x : Var.t)
-        (le_x_old : Expr.t)
-        (make_new_x : unit -> Expr.t) : Expr.t =
+    let find_in_subst (x : kt) (le_x_old : Expr.t) (make_new_x : unit -> Expr.t)
+        : Expr.t =
       match get subst x with
       | Some v -> Val.to_expr v
       | None -> (
@@ -309,30 +320,33 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         val mutable self_subst = init []
 
         method! visit_LVar () this x =
-          find_in_subst x this (fun () -> Expr.LVar (LVar.alloc ()))
+          find_in_subst (x :> kt) this (fun () -> Expr.LVar (LVar.alloc ()))
 
         method! visit_ALoc () this x =
-          find_in_subst x this (fun () -> Expr.ALoc (LVar.alloc ()))
+          find_in_subst (x :> kt) this (fun () -> Expr.ALoc (ALoc.alloc ()))
 
         method! visit_PVar () this x =
-          find_in_subst x this (fun () ->
-              let lvar = LVar.alloc () in
-              L.(
-                verbose (fun m ->
-                    m
-                      "General: Subst in lexpr: PVar %s not in subst, \
-                       generating fresh: %s"
-                      x lvar));
-              Expr.LVar lvar)
+          find_in_subst (x :> kt) this @@ fun () ->
+          let lvar = LVar.alloc () in
+          L.verbose (fun m ->
+              m
+                "General: Subst in lexpr: PVar %a not in subst, generating \
+                 fresh: %a"
+                Var.pp x LVar.pp lvar);
+          Expr.LVar lvar
 
         method! visit_Exists () this bt e =
           let binders = List.to_seq bt |> Seq.map fst in
           let binder_substs =
             binders
             |> Seq.filter_map (fun x ->
-                   Option.map (fun x_v -> (x, x_v)) (get self_subst x))
+                   Option.map
+                     (fun x_v -> ((x :> kt), x_v))
+                     (get self_subst (x :> kt)))
           in
-          Seq.iter (fun x -> put self_subst x (Val.from_lvar_name x)) binders;
+          Seq.iter
+            (fun x -> put self_subst (x :> kt) (Val.from_lvar_name x))
+            binders;
           let new_expr = self#visit_expr () e in
           Seq.iter (fun (x, le_x) -> put self_subst x le_x) binder_substs;
           if new_expr == e then this else Exists (bt, new_expr)
@@ -342,9 +356,13 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           let binder_substs =
             binders
             |> Seq.filter_map (fun x ->
-                   Option.map (fun x_v -> (x, x_v)) (get self_subst x))
+                   Option.map
+                     (fun x_v -> ((x :> kt), x_v))
+                     (get self_subst (x :> kt)))
           in
-          Seq.iter (fun x -> put self_subst x (Val.from_lvar_name x)) binders;
+          Seq.iter
+            (fun x -> put self_subst (x :> kt) (Val.from_lvar_name x))
+            binders;
           let new_expr = self#visit_expr () e in
           Seq.iter (fun (x, le_x) -> put self_subst x le_x) binder_substs;
           if new_expr == e then this else ForAll (bt, new_expr)
@@ -361,7 +379,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   *)
   let subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
     let f_before : Expr.t -> Expr.t option * bool = function
-      | LVar x | ALoc x | PVar x -> (Option.map Val.to_expr (get subst x), false)
+      | LVar x -> (Option.map Val.to_expr (get subst (x :> kt)), false)
+      | ALoc x -> (Option.map Val.to_expr (get subst (x :> kt)), false)
+      | PVar x -> (Option.map Val.to_expr (get subst (x :> kt)), false)
       | _ -> (Some le, true)
     in
     Expr.map_opt f_before None le

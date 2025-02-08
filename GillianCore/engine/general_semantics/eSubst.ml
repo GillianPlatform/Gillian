@@ -24,7 +24,7 @@ module type S = sig
   val clear : t -> unit
 
   (** Domain of the e-substitution *)
-  val domain : t -> (Expr.t -> bool) option -> Expr.Set.t
+  val domain : t -> Expr.Set.t
 
   (** Range of the e-substitution *)
   val range : t -> vt list
@@ -69,7 +69,8 @@ module type S = sig
   val full_pp : Format.formatter -> t -> unit
 
   (** Selective Pretty Printer *)
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+  val pp_by_need :
+    Var.Set.t -> LVar.Set.t -> ALoc.Set.t -> Format.formatter -> t -> unit
 
   val filter_in_place : t -> (Expr.t -> vt -> vt option) -> unit
 
@@ -90,7 +91,6 @@ module type S = sig
 end
 
 module Make (Val : Val.S) : S with type vt = Val.t = struct
-  open Containers
   module L = Logging
 
   (** Type of GIL values *)
@@ -132,15 +132,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param filter_out Optional filtering function
     @return Domain of the (filtered) substitution
   *)
-  let domain (subst : t) (filter_out : (Expr.t -> bool) option) : Expr.Set.t =
-    let filter =
-      match filter_out with
-      | Some filter -> filter
-      | None -> fun _ -> false
-    in
-    Hashtbl.fold
-      (fun e _ ac -> if filter e then ac else Expr.Set.add e ac)
-      subst Expr.Set.empty
+  let domain (subst : t) : Expr.Set.t =
+    Hashtbl.fold (fun e _ ac -> Expr.Set.add e ac) subst Expr.Set.empty
 
   (**
     Substitution range
@@ -284,25 +277,19 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     in
     Fmt.pf fmt "@[<hv 2>[ %a ]@]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
 
-  let pp_by_need (filter_vars : Containers.SS.t) fmt (subst : t) =
+  let pp_by_need f_pvars f_lvars f_alocs fmt (subst : t) =
     let pp_pair fmt (e, e_val) =
       Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.pp e_val
     in
-    let bindings = fold subst (fun x t ac -> (x, t) :: ac) [] in
     let bindings =
-      List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings
-    in
-    let bindings =
-      List.filter
-        (fun (v, _) ->
-          let pvars, lvars, alocs =
-            (Expr.pvars v, Expr.lvars v, Expr.alocs v)
-          in
-          Containers.SS.inter
-            (SS.union pvars (SS.union lvars alocs))
-            filter_vars
-          <> Containers.SS.empty)
-        bindings
+      fold subst (fun x t ac -> (x, t) :: ac) []
+      |> List.filter (fun (v, _) ->
+             not
+               ((Var.Set.is_empty @@ Var.Set.inter f_pvars @@ Expr.pvars v)
+               && (LVar.Set.is_empty @@ LVar.Set.inter f_lvars @@ Expr.lvars v)
+               && (ALoc.Set.is_empty @@ ALoc.Set.inter f_alocs @@ Expr.alocs v)
+               ))
+      |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
     in
     Fmt.pf fmt "@[<hv 2>[ %a ]@]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
 
@@ -390,12 +377,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         self#find_in_subst
           ~make_new_x:(fun () ->
             let lvar = LVar.alloc () in
-            L.(
-              verbose (fun m ->
-                  m
-                    "General: Subst in lexpr: PVar %s not in subst, generating \
-                     fresh: %s"
-                    x lvar));
+            L.verbose (fun m ->
+                m
+                  "General: Subst in lexpr: PVar %a not in subst, generating \
+                   fresh: %a"
+                  Var.pp x LVar.pp lvar);
             Expr.LVar lvar)
           this
 

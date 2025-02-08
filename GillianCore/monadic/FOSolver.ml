@@ -1,9 +1,5 @@
-module FOSolver = Engine.FOSolver
-module PFS = Engine.PFS
-module Type_env = Engine.Type_env
-module Reduction = Engine.Reduction
-module Expr = Gil_syntax.Expr
-module Typing = Engine.Typing
+open Engine
+open Gil_syntax
 
 (** FIXME: optimization? *)
 let build_full_pfs (pc : Pc.t) =
@@ -32,20 +28,18 @@ let sat ~(pc : Pc.t) formula =
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
   try
-    let f =
-      Engine.Reduction.reduce_lexpr ~matching:pc.matching ~gamma ~pfs formula
-    in
+    let f = Reduction.reduce_lexpr ~matching:pc.matching ~gamma ~pfs formula in
     match f with
     | Lit (Bool b) -> b
     | _ ->
-        FOSolver.check_entailment ~matching:pc.matching
-          Utils.Containers.SS.empty pfs [ f ] gamma
-  with Engine.Reduction.ReductionException (e, msg) ->
+        FOSolver.check_entailment ~matching:pc.matching LVar.Set.empty pfs [ f ]
+          gamma
+  with Reduction.ReductionException (e, msg) ->
     Logging.verbose (fun m ->
         m
           "check_entailment: couldn't check due to an error reducing %a - %s\n\
            Formula:%a"
-          Gil_syntax.Expr.pp e msg Expr.pp formula);
+          Expr.pp e msg Expr.pp formula);
     false
 
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =

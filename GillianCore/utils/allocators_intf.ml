@@ -1,16 +1,16 @@
 module type S = sig
-  type t [@@deriving yojson, eq, ord]
+  type t [@@deriving yojson, eq, ord, show]
 
   val alloc : unit -> t
   val dealloc : t -> unit
   val eq : t -> t -> bool
   val reset : unit -> unit
+  val str : t -> string
 end
 
 module type S_with_stringify = sig
   include S
 
-  val to_string : t -> string
   val of_string : string -> t
 end
 
@@ -34,20 +34,20 @@ module type Intf = sig
   end
 
   (** @canonical Gillian.Utils.Allocators.Basic
-  
+
     A basic int allocator
-      
+
     Automatically registers a resetter *)
   module Basic () : S_with_stringify with type t = int
 
   (** @canonical Gillian.Utils.Allocators.Make_with_prefix
-  
+
     Wraps an allocator [A] with a string prefix
-      
+
     Assumes that [A]'s resetter has already been registered *)
   module Make_with_prefix
       (A : S_with_stringify)
       (P : sig
         val prefix : string
-      end) : S with type t = string
+      end) : S_with_stringify with type t = string
 end

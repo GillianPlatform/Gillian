@@ -14,7 +14,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:Id.Sets.SubstSet.t ->
     unit ->
     t
 
@@ -43,7 +43,6 @@ module Make (State : SState.S) :
      and type heap_t = State.heap_t
      and type m_err_t = State.m_err_t
      and type init_data = State.init_data = struct
-  open Containers
   open Literal
   module L = Logging
   module SMatcher = Matcher.Make (State)
@@ -119,7 +118,7 @@ module Make (State : SState.S) :
       ~(store : store_t)
       ~(pfs : PFS.t)
       ~(gamma : Type_env.t)
-      ~(spec_vars : SS.t)
+      ~(spec_vars : Id.Sets.SubstSet.t)
       () : t =
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
     let variants = Hashtbl.create 1 in
@@ -250,19 +249,20 @@ module Make (State : SState.S) :
       (State.pp_by_need pvars lvars locs)
       state Preds.pp preds Wands.pp wands
 
-  let add_spec_vars (astate : t) (vs : Var.Set.t) : t =
+  let add_spec_vars (astate : t) (vs : Id.Sets.SubstSet.t) : t =
     let state = State.add_spec_vars astate.state vs in
     { astate with state }
 
-  let get_spec_vars (astate : t) : Var.Set.t = State.get_spec_vars astate.state
+  let get_spec_vars (astate : t) : Id.Sets.SubstSet.t =
+    State.get_spec_vars astate.state
 
-  let get_lvars (astate : t) : Var.Set.t =
+  let get_lvars (astate : t) : LVar.Set.t =
     let { state; preds; wands; _ } = astate in
     State.get_lvars state
-    |> SS.union (Preds.get_lvars preds)
-    |> SS.union (Wands.get_lvars wands)
+    |> LVar.Set.union (Preds.get_lvars preds)
+    |> LVar.Set.union (Wands.get_lvars wands)
 
-  let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
+  let to_assertions ?to_keep (astate : t) : Asrt.t =
     let { state; preds; wands; _ } = astate in
     let s_asrts = State.to_assertions ?to_keep state in
     let p_asrts = Preds.to_assertions preds in
@@ -295,7 +295,7 @@ module Make (State : SState.S) :
         })
       (State.substitution_in_place ~subst_all subst state)
 
-  let update_store (state : t) (x : string option) (v : Expr.t) : t =
+  let update_store (state : t) (x : Var.t option) (v : Expr.t) : t =
     match x with
     | None -> state
     | Some x ->
@@ -307,12 +307,12 @@ module Make (State : SState.S) :
   (* FIXME: This needs to change -> we need to return a matching ret type, so we can
       compose with bi-abduction at the spec level *)
   let run_spec_aux
-      ?(existential_bindings : (string * vt) list option)
+      ?(existential_bindings : (LVar.t * vt) list option)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (mp : MP.t)
       (astate : t)
-      (x : string option)
+      (x : Var.t option)
       (args : vt list) : (t * Flag.t, SMatcher.err_t) Res_list.t =
     L.verbose (fun m ->
         m "INSIDE RUN spec of %s with the following MP:@\n%a@\n" name MP.pp mp);
@@ -365,7 +365,7 @@ module Make (State : SState.S) :
     (* OK FOR DELAY ENTAILMENT *)
     let* final_state = SMatcher.produce_posts frame_state subst posts in
     let final_store = get_store final_state in
-    let v_ret = SStore.get final_store Names.return_variable in
+    let v_ret = SStore.get final_store Id.return_variable in
     let final_state = set_store final_state (SStore.copy old_store) in
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
@@ -376,8 +376,8 @@ module Make (State : SState.S) :
     in
     Ok (with_unfolded_concrete, fl)
 
-  let fresh_subst (xs : SS.t) : SVal.SESubst.t =
-    let xs = SS.elements xs in
+  let fresh_subst (xs : LVar.Set.t) : SVal.SESubst.t =
+    let xs = LVar.Set.elements xs in
     let bindings =
       List.map (fun x -> (Expr.LVar x, Expr.LVar (LVar.alloc ()))) xs
     in
@@ -387,10 +387,10 @@ module Make (State : SState.S) :
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvars_subst =
-      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (LVar.Set.elements lvars)
     in
     let alocs_subst =
-      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (ALoc.Set.elements alocs)
     in
     let subst_lst = lvars_subst @ alocs_subst in
     SVal.SESubst.init subst_lst
@@ -411,15 +411,16 @@ module Make (State : SState.S) :
     { state; preds; wands = Wands.init []; pred_defs; variants }
 
   let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
-    if not (List.for_all Names.is_lvar_name binders) then
-      failwith "Binding of pure variables in *-assert.";
+    (* With type-checked variables, this can be removed I think.
+       if not (List.for_all (fun x -> Names.is_lvar_name @@ LVar.str x) binders)
+       then failwith "Binding of pure variables in *-assert."; *)
     let store = State.get_store astate.state in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
-    let pvars_diff = SS.diff pvars_a pvars_store in
-    (if not (SS.is_empty pvars_diff) then
+    let pvars_diff = Var.Set.diff pvars_a pvars_store in
+    (if not (Var.Set.is_empty pvars_diff) then
        let pvars_errs : err_t list =
-         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+         List.map (fun pvar : err_t -> EVar pvar) (Var.Set.elements pvars_diff)
        in
        raise (Internal_State_Error (pvars_errs, astate)));
     let store_subst = SStore.to_ssubst store in
@@ -427,12 +428,12 @@ module Make (State : SState.S) :
     (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
     let state_lvars = State.get_lvars astate.state in
     let known_lvars =
-      SS.elements
-        (SS.diff (SS.inter state_lvars (Asrt.lvars a)) (SS.of_list binders))
+      LVar.Set.(
+        elements (diff (inter state_lvars (Asrt.lvars a)) (of_list binders)))
     in
     let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
     let asrt_alocs =
-      List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+      List.map (fun x -> Expr.ALoc x) (ALoc.Set.elements (Asrt.alocs a))
     in
     let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
@@ -448,12 +449,14 @@ module Make (State : SState.S) :
     let mp =
       MP.init known_matchables Expr.Set.empty pred_ins [ (a, (None, None)) ]
     in
-    let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
-    if not (SS.is_empty vars_to_forget) then (
+    let vars_to_forget =
+      LVar.Set.inter state_lvars (LVar.Set.of_list binders)
+    in
+    if not (LVar.Set.is_empty vars_to_forget) then (
       let oblivion_subst = fresh_subst vars_to_forget in
       L.verbose (fun m ->
           m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
+            Fmt.(iter ~sep:comma LVar.Set.iter Id.pp)
             vars_to_forget SVal.SESubst.pp oblivion_subst);
 
       (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
@@ -513,7 +516,8 @@ module Make (State : SState.S) :
         let result =
           let** new_astate = SMatcher.produce new_state full_subst a_produce in
           let new_state' =
-            State.add_spec_vars new_astate.state (SS.of_list binders)
+            State.add_spec_vars new_astate.state
+              (Id.Sets.SubstSet.of_list (binders :> Id.substable Id.t list))
           in
           let subst, new_states =
             State.simplify ~kill_new_lvars:true new_state'
@@ -555,10 +559,10 @@ module Make (State : SState.S) :
     let store = State.get_store astate.state in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
-    let pvars_diff = SS.diff pvars_a pvars_store in
-    (if not (SS.is_empty pvars_diff) then
+    let pvars_diff = Var.Set.diff pvars_a pvars_store in
+    (if not (Var.Set.is_empty pvars_diff) then
        let pvars_errs : err_t list =
-         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+         List.map (fun pvar : err_t -> EVar pvar) (Var.Set.elements pvars_diff)
        in
        raise (Internal_State_Error (pvars_errs, astate)));
     let store_subst = SStore.to_ssubst store in
@@ -580,31 +584,36 @@ module Make (State : SState.S) :
       (revisited : bool)
       (astate : t)
       (a : Asrt.t)
-      (binders : string list) : (t * t, err_t) Res_list.t =
+      (binders : Id.any_var Id.t list) : (t * t, err_t) Res_list.t =
     let store = State.get_store astate.state in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
-    let pvars_diff = SS.diff pvars_a pvars_store in
-    L.verbose (fun m -> m "%s" (String.concat ", " (SS.elements pvars_diff)));
-    (if not (SS.is_empty pvars_diff) then
+    let pvars_diff = Var.Set.diff pvars_a pvars_store in
+    L.verbose (fun m ->
+        m "%a" Fmt.(iter ~sep:comma Var.Set.iter Id.pp) pvars_diff);
+    (if not (Var.Set.is_empty pvars_diff) then
        let pvars_errs : err_t list =
-         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+         List.map (fun pvar : err_t -> EVar pvar) (Var.Set.elements pvars_diff)
        in
        raise (Internal_State_Error (pvars_errs, astate)));
     let lvar_binders, pvar_binders =
-      List.partition Names.is_lvar_name binders
+      List.partition_map
+        (fun x ->
+          let x = Id.str x in
+          if Names.is_lvar_name x then Left (LVar.of_string x)
+          else Right (Var.of_string x))
+        binders
     in
-    let known_pvars = List.map Expr.from_var_name (SS.elements pvars_a) in
+    let known_pvars = List.map Expr.var_to_expr (Var.Set.elements pvars_a) in
     let state_lvars = State.get_lvars astate.state in
     let known_lvars =
-      SS.elements
-        (SS.diff
-           (SS.inter state_lvars (Asrt.lvars a))
-           (SS.of_list lvar_binders))
+      LVar.Set.(
+        elements
+          (diff (inter state_lvars (Asrt.lvars a)) (of_list lvar_binders)))
     in
     let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
     let asrt_alocs =
-      List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+      List.map (fun x -> Expr.ALoc x) (ALoc.Set.elements (Asrt.alocs a))
     in
     let known_matchables =
       Expr.Set.of_list (known_pvars @ known_lvars @ asrt_alocs)
@@ -623,12 +632,14 @@ module Make (State : SState.S) :
     in
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
-    let vars_to_forget = SS.inter state_lvars (SS.of_list lvar_binders) in
-    if vars_to_forget <> SS.empty then (
+    let vars_to_forget =
+      LVar.Set.inter state_lvars (LVar.Set.of_list lvar_binders)
+    in
+    if not @@ LVar.Set.is_empty vars_to_forget then (
       let oblivion_subst = fresh_subst vars_to_forget in
       L.verbose (fun m ->
           m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
+            Fmt.(iter ~sep:comma LVar.Set.iter Id.pp)
             vars_to_forget SVal.SESubst.pp oblivion_subst);
 
       (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
@@ -713,7 +724,7 @@ module Make (State : SState.S) :
                 (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp))))
             bindings);
       let known_pvars =
-        SS.elements (SS.diff pvars_a (SS.of_list pvar_binders))
+        Var.Set.elements (Var.Set.diff pvars_a (Var.Set.of_list pvar_binders))
       in
       let bindings =
         (if revisited then new_bindings @ bindings else bindings)
@@ -728,8 +739,7 @@ module Make (State : SState.S) :
       let pvar_subst_list_known =
         List.map
           (fun x ->
-            ( Expr.PVar x,
-              Option.get (SStore.get (State.get_store astate.state) x) ))
+            (Expr.PVar x, SStore.get_unsafe (State.get_store astate.state) x))
           known_pvars
       in
       let pvar_subst_list_bound =
@@ -768,7 +778,9 @@ module Make (State : SState.S) :
       match res with
       | Ok new_astate ->
           let new_state' =
-            State.add_spec_vars new_astate.state (SS.of_list lvar_binders)
+            State.add_spec_vars new_astate.state
+              (Id.Sets.SubstSet.of_list
+                 (lvar_binders :> Id.substable Id.t list))
           in
           let invariant_state = { new_astate with state = new_state' } in
           let _, invariant_states =
@@ -907,32 +919,39 @@ module Make (State : SState.S) :
           let _, astates = simplify ~kill_new_lvars:true astate in
           Res_list.just_oks astates
       | SepAssert (a, binders) -> (
-          if not (List.for_all Names.is_lvar_name binders) then
-            failwith "Binding of pure variables in *-assert.";
+          if
+            not (List.for_all (fun x -> Names.is_lvar_name @@ Id.str x) binders)
+          then failwith "Binding of pure variables in *-assert.";
           let store = State.get_store astate.state in
           let pvars_store = SStore.domain store in
           let pvars_a = Asrt.pvars a in
-          let pvars_diff = SS.diff pvars_a pvars_store in
+          let pvars_diff = Var.Set.diff pvars_a pvars_store in
           L.verbose (fun m ->
-              m "%s" (String.concat ", " (SS.elements pvars_diff)));
-          (if not (SS.is_empty pvars_diff) then
+              m "%a" Fmt.(iter ~sep:comma Var.Set.iter Id.pp) pvars_diff);
+          (if not (Var.Set.is_empty pvars_diff) then
              let pvars_errs : err_t list =
-               List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+               List.map
+                 (fun pvar : err_t -> EVar pvar)
+                 (Var.Set.elements pvars_diff)
              in
              raise (Internal_State_Error (pvars_errs, astate)));
           let store_subst = SStore.to_ssubst store in
           let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
           (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
           let state_lvars = State.get_lvars astate.state in
+          (* TODO: can binders even be PVars? *)
+          let binders_as_lvars =
+            binders |> List.map (fun s -> LVar.of_string @@ Id.str s)
+          in
           let known_lvars =
-            SS.elements
-              (SS.diff
-                 (SS.inter state_lvars (Asrt.lvars a))
-                 (SS.of_list binders))
+            LVar.Set.(
+              elements
+              @@ diff (inter state_lvars @@ Asrt.lvars a)
+              @@ LVar.Set.of_list binders_as_lvars)
           in
           let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
           let asrt_alocs =
-            List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+            List.map (fun x -> Expr.ALoc x) (ALoc.Set.elements (Asrt.alocs a))
           in
           let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
@@ -949,12 +968,14 @@ module Make (State : SState.S) :
             MP.init known_matchables Expr.Set.empty pred_ins
               [ (a, (None, None)) ]
           in
-          let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
-          if not (SS.is_empty vars_to_forget) then (
+          let vars_to_forget =
+            LVar.Set.inter state_lvars (LVar.Set.of_list binders_as_lvars)
+          in
+          if not (LVar.Set.is_empty vars_to_forget) then (
             let oblivion_subst = fresh_subst vars_to_forget in
             L.verbose (fun m ->
                 m "Forget @[%a@] with subst: %a"
-                  Fmt.(iter ~sep:comma SS.iter string)
+                  Fmt.(iter ~sep:comma LVar.Set.iter Id.pp)
                   vars_to_forget SVal.SESubst.pp oblivion_subst);
 
             (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
@@ -989,7 +1010,7 @@ module Make (State : SState.S) :
           match matching_result with
           | Ok (new_state, subst', _) ->
               (* Successful matching *)
-              let lbinders = List.map (fun x -> Expr.LVar x) binders in
+              let lbinders = List.map (fun x -> Expr.LVar x) binders_as_lvars in
               let new_bindings =
                 List.map (fun e -> (e, SVal.SESubst.get subst' e)) lbinders
               in
@@ -1026,7 +1047,9 @@ module Make (State : SState.S) :
                   SMatcher.produce new_state full_subst a_produce
                 in
                 let new_state' =
-                  State.add_spec_vars new_astate.state (SS.of_list binders)
+                  State.add_spec_vars new_astate.state
+                    (Id.Sets.SubstSet.of_list
+                       (binders_as_lvars :> Id.substable Id.t list))
                 in
                 let subst, new_states =
                   State.simplify ~kill_new_lvars:true new_state'
@@ -1064,31 +1087,42 @@ module Make (State : SState.S) :
               in
               L.print_to_all msg;
               Res_list.error_with (StateErr.EPure fail_pfs))
-      | Consume (asrt, binders) -> consume ~prog astate asrt binders
+      | Consume (asrt, binders) -> (
+          (* TODO: check if type of Consume can be changed to only accept lvars. *)
+          match Id.as_lvars binders with
+          | None -> failwith "Binding of pure variables in *-assert."
+          | Some binders ->
+              consume ~prog astate asrt
+                (List.map (fun x -> LVar.of_string @@ Id.str x) binders))
       | Produce asrt -> produce astate asrt
-      | ApplyLem (lname, args, binders) ->
-          if not (List.for_all Names.is_lvar_name binders) then
-            failwith "Binding of pure variables in lemma application.";
-          let lemma =
-            match MP.get_lemma prog lname with
-            | Error _ -> Fmt.failwith "Lemma %s does not exist" lname
-            | Ok lemma -> lemma
-          in
-          let v_args : vt list = List.map eval_expr args in
-          (* Printf.printf "apply lemma. binders: %s. existentials: %s\n\n"
-             (String.concat ", " binders) (String.concat ", " lemma.lemma.existentials); *)
-          let existential_bindings =
-            List.map2
-              (fun x y -> (x, Expr.LVar y))
-              lemma.data.lemma_existentials binders
-          in
-          let** astate, _ =
-            run_spec_aux ~existential_bindings lname lemma.data.lemma_params
-              lemma.mp astate None v_args
-          in
-          let astate = add_spec_vars astate (Var.Set.of_list binders) in
-          let _, astates = simplify ~matching:true astate in
-          Res_list.just_oks astates
+      | ApplyLem (lname, args, binders) -> (
+          (* TODO: check if type of ApplyLem can be changed to only accept lvars. *)
+          match Id.as_lvars binders with
+          | None -> failwith "Binding of pure variables in lemma application."
+          | Some binders ->
+              let lemma =
+                match MP.get_lemma prog lname with
+                | Error _ -> Fmt.failwith "Lemma %s does not exist" lname
+                | Ok lemma -> lemma
+              in
+              let v_args : vt list = List.map eval_expr args in
+              (* Printf.printf "apply lemma. binders: %s. existentials: %s\n\n"
+                 (String.concat ", " binders) (String.concat ", " lemma.lemma.existentials); *)
+              let existential_bindings =
+                List.map2
+                  (fun x y -> (x, Expr.LVar y))
+                  lemma.data.lemma_existentials binders
+              in
+              let** astate, _ =
+                run_spec_aux ~existential_bindings lname lemma.data.lemma_params
+                  lemma.mp astate None v_args
+              in
+              let astate =
+                add_spec_vars astate
+                  (Id.Sets.SubstSet.of_list (binders :> Id.substable Id.t list))
+              in
+              let _, astates = simplify ~matching:true astate in
+              Res_list.just_oks astates)
       | Invariant _ ->
           raise
             (Failure "Invariant must be treated by the match_invariant function")
@@ -1099,17 +1133,13 @@ module Make (State : SState.S) :
   let run_spec
       (spec : MP.spec)
       (astate : t)
-      (x : string)
+      (x : Var.t)
       (args : vt list)
-      (subst : (string * (string * vt) list) option) :
+      (subst : (string * (LVar.t * vt) list) option) :
       (t * Flag.t, err_t) Res_list.t =
-    match subst with
-    | None ->
-        run_spec_aux spec.data.spec_name spec.data.spec_params spec.mp astate
-          (Some x) args
-    | Some (_, subst_lst) ->
-        run_spec_aux ~existential_bindings:subst_lst spec.data.spec_name
-          spec.data.spec_params spec.mp astate (Some x) args
+    let existential_bindings = Option.map snd subst in
+    run_spec_aux ?existential_bindings spec.data.spec_name spec.data.spec_params
+      spec.mp astate (Some x) args
 
   let matches
       (astate : t)

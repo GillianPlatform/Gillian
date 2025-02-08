@@ -66,28 +66,24 @@ val substitution : SVal.SESubst.t -> t -> unit
 val subst_expr_for_expr : Expr.t -> Expr.t -> t -> unit
 
 (** [lvars pfs] returns the set containing all the lvars occurring in [pfs] *)
-val lvars : t -> Containers.SS.t
+val lvars : t -> LVar.Set.t
 
 (** Returns the set containing all the alocs occurring in --pfs-- *)
-val alocs : t -> Containers.SS.t
+val alocs : t -> ALoc.Set.t
 (** [alocs pfs] returns the set containing all the abstract locations occurring in [pfs] *)
 
 (** [clocs pfs] returns the set containing all the concrete locations occurring in [pfs] *)
-val clocs : t -> Containers.SS.t
+val clocs : t -> Loc.Set.t
 
 (** [pp fmt pfs] prints the pure formulae [pfs] *)
 val pp : Format.formatter -> t -> unit
 
-(** [pp pvars lvars locs fmt pfs] prints the pure formulae [pfs] relevnt to [pvars], [lvars] and [locs] *)
+(** [pp pvars lvars locs fmt pfs] prints the pure formulae [pfs] relevnt to [pvars], [lvars] and [alocs] *)
 val pp_by_need :
-  Containers.SS.t * Containers.SS.t * Containers.SS.t ->
-  Format.formatter ->
-  t ->
-  unit
+  Var.Set.t * LVar.Set.t * Id.Sets.LocSet.t -> Format.formatter -> t -> unit
 
 (** [filter_with_info pvars lvars locs pfs] returns only the pfs relevant to [pvars], [lvars], and [locs]*)
-val filter_with_info :
-  Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t
+val filter_with_info : Var.Set.t * LVar.Set.t * Id.Sets.LocSet.t -> t -> t
 
 (** [sort pfs] sorts the pure formulae [pfs] *)
 val sort : t -> unit
@@ -96,11 +92,11 @@ val remove_duplicates : t -> unit
 val clean_up : t -> unit
 
 val get_relevant_info :
-  Containers.SS.t ->
-  Containers.SS.t ->
-  Containers.SS.t ->
+  Var.Set.t ->
+  LVar.Set.t ->
+  Id.Sets.LocSet.t ->
   t ->
-  Containers.SS.t * Containers.SS.t * Containers.SS.t
+  Var.Set.t * LVar.Set.t * Id.Sets.LocSet.t
 
 val filter_map_stop :
   (Expr.t -> [ `Stop | `Filter | `Replace of Expr.t ]) -> t -> bool

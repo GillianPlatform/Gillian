@@ -1,4 +1,5 @@
 open JS_Parser.Syntax
+module Var = Gil_syntax.Var
 
 (********************************************)
 (********************************************)
@@ -470,7 +471,7 @@ let var_decls_inner exp =
     if not state then ac
     else
       match exp.exp_stx with
-      | VarDec vars -> List.map (fun (v, _) -> v) vars @ ac
+      | VarDec vars -> List.map (fun (v, _) -> Var.of_string v) vars @ ac
       | _ -> ac
   in
   let f_state exp state =
@@ -481,7 +482,8 @@ let var_decls_inner exp =
   js_fold f_ac f_state true exp
 
 let var_decls exp =
-  List.sort_uniq Stdlib.compare (var_decls_inner exp) @ [ "arguments" ]
+  List.sort_uniq Stdlib.compare (var_decls_inner exp)
+  @ [ Var.of_string "arguments" ]
 
 let get_fun_decls exp =
   let f_ac exp _ _ ac =
@@ -519,7 +521,7 @@ let get_all_vars_f f_body f_args =
     List.map
       (fun f ->
         match f.exp_stx with
-        | Function (_, Some name, _, _) -> name
+        | Function (_, Some name, _, _) -> Var.of_string name
         | _ ->
             raise
               (Failure

@@ -518,6 +518,7 @@ struct
       Type_env.to_list typ_env
       |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
       |> List.map (fun (name, value) ->
+             let name = Id.str name in
              let value = Type.str value in
              { name; value; type_ = None; var_ref = 0 })
       |> List.sort (fun v w -> Stdlib.compare v.name w.name)

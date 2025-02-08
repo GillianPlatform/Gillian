@@ -60,7 +60,7 @@ type 'e t_base_sat := 'e MyUtils.ExpMap.t
 type 'e t_base_ent := 'e MyUtils.ExpMapEnt.t
 type 'e t_split_sat := 'e MyUtils.ExpMap.t * 'e MyUtils.ExpMap.t
 type 'e t_split_ent := 'e MyUtils.ExpMapEnt.t * 'e MyUtils.ExpMapEnt.t
-type 'e t_aloc := 'e MyUtils.SMap.t
+type 'e t_aloc := 'e MyUtils.LMap.t
 
 module BaseImplSat : functor (I : PMapIndex) (S : MyMonadicSMemory.S) ->
   PMapImpl with type t = S.t t_base_sat and type entry = S.t

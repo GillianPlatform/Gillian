@@ -230,10 +230,12 @@ module PatchedALocPMap (S : MyMonadicSMemory) = struct
   let pp ft (h : t) =
     let open Fmt in
     let sorted_locs_with_vals =
-      States.MyUtils.SMap.bindings h
-      |> List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2)
+      States.MyUtils.LMap.bindings h
+      |> List.sort (fun (k1, _) (k2, _) -> Id.compare k1 k2)
     in
-    let pp_one ft (loc, fv_pairs) = pf ft "@[%s |-> %a@]" loc S.pp fv_pairs in
+    let pp_one ft (loc, fv_pairs) =
+      pf ft "@[%a |-> %a@]" Id.pp loc S.pp fv_pairs
+    in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
 end
 
@@ -246,8 +248,6 @@ module PatchAlloc
     (Map : OpenPMapType with type entry = Obj.t) =
 struct
   include Map
-  module SS = Gillian.Utils.Containers.SS
-  module SMap = States.MyUtils.SMap
 
   (* Patch the alloc action *)
   let execute_action a s args =
@@ -256,7 +256,8 @@ struct
     | "alloc", [ idx; v ] ->
         let* idx =
           match idx with
-          | Expr.Lit Empty -> Delayed.return (Some (ALoc.alloc ()))
+          | Expr.Lit Empty ->
+              Delayed.return (Some (ALoc.alloc () :> Id.any_loc Id.t))
           | _ -> States.MyUtils.get_loc idx
         in
         let idx =

@@ -109,7 +109,7 @@ module M : Memory_S with type init_data = unit = struct
   let alloc (heap : t) (loc : vt option) (mv : vt) : action_ret =
     let new_loc =
       match loc with
-      | None -> Generators.fresh_loc ()
+      | None -> Loc.alloc ()
       | Some (Loc loc) -> loc
       | _ -> raise (Failure "C Allocation: non-loc loc argument")
     in

@@ -1,5 +1,4 @@
 open Gil_syntax
-open Utils.Containers
 open Monadic
 
 type missingResourceType =
@@ -38,8 +37,8 @@ val empty : t
 val freed : t
 val is_empty : t -> bool
 val is_empty_or_freed : t -> bool
-val lvars : t -> SS.t
-val alocs : t -> SS.t
+val lvars : t -> LVar.Set.t
+val alocs : t -> ALoc.Set.t
 val cons_bounds : t -> (Range.t option * t) or_error
 val prod_bounds : t -> Range.t option -> t or_error
 
@@ -85,7 +84,7 @@ val allocated_function : t
     [dst_tree] after modification *)
 val move : t -> Expr.t -> t -> Expr.t -> Expr.t -> t d_or_error
 
-val assertions : loc:string -> t -> Asrt.t
+val assertions : loc:Id.any_loc Id.t -> t -> Asrt.t
 
 val substitution :
   le_subst:(Expr.t -> Expr.t) ->
@@ -106,7 +105,7 @@ module Lift : sig
       ?children:Variable.t list ->
       unit ->
       Variable.t) ->
-    loc:string ->
+    loc:Id.any_loc Id.t ->
     t ->
     Variable.t
 end

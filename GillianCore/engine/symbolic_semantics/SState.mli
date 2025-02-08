@@ -10,7 +10,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:Id.Sets.SubstSet.t ->
     t
 
   val init : init_data -> t

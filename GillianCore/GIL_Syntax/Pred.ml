@@ -3,9 +3,9 @@ type t = TypeDef__.pred = {
   pred_source_path : string option;
   pred_internal : bool;
   pred_num_params : int;  (** Number of parameters   *)
-  pred_params : (string * Type.t option) list;  (** Actual parameters      *)
+  pred_params : (Id.Var.t * Type.t option) list;  (** Actual parameters      *)
   pred_ins : int list;  (** Ins                    *)
-  pred_definitions : ((string * string list) option * Asrt.t) list;
+  pred_definitions : ((string * Id.LVar.t list) option * Asrt.t) list;
       (** Predicate definitions  *)
   pred_facts : Expr.t list;  (** Facts that hold for every definition *)
   pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
@@ -34,7 +34,7 @@ let ins_and_outs (pred : t) : SI.t * SI.t =
   let outs_set = SI.of_list outs in
   (ins_set, outs_set)
 
-let in_params (pred : t) : string list =
+let in_params (pred : t) : Id.Var.t list =
   let ins_set = SI.of_list pred.pred_ins in
   let _, ins =
     List.fold_left
@@ -146,7 +146,7 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
     let all_pred_pvars : string list =
       List.concat
         (List.map
-           (fun (_, ass) -> SS.elements (Asrt.pvars ass))
+           (fun (_, ass) -> Id.Var.Set.elements (Asrt.pvars ass))
            predicate.pred_definitions)
     in
 

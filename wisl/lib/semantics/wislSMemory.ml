@@ -34,12 +34,10 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
          add to the path condition that it is equal to the given loc *)
     let resolved_loc_opt = resolve_loc pfs gamma loc in
     match resolved_loc_opt with
-    | Some loc_name ->
-        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
-        else (loc_name, [])
+    | Some loc_name -> (loc_name, [])
     | None ->
         let al = ALoc.alloc () in
-        (al, [ Expr.BinOp (Expr.ALoc al, Equal, loc) ])
+        ((al :> Id.any_loc Id.t), [ Expr.BinOp (Expr.ALoc al, Equal, loc) ])
   in
   match WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value with
   | Error e -> Error [ e ]
@@ -72,12 +70,10 @@ let set_bound heap pfs gamma (loc : vt) (bound : int) =
          add to the path condition that it is equal to the given loc *)
     let resolved_loc_opt = resolve_loc pfs gamma loc in
     match resolved_loc_opt with
-    | Some loc_name ->
-        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
-        else (loc_name, [])
+    | Some loc_name -> (loc_name, [])
     | None ->
         let al = ALoc.alloc () in
-        (al, [ Expr.BinOp (ALoc al, Equal, loc) ])
+        ((al :> Id.any_loc Id.t), [ Expr.BinOp (ALoc al, Equal, loc) ])
   in
   match WislSHeap.set_bound heap loc_name bound with
   | Error e -> Error [ e ]
@@ -109,12 +105,10 @@ let set_freed heap pfs gamma (loc : vt) =
          add to the path condition that it is equal to the given loc *)
     let resolved_loc_opt = resolve_loc pfs gamma loc in
     match resolved_loc_opt with
-    | Some loc_name ->
-        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
-        else (loc_name, [])
+    | Some loc_name -> (loc_name, [])
     | None ->
         let al = ALoc.alloc () in
-        (al, [ Expr.BinOp (ALoc al, Equal, loc) ])
+        ((al :> Id.any_loc Id.t), [ Expr.BinOp (ALoc al, Equal, loc) ])
   in
   let () = WislSHeap.set_freed heap loc_name in
   Ok [ (heap, [], new_pfs, []) ]
@@ -134,7 +128,7 @@ let alloc heap _pfs _gamma (size : int) =
   Ok
     [
       ( heap,
-        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
+        [ Expr.loc_from_loc_name loc; Expr.Lit (Literal.Int Z.zero) ],
         [],
         [] );
     ]
@@ -265,7 +259,7 @@ let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 let pp_by_need _ fmt h = pp fmt h
 
 (* TODO: Implement properly *)
-let get_print_info _ _ = (SS.empty, SS.empty)
+let get_print_info _ _ = (LVar.Set.empty, Id.Sets.LocSet.empty)
 
 let pp_err fmt t =
   match t with

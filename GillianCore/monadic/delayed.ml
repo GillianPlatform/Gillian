@@ -1,5 +1,4 @@
-module Expr = Gil_syntax.Expr
-module Type = Gil_syntax.Type
+open Gil_syntax
 
 exception NonExhaustiveEntailment of Expr.t list
 
@@ -19,7 +18,12 @@ let resolve ~curr_pc p = p ~curr_pc
 (** When using Branching, it should be certain that the paths are complete *)
 
 let return ?(learned = []) ?(learned_types = []) final_value ~curr_pc =
-  let new_pc = Pc.extend (Pc.extend_types curr_pc learned_types) learned in
+  let new_pc =
+    Pc.extend
+      (Pc.extend_types curr_pc
+         (learned_types :> (Id.any_var Id.t * Type.t) list))
+      learned
+  in
   [ Branch.make ~pc:new_pc ~value:final_value ]
 
 let vanish () ~curr_pc = []

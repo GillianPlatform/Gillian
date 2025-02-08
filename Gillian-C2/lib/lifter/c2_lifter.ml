@@ -370,7 +370,8 @@ struct
         let> pid =
           match CmdReport.(cmd_report.cmd) with
           | Call (_, Lit (String pid), _, _, _)
-          | ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
+          | ECall (_, Lit (String pid), _, _) -> Some pid
+          | ECall (_, PVar pid, _, _) -> Some (Var.str pid)
           | _ -> None
         in
         let kind =

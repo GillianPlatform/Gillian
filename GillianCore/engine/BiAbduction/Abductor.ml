@@ -29,7 +29,7 @@ module Make
 
   type bi_state_t = SBAState.t
   type result_t = SBAInterpreter.result_t
-  type t = { name : string; params : string list; state : bi_state_t }
+  type t = { name : string; params : Var.t list; state : bi_state_t }
   type annot = PC.Annot.t
   type init_data = PC.init_data
 
@@ -37,10 +37,12 @@ module Make
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvar_bindings =
-      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (LVar.Set.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (Expr.LVar x, Expr.ALoc x)) (SS.elements alocs)
+      List.map
+        (fun x -> (Expr.LVar (LVar.of_string @@ ALoc.str x), Expr.ALoc x))
+        (ALoc.Set.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -56,7 +58,7 @@ module Make
   let make_spec
       (_ : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (bi_state_i : bi_state_t)
       (bi_state_f : bi_state_t)
       (fl : Flag.t) : Spec.t option =
@@ -68,7 +70,7 @@ module Make
       (* let _              = SBAState.simplify ~kill_new_lvars:true bi_state_f in *)
       let state_i, _ = SBAState.get_components bi_state_i in
       let state_f, state_af = SBAState.get_components bi_state_f in
-      let pvars = SS.of_list (Names.return_variable :: params) in
+      let pvars = Var.Set.of_list (Id.return_variable :: params) in
 
       L.verbose (fun m ->
           m
@@ -78,12 +80,12 @@ module Make
              @[<v 2>Final STATE:@\n\
              %a@]"
             name
-            Fmt.(list ~sep:comma string)
+            Fmt.(list ~sep:comma Id.pp)
             params SPState.pp state_af SPState.pp state_f);
       (* Drop all pvars except ret/err from the state *)
       let () =
         SStore.filter_map_inplace (SPState.get_store state_f) (fun x v ->
-            if x = Names.return_variable then Some v else None)
+            if x = Id.return_variable then Some v else None)
       in
       let* post =
         let _, finals_simplified =
@@ -112,11 +114,11 @@ module Make
       in
       let post_clocs = Asrt.clocs post in
       let pre_clocs = Asrt.clocs pre in
-      let new_clocs = SS.diff post_clocs pre_clocs in
+      let new_clocs = Loc.Set.diff post_clocs pre_clocs in
       let subst = Hashtbl.create Config.medium_tbl_size in
       List.iter
         (fun cloc -> Hashtbl.replace subst cloc (Expr.ALoc (ALoc.alloc ())))
-        (SS.elements new_clocs);
+        (Loc.Set.elements new_clocs);
       let subst_fun cloc =
         match Hashtbl.find_opt subst cloc with
         | Some e -> e
@@ -153,14 +155,14 @@ module Make
                the spec:@\n\
                %a@]"
               name
-              Fmt.(list ~sep:comma string)
+              Fmt.(list ~sep:comma Id.pp)
               params Spec.pp spec);
         Some spec
 
   let testify ~init_data ~(prog : annot MP.prog) (bi_spec : BiSpec.t) : t list =
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
     let proc_names = Prog.get_proc_names prog.prog in
-    let params = SS.of_list bi_spec.bispec_params in
+    let params = Var.Set.of_list bi_spec.bispec_params in
     let normalise =
       Normaliser.normalise_assertion ~init_data ~pred_defs:prog.preds
         ~pvars:params
@@ -187,7 +189,10 @@ module Make
       (prog : annot MP.prog)
       (test : t) : (Spec.t * Flag.t) list =
     let state = SBAState.copy test.state in
-    let state = SBAState.add_spec_vars state (SBAState.get_lvars state) in
+    let state =
+      SBAState.add_spec_vars state
+        (Id.Sets.lvar_to_subst @@ SBAState.get_lvars state)
+    in
     try
       let opt_results =
         SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
@@ -214,7 +219,7 @@ module Make
   let process_sym_exec_result
       (prog : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (state_i : bi_state_t)
       (result : result_t) : (Spec.t * Flag.t) option =
     let open Syntaxes.Option in

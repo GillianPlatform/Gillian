@@ -63,7 +63,7 @@ module CBMC_names = struct
 end
 
 module Gillian_C2_names = struct
-  let return_by_copy_name = "i___ret"
+  let return_by_copy_name = Gil_syntax.Var.of_string "i___ret"
   let ret_label = "ret"
 end
 

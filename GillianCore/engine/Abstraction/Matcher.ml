@@ -74,7 +74,7 @@ module type S = sig
     end
   end
 
-  type unfold_info_t = (string * string) list
+  type unfold_info_t = (LVar.t * LVar.t) list
 
   val produce_assertion :
     t -> SVal.SESubst.t -> Asrt.atom -> (t, err_t) Res_list.t
@@ -142,7 +142,6 @@ end
 module Make (State : SState.S) :
   S with type state_t = State.t and type err_t = State.err_t = struct
   open Literal
-  open Containers
   module L = Logging
 
   type state_t = State.t [@@deriving yojson]
@@ -162,7 +161,7 @@ module Make (State : SState.S) :
   type s_state = t * SVal.SESubst.t * MP.t
   type search_state = s_state list * err_t list
   type search_state' = (s_state * L.Report_id.t option) list * err_t list
-  type unfold_info_t = (string * string) list
+  type unfold_info_t = (LVar.t * LVar.t) list
 
   (* This is mostly to do with Gillian legacy.
      We have to handle UX and OX separately, or otherwise
@@ -180,8 +179,12 @@ module Make (State : SState.S) :
         (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
         variants
 
-    let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate
-        =
+    let pp_astate_by_need
+        (pvars : Var.Set.t)
+        (lvars : LVar.Set.t)
+        (locs : Id.Sets.LocSet.t)
+        fmt
+        astate =
       let { state; preds; wands; variants; _ } = astate in
       Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\nWANDS:@\n%a@\nVARIANTS:@\n%a@\n"
         (State.pp_by_need pvars lvars locs)
@@ -317,7 +320,7 @@ module Make (State : SState.S) :
     else if State.assert_a state [ f ] then Success state
     else Abort f
 
-  let update_store (astate : t) (x : string) (v : Expr.t) : t =
+  let update_store (astate : t) (x : Var.t) (v : Expr.t) : t =
     let store = State.get_store astate.state in
     let () = SStore.put store x v in
     let state' = State.set_store astate.state store in
@@ -466,12 +469,10 @@ module Make (State : SState.S) :
     (* Strategy 4: Predicate has non-literal parameters in pure formulae *)
     let strategy_4 ~state ((name, args) : string * Expr.t list) : int =
       print_local_info 4 name args;
-      let lvars_state = State.get_spec_vars state in
-      let lvars_args =
-        List.fold_left SS.union SS.empty (List.map Expr.lvars args)
-      in
-      let inter = SS.inter lvars_args lvars_state in
-      SS.cardinal inter
+      let lvars_state = Id.Sets.substset_to_lvar @@ State.get_spec_vars state in
+      List.map Expr.lvars args
+      |> List.fold_left LVar.Set.union LVar.Set.empty
+      |> LVar.Set.inter lvars_state |> LVar.Set.cardinal
   end
 
   let consume_pred_with_vs
@@ -652,8 +653,8 @@ module Make (State : SState.S) :
             L.verbose (fun m ->
                 m
                   "UNHAPPY. update_store inside produce assertions with prog \
-                   variable: %s!!!\n"
-                  x);
+                   variable: %a!!!\n"
+                  Id.pp x);
             Res_list.return (update_store astate x v))
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
@@ -760,9 +761,10 @@ module Make (State : SState.S) :
                  | _ -> ());
              Some state)
 
-  let complete_subst (subst : SVal.SESubst.t) (lab : string * SS.t) : unit =
+  let complete_subst (subst : SVal.SESubst.t) (lab : string * LVar.Set.t) : unit
+      =
     let _, existentials = lab in
-    SS.iter
+    LVar.Set.iter
       (fun x ->
         let lvar = Expr.LVar x in
         if not (SVal.SESubst.mem subst lvar) then
@@ -778,7 +780,7 @@ module Make (State : SState.S) :
   let extend_subst_with_bindings
       (state : State.t)
       (subst : SVal.SESubst.t)
-      (bindings : (string * string) list) : unit =
+      (bindings : (LVar.t * LVar.t) list) : unit =
     let bindings =
       List.map
         (fun (x, y) -> (Expr.LVar y, State.eval_expr state (Expr.LVar x)))
@@ -829,11 +831,13 @@ module Make (State : SState.S) :
 
     L.verbose (fun m ->
         m "unfold with unfold_info with additional bindings@\n%a@\n"
-          Fmt.(Dump.list (pair string string))
+          Fmt.(Dump.list (pair Id.pp Id.pp))
           additional_bindings);
 
     let new_spec_vars =
-      List.to_seq additional_bindings |> Seq.map fst |> SS.of_seq
+      (List.to_seq additional_bindings |> Seq.map fst
+        :> Id.substable Id.t Seq.t)
+      |> Id.Sets.SubstSet.of_seq
     in
     let () = extend_subst_with_bindings state subst_i additional_bindings in
     let definitions =
@@ -1103,7 +1107,9 @@ module Make (State : SState.S) :
         fmt "Obtained exprs: %a" Fmt.(brackets (list ~sep:semi Expr.pp)) eos);
     (* Substitution of the program variables *)
     let pvar_subst_bindings =
-      List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) vos
+      List.mapi
+        (fun i v -> (Expr.PVar (Var.of_string (string_of_int i)), v))
+        vos
     in
     let pvar_subst = SVal.SESubst.init pvar_subst_bindings in
     L.verbose (fun fmt -> fmt "Parameter subst\n%a" SVal.SESubst.pp pvar_subst);
@@ -1165,52 +1171,50 @@ module Make (State : SState.S) :
     let { state; wands; preds; pred_defs; variants } = astate in
 
     let assertion_loggable =
+      let open Id.Sets in
       let+ () = if L.Mode.enabled () then Some () else None in
       let a = fst step in
-      (* Get pvars, lvars, locs from the assertion *)
-      let a_pvars, a_lvars, a_locs =
-        (Asrt.pvars [ a ], Asrt.lvars [ a ], Asrt.locs [ a ])
+      (* Get pvars, lvars, alocs from the assertion *)
+      let a_pvars, a_lvars, a_alocs =
+        (Asrt.pvars [ a ], Asrt.lvars [ a ], Asrt.alocs [ a ])
       in
-      let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
 
       (* From the subst, we take any pair that has any of those and collect
          the pvars, lvars, and alocs, from their values *)
-      let s_pvars, s_lvars, s_locs =
+      let s_pvars, s_lvars, s_alocs =
         SVal.SESubst.fold subst
-          (fun e v (s_pvars, s_lvars, s_locs) ->
-            let pvars, lvars, locs =
-              (Expr.pvars e, Expr.lvars e, Expr.locs e)
-            in
+          (fun e v (s_pvars, s_lvars, s_alocs) ->
             if
-              Containers.SS.inter
-                (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
-                filter_vars
-              <> SS.empty
-            then
-              ( SS.union s_pvars (Expr.pvars v),
-                SS.union s_lvars (Expr.lvars v),
-                SS.union s_locs (Expr.locs v) )
-            else (s_pvars, s_lvars, s_locs))
-          (SS.empty, SS.empty, SS.empty)
+              (Var.Set.is_empty @@ Var.Set.inter a_pvars @@ Expr.pvars e)
+              && (LVar.Set.is_empty @@ LVar.Set.inter a_lvars @@ Expr.lvars e)
+              && (ALoc.Set.is_empty @@ ALoc.Set.inter a_alocs @@ Expr.alocs e)
+            then (s_pvars, s_lvars, s_alocs)
+            else
+              ( Var.Set.union s_pvars @@ Expr.pvars v,
+                LVar.Set.union s_lvars @@ Expr.lvars v,
+                ALoc.Set.union s_alocs @@ Expr.alocs v ))
+          (Var.Set.empty, LVar.Set.empty, ALoc.Set.empty)
       in
 
       let subst_pp =
         match !Config.pbn with
         | false -> SVal.SESubst.pp
-        | true ->
-            SVal.SESubst.pp_by_need (SS.union a_pvars (SS.union a_lvars a_locs))
+        | true -> SVal.SESubst.pp_by_need a_pvars a_lvars a_alocs
       in
 
-      let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
-
       L.verbose (fun fmt ->
-          fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars)
-            pp_str_list (SS.elements s_lvars) pp_str_list (SS.elements s_locs));
+          fmt "Substs:\n%a\n%a\n%a"
+            Fmt.(brackets @@ iter ~sep:comma Var.Set.iter Id.pp)
+            s_pvars
+            Fmt.(brackets @@ iter ~sep:comma LVar.Set.iter Id.pp)
+            s_lvars
+            Fmt.(brackets @@ iter ~sep:comma ALoc.Set.iter Id.pp)
+            s_alocs);
 
       let pp_astate =
         match !Config.pbn with
         | false -> pp_astate
-        | true -> pp_astate_by_need s_pvars s_lvars s_locs
+        | true -> pp_astate_by_need s_pvars s_lvars (aloc_to_loc s_alocs)
       in
 
       AssertionReport.to_loggable pp_astate subst_pp
@@ -1463,7 +1467,7 @@ module Make (State : SState.S) :
                 m
                   "Reached LabelStep, about to complete substitution with \
                    vars: %a"
-                  Fmt.(Dump.iter SS.iter nop string)
+                  Fmt.(Dump.iter LVar.Set.iter nop Id.pp)
                   (snd label));
             complete_subst subst label;
             let current_state = ((astate, subst, rest_mp), prev_id) in
@@ -1873,15 +1877,15 @@ module Make (State : SState.S) :
     type split_answer = {
       init_subst : State.st;
       mp : MP.t;
-      fold_outs_info : State.st * MP.step * string list * Expr.t list;
+      fold_outs_info : State.st * MP.step * Var.t list * Expr.t list;
     }
 
     let matchables expr =
       let lvars =
-        Expr.lvars expr |> SS.to_seq |> Seq.map (fun x -> Expr.LVar x)
+        Expr.lvars expr |> LVar.Set.to_seq |> Seq.map (fun x -> Expr.LVar x)
       in
       let alocs =
-        Expr.alocs expr |> SS.to_seq |> Seq.map Expr.loc_from_loc_name
+        Expr.alocs expr |> ALoc.Set.to_seq |> Seq.map (fun x -> Expr.ALoc x)
       in
       Seq.append lvars alocs
 
@@ -1940,7 +1944,9 @@ module Make (State : SState.S) :
             MP.KB.to_seq kb |> Seq.map (fun x -> (x, x)) |> SVal.SESubst.of_seq
           in
           let out_params =
-            List.mapi (fun i _ -> "out___" ^ string_of_int i) outs
+            List.mapi
+              (fun i _ -> Var.of_string @@ "out___" ^ string_of_int i)
+              outs
           in
           (* Now we build our assertion *)
           let+ new_ins_l, new_outs_learn =
@@ -1958,14 +1964,11 @@ module Make (State : SState.S) :
                 Expr.LVar (LVar.alloc ()))
           in
           let pvar_subst =
-            let seq =
-              Seq.concat
-              @@ Seq.init cp_amount (fun i ->
-                     Seq.init out_amount (fun j ->
-                         let id = Fmt.str "%d:%d" i j in
-                         (Expr.PVar id, all_new_outs.((i * out_amount) + j))))
-            in
-            SVal.SESubst.of_seq seq
+            SVal.SESubst.of_seq @@ Seq.concat
+            @@ Seq.init cp_amount (fun i ->
+                   Seq.init out_amount (fun j ->
+                       let id = Var.of_string @@ Fmt.str "%d:%d" i j in
+                       (Expr.PVar id, all_new_outs.((i * out_amount) + j))))
           in
           let new_cps =
             List.mapi
@@ -2015,7 +2018,9 @@ module Make (State : SState.S) :
       let open Syntaxes.List in
       let outs = snd step in
       let pvar_subst =
-        List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) obtained
+        List.mapi
+          (fun i v -> (Expr.PVar (Var.of_string @@ string_of_int i), v))
+          obtained
         |> SVal.SESubst.init
       in
       let outs =
@@ -2088,7 +2093,7 @@ module Make (State : SState.S) :
                     (fun x ->
                       match SVal.SESubst.get state.subst (PVar x) with
                       | Some x -> x
-                      | None -> Fmt.failwith "Did not learn %s ??" x)
+                      | None -> Fmt.failwith "Did not learn %a ??" Id.pp x)
                     out_params
                 in
                 let+ state =

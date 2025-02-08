@@ -252,11 +252,18 @@ let mangle_proc proc mangled_syms =
       inherit [_] Gillian.Gil_syntax.Visitors.endo as super
 
       method! visit_proc env proc =
-        let proc_params = List.map mangle_var proc.proc_params in
+        let proc_params =
+          List.map
+            (fun x ->
+              Gil_syntax.Var.of_string @@ mangle_var @@ Gil_syntax.Var.str x)
+            proc.proc_params
+        in
         let proc = super#visit_proc env proc in
         { proc with proc_params }
 
-      method! visit_PVar _ _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
+      method! visit_PVar _ _ var =
+        Gillian.Gil_syntax.Expr.PVar
+          Gil_syntax.Id.Var.(of_string @@ mangle_var @@ str var)
 
       method! visit_Loc _ _ str =
         Gillian.Gil_syntax.Literal.Loc (mangle_symbol str)
@@ -457,7 +464,7 @@ let parse_and_compile_files paths =
       (fun a b ->
         match (a, b) with
         | ( Cmd.Call (_, _, Lit (Loc a) :: _, _, _),
-            Cmd.Call (_, _, Lit (Loc b) :: _, _, _) ) -> String.compare a b
+            Cmd.Call (_, _, Lit (Loc b) :: _, _, _) ) -> Loc.compare a b
         | _ -> failwith "Wrong init cmd")
       (init_cmds @ genv_init_cmds)
   in

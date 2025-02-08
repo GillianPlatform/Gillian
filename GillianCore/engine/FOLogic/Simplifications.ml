@@ -4,17 +4,17 @@ module SB = Containers.SB
 
 type simpl_key_type = {
   kill_new_lvars : bool option;
-  gamma_list : (Var.t * Type.t) list;
+  gamma_list : (Id.any_var Id.t * Type.t) list;
   pfs_list : Expr.t list;
-  existentials : SS.t;
+  existentials : LVar.Set.t;
   matching : bool;
-  save_spec_vars : (SS.t * bool) option; (* rpfs_lvars  : CCommon.SS.t *)
+  save_spec_vars : (LVar.Set.t * bool) option; (* rpfs_lvars  : CCommon.SS.t *)
 }
 
 type simpl_val_type = {
-  simpl_gamma : (Var.t * Type.t) list;
+  simpl_gamma : (Id.any_var Id.t * Type.t) list;
   simpl_pfs : Expr.t list;
-  simpl_existentials : SS.t;
+  simpl_existentials : LVar.Set.t;
   subst : SVal.SESubst.t;
 }
 
@@ -85,7 +85,7 @@ let get_num_set_intersections pfs =
                 Or,
                 BinOp (LVar elem, FLessThan, LVar z) ) )
         when x = y && x = z ->
-          L.(verbose (fun m -> m "Got left: %s, %s" elem set));
+          L.verbose (fun m -> m "Got left: %a, %a" Id.pp elem Id.pp set);
           Hashtbl.add lvars elem set
       | ForAll
           ( [ (x, Some NumberType) ],
@@ -94,15 +94,16 @@ let get_num_set_intersections pfs =
                 Or,
                 BinOp (LVar z, FLessThan, LVar elem) ) )
         when x = y && x = z ->
-          L.(verbose (fun m -> m "Got right: %s, %s" elem set));
+          L.verbose (fun m -> m "Got right: %a, %a" Id.pp elem Id.pp set);
           Hashtbl.add rvars elem set
       | _ -> ())
     pfs;
 
-  L.verbose (fun m -> m "v <# set :");
-  Hashtbl.iter (fun v s -> L.(verbose (fun m -> m "\t%s, %s" v s))) lvars;
-  L.verbose (fun m -> m "set <# v :");
-  Hashtbl.iter (fun v s -> L.(verbose (fun m -> m "\t%s, %s" v s))) rvars;
+  L.verbose (fun m ->
+      let hashtbl_pp : (LVar.t, LVar.t) Hashtbl.t Fmt.t =
+        Fmt.(hashtbl ~sep:(any "\t") (pair ~sep:comma Id.pp Id.pp))
+      in
+      m "v <# set :@\n%a@\nset <# v :@\n%a" hashtbl_pp lvars hashtbl_pp rvars);
 
   (*
    *   1. forall (v, s) in lvars -> inter { v }, s = 0
@@ -172,21 +173,16 @@ let _resolve_set_existentials
   let exists = ref exists in
 
   let set_exists =
-    SS.filter (fun x -> Type_env.get gamma x = Some SetType) !exists
+    LVar.Set.filter (fun x -> Type_env.get gamma x = Some SetType) !exists
   in
-  if SS.cardinal set_exists > 0 then (
+  if LVar.Set.cardinal set_exists > 0 then (
     let intersections =
       get_num_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
     in
-    L.(
-      verbose (fun m ->
-          m "Intersections we have:\n%s"
-            (String.concat "\n"
-               (List.map
-                  (fun s ->
-                    String.concat ", "
-                      (List.map (fun e -> (Fmt.to_to_string Expr.pp) e) s))
-                  intersections))));
+    L.verbose (fun m ->
+        m "Intersections we have:\n%a"
+          Fmt.(list ~sep:(any "\n") @@ list ~sep:comma Expr.pp)
+          intersections);
 
     let filter_map_fun (formula_to_filter : Expr.t) =
       match formula_to_filter with
@@ -276,14 +272,14 @@ let _resolve_set_existentials
               in
               (* CAREFULLY substitute *)
               match lhs with
-              | LVar v when SS.mem v set_exists ->
+              | LVar v when LVar.Set.mem v set_exists ->
                   L.(
                     verbose (fun m ->
-                        m "Managed to instantiate a set existential: %s" v));
+                        m "Managed to instantiate a set existential: %a" Id.pp v));
                   let temp_subst = SESubst.init [] in
                   SESubst.put temp_subst (LVar v) rhs;
                   PFS.substitution temp_subst rpfs;
-                  exists := SS.remove v !exists;
+                  exists := LVar.Set.remove v !exists;
                   while Type_env.mem gamma v do
                     Type_env.remove gamma v
                   done;
@@ -308,15 +304,15 @@ let _resolve_set_existentials
 let simplify_pfs_and_gamma
     ?(matching = false)
     ?(kill_new_lvars : bool option)
-    ?(save_spec_vars : (SS.t * bool) option)
-    ?(existentials : SS.t option)
+    ?(save_spec_vars : (LVar.Set.t * bool) option)
+    ?(existentials : LVar.Set.t option)
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
-    (gamma : Type_env.t) : SESubst.t * SS.t =
+    (gamma : Type_env.t) : SESubst.t * LVar.Set.t =
   (* let t = Sys.time () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
-  let existentials : SS.t ref =
-    ref (Option.value ~default:SS.empty existentials)
+  let existentials : LVar.Set.t ref =
+    ref (Option.value ~default:LVar.Set.empty existentials)
   in
 
   let key : simpl_key_type =
@@ -354,16 +350,16 @@ let simplify_pfs_and_gamma
       let result = SESubst.init [] in
 
       let vars_to_save, save_all =
-        Option.value ~default:(SS.empty, false) save_spec_vars
+        Option.value ~default:(LVar.Set.empty, false) save_spec_vars
       in
 
-      let vars_to_kill = ref SS.empty in
+      let vars_to_kill = ref LVar.Set.empty in
       let kill_new_lvars = Option.value ~default:false kill_new_lvars in
 
       (* Unit types *)
       let simplify_unit_types () =
         Type_env.iter gamma (fun x t ->
-            let e = Expr.from_var_name x in
+            let e = Expr.var_to_expr x in
             match t with
             | UndefinedType -> SESubst.put result e (Lit Undefined)
             | NullType -> SESubst.put result e (Lit Null)
@@ -427,8 +423,8 @@ let simplify_pfs_and_gamma
                 let append_lvar = LVar.alloc () in
                 (* Fresh variables can be removed *)
                 vars_to_kill :=
-                  SS.add append_lvar
-                    (SS.add_seq (List.to_seq prepend_lvars) !vars_to_kill);
+                  LVar.Set.add append_lvar
+                    (LVar.Set.add_seq (List.to_seq prepend_lvars) !vars_to_kill);
                 let prepend = List.map (fun x -> Expr.LVar x) prepend_lvars in
                 let append = Expr.LVar append_lvar in
                 rec_call
@@ -450,7 +446,8 @@ let simplify_pfs_and_gamma
             let len = Z.to_int len in
             if len >= 0 then (
               let le_vars = List.init len (fun _ -> LVar.alloc ()) in
-              vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
+              vars_to_kill :=
+                LVar.Set.union !vars_to_kill (LVar.Set.of_list le_vars);
               let le' = List.map (fun x -> Expr.LVar x) le_vars in
               rec_call (BinOp (le, Equal, EList le')))
             else stop_explain "List length an unexpected integer."
@@ -469,7 +466,7 @@ let simplify_pfs_and_gamma
             | None -> `Replace whole
             | Some (pf, new_vars) ->
                 extend_with pf;
-                vars_to_kill := SS.union !vars_to_kill new_vars;
+                vars_to_kill := LVar.Set.union !vars_to_kill new_vars;
                 `Replace whole)
         (*  *)
         | BinOp (UnOp (LstLen, x), Equal, BinOp (Lit (Int n), IPlus, LVar z))
@@ -492,7 +489,7 @@ let simplify_pfs_and_gamma
             let prefix_lvar = LVar.alloc () in
             let suffix_lvar = LVar.alloc () in
             vars_to_kill :=
-              SS.add prefix_lvar (SS.add suffix_lvar !vars_to_kill);
+              LVar.Set.add prefix_lvar (LVar.Set.add suffix_lvar !vars_to_kill);
             let suffix_len =
               let open Expr.Infix in
               Expr.list_length lst - (start + num)
@@ -534,7 +531,7 @@ let simplify_pfs_and_gamma
                 | UnOp (LstLen, LVar x), UnOp (LstLen, LVar y) when x <> y ->
                     let x, y =
                       match
-                        (Names.is_spec_var_name x, Names.is_spec_var_name y)
+                        (LVar.is_spec_var_name x, LVar.is_spec_var_name y)
                       with
                       | true, false -> (x, y)
                       | false, true -> (y, x)
@@ -554,7 +551,7 @@ let simplify_pfs_and_gamma
                          PFS.substitution_in_place temp_subst lpfs *)
                 | ALoc alocl, ALoc alocr when matching ->
                     L.verbose (fun fmt ->
-                        fmt "Two equal alocs: %s and %s" alocl alocr);
+                        fmt "Two equal alocs: %a and %a" Id.pp alocl Id.pp alocr);
                     SESubst.put result (ALoc alocr) (ALoc alocl);
                     let temp_subst =
                       SESubst.init [ (ALoc alocr, ALoc alocl) ]
@@ -577,23 +574,27 @@ let simplify_pfs_and_gamma
                     let v, (le : Expr.t) =
                       match le with
                       | LVar w -> (
-                          let save_v = save_all || SS.mem v vars_to_save in
-                          let save_w = save_all || SS.mem w vars_to_save in
+                          let save_v =
+                            save_all || LVar.Set.mem v vars_to_save
+                          in
+                          let save_w =
+                            save_all || LVar.Set.mem w vars_to_save
+                          in
                           match (save_v, save_w) with
                           | true, false -> (w, LVar v)
                           | true, true -> (v, le)
                           | false, true -> (v, le)
                           | false, false ->
                               if
-                                Names.is_spec_var_name v
-                                && not (Names.is_spec_var_name w)
+                                LVar.is_spec_var_name v
+                                && not (LVar.is_spec_var_name w)
                               then (w, LVar v)
                               else (v, le))
                       | _ -> (v, le)
                     in
 
                     let lvars_le = Expr.lvars le in
-                    match SS.mem v lvars_le with
+                    match LVar.Set.mem v lvars_le with
                     (* Cannot substitute if variable on both sides or not substitutable *)
                     | true -> `Replace whole
                     | false -> (
@@ -627,7 +628,7 @@ let simplify_pfs_and_gamma
                                   SESubst.put result x sle);
                               SESubst.put result (LVar v) le;
 
-                              existentials := SS.remove v !existentials;
+                              existentials := LVar.Set.remove v !existentials;
 
                               (* Understand gamma if subst is another LVar *)
                               let* () =
@@ -649,7 +650,9 @@ let simplify_pfs_and_gamma
 
                               (* Remove (or add) from (or to) gamma *)
                               let* () =
-                                match save_all || SS.mem v vars_to_save with
+                                match
+                                  save_all || LVar.Set.mem v vars_to_save
+                                with
                                 | true -> (
                                     let le_type, _ =
                                       Typing.type_lexpr gamma le
@@ -711,7 +714,7 @@ let simplify_pfs_and_gamma
               match pf with
               (* List length direct equality *)
               | BinOp (UnOp (LstLen, LVar x), Equal, UnOp (LstLen, LVar y))
-                when not (String.equal x y) ->
+                when not (Id.equal x y) ->
                   let lens = map_add (UnOp (LstLen, LVar y)) (LVar x) lens in
                   (map_add (UnOp (LstLen, LVar x)) (LVar y) lens, cats, xcats)
               (* List length equals some other expression on the right *)
@@ -873,20 +876,28 @@ let simplify_pfs_and_gamma
               match v with
               | LVar v ->
                   if
-                    (not (SS.mem v !vars_to_kill))
+                    (not (LVar.Set.mem v !vars_to_kill))
                     && (save_all
-                       || (kill_new_lvars && SS.mem v vars_to_save)
-                       || ((not kill_new_lvars) && vars_to_save <> SS.empty))
-                    && not (Names.is_aloc_name v)
+                       || (kill_new_lvars && LVar.Set.mem v vars_to_save)
+                       || (not kill_new_lvars)
+                          && (not @@ LVar.Set.is_empty vars_to_save))
+                    && not (Names.is_aloc_name (LVar.str v))
                   then PFS.extend lpfs (BinOp (LVar v, Equal, le))
               | _ -> ());
 
           sanitise_pfs_no_store ~matching gamma lpfs;
 
-          let current_lvars = SS.union (PFS.lvars lpfs) (PFS.lvars rpfs) in
+          let current_lvars =
+            LVar.Set.union (PFS.lvars lpfs) (PFS.lvars rpfs)
+          in
           Type_env.iter gamma (fun v _ ->
-              if SS.mem v !vars_to_kill && not (SS.mem v current_lvars) then
-                Type_env.remove gamma v);
+              (* Need to cast Var|LVar to LVar, unfortunately.
+                 Could Type_env be reduced to only handle LVars? *)
+              let v_ = LVar.of_string (Id.str v) in
+              if
+                LVar.Set.mem v_ !vars_to_kill
+                && not (LVar.Set.mem v_ current_lvars)
+              then Type_env.remove gamma v);
 
           Type_env.iter gamma (fun v t ->
               match t with
@@ -895,7 +906,7 @@ let simplify_pfs_and_gamma
                     (BinOp
                        ( Expr.zero_i,
                          ILessThanEqual,
-                         UnOp (LstLen, Expr.from_var_name v) ))
+                         UnOp (LstLen, Expr.var_to_expr v) ))
               | _ -> ());
 
           analyse_list_structure lpfs;
@@ -950,7 +961,7 @@ let simplify_pfs_and_gamma
 
 let simplify_implication
     ~matching
-    (exists : SS.t)
+    (exists : LVar.Set.t)
     (lpfs : PFS.t)
     (rpfs : PFS.t)
     (gamma : Type_env.t) =
@@ -991,7 +1002,7 @@ let simplify_implication
            @[<hv 2>Right:@ %a@]\n\
            Gamma:\n\
            %a\n"
-          (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+          (Fmt.iter ~sep:Fmt.comma LVar.Set.iter Id.pp)
           exists PFS.pp lpfs PFS.pp rpfs Type_env.pp gamma));
   (* Utils.Statistics.update_statistics "FOS: SimplifyImplication"
      (Sys.time () -. t); *)
@@ -1012,9 +1023,9 @@ let admissible_assertion (a : Asrt.t) : bool =
     | Pure f -> PFS.extend pfs f
     | Types ets ->
         List.iter
-          (fun (le, t) ->
-            match (le : Expr.t) with
-            | LVar x | PVar x -> Type_env.update gamma x t
+          (function
+            | Expr.LVar x, t -> Type_env.update gamma x t
+            | PVar x, t -> Type_env.update gamma x t
             | _ -> ())
           ets
     | _ -> ()

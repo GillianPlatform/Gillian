@@ -24,7 +24,7 @@ struct
     store
     |> List.map (fun (var, value) : Variable.t ->
            let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           Variable.create_leaf var value ())
+           Variable.create_leaf (Var.str var) value ())
     |> List.sort (fun (v : Variable.t) (w : Variable.t) ->
            Stdlib.compare v.name w.name)
 
@@ -66,7 +66,10 @@ struct
     in
     node
 
-  let add_memory_vars smemory get_new_scope_id (variables : Variable.ts) =
+  let add_memory_vars
+      (smemory : memory)
+      get_new_scope_id
+      (variables : Variable.ts) =
     let sorted_locs_with_vals = Legacy_symbolic.sorted_locs_with_vals smemory in
     let value_nodes (loc, ((properties, domain), metadata)) : Variable.t =
       let () = ignore properties in
@@ -85,23 +88,25 @@ struct
       let () =
         Hashtbl.replace variables loc_id [ properties; domain; metadata ]
       in
-      Variable.create_node loc loc_id ()
+      Variable.create_node (Id.str loc) loc_id ()
     in
     List.map value_nodes sorted_locs_with_vals
 
   let rec add_loc_vars
-      (loc : string)
+      (loc : Id.any_loc Id.t)
       smemory
       get_new_scope_id
       (variables : Variable.ts)
-      (loc_to_scope_id : (string, int) Hashtbl.t) : unit =
+      (loc_to_scope_id : (Id.any_loc Id.t, int) Hashtbl.t) : unit =
     let rec add_lit_vars name lit : Variable.t =
       match lit with
       | Literal.Loc loc ->
           let () =
-            add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
+            add_loc_vars
+              (loc :> Id.any_loc Id.t)
+              smemory get_new_scope_id variables loc_to_scope_id
           in
-          let id = Hashtbl.find loc_to_scope_id loc in
+          let id = Hashtbl.find loc_to_scope_id (loc :> Id.any_loc Id.t) in
           Variable.create_node name id ()
       | LList lst ->
           let nodes =
@@ -119,9 +124,11 @@ struct
       match expr with
       | Expr.ALoc loc ->
           let () =
-            add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
+            add_loc_vars
+              (loc :> Id.any_loc Id.t)
+              smemory get_new_scope_id variables loc_to_scope_id
           in
-          let id = Hashtbl.find loc_to_scope_id loc in
+          let id = Hashtbl.find loc_to_scope_id (loc :> Id.any_loc Id.t) in
           Variable.create_node name id ()
       (* TODO: The below causes a stack overflow error in large pieces of
          code, so they is probably a more efficient way to write this algorithm
@@ -213,10 +220,14 @@ struct
                     match metadata with
                     | Expr.ALoc child_loc ->
                         let () =
-                          add_loc_vars child_loc smemory get_new_scope_id
-                            variables loc_to_scope_id
+                          add_loc_vars
+                            (child_loc :> Id.any_loc Id.t)
+                            smemory get_new_scope_id variables loc_to_scope_id
                         in
-                        let id = Hashtbl.find loc_to_scope_id child_loc in
+                        let id =
+                          Hashtbl.find loc_to_scope_id
+                            (child_loc :> Id.any_loc Id.t)
+                        in
                         Variable.create_node name id ()
                     | _ ->
                         Variable.create_leaf name (to_str Expr.pp metadata) ())
@@ -239,7 +250,7 @@ struct
 
   let add_variables
       ~store
-      ~memory
+      ~(memory : memory)
       ~is_gil_file
       ~get_new_scope_id
       (variables : Variable.ts) =
@@ -281,23 +292,26 @@ struct
             else None)
           store
       in
-      let local_scope_loc =
-        if List.length local_scope == 0 then ""
-        else
-          match List.hd local_scope with
-          | _, Expr.EList [ _; ALoc loc ] -> loc
-          | _ -> ""
-      in
+
       let local_id : int =
-        match Hashtbl.find_opt loc_to_scope_id local_scope_loc with
-        | None ->
+        match local_scope with
+        | (_, Expr.EList [ _; ALoc loc ]) :: _ -> (
+            match Hashtbl.find_opt loc_to_scope_id (loc :> Id.any_loc Id.t) with
+            | Some local_id -> local_id
+            | None ->
+                let local_id = get_new_scope_id () in
+                let () = Hashtbl.replace variables local_id [] in
+                local_id)
+        | _ ->
             let local_id = get_new_scope_id () in
             let () = Hashtbl.replace variables local_id [] in
             local_id
-        | Some local_id -> local_id
       in
       let global_id : int =
-        match Hashtbl.find_opt loc_to_scope_id "$lg" with
+        match
+          Hashtbl.find_opt loc_to_scope_id
+            (Jslogic.JSLogicCommon.locGlobName :> Id.any_loc Id.t)
+        with
         | None ->
             let global_id = get_new_scope_id () in
             let () = Hashtbl.replace variables global_id [] in

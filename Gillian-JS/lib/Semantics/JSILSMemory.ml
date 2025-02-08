@@ -11,6 +11,8 @@ module Type_env = Gillian.Symbolic.Type_env
 module Recovery_tactic = Gillian.General.Recovery_tactic
 open Gillian.Logic
 
+type loc_t = Id.any_loc Id.t
+
 module M = struct
   type init_data = unit
   type vt = SVal.t [@@deriving yojson, show]
@@ -34,7 +36,7 @@ module M = struct
   type err_t = vt list * i_fix_t list list * Expr.t [@@deriving yojson, show]
 
   type action_ret =
-    ( (t * vt list * Expr.t list * (string * Type.t) list) list,
+    ( (t * vt list * Expr.t list * (Id.any_var Id.t * Type.t) list) list,
       err_t list )
     result
 
@@ -91,8 +93,8 @@ module M = struct
     Recovery_tactic.try_unfold values
 
   let assertions ?to_keep:_ (heap : t) : GAsrt.t = SHeap.assertions heap
-  let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
-  let alocs (heap : t) : Containers.SS.t = SHeap.alocs heap
+  let lvars (heap : t) : LVar.Set.t = SHeap.lvars heap
+  let alocs (heap : t) : ALoc.Set.t = SHeap.alocs heap
 
   let clean_up ?(keep = Expr.Set.empty) (heap : t) : Expr.Set.t * Expr.Set.t =
     SHeap.clean_up heap;
@@ -114,21 +116,18 @@ module M = struct
     Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma
 
   let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : Type_env.t) :
-      string * vt * Expr.t list =
+      loc_t * vt * Expr.t list =
     match loc with
     | Some loc -> (
         let loc_name = get_loc_name pfs gamma loc in
         match loc_name with
-        | Some loc_name ->
-            if Names.is_aloc_name loc_name then
-              (loc_name, Expr.ALoc loc_name, [])
-            else (loc_name, Expr.Lit (Loc loc_name), [])
+        | Some loc_name -> (loc_name, Expr.loc_from_loc_name loc_name, [])
         | None ->
             let al = ALoc.alloc () in
-            (al, ALoc al, [ Expr.BinOp (ALoc al, Equal, loc) ]))
+            ((al :> loc_t), ALoc al, [ Expr.BinOp (ALoc al, Equal, loc) ]))
     | None ->
         let al = ALoc.alloc () in
-        (al, ALoc al, [])
+        ((al :> loc_t), ALoc al, [])
 
   let alloc
       (heap : t)
@@ -136,22 +135,19 @@ module M = struct
       (loc : vt option)
       ?is_empty:(ie = false)
       (mv : vt option) : action_ret =
-    let (loc_name : string), (loc : Expr.t) =
+    let (loc_name : loc_t), (loc : Expr.t) =
       match (loc : Expr.t option) with
       | None ->
           let loc_name = ALoc.alloc () in
-          (loc_name, ALoc loc_name)
-      | Some (Lit (Loc loc)) -> (loc, Lit (Loc loc))
-      | Some (ALoc loc) -> (loc, ALoc loc)
+          ((loc_name :> loc_t), ALoc loc_name)
+      | Some (Lit (Loc loc)) -> ((loc :> loc_t), Lit (Loc loc))
+      | Some (ALoc loc) -> ((loc :> loc_t), ALoc loc)
       | Some (LVar v) ->
           let loc_name = ALoc.alloc () in
           PFS.extend pfs (BinOp (LVar v, Equal, ALoc loc_name));
-          (loc_name, ALoc loc_name)
+          ((loc_name :> loc_t), ALoc loc_name)
       | Some le ->
-          raise
-            (Failure
-               (Printf.sprintf "Alloc with a non-loc loc argument: %s"
-                  ((Fmt.to_to_string Expr.pp) le)))
+          Fmt.failwith "Alloc with a non-loc loc argument: %a" Expr.pp le
     in
     SHeap.init_object heap loc_name ~is_empty:ie mv;
     Ok [ (heap, [ loc ], [], []) ]
@@ -177,11 +173,11 @@ module M = struct
 
     L.tmi (fun m ->
         m "@[<h>GetCell: resolved location: %a -> %a@]" SVal.pp loc
-          Fmt.(option ~none:(any "None") string)
+          Fmt.(option ~none:(any "None") Id.pp)
           loc_name);
 
     let make_gc_error
-        (loc_name : string)
+        (loc_name : loc_t)
         (prop : vt)
         (props : vt list)
         (dom : vt option) : err_t =
@@ -241,7 +237,7 @@ module M = struct
                     UnOp (Not, BinOp (prop, SetMem, dom))
                   in
                   if
-                    FOSolver.check_entailment Containers.SS.empty pfs
+                    FOSolver.check_entailment LVar.Set.empty pfs
                       [ a_set_inclusion ] gamma
                   then (
                     let new_domain : Expr.t =
@@ -260,7 +256,7 @@ module M = struct
                       BinOp (dom, Equal, ESet f_names)
                     in
                     if
-                      FOSolver.check_entailment Containers.SS.empty pfs
+                      FOSolver.check_entailment LVar.Set.empty pfs
                         [ full_knowledge ] gamma
                     then (
                       L.verbose (fun m -> m "GET CELL will branch\n");
@@ -330,7 +326,7 @@ module M = struct
       (loc : vt)
       (prop : vt) : action_ret =
     let heap = SHeap.copy heap in
-    let f (loc_name : string) : unit =
+    let f (loc_name : loc_t) : unit =
       Option.fold
         ~some:(fun ((fv_list, dom), mtdt) ->
           SHeap.set heap loc_name (SFVL.remove prop fv_list) dom mtdt;
@@ -359,16 +355,13 @@ module M = struct
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
 
-    let make_gm_error (loc_name : string) : err_t =
+    let make_gm_error (loc_name : loc_t) : err_t =
       let loc = Expr.loc_from_loc_name loc_name in
       ([ loc ], [ [ FMetadata loc ] ], Expr.false_)
     in
 
     let f loc_name =
-      let loc =
-        if Names.is_aloc_name loc_name then Expr.ALoc loc_name
-        else Expr.Lit (Loc loc_name)
-      in
+      let loc = Expr.loc_from_loc_name loc_name in
       match SHeap.get heap loc_name with
       | None -> Error [ make_gm_error loc_name ]
       | Some ((_, _), mtdt) ->
@@ -487,7 +480,7 @@ module M = struct
           let props = SFVL.field_names fv_list in
           let a_set_equality : Expr.t = BinOp (dom, Equal, ESet props) in
           let solver_ret =
-            FOSolver.check_entailment Containers.SS.empty pfs [ a_set_equality ]
+            FOSolver.check_entailment LVar.Set.empty pfs [ a_set_equality ]
               gamma
           in
           if solver_ret then
@@ -505,7 +498,7 @@ module M = struct
 
   let remove_domain (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
-    let f (loc_name : string) : unit =
+    let f (loc_name : loc_t) : unit =
       Option.fold
         ~some:(fun ((fv_list, _), mtdt) ->
           SHeap.set heap loc_name fv_list None mtdt;
@@ -742,6 +735,6 @@ module M = struct
   let can_fix _ = true
 
   let sorted_locs_with_vals (smemory : t) =
-    let sorted_locs = Containers.SS.elements (SHeap.domain smemory) in
-    List.map (fun loc -> (loc, Option.get (SHeap.get smemory loc))) sorted_locs
+    Id.Sets.LocSet.elements (SHeap.domain smemory)
+    |> List.map (fun loc -> (loc, Option.get @@ SHeap.get smemory loc))
 end

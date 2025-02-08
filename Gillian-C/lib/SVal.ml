@@ -6,7 +6,7 @@ let ( let+ ) o f = Option.map f o
 
 type t =
   | SUndefined
-  | Sptr of string * Expr.t
+  | Sptr of Id.any_loc Id.t * Expr.t
   | SVint of Expr.t
   | SVlong of Expr.t
   | SVsingle of Expr.t
@@ -16,8 +16,7 @@ type t =
 let equal a b =
   match (a, b) with
   | SUndefined, SUndefined -> true
-  | Sptr (la, oa), Sptr (lb, ob) when String.equal la lb && Expr.equal oa ob ->
-      true
+  | Sptr (la, oa), Sptr (lb, ob) when Id.equal la lb && Expr.equal oa ob -> true
   | SVint a, SVint b when Expr.equal a b -> true
   | SVlong a, SVlong b when Expr.equal a b -> true
   | SVsingle a, SVsingle b when Expr.equal a b -> true
@@ -71,16 +70,18 @@ let of_gil_expr_almost_concrete ?(gamma = Type_env.init ()) gexpr =
   let open CConstants.VTypes in
   match gexpr with
   | Lit Undefined -> Some (SUndefined, [])
-  | EList [ ALoc loc; offset ] | EList [ Lit (Loc loc); offset ] ->
-      Some (Sptr (loc, offset), [])
+  | EList [ ALoc loc; offset ] ->
+      Some (Sptr ((loc :> Id.any_loc Id.t), offset), [])
+  | EList [ Lit (Loc loc); offset ] ->
+      Some (Sptr ((loc :> Id.any_loc Id.t), offset), [])
   | EList [ LVar loc; Lit (Int k) ] ->
       let aloc = ALoc.alloc () in
       let new_pf = Expr.BinOp (LVar loc, Equal, Expr.ALoc aloc) in
-      Some (Sptr (aloc, Lit (Int k)), [ new_pf ])
+      Some (Sptr ((aloc :> Id.any_loc Id.t), Lit (Int k)), [ new_pf ])
   | EList [ LVar loc; LVar ofs ] when is_loc_ofs gamma loc ofs ->
       let aloc = ALoc.alloc () in
       let new_pf = Expr.BinOp (LVar loc, Equal, Expr.ALoc aloc) in
-      Some (Sptr (aloc, LVar ofs), [ new_pf ])
+      Some (Sptr ((aloc :> Id.any_loc Id.t), LVar ofs), [ new_pf ])
   | EList [ Lit (String typ); value ] when String.equal typ int_type ->
       Some (SVint value, [])
   | EList [ Lit (String typ); value ] when String.equal typ float_type ->
@@ -132,20 +133,17 @@ let to_gil_expr gexpr =
   | SVsingle n ->
       (EList [ Lit (String single_type); n ], [ (n, Type.NumberType) ])
 
-let lvars =
-  let open Utils.Containers in
-  function
-  | SUndefined -> SS.empty
-  | Sptr (_, e) -> Expr.lvars e
-  | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.lvars e
+let lvars = function
+  | SUndefined -> LVar.Set.empty
+  | Sptr (_, e) | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.lvars e
 
-let alocs =
-  let open Utils.Containers in
-  function
-  | SUndefined -> SS.empty
-  | Sptr (l, e) ->
-      let alocs_e = Expr.alocs e in
-      if Utils.Names.is_aloc_name l then SS.add l alocs_e else alocs_e
+let alocs = function
+  | SUndefined -> ALoc.Set.empty
+  | Sptr (l, e) -> (
+      let e_alocs = Expr.alocs e in
+      match Id.as_aloc l with
+      | Some l -> ALoc.Set.add l e_alocs
+      | None -> e_alocs)
   | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.alocs e
 
 let pp fmt v =
@@ -153,7 +151,7 @@ let pp fmt v =
   let f = Format.fprintf in
   match v with
   | SUndefined -> f fmt "undefined"
-  | Sptr (l, ofs) -> f fmt "Ptr(%s, %a)" l se ofs
+  | Sptr (l, ofs) -> f fmt "Ptr(%a, %a)" Id.pp l se ofs
   | SVint i -> f fmt "Int(%a)" se i
   | SVlong i -> f fmt "Long(%a)" se i
   | SVfloat i -> f fmt "Float(%a)" se i
@@ -169,7 +167,6 @@ let substitution ~le_subst sv =
   | Sptr (loc, offs) -> (
       let loc_e = Expr.loc_from_loc_name loc in
       match le_subst loc_e with
-      | Expr.ALoc nloc | Lit (Loc nloc) -> Sptr (nloc, le_subst offs)
-      | e ->
-          failwith
-            (Format.asprintf "Heap substitution fail for loc: %a" Expr.pp e))
+      | Expr.ALoc nloc -> Sptr ((nloc :> Id.any_loc Id.t), le_subst offs)
+      | Lit (Loc nloc) -> Sptr ((nloc :> Id.any_loc Id.t), le_subst offs)
+      | e -> Fmt.failwith "Heap substitution fail for loc: %a" Expr.pp e)

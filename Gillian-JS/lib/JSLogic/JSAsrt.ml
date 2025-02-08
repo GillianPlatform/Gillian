@@ -54,7 +54,7 @@ let rec js2jsil_pure (scope_le : Expr.t option) (a : pt) : Expr.t =
   | LessEq (le1, le2) -> BinOp (fe le1, FLessThanEqual, fe le2)
   | StrLess (le1, le2) -> BinOp (fe le1, StrLess, fe le2)
   | ForAll (s, a) ->
-      let new_binders = List.map (fun (x, t) -> (x, Some t)) s in
+      let new_binders = List.map (fun (x, t) -> (LVar.of_string x, Some t)) s in
       ForAll (new_binders, f a)
   | SetMem (le1, le2) -> BinOp (fe le1, SetMem, fe le2)
   | SetSub (le1, le2) -> BinOp (fe le1, SetSub, fe le2)
@@ -89,7 +89,8 @@ let rec js2jsil
   | MetaData (le1, le2) -> Asrt.MetaData (fe le1, fe le2)
   | Emp -> Asrt.Emp
   | Types vts ->
-      Asrt.Types (List.map (fun (v, t) -> (Expr.from_var_name v, t)) vts)
+      Asrt.Types
+        (List.map (fun (v, t) -> (Expr.var_to_expr @@ Var.of_string v, t)) vts)
   | EmptyFields (e, domain) -> Asrt.EmptyFields (fe e, fe domain)
   | Pred (name, [ loc; Lit (String fid); sch; args_len; fproto ])
     when name = "JSFunctionObject" || name = "JSFunctionObjectStrong" ->
@@ -118,7 +119,7 @@ let rec js2jsil
        ((l-nth(le_sc', i), "x") -> le_x')               if Phi(fid, x) != 0
        ((lg, "x") -> {{"d", le_x', true, true, false}}) if Phi(fid, x) = 0 or bot *)
   | VarSChain (fid, x, le_x, le_sc) ->
-      let i = psi cc_tbl vis_tbl fid x in
+      let i = psi cc_tbl vis_tbl fid (Var.of_string x) in
       (* let a_len = Asrt.Pure (Eq (Lit (Num (float_of_int len)), UnOp (LstLen, fe le_sc))) in *)
       let a' =
         match i with
@@ -267,7 +268,7 @@ let js2jsil_tactic
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (scope_var : string)
+    (scope_var : Var.t)
     (a : t) : Asrt.t =
   let vis_list = get_vis_list vis_tbl fid in
   let scope_chain_list = vislist_2_les vis_list (List.length vis_list) in
@@ -282,7 +283,7 @@ let js2jsil_tactic
 
   (*  x__this == #this                *)
   let a_this =
-    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_logic_var_name))
+    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_lvar))
   in
 
   Asrt.star [ a'; a''; a_this ]

@@ -14,6 +14,9 @@ module GBiSpec = Gil.BiSpec
 module GCmd = Gil.Cmd
 module Expr = Gil.Expr
 module Annot = Gil.Annot
+module Var = Gil.Var
+module LVar = Gil.LVar
+module Id = Gil.Id
 
 (**
  *  Fresh identifiers
@@ -31,6 +34,11 @@ let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
 let fresh_then, reset_then = fresh_sth "glab_then_"
 let fresh_else, reset_else = fresh_sth "glab_else_"
 let fresh_var, reset_var = fresh_sth "gvar_aux_"
+let fresh_var () = Var.of_string @@ fresh_var ()
+
+let map_bindings =
+  Option.map (fun (info_l, info_r) ->
+      (info_l, List.map (fun (x, t) -> (LVar.of_string x, t)) info_r))
 
 let resource_error args =
   if Utils.Exec_mode.is_biabduction_exec !Config.current_exec_mode then
@@ -91,12 +99,28 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
 
 let jsil2gil_slcmd (slcmd : SLCmd.t) : GSLCmd.t =
   match slcmd with
-  | Fold (pn, es, info) -> Fold (pn, List.map jsil2gil_expr es, info)
-  | Unfold (pn, es, info, b) -> Unfold (pn, List.map jsil2gil_expr es, info, b)
+  | Fold (pn, es, info) ->
+      Fold (pn, List.map jsil2gil_expr es, map_bindings info)
+  | Unfold (pn, es, info, b) ->
+      Unfold
+        ( pn,
+          List.map jsil2gil_expr es,
+          Option.map
+            (List.map (fun (l, r) -> (LVar.of_string l, LVar.of_string r)))
+            info,
+          b )
   | GUnfold pn -> GUnfold pn
-  | ApplyLem (x, es, xs) -> ApplyLem (x, List.map jsil2gil_expr es, xs)
-  | SepAssert (a, xs) -> SepAssert (jsil2gil_asrt a, xs)
-  | Invariant (a, xs) -> Invariant (jsil2gil_asrt a, xs)
+  | ApplyLem (x, es, xs) ->
+      ApplyLem
+        ( x,
+          List.map jsil2gil_expr es,
+          (List.map Var.of_string xs :> Id.any_var Id.t list) )
+  | SepAssert (a, xs) ->
+      SepAssert
+        (jsil2gil_asrt a, (List.map Var.of_string xs :> Id.any_var Id.t list))
+  | Invariant (a, xs) ->
+      Invariant
+        (jsil2gil_asrt a, (List.map Var.of_string xs :> Id.any_var Id.t list))
 
 let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
   let f = jsil2gil_lcmd in
@@ -109,12 +133,14 @@ let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
   | Assert f -> Assert (fe f)
   | Assume f -> Assume (fe f)
   | AssumeType (x, t) -> AssumeType (fe x, t)
-  | FreshSVar x -> FreshSVar x
+  | FreshSVar x -> FreshSVar (Var.of_string x)
   | SL slcmd -> SL (jsil2gil_slcmd slcmd)
 
 let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =
   let ss_label =
-    Option.map (fun (l, vl) -> (l, Containers.SS.elements vl)) sspec.label
+    Option.map
+      (fun (l, vl) -> (l, Containers.SS.elements vl |> List.map LVar.of_string))
+      sspec.label
   in
   {
     ss_pre = jsil2gil_asrt sspec.pre;
@@ -143,7 +169,7 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
     lemma_source_path = None;
     lemma_internal = false;
     (* TODO (Alexis): Set depending on module of lemma *)
-    lemma_params = lemma.params;
+    lemma_params = List.map Var.of_string lemma.params;
     lemma_specs =
       [
         {
@@ -154,7 +180,7 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = Option.map jsil2gil_expr lemma.variant;
-    lemma_existentials = lemma.existentials;
+    lemma_existentials = List.map LVar.of_string lemma.existentials;
   }
 
 let jsil2gil_pred (pred : Pred.t) : GPred.t =
@@ -167,7 +193,11 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_params = pred.params;
     pred_ins = pred.ins;
     pred_definitions =
-      List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
+      List.map
+        (fun (info, asrt) ->
+          ( Option.map (fun (l, r) -> (l, List.map LVar.of_string r)) info,
+            jsil2gil_asrt asrt ))
+        pred.definitions;
     pred_facts = List.map jsil2gil_expr pred.facts;
     pred_guard = None;
     (* TODO: Support for predicates with tokens *)
@@ -180,7 +210,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
 let jsil2gil_macro (macro : Macro.t) : GMacro.t =
   {
     macro_name = macro.name;
-    macro_params = macro.params;
+    macro_params = List.map Var.of_string macro.params;
     macro_definition = List.map jsil2gil_lcmd macro.definition;
   }
 
@@ -440,7 +470,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
   | LGoto j -> [ (lab, GCmd.Goto j) ]
   | LGuardedGoto (e, j, k) -> [ (lab, GCmd.GuardedGoto (fe e, j, k)) ]
   | LCall (x, e, es, j, subst) ->
-      [ (lab, GCmd.Call (x, fe e, List.map fe es, j, subst)) ]
+      [ (lab, GCmd.Call (x, fe e, List.map fe es, j, map_bindings subst)) ]
   | LECall (x, e, es, j) -> [ (lab, GCmd.ECall (x, fe e, List.map fe es, j)) ]
   | LApply (x, e, j) -> [ (lab, GCmd.Apply (x, fe e, j)) ]
   | LArguments x -> [ (lab, GCmd.Arguments x) ]

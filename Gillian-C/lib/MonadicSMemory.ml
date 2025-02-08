@@ -18,7 +18,7 @@ module Recovery_tactic = Gillian.General.Recovery_tactic
 
 type init_data = Global_env.t
 
-let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
+let resolve_or_create_loc_name (lvar_loc : Expr.t) : Id.any_loc Id.t Delayed.t =
   let open Delayed.Syntax in
   let* loc_name = Delayed.resolve_loc lvar_loc in
   match loc_name with
@@ -26,15 +26,21 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
       let new_loc_name = ALoc.alloc () in
       let learned = [ Expr.BinOp (ALoc new_loc_name, Equal, lvar_loc) ] in
       Logging.verbose (fun fmt ->
-          fmt "Couldn't resolve loc %a, created %s" Expr.pp lvar_loc
+          fmt "Couldn't resolve loc %a, created %a" Expr.pp lvar_loc Id.pp
             new_loc_name);
-      Delayed.return ~learned new_loc_name
+      Delayed.return ~learned (new_loc_name :> Id.any_loc Id.t)
   | Some l ->
-      Logging.verbose (fun fmt -> fmt "Resolved %a as %s" Expr.pp lvar_loc l);
+      Logging.verbose (fun fmt ->
+          fmt "Resolved %a as %a" Expr.pp lvar_loc Id.pp l);
       Delayed.return l
 
 type vt = Values.t
 type st = Subst.t
+type loc_t = Id.any_loc Id.t
+
+let pp_loc_t = Id.pp
+let loc_t_to_yojson = Id.to_yojson'
+let loc_t_of_yojson = Id.of_yojson'
 
 (* let ga = LActions.ga *)
 
@@ -43,14 +49,11 @@ type err_t =
   | MissingLocResource of {
       is_store : bool;
       action : LActions.ga;
-      loc_name : string;
+      loc_name : loc_t;
       ofs_opt : Expr.t option;
       chunk_opt : Chunk.t option;
     }
-  | SHeapTreeErr of {
-      at_locations : string list;
-      sheaptree_err : SHeapTree.err;
-    }
+  | SHeapTreeErr of { at_locations : loc_t list; sheaptree_err : SHeapTree.err }
 [@@deriving show, yojson]
 
 let lift_sheaptree_err loc err =
@@ -66,13 +69,12 @@ module Mem = struct
   open Delayed.Syntax
 
   module SMap = GUtils.Prelude.Map.Make (struct
-    include String
+    include Gil_syntax.Id
 
-    let of_yojson = function
-      | `String s -> Ok s
-      | _ -> Error "string_of_yojson: expected string"
+    type t = any_loc Id.t
 
-    let to_yojson s = `String s
+    let of_yojson = of_yojson'
+    let to_yojson = to_yojson'
   end)
 
   type t = SHeapTree.t SMap.t
@@ -96,10 +98,10 @@ module Mem = struct
 
   (***** Implementation of local actions *****)
 
-  let alloc (map : t) low high : t * string =
+  let alloc (map : t) low high : t * ALoc.t =
     let loc = ALoc.alloc () in
     let tree = SHeapTree.alloc low high in
-    (SMap.add loc tree map, loc)
+    (SMap.add (loc :> loc_t) tree map, loc)
 
   let weak_valid_pointer map loc ofs =
     let open DR.Syntax in
@@ -284,16 +286,14 @@ module Mem = struct
       SMap.add dst_loc_name new_dst_tree map
 
   let lvars map =
-    let open Utils.Containers in
     SMap.fold
-      (fun _ tree acc -> SS.union (SHeapTree.lvars tree) acc)
-      map SS.empty
+      (fun _ tree acc -> LVar.Set.union (SHeapTree.lvars tree) acc)
+      map LVar.Set.empty
 
   let alocs map =
-    let open Utils.Containers in
     SMap.fold
-      (fun _ tree acc -> SS.union (SHeapTree.alocs tree) acc)
-      map SS.empty
+      (fun _ tree acc -> ALoc.Set.union (SHeapTree.alocs tree) acc)
+      map ALoc.Set.empty
 
   let assertions ~exclude map =
     SMap.fold
@@ -303,17 +303,17 @@ module Mem = struct
 
   let pp_full ft mem =
     let open Fmt in
-    (Dump.iter_bindings SMap.iter nop string SHeapTree.pp_full) ft mem
+    (Dump.iter_bindings SMap.iter nop Id.pp SHeapTree.pp_full) ft mem
 
   let substitution subst map : (t, SHeapTree.err) DR.t =
     let open DR.Syntax in
-    if Subst.domain subst None = Expr.Set.empty then DR.ok map
+    if Expr.Set.is_empty @@ Subst.domain subst then DR.ok map
     else
       let aloc_subst =
         Subst.fold subst
           (fun l r acc ->
             match l with
-            | ALoc aloc -> (aloc, r) :: acc
+            | ALoc aloc -> ((aloc :> loc_t), r) :: acc
             | _ -> acc)
           []
       in
@@ -328,11 +328,12 @@ module Mem = struct
         (fun acc (old_loc, new_loc) ->
           let** acc = acc in
           Logging.verbose (fun fmt ->
-              fmt "SHOULD Merge locs: %s --> %a" old_loc Expr.pp new_loc);
+              fmt "SHOULD Merge locs: %a --> %a" Id.pp old_loc Expr.pp new_loc);
           Logging.tmi (fun fmt -> fmt "IN MEMORY: %a" pp_full acc);
           let new_loc =
             match new_loc with
-            | Lit (Loc loc) | ALoc loc -> loc
+            | Lit (Loc loc) -> (loc :> loc_t)
+            | ALoc loc -> (loc :> loc_t)
             | _ ->
                 Fmt.failwith "Heap substitution failed for loc : %a" Expr.pp
                   new_loc
@@ -360,7 +361,7 @@ module Mem = struct
       (fun loc tree ->
         if not (exclude loc) then (
           if !is_first then is_first := false else Fmt.pf ft "@\n";
-          Fmt.pf ft "%s -> @[<v 0>%a@]" loc SHeapTree.pp tree))
+          Fmt.pf ft "%a -> @[<v 0>%a@]" Id.pp loc SHeapTree.pp tree))
       mem
 
   let pp ~exclude fmt map =
@@ -384,10 +385,10 @@ let make_branch ~heap ?(rets = []) () = (heap, rets)
 
 let just_functions genv =
   if !Config.allocated_functions then
-    String_map.fold
+    LocMap.fold
       (fun loc def acc ->
         match def with
-        | Global_env.FunDef _ -> Mem.allocate_function acc loc
+        | Global_env.FunDef _ -> Mem.allocate_function acc (loc :> loc_t)
         | GlobVar _ -> acc)
       genv Mem.empty
   else Mem.empty
@@ -395,7 +396,9 @@ let just_functions genv =
 let init genv = { genv; mem = just_functions genv }
 
 let sure_is_nonempty state =
-  let is_genv loc = String_map.find_opt loc state.genv |> Option.is_some in
+  let is_genv loc =
+    LocMap.find_opt (Loc.of_string @@ Id.str loc) state.genv |> Option.is_some
+  in
   let is_empty =
     Mem.SMap.for_all
       (fun loc tree -> is_genv loc || SHeapTree.is_empty_or_freed tree)
@@ -640,7 +643,9 @@ let execute_prod_bounds heap params =
 
 let execute_genvgetdef heap params =
   match params with
-  | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> (
+  (* Are the other two cases even relevant, as GEnv only has concrete locs??
+     | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> ( *)
+  | [ Expr.Lit (Loc loc) ] -> (
       match Global_env.find_def_opt heap.genv loc with
       | Some def ->
           let v = Global_env.serialize_def def in
@@ -650,8 +655,8 @@ let execute_genvgetdef heap params =
              signal. *)
           if !Gillian.Utils.Config.under_approximation then Delayed.vanish ()
           else
-            Fmt.failwith "execute_genvgetdef: couldn't find %s\nGENV:\n%a" loc
-              Global_env.pp heap.genv)
+            Fmt.failwith "execute_genvgetdef: couldn't find %a\nGENV:\n%a" Id.pp
+              loc Global_env.pp heap.genv)
   | _ -> fail_ungracefully "genv_getdef" params
 
 (* Complete fixes  *)
@@ -665,21 +670,21 @@ let pp_err fmt (e : err_t) =
         Expr.pp loc
   | MissingLocResource { is_store; action; loc_name; ofs_opt; chunk_opt } ->
       Fmt.pf fmt
-        "[MissingLocResource] No block associated with location '%s'. \
+        "[MissingLocResource] No block associated with location '%a'. \
          Associated data: \n\
         \ * is_store: '%B'\n\
-        \ * location: '%s'\n\
+        \ * location: '%a'\n\
         \ * core_pred: %s\n\
         \ * value: %a \n\
         \ * chunk: %a \n"
-        loc_name is_store loc_name (LActions.str_ga action)
+        Id.pp loc_name is_store Id.pp loc_name (LActions.str_ga action)
         (Fmt.Dump.option Expr.pp) ofs_opt (Fmt.Dump.option Chunk.pp) chunk_opt
   | SHeapTreeErr { at_locations; sheaptree_err } ->
       Fmt.pf fmt "[SHeapTreeErr] Tree at location%a raised: <%a>"
         (fun fmt l ->
           match l with
-          | [ s ] -> Fmt.pf fmt " '%s'" s
-          | l -> Fmt.pf fmt "s %a" (Fmt.Dump.list Fmt.string) l)
+          | [ s ] -> Fmt.pf fmt " '%a'" Id.pp s
+          | l -> Fmt.pf fmt "s %a" (Fmt.Dump.list Id.pp) l)
         at_locations SHeapTree.pp_err sheaptree_err
 
 (* let str_of_err e = Format.asprintf "%a" pp_err e *)
@@ -687,15 +692,15 @@ let pp_err fmt (e : err_t) =
 let pp fmt h =
   let exclude loc =
     try
-      match String_map.find loc h.genv with
+      match LocMap.find (Loc.of_string @@ Id.str loc) h.genv with
       | Global_env.FunDef _ -> true
       | _ -> false
     with Not_found -> false
   in
   Format.fprintf fmt "@[%a@]" (Mem.pp ~exclude) h.mem
 
-let pp_by_need (_ : SS.t) fmt h = pp fmt h
-let get_print_info _ _ = (SS.empty, SS.empty)
+let pp_by_need _ fmt h = pp fmt h
+let get_print_info _ _ = (LVar.Set.empty, Id.Sets.LocSet.empty)
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
@@ -795,7 +800,7 @@ let alocs heap = Mem.alocs heap.mem
 let assertions ?to_keep:_ heap =
   let exclude loc =
     try
-      match String_map.find loc heap.genv with
+      match LocMap.find (Loc.of_string @@ Id.str loc) heap.genv with
       | Global_env.FunDef _ -> true
       | _ -> false
     with Not_found -> false
@@ -813,7 +818,7 @@ module Lift = struct
     store
     |> List.map (fun (var, value) : Variable.t ->
            let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           Variable.create_leaf var value ())
+           Variable.create_leaf (Var.str var) value ())
     |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
 
   let make_node ~get_new_scope_id ~variables ~name ~value ?(children = []) () :
@@ -866,7 +871,7 @@ let get_recovery_tactic _ err =
   let values =
     match err with
     | InvalidLocation e ->
-        List.map (fun x -> Expr.LVar x) (SS.elements (Expr.lvars e))
+        List.map (fun x -> Expr.LVar x) (LVar.Set.elements (Expr.lvars e))
     | MissingLocResource
         { is_store = _; action = _; loc_name; ofs_opt = _; chunk_opt = _ } ->
         [ Expr.loc_from_loc_name loc_name ]

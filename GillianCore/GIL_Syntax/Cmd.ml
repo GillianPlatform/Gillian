@@ -5,83 +5,87 @@
 (**************************************************************)
 (**************************************************************)
 
-module SS = Containers.SS
+open Id
 
-type logic_bindings_t = string * (string * Expr.t) list [@@deriving yojson]
+type logic_bindings_t = string * (Id.LVar.t * Expr.t) list [@@deriving yojson]
 
 type 'label t = 'label TypeDef__.cmd =
   | Skip  (** Skip                *)
-  | Assignment of string * Expr.t  (** Assignment          *)
-  | LAction of string * string * Expr.t list  (** Local Actions       *)
+  | Assignment of Var.t * Expr.t  (** Assignment          *)
+  | LAction of Var.t * string * Expr.t list  (** Local Actions       *)
   | Logic of LCmd.t  (** GIL Logic commands *)
   | Goto of 'label  (** Unconditional goto  *)
   | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto    *)
   | Call of
-      string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
+      Var.t * Expr.t * Expr.t list * 'label option * logic_bindings_t option
       (** Procedure call *)
-  | ECall of string * Expr.t * Expr.t list * 'label option
+  | ECall of Var.t * Expr.t * Expr.t list * 'label option
       (** External Procedure call           *)
-  | Apply of string * Expr.t * 'label option
+  | Apply of Var.t * Expr.t * 'label option
       (** Application-style procedure call  *)
-  | Arguments of string  (** Arguments of the current function *)
-  | PhiAssignment of (string * Expr.t list) list  (** PHI assignment      *)
+  | Arguments of Var.t  (** Arguments of the current function *)
+  | PhiAssignment of (Var.t * Expr.t list) list  (** PHI assignment      *)
   | ReturnNormal  (** Normal return       *)
   | ReturnError  (** Error return        *)
   | Fail of string * Expr.t list  (** Failure             *)
 [@@deriving yojson]
 
 let equal = TypeDef__.equal_cmd
-let fold = List.fold_left SS.union SS.empty
 
-let pvars (cmd : 'label t) : SS.t =
+let pvars (cmd : 'label t) : Var.Set.t =
+  let fold = List.fold_left Var.Set.union Var.Set.empty in
   let pvars_es es = fold (List.map Expr.pvars es) in
   match cmd with
-  | Skip -> SS.empty
-  | Assignment (x, e) -> SS.add x (Expr.pvars e)
-  | LAction (x, _, es) -> SS.add x (pvars_es es)
+  | Skip -> Var.Set.empty
+  | Assignment (x, e) -> Var.Set.add x (Expr.pvars e)
+  | LAction (x, _, es) -> Var.Set.add x (pvars_es es)
   | Logic lcmd -> LCmd.pvars lcmd
-  | Goto _ -> SS.empty
+  | Goto _ -> Var.Set.empty
   | GuardedGoto (e, _, _) -> Expr.pvars e
-  | Call (x, e, es, _, _) -> SS.union (SS.add x (Expr.pvars e)) (pvars_es es)
-  | ECall (x, e, es, _) -> SS.union (SS.add x (Expr.pvars e)) (pvars_es es)
-  | Apply (x, e, _) -> SS.add x (Expr.pvars e)
-  | Arguments x -> SS.singleton x
+  | Call (x, e, es, _, _) ->
+      Var.Set.union (Var.Set.add x (Expr.pvars e)) (pvars_es es)
+  | ECall (x, e, es, _) ->
+      Var.Set.union (Var.Set.add x (Expr.pvars e)) (pvars_es es)
+  | Apply (x, e, _) -> Var.Set.add x (Expr.pvars e)
+  | Arguments x -> Var.Set.singleton x
   | PhiAssignment phis -> fold (List.map (fun (_, es) -> pvars_es es) phis)
-  | ReturnNormal | ReturnError -> SS.singleton "ret"
+  | ReturnNormal | ReturnError -> Var.Set.singleton "ret"
   | Fail (_, es) -> pvars_es es
 
-let lvars (cmd : 'label t) : SS.t =
+let lvars (cmd : 'label t) : LVar.Set.t =
+  let fold = List.fold_left LVar.Set.union LVar.Set.empty in
   let lvars_es es = fold (List.map Expr.lvars es) in
   match cmd with
-  | Skip -> SS.empty
+  | Skip -> LVar.Set.empty
   | Assignment (_, e) -> Expr.lvars e
   | LAction (_, _, es) -> lvars_es es
   | Logic lcmd -> LCmd.lvars lcmd
-  | Goto _ -> SS.empty
+  | Goto _ -> LVar.Set.empty
   | GuardedGoto (e, _, _) -> Expr.lvars e
-  | Call (_, e, es, _, _) -> SS.union (Expr.lvars e) (lvars_es es)
-  | ECall (_, e, es, _) -> SS.union (Expr.lvars e) (lvars_es es)
+  | Call (_, e, es, _, _) -> LVar.Set.union (Expr.lvars e) (lvars_es es)
+  | ECall (_, e, es, _) -> LVar.Set.union (Expr.lvars e) (lvars_es es)
   | Apply (_, e, _) -> Expr.lvars e
-  | Arguments _ -> SS.empty
+  | Arguments _ -> LVar.Set.empty
   | PhiAssignment phis -> fold (List.map (fun (_, es) -> lvars_es es) phis)
-  | ReturnNormal | ReturnError -> SS.empty
+  | ReturnNormal | ReturnError -> LVar.Set.empty
   | Fail (_, es) -> lvars_es es
 
-let locs (cmd : 'label t) : SS.t =
+let locs (cmd : 'label t) : Sets.LocSet.t =
+  let fold = List.fold_left Sets.LocSet.union Sets.LocSet.empty in
   let locs_es es = fold (List.map Expr.locs es) in
   match cmd with
-  | Skip -> SS.empty
+  | Skip -> Sets.LocSet.empty
   | Assignment (_, e) -> Expr.locs e
   | LAction (_, _, es) -> locs_es es
-  | Logic lcmd -> LCmd.lvars lcmd
-  | Goto _ -> SS.empty
+  | Logic lcmd -> LCmd.locs lcmd
+  | Goto _ -> Sets.LocSet.empty
   | GuardedGoto (e, _, _) -> Expr.locs e
-  | Call (_, e, es, _, _) -> SS.union (Expr.lvars e) (locs_es es)
-  | ECall (_, e, es, _) -> SS.union (Expr.lvars e) (locs_es es)
+  | Call (_, e, es, _, _) -> Sets.LocSet.union (Expr.locs e) (locs_es es)
+  | ECall (_, e, es, _) -> Sets.LocSet.union (Expr.locs e) (locs_es es)
   | Apply (_, e, _) -> Expr.locs e
-  | Arguments _ -> SS.empty
+  | Arguments _ -> Sets.LocSet.empty
   | PhiAssignment phis -> fold (List.map (fun (_, es) -> locs_es es) phis)
-  | ReturnNormal | ReturnError -> SS.empty
+  | ReturnNormal | ReturnError -> Sets.LocSet.empty
   | Fail (_, es) -> locs_es es
 
 let successors (cmd : int t) (i : int) : int list =

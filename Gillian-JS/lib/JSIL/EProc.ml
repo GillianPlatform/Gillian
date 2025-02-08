@@ -5,7 +5,7 @@ module Flag = Gillian.Gil_syntax.Flag
 type t = {
   name : string;
   body : (Annot.t * string option * LabCmd.t) array;
-  params : string list;
+  params : Gil_syntax.Var.t list;
   spec : Spec.t option;
 }
 
@@ -34,7 +34,7 @@ let pp fmt labproc =
   Fmt.pf fmt "@[%a@\n@[<v 2>proc %s(%a) {@\n%a@\n@]@\n};@\n@]"
     Fmt.(option Spec.pp)
     spec name
-    Fmt.(list ~sep:(Fmt.any ", ") Fmt.string)
+    Fmt.(list ~sep:(Fmt.any ", ") Gil_syntax.Var.pp)
     params
     Fmt.(array ~sep:(any ";@\n") pp_cmd_triple)
     body
