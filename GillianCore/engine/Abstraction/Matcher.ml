@@ -2286,12 +2286,14 @@ module Make (State : SState.S) :
       let start_state =
         match lhs_states with
         | [] -> Fmt.kstr L.fail "wand lhs is False!"
-        | [ lhs_state ] ->
+        | [ lhs_state ] -> (
           (* We add (persistent) knowledge from lhs state to current state *)
-          let lhs_pfs = State.get_pfs lhs_state.state in
-          let current_pfs = State.get_pfs astate.state in
-          PFS.iter (fun f -> PFS.extend current_pfs f) lhs_pfs;
-          { lhs_state; current_state = astate; subst }
+          let lhs_pfs = State.get_pfs lhs_state.state |> PFS.to_list in
+          match State.assume_a ~matching:true ~production:true astate.state lhs_pfs with
+          | Some state ->
+            { lhs_state; current_state = { astate with state }; subst }
+          | None ->
+            Fmt.kstr L.fail "Wand lhs pure contradicts with current state!")
         | _ :: _ ->
             Fmt.kstr L.fail "Wand lhs produced %d states!@\n%a"
               (List.length lhs_states)
