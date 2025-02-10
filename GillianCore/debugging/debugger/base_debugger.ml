@@ -144,7 +144,9 @@ struct
         | None -> debug_state.cur_proc_name
       in
       match Hashtbl.find_opt procs proc_name with
-      | None -> Error ("get_proc_state: couldn't find proc " ^ proc_name)
+      | None ->
+          Gillian_result.internal_error
+            ("get_proc_state: couldn't find proc " ^ proc_name)
       | Some proc_state ->
           debug_state.cur_proc_name <- proc_state.proc_name;
           if activate_report_state then
@@ -154,7 +156,7 @@ struct
     let get_proc_state_exn ?cmd_id ?(activate_report_state = true) dbg =
       match get_proc_state ?cmd_id ~activate_report_state dbg with
       | Ok proc_state -> proc_state
-      | Error msg -> failwith msg
+      | Error msg -> failwith (Gillian_result.Error.show msg)
 
     module Inspect = struct
       open Sedap_types
@@ -539,12 +541,13 @@ struct
                 exit 1
             | _ -> (progs, entrypoint))
         | Error err ->
-            Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
+            Fmt.pr "Error during compilation to GIL:\n%a"
+              Gillian_result.Error.pp err;
             exit 1
 
       let compile_tl_files entrypoint files =
-        let progs, entrypoint =
-          get_progs_or_fail (Lifter.parse_and_compile_files ~entrypoint files)
+        let++ progs, entrypoint =
+          Lifter.parse_and_compile_files ~entrypoint files
         in
         let e_progs = progs.gil_progs in
         let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
@@ -554,7 +557,7 @@ struct
           entrypoint )
 
       let parse_gil_file file =
-        let Gil_parsing.{ labeled_prog; init_data } =
+        let++ Gil_parsing.{ labeled_prog; init_data } =
           Gil_parsing.parse_eprog_from_file file
         in
         let init_data =
@@ -577,8 +580,10 @@ struct
             m ~json:procs_json "Got %d procs" (Hashtbl.length procs))
 
       let f ~proc_name ~outfile ~no_unfold ~already_compiled files =
-        let (e_prog, init_data, source_files_opt, tl_ast), proc_name =
-          if already_compiled then (parse_gil_file (List.hd files), proc_name)
+        let** (e_prog, init_data, source_files_opt, tl_ast), proc_name =
+          if already_compiled then
+            let++ parsed = parse_gil_file (List.hd files) in
+            (parsed, proc_name)
           else compile_tl_files proc_name files
         in
         let pp_annot fmt annot =
@@ -588,12 +593,9 @@ struct
           ~pp_prog:(Prog.pp_labeled ~pp_annot)
           e_prog outfile;
         (* Prog.perform_syntax_checks e_prog; *)
-        let other_imports =
-          Command_line_utils.convert_other_imports PC.other_imports
-        in
-        let prog =
+        let++ prog =
           Gil_parsing.eprog_to_prog ?prog_path:(List_utils.hd_opt files)
-            ~other_imports e_prog
+            ~other_imports:PC.other_imports e_prog
         in
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n"
@@ -731,7 +733,7 @@ struct
         DL.log ~v:true (fun m -> m "Jumping to id %a" L.Report_id.pp id);
         state |> update_proc_state id cfg;
         Ok ()
-      with Failure msg -> Error msg
+      with Failure msg -> Gillian_result.internal_error msg
 
     let jump_to_id id (state : t) =
       let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
@@ -972,15 +974,19 @@ struct
     end
 
     module Launch_proc = struct
+      open Gillian_result
+
       let check_init_report id =
         let** id =
-          Option.to_result ~none:"HORROR: No report from initial cont!" id
+          match id with
+          | Some id -> Ok id
+          | None -> internal_error "HORROR: No report from initial cont!"
         in
         match L.Log_queryer.get_report id with
-        | None -> Error "HORROR: No report on initial cont_func!"
+        | None -> internal_error "HORROR: No report on initial cont_func!"
         | Some (_, type_)
           when type_ = L.Logging_constants.Content_type.proc_init -> Ok ()
-        | Some _ -> Error "HORROR: Initial report is not a proc_init!"
+        | Some _ -> internal_error "HORROR: Initial report is not a proc_init!"
 
       (* For the initial step, we should always get a blank Continue *)
       let get_cont_func proc_name debug_state =
@@ -989,7 +995,9 @@ struct
             { report_id; branch_path = []; new_branch_cases = []; cont_func } ->
             let++ () = check_init_report report_id in
             cont_func
-        | _ -> Error "HORROR: Unexpected conf from initial cont!"
+        | _ ->
+            Gillian_result.internal_error
+              "HORROR: Unexpected conf from initial cont!"
 
       let init_lifter proc_name debug_state =
         let { proc_names; tl_ast; prog; _ } = debug_state in
@@ -1015,7 +1023,6 @@ struct
                let** stop_reason =
                  Step.lifter_call init_lifter' proc_state state
                in
-
                Ok (proc_state, stop_reason))
     end
 
@@ -1031,7 +1038,7 @@ struct
         let proc_name =
           proc_name |> Option_utils.or_else (fun () -> failwith "No proc name!")
         in
-        let (prog, init_data, source_files, tl_ast), entrypoint =
+        let++ (prog, init_data, source_files, tl_ast), entrypoint =
           process_files ~proc_name ~outfile ~no_unfold ~already_compiled
             [ file_name ]
         in
@@ -1055,11 +1062,11 @@ struct
 
       let make_state debug_state = { debug_state; procs = Hashtbl.create 0 }
 
-      let f file_name proc_name : (t, string) result =
+      let f file_name proc_name : t Gillian_result.t =
         Fmt_tty.setup_std_outputs ();
         PC.initialize !Config.current_exec_mode;
         Config.stats := false;
-        let debug_state, entrypoint = build_debug_state file_name proc_name in
+        let** debug_state, entrypoint = build_debug_state file_name proc_name in
         let proc_name = debug_state.main_proc_name in
         let state = make_state debug_state in
         let++ main_proc_state, _ = launch_proc proc_name ~entrypoint state in
@@ -1092,8 +1099,7 @@ struct
     let terminate state =
       L.Report_state.(activate global_state);
       Verification.postprocess_files state.debug_state.source_files;
-      if !Config.stats then Statistics.print_statistics ();
-      L.wrap_up ()
+      if !Config.stats then Statistics.print_statistics ()
 
     let get_frames state =
       let { frames; _ } = get_proc_state_exn state in

@@ -2,6 +2,12 @@ open Cmdliner
 module L = Logging
 
 module Make (PC : ParserAndCompiler.S) = struct
+  let exit_on_error = function
+    | Ok x -> x
+    | Error e ->
+        let () = Logging.print_to_all (Gillian_result.Error.show e) in
+        exit (Gillian_result.Error.to_error_code e)
+
   let entry_point =
     let doc = "Entry point of execution." in
     let docv = "PROCEDURE_NAME" in

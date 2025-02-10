@@ -8,8 +8,8 @@ module type S = sig
     val dump_state : t -> Yojson.Safe.t
   end
 
-  val launch : string -> string option -> (t, string) result
-  val jump_to_id : Logging.Report_id.t -> t -> (unit, string) result
+  val launch : string -> string option -> t Gillian_result.t
+  val jump_to_id : Logging.Report_id.t -> t -> unit Gillian_result.t
   val step_in : t -> stop_reason
   val step : ?reverse:bool -> t -> stop_reason
 
@@ -17,11 +17,11 @@ module type S = sig
     Exec_map.Packaged.branch_case option ->
     Logging.Report_id.t ->
     t ->
-    (stop_reason, string) result
+    stop_reason Gillian_result.t
 
   val step_out : t -> stop_reason
   val run : ?reverse:bool -> ?launch:bool -> t -> stop_reason
-  val start_proc : string -> t -> (stop_reason, string) result
+  val start_proc : string -> t -> stop_reason Gillian_result.t
   val terminate : t -> unit
   val get_frames : t -> frame list
   val get_scopes : t -> Variable.scope list

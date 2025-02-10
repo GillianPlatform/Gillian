@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Syntaxes.Result
 module L = Logging
 
 module Make
@@ -45,24 +46,21 @@ struct
 
   let parse_eprog files already_compiled =
     if not already_compiled then
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
-          (PC.parse_and_compile_files files)
-      in
+      let+ progs = PC.parse_and_compile_files files in
       let e_progs = progs.gil_progs in
       let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
       let e_prog = snd (List.hd e_progs) in
       let source_files = progs.source_files in
       (e_prog, progs.init_data, Some source_files)
     else
-      let e_prog, init_data =
-        let Gil_parsing.{ labeled_prog; init_data } =
+      let+ e_prog, init_data =
+        let* Gil_parsing.{ labeled_prog; init_data } =
           Gil_parsing.parse_eprog_from_file (List.hd files)
         in
-        let init_data =
+        let+ init_data =
           match ID.of_yojson init_data with
-          | Ok d -> d
-          | Error e -> failwith e
+          | Ok d -> Ok d
+          | Error e -> Gillian_result.compilation_error e
         in
         (labeled_prog, init_data)
       in
@@ -71,7 +69,7 @@ struct
   let process_files files already_compiled outfile_opt no_unfold incremental =
     Verification.start_time := Sys.time ();
     Fmt.pr "Parsing and compiling...\n@?";
-    let e_prog, init_data, source_files_opt =
+    let* e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled
     in
     let () =
@@ -86,10 +84,8 @@ struct
     in
     (* Prog.perform_syntax_checks e_prog; *)
     Fmt.pr "Preprocessing...\n@?";
-    let prog =
-      Gil_parsing.eprog_to_prog
-        ~other_imports:(convert_other_imports PC.other_imports)
-        e_prog
+    let+ prog =
+      Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
     let () =
       L.verbose (fun m ->
@@ -128,11 +124,13 @@ struct
     let () = Config.manual_proof := manual in
     let () = Config.Verification.set_procs_to_verify procs_to_verify in
     let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
-    let () =
+    let r =
+      Gillian_result.try_ @@ fun () ->
       process_files files already_compiled outfile_opt no_unfold incremental
     in
     let () = if stats then Statistics.print_statistics () in
-    Logging.wrap_up ()
+    let () = Common_args.exit_on_error r in
+    exit 0
 
   let verify_t =
     Term.(

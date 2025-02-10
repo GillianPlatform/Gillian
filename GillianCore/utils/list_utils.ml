@@ -251,3 +251,8 @@ let[@tail_mod_cons] rec assoc_replace k v = function
   | [] -> [ (k, v) ]
   | (k', _) :: r when k = k' -> (k, v) :: r
   | x :: r -> x :: assoc_replace k v r
+
+let[@tail_mod_cons] rec drop n = function
+  | [] -> []
+  | l when n = 0 -> l
+  | _ :: r -> drop (n - 1) r
