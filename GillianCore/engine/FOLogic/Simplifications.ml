@@ -549,9 +549,9 @@ let simplify_pfs_and_gamma
                 | ALoc alocl, ALoc alocr when matching ->
                     L.verbose (fun fmt ->
                         fmt "Two equal alocs: %s and %s" alocl alocr);
-                    SESubst.put result (ALoc alocr) (ALoc alocl);
+                    SESubst.put result (ALoc alocl) (ALoc alocr);
                     let temp_subst =
-                      SESubst.init [ (ALoc alocr, ALoc alocl) ]
+                      SESubst.init [ (ALoc alocl, ALoc alocr) ]
                     in
                     PFS.substitution temp_subst lpfs;
                     let substituted =

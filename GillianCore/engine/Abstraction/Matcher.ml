@@ -1924,7 +1924,7 @@ module Make (State : SState.S) :
       match produced with
       | Error _ -> []
       | Ok state ->
-          let _, simplified = simplify_astate ~matching:true state in
+          let _, simplified = simplify_astate ~save:true ~matching:true state in
           simplified
 
     let match_assertion astate subst step =
@@ -2289,9 +2289,15 @@ module Make (State : SState.S) :
         | [ lhs_state ] -> (
           (* We add (persistent) knowledge from lhs state to current state *)
           let lhs_pfs = State.get_pfs lhs_state.state |> PFS.to_list in
-          match State.assume_a ~matching:true ~production:true astate.state lhs_pfs with
-          | Some state ->
-            { lhs_state; current_state = { astate with state }; subst }
+          let lhs_alocs =
+            List.fold_left
+              (fun acc pf -> SS.union acc (Formula.alocs pf))
+              SS.empty lhs_pfs
+          in
+          let current_sstate =  State.add_spec_vars astate.state lhs_alocs in 
+          match State.assume_a ~matching:true ~production:true current_sstate lhs_pfs with
+          | Some current_sstate ->
+            { lhs_state; current_state = { astate with state = current_sstate }; subst }
           | None ->
             Fmt.kstr L.fail "Wand lhs pure contradicts with current state!")
         | _ :: _ ->

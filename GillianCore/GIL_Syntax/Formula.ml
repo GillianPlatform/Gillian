@@ -153,7 +153,7 @@ let alocs (f : t) : SS.t = Visitors.Collectors.aloc_collector#visit_formula () f
 let clocs (f : t) : SS.t = Visitors.Collectors.cloc_collector#visit_formula () f
 
 (* Get all the locations in [a] *)
-let locs (f : t) : SS.t = Visitors.Collectors.cloc_collector#visit_formula () f
+let locs (f : t) : SS.t = Visitors.Collectors.loc_collector#visit_formula () f
 let get_print_info (a : t) = (pvars a, lvars a, locs a)
 
 (* Get all the logical expressions of --a-- of the form (Lit (LList lst)) and (EList lst)  *)
