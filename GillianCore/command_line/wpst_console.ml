@@ -12,8 +12,8 @@ module Make
                        with type annot = PC.Annot.t
                         and type state_t = SState.t
                         and type state_err_t = SState.err_t)
-    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
-struct
+    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t)
+    (Debug_adapter : Debug_adapter.S) : Console.S = struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
@@ -265,6 +265,32 @@ struct
     in
     Cmd.info "wpst" ~doc ~man
 
-  let wpst_cmd = Cmd.v wpst_info (Common_args.use wpst_t)
+  module Debug = struct
+    let debug_wpst_info =
+      let doc =
+        "Starts Gillian in debugging mode for whole-program symbolic testing"
+      in
+      let man =
+        [
+          `S Manpage.s_description;
+          `P
+            "Starts Gillian in debugging mode for whole-program symbolic \
+             testing, which communicates via the Debug Adapter Protocol";
+        ]
+      in
+      Cmd.info "debug" ~doc ~man
+
+    let start_debug_adapter () =
+      Config.current_exec_mode := Utils.Exec_mode.Symbolic;
+      Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
+
+    let debug_wpst_t = Common_args.use Term.(const start_debug_adapter)
+    let debug_wpst_cmd = Cmd.v debug_wpst_info debug_wpst_t
+  end
+
+  let wpst_cmd =
+    Cmd.group ~default:(Common_args.use wpst_t) wpst_info
+      [ Debug.debug_wpst_cmd ]
+
   let cmds = [ wpst_cmd ]
 end

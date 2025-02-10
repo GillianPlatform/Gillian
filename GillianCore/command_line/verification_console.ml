@@ -9,8 +9,8 @@ module Make
     (Verification : Verifier.S
                       with type annot = PC.Annot.t
                        and type SPState.init_data = ID.t)
-    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
-struct
+    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t)
+    (Debug_adapter : Debug_adapter.S) : Console.S = struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
@@ -147,6 +147,33 @@ struct
     in
     Cmd.info "verify" ~doc ~man
 
-  let verify_cmd = Cmd.v verify_info (Common_args.use verify_t)
+  module Debug = struct
+    let debug_verify_info =
+      let doc = "Starts Gillian in debugging mode for verification" in
+      let man =
+        [
+          `S Manpage.s_description;
+          `P
+            "Starts Gillian in debugging mode for verification, which \
+             communicates via the Debug Adapter Protocol";
+        ]
+      in
+      Cmd.info "debug" ~doc ~man
+
+    let start_debug_adapter manual () =
+      Config.current_exec_mode := Utils.Exec_mode.Verification;
+      Config.manual_proof := manual;
+      Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
+
+    let debug_verify_t =
+      Common_args.use Term.(const start_debug_adapter $ manual)
+
+    let debug_verify_cmd = Cmd.v debug_verify_info debug_verify_t
+  end
+
+  let verify_cmd =
+    Cmd.group ~default:(Common_args.use verify_t) verify_info
+      [ Debug.debug_verify_cmd ]
+
   let cmds = [ verify_cmd ]
 end

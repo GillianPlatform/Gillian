@@ -60,16 +60,12 @@ struct
         (module Compiler_console.Make (ID) (PC));
         (module C_interpreter_console.Make (ID) (PC) (CState) (C_interpreter)
                   (Gil_parsing));
-        (module S_interpreter_console.Make (ID) (PC) (SState) (S_interpreter)
-                  (Gil_parsing));
-        (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing));
-        (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
-        (module Debug_verification_console.Make
-                  (PC)
-                  (Debug_adapter.Make (Verif_debugger)));
-        (module Debug_wpst_console.Make
-                  (PC)
+        (module Wpst_console.Make (ID) (PC) (SState) (S_interpreter)
+                  (Gil_parsing)
                   (Debug_adapter.Make (Symb_debugger)));
+        (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing)
+                  (Debug_adapter.Make (Verif_debugger)));
+        (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
         (module Bulk_console.Make (PC) (Runners));
       ]
     in
