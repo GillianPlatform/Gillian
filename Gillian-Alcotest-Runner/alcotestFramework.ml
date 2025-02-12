@@ -49,7 +49,7 @@ module Make (Outcome : Outcome.S) = struct
     make_check_fail_at_parsing ~expected:(Some (constraint_name, constr))
 
   let fail_at_exec = function
-    | Error (InternalError _ | OperationError _) -> ()
+    | Error (InternalError _ | OperationError _ | AnalysisFailures _) -> ()
     | (Ok _ | Error (CompilationError _)) as actual ->
         Alcotest.failf
           "Expected the test to fail at execution \nBut the test %a"

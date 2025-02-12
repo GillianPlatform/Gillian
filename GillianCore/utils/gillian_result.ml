@@ -1,4 +1,6 @@
 module Error = struct
+  type analysis_failure = { msg : string; loc : Location.t option }
+
   type compilation_error = {
     msg : string;
     loc : Location.t option;
@@ -12,12 +14,14 @@ module Error = struct
   }
 
   type t =
+    | AnalysisFailures of analysis_failure list
     | CompilationError of compilation_error
     | OperationError of string
         (** Handled failure unrelated to analysis, e.g. unable to read input file *)
     | InternalError of internal_error  (** Something went very wrong! *)
 
   let pp fmt = function
+    | AnalysisFailures _ -> Fmt.pf fmt "Analysis failure"
     | CompilationError { msg; _ } ->
         Fmt.pf fmt "Error during compilation.\n%s" msg
     | OperationError o -> Fmt.pf fmt "%s" o
@@ -26,6 +30,7 @@ module Error = struct
   let show = Fmt.to_to_string pp
 
   let to_error_code = function
+    | AnalysisFailures _ -> 1
     | CompilationError _ -> 1
     | OperationError _ -> 2
     | InternalError _ -> 3
@@ -53,6 +58,8 @@ module Exc = struct
 end
 
 type 'a t = ('a, Error.t) result
+
+let analysis_failures errs = Error (AnalysisFailures errs)
 
 let compilation_error ?additional_data ?loc msg =
   Error (CompilationError { msg; loc; additional_data })
@@ -84,3 +91,26 @@ let try_ f =
       let backtrace = Some (Printexc.get_backtrace ()) in
       let msg = "Internal error!\n" ^ Printexc.to_string e in
       internal_error ~backtrace msg
+
+(** "Merges" two results by selecting the error with highest precedence.
+  If both results are AnalysisFailures, they are properly merged.
+  If both results are Ok, takes the result of merge_ok, which takes the {b first} value by default *)
+let merge ?(merge_ok : 'a -> 'b -> 'c = fun x _ -> x) e1 e2 =
+  match (e1, e2) with
+  | Error (InternalError e), _ | _, Error (InternalError e) ->
+      Error (InternalError e)
+  | Error (OperationError e), _ | _, Error (OperationError e) ->
+      Error (OperationError e)
+  | Error (CompilationError e), _ | _, Error (CompilationError e) ->
+      Error (CompilationError e)
+  | Error (AnalysisFailures e1), Error (AnalysisFailures e2) ->
+      Error (AnalysisFailures (e1 @ e2))
+  | Error (AnalysisFailures e), _ | _, Error (AnalysisFailures e) ->
+      Error (AnalysisFailures e)
+  | Ok a, Ok b -> Ok (merge_ok a b)
+
+(* Execution should continue if ok or analysis failure (to get the rest of the results).
+   Other errors should halt immediately. *)
+let should_continue = function
+  | Ok _ | Error (AnalysisFailures _) -> true
+  | Error (InternalError _ | OperationError _ | CompilationError _) -> false
