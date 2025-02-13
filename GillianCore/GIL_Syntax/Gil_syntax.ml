@@ -11,7 +11,6 @@ module Flag = Flag
 module LCmd = LCmd
 module Lemma = Lemma
 module Literal = Literal
-module Location = Location
 module LVar = LVar
 module Macro = Macro
 module NOp = NOp

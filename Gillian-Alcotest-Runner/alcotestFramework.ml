@@ -1,17 +1,19 @@
+open Utils.Gillian_result.Error
+
 module Make (Outcome : Outcome.S) = struct
   include AlcotestCheckers.Make (Outcome)
 
   let make_check_fail_at_parsing
-      ~(expected : (string * (Outcome.ParserAndCompiler.err -> bool)) option)
+      ~(expected : (string * (compilation_error -> bool)) option)
       (actual : Outcome.t) : unit =
     match (actual, expected) with
-    | ParseAndCompileError _, None -> ()
-    | ParseAndCompileError pa, Some (cname, constr) ->
+    | Error (CompilationError _), None -> ()
+    | Error (CompilationError pa), Some (cname, constr) ->
         let failure_message =
           Fmt.str
-            "Expected test to fail at parsing time with %a\n\
-             but it failed at parsing time with constraint: %a"
-            Outcome.ParserAndCompiler.pp_err pa Fmt.string cname
+            "Expected test to fail at parsing time with %s\n\
+             but it failed at parsing time with constraint: %a" pa.msg
+            Fmt.string cname
         in
         Alcotest.(check bool) failure_message true (constr pa)
     | other, _ ->
@@ -29,7 +31,7 @@ module Make (Outcome : Outcome.S) = struct
       (branches : BranchReasoning.branches)
       (actual : Outcome.t) =
     match actual with
-    | FinishedExec res ->
+    | Ok res ->
         let msg, pass =
           BranchReasoning.resInMode
             ~pp_what_branch_did:Outcome.pp_what_branch_did branches flag
@@ -47,8 +49,8 @@ module Make (Outcome : Outcome.S) = struct
     make_check_fail_at_parsing ~expected:(Some (constraint_name, constr))
 
   let fail_at_exec = function
-    | Outcome.FailedExec _ -> ()
-    | actual ->
+    | Error (InternalError _ | OperationError _ | AnalysisFailures _) -> ()
+    | (Ok _ | Error (CompilationError _)) as actual ->
         Alcotest.failf
           "Expected the test to fail at execution \nBut the test %a"
           Outcome.pp_what_test_did actual

@@ -33,7 +33,12 @@ let is_true = function
   | Sexplib.Sexp.Atom "true" -> true
   | _ -> false
 
-type typenv = (string, Type.t) Hashtbl.t
+type typenv = (string, Type.t) Hashtbl.t [@@deriving to_yojson]
+
+let fs_to_yojson fs = fs |> Expr.Set.to_list |> list_to_yojson Expr.to_yojson
+
+let sexps_to_yojson sexps =
+  `List (List.map (fun sexp -> `String (Sexplib.Sexp.to_string_hum sexp)) sexps)
 
 let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
 
@@ -950,22 +955,16 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
     | Unknown ->
         if !Config.under_approximation then raise SMT_unknown
         else
-          let msg =
-            Fmt.str
-              "FATAL ERROR: SMT returned UNKNOWN for SAT question:\n\
-               %a\n\
-               with gamma:\n\
-               @[%a@]\n\n\n\
-               Solver:\n\
-               %a\n\
-               @?"
-              (Fmt.iter ~sep:(Fmt.any ", ") Expr.Set.iter Expr.pp)
-              fs pp_typenv gamma
-              (Fmt.list ~sep:(Fmt.any "\n\n") Sexplib.Sexp.pp_hum)
-              encoded_assertions
+          let additional_data =
+            [
+              ("expressions", fs_to_yojson fs);
+              ("gamma", typenv_to_yojson gamma);
+              ("encoded_assertions", sexps_to_yojson encoded_assertions);
+            ]
           in
-          let () = L.print_to_all msg in
-          exit 1
+          raise
+            Gillian_result.Exc.(
+              internal_error ~additional_data "SMT returned unknown")
     | Sat -> Some (get_model solver)
     | Unsat -> None
   in
@@ -974,14 +973,14 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
 let exec_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   try exec_sat' fs gamma
   with UnexpectedSolverResponse _ as e ->
-    let msg =
-      Fmt.str "SMT failure!@\n%s@\nExpressions: @\n%a"
-        (Printexc.to_string e ^ "\n")
-        Fmt.(list ~sep:(Fmt.any "@\n") Expr.pp)
-        (Expr.Set.elements fs)
+    let additional_data =
+      [
+        ("smt_error", `String (Printexc.to_string e));
+        ("expressions", fs_to_yojson fs);
+        ("gamma", typenv_to_yojson gamma);
+      ]
     in
-    let () = L.print_to_all msg in
-    exit 1
+    raise Gillian_result.Exc.(internal_error ~additional_data "SMT failure")
 
 let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   match Hashtbl.find_opt sat_cache fs with

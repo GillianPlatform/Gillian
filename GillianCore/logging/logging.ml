@@ -17,12 +17,13 @@ let file_reporter : Reporter.t = (module File_reporter)
 let database_reporter : Reporter.t = (module Database_reporter)
 let reporters = ref []
 
-let initialize (reporters_to_initialize : (module Reporter.S) list) =
-  reporters := reporters_to_initialize;
-  List.iter (fun reporter -> Reporter.initialize reporter) !reporters
-
 let wrap_up () =
   List.iter (fun reporter -> Reporter.wrap_up reporter) !reporters
+
+let initialize (reporters_to_initialize : (module Reporter.S) list) =
+  reporters := reporters_to_initialize;
+  List.iter (fun reporter -> Reporter.initialize reporter) !reporters;
+  at_exit wrap_up
 
 let log_on_all_reporters (report : Report.t) =
   List.iter (fun reporter -> Reporter.log reporter report) !reporters

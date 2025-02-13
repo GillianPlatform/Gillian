@@ -448,7 +448,7 @@ struct
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
 
-  let analyse_proc_result test flag ?parent_id result =
+  let analyse_proc_result test flag ?parent_id result : unit Gillian_result.t =
     match (result : SAInterpreter.result_t) with
     | Exec_res.RFail { proc; proc_idx; error_state; errors } ->
         L.verbose (fun m ->
@@ -465,18 +465,25 @@ struct
               Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
               errors);
         if not !Config.debug then Fmt.pr "f @?";
-        false
+        let errors =
+          errors
+          |> List.map @@ fun e ->
+             let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
+             Gillian_result.Error.{ msg; loc = None }
+        in
+        Gillian_result.analysis_failures errors
     | Exec_res.RSucc { flag = fl; final_state; last_report; _ } ->
         if Some fl <> test.flag then (
+          let msg =
+            Fmt.str "Terminated with flag %s instead of %s" (Flag.str fl)
+              (Flag.str flag)
+          in
           L.normal (fun m ->
-              m
-                "VERIFICATION FAILURE: Spec %s %a terminated with flag %s \
-                 instead of %s\n"
-                test.name
+              m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
                 (Fmt.Dump.pair Fmt.int Fmt.int)
-                test.id (Flag.str fl) (Flag.str flag));
+                test.id msg);
           if not !Config.debug then Fmt.pr "f @?";
-          false)
+          Gillian_result.analysis_failures [ { msg; loc = None } ])
         else
           let parent_id =
             match parent_id with
@@ -487,79 +494,93 @@ struct
               m "Match: setting parent to %a"
                 (Fmt.option L.Report_id.pp)
                 parent_id);
-          L.Parent.with_id parent_id (fun () ->
-              let store = SPState.get_store final_state in
-              let () =
-                SStore.filter_map_inplace store (fun x v ->
-                    if x = Names.return_variable then Some v else None)
-              in
-              let subst = make_post_subst test final_state in
-              if analyse_result subst test final_state then (
-                L.normal (fun m ->
-                    m
-                      "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                      test.name
-                      (Fmt.Dump.pair Fmt.int Fmt.int)
-                      test.id);
-                if not !Config.debug then Fmt.pr "s @?";
-                true)
-              else (
-                L.normal (fun m ->
-                    m
-                      "VERIFICATION FAILURE: Spec %s %a - post condition not \
-                       matchable\n"
-                      test.name
-                      (Fmt.Dump.pair Fmt.int Fmt.int)
-                      test.id);
-                if not !Config.debug then Fmt.pr "f @?";
-                false))
+          L.Parent.with_id parent_id @@ fun () ->
+          let store = SPState.get_store final_state in
+          let () =
+            SStore.filter_map_inplace store (fun x v ->
+                if x = Names.return_variable then Some v else None)
+          in
+          let subst = make_post_subst test final_state in
+          if analyse_result subst test final_state then
+            let () =
+              L.normal (fun m ->
+                  m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                    test.name
+                    (Fmt.Dump.pair Fmt.int Fmt.int)
+                    test.id)
+            in
+            let () = if not !Config.debug then Fmt.pr "s @?" in
+            Ok ()
+          else
+            let msg = "Postcondition not matchable" in
+            let () =
+              L.normal (fun m ->
+                  m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
+                    (Fmt.Dump.pair Fmt.int Fmt.int)
+                    test.id msg)
+            in
+            let () = if not !Config.debug then Fmt.pr "f @?" in
+            Gillian_result.analysis_failures [ { msg; loc = None } ]
 
   let analyse_proc_results
       (test : t)
       (flag : Flag.t)
-      (rets : SAInterpreter.result_t list) : bool =
+      (rets : SAInterpreter.result_t list) : unit Gillian_result.t =
     if rets = [] then (
       L.(
         normal (fun m ->
             m "ERROR: Function %s evaluates to 0 results." test.name));
       exit 1);
-    let success = List.for_all (analyse_proc_result test flag) rets in
-    print_success_or_failure success;
-    success
-
-  let analyse_lemma_results (test : t) (rets : SPState.t list) : bool =
-    let success : bool =
-      rets <> []
-      && List.fold_left
-           (fun ac final_state ->
-             let empty_store = SStore.init [] in
-             let final_state = SPState.set_store final_state empty_store in
-             let subst = make_post_subst test final_state in
-             if analyse_result subst test final_state then (
-               L.normal (fun m ->
-                   m
-                     "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                     test.name
-                     (Fmt.Dump.pair Fmt.int Fmt.int)
-                     test.id);
-               ac)
-             else (
-               L.normal (fun m ->
-                   m
-                     "VERIFICATION FAILURE: Spec %s %a - post condition not \
-                      matchable\n"
-                     test.name
-                     (Fmt.Dump.pair Fmt.int Fmt.int)
-                     test.id);
-               false))
-           true rets
+    let result =
+      List.fold_left
+        (fun acc ret ->
+          let res = analyse_proc_result test flag ret in
+          Gillian_result.merge acc res)
+        (Ok ()) rets
     in
-    if rets = [] then (
-      L.(
-        normal (fun m -> m "ERROR: Lemma %s evaluates to 0 results." test.name));
-      exit 1);
-    print_success_or_failure success;
-    success
+    print_success_or_failure (Result.is_ok result);
+    result
+
+  let analyse_lemma_results (test : t) (rets : SPState.t list) :
+      unit Gillian_result.t =
+    let open Syntaxes.Result in
+    let* () =
+      if rets = [] then
+        Gillian_result.internal_error "Lemma evaluates to 0 results."
+      else Ok ()
+    in
+    let errors =
+      rets
+      |> List.filter_map @@ fun final_state ->
+         let empty_store = SStore.init [] in
+         let final_state = SPState.set_store final_state empty_store in
+         let subst = make_post_subst test final_state in
+         if analyse_result subst test final_state then
+           let () =
+             L.normal (fun m ->
+                 m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                   test.name
+                   (Fmt.Dump.pair Fmt.int Fmt.int)
+                   test.id)
+           in
+           None
+         else
+           let msg = "Postcondition not matchable" in
+           let () =
+             L.normal (fun m ->
+                 m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
+                   (Fmt.Dump.pair Fmt.int Fmt.int)
+                   test.id msg)
+           in
+           Some Gillian_result.Error.{ msg; loc = None }
+    in
+    let result =
+      match errors with
+      | [] -> Ok ()
+      | _ -> Gillian_result.analysis_failures errors
+    in
+    print_success_or_failure (Result.is_ok result);
+    result
 
   (* FIXME: This function name is very bad! *)
   let verify_up_to_procs (prog : annot MP.prog) (test : t) : annot MP.prog =
@@ -573,7 +594,7 @@ struct
         { prog with coverage = Hashtbl.create 1 }
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
-  let verify (prog : annot MP.prog) (test : t) : bool =
+  let verify (prog : annot MP.prog) (test : t) : unit Gillian_result.t =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -594,9 +615,9 @@ struct
         match lemma.lemma_proof with
         | None ->
             if !Config.lemma_proof then
-              raise
-                (Failure (Printf.sprintf "Lemma %s WITHOUT proof" test.name))
-            else true (* It's already correct *)
+              Gillian_result.operation_error
+                (Fmt.str "Lemma %s WITHOUT proof" test.name)
+            else Ok () (* It's already correct *)
         | Some proof -> (
             let msg = "Verifying lemma " ^ test.name ^ "... " in
             L.tmi (fun fmt -> fmt "%s" msg);
@@ -608,8 +629,14 @@ struct
             match errors with
             | [] -> analyse_lemma_results test successes
             | _ ->
+                let errors =
+                  errors
+                  |> List.map @@ fun e ->
+                     let msg = Fmt.str "%a" SPState.pp_err e in
+                     Gillian_result.Error.{ msg; loc = None }
+                in
                 print_success_or_failure false;
-                false))
+                Gillian_result.analysis_failures errors))
 
   let pred_extracting_visitor =
     object
@@ -806,15 +833,20 @@ struct
     (* STEP 6: Run the symbolic tests *)
     let cur_time = Sys.time () in
     Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
-    let success : bool =
-      List.fold_left
-        (fun ac test -> if verify prog' test then ac else false)
-        true (tests' @ tests)
+    let result =
+      let rec aux = function
+        | [], acc -> acc
+        | _, acc when not (Gillian_result.should_continue acc) -> acc
+        | test :: tests, acc ->
+            let res = verify prog' test in
+            aux (tests, Gillian_result.merge acc res)
+      in
+      aux (tests' @ tests, Ok ())
     in
     let end_time = Sys.time () in
     let cur_verified = SS.union pnames_to_verify lnames_to_verify in
     let success =
-      success && check_previously_verified prev_results cur_verified
+      Result.is_ok result && check_previously_verified prev_results cur_verified
     in
     let msg : string =
       if success then "All specs succeeded:" else "There were failures:"
@@ -880,85 +912,76 @@ struct
       (prog : prog_t)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
-    let f prog incremental source_files =
-      let open ResultsDir in
-      let open ChangeTracker in
-      if incremental && prev_results_exist () then (
-        (* Only verify changed procedures and lemmas *)
-        let cur_source_files =
-          match source_files with
-          | Some files -> files
-          | None -> failwith "Cannot use -a in incremental mode"
-        in
-        let prev_source_files, prev_call_graph, results =
-          read_verif_results ()
-        in
-        let proc_changes, lemma_changes =
-          get_verif_changes prog ~prev_source_files ~prev_call_graph
-            ~cur_source_files
-        in
-        let procs_to_prune =
-          proc_changes.changed_procs @ proc_changes.deleted_procs
-          @ proc_changes.dependent_procs
-        in
-        let lemmas_to_prune =
-          lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
-          @ lemma_changes.dependent_lemmas
-        in
-        let () = Call_graph.prune_procs prev_call_graph procs_to_prune in
-        let () = Call_graph.prune_lemmas prev_call_graph lemmas_to_prune in
-        let () =
-          VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
-        in
-        let procs_to_verify =
-          SS.of_list
-            (proc_changes.changed_procs @ proc_changes.new_procs
-           @ proc_changes.dependent_procs)
-        in
-        let lemmas_to_verify =
-          SS.of_list
-            (lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
-           @ lemma_changes.dependent_lemmas)
-        in
+    L.Phase.with_normal ~title:"Program verification" @@ fun () ->
+    let open ResultsDir in
+    let open ChangeTracker in
+    if incremental && prev_results_exist () then (
+      (* Only verify changed procedures and lemmas *)
+      let cur_source_files =
+        match source_files with
+        | Some files -> files
+        | None -> failwith "Cannot use -a in incremental mode"
+      in
+      let prev_source_files, prev_call_graph, results = read_verif_results () in
+      let proc_changes, lemma_changes =
+        get_verif_changes prog ~prev_source_files ~prev_call_graph
+          ~cur_source_files
+      in
+      let procs_to_prune =
+        proc_changes.changed_procs @ proc_changes.deleted_procs
+        @ proc_changes.dependent_procs
+      in
+      let lemmas_to_prune =
+        lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
+        @ lemma_changes.dependent_lemmas
+      in
+      let () = Call_graph.prune_procs prev_call_graph procs_to_prune in
+      let () = Call_graph.prune_lemmas prev_call_graph lemmas_to_prune in
+      let () =
+        VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
+      in
+      let procs_to_verify =
+        SS.of_list
+          (proc_changes.changed_procs @ proc_changes.new_procs
+         @ proc_changes.dependent_procs)
+      in
+      let lemmas_to_verify =
+        SS.of_list
+          (lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
+         @ lemma_changes.dependent_lemmas)
+      in
+      if !Config.Verification.verify_only_some_of_the_things then
+        failwith "Cannot use --incremental and --procs or --lemma together";
+      let () =
+        verify_procs ~init_data ~prev_results:results prog procs_to_verify
+          lemmas_to_verify
+      in
+      let cur_call_graph = SAInterpreter.call_graph in
+      let cur_results = global_results in
+      let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
+      let results = VerificationResults.merge results cur_results in
+      let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
+      write_verif_results cur_source_files call_graph ~diff results)
+    else
+      (* Analyse all procedures and lemmas *)
+      let cur_source_files =
+        Option.value ~default:(SourceFiles.make ()) source_files
+      in
+      let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+      let lemmas_to_verify =
+        SS.of_list (Prog.get_noninternal_lemma_names prog)
+      in
+      let procs_to_verify, lemmas_to_verify =
         if !Config.Verification.verify_only_some_of_the_things then
-          failwith "Cannot use --incremental and --procs or --lemma together";
-        let () =
-          verify_procs ~init_data ~prev_results:results prog procs_to_verify
-            lemmas_to_verify
-        in
-        let cur_call_graph = SAInterpreter.call_graph in
-        let cur_results = global_results in
-        let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
-        let results = VerificationResults.merge results cur_results in
-        let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-        write_verif_results cur_source_files call_graph ~diff results)
-      else
-        (* Analyse all procedures and lemmas *)
-        let cur_source_files =
-          Option.value ~default:(SourceFiles.make ()) source_files
-        in
-        let procs_to_verify =
-          SS.of_list (Prog.get_noninternal_proc_names prog)
-        in
-        let lemmas_to_verify =
-          SS.of_list (Prog.get_noninternal_lemma_names prog)
-        in
-        let procs_to_verify, lemmas_to_verify =
-          if !Config.Verification.verify_only_some_of_the_things then
-            ( SS.inter procs_to_verify
-                (SS.of_list !Config.Verification.procs_to_verify),
-              SS.inter lemmas_to_verify
-                (SS.of_list !Config.Verification.lemmas_to_verify) )
-          else (procs_to_verify, lemmas_to_verify)
-        in
-        let () =
-          verify_procs ~init_data prog procs_to_verify lemmas_to_verify
-        in
-        let call_graph = SAInterpreter.call_graph in
-        write_verif_results cur_source_files call_graph ~diff:"" global_results
-    in
-    L.Phase.with_normal ~title:"Program verification" (fun () ->
-        f prog incremental source_files)
+          ( SS.inter procs_to_verify
+              (SS.of_list !Config.Verification.procs_to_verify),
+            SS.inter lemmas_to_verify
+              (SS.of_list !Config.Verification.lemmas_to_verify) )
+        else (procs_to_verify, lemmas_to_verify)
+      in
+      let () = verify_procs ~init_data prog procs_to_verify lemmas_to_verify in
+      let call_graph = SAInterpreter.call_graph in
+      write_verif_results cur_source_files call_graph ~diff:"" global_results
 
   module Debug = struct
     let get_tests_for_prog ~init_data (prog : prog_t) =
@@ -1001,7 +1024,7 @@ struct
       tests
 
     let analyse_result test parent_id result =
-      analyse_proc_result test Normal ~parent_id result
+      analyse_proc_result test Normal ~parent_id result |> Result.is_ok
   end
 end
 

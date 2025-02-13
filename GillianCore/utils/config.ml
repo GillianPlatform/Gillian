@@ -10,6 +10,8 @@ let results_dir, set_result_dir =
   let rd = ref ".gillian" in
   ((fun () -> !rd), fun r -> rd := r)
 
+let file_content_overrides : (string, string) Hashtbl.t = Hashtbl.create 0
+
 let entry_point = ref "main"
 let json_ui = ref false
 let ci = ref false

@@ -1,17 +1,3 @@
-(** @canonical Gillian.Gil_syntax.Location *)
-module Location : sig
-  (** Representation of a location in a source file *)
-
-  type position = { pos_line : int; pos_column : int } [@@deriving yojson]
-
-  type t = { loc_start : position; loc_end : position; loc_source : string }
-  [@@deriving yojson, eq]
-
-  val none : t
-  val pp : t Fmt.t
-  val pp_log_opt : Format.formatter -> t option -> unit
-end
-
 (** @canonical Gillian.Gil_syntax.LVar *)
 module LVar : sig
   (** Allocator for logical variable names *)
