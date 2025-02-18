@@ -67,6 +67,7 @@ functor
 
     let start in_ out =
       try%lwt
+        Utils.Prelude.disable_stdout ();
         Config.debug := true;
         let rpc = Debug_rpc.create ~in_ ~out () in
         DL.setup rpc;

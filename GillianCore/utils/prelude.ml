@@ -222,3 +222,7 @@ let opt_to_yojson (to_yojson : 'a -> Yojson.Safe.t) = function
 (** Converts a list of values to yojson *)
 let list_to_yojson (to_yojson : 'a -> Yojson.Safe.t) xs =
   `List (xs |> List.map to_yojson)
+
+let disable_stdout () =
+  let outfile = Out_channel.open_bin Filename.null in
+  Format.set_formatter_out_channel outfile

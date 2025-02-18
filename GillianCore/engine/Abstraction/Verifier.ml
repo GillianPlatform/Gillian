@@ -464,7 +464,7 @@ struct
               test.id SPState.pp error_state
               Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
               errors);
-        if not !Config.debug then Fmt.pr "f @?";
+        Fmt.pr "f @?";
         let errors =
           errors
           |> List.map @@ fun e ->
@@ -482,7 +482,7 @@ struct
               m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
                 (Fmt.Dump.pair Fmt.int Fmt.int)
                 test.id msg);
-          if not !Config.debug then Fmt.pr "f @?";
+          Fmt.pr "f @?";
           Gillian_result.analysis_failures [ { msg; loc = None } ])
         else
           let parent_id =
@@ -509,7 +509,7 @@ struct
                     (Fmt.Dump.pair Fmt.int Fmt.int)
                     test.id)
             in
-            let () = if not !Config.debug then Fmt.pr "s @?" in
+            let () = Fmt.pr "s @?" in
             Ok ()
           else
             let msg = "Postcondition not matchable" in
@@ -519,7 +519,7 @@ struct
                     (Fmt.Dump.pair Fmt.int Fmt.int)
                     test.id msg)
             in
-            let () = if not !Config.debug then Fmt.pr "f @?" in
+            let () = Fmt.pr "f @?" in
             Gillian_result.analysis_failures [ { msg; loc = None } ]
 
   let analyse_proc_results

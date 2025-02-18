@@ -69,7 +69,7 @@ end
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
-  print_endline str
+  Fmt.pr "%s" str
 
 (* Failure *)
 let fail msg =

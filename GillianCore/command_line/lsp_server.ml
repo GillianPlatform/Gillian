@@ -93,6 +93,7 @@ class lsp_server (f : string -> unit Gillian_result.t) =
   end
 
 let run analyse =
+  Utils.Prelude.disable_stdout ();
   let s = new lsp_server analyse in
   let server = Linol_lwt.Jsonrpc2.create_stdio ~env:() s in
   let task =
