@@ -250,6 +250,8 @@ module Make
     let () = Common_args.exit_on_error r in
     exit 0
 
+  let cmd_name = "wpst"
+
   let wpst_t =
     Term.(
       const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
@@ -263,7 +265,9 @@ module Make
         `P "Symbolically executes a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info "wpst" ~doc ~man
+    Cmd.info cmd_name ~doc ~man
+
+  let wpst_cmd = Console.Normal (Cmd.v wpst_info (Common_args.use wpst_t))
 
   module Debug = struct
     let debug_wpst_info =
@@ -278,19 +282,15 @@ module Make
              testing, which communicates via the Debug Adapter Protocol";
         ]
       in
-      Cmd.info "debug" ~doc ~man
+      Cmd.info cmd_name ~doc ~man
 
     let start_debug_adapter () =
       Config.current_exec_mode := Utils.Exec_mode.Symbolic;
       Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
 
     let debug_wpst_t = Common_args.use Term.(const start_debug_adapter)
-    let debug_wpst_cmd = Cmd.v debug_wpst_info debug_wpst_t
+    let debug_wpst_cmd = Console.Debug (Cmd.v debug_wpst_info debug_wpst_t)
   end
 
-  let wpst_cmd =
-    Cmd.group ~default:(Common_args.use wpst_t) wpst_info
-      [ Debug.debug_wpst_cmd ]
-
-  let cmds = [ wpst_cmd ]
+  let cmds = [ wpst_cmd; Debug.debug_wpst_cmd ]
 end

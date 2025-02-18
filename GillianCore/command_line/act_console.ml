@@ -175,6 +175,6 @@ struct
     in
     Cmd.info "act" ~doc ~man
 
-  let act_cmd = Cmd.v act_info (Common_args.use act_t)
+  let act_cmd = Console.Normal (Cmd.v act_info (Common_args.use act_t))
   let cmds = [ act_cmd ]
 end

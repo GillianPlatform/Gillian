@@ -68,6 +68,6 @@ module Make
     in
     Cmd.info "compile" ~doc ~man
 
-  let compile_cmd = Cmd.v compile_info compile_t
+  let compile_cmd = Console.Normal (Cmd.v compile_info compile_t)
   let cmds = [ compile_cmd ]
 end

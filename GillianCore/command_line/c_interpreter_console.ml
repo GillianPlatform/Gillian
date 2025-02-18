@@ -104,6 +104,6 @@ struct
     in
     Cmd.info "exec" ~doc ~man
 
-  let exec_cmd = Cmd.v exec_info (Common_args.use exec_t)
+  let exec_cmd = Console.Normal (Cmd.v exec_info (Common_args.use exec_t))
   let cmds = [ exec_cmd ]
 end

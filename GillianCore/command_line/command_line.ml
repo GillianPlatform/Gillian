@@ -42,6 +42,34 @@ struct
   module Verif_debugger =
     Debugger.Verification_debugger.Make (ID) (PC) (Verification) (Lifter)
 
+  let split_cmds cmds =
+    let cmds, debug_cmds, lsp_cmds =
+      List.fold_left
+        Console.(
+          fun (acc_normal, acc_debug, acc_lsp) -> function
+            | Normal cmd -> (cmd :: acc_normal, acc_debug, acc_lsp)
+            | Debug cmd -> (acc_normal, cmd :: acc_debug, acc_lsp)
+            | Lsp cmd -> (acc_normal, acc_debug, cmd :: acc_lsp))
+        ([], [], []) cmds
+    in
+    let cmds =
+      match debug_cmds with
+      | [] -> cmds
+      | _ ->
+          let debug_info = Cmd.info "debug" ~doc:"Commands for debugger mode" in
+          Cmd.group debug_info debug_cmds :: cmds
+    in
+    let cmds =
+      match lsp_cmds with
+      | [] -> cmds
+      | _ ->
+          let lsp_info =
+            Cmd.info "lsp" ~doc:"Commands for language server mode"
+          in
+          Cmd.group lsp_info lsp_cmds :: cmds
+    in
+    cmds
+
   let main () =
     Memtrace.trace_if_requested ();
 
@@ -70,7 +98,9 @@ struct
       ]
     in
     let cmds =
-      consoles |> List.concat_map (fun (module C : Console.S) -> C.cmds)
+      consoles
+      |> List.concat_map (fun (module C : Console.S) -> C.cmds)
+      |> split_cmds
     in
     exit (Cmd.eval (Cmd.group info cmds))
 end

@@ -66,7 +66,8 @@ module Make
       in
       (e_prog, init_data, None)
 
-  let process_files files already_compiled outfile_opt no_unfold incremental =
+  let verify files already_compiled outfile_opt no_unfold incremental =
+    Gillian_result.try_ @@ fun () ->
     Verification.start_time := Sys.time ();
     Fmt.pr "Parsing and compiling...\n@?";
     let* e_prog, init_data, source_files_opt =
@@ -102,7 +103,7 @@ module Make
     in
     Verification.verify_prog ~init_data prog incremental source_files_opt
 
-  let verify
+  let verify_once
       files
       already_compiled
       outfile_opt
@@ -124,18 +125,17 @@ module Make
     let () = Config.manual_proof := manual in
     let () = Config.Verification.set_procs_to_verify procs_to_verify in
     let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
-    let r =
-      Gillian_result.try_ @@ fun () ->
-      process_files files already_compiled outfile_opt no_unfold incremental
-    in
+    let r = verify files already_compiled outfile_opt no_unfold incremental in
     let () = if stats then Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 
+  let cmd_name = "verify"
+
   let verify_t =
     Term.(
-      const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
-      $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg)
+      const verify_once $ files $ already_compiled $ output_gil $ no_unfold
+      $ stats $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg)
 
   let verify_info =
     let doc = "Verifies a file of the target language" in
@@ -145,7 +145,9 @@ module Make
         `P "Verifies a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info "verify" ~doc ~man
+    Cmd.info cmd_name ~doc ~man
+
+  let verify_cmd = Console.Normal (Cmd.v verify_info (Common_args.use verify_t))
 
   module Debug = struct
     let debug_verify_info =
@@ -158,7 +160,7 @@ module Make
              communicates via the Debug Adapter Protocol";
         ]
       in
-      Cmd.info "debug" ~doc ~man
+      Cmd.info cmd_name ~doc ~man
 
     let start_debug_adapter manual () =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
@@ -168,12 +170,34 @@ module Make
     let debug_verify_t =
       Common_args.use Term.(const start_debug_adapter $ manual)
 
-    let debug_verify_cmd = Cmd.v debug_verify_info debug_verify_t
+    let debug_verify_cmd =
+      Console.Debug (Cmd.v debug_verify_info debug_verify_t)
   end
 
-  let verify_cmd =
-    Cmd.group ~default:(Common_args.use verify_t) verify_info
-      [ Debug.debug_verify_cmd ]
+  module Lsp = struct
+    let debug_verify_info =
+      let doc = "Starts Gillian in language server mode for verification" in
+      let man =
+        [
+          `S Manpage.s_description;
+          `P
+            "Starts Gillian in language server mode for verification, which \
+             communicates via the Language Server Protocol";
+        ]
+      in
+      Cmd.info cmd_name ~doc ~man
 
-  let cmds = [ verify_cmd ]
+    let start_language_server manual () =
+      Config.current_exec_mode := Utils.Exec_mode.Verification;
+      Config.manual_proof := manual;
+      let analyse file = verify [ file ] false None false false in
+      Lsp_server.run analyse
+
+    let lsp_verify_t =
+      Common_args.use Term.(const start_language_server $ manual)
+
+    let lsp_verify_cmd = Console.Lsp (Cmd.v debug_verify_info lsp_verify_t)
+  end
+
+  let cmds = [ verify_cmd; Debug.debug_verify_cmd; Lsp.lsp_verify_cmd ]
 end
