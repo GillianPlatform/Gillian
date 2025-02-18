@@ -4,17 +4,17 @@ type buffer_state = { path : string; content : string }
 
 let default_range =
   let start = Position.create ~line:0 ~character:0 in
-  let end_ = start in
+  let end_ = Position.create ~line:0 ~character:1 in
   Range.create ~start ~end_
 
-let loc_to_range (loc : Utils.Location.t) : Range.t =
-  let start =
-    Position.create ~line:loc.loc_start.pos_line
-      ~character:loc.loc_start.pos_column
-  in
-  let end_ =
-    Position.create ~line:loc.loc_end.pos_line ~character:loc.loc_end.pos_column
-  in
+let convert_pos ({ pos_line; pos_column; _ } : Utils.Location.position) =
+  let line = pos_line - 1 in
+  let character = pos_column in
+  Position.create ~line ~character
+
+let loc_to_range (loc : Utils.Location.t) =
+  let start = convert_pos loc.loc_start in
+  let end_ = convert_pos loc.loc_end in
   Range.create ~start ~end_
 
 let mk_diagnostic
