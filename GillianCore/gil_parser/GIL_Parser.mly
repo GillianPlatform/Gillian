@@ -752,13 +752,65 @@ g_spec_target:
 ;
 
 g_spec_line:
-  OASSERT; a = g_assertion_target; CASSERT { let a' : Asrt.t = a in a' }
+  OASSERT; a = g_assertion_target; CASSERT
+  { let open Location in
+    let open Lexing in
+
+    let a' : Asrt.t = a in
+    let loc_start : Location.position =
+      {
+        pos_line = $startpos.pos_lnum;
+        pos_column = $startpos.pos_cnum - $startpos.pos_bol;
+      }
+    in
+    let loc_end : Location.position =
+      {
+        pos_line = $endpos.pos_lnum;
+        pos_column = $endpos.pos_cnum - $endpos.pos_bol;
+      }
+    in
+    let loc : Location.t =
+      {
+        loc_start;
+        loc_end;
+        loc_source = $startpos.pos_fname;
+      }
+    in
+    a', Some loc
+  }
 ;
 
 g_mult_spec_line:
-  OASSERT; asrts = separated_list(SCOLON, g_assertion_target); CASSERT
-    { let asrts' : Asrt.t list = asrts in asrts'  }
+  OASSERT; asrts = separated_list(SCOLON, g_assertion_target_loc); CASSERT
+    { let asrts' : (Asrt.t * Location.t option) list = asrts in asrts'  }
 ;
+
+g_assertion_target_loc:
+  asrt = g_assertion_target
+  { let open Location in
+    let open Lexing in
+
+    let loc_start : Location.position =
+      {
+        pos_line = $startpos.pos_lnum;
+        pos_column = $startpos.pos_cnum - $startpos.pos_bol;
+      }
+    in
+    let loc_end : Location.position =
+      {
+        pos_line = $endpos.pos_lnum;
+        pos_column = $endpos.pos_cnum - $endpos.pos_bol;
+      }
+    in
+    let loc : Location.t =
+      {
+        loc_start;
+        loc_end;
+        loc_source = $startpos.pos_fname;
+      }
+    in
+    asrt, Some loc
+   }
 
 g_spec_kind:
   | NORMAL { Flag.Normal }

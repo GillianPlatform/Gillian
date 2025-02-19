@@ -732,8 +732,8 @@ let trans_sspec ~ann fname sspecs =
   let make_post p = if !Config.allocated_functions then ta p else ta p in
   Spec.
     {
-      ss_pre = tap @ ta pre;
-      ss_posts = List.map make_post posts;
+      ss_pre = (tap @ ta pre, None);
+      ss_posts = List.map (fun post -> (make_post post, None)) posts;
       (* FIXME: bring in variant *)
       ss_variant = None;
       ss_flag = Flag.Normal;
@@ -746,9 +746,12 @@ let trans_lemma ~ann ~filepath lemma =
   let trans_asrt = trans_asrt ~ann ~fname:name in
   let trans_lcmd = trans_lcmd ~ann ~fname:name in
   let make_post p =
-    if !Config.allocated_functions then trans_asrt p else trans_asrt p
+    let post =
+      if !Config.allocated_functions then trans_asrt p else trans_asrt p
+    in
+    (post, None)
   in
-  let lemma_hyp = trans_asrt hypothesis in
+  let lemma_hyp = (trans_asrt hypothesis, None) in
   let lemma_concs = List.map make_post conclusions in
   let lemma_proof =
     Option.map
@@ -923,7 +926,7 @@ let generate_bispec clight_prog fname ident f =
     {
       bispec_name = fname;
       bispec_params = true_params;
-      bispec_pres = [ pre ];
+      bispec_pres = [ (pre, None) ];
       bispec_normalised = false;
     }
 

@@ -1,4 +1,5 @@
 open Containers
+open Location
 module DL = Debugger_log
 
 module type S = sig
@@ -125,12 +126,13 @@ struct
       (name : string)
       (params : string list)
       (id : int)
-      (pre : Asrt.t)
-      (posts : Asrt.t list)
+      (pre : Asrt.t located)
+      (posts : Asrt.t located list)
       (variant : Expr.t option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
-      (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
+      (to_verify : bool) :
+      (t option * (Asrt.t located * Asrt.t located list) option) list =
     let test_of_normalised_state id' (ss_pre, subst) =
       (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
       let lvars =
@@ -138,7 +140,8 @@ struct
           (fun x acc ->
             if Names.is_spec_var_name x then Expr.Set.add (Expr.LVar x) acc
             else acc)
-          (Asrt.lvars pre) Expr.Set.empty
+          (Asrt.lvars (fst pre))
+          Expr.Set.empty
       in
       let subst_dom = SSubst.domain subst None in
       let alocs =
@@ -169,10 +172,10 @@ struct
                   Fmt.pf ft "[ %s; %a ]" s (iter ~sep:comma SS.iter string) e))
             label
             Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
-            spec_vars Asrt.pp pre SPState.pp ss_pre SSubst.pp subst
+            spec_vars Asrt.pp (fst pre) SPState.pp ss_pre SSubst.pp subst
             (List.length posts)
             Fmt.(list ~sep:(any "@\n") Asrt.pp)
-            posts);
+            (List.map fst posts));
       let subst =
         SSubst.filter subst (fun e _ ->
             match e with
@@ -181,16 +184,17 @@ struct
       in
       let posts =
         List.filter_map
-          (fun p ->
+          (fun (p, loc) ->
             let substituted = SSubst.substitute_asrt subst ~partial:true p in
             let reduced = Reduction.reduce_assertion substituted in
-            if Simplifications.admissible_assertion reduced then Some reduced
+            if Simplifications.admissible_assertion reduced then
+              Some (reduced, loc)
             else None)
           posts
       in
       if not to_verify then
         let pre' = SPState.to_assertions ss_pre in
-        (None, Some (pre', posts))
+        (None, Some ((pre', snd pre), posts))
       else
         (* Step 4 - create a matching plan for the postconditions and s_test *)
         let () =
@@ -214,7 +218,9 @@ struct
             label
         in
         let known_matchables = Expr.Set.union known_matchables existentials in
-        let simple_posts = List.map (fun post -> (post, (label, None))) posts in
+        let simple_posts =
+          List.map (fun (post, _) -> (post, (label, None))) posts
+        in
         let post_mp =
           MP.init known_matchables Expr.Set.empty pred_ins simple_posts
         in
@@ -249,13 +255,13 @@ struct
                 spec_vars;
               }
             in
-            (Some test, Some (pre', posts))
+            (Some test, Some ((pre', snd pre), posts))
     in
     try
       (* Step 1 - normalise the precondition *)
       match
         Normaliser.normalise_assertion ~init_data ~pred_defs:preds
-          ~pvars:(SS.of_list params) pre
+          ~pvars:(SS.of_list params) (fst pre)
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->

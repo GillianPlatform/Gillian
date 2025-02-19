@@ -18,3 +18,27 @@ let pp_log_opt fmt loc =
   | Some { loc_start; loc_source; _ } ->
       Fmt.pf fmt "%s:%d:%d" loc_source loc_start.pos_line loc_start.pos_column
   | None -> Fmt.pf fmt "unknown loc"
+
+let min_position a b =
+  if a.pos_line < b.pos_line then a
+  else if a.pos_line > b.pos_line then b
+  else if a.pos_column < b.pos_column then a
+  else b
+
+let max_position a b =
+  if a.pos_line > b.pos_line then a
+  else if a.pos_line < b.pos_line then b
+  else if a.pos_column > b.pos_column then a
+  else b
+
+let merge ?(check_source = true) a b =
+  let () =
+    if check_source && a.loc_source <> b.loc_source then
+      Fmt.failwith "Cannot merge locations from different sources: %s and %s"
+        a.loc_source b.loc_source
+  in
+  let loc_start = min_position a.loc_start b.loc_start in
+  let loc_end = max_position a.loc_end b.loc_end in
+  { loc_start; loc_end; loc_source = a.loc_source }
+
+type 'a located = 'a * t option

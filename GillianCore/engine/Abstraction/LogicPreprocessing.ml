@@ -1,4 +1,5 @@
 open Config
+open Location
 module L = Logging
 
 let unfolded_preds : (string, Pred.t) Hashtbl.t = Hashtbl.create small_tbl_size
@@ -265,18 +266,30 @@ let unfold_spec
     (rec_info : (string, bool) Hashtbl.t)
     (spec : Spec.t) : Spec.t =
   let aux (sspec : Spec.st) : Spec.st list =
-    let pres : Asrt.t list = auto_unfold preds rec_info sspec.ss_pre in
-    L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec.spec_name);
-    let pres = List.filter Simplifications.admissible_assertion pres in
-    let posts : Asrt.t list =
-      List.concat_map (auto_unfold preds rec_info) sspec.ss_posts
+    let pres : Asrt.t located list =
+      concat_map_fst (auto_unfold preds rec_info) sspec.ss_pre
     in
-    let posts = List.map Reduction.reduce_assertion posts in
+    L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec.spec_name);
+    let pres =
+      List.filter
+        (fun (pre, _) -> Simplifications.admissible_assertion pre)
+        pres
+    in
+    let posts : Asrt.t located list =
+      List.concat_map
+        (concat_map_fst @@ auto_unfold preds rec_info)
+        sspec.ss_posts
+    in
+    let posts = List.map (map_fst Reduction.reduce_assertion) posts in
     L.verbose (fun fmt -> fmt "Post admissibility: %s" spec.spec_name);
     L.tmi (fun fmt ->
         fmt "@[<hov 2>Testing admissibility for assertions:@.%a@]"
-          (Fmt.list Asrt.pp) posts);
-    let posts = List.filter Simplifications.admissible_assertion posts in
+          (Fmt.list Asrt.pp) (List.map fst posts));
+    let posts =
+      List.filter
+        (fun (post, _) -> Simplifications.admissible_assertion post)
+        posts
+    in
     if posts = [] then
       Fmt.failwith
         "Unfolding: Postcondition of %s seems invalid, it has been reduced to \
@@ -300,13 +313,19 @@ let unfold_lemma
   let unfold_lemma_spec (spec : Lemma.spec) =
     L.verbose (fun fmt ->
         fmt "Unfolding spec of lemma: %s with pre-condition\n%a"
-          lemma.lemma_name Asrt.pp spec.lemma_hyp);
-    let lemma_hyps : Asrt.t list =
-      let unfolded_lemma_pre = auto_unfold preds rec_info spec.lemma_hyp in
-      List.filter Simplifications.admissible_assertion unfolded_lemma_pre
+          lemma.lemma_name Asrt.pp (fst spec.lemma_hyp));
+    let lemma_hyps : Asrt.t located list =
+      let unfolded_lemma_pre =
+        concat_map_fst (auto_unfold preds rec_info) spec.lemma_hyp
+      in
+      List.filter
+        (fun (pre, _) -> Simplifications.admissible_assertion pre)
+        unfolded_lemma_pre
     in
-    let lemma_concs : Asrt.t list =
-      List.concat (List.map (auto_unfold preds rec_info) spec.lemma_concs)
+    let lemma_concs : Asrt.t located list =
+      List.concat_map
+        (concat_map_fst (auto_unfold preds rec_info))
+        spec.lemma_concs
     in
     List.map
       (fun lemma_hyp ->
@@ -328,14 +347,16 @@ let unfold_bispec
     if curr_depth <= 0 then curr_pres
     else
       let new_pres =
-        List.concat
-          (List.map
-             (auto_unfold ~unfold_rec_predicates:true preds rec_info)
-             curr_pres)
+        List.concat_map
+          (concat_map_fst
+             (auto_unfold ~unfold_rec_predicates:true preds rec_info))
+          curr_pres
       in
       unfold_pres (curr_depth - 1) new_pres
   in
-  let bispec_pres : Asrt.t list = unfold_pres depth bi_spec.bispec_pres in
+  let bispec_pres : Asrt.t located list =
+    unfold_pres depth bi_spec.bispec_pres
+  in
   { bi_spec with bispec_pres }
 
 let remove_equalities_between_binders_and_lvars binders assertion =

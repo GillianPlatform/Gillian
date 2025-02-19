@@ -226,3 +226,8 @@ let list_to_yojson (to_yojson : 'a -> Yojson.Safe.t) xs =
 let disable_stdout () =
   let outfile = Out_channel.open_bin Filename.null in
   Format.set_formatter_out_channel outfile
+
+let map_fst f (a, b) = (f a, b)
+let map_snd f (a, b) = (a, f b)
+let concat_map_fst f (a, b) = List.map (fun a' -> (a', b)) (f a)
+let concat_map_snd f (a, b) = List.map (fun b' -> (a, b')) (f b)
