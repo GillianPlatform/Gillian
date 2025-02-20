@@ -50,7 +50,11 @@ let pp fmt lemma =
     lemma.lemma_specs (Fmt.option pp_proof) lemma.lemma_proof
 
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
-  let map_asrts = map_fst (Pred.extend_asrt_pred_types preds) in
+  let map_asrts (pred, loc) =
+    match Pred.extend_asrt_pred_types preds pred with
+    | Ok pred -> (pred, loc)
+    | Error msg -> raise (Gillian_result.Exc.verification_failure ?loc msg)
+  in
   let pt_spec { lemma_hyp; lemma_concs; lemma_spec_variant } =
     {
       lemma_hyp = map_asrts lemma_hyp;

@@ -20,8 +20,27 @@ module Error = struct
         (** Handled failure unrelated to analysis, e.g. unable to read input file *)
     | InternalError of internal_error  (** Something went very wrong! *)
 
+  let pp_loc_opt fmt =
+    let open Location in
+    function
+    | None -> Fmt.nop fmt ()
+    | Some { loc_source; loc_start; loc_end } ->
+        Fmt.pf fmt " [%s %d%s-%d:%d]" loc_source loc_start.pos_line
+          (if loc_start.pos_line = loc_end.pos_line then
+             Fmt.str ":%d" loc_start.pos_column
+           else "")
+          loc_end.pos_line loc_end.pos_column
+
   let pp fmt = function
-    | AnalysisFailures _ -> Fmt.pf fmt "Analysis failure"
+    | AnalysisFailures es ->
+        let msgs =
+          es
+          |> List.mapi @@ fun i ({ msg; loc } : analysis_failure) ->
+             Fmt.str "%d. %s%a" (i + 1) msg pp_loc_opt loc
+        in
+        Fmt.pf fmt "Analysis failures!\n%a\n"
+          (Fmt.list ~sep:(Fmt.any "\n") Fmt.string)
+          msgs
     | CompilationError { msg; _ } ->
         Fmt.pf fmt "Error during compilation.\n%s" msg
     | OperationError o -> Fmt.pf fmt "%s" o
@@ -55,11 +74,15 @@ module Exc = struct
       | _ -> Some (`Assoc additional_data)
     in
     Gillian_internal_error { msg; additional_data }
+
+  let verification_failure ?loc msg =
+    Gillian_error (AnalysisFailures [ { msg; loc } ])
 end
 
 type 'a t = ('a, Error.t) result
 
 let analysis_failures errs = Error (AnalysisFailures errs)
+let analysis_failure ?loc msg = Error (AnalysisFailures [ { msg; loc } ])
 
 let compilation_error ?additional_data ?loc msg =
   Error (CompilationError { msg; loc; additional_data })

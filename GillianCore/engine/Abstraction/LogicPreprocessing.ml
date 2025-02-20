@@ -10,6 +10,7 @@ let unfolded_preds : (string, Pred.t) Hashtbl.t = Hashtbl.create small_tbl_size
  * *)
 let rec auto_unfold
     ?(unfold_rec_predicates = false)
+    ?loc
     (predicates : (string, Pred.t) Hashtbl.t)
     (rec_tbl : (string, bool) Hashtbl.t)
     (asrt : Asrt.t) : Asrt.t list =
@@ -34,10 +35,13 @@ let rec auto_unfold
            let combined =
              try List.combine params args
              with Invalid_argument _ ->
-               Fmt.failwith
-                 "Impossible to auto unfold predicate %s. Used with %i args \
-                  instead of %i"
-                 name (List.length args) (List.length params)
+               let msg =
+                 Fmt.str
+                   "Impossible to auto unfold predicate %s. Used with %i args \
+                    instead of %i"
+                   name (List.length args) (List.length params)
+               in
+               raise (Gillian_result.Exc.verification_failure ?loc msg)
            in
            let subst = SVal.SSubst.init combined in
            let defs = List.map (fun (_, def) -> def) pred.pred_definitions in
@@ -482,7 +486,13 @@ let explicit_param_types
   Hashtbl.iter
     (fun name pred ->
       (* Substitute literals in the head for logical variables *)
-      let pred = Pred.explicit_param_types preds pred in
+      let pred =
+        match Pred.explicit_param_types preds pred with
+        | Ok pred -> pred
+        | Error msg ->
+            raise
+              (Gillian_result.Exc.verification_failure ?loc:pred.pred_loc msg)
+      in
       (* Join the new predicate definition with all previous for the same predicate (if any) *)
       try
         let current_pred = Hashtbl.find copy_preds name in
@@ -613,6 +623,7 @@ let add_closing_tokens preds =
           {
             pred_name;
             pred_source_path = pred.pred_source_path;
+            pred_loc = pred.pred_loc;
             pred_internal = false;
             pred_num_params;
             pred_params;

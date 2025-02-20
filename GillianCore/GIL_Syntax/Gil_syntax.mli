@@ -614,6 +614,7 @@ module Pred : sig
   type t = {
     pred_name : string;  (** Name of the predicate *)
     pred_source_path : string option;
+    pred_loc : Location.t option;
     pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
@@ -654,7 +655,7 @@ module Pred : sig
   val check_pvars : (string, t) Hashtbl.t -> unit
 
   (** Infers parameter types and makes them explicit in the assertions *)
-  val explicit_param_types : (string, t) Hashtbl.t -> t -> t
+  val explicit_param_types : (string, t) Hashtbl.t -> t -> (t, string) result
 
   (** Combines a list of ins and a list of outs putting them in the right order
     according to a given predicate. *)

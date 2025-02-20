@@ -208,6 +208,7 @@ and flag = Normal | Error | Bug
 and pred = {
   pred_name : string;
   pred_source_path : string option;
+  pred_loc : location option;
   pred_internal : bool;
   pred_num_params : int;
   pred_params : (string * typ option) list;

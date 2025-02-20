@@ -263,6 +263,7 @@ let gen_pred_of_struct cenv ann struct_name =
       {
         pred_name;
         pred_source_path = None;
+        pred_loc = None;
         pred_internal = true;
         pred_ins;
         pred_num_params;
@@ -659,6 +660,7 @@ let trans_abs_pred ~filepath cl_pred =
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc = None;
       pred_internal = false;
       pred_num_params;
       pred_params;
@@ -699,6 +701,7 @@ let trans_pred ~ann ~filepath cl_pred =
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc = None;
       pred_internal = false;
       pred_num_params;
       pred_params;

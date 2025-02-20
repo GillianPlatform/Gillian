@@ -944,7 +944,10 @@ let compile_spec
   Spec.init fname fparams [ single_spec ] false false true
 
 let compile_pred filepath pred =
-  let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
+  let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
+      =
+    pred
+  in
   let types = WType.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
@@ -956,10 +959,12 @@ let compile_pred filepath pred =
     let _, casrt = compile_lassert pred_def in
     (None, casrt)
   in
+  let pred_loc = Some (CodeLoc.to_location pred_loc) in
   Pred.
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc;
       pred_internal = false;
       pred_num_params = List.length pred_params;
       pred_params;

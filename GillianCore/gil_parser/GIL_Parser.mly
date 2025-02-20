@@ -1013,10 +1013,33 @@ g_pred_target:
     in
     let pred_facts = Option.fold ~none:[] ~some:split_ands pred_facts in
 
+    let open Location in
+    let open Lexing in
+    let loc_start : Location.position =
+      {
+        pos_line = $startpos.pos_lnum;
+        pos_column = $startpos.pos_cnum - $startpos.pos_bol;
+      }
+    in
+    let loc_end : Location.position =
+      {
+        pos_line = $endpos.pos_lnum;
+        pos_column = $endpos.pos_cnum - $endpos.pos_bol;
+      }
+    in
+    let pred_loc : Location.t option =
+      Some {
+        loc_start;
+        loc_end;
+        loc_source = $startpos.pos_fname;
+      }
+    in
+
     Pred.
       {
         pred_name;
         pred_source_path = None;
+        pred_loc;
         pred_internal = Option.is_some internal;
         pred_num_params;
         pred_params;

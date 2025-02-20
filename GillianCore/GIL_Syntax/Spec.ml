@@ -77,7 +77,11 @@ let pp fmt spec =
     spec.spec_sspecs
 
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
-  let map_asrts = map_fst @@ Pred.extend_asrt_pred_types preds in
+  let map_asrts (pred, loc) =
+    match Pred.extend_asrt_pred_types preds pred with
+    | Ok pred -> (pred, loc)
+    | Error msg -> raise (Gillian_result.Exc.verification_failure ?loc msg)
+  in
   let pt_sspec (sspec : st) : st =
     {
       sspec with
