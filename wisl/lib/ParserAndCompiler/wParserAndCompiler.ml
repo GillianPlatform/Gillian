@@ -1,5 +1,6 @@
 open Lexing
 open WLexer
+open Utils.Syntaxes.Result
 
 type init_data = unit
 type err = unit
@@ -10,23 +11,30 @@ module Annot = WAnnot
 let pp_err _ () = ()
 
 let parse_with_error token lexbuf =
-  try token read lexbuf with
-  | SyntaxError message -> failwith ("SYNTAX ERROR" ^ message)
+  let open Utils.Gillian_result in
+  try Ok (token read lexbuf) with
+  | SyntaxError message ->
+      let loc = CodeLoc.(to_location @@ curr lexbuf) in
+      compilation_error ~loc ("Syntax error: " ^ message)
   | WParser.Error ->
-      let range = CodeLoc.curr lexbuf in
-      let message =
-        Printf.sprintf "unexpected token : %s at loc %s" (Lexing.lexeme lexbuf)
-          (CodeLoc.str range)
-      in
-      failwith ("PARSER ERROR : " ^ message)
+      let loc = CodeLoc.(to_location @@ curr lexbuf) in
+      compilation_error ~loc
+        ("Syntax error: Unexpected token " ^ Lexing.lexeme lexbuf)
+
+let with_lexbuf file f =
+  match Hashtbl.find_opt Utils.Config.file_content_overrides file with
+  | Some content -> Lexing.from_string content |> f
+  | None ->
+      let inx = open_in file in
+      let lexbuf = Lexing.from_channel inx in
+      let x = f lexbuf in
+      let () = close_in inx in
+      x
 
 let parse_file file =
-  let inx = open_in file in
-  let lexbuf = Lexing.from_channel inx in
+  with_lexbuf file @@ fun lexbuf ->
   let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = file } in
-  let wprog = parse_with_error WParser.prog lexbuf in
-  let () = close_in inx in
-  wprog
+  parse_with_error WParser.prog lexbuf
 
 let compile = Wisl2Gil.compile
 
@@ -46,8 +54,8 @@ let create_compilation_result path prog wprog =
 let parse_and_compile_files files =
   let f files =
     let path = List.hd files in
-    let wprog = parse_file path in
-    Ok (create_compilation_result path (compile ~filepath:path wprog) wprog)
+    let+ wprog = parse_file path in
+    create_compilation_result path (compile ~filepath:path wprog) wprog
   in
   Logging.Phase.with_normal ~title:"Program parsing and compilation" (fun () ->
       f files)

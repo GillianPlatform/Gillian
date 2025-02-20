@@ -28,7 +28,7 @@ struct
       in
       Cmd.info (Runner.cmd_name runner) ~doc ~man
     in
-    Cmd.v run_info (Common_args.use run_t)
+    Console.Normal (Cmd.v run_info (Common_args.use run_t))
 
   let cmds = List.map make_bulk_console Runners.runners
 end

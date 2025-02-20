@@ -116,9 +116,10 @@ let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =
   let ss_label =
     Option.map (fun (l, vl) -> (l, Containers.SS.elements vl)) sspec.label
   in
+  (* TODO: add locs *)
   {
-    ss_pre = jsil2gil_asrt sspec.pre;
-    ss_posts = List.map jsil2gil_asrt sspec.posts;
+    ss_pre = (jsil2gil_asrt sspec.pre, None);
+    ss_posts = List.map (fun post -> (jsil2gil_asrt post, None)) sspec.posts;
     (* FIXME: bring in variant *)
     ss_variant = None;
     ss_flag = sspec.flag;
@@ -144,11 +145,13 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
     lemma_internal = false;
     (* TODO (Alexis): Set depending on module of lemma *)
     lemma_params = lemma.params;
+    (* TODO: add locs *)
     lemma_specs =
       [
         {
-          lemma_hyp = jsil2gil_asrt lemma.pre;
-          lemma_concs = List.map jsil2gil_asrt lemma.posts;
+          lemma_hyp = (jsil2gil_asrt lemma.pre, None);
+          lemma_concs =
+            List.map (fun post -> (jsil2gil_asrt post, None)) lemma.posts;
           lemma_spec_variant = Option.map jsil2gil_expr lemma.variant;
         };
       ];
@@ -161,6 +164,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
   {
     pred_name = pred.name;
     pred_source_path = None;
+    pred_loc = None;
     pred_internal = false;
     (* TODO (Alexis): Set depending on module of pred *)
     pred_num_params = pred.num_params;
@@ -185,10 +189,11 @@ let jsil2gil_macro (macro : Macro.t) : GMacro.t =
   }
 
 let jsil2gil_bispec (bispec : BiSpec.t) : GBiSpec.t =
+  (* TODO: add loc *)
   {
     bispec_name = bispec.name;
     bispec_params = bispec.params;
-    bispec_pres = [ jsil2gil_asrt bispec.pre ];
+    bispec_pres = [ (jsil2gil_asrt bispec.pre, None) ];
     bispec_normalised = bispec.normalised;
   }
 

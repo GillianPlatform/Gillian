@@ -119,7 +119,11 @@ type err = string
 let pp_err = Fmt.string
 
 let parse_symtab_into_goto json =
-  let+ tbl = Irep_lib.Symtab.of_yojson json in
+  let+ tbl =
+    match Irep_lib.Symtab.of_yojson json with
+    | Ok tbl -> Ok tbl
+    | Error msg -> Utils.Gillian_result.compilation_error msg
+  in
   let machine = Machine_model_parse.consume_from_symtab tbl in
   if not Machine_model.(equal machine archi64) then
     failwith "For now, Gillian-C2 can only run on archi64";

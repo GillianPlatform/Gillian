@@ -734,9 +734,9 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
                         (brackets
                            (pair ~sep:(any ": ") string (list ~sep:comma string))))
                     sspec.ss_label);
-              ( sspec.ss_pre,
+              ( fst sspec.ss_pre,
                 ( Spec.label_vars_to_set sspec.ss_label,
-                  Some (sspec.ss_flag, sspec.ss_posts) ) ))
+                  Some (sspec.ss_flag, List.map fst sspec.ss_posts) ) ))
             spec.spec_sspecs
         in
 
@@ -771,8 +771,8 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
             list =
           List.map
             (fun spec ->
-              ( spec.Lemma.lemma_hyp,
-                (None, Some (Flag.Normal, spec.lemma_concs)) ))
+              ( fst spec.Lemma.lemma_hyp,
+                (None, Some (Flag.Normal, List.map fst spec.lemma_concs)) ))
             lemma.lemma_specs
         in
         let mp = init ~use_params:true KB.empty params preds sspecs in
@@ -926,9 +926,10 @@ let pp_sspec
     (fmt : Format.formatter)
     (sspec : Spec.st) =
   let pp_a = pp_asrt ?preds_printer ~preds in
-  Fmt.pf fmt "[[ @[<hv>%a@] ]]@\n[[ @[<hv>%a@] ]]@\n%a" pp_a sspec.ss_pre
+  Fmt.pf fmt "[[ @[<hv>%a@] ]]@\n[[ @[<hv>%a@] ]]@\n%a" pp_a (fst sspec.ss_pre)
     Fmt.(list ~sep:semi pp_a)
-    sspec.ss_posts Flag.pp sspec.ss_flag
+    (List.map fst sspec.ss_posts)
+    Flag.pp sspec.ss_flag
 
 let pp_spec
     ?(preds_printer : (Format.formatter -> string * Expr.t list -> unit) option)
@@ -986,7 +987,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
   let posts_from_sspecs sspecs =
     List.map
       (fun (sspec : Spec.st) ->
-        (sspec.ss_pre, Some (sspec.ss_flag, sspec.ss_posts)))
+        (fst sspec.ss_pre, Some (sspec.ss_flag, List.map fst sspec.ss_posts)))
       sspecs
   in
 

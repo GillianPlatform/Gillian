@@ -911,8 +911,16 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
 let compile_spec
     ?(fname = "main")
     WSpec.{ pre; post; variant; fparams; existentials; _ } =
-  let _, comp_pre = compile_lassert ~fname pre in
-  let _, comp_post = compile_lassert ~fname post in
+  let comp_pre =
+    let _, comp_pre = compile_lassert ~fname pre in
+    let loc = WLAssert.get_loc pre |> CodeLoc.to_location in
+    (comp_pre, Some loc)
+  in
+  let comp_post =
+    let _, comp_post = compile_lassert ~fname post in
+    let loc = WLAssert.get_loc post |> CodeLoc.to_location in
+    (comp_post, Some loc)
+  in
   let comp_variant =
     Option.map
       (fun variant ->
@@ -936,7 +944,10 @@ let compile_spec
   Spec.init fname fparams [ single_spec ] false false true
 
 let compile_pred filepath pred =
-  let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
+  let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
+      =
+    pred
+  in
   let types = WType.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
@@ -948,10 +959,12 @@ let compile_pred filepath pred =
     let _, casrt = compile_lassert pred_def in
     (None, casrt)
   in
+  let pred_loc = Some (CodeLoc.to_location pred_loc) in
   Pred.
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc;
       pred_internal = false;
       pred_num_params = List.length pred_params;
       pred_params;
@@ -1100,8 +1113,16 @@ let compile_lemma
         comp_lexpr)
       lemma_variant
   in
-  let _, lemma_hyp = compile_lassert lemma_hypothesis in
-  let _, post = compile_lassert lemma_conclusion in
+  let lemma_hyp =
+    let _, lemma_hyp = compile_lassert lemma_hypothesis in
+    let loc = WLAssert.get_loc lemma_hypothesis |> CodeLoc.to_location in
+    (lemma_hyp, Some loc)
+  in
+  let post =
+    let _, post = compile_lassert lemma_conclusion in
+    let loc = WLAssert.get_loc lemma_conclusion |> CodeLoc.to_location in
+    (post, Some loc)
+  in
   let lemma_existentials = [] in
   (* TODO: What about existentials for lemma in WISL ? *)
   Lemma.
@@ -1164,7 +1185,7 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
             {
               bispec_name = name;
               bispec_params = proc.Proc.proc_params;
-              bispec_pres = [ pre ];
+              bispec_pres = [ (pre, None) ];
               bispec_normalised = false;
             }
         in

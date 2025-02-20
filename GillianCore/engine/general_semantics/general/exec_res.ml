@@ -4,25 +4,28 @@ type ('state, 'value, 'err) t =
       proc_idx : int;
       error_state : 'state;
       errors : 'err list;
+      loc : Location.t option;
     }
   | RSucc of {
       flag : Flag.t;
       ret_val : 'value;
       final_state : 'state;
       last_report : Logging.Report_id.t option;
+      loc : Location.t option;
     }
 [@@deriving yojson]
 
 let pp pp_state pp_value pp_err ft res =
   let open Fmt in
   match res with
-  | RFail { proc; proc_idx; error_state; errors } ->
+  | RFail { proc; proc_idx; error_state; errors; loc } ->
       pf ft
-        "@[FAILURE TERMINATION: Procedure %s, Command %d@\n\
+        "@[FAILURE TERMINATION: Procedure %s, Command %d%a@\n\
          Errors: @[<h>%a@]@\n\
          @[<v 2>FINAL STATE:@\n\
          %a@]@]"
-        proc proc_idx (list ~sep:comma pp_err) errors pp_state error_state
+        proc proc_idx Location.pp_full loc (list ~sep:comma pp_err) errors
+        pp_state error_state
   | RSucc { flag; ret_val; final_state; _ } ->
       pf ft "@[SUCCESSFUL TERMINATION: (%s, %a)@\n@[<v 2>FINAL STATE:@\n%a@]@]"
         (Flag.str flag) pp_value ret_val pp_state final_state

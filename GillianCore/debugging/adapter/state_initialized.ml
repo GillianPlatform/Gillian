@@ -23,7 +23,7 @@ module Make (Debugger : Debugger.S) = struct
           with
           | Ok dbg -> Lwt.wakeup_later resolver (launch_args, dbg)
           | Error err ->
-              DL.log (fun m -> m "%s" err);
+              DL.log (fun m -> m "%a" Gillian_result.Error.pp err);
               Lwt.wakeup_later_exn resolver Exit
         in
         Lwt.return_unit);

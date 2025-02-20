@@ -1,3 +1,5 @@
+open Syntaxes.Result
+
 module type S = sig
   val cmd_name : string
   val exec_mode : Exec_mode.t
@@ -110,39 +112,36 @@ module Make
       expect
       (test : (Suite.info, Suite.category) Test.t) =
     let open Outcome in
-    let result = ref (FailedExec "Execution failure") in
+    let result = ref (Gillian_result.operation_error "Execution failure") in
     let execute () =
       let () = before_compilation test in
       let filename = Filename.basename (Filename.chop_extension test.path) in
       let res =
-        match PC.parse_and_compile_files [ test.path ] with
-        | Error err -> ParseAndCompileError err
-        | Ok progs ->
-            let e_progs = progs.gil_progs in
-            let () = Hashtbl.add cur_source_files filename progs.source_files in
-            let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
-            let e_prog = snd (List.hd e_progs) in
-            let other_imports =
-              Command_line_utils.convert_other_imports PC.other_imports
-            in
-            let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
-            if should_execute prog filename prev_results_opt then
-              match MP.init_prog prog with
-              | Error _ -> failwith "Failed to create matching plans"
-              | Ok prog ->
-                  let () = before_execution () in
-                  let ret =
-                    Interpreter.evaluate_proc
-                      (fun x -> x)
-                      prog !Config.entry_point []
-                      (State.init progs.init_data)
-                  in
-                  let call_graph = Interpreter.call_graph in
-                  let copy = Call_graph.merge (Call_graph.make ()) call_graph in
-                  let () = Hashtbl.add cur_call_graphs filename copy in
-                  let () = tests_ran := filename :: !tests_ran in
-                  FinishedExec ret
-            else FinishedExec []
+        let* progs = PC.parse_and_compile_files [ test.path ] in
+        let e_progs = progs.gil_progs in
+        let () = Hashtbl.add cur_source_files filename progs.source_files in
+        let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+        let e_prog = snd (List.hd e_progs) in
+        let* prog =
+          Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
+        in
+        if should_execute prog filename prev_results_opt then
+          match MP.init_prog prog with
+          | Error _ -> failwith "Failed to create matching plans"
+          | Ok prog ->
+              let () = before_execution () in
+              let ret =
+                Interpreter.evaluate_proc
+                  (fun x -> x)
+                  prog !Config.entry_point []
+                  (State.init progs.init_data)
+              in
+              let call_graph = Interpreter.call_graph in
+              let copy = Call_graph.merge (Call_graph.make ()) call_graph in
+              let () = Hashtbl.add cur_call_graphs filename copy in
+              let () = tests_ran := filename :: !tests_ran in
+              Ok ret
+        else Ok []
         (* TODO (Alexis): Persist and fetch actual execution summary *)
       in
       result := res
