@@ -85,7 +85,7 @@ module Make
     in
     (* Prog.perform_syntax_checks e_prog; *)
     Fmt.pr "Preprocessing...\n@?";
-    let+ prog =
+    let* prog =
       Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
     let () =

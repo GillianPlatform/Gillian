@@ -35,6 +35,7 @@ module type S = sig
       errors : err_t list;
       branch_path : Branch_case.path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
 
     type cont = {
@@ -57,6 +58,7 @@ module type S = sig
       final_state : state_t;
       branch_path : Branch_case.path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
 
     type susp = {

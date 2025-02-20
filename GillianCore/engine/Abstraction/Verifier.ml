@@ -38,7 +38,7 @@ module type S = sig
     prog_t ->
     bool ->
     SourceFiles.t option ->
-    unit
+    unit Gillian_result.t
 
   val verify_up_to_procs :
     ?proc_name:string ->
@@ -456,7 +456,7 @@ struct
 
   let analyse_proc_result test flag ?parent_id result : unit Gillian_result.t =
     match (result : SAInterpreter.result_t) with
-    | Exec_res.RFail { proc; proc_idx; error_state; errors } ->
+    | Exec_res.RFail { proc; proc_idx; error_state; errors; loc } ->
         L.verbose (fun m ->
             m
               "VERIFICATION FAILURE: Procedure %s, Command %d\n\
@@ -475,10 +475,10 @@ struct
           errors
           |> List.map @@ fun e ->
              let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
-             Gillian_result.Error.{ msg; loc = None }
+             Gillian_result.Error.{ msg; loc }
         in
         Gillian_result.analysis_failures errors
-    | Exec_res.RSucc { flag = fl; final_state; last_report; _ } ->
+    | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } ->
         if Some fl <> test.flag then (
           let msg =
             Fmt.str "Terminated with flag %s instead of %s" (Flag.str fl)
@@ -489,7 +489,7 @@ struct
                 (Fmt.Dump.pair Fmt.int Fmt.int)
                 test.id msg);
           Fmt.pr "f @?";
-          Gillian_result.analysis_failures [ { msg; loc = None } ])
+          Gillian_result.analysis_failures [ { msg; loc } ])
         else
           let parent_id =
             match parent_id with
@@ -832,7 +832,7 @@ struct
       ?(prev_results : VerificationResults.t option)
       (prog : prog_t)
       (pnames_to_verify : SS.t)
-      (lnames_to_verify : SS.t) : unit =
+      (lnames_to_verify : SS.t) : unit Gillian_result.t =
     let prog', tests', tests =
       get_tests_to_verify ~init_data prog pnames_to_verify lnames_to_verify
     in
@@ -859,7 +859,8 @@ struct
     in
     let msg : string = Printf.sprintf "%s %f%!" msg (end_time -. !start_time) in
     Printf.printf "%s\n" msg;
-    L.normal (fun m -> m "%s" msg)
+    L.normal (fun m -> m "%s" msg);
+    result
 
   let verify_up_to_procs
       ?(proc_name : string option)
@@ -917,7 +918,7 @@ struct
       ~(init_data : SPState.init_data)
       (prog : prog_t)
       (incremental : bool)
-      (source_files : SourceFiles.t option) : unit =
+      (source_files : SourceFiles.t option) : unit Gillian_result.t =
     L.Phase.with_normal ~title:"Program verification" @@ fun () ->
     let open ResultsDir in
     let open ChangeTracker in
@@ -958,7 +959,7 @@ struct
       in
       if !Config.Verification.verify_only_some_of_the_things then
         failwith "Cannot use --incremental and --procs or --lemma together";
-      let () =
+      let r =
         verify_procs ~init_data ~prev_results:results prog procs_to_verify
           lemmas_to_verify
       in
@@ -967,7 +968,8 @@ struct
       let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
       let results = VerificationResults.merge results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-      write_verif_results cur_source_files call_graph ~diff results)
+      let () = write_verif_results cur_source_files call_graph ~diff results in
+      r)
     else
       (* Analyse all procedures and lemmas *)
       let cur_source_files =
@@ -985,9 +987,12 @@ struct
               (SS.of_list !Config.Verification.lemmas_to_verify) )
         else (procs_to_verify, lemmas_to_verify)
       in
-      let () = verify_procs ~init_data prog procs_to_verify lemmas_to_verify in
+      let r = verify_procs ~init_data prog procs_to_verify lemmas_to_verify in
       let call_graph = SAInterpreter.call_graph in
-      write_verif_results cur_source_files call_graph ~diff:"" global_results
+      let () =
+        write_verif_results cur_source_files call_graph ~diff:"" global_results
+      in
+      r
 
   module Debug = struct
     let get_tests_for_prog ~init_data (prog : prog_t) =

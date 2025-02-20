@@ -20,23 +20,12 @@ module Error = struct
         (** Handled failure unrelated to analysis, e.g. unable to read input file *)
     | InternalError of internal_error  (** Something went very wrong! *)
 
-  let pp_loc_opt fmt =
-    let open Location in
-    function
-    | None -> Fmt.nop fmt ()
-    | Some { loc_source; loc_start; loc_end } ->
-        Fmt.pf fmt " [%s %d%s-%d:%d]" loc_source loc_start.pos_line
-          (if loc_start.pos_line = loc_end.pos_line then
-             Fmt.str ":%d" loc_start.pos_column
-           else "")
-          loc_end.pos_line loc_end.pos_column
-
   let pp fmt = function
     | AnalysisFailures es ->
         let msgs =
           es
           |> List.mapi @@ fun i ({ msg; loc } : analysis_failure) ->
-             Fmt.str "%d. %s%a" (i + 1) msg pp_loc_opt loc
+             Fmt.str "%d. %s%a" (i + 1) msg Location.pp_full loc
         in
         Fmt.pf fmt "Analysis failures!\n%a\n"
           (Fmt.list ~sep:(Fmt.any "\n") Fmt.string)
