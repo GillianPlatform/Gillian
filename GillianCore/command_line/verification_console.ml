@@ -145,7 +145,7 @@ module Make
         `P "Verifies a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info cmd_name ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info cmd_name ~doc ~man
 
   let verify_cmd = Console.Normal (Cmd.v verify_info (Common_args.use verify_t))
 

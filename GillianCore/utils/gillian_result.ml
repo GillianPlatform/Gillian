@@ -39,9 +39,9 @@ module Error = struct
 
   let to_error_code = function
     | AnalysisFailures _ -> 1
-    | CompilationError _ -> 1
-    | OperationError _ -> 2
-    | InternalError _ -> 3
+    | CompilationError _ -> 2
+    | OperationError _ -> 124
+    | InternalError _ -> 125
 end
 
 open Error

@@ -173,7 +173,7 @@ struct
            compiling it to GIL";
       ]
     in
-    Cmd.info "act" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info "act" ~doc ~man
 
   let act_cmd = Console.Normal (Cmd.v act_info (Common_args.use act_t))
   let cmds = [ act_cmd ]

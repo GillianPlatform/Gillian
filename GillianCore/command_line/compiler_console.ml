@@ -66,7 +66,7 @@ module Make
            defaults to Verification.";
       ]
     in
-    Cmd.info "compile" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info "compile" ~doc ~man
 
   let compile_cmd = Console.Normal (Cmd.v compile_info compile_t)
   let cmds = [ compile_cmd ]

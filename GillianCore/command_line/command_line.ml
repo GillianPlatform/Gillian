@@ -81,7 +81,11 @@ struct
         `P "Analysis toolchain for a given language, based on Gillian";
       ]
     in
-    let info = Cmd.info (Filename.basename Sys.executable_name) ~doc ~man in
+    let info =
+      Cmd.info ~exits:Common_args.exit_code_info
+        (Filename.basename Sys.executable_name)
+        ~doc ~man
+    in
 
     let consoles : (module Console.S) list =
       [

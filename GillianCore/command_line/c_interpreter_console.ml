@@ -102,7 +102,7 @@ struct
         `P "Concretely executes a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info "exec" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info "exec" ~doc ~man
 
   let exec_cmd = Console.Normal (Cmd.v exec_info (Common_args.use exec_t))
   let cmds = [ exec_cmd ]

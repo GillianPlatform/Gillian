@@ -265,7 +265,7 @@ module Make
         `P "Symbolically executes a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info cmd_name ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info cmd_name ~doc ~man
 
   let wpst_cmd = Console.Normal (Cmd.v wpst_info (Common_args.use wpst_t))
 

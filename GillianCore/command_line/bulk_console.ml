@@ -26,7 +26,8 @@ struct
       let man =
         [ `S Manpage.s_description; `P "Execute a predefined test-suite" ]
       in
-      Cmd.info (Runner.cmd_name runner) ~doc ~man
+      Cmd.info ~exits:Common_args.exit_code_info (Runner.cmd_name runner) ~doc
+        ~man
     in
     Console.Normal (Cmd.v run_info (Common_args.use run_t))
 
