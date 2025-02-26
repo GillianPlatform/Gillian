@@ -351,7 +351,7 @@ end
 
 let start_for_harness = Start_for_harness.f
 
-let compile (context : Ctx.t) : (C2_annot.t, string) Prog.t =
+let compile (annots : C2_prog.t) (context : Ctx.t) : (C2_annot.t, string) Prog.t =
   let program = context.prog in
   let gil_prog = Prog.create () in
   let gil_prog =
