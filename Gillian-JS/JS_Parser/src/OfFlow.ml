@@ -384,13 +384,12 @@ let rec transform_properties ~parent_strict start_loc annotations properties =
       (* PETAR: ALLOWING SHORTHAND!
          let () =
            if shorthand then
-             print_endline (Printf.sprintf "Shorthand:\n\tKey: %s\n\tValue: %s"
+             Format.printf "Shorthand:\n\tKey: %s\n\tValue: %s"
                (PrettyPrint.string_of_propname trans_key)
-               (PrettyPrint.string_of_exp_syntax trans_val.exp_stx));
-             raise
-               (ParserError
-                  (NotEcmaScript5
-                     ("Shorthand properties are not part of ES5", loc))) *)
+               (PrettyPrint.string_of_exp_syntax trans_val.exp_stx);
+           raise
+             (ParserError
+                (NotEcmaScript5 ("Shorthand properties are not part of ES5", loc))) *)
       (trans_key, PropbodyVal, trans_val)
       :: transform_properties ~parent_strict (char_after loc) rest_annots r
   | (loc, Get { key; value; _ }) :: r | (loc, Set { key; value; _ }) :: r ->

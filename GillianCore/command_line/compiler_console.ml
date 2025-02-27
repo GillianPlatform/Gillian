@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 
 module Make
     (ID : Init_data.S)
@@ -23,10 +24,7 @@ module Make
     Arg.(last & vflag_all [ Verification ] [ concrete; wpst; verif; act ])
 
   let process_files files =
-    let progs =
-      ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
-        (PC.parse_and_compile_files files)
-    in
+    let+ progs = PC.parse_and_compile_files files in
     let pp_annot fmt annot =
       Fmt.pf fmt "%a"
         (Yojson.Safe.pretty_print ?std:None)
@@ -49,7 +47,9 @@ module Make
       Config.set_runtime_paths ?default_folders:PC.default_import_paths
         runtime_path
     in
-    process_files files
+    let r = process_files files in
+    let () = exit_on_error r in
+    exit 0
 
   let compile_t =
     Term.(
@@ -66,8 +66,8 @@ module Make
            defaults to Verification.";
       ]
     in
-    Cmd.info "compile" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info "compile" ~doc ~man
 
-  let compile_cmd = Cmd.v compile_info compile_t
+  let compile_cmd = Console.Normal (Cmd.v compile_info compile_t)
   let cmds = [ compile_cmd ]
 end

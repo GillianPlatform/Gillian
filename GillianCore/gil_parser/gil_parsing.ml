@@ -1,4 +1,5 @@
 open Lexing
+open Syntaxes.Result
 module L = Logging
 include Gil_parsing_intf
 
@@ -19,40 +20,49 @@ module Make (Annot : Annot.S) = struct
     init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
   }
 
-  let col pos = pos.pos_cnum - pos.pos_bol + 1
+  let get_loc_from_lexbuf lexbuf =
+    let to_position loc : Location.position =
+      { pos_line = loc.pos_lnum; pos_column = loc.pos_cnum - loc.pos_bol }
+    in
+    let loc_source, loc_start =
+      let loc_start = lexeme_start_p lexbuf in
+      (loc_start.pos_fname, to_position loc_start)
+    in
+    let loc_end = to_position (lexeme_end_p lexbuf) in
+    Location.{ loc_start; loc_end; loc_source }
 
   let parse start lexbuf =
-    try start GIL_Lexer.read lexbuf with
-    | GIL_Lexer.Syntax_error message -> failwith ("Syntax error: " ^ message)
+    let open Gillian_result in
+    try Ok (start GIL_Lexer.read lexbuf) with
+    | GIL_Lexer.Syntax_error message ->
+        let loc = get_loc_from_lexbuf lexbuf in
+        let msg = "Syntax error: " ^ message in
+        compilation_error ~loc msg
     | GIL_Parser.Error ->
-        let loc_start = lexeme_start_p lexbuf in
-        let loc_end = lexeme_end_p lexbuf in
-        let unexpected_token = lexeme lexbuf in
-        let message =
-          Printf.sprintf
-            "unexpected token: %s at loc %i:%i-%i:%i while reading %s"
-            unexpected_token loc_start.pos_lnum (col loc_start) loc_end.pos_lnum
-            (col loc_end)
-            (if String.equal loc_start.pos_fname "" then "a string"
-             else loc_start.pos_fname)
-        in
-        failwith ("Parsing error: " ^ message)
+        let loc = get_loc_from_lexbuf lexbuf in
+        compilation_error ~loc
+          ("Syntax error: Unexpected token " ^ Lexing.lexeme lexbuf)
 
   let parse_from_string start str =
+    let open Gillian_result in
     let lexbuf = from_string str in
     let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = "" } in
-    try parse start lexbuf with
-    | Failure msg ->
-        failwith
-          (Printf.sprintf "Failed while trying to parse the string:@\n%s@\n%s"
-             str msg)
-    | _ ->
-        failwith
-          (Printf.sprintf "Unkown parsing error while parsing the string:@\n%s"
-             str)
+    try
+      match parse start lexbuf with
+      | Error (Gillian_result.Error.CompilationError { msg; _ }) ->
+          let msg =
+            Fmt.str "Failed while trying to parse the string:@\n%s@\n%s" str msg
+          in
+          compilation_error msg
+      | res -> res
+    with _ ->
+      let msg =
+        Fmt.str "Unkown parsing error while parsing the string:@\n%s" str
+      in
+      compilation_error msg
 
-  let parse_eprog_from_string str : parsing_result =
-    let labeled_prog, init_data =
+  let parse_eprog_from_string str : parsing_result Gillian_result.t =
+    let+ labeled_prog, init_data =
       parse_from_string GIL_Parser.gmain_target str
     in
     { labeled_prog; init_data }
@@ -103,7 +113,7 @@ module Make (Annot : Annot.S) = struct
     in
     lemmas'
 
-  let parse_eprog_from_file (path : string) : parsing_result =
+  let parse_eprog_from_file (path : string) : parsing_result Gillian_result.t =
     let f path =
       (* Check that the file is of a valid type *)
       let extension = Filename.extension path in
@@ -119,7 +129,7 @@ module Make (Annot : Annot.S) = struct
       let () =
         lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path }
       in
-      let prog, init_data =
+      let+ prog, init_data =
         try parse GIL_Parser.gmain_target lexbuf
         with exn ->
           Fmt.epr "In file at path: %s\n" path;
@@ -173,24 +183,26 @@ module Make (Annot : Annot.S) = struct
 
   let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
 
-  let fetch_imported_prog ?rel path other_imports : (annot, string) Prog.t =
-    if Hashtbl.mem cached_progs path then Hashtbl.find cached_progs path
-    else
-      let file = resolve_path ?rel path in
-      let extension = Filename.extension file in
-      let prog =
-        if String.equal extension ".gil" then
-          let result = parse_eprog_from_file file in
-          match result.init_data with
-          | `Null -> result.labeled_prog
-          | _ -> failwith "imported file had init_data, don't know what to do"
-        else
-          match List.assoc_opt (remove_dot extension) other_imports with
-          | None -> failwith (Printf.sprintf "Cannot import file \"%s\"" file)
-          | Some parse_and_compile -> parse_and_compile file
-      in
-      cache_gil_prog path prog;
-      prog
+  let fetch_imported_prog ?rel path other_imports :
+      (annot, string) Prog.t Gillian_result.t =
+    match Hashtbl.find_opt cached_progs path with
+    | Some prog -> Ok prog
+    | None ->
+        let file = resolve_path ?rel path in
+        let extension = Filename.extension file in
+        let+ prog =
+          if String.equal extension ".gil" then
+            let+ result = parse_eprog_from_file file in
+            match result.init_data with
+            | `Null -> result.labeled_prog
+            | _ -> failwith "imported file had init_data, don't know what to do"
+          else
+            match List.assoc_opt (remove_dot extension) other_imports with
+            | None -> failwith (Printf.sprintf "Cannot import file \"%s\"" file)
+            | Some parse_and_compile -> parse_and_compile file
+        in
+        cache_gil_prog path prog;
+        prog
 
   let combine
       (existing_components : (string, 'a) Hashtbl.t)
@@ -234,14 +246,15 @@ module Make (Annot : Annot.S) = struct
   let resolve_imports
       ?(prog_path : string option)
       (program : (annot, string) Prog.t)
-      (other_imports : (string * (string -> (annot, string) Prog.t)) list) :
-      unit =
+      (other_imports :
+        (string * (string -> (annot, string) Prog.t Gillian_result.t)) list) :
+      unit Gillian_result.t =
     let rec resolve imports added_imports =
       match imports with
-      | [] -> ()
+      | [] -> Ok ()
       | (file, should_verify) :: rest ->
           if not (SS.mem file added_imports) then
-            let imported_prog =
+            let* imported_prog =
               fetch_imported_prog file ?rel:prog_path other_imports
             in
             let () = extend_program program imported_prog should_verify in
@@ -253,7 +266,7 @@ module Make (Annot : Annot.S) = struct
 
   let eprog_to_prog ?prog_path ~other_imports ext_program =
     let open Prog in
-    let () = resolve_imports ?prog_path ext_program other_imports in
+    let+ () = resolve_imports ?prog_path ext_program other_imports in
     let proc_of_ext_proc (proc : (annot, string) Proc.t) :
         (annot, int) Proc.t * (string * int * int * int) list =
       let open Proc in

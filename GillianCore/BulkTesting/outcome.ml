@@ -19,11 +19,10 @@ module type S = sig
 
   module External : External.T(ParserAndCompiler.Annot).S
 
-  type t =
-    | ParseAndCompileError of ParserAndCompiler.err
-    | FailedExec of string
-    | FinishedExec of
-        (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t list
+  type exec_res =
+    (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t list
+
+  type t = exec_res Gillian_result.t
 
   val pp_what_test_did : Format.formatter -> t -> unit
 
@@ -62,29 +61,22 @@ module Make
   module Store = StoreP
   module External = ExternalP
 
-  type t =
-    | ParseAndCompileError of ParserAndCompiler.err
-    | FailedExec of string
-    | FinishedExec of
-        (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t list
+  type exec_res =
+    (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t list
 
-  let pp_what_test_did fmt = function
-    | ParseAndCompileError e ->
-        Fmt.pf fmt "failed at parsing time with error: %a"
-          ParserAndCompiler.pp_err e
-    | FailedExec msg ->
-        Fmt.pf fmt "failed at execution with message: \"%s\"" msg
-    | FinishedExec [ RSucc _ ] ->
-        Fmt.pf fmt "finished its execution successfully"
-    | FinishedExec [ RFail { proc; proc_idx; errors; _ } ] ->
+  type t = exec_res Gillian_result.t
+
+  let pp_what_test_did fmt : t -> unit = function
+    | Error e -> Gillian_result.Error.pp fmt e
+    | Ok [ RSucc _ ] -> Fmt.pf fmt "finished its execution successfully"
+    | Ok [ RFail { proc; proc_idx; errors; _ } ] ->
         Fmt.pf fmt
           "finished its execution with failure in proc %s at command %i with \
            errors: %a"
           proc proc_idx
           (Fmt.Dump.list (Exec_err.pp Val.pp State.pp_err))
           errors
-    | FinishedExec _ ->
-        Fmt.pf fmt "finished its execution with several branches"
+    | Ok _ -> Fmt.pf fmt "finished its execution with several branches"
 
   let pp_what_branch_did fmt b =
     Exec_res.pp_what_exec_did Val.pp (Exec_err.pp Val.pp State.pp_err) fmt b

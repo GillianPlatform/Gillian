@@ -15,7 +15,7 @@ type stmt_kind =
 [@@deriving yojson, show]
 
 type t = {
-  origin_loc : Gil_syntax.Location.t option;
+  origin_loc : Utils.Location.t option;
       (** Better not to know what this is for *)
   origin_id : int option;  (** Origin Id, that should be abstracted away *)
   loop_info : string list;
