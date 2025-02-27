@@ -1,4 +1,4 @@
 (library
  (name gillian_c2_lib)
- (libraries gillian yojson irep_lib kutils goto_lib gillian_c2_compiler)
+ (libraries gillian yojson irep_lib kutils goto_lib gillian_C2_compiler)
  (flags :standard -open Goto_lib))
