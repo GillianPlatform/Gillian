@@ -1,7 +1,24 @@
 open Cmdliner
 module L = Logging
 
+let exit_code_info =
+  [
+    Cmd.Exit.info ~doc:"Success" 0;
+    Cmd.Exit.info ~doc:"Analysis / runtime failure" 1;
+    Cmd.Exit.info ~doc:"Compilation error" 2;
+    Cmd.Exit.info ~doc:"Operation error - e.g. incorrect arguments" 124;
+    Cmd.Exit.info ~doc:"Internal error - please report this!" 125;
+  ]
+
 module Make (PC : ParserAndCompiler.S) = struct
+  let exit_code_info = exit_code_info
+
+  let exit_on_error = function
+    | Ok x -> x
+    | Error e ->
+        let () = Logging.print_to_all (Gillian_result.Error.show e) in
+        exit (Gillian_result.Error.to_error_code e)
+
   let entry_point =
     let doc = "Entry point of execution." in
     let docv = "PROCEDURE_NAME" in

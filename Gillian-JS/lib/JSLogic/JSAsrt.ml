@@ -205,10 +205,9 @@ let rec js2jsil
         List.sort (fun (x1, _, _) (x2, _, _) -> Stdlib.compare x1 x2) fsclens
       in
 
-      print_endline
-        (Printf.sprintf "Sorting:\n\t%s"
-           (String.concat "\n\t"
-              (List.map (fun (x, y, _) -> Printf.sprintf "%s : %d" y x) fsclens)));
+      Format.printf "Sorting:\n\t%s"
+        (String.concat "\n\t"
+           (List.map (fun (x, y, _) -> Printf.sprintf "%s : %d" y x) fsclens));
       assert (
         let x0, _, _ = List.hd fsclens in
         let x1, _, _ = List.hd (List.tl fsclens) in
@@ -222,10 +221,9 @@ let rec js2jsil
           fsclens
       in
 
-      print_endline
-        (Printf.sprintf "Adjusted:\n\t%s"
-           (String.concat "\n\t"
-              (List.map (fun (x, y, _) -> Printf.sprintf "%s : %d" y x) fsclens)));
+      Format.printf "Adjusted:\n\t%s"
+        (String.concat "\n\t"
+           (List.map (fun (x, y, _) -> Printf.sprintf "%s : %d" y x) fsclens));
 
       let asrt_lens : t list =
         List.map
@@ -239,7 +237,7 @@ let rec js2jsil
     let len_fid1 = List.length (get_vis_list vis_tbl fid1) in
     let len_fid2 = List.length (get_vis_list vis_tbl fid2) in
 
-    print_endline (Printf.sprintf "fid1: %s; len: %d\nfid2: %s; len: %d" fid1 len_fid1 fid2 len_fid2);
+    Format.printf "fid1: %s; len: %d\nfid2: %s; len: %d" fid1 len_fid1 fid2 len_fid2;
 
     let len_fid1 = LEq (UnOp(LstLen, le_sc1'), Lit (Num (float_of_int len_fid1))) in
     let len_fid2 = LEq (UnOp(LstLen, le_sc2'), Lit (Num (float_of_int len_fid2))) in  *)

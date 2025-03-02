@@ -34,7 +34,8 @@ pred SLL(+p: List, sz: Int):
     is_ptr(#next) * <mem_single>(#l, #o i+ 8i, "u64"; #next, "Freeable") *
     SLL(#next, #sz_next) *
     (* The size of the list is the size of the rest plus one *)
-    (sz == (#sz_next i+ 1i));
+    (sz == (#sz_next i+ 1i)) *
+    (0i i<# sz);
 
 
 spec list_length(self)

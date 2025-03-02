@@ -263,6 +263,7 @@ let gen_pred_of_struct cenv ann struct_name =
       {
         pred_name;
         pred_source_path = None;
+        pred_loc = None;
         pred_internal = true;
         pred_ins;
         pred_num_params;
@@ -659,6 +660,7 @@ let trans_abs_pred ~filepath cl_pred =
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc = None;
       pred_internal = false;
       pred_num_params;
       pred_params;
@@ -699,6 +701,7 @@ let trans_pred ~ann ~filepath cl_pred =
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc = None;
       pred_internal = false;
       pred_num_params;
       pred_params;
@@ -732,8 +735,8 @@ let trans_sspec ~ann fname sspecs =
   let make_post p = if !Config.allocated_functions then ta p else ta p in
   Spec.
     {
-      ss_pre = tap @ ta pre;
-      ss_posts = List.map make_post posts;
+      ss_pre = (tap @ ta pre, None);
+      ss_posts = List.map (fun post -> (make_post post, None)) posts;
       (* FIXME: bring in variant *)
       ss_variant = None;
       ss_flag = Flag.Normal;
@@ -745,10 +748,8 @@ let trans_lemma ~ann ~filepath lemma =
   let CLemma.{ name; params; hypothesis; conclusions; proof } = lemma in
   let trans_asrt = trans_asrt ~ann ~fname:name in
   let trans_lcmd = trans_lcmd ~ann ~fname:name in
-  let make_post p =
-    if !Config.allocated_functions then trans_asrt p else trans_asrt p
-  in
-  let lemma_hyp = trans_asrt hypothesis in
+  let make_post p = (trans_asrt p, None) in
+  let lemma_hyp = (trans_asrt hypothesis, None) in
   let lemma_concs = List.map make_post conclusions in
   let lemma_proof =
     Option.map
@@ -923,7 +924,7 @@ let generate_bispec clight_prog fname ident f =
     {
       bispec_name = fname;
       bispec_params = true_params;
-      bispec_pres = [ pre ];
+      bispec_pres = [ (pre, None) ];
       bispec_normalised = false;
     }
 

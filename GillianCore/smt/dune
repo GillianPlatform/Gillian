@@ -3,5 +3,5 @@
  (public_name gillian.smt)
  (libraries gil_syntax utils simple_smt sexplib)
  (preprocess
-  (pps ppx_deriving.std))
+  (pps ppx_deriving.std ppx_deriving_yojson))
  (flags :standard -open Utils.Prelude))

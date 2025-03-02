@@ -7,10 +7,10 @@ module type S = sig
   }
 
   (** Takes a path to a file and returns the parsed GIL program with its global environment. *)
-  val parse_eprog_from_file : string -> parsing_result
+  val parse_eprog_from_file : string -> parsing_result Gillian_result.t
 
   (** Takes a string containing a GIL program and parses it. *)
-  val parse_eprog_from_string : string -> parsing_result
+  val parse_eprog_from_string : string -> parsing_result Gillian_result.t
 
   (** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t],
       resolving the imports in the meantime. The parameter [other_imports] is an
@@ -22,9 +22,10 @@ module type S = sig
       the file as a JSIL program, and compiles this to a GIL program. *)
   val eprog_to_prog :
     ?prog_path:string ->
-    other_imports:(string * (string -> (annot, string) Prog.t)) list ->
+    other_imports:
+      (string * (string -> (annot, string) Prog.t Gillian_result.t)) list ->
     (annot, string) Prog.t ->
-    (annot, int) Prog.t
+    (annot, int) Prog.t Gillian_result.t
 
   (** Caches a mapping from the output GIL filepaths to the corresponding
       sring-labelled GIL programs. Can be called before [eprog_to_prog] in order
@@ -33,10 +34,10 @@ module type S = sig
   val cache_labelled_progs : (string * (annot, string) Prog.t) list -> unit
 
   (** Parses a [Literal.t] from a lexbuf; raises [Failure] if parsing fails. *)
-  val parse_literal : Lexing.lexbuf -> Literal.t
+  val parse_literal : Lexing.lexbuf -> Literal.t Gillian_result.t
 
   (** Parses a [Expr.t] from a lexbuf; raises [Failure] if parsing fails. *)
-  val parse_expression : Lexing.lexbuf -> Expr.t
+  val parse_expression : Lexing.lexbuf -> Expr.t Gillian_result.t
 end
 
 module type Intf = sig

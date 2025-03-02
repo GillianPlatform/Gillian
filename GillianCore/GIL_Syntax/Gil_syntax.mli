@@ -1,17 +1,3 @@
-(** @canonical Gillian.Gil_syntax.Location *)
-module Location : sig
-  (** Representation of a location in a source file *)
-
-  type position = { pos_line : int; pos_column : int } [@@deriving yojson]
-
-  type t = { loc_start : position; loc_end : position; loc_source : string }
-  [@@deriving yojson, eq]
-
-  val none : t
-  val pp : t Fmt.t
-  val pp_log_opt : Format.formatter -> t option -> unit
-end
-
 (** @canonical Gillian.Gil_syntax.LVar *)
 module LVar : sig
   (** Allocator for logical variable names *)
@@ -628,6 +614,7 @@ module Pred : sig
   type t = {
     pred_name : string;  (** Name of the predicate *)
     pred_source_path : string option;
+    pred_loc : Location.t option;
     pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
@@ -668,7 +655,7 @@ module Pred : sig
   val check_pvars : (string, t) Hashtbl.t -> unit
 
   (** Infers parameter types and makes them explicit in the assertions *)
-  val explicit_param_types : (string, t) Hashtbl.t -> t -> t
+  val explicit_param_types : (string, t) Hashtbl.t -> t -> (t, string) result
 
   (** Combines a list of ins and a list of outs putting them in the right order
     according to a given predicate. *)
@@ -709,8 +696,8 @@ module Lemma : sig
   (** GIL Lemmas *)
 
   type spec = {
-    lemma_hyp : Asrt.t;  (** Hypothesis *)
-    lemma_concs : Asrt.t list;  (** Conclusion *)
+    lemma_hyp : Asrt.t Location.located;  (** Hypothesis *)
+    lemma_concs : Asrt.t Location.located list;  (** Conclusion *)
     lemma_spec_variant : Expr.t option;  (** Variant *)
   }
 
@@ -775,10 +762,12 @@ end
 module Spec : sig
   (** GIL specifications *)
 
+  open Location
+
   (** Single specification *)
   type st = {
-    ss_pre : Asrt.t;  (** Precondition *)
-    ss_posts : Asrt.t list;  (** Postcondition *)
+    ss_pre : Asrt.t located;  (** Precondition *)
+    ss_posts : Asrt.t located list;  (** Postcondition *)
     ss_variant : Expr.t option;  (** Variant *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
@@ -798,8 +787,8 @@ module Spec : sig
   (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single specification with the given values *)
   val s_init :
     ?ss_label:string * string list ->
-    Asrt.t ->
-    Asrt.t list ->
+    Asrt.t located ->
+    Asrt.t located list ->
     Expr.t option ->
     Flag.t ->
     bool ->
@@ -837,16 +826,18 @@ end
 module BiSpec : sig
   (** Bi-abductive specifications *)
 
+  open Location
+
   type t = {
     bispec_name : string;  (** Procedure/spec name *)
     bispec_params : string list;  (** Procedure/spec parameters *)
-    bispec_pres : Asrt.t list;  (** Possible preconditions *)
+    bispec_pres : Asrt.t located list;  (** Possible preconditions *)
     bispec_normalised : bool;  (** If the spec is already normalised *)
   }
 
   type t_tbl = (string, t) Hashtbl.t
 
-  val init : string -> string list -> Asrt.t list -> bool -> t
+  val init : string -> string list -> Asrt.t located list -> bool -> t
   val init_tbl : unit -> t_tbl
 
   (** Pretty-printer *)
@@ -1350,6 +1341,8 @@ module Visitors : sig
          ; visit_binop : 'c -> BinOp.t -> BinOp.t
          ; visit_bispec : 'c -> BiSpec.t -> BiSpec.t
          ; visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
+         ; visit_position : 'c -> Location.position -> Location.position
+         ; visit_location : 'c -> Location.t -> Location.t
          ; visit_constant : 'c -> Constant.t -> Constant.t
          ; visit_expr : 'c -> Expr.t -> Expr.t
          ; visit_flag : 'c -> Flag.t -> Flag.t
@@ -1615,6 +1608,8 @@ module Visitors : sig
     method private visit_bytes : 'env. 'env -> bytes -> bytes
     method private visit_char : 'env. 'env -> char -> char
     method visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
+    method visit_position : 'c -> Location.position -> Location.position
+    method visit_location : 'c -> Location.t -> Location.t
     method visit_constant : 'c -> Constant.t -> Constant.t
     method visit_expr : 'c -> Expr.t -> Expr.t
     method visit_flag : 'c -> Flag.t -> Flag.t
@@ -1864,6 +1859,8 @@ module Visitors : sig
          ; visit_binop : 'c -> BinOp.t -> 'f
          ; visit_bispec : 'c -> BiSpec.t -> 'f
          ; visit_cmd : 'c -> 'g Cmd.t -> 'f
+         ; visit_position : 'c -> Location.position -> 'f
+         ; visit_location : 'c -> Location.t -> 'f
          ; visit_constant : 'c -> Constant.t -> 'f
          ; visit_expr : 'c -> Expr.t -> 'f
          ; visit_flag : 'c -> Flag.t -> 'f
@@ -2085,6 +2082,8 @@ module Visitors : sig
     method visit_binop : 'c -> BinOp.t -> 'f
     method visit_bispec : 'c -> BiSpec.t -> 'f
     method visit_cmd : 'c -> 'g Cmd.t -> 'f
+    method visit_position : 'c -> Location.position -> 'f
+    method visit_location : 'c -> Location.t -> 'f
     method visit_constant : 'c -> Constant.t -> 'f
     method visit_expr : 'c -> Expr.t -> 'f
     method visit_flag : 'c -> Flag.t -> 'f
@@ -2304,6 +2303,8 @@ module Visitors : sig
          ; visit_binop : 'c -> BinOp.t -> unit
          ; visit_bispec : 'c -> BiSpec.t -> unit
          ; visit_cmd : 'c -> 'f Cmd.t -> unit
+         ; visit_position : 'c -> Location.position -> unit
+         ; visit_location : 'c -> Location.t -> unit
          ; visit_constant : 'c -> Constant.t -> unit
          ; visit_expr : 'c -> Expr.t -> unit
          ; visit_flag : 'c -> Flag.t -> unit
@@ -2538,6 +2539,8 @@ module Visitors : sig
     method private visit_bytes : 'env. 'env -> bytes -> unit
     method private visit_char : 'env. 'env -> char -> unit
     method visit_cmd : 'c -> 'f Cmd.t -> unit
+    method visit_position : 'c -> Location.position -> unit
+    method visit_location : 'c -> Location.t -> unit
     method visit_constant : 'c -> Constant.t -> unit
     method visit_expr : 'c -> Expr.t -> unit
     method visit_flag : 'c -> Flag.t -> unit

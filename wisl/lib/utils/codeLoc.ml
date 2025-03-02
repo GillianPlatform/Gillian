@@ -58,8 +58,8 @@ let json_with_uri loc =
 
 let dummy = { loc_start = dummy_pos; loc_end = dummy_pos }
 
-let to_location (loc : t) : Gillian.Gil_syntax.Location.t =
-  let to_position loc : Gillian.Gil_syntax.Location.position =
+let to_location (loc : t) : Gillian.Utils.Location.t =
+  let to_position loc : Gillian.Utils.Location.position =
     { pos_line = loc.pos_lnum; pos_column = loc.pos_cnum - loc.pos_bol }
   in
   {

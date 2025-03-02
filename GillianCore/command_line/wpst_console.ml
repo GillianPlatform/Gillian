@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 module L = Logging
 module SS = Containers.SS
 
@@ -11,8 +12,8 @@ module Make
                        with type annot = PC.Annot.t
                         and type state_t = SState.t
                         and type state_err_t = SState.err_t)
-    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
-struct
+    (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t)
+    (Debug_adapter : Debug_adapter.S) : Console.S = struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
@@ -167,10 +168,7 @@ struct
                *** Stage 1: Parsing program in original language and compiling \
                to Gil. ***@\n")
       in
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
-          (PC.parse_and_compile_files files)
-      in
+      let+ progs = PC.parse_and_compile_files files in
       let init_data = progs.init_data in
       let e_progs = progs.gil_progs in
       let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
@@ -181,14 +179,14 @@ struct
       let () =
         L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
       in
-      let e_prog, init_data =
-        let Gil_parsing.{ labeled_prog; init_data } =
+      let+ e_prog, init_data =
+        let* Gil_parsing.{ labeled_prog; init_data } =
           Gil_parsing.parse_eprog_from_file (List.hd files)
         in
-        let init_data =
+        let+ init_data =
           match ID.of_yojson init_data with
-          | Ok d -> d
-          | Error e -> failwith e
+          | Ok d -> Ok d
+          | Error e -> Gillian_result.compilation_error e
         in
         (labeled_prog, init_data)
       in
@@ -196,7 +194,7 @@ struct
 
   let process_files files already_compiled outfile_opt incremental =
     let t = Sys.time () in
-    let e_prog, init_data, source_files_opt =
+    let* e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled
     in
     let () =
@@ -210,10 +208,8 @@ struct
         ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
     in
     let () = L.normal (fun m -> m "*** Stage 2: Transforming the program.\n") in
-    let prog =
-      Gil_parsing.eprog_to_prog
-        ~other_imports:(convert_other_imports PC.other_imports)
-        e_prog
+    let+ prog =
+      Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
     let () =
       L.normal (fun m -> m "\n*** Stage 2: DONE transforming the program.\n")
@@ -246,10 +242,15 @@ struct
     let () = Config.leak_check := leak_check in
     let () = PC.initialize Symbolic in
     let () = Config.max_branching := unroll in
-    let () = process_files files already_compiled outfile_opt incremental in
+    let r =
+      Gillian_result.try_ @@ fun () ->
+      process_files files already_compiled outfile_opt incremental
+    in
     let () = if stats then Statistics.print_statistics () in
-    (* TODO: wrap-up should be done using [Stdlib.onexit] instead *)
-    Logging.wrap_up ()
+    let () = Common_args.exit_on_error r in
+    exit 0
+
+  let cmd_name = "wpst"
 
   let wpst_t =
     Term.(
@@ -264,8 +265,32 @@ struct
         `P "Symbolically executes a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info "wpst" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info cmd_name ~doc ~man
 
-  let wpst_cmd = Cmd.v wpst_info (Common_args.use wpst_t)
-  let cmds = [ wpst_cmd ]
+  let wpst_cmd = Console.Normal (Cmd.v wpst_info (Common_args.use wpst_t))
+
+  module Debug = struct
+    let debug_wpst_info =
+      let doc =
+        "Starts Gillian in debugging mode for whole-program symbolic testing"
+      in
+      let man =
+        [
+          `S Manpage.s_description;
+          `P
+            "Starts Gillian in debugging mode for whole-program symbolic \
+             testing, which communicates via the Debug Adapter Protocol";
+        ]
+      in
+      Cmd.info cmd_name ~doc ~man
+
+    let start_debug_adapter () =
+      Config.current_exec_mode := Utils.Exec_mode.Symbolic;
+      Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
+
+    let debug_wpst_t = Common_args.use Term.(const start_debug_adapter)
+    let debug_wpst_cmd = Console.Debug (Cmd.v debug_wpst_info debug_wpst_t)
+  end
+
+  let cmds = [ wpst_cmd; Debug.debug_wpst_cmd ]
 end
