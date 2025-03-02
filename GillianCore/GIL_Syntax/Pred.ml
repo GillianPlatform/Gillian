@@ -194,15 +194,11 @@ let extend_asrt_pred_types (preds : (string, t) Hashtbl.t) (a : Asrt.t) :
         let* combined =
           try Ok (List.combine pred.pred_params les)
           with Invalid_argument _ ->
-            let message =
-              Fmt.str
-                "Invalid number of parameters for predicate %s which requires \
-                 %i parameters and was used with the following %i parameters: \
-                 %a"
-                pred.pred_name pred.pred_num_params (List.length les)
-                (Fmt.Dump.list Expr.pp) les
-            in
-            Error message
+            Fmt.error
+              "Invalid number of parameters for predicate %s which requires %i \
+               parameters and was used with the following %i parameters: %a"
+              pred.pred_name pred.pred_num_params (List.length les)
+              (Fmt.Dump.list Expr.pp) les
         in
         let ac_types =
           List.fold_left

@@ -748,12 +748,7 @@ let trans_lemma ~ann ~filepath lemma =
   let CLemma.{ name; params; hypothesis; conclusions; proof } = lemma in
   let trans_asrt = trans_asrt ~ann ~fname:name in
   let trans_lcmd = trans_lcmd ~ann ~fname:name in
-  let make_post p =
-    let post =
-      if !Config.allocated_functions then trans_asrt p else trans_asrt p
-    in
-    (post, None)
-  in
+  let make_post p = (trans_asrt p, None) in
   let lemma_hyp = (trans_asrt hypothesis, None) in
   let lemma_concs = List.map make_post conclusions in
   let lemma_proof =

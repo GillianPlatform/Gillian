@@ -35,7 +35,6 @@ pred SLL(+p: List, sz: Int):
     SLL(#next, #sz_next) *
     (* The size of the list is the size of the rest plus one *)
     (sz == (#sz_next i+ 1i)) *
-    (* FIXME: this shouldn't be necessary? *)
     (0i i<# sz);
 
 
