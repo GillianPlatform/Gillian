@@ -22,11 +22,12 @@ let pp_log_opt fmt loc =
 let pp_full fmt = function
   | None -> Fmt.nop fmt ()
   | Some { loc_source; loc_start; loc_end } ->
-      Fmt.pf fmt " [%s %d%s-%d:%d]" loc_source loc_start.pos_line
-        (if loc_start.pos_line = loc_end.pos_line then
-           Fmt.str ":%d" loc_start.pos_column
+      Fmt.pf fmt " [%s %d:%d-%s%d]" loc_source loc_start.pos_line
+        (loc_start.pos_column + 1)
+        (if loc_start.pos_line <> loc_end.pos_line then
+           Fmt.str "%d:" loc_end.pos_line
          else "")
-        loc_end.pos_line loc_end.pos_column
+        (loc_end.pos_column + 1)
 
 let min_position a b =
   if a.pos_line < b.pos_line then a
