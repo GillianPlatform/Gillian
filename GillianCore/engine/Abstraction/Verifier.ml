@@ -98,6 +98,7 @@ struct
     params : string list;
     pre_state : SPState.t;
     post_mp : MP.t;
+    post_loc : Location.t option;
     flag : Flag.t option;
     spec_vars : Expr.Set.t; [@to_yojson yojson_of_expr_set]
   }
@@ -244,6 +245,15 @@ struct
                   SPState.set_store ss_pre empty_store
               | Some _ -> ss_pre
             in
+            let post_loc =
+              List.fold_left
+                (fun acc (_, loc) ->
+                  match (acc, loc) with
+                  | None, None -> None
+                  | Some l, None | None, Some l -> Some l
+                  | Some l1, Some l2 -> Some (Location.merge l1 l2))
+                None posts
+            in
             let test =
               {
                 name;
@@ -253,6 +263,7 @@ struct
                 post_mp;
                 flag;
                 spec_vars;
+                post_loc;
               }
             in
             (Some test, Some ((pre', snd pre), posts))
@@ -526,7 +537,7 @@ struct
                     test.id msg)
             in
             let () = Fmt.pr "f @?" in
-            Gillian_result.analysis_failures [ { msg; loc = None } ]
+            Gillian_result.analysis_failures [ { msg; loc = test.post_loc } ]
 
   let analyse_proc_results
       (test : t)
@@ -578,7 +589,7 @@ struct
                    (Fmt.Dump.pair Fmt.int Fmt.int)
                    test.id msg)
            in
-           Some Gillian_result.Error.{ msg; loc = None }
+           Some Gillian_result.Error.{ msg; loc = test.post_loc }
     in
     let result =
       match errors with
