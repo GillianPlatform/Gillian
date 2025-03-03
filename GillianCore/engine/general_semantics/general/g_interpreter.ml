@@ -56,6 +56,7 @@ struct
       errors : err_t list;
       branch_path : branch_path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
     [@@deriving yojson]
 
@@ -80,6 +81,7 @@ struct
       final_state : state_t;
       branch_path : branch_path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
     [@@deriving yojson]
 
@@ -754,7 +756,9 @@ struct
             b_counter
             has_branched
             spec_name : CConf.t =
-          let { i; cs; branch_path; prev_cmd_report_id; _ } = eval_state in
+          let { i; cs; branch_path; prev_cmd_report_id; annot; _ } =
+            eval_state
+          in
           let process_ret_cont new_j =
             process_ret_cont new_j eval_state ix ret_state fl b_counter
               has_branched
@@ -773,6 +777,7 @@ struct
               L.normal (fun fmt -> fmt "%s" msg);
               raise (Syntax_error msg)
           | Flag.Bug, _ ->
+              let loc = Annot.get_origin_loc annot in
               ConfErr
                 {
                   callstack = cs;
@@ -787,6 +792,7 @@ struct
                     ];
                   branch_path;
                   prev_cmd_report_id;
+                  loc;
                 }
 
         let symb_exec_proc x pid v_args j params args eval_state () =
@@ -807,7 +813,16 @@ struct
           ]
 
         let exec_with_spec spec x j args pid subst symb_exec_proc eval_state =
-          let { state; i; b_counter; cs; branch_path; prev_cmd_report_id; _ } =
+          let {
+            annot;
+            state;
+            i;
+            b_counter;
+            cs;
+            branch_path;
+            prev_cmd_report_id;
+            _;
+          } =
             eval_state
           in
           let process_ret = process_ret pid j eval_state in
@@ -824,6 +839,7 @@ struct
               in
               L.verbose (fun fmt ->
                   fmt "Run_spec returned %d Results" (List.length ret));
+              let loc = Annot.get_origin_loc annot in
               if ret = [] then
                 if spec.data.spec_incomplete then (
                   L.normal (fun fmt ->
@@ -847,6 +863,7 @@ struct
                           ];
                         branch_path;
                         prev_cmd_report_id;
+                        loc;
                       };
                   ]
               else
@@ -882,6 +899,7 @@ struct
                             errors;
                             branch_path;
                             prev_cmd_report_id;
+                            loc;
                           };
                       ]
                 in
@@ -1061,6 +1079,7 @@ struct
                     ~json:
                       [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
                     "Error");
+              let loc = Annot.get_origin_loc annot in
               if Exec_mode.is_verification_exec !Config.current_exec_mode then (
                 let tactic_from_params =
                   let recovery_params =
@@ -1118,6 +1137,7 @@ struct
                           errors = List.map (fun x -> Exec_err.EState x) errs;
                           branch_path;
                           prev_cmd_report_id;
+                          loc;
                         };
                     ])
               else
@@ -1131,6 +1151,7 @@ struct
                       errors = List.map (fun x -> Exec_err.EState x) errs;
                       branch_path;
                       prev_cmd_report_id;
+                      loc;
                     };
                 ]
         in
@@ -1157,6 +1178,7 @@ struct
           state
         in
         DL.log ~v:true (fun m -> m "LCmd");
+        let loc = Annot.get_origin_loc annot in
         match lcmd with
         | SL SymbExec ->
             symb_exec_next := true;
@@ -1197,6 +1219,7 @@ struct
                         errors;
                         branch_path;
                         prev_cmd_report_id;
+                        loc;
                       })
               frames_and_states
         | _ ->
@@ -1234,6 +1257,7 @@ struct
                         errors;
                         branch_path;
                         prev_cmd_report_id;
+                        loc;
                       };
                   ]
             in
@@ -1408,6 +1432,7 @@ struct
 
       let eval_return_normal eval_state =
         let {
+          annot;
           store;
           cs;
           loop_ids;
@@ -1440,6 +1465,7 @@ struct
                     final_state = state;
                     branch_path;
                     prev_cmd_report_id;
+                    loc = Annot.get_origin_loc annot;
                   };
               ]
           | ( Some v_ret,
@@ -1486,6 +1512,7 @@ struct
           iframes;
           b_counter;
           prev_cmd_report_id;
+          annot;
           _;
         } =
           eval_state
@@ -1505,6 +1532,7 @@ struct
                   final_state = state;
                   branch_path : branch_path;
                   prev_cmd_report_id;
+                  loc = Annot.get_origin_loc annot;
                 };
             ]
         | ( Some v_ret,
@@ -1752,6 +1780,10 @@ struct
     in
     List.concat_map
       (fun state ->
+        let get_loc () =
+          let _, (annot, _) = get_cmd prog cs i in
+          Annot.get_origin_loc annot
+        in
         try
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
             report_id_ref branch_path branch_case
@@ -1766,6 +1798,7 @@ struct
                   errors;
                   branch_path = List_utils.cons_opt branch_case branch_path;
                   prev_cmd_report_id = !report_id_ref;
+                  loc = get_loc ();
                 };
             ]
         | State.Internal_State_Error (errs, error_state) ->
@@ -1779,6 +1812,7 @@ struct
                   errors = List.map (fun x -> Exec_err.EState x) errs;
                   branch_path = List_utils.cons_opt branch_case branch_path;
                   prev_cmd_report_id = !report_id_ref;
+                  loc = get_loc ();
                 };
             ])
       states
@@ -2119,11 +2153,13 @@ struct
 
       let err (cconf : CConf.err) eval_step_state =
         let { results; rest_confs; f; _ } = eval_step_state in
-        let { callstack; proc_idx; error_state; errors; branch_path; _ } =
+        let { callstack; proc_idx; error_state; errors; branch_path; loc; _ } =
           cconf
         in
         let proc = Call_stack.get_cur_proc_id callstack in
-        let result = Exec_res.RFail { proc; proc_idx; error_state; errors } in
+        let result =
+          Exec_res.RFail { proc; proc_idx; error_state; errors; loc }
+        in
         let results =
           (cconf.prev_cmd_report_id, branch_path, result) :: results
         in
@@ -2135,10 +2171,10 @@ struct
 
       let finish (cconf : CConf.finish) eval_step_state =
         let { results; rest_confs; f; _ } = eval_step_state in
-        let { flag; ret_val; final_state; branch_path; _ } = cconf in
+        let { flag; ret_val; final_state; branch_path; loc; _ } = cconf in
         let result =
           Exec_res.RSucc
-            { flag; ret_val; final_state; last_report = L.Parent.get () }
+            { flag; ret_val; final_state; last_report = L.Parent.get (); loc }
         in
         let results =
           (cconf.prev_cmd_report_id, branch_path, result) :: results
@@ -2349,14 +2385,15 @@ struct
   *)
   let check_leaks result =
     match result with
-    | Exec_res.RSucc { final_state; _ } when State.sure_is_nonempty final_state
-      ->
+    | Exec_res.RSucc { final_state; loc; _ }
+      when State.sure_is_nonempty final_state ->
         Exec_res.RFail
           {
             proc = "Memory Leak Check post-execution";
             proc_idx = -1;
             error_state = final_state;
             errors = [ Exec_err.ELeak ];
+            loc;
           }
     | _ -> result
 end

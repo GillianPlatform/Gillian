@@ -34,7 +34,7 @@ module type S = sig
     prog_t ->
     bool ->
     SourceFiles.t option ->
-    unit
+    unit Gillian_result.t
 
   val verify_up_to_procs :
     ?proc_name:string ->

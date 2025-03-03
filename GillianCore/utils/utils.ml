@@ -112,6 +112,18 @@ module List_res = struct
   include List_res
 end
 
+(** @canonical Gillian.Utils.Location *)
+module Location = struct
+  (** @inline *)
+  include Location
+end
+
+(** @canonical Gillian.Utils.Gillian_result *)
+module Gillian_result = struct
+  (** @inline *)
+  include Gillian_result
+end
+
 (**/**)
 
 module Preprocessing_utils = Preprocessing_utils

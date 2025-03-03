@@ -3,6 +3,27 @@
 %{
 open Parser_state
 
+let get_loc startpos endpos : Location.t =
+  let open Location in
+  let open Lexing in
+  let loc_start : Location.position =
+    {
+      pos_line = startpos.pos_lnum;
+      pos_column = startpos.pos_cnum - startpos.pos_bol;
+    }
+  in
+  let loc_end : Location.position =
+    {
+      pos_line = endpos.pos_lnum;
+      pos_column = endpos.pos_cnum - endpos.pos_bol;
+    }
+  in
+  {
+    loc_start;
+    loc_end;
+    loc_source = startpos.pos_fname;
+  }
+
 let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %}
 
@@ -651,27 +672,7 @@ gcmd_with_label:
 gcmd_with_annot:
   | cmd = gcmd_target
     {
-      let open Location in
-      let open Lexing in
-      let loc_start : Location.position =
-        {
-          pos_line = $startpos.pos_lnum;
-          pos_column = $startpos.pos_cnum - $startpos.pos_bol;
-        }
-      in
-      let loc_end : Location.position =
-        {
-          pos_line = $endpos.pos_lnum;
-          pos_column = $endpos.pos_cnum - $endpos.pos_bol;
-        }
-      in
-      let origin_loc : Location.t =
-        {
-          loc_start;
-          loc_end;
-          loc_source = $startpos.pos_fname;
-        }
-      in
+      let origin_loc = get_loc $startpos $endpos in
       let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
@@ -752,13 +753,20 @@ g_spec_target:
 ;
 
 g_spec_line:
-  OASSERT; a = g_assertion_target; CASSERT { let a' : Asrt.t = a in a' }
+  OASSERT; a = g_assertion_target; CASSERT
+  { let a' : Asrt.t = a in
+    a', Some (get_loc $startpos $endpos)
+  }
 ;
 
 g_mult_spec_line:
-  OASSERT; asrts = separated_list(SCOLON, g_assertion_target); CASSERT
-    { let asrts' : Asrt.t list = asrts in asrts'  }
+  OASSERT; asrts = separated_list(SCOLON, g_assertion_target_loc); CASSERT
+    { let asrts' : (Asrt.t * Location.t option) list = asrts in asrts'  }
 ;
+
+g_assertion_target_loc:
+  asrt = g_assertion_target
+  { asrt, Some (get_loc $startpos $endpos) }
 
 g_spec_kind:
   | NORMAL { Flag.Normal }
@@ -960,11 +968,13 @@ g_pred_target:
       | e -> [e]
     in
     let pred_facts = Option.fold ~none:[] ~some:split_ands pred_facts in
+    let pred_loc = Some (get_loc $startpos $endpos) in
 
     Pred.
       {
         pred_name;
         pred_source_path = None;
+        pred_loc;
         pred_internal = Option.is_some internal;
         pred_num_params;
         pred_params;

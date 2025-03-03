@@ -1,5 +1,6 @@
 open Cmdliner
 open Command_line_utils
+open Syntaxes.Result
 
 module Make
     (ID : Init_data.S)
@@ -45,15 +46,12 @@ struct
 
   let parse_eprog files already_compiled =
     if not already_compiled then (
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
-          (PC.parse_and_compile_files files)
-      in
+      let+ progs = PC.parse_and_compile_files files in
       let e_progs, init_data = (progs.gil_progs, progs.init_data) in
       Gil_parsing.cache_labelled_progs (List.tl e_progs);
       (snd (List.hd e_progs), init_data))
     else
-      let Gil_parsing.{ labeled_prog; init_data } =
+      let+ Gil_parsing.{ labeled_prog; init_data } =
         Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let init_data =
@@ -63,24 +61,26 @@ struct
       in
       (labeled_prog, init_data)
 
-  let exec files already_compiled debug outfile_opt no_heap entry_point () =
-    let () = Config.current_exec_mode := Concrete in
-    let () = Config.no_heap := no_heap in
-    let () = Config.entry_point := entry_point in
-    let () = PC.initialize Concrete in
-    let e_prog, init_data = parse_eprog files already_compiled in
+  let process_files files already_compiled debug outfile_opt =
+    let* e_prog, init_data = parse_eprog files already_compiled in
     let () =
       burn_gil ~init_data:(ID.to_yojson init_data)
         ~pp_prog:(Prog.pp_labeled ?pp_annot:None)
         e_prog outfile_opt
     in
-    let prog =
-      Gil_parsing.eprog_to_prog
-        ~other_imports:(convert_other_imports PC.other_imports)
-        e_prog
+    let+ prog =
+      Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
-    let () = run debug prog init_data in
-    Logging.wrap_up ()
+    run debug prog init_data
+
+  let exec files already_compiled debug outfile_opt no_heap entry_point () =
+    let () = Config.current_exec_mode := Concrete in
+    let () = Config.no_heap := no_heap in
+    let () = Config.entry_point := entry_point in
+    let () = PC.initialize Concrete in
+    let r = process_files files already_compiled debug outfile_opt in
+    let () = Common_args.exit_on_error r in
+    exit 0
 
   let debug =
     let doc =
@@ -102,8 +102,8 @@ struct
         `P "Concretely executes a given file, after compiling it to GIL";
       ]
     in
-    Cmd.info "exec" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info "exec" ~doc ~man
 
-  let exec_cmd = Cmd.v exec_info (Common_args.use exec_t)
+  let exec_cmd = Console.Normal (Cmd.v exec_info (Common_args.use exec_t))
   let cmds = [ exec_cmd ]
 end

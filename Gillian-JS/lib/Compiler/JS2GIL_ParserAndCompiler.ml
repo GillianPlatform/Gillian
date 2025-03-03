@@ -1,8 +1,8 @@
+open Cmdliner
+
 let burn_jsil = ref false
 
 module TargetLangOptions = struct
-  open Cmdliner
-
   type t = { jsil : bool; harness : bool; burn_jsil : bool }
 
   let term =
@@ -78,12 +78,15 @@ let parse_and_compile_js path =
     let core_prog = JSIL2GIL.jsil2core_prog ext_prog in
     Ok (core_prog, JavaScriptSource js_prog)
   with
-  | JS_Parser.Error.ParserError e -> Error (JSParserErr e)
+  | JS_Parser.Error.ParserError e ->
+      let msg = Fmt.str "Parsing error: %s\n" (JS_Parser.Error.str e) in
+      let additional_data = `Assoc [ ("is_parser_error", `Bool true) ] in
+      Gillian_result.compilation_error ~additional_data msg
   | JS2JSIL_Preprocessing.EarlyError e ->
-      Error
-        (JS2GILErr
-           (Printf.sprintf "\nParser post-processing threw an EarlyError: %s\n"
-              e))
+      let msg =
+        Fmt.str "\nParser post-processing threw an EarlyError: %s\n" e
+      in
+      Gillian_result.compilation_error msg
 
 (*
   | _ ->

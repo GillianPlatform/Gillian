@@ -1,6 +1,8 @@
+open Location
+
 type spec = TypeDef__.lemma_spec = {
-  lemma_hyp : Asrt.t;
-  lemma_concs : Asrt.t list;
+  lemma_hyp : Asrt.t located;
+  lemma_concs : Asrt.t located list;
   lemma_spec_variant : Expr.t option;
 }
 
@@ -24,9 +26,9 @@ let init_tbl () : (string, t) Hashtbl.t = Hashtbl.create Config.small_tbl_size
 let pp fmt lemma =
   let pp_spec fmt spec =
     Fmt.pf fmt "[[  @[<hov 0>%a@] ]]@ [[  @[<hov 0>%a@] ]]" Asrt.pp
-      spec.lemma_hyp
+      (fst spec.lemma_hyp)
       (Fmt.list ~sep:Fmt.semi Asrt.pp)
-      spec.lemma_concs
+      (List.map fst spec.lemma_concs)
   in
   let pp_proof fmt' proof =
     Fmt.pf fmt' "[*  @[<hov 0>%a@]  *]" (Fmt.list ~sep:Fmt.semi LCmd.pp) proof
@@ -48,7 +50,11 @@ let pp fmt lemma =
     lemma.lemma_specs (Fmt.option pp_proof) lemma.lemma_proof
 
 let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
-  let map_asrts = Pred.extend_asrt_pred_types preds in
+  let map_asrts (pred, loc) =
+    match Pred.extend_asrt_pred_types preds pred with
+    | Ok pred -> (pred, loc)
+    | Error msg -> raise (Gillian_result.Exc.verification_failure ?loc msg)
+  in
   let pt_spec { lemma_hyp; lemma_concs; lemma_spec_variant } =
     {
       lemma_hyp = map_asrts lemma_hyp;
@@ -67,5 +73,8 @@ let add_param_bindings (lemma : t) =
       (fun pv lv -> Asrt.Pure (Expr.BinOp (PVar pv, Equal, LVar lv)))
       params lvar_params
   in
-  let add_to_spec spec = { spec with lemma_hyp = param_eqs @ spec.lemma_hyp } in
+  let add_to_spec spec =
+    let lemma_hyp = (param_eqs @ fst spec.lemma_hyp, snd spec.lemma_hyp) in
+    { spec with lemma_hyp }
+  in
   { lemma with lemma_specs = List.map add_to_spec lemma.lemma_specs }

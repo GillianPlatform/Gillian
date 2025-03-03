@@ -47,10 +47,10 @@ module Make (Debugger : Debugger.S) = struct
         let id =
           match Logging.Report_id.of_string_opt step_id with
           | Some id -> id
-          | None -> raise (Failure "Invalid step id")
+          | None -> failwith "Invalid step id"
         in
         match dbg |> Debugger.jump_to_id id with
-        | Error e -> raise (Failure e)
+        | Error e -> raise (Gillian_result.Exc.Gillian_error e)
         | Ok () ->
             send_stopped_events Step;%lwt
             Lwt.return ());
@@ -63,7 +63,7 @@ module Make (Debugger : Debugger.S) = struct
           | None -> raise (Failure "Invalid step id")
         in
         match dbg |> Debugger.step_specific branch_case prev_id with
-        | Error e -> raise (Failure e)
+        | Error e -> raise (Gillian_result.Exc.Gillian_error e)
         | Ok stop_reason ->
             send_stopped_events stop_reason;%lwt
             Lwt.return ());
