@@ -21,18 +21,8 @@ let parse_with_error token lexbuf =
       compilation_error ~loc
         ("Syntax error: Unexpected token " ^ Lexing.lexeme lexbuf)
 
-let with_lexbuf file f =
-  match Hashtbl.find_opt Utils.Config.file_content_overrides file with
-  | Some content -> Lexing.from_string content |> f
-  | None ->
-      let inx = open_in file in
-      let lexbuf = Lexing.from_channel inx in
-      let x = f lexbuf in
-      let () = close_in inx in
-      x
-
 let parse_file file =
-  with_lexbuf file @@ fun lexbuf ->
+  Utils.Config.with_lexbuf file @@ fun lexbuf ->
   let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = file } in
   parse_with_error WParser.prog lexbuf
 
