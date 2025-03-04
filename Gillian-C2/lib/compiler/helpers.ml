@@ -21,3 +21,18 @@ let set_end ?(is_end = true) =
   List_utils.map_last (fun (annot, label, cmd) ->
       let annot = C2_annot.set_end ~is_end annot in
       (annot, label, cmd))
+
+let get_location lexbuf =
+  let open Lexing in
+  let open Gillian.Utils in
+  let to_position loc : Location.position =
+    { pos_line = loc.pos_lnum; pos_column = loc.pos_cnum - loc.pos_bol }
+  in
+  let loc_start = lexeme_start_p lexbuf in
+  let loc_end = lexeme_end_p lexbuf in
+  Location.
+    {
+      loc_start = to_position loc_start;
+      loc_end = to_position loc_end;
+      loc_source = loc_start.pos_fname;
+    }
