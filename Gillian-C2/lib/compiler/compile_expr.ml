@@ -416,7 +416,7 @@ let fresh_sv ctx =
 let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
   let open Cs.Syntax in
   match type_ with
-  | CInteger I_bool ->
+  (* | CInteger I_bool ->
       (* Special case, the bounds are different *)
       let assume_int = Cmd.Logic (AssumeType (expr, IntType)) in
       let condition =
@@ -424,7 +424,7 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
         expr == Expr.one_i || expr == Expr.zero_i
       in
       let assume_range = Cmd.Logic (Assume condition) in
-      Cs.return ~app:[ assume_int; assume_range ] ()
+      Cs.return ~app:[ assume_int; assume_range ] () *)
   | CInteger _ | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
       let assume_int = Cmd.Logic (AssumeType (expr, IntType)) in
       let bounds =
