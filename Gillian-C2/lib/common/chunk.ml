@@ -77,6 +77,12 @@ let of_int_type ~signed ~size =
   | 128, false -> Some U128
   | _ -> None
 
+let of_float_type ~size =
+  match size with
+  | 32 -> Some F32
+  | 64 -> Some F64
+  | _ -> None
+
 let to_components chunk =
   match chunk with
   | U8 -> Int { bit_width = 8; signed = false }
