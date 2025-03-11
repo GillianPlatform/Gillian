@@ -7,10 +7,14 @@ on:
     branches: [master]
   merge_group:
   workflow_dispatch:
+    inputs:
+      docker-tag:
+        type: string
+        description: "Docker tag; leave blank to use the branch name."
 
 env:
   NODE_VERSION: 18
-  DOCKER_TEST_TAG: gillian:test
+  DOCKER_IMG_NAME: ghcr.io/gillianplatform/gillian
 
 jobs:
   build:
@@ -36,7 +40,7 @@ jobs:
         run: sudo pip install sphinx furo
       - name: Restore Cache
         id: restore-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
             cache-name: cache-ocaml
         with:
@@ -307,7 +311,7 @@ jobs:
           driver: docker
       - name: Restore Cache
         id: restore-cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         env:
             cache-name: cache-ocaml
         with:
@@ -320,17 +324,53 @@ jobs:
         with:
           context: .
           load: true
-          tags: ${{ env.DOCKER_TEST_TAG }}
+          tags: ${{ env.DOCKER_IMG_NAME }}:test
           target: test
       - name: Dune test
-        run: docker run --rm ${{ env.DOCKER_TEST_TAG }} opam exec -- dune test
+        run: docker run --rm ${{ env.DOCKER_IMG_NAME }}:test opam exec -- dune test
       - name: Extract cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           rm -rf .docker_opam_cache
-          docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "opam clean"
+          docker run --name deps ${{ env.DOCKER_IMG_NAME }}:test bash -c "opam clean"
           docker cp deps:/home/opam/.opam/5.2 ./.docker_opam_cache
           docker rm deps
+
+  push-docker:
+    runs-on: ubuntu-latest
+    if: ${{ contains(fromJSON('["push", "workflow_dispatch", "release"]'), github.event_name) }}
+    env:
+      DOCKER_TAG_PRE: ${{ github.event.inputs.docker-tag || (github.ref_name == 'master' && 'nightly' || github.ref_name) }}
+    needs: build-docker
+    steps:
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+      - name: Restore Cache
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        env:
+            cache-name: cache-ocaml
+        with:
+          path: .docker_opam_cache
+          key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
+          restore-keys: |
+            docker-${{ env.cache-name }}-ocaml-5.2.0
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set docker tag
+        run: echo "DOCKER_TAG=$DOCKER_TAG_PRE" | tr "/" "-" >> "$GITHUB_ENV"
+      - name: Build and export docker image
+        uses: docker/build-push-action@v6
+        with:
+          tags: ${{ env.DOCKER_IMG_NAME }}:${{ env.DOCKER_TAG }}
+          push: true
+          target: run
 
   deploy-docs:
     if: github.ref == 'refs/heads/master'
@@ -352,7 +392,7 @@ jobs:
           git config --global user.name "GitHub Actions"
           git clone https://${{ secrets.DOCS_USER }}:${{ secrets.DOCS_TOKEN }}@github.com/GillianPlatform/GillianPlatform.github.io.git docs-repo --branch master
           cd docs-repo
-          rm * -rf
+          rm ./* -rf
           cp -r ../docs/* .
           git add -A
           git commit --allow-empty -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
