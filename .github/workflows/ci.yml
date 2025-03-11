@@ -7,6 +7,10 @@ on:
     branches: [master]
   merge_group:
   workflow_dispatch:
+    inputs:
+      docker-tag:
+        type: string
+        description: "Docker tag; leave blank to use the branch name."
 
 env:
   NODE_VERSION: 18
@@ -335,6 +339,8 @@ jobs:
   push-docker:
     runs-on: ubuntu-latest
     if: ${{ contains(fromJSON('["push", "workflow_dispatch", "release"]'), github.event_name) }}
+    env:
+      DOCKER_TAG_PRE: ${{ github.event.inputs.docker-tag || (github.ref_name == 'master' && 'nightly' || github.ref_name) }}
     needs: build-docker
     steps:
       - name: Set up docker buildx
@@ -358,7 +364,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set docker tag
-        run: echo "DOCKER_TAG=${{ github.ref_name == 'master' && 'nightly' || github.ref_name }}" | tr "/" "-" >> "$GITHUB_ENV"
+        run: echo "DOCKER_TAG=$DOCKER_TAG_PRE" | tr "/" "-" >> "$GITHUB_ENV"
       - name: Build and export docker image
         uses: docker/build-push-action@v6
         with:
