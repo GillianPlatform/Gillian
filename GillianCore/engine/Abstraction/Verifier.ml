@@ -873,6 +873,17 @@ struct
     L.normal (fun m -> m "%s" msg);
     result
 
+  let select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify =
+    match !Config.Verification.things_to_verify with
+    | All -> (procs_to_verify, lemmas_to_verify)
+    | ProcsOnly -> (procs_to_verify, SS.empty)
+    | LemmasOnly -> (SS.empty, lemmas_to_verify)
+    | Specific ->
+        ( SS.inter procs_to_verify
+            (SS.of_list !Config.Verification.procs_to_verify),
+          SS.inter lemmas_to_verify
+            (SS.of_list !Config.Verification.lemmas_to_verify) )
+
   let verify_up_to_procs
       ?(proc_name : string option)
       ~(init_data : SPState.init_data)
@@ -886,12 +897,7 @@ struct
           SS.of_list (Prog.get_noninternal_lemma_names prog)
         in
         let procs_to_verify, lemmas_to_verify =
-          if !Config.Verification.verify_only_some_of_the_things then
-            ( SS.inter procs_to_verify
-                (SS.of_list !Config.Verification.procs_to_verify),
-              SS.inter lemmas_to_verify
-                (SS.of_list !Config.Verification.lemmas_to_verify) )
-          else (procs_to_verify, lemmas_to_verify)
+          select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
         in
         let prog, _, proc_tests =
           get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
@@ -968,8 +974,10 @@ struct
           (lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
          @ lemma_changes.dependent_lemmas)
       in
-      if !Config.Verification.verify_only_some_of_the_things then
-        failwith "Cannot use --incremental and --procs or --lemma together";
+      if Config.Verification.(!things_to_verify <> All) then
+        failwith
+          "Cannot use --incremental while restricting procs and/or lemmas to \
+           verify";
       let r =
         verify_procs ~init_data ~prev_results:results prog procs_to_verify
           lemmas_to_verify
@@ -991,12 +999,7 @@ struct
         SS.of_list (Prog.get_noninternal_lemma_names prog)
       in
       let procs_to_verify, lemmas_to_verify =
-        if !Config.Verification.verify_only_some_of_the_things then
-          ( SS.inter procs_to_verify
-              (SS.of_list !Config.Verification.procs_to_verify),
-            SS.inter lemmas_to_verify
-              (SS.of_list !Config.Verification.lemmas_to_verify) )
-        else (procs_to_verify, lemmas_to_verify)
+        select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
       in
       let r = verify_procs ~init_data prog procs_to_verify lemmas_to_verify in
       let call_graph = SAInterpreter.call_graph in

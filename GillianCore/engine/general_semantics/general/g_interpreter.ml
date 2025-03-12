@@ -71,6 +71,7 @@ struct
       prev_cmd_report_id : Logging.Report_id.t option;
       branch_case : branch_case option;
       branch_path : branch_path;
+      loc : Location.t option;
     }
     [@@deriving yojson]
 
@@ -96,6 +97,7 @@ struct
       branch_count : int;
       branch_path : branch_path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
     [@@deriving yojson]
 
@@ -121,6 +123,7 @@ struct
         ~loop_ids
         ~branch_count
         ~branch_path
+        ?loc
         ?prev_cmd_report_id
         ?branch_case
         () =
@@ -138,6 +141,7 @@ struct
           loop_ids;
           branch_count;
           branch_path;
+          loc;
           prev_cmd_report_id;
           branch_case;
         }
@@ -153,8 +157,8 @@ struct
       | _ -> None
 
     let get_branch_path = function
-      | ConfErr { branch_path; _ } -> branch_path
-      | ConfFinish { branch_path; _ } -> branch_path
+      | ConfErr { branch_path; _ }
+      | ConfFinish { branch_path; _ }
       | ConfSusp { branch_path; _ } -> branch_path
       | ConfCont { branch_path; branch_case; _ } ->
           List_utils.cons_opt branch_case branch_path
@@ -687,6 +691,7 @@ struct
       eval_expr : Expr.t -> Val.t;
       loop_action : loop_action;
       branch_path : branch_path;
+      last_known_loc : Location.t option;
       prev_cmd_report_id : L.Report_id.t option;
     }
 
@@ -916,6 +921,7 @@ struct
             prev;
             prev_loop_ids;
             branch_path;
+            last_known_loc;
             prev_cmd_report_id;
             _;
           } =
@@ -934,6 +940,7 @@ struct
                   next_idx = i;
                   branch_path;
                   branch_count = b_counter;
+                  loc = last_known_loc;
                   prev_cmd_report_id;
                 };
             ]
@@ -1647,6 +1654,7 @@ struct
         (prev_loop_ids : string list)
         (i : int)
         (b_counter : int)
+        (last_known_loc : Location.t option ref)
         (report_id_ref : L.Report_id.t option ref)
         (branch_path : branch_path)
         (branch_case : branch_case option) : CConf.t list =
@@ -1664,7 +1672,7 @@ struct
       in
       let eval_in_state state =
         eval_cmd_after_frame_handling prog state cs iframes prev prev_loop_ids i
-          b_counter report_id_ref branch_path branch_case
+          b_counter last_known_loc report_id_ref branch_path branch_case
       in
       match loop_action with
       | Nothing -> eval_in_state state
@@ -1703,6 +1711,7 @@ struct
         (prev_loop_ids : string list)
         (i : int)
         (b_counter : int)
+        (last_known_loc : Location.t option ref)
         (report_id_ref : L.Report_id.t option ref)
         (branch_path : branch_path)
         (branch_case : branch_case option) : CConf.t list =
@@ -1710,6 +1719,16 @@ struct
       let eval_expr = make_eval_expr state in
       let proc_name, annot_cmd = get_cmd prog cs i in
       let annot, cmd = annot_cmd in
+      let () =
+        let is_internal =
+          let pid = (List.hd cs).pid in
+          let proc = Hashtbl.find prog.prog.procs pid in
+          proc.proc_internal
+        in
+        match Annot.get_origin_loc annot with
+        | Some loc when not is_internal -> last_known_loc := Some loc
+        | _ -> ()
+      in
       let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
       let loop_action : loop_action =
         if Exec_mode.is_verification_exec !Config.current_exec_mode then
@@ -1725,8 +1744,11 @@ struct
              L.Parent.set report_id);
 
       let branch_path = List_utils.cons_opt branch_case branch_path in
+      let loc = !last_known_loc in
       let prev_cmd_report_id = !report_id_ref in
-      let make_confcont = CConf.make_cont ?prev_cmd_report_id ~branch_path in
+      let make_confcont =
+        CConf.make_cont ?loc ?prev_cmd_report_id ~branch_path
+      in
 
       (* DL.log (fun m ->
           m
@@ -1749,6 +1771,7 @@ struct
           eval_expr;
           loop_action;
           branch_path;
+          last_known_loc = !last_known_loc;
           prev_cmd_report_id;
         }
       in
@@ -1770,6 +1793,7 @@ struct
       (prev_loop_ids : string list)
       (i : int)
       (b_counter : int)
+      (last_known_loc : Location.t option)
       (report_id_ref : L.Report_id.t option ref)
       (branch_path : branch_path)
       (branch_case : branch_case option) : CConf.t list =
@@ -1780,13 +1804,10 @@ struct
     in
     List.concat_map
       (fun state ->
-        let get_loc () =
-          let _, (annot, _) = get_cmd prog cs i in
-          Annot.get_origin_loc annot
-        in
+        let last_known_loc = ref last_known_loc in
         try
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
-            report_id_ref branch_path branch_case
+            last_known_loc report_id_ref branch_path branch_case
         with
         | Interpreter_error (errors, error_state) ->
             [
@@ -1798,7 +1819,7 @@ struct
                   errors;
                   branch_path = List_utils.cons_opt branch_case branch_path;
                   prev_cmd_report_id = !report_id_ref;
-                  loc = get_loc ();
+                  loc = !last_known_loc;
                 };
             ]
         | State.Internal_State_Error (errs, error_state) ->
@@ -1812,7 +1833,7 @@ struct
                   errors = List.map (fun x -> Exec_err.EState x) errs;
                   branch_path = List_utils.cons_opt branch_case branch_path;
                   prev_cmd_report_id = !report_id_ref;
-                  loc = get_loc ();
+                  loc = !last_known_loc;
                 };
             ])
       states
@@ -2107,6 +2128,7 @@ struct
           prev_cmd_report_id;
           branch_path;
           branch_case;
+          loc;
           _;
         } =
           cconf
@@ -2114,7 +2136,7 @@ struct
         L.set_previous prev_cmd_report_id;
         let next_confs =
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
-            b_counter parent_id_ref branch_path branch_case
+            b_counter loc parent_id_ref branch_path branch_case
         in
         continue_or_pause ~new_confs:true next_confs
           (fun ?selector () -> f (next_confs @ rest_confs) selector results)
@@ -2209,13 +2231,16 @@ struct
           next_idx;
           branch_count;
           branch_path;
+          loc;
+          prev_cmd_report_id;
           _;
         } =
           cconf
         in
         let conf =
-          CConf.make_cont ~state ~callstack ~invariant_frames ~prev_idx
-            ~loop_ids ~next_idx ~branch_count ~branch_path ()
+          CConf.make_cont ~state ~callstack ~invariant_frames ~prev_idx ?loc
+            ?prev_cmd_report_id ~loop_ids ~next_idx ~branch_count ~branch_path
+            ()
         in
         L.(
           verbose (fun m ->

@@ -92,19 +92,21 @@ let set_runtime_paths, get_runtime_paths =
 
 (** @canonical Gillian.Utils.Config.Verification *)
 module Verification = struct
+  type things_to_verify = Specific | All | ProcsOnly | LemmasOnly
+
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
-  let verify_only_some_of_the_things = ref false
+  let things_to_verify = ref All
 
   let set_procs_to_verify = function
     | [] -> ()
     | a ->
         procs_to_verify := a;
-        verify_only_some_of_the_things := true
+        things_to_verify := Specific
 
   let set_lemmas_to_verify = function
     | [] -> ()
     | a ->
         lemmas_to_verify := a;
-        verify_only_some_of_the_things := true
+        things_to_verify := Specific
 end
