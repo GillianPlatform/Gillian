@@ -18,6 +18,10 @@ module Make
     let doc = "Do not verify the proofs of lemmas." in
     Arg.(value & flag & info [ "no-lemma-proof" ] ~doc)
 
+  let procs_only =
+    let doc = "Only verify procs." in
+    Arg.(value & flag & info [ "procs-only" ] ~doc)
+
   let proc_arg =
     let doc =
       "Specifies a procedure or list of procedures that should be verified. By \
@@ -162,13 +166,16 @@ module Make
       in
       Cmd.info cmd_name ~doc ~man
 
-    let start_debug_adapter manual () =
+    let start_debug_adapter procs_only manual () =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
+      let () =
+        if procs_only then Config.Verification.(things_to_verify := ProcsOnly)
+      in
       Config.manual_proof := manual;
       Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
 
     let debug_verify_t =
-      Common_args.use Term.(const start_debug_adapter $ manual)
+      Common_args.use Term.(const start_debug_adapter $ procs_only $ manual)
 
     let debug_verify_cmd =
       Console.Debug (Cmd.v debug_verify_info debug_verify_t)
@@ -187,14 +194,17 @@ module Make
       in
       Cmd.info cmd_name ~doc ~man
 
-    let start_language_server manual () =
+    let start_language_server procs_only manual () =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
+      let () =
+        if procs_only then Config.Verification.(things_to_verify := ProcsOnly)
+      in
       Config.manual_proof := manual;
       let analyse file = verify [ file ] false None false false in
       Lsp_server.run analyse
 
     let lsp_verify_t =
-      Common_args.use Term.(const start_language_server $ manual)
+      Common_args.use Term.(const start_language_server $ procs_only $ manual)
 
     let lsp_verify_cmd = Console.Lsp (Cmd.v debug_verify_info lsp_verify_t)
   end
