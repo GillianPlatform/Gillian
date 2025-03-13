@@ -391,7 +391,7 @@ let rec trans_form : CFormula.t -> Asrt.t * Var.t list * Expr.t = function
 let malloc_chunk_asrt loc beg_ofs struct_sz =
   Constr.Others.malloced ~ptr:(loc, beg_ofs) ~total_size:struct_sz
 
-let trans_constr ~(ctx : Ctx.t) ?fname:_ ~(typ : CAssert.points_to_type) s c =
+let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
   let malloc =
     match typ with
     | Malloced -> true
@@ -471,11 +471,10 @@ let trans_constr ~(ctx : Ctx.t) ?fname:_ ~(typ : CAssert.points_to_type) s c =
   | ConsExpr _ | ConsStruct _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
 
-let rec trans_asrt ~ctx ~fname asrt =
+let rec trans_asrt ~ctx asrt =
   let a =
     match asrt with
-    | CAssert.Star (a1, a2) ->
-        trans_asrt ~ctx ~fname a1 @ trans_asrt ~ctx ~fname a2
+    | CAssert.Star (a1, a2) -> trans_asrt ~ctx a1 @ trans_asrt ~ctx a2
     | Array { ptr; chunk; size; content; malloced } ->
         let a1, _, ptr = trans_expr ptr in
         let a2, _, size = trans_expr size in
@@ -509,15 +508,15 @@ let rec trans_asrt ~ctx ~fname asrt =
         let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
         Pred (p, gel) :: ap
     | Emp -> [ Asrt.Emp ]
-    | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~ctx ~fname ~typ s c
+    | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~ctx ~typ s c
   in
   match List.filter (fun x -> x <> Asrt.Emp) a with
   | [] -> [ Asrt.Emp ]
   | a -> a
 
-let rec trans_lcmd ~ctx ~fname lcmd =
-  let trans_lcmd = trans_lcmd ~fname in
-  let trans_asrt = trans_asrt ~fname in
+let rec trans_lcmd ~ctx lcmd =
+  let trans_lcmd = trans_lcmd in
+  let trans_asrt = trans_asrt in
   let make_assert ~bindings = function
     | [] | [ Asrt.Emp ] -> []
     | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
@@ -613,10 +612,10 @@ let trans_pred ~ctx ~filepath cl_pred =
     List.map
       (fun (d, a) ->
         match d with
-        | None -> (None, trans_asrt ~ctx ~fname:pred_name a)
+        | None -> (None, trans_asrt ~ctx a)
         | Some da ->
             let ada, gda = trans_asrt_annot da in
-            (Some gda, ada @ trans_asrt ~ctx ~fname:pred_name a))
+            (Some gda, ada @ trans_asrt ~ctx a))
       definitions
   in
   Pred.
@@ -644,7 +643,7 @@ let add_trans_pred ~ctx filepath ann cl_pred =
 let add_trans_abs_pred filepath ann cl_pred =
   { ann with preds = trans_abs_pred ~filepath cl_pred :: ann.preds }
 
-let trans_sspec ~ctx fname sspecs =
+let trans_sspec ~ctx sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
   let tap, spa =
     match spec_annot with
@@ -653,7 +652,7 @@ let trans_sspec ~ctx fname sspecs =
         let a, (label, exs) = trans_asrt_annot spa in
         (a, Some (label, exs))
   in
-  let ta = trans_asrt ~ctx ~fname in
+  let ta = trans_asrt ~ctx in
   Spec.
     {
       ss_pre = (tap @ ta pre, None);
@@ -667,8 +666,8 @@ let trans_sspec ~ctx fname sspecs =
 
 let trans_lemma ~ctx ~filepath lemma =
   let CLemma.{ name; params; hypothesis; conclusions; proof } = lemma in
-  let trans_asrt = trans_asrt ~ctx ~fname:name in
-  let trans_lcmd = trans_lcmd ~ctx ~fname:name in
+  let trans_asrt = trans_asrt ~ctx in
+  let trans_lcmd = trans_lcmd ~ctx in
   let make_post p = (trans_asrt p, None) in
   let lemma_hyp = (trans_asrt hypothesis, None) in
   let lemma_concs = List.map make_post conclusions in
@@ -703,7 +702,7 @@ let trans_spec ~ctx ?(only_spec = false) cl_spec =
       {
         spec_name = fname;
         spec_params = params;
-        spec_sspecs = List.map (trans_sspec ~ctx fname) sspecs;
+        spec_sspecs = List.map (trans_sspec ~ctx) sspecs;
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
