@@ -10,6 +10,7 @@ let initialize _ =
     !Kconfig.kstats_file
 
 let default_import_paths = Some Runtime_sites.Sites.runtime
+let default_include_dirs = Runtime_sites.Sites.c_includes
 let other_imports = []
 
 type init_data = unit
@@ -106,7 +107,7 @@ module TargetLangOptions = struct
         hide_genv;
         print_unhandled;
       } =
-    Kconfig.include_dirs := include_dirs;
+    Kconfig.include_dirs := default_include_dirs @ include_dirs;
     Kconfig.source_dirs := source_dirs;
     Kconfig.kstats_file := kstats_file;
     Kconfig.harness := harness;
