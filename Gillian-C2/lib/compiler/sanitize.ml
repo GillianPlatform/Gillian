@@ -50,12 +50,17 @@ let is_kani_specific = function
     -> true
   | _ -> false
 
+let is_gillian_specific = function
+  | "__GILLIAN" -> true
+  | _ -> false
+
 let sanitize_symbol ~(ctx : Program.t) s =
   let s' =
     match s with
     | "" -> "i__empty"
     | _ -> (
-        if is_cbmc_specific s || is_kani_specific s then s
+        if is_cbmc_specific s || is_kani_specific s || is_gillian_specific s
+        then s
         else
           let replaced = Str.global_replace (Str.regexp {|[:\.\$]|}) "_" s in
           match String.get replaced 0 with
