@@ -864,7 +864,7 @@ and compile_call
       in
       by_value ~app:[ b (Logic (Assume f)) ] (Lit Null)
   | Symbol "__CPROVER_assert" ->
-      (* The second argument of assert is a string that we may to keep
+      (* The second argument of assert is a string that we may keep
          alive for error messages. For now we're discarding it.
          In the future, we could change Gillian's assume to also have an error message *)
       (* I should still find a way to factor out the call to assume and assert *)
@@ -904,6 +904,42 @@ and compile_call
         | true -> to_assert
       in
       by_value ~app:[ b (Logic (Assert f)) ] (Expr.Lit Null)
+  | Symbol "__GILLIAN" ->
+      let string_lcmd =
+        match args with
+        | [ GExpr.{ value = StringConstant s; _ } ] -> s
+        | _ ->
+            Error.user_error "__GILLIAN() must be called with a string constant"
+      in
+      let lexbuf = Lexing.from_string string_lcmd in
+      let lcmd =
+        try C2_annot_parser.logic_command_entry C2_annot_lexer.read lexbuf with
+        | C2_annot_parser.Error ->
+            let curr = lexbuf.Lexing.lex_curr_p in
+            let msg =
+              Fmt.str
+                "Syntax error in annot\n\
+                 %s\n\n\
+                 Unexpected token %s at loc (%i, %i)" string_lcmd
+                (Lexing.lexeme lexbuf) curr.pos_lnum
+                (curr.pos_cnum - curr.pos_bol + 1)
+            in
+            Error.user_error msg
+        | exc ->
+            let msg =
+              Fmt.str "Syntax Error in annot (%s): \n%s"
+                (Printexc.to_string exc) string_lcmd
+            in
+            Error.user_error msg
+      in
+      let cmds =
+        match Gil_logic_gen.trans_lcmd ~ctx lcmd with
+        | `Normal gil_lcmds ->
+            if Kutils.Exec_mode.is_concrete_exec ctx.exec_mode then []
+            else gil_lcmds |> List.map @@ fun lcmd -> b (Cmd.Logic lcmd)
+        | `Invariant _ -> Error.user_error "Invariants not supported yet"
+      in
+      by_value ~app:cmds (Expr.Lit Null)
   | _ ->
       let* e = compile_expr ~ctx func in
       let fname, nest_kind =
