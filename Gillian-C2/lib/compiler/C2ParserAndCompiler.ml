@@ -118,21 +118,42 @@ type err = string
 
 let pp_err = Fmt.string
 
+let parse_annots_with_error token lexbuf =
+  let open Utils.Gillian_result in
+  let open C2_annot_lexer in
+  try Ok (token read lexbuf) with
+  | SyntaxError message ->
+      let loc = Helpers.get_location lexbuf in
+      compilation_error ~loc ("Syntax error: " ^ message)
+  | C2_annot_parser.Error ->
+      let loc = Helpers.get_location lexbuf in
+      compilation_error ~loc
+        ("Syntax error: Unexpected token " ^ Lexing.lexeme lexbuf)
+
+let parse_annots file =
+  Kutils.Config.with_lexbuf file @@ fun lexbuf ->
+  let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = file } in
+  parse_annots_with_error C2_annot_parser.prog lexbuf
+
 let parse_symtab_into_goto json =
-  let+ tbl =
+  let* tbl =
     match Irep_lib.Symtab.of_yojson json with
     | Ok tbl -> Ok tbl
     | Error msg -> Utils.Gillian_result.compilation_error msg
   in
   let machine = Machine_model_parse.consume_from_symtab tbl in
-  if not Machine_model.(equal machine archi64) then
-    failwith "For now, Gillian-C2 can only run on archi64";
+  let* () =
+    if Machine_model.(equal machine archi64) then Ok ()
+    else
+      Kutils.Gillian_result.operation_error
+        "For now, Gillian-C2 can only run on archi64"
+  in
   Kconfig.machine_model := machine;
   Logging.normal ~severity:Warning (fun m ->
       m
         "Filtering every cprover_specific symbol!! Need to remove that in the \
          future");
-  Goto_lib.Program.of_symtab ~machine tbl
+  Ok (Goto_lib.Program.of_symtab ~machine tbl)
 
 let create_compilation_result path goto_prog gil_prog =
   let open Gillian.Command_line.ParserAndCompiler in
@@ -221,26 +242,67 @@ let load_symtab_from_file file =
   | Ok symtab -> symtab
   | Error msg -> Fmt.failwith "Malformed symtab file - %s" msg
 
+let combine_prog_with_lprog
+    (prog : (Annot.t, string) Gil_syntax.Prog.t)
+    (lprog : Gil_logic_gen.gil_annots) =
+  let open Gil_syntax in
+  let () =
+    lprog.preds
+    |> List.iter @@ fun p -> Hashtbl.add prog.preds p.Pred.pred_name p
+  in
+  let () =
+    lprog.onlyspecs
+    |> List.iter @@ fun p -> Hashtbl.add prog.only_specs p.Spec.spec_name p
+  in
+  let () =
+    lprog.lemmas
+    |> List.iter @@ fun p -> Hashtbl.add prog.lemmas p.Lemma.lemma_name p
+  in
+  let () =
+    lprog.specs
+    |> List.iter @@ fun spec ->
+       match Hashtbl.find_opt prog.procs spec.Spec.spec_name with
+       | None ->
+           Logging.verbose (fun m ->
+               m "Found spec but no declaration for '%s'" spec.spec_name)
+       | Some proc ->
+           Hashtbl.replace prog.procs spec.Spec.spec_name
+             { proc with proc_spec = Some spec }
+  in
+  { prog with imports = prog.imports @ lprog.imports }
+
 let parse_and_compile_files files =
   let open Utils.Syntaxes.Result in
   (* Call CBMC ourselves *)
-  let path =
+  let path, annots_path =
     match files with
     | [ p ] -> (
         match Filename.extension p with
-        | ".json" -> p
-        | ".c" -> compile_c_to_symtab p
+        | ".json" -> (p, None)
+        | ".c" -> (compile_c_to_symtab p, Some p)
         | ext -> Fmt.failwith "Unknown file type '%s'!" ext)
     | _ -> failwith "Gillian-C2 only handles one file at the moment"
   in
   let json = load_symtab_from_file path in
-  let+ goto_prog = parse_symtab_into_goto json in
+  let* goto_prog = parse_symtab_into_goto json in
   let goto_prog = Sanitize.sanitize_and_index_program goto_prog in
-  let context =
+  let ctx =
     Ctx.make
       ~exec_mode:!Kutils.Config.current_exec_mode
       ~machine:!Kconfig.machine_model ~prog:goto_prog ~harness:!Kconfig.harness
       ()
   in
-  let gil_prog = Compile.compile context in
+  let+ gil_lprog =
+    match annots_path with
+    | Some path ->
+        let+ lprog = parse_annots path in
+        if Utils.(Exec_mode.is_verification_exec !Config.current_exec_mode) then
+          Some (Gil_logic_gen.trans_annots ~ctx lprog path)
+        else None
+    | None -> Ok None
+  in
+  let gil_lprog = Option.value ~default:Gil_logic_gen.empty gil_lprog in
+  ignore gil_lprog;
+  let gil_prog = Compile.compile ctx in
+  let gil_prog = combine_prog_with_lprog gil_prog gil_lprog in
   create_compilation_result path goto_prog gil_prog
