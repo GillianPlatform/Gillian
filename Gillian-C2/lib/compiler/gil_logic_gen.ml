@@ -73,13 +73,13 @@ let empty =
     imports = [];
   }
 
-let already_annot_structs = ref Gillian.Utils.Containers.SS.empty
+let already_annot_structs = ref Str_set.empty
 
 let get_structs_not_annot ctx =
   let struct_names =
     ctx.prog.types |> Hashtbl.to_seq_values
     |> Seq.filter_map (Ctx.resolve_struct_tag_opt ctx)
-    |> List.of_seq
+    |> Str_set.of_seq |> Str_set.to_list
   in
   let already_annot = !already_annot_structs in
   let structs_not_annot =
@@ -111,14 +111,7 @@ let convert_struct_field
   let pvloc = Expr.PVar loc_param_name in
   let pvofs = Expr.PVar ofs_param_name in
   let pvmember = Expr.PVar name in
-  let size_bits = Ctx.size_of ctx type_ in
-  let () =
-    if size_bits mod 8 <> 0 then
-      Fmt.failwith "Type %s of field %s of struct %s has unsupported size %d"
-        (Goto_lib.Type.show_simple type_)
-        name struct_name size_bits
-  in
-  let size = Stdlib.(size_bits / 8) in
+  let size = Ctx.size_of ctx type_ in
   let ofs = pvofs + Expr.int offset in
   let gil_type, asrts =
     match type_ with
@@ -208,7 +201,8 @@ let gen_pred_of_struct ctx ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
   let pred_ins = [ 0; 1 ] in
   let components =
-    Ctx.resolve_struct_components ctx (Ctx.tag_lookup ctx struct_name)
+    let struct_tag = "tag-" ^ struct_name in
+    Ctx.resolve_struct_components ctx (Ctx.tag_lookup ctx struct_tag)
   in
   let first_params =
     [
@@ -468,8 +462,22 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:ptr ~perm:(Some Freeable)
       in
       [ ga_single; malloc_chunk siz ] @ to_assert
-  | ConsExpr _ | ConsStruct _ ->
+  | ConsExpr _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
+  | ConsStruct (sname, el) ->
+      let struct_pred = pred_name_of_struct sname in
+      let size =
+        (* In specs, you must always refer to `struct x` and not a typedef, so the tag must be 'tag-'^sname *)
+        let type_ = Ctx.tag_lookup ctx ("tag-" ^ sname) in
+        Ctx.size_of ctx type_ |> Z.of_int
+      in
+      let more_asrt, _, params_fields =
+        split3_expr_comp (List.map trans_expr el)
+      in
+      let pr =
+        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields) :: more_asrt
+      in
+      pr @ to_assert @ [ malloc_chunk size ]
 
 let rec trans_asrt ~ctx asrt =
   let a =
