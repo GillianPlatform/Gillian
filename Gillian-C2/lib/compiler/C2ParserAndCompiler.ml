@@ -275,7 +275,7 @@ let combine_prog_with_lprog
 let parse_and_compile_files files =
   let open Utils.Syntaxes.Result in
   (* Call CBMC ourselves *)
-  let path, annots_path =
+  let path, source_path =
     match files with
     | [ p ] -> (
         match Filename.extension p with
@@ -294,7 +294,7 @@ let parse_and_compile_files files =
       ()
   in
   let+ gil_lprog =
-    match annots_path with
+    match source_path with
     | Some path ->
         let+ lprog = parse_annots path in
         if Utils.(Exec_mode.is_verification_exec !Config.current_exec_mode) then
@@ -303,7 +303,7 @@ let parse_and_compile_files files =
     | None -> Ok None
   in
   let gil_lprog = Option.value ~default:Gil_logic_gen.empty gil_lprog in
-  ignore gil_lprog;
   let gil_prog = Compile.compile ctx in
   let gil_prog = combine_prog_with_lprog gil_prog gil_lprog in
-  create_compilation_result path goto_prog gil_prog
+  let source_path = Option.value ~default:path source_path in
+  create_compilation_result source_path goto_prog gil_prog
