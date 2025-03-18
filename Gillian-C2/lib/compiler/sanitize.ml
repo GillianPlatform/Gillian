@@ -90,6 +90,9 @@ let sanitize_stmt ~ctx = sanitizer#visit_stmt ~ctx
 let sanitize_param ~ctx (p : Param.t) =
   { p with identifier = Option.map (sanitize_symbol ~ctx) p.identifier }
 
+let sanitize_param_map ~ctx =
+  List.map (fun (a, b) -> (a, sanitize_symbol ~ctx b))
+
 (** Sanitizes every variable symbol symbol. *)
 let sanitize_and_index_program (prog : Program.t) =
   (* Create a second table with the new vars *)
@@ -122,6 +125,7 @@ let sanitize_and_index_program (prog : Program.t) =
             location = func.location;
             return_type = func.return_type;
             internal = func.internal;
+            param_map = sanitize_param_map ~ctx:prog func.param_map;
           }
       in
       Hashtbl.add new_funs new_name new_fun)

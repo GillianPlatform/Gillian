@@ -73,7 +73,7 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
       match gv.value with
       | None -> []
       | Some e ->
-          let v, v_init_cmds = compile_expr ~ctx e in
+          let v, v_init_cmds = compile_expr ~ctx ~pvar_map:[] e in
           let dst = Expr.EList [ loc; Expr.zero_i ] in
           let store_value =
             match v with
@@ -241,7 +241,8 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
       (free_locals @ [ b ~cmd_kind:Return ReturnNormal ])
   in
   let alloc_params = compile_alloc_params ~ctx proc_params |> List.map b in
-  let _, comp_body = compile_statement ~ctx body in
+  let pvar_map = func.param_map in
+  let (_, comp_body), _ = compile_statement ~ctx ~pvar_map body in
   let proc_body = alloc_params @ comp_body @ [ return_undef ] @ return_block in
   let proc_body =
     if is_internal then List.map (Body_item.with_cmd_kind Internal) proc_body
@@ -338,6 +339,7 @@ module Start_for_harness = struct
       body;
       location = harness.location;
       internal = true;
+      param_map = [];
     }
 
   let f ~ctx (harness : Program.Func.t) =

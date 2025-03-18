@@ -33,6 +33,7 @@ module Func = struct
     location : Location.t;
     symbol : string;
     internal : bool;
+    param_map : (string * string) list;
   }
 end
 
@@ -67,6 +68,13 @@ let add_struct_tag struct_tags (sym : Irep_lib.Symbol.t) =
    in
    Hashtbl.add struct_tags id typedef)
   |> ignore
+
+let mk_pvar_map params =
+  params
+  |> List.filter_map @@ fun Param.{ base_name; identifier; _ } ->
+     match (base_name, identifier) with
+     | Some b, Some i -> Some (b, i)
+     | _ -> None
 
 let of_symtab ~machine (symtab : Symtab.t) : t =
   let env =
@@ -109,6 +117,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
                    | Expr _ ->
                        Gerror.unexpected "function body is not a statment"
                  in
+                 let param_map = mk_pvar_map params in
                  let func =
                    Func.
                      {
@@ -118,6 +127,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
                        location;
                        body;
                        internal = false;
+                       param_map;
                      }
                  in
                  let () =

@@ -266,6 +266,7 @@ module Program : sig
       location : Location.t;
       symbol : string;
       internal : bool;
+      param_map : (string * string) list;
     }
   end
 
