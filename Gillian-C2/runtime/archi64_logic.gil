@@ -1,0 +1,10 @@
+pred i__is_int (n: Int):
+  (-2147483648i i<=# n * n < 2147483647i);
+
+pred i__is_long (n: Int):
+  (-9223372036854775808i i<=# n * n < 9223372036854775807i);
+
+pred i__malloced(+p: List, bytes: Int):
+  i__ptr(p, #l, 0i) *
+  <mem_single>(#l, -8i, "int64"; bytes, "Freeable") *
+  <mem_bounds>(#l; {{ -8i, bytes }});

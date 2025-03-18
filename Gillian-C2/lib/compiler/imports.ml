@@ -24,6 +24,8 @@ let all_imports =
     { file = "internal_stdlib.gil"; arch = any_arch; exec = all_exec };
     { file = "rust_allocation_internals.gil"; arch = any_arch; exec = all_exec };
     { file = "string.gil"; arch = any_arch; exec = all_exec };
+    { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
+    { file = "archi64_logic.gil"; arch = a64; exec = exec_with_preds };
   ]
 
 let imports arch exec_mode =
