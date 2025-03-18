@@ -9,6 +9,8 @@ type t = TypeDef__.expr =
   | UnOp of UnOp.t * t  (** Unary operators         *)
   | BinOp of t * BinOp.t * t  (** Binary operators        *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
+  | LstSwap of t * t * t
+      (** [LstSwap (list, i, j)] is the list obtained from swapping elements [i] and [j] in [list] *)
   | NOp of NOp.t * t list  (** n-ary operators         *)
   | EList of t list  (** Lists of expressions    *)
   | ESet of t list  (** Sets of expressions     *)
@@ -311,6 +313,10 @@ let rec map_opt
             match (map_e e1, map_e e2, map_e e3) with
             | Some e1', Some e2', Some e3' -> Some (LstSub (e1', e2', e3'))
             | _ -> None)
+        | LstSwap (e1, e2, e3) -> (
+            match (map_e e1, map_e e2, map_e e3) with
+            | Some e1', Some e2', Some e3' -> Some (LstSwap (e1', e2', e3'))
+            | _ -> None)
         | NOp (op, les) -> aux les (fun les -> NOp (op, les))
         | EList les -> aux les (fun les -> EList les)
         | ESet les -> aux les (fun les -> ESet les)
@@ -341,6 +347,7 @@ let rec pp fmt e =
           Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
       | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
+  | LstSwap (e1, e2, e3) -> Fmt.pf fmt "l-swap(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
   | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
   | EList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
@@ -422,6 +429,7 @@ let rec is_concrete (le : t) : bool =
   | UnOp (_, e) -> loop [ e ]
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
+  | LstSwap (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
 
 let is_concrete_zero_i (le : t) : bool =

@@ -135,6 +135,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LSTNTH
 %token LSTREPEAT
 %token LSTSUB
+%token LSTSWP
 %token STRNTH
 %token BIND
 %token EXISTENTIALS
@@ -414,6 +415,8 @@ expr_target:
      { Expr.BinOp (e1, LstRepeat, e2) }
   | LSTSUB; LBRACE; e1=expr_target; COMMA; e2=expr_target; COMMA; e3 = expr_target; RBRACE
     { Expr.LstSub (e1, e2, e3) }
+  | LSTSWP; LBRACE; e1=expr_target; COMMA; e2=expr_target; COMMA; e3 = expr_target; RBRACE
+    { Expr.LstSwap (e1, e2, e3)}
 (* nop le *)
   | nop=nop_target; LBRACE; les=separated_list(COMMA, expr_target); RBRACE
      {

@@ -235,6 +235,7 @@ rule read = parse
   | "l-len"              { GIL_Parser.LSTLEN }
   | "l-rev"              { GIL_Parser.LSTREV }
   | "l-sub"              { GIL_Parser.LSTSUB }
+  | "l-swap"             { GIL_Parser.LSTSWP }
   | "s-len"              { GIL_Parser.STRLEN }
 (* Expression keywords *)
   | "l-nth"              { GIL_Parser.LSTNTH }

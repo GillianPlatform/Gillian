@@ -88,6 +88,27 @@ let list_sub l ofs len =
   in
   aux l 0 []
 
+let list_swap l i j =
+  if i < 0 || j < 0 then failwith "list_swap: negative index";
+  let rec swap_1 l k v =
+    match (l, k) with
+    | [], _ -> failwith "list_swap: index out of bounds"
+    | x :: r, 0 -> (x, v :: r)
+    | x :: r, k ->
+        let v', r' = swap_1 r (k - 1) v in
+        (v', x :: r')
+  in
+  let rec aux l i j =
+    (* We ensure that i < j *)
+    match (l, i) with
+    | [], _ -> failwith "list_swap: index out of bounds"
+    | x :: r, 0 ->
+        let v, r' = swap_1 r (j - 1) x in
+        v :: r'
+    | x :: r, i -> x :: aux r (i - 1) (j - 1)
+  in
+  if i == j then l else if i < j then aux l i j else aux l j i
+
 (** Makes a list of a repeated element *)
 let make n el =
   let rec aux acc i = if i <= 0 then acc else aux (el :: acc) (i - 1) in

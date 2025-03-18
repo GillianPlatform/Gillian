@@ -141,7 +141,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     | UnOp (_, e) -> f e
     | BinOp (e1, _, e2) -> join [ e1; e2 ]
     | NOp (_, le) | EList le | ESet le -> join le
-    | LstSub (e1, e2, e3) ->
+    | LstSub (e1, e2, e3) | LstSwap (e1, e2, e3) ->
         let result = join [ e1; e2; e3 ] in
         L.verbose (fun fmt ->
             fmt "Missing for %a: %a" Expr.full_pp e
@@ -263,6 +263,11 @@ let rec learn_expr
       | true, true | false, false -> []
       | true, false -> f (BinOp (base_expr, IMinus, e1)) e2
       | false, true -> f (BinOp (base_expr, IMinus, e2)) e1)
+  | LstSwap (l, i, j) -> (
+      (* If we know i and j, we can reconstruct the l, because swapping is involutive *)
+      match (is_known_expr kb l, is_known_expr kb i, is_known_expr kb j) with
+      | false, true, true -> f (Expr.LstSwap (base_expr, i, j)) l
+      | _, _, _ -> [])
   (* Floating-point minus is invertible in two different ways *)
   | BinOp (e1, FMinus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)

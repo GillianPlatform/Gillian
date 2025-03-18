@@ -256,6 +256,8 @@ module Expr : sig
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)
+    | LstSwap of t * t * t
+        (** [LstSwap (list, i, j)] is the list obtained from swapping elements [i] and [j] in [list] *)
     | NOp of NOp.t * t list  (** n-ary operators ({!type:NOp.t}) *)
     | EList of t list  (** Lists of expressions *)
     | ESet of t list  (** Sets of expressions *)
@@ -1401,6 +1403,7 @@ module Visitors : sig
          ; visit_LstRepeat : 'c -> BinOp.t -> BinOp.t
          ; visit_LstRev : 'c -> UnOp.t -> UnOp.t
          ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
+         ; visit_LstSwap : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
          ; visit_M_abs : 'c -> UnOp.t -> UnOp.t
          ; visit_M_acos : 'c -> UnOp.t -> UnOp.t
          ; visit_M_asin : 'c -> UnOp.t -> UnOp.t
@@ -1671,6 +1674,7 @@ module Visitors : sig
     method visit_LstRepeat : 'c -> BinOp.t -> BinOp.t
     method visit_LstRev : 'c -> UnOp.t -> UnOp.t
     method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
+    method visit_LstSwap : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
     method visit_M_abs : 'c -> UnOp.t -> UnOp.t
     method visit_M_acos : 'c -> UnOp.t -> UnOp.t
     method visit_M_asin : 'c -> UnOp.t -> UnOp.t
@@ -1941,6 +1945,7 @@ module Visitors : sig
          ; visit_LstRepeat : 'c -> 'f
          ; visit_LstRev : 'c -> 'f
          ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
+         ; visit_LstSwap : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
          ; visit_M_abs : 'c -> 'f
          ; visit_M_acos : 'c -> 'f
          ; visit_M_asin : 'c -> 'f
@@ -2179,6 +2184,7 @@ module Visitors : sig
     method visit_LstRepeat : 'c -> 'f
     method visit_LstRev : 'c -> 'f
     method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
+    method visit_LstSwap : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
     method visit_M_abs : 'c -> 'f
     method visit_M_acos : 'c -> 'f
     method visit_M_asin : 'c -> 'f
@@ -2424,6 +2430,7 @@ module Visitors : sig
          ; visit_LstRepeat : 'c -> unit
          ; visit_LstRev : 'c -> unit
          ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
+         ; visit_LstSwap : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
          ; visit_M_abs : 'c -> unit
          ; visit_M_acos : 'c -> unit
          ; visit_M_asin : 'c -> unit
@@ -2666,6 +2673,7 @@ module Visitors : sig
     method visit_LstRepeat : 'c -> unit
     method visit_LstRev : 'c -> unit
     method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
+    method visit_LstSwap : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
     method visit_M_abs : 'c -> unit
     method visit_M_acos : 'c -> unit
     method visit_M_asin : 'c -> unit

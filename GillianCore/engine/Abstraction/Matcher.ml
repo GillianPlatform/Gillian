@@ -2287,19 +2287,26 @@ module Make (State : SState.S) :
         match lhs_states with
         | [] -> Fmt.kstr L.fail "wand lhs is False!"
         | [ lhs_state ] -> (
-          (* We add (persistent) knowledge from lhs state to current state *)
-          let lhs_pfs = State.get_pfs lhs_state.state |> PFS.to_list in
-          let lhs_alocs =
-            List.fold_left
-              (fun acc pf -> SS.union acc (Formula.alocs pf))
-              SS.empty lhs_pfs
-          in
-          let current_sstate =  State.add_spec_vars astate.state lhs_alocs in 
-          match State.assume_a ~matching:true ~production:true current_sstate lhs_pfs with
-          | Some current_sstate ->
-            { lhs_state; current_state = { astate with state = current_sstate }; subst }
-          | None ->
-            Fmt.kstr L.fail "Wand lhs pure contradicts with current state!")
+            (* We add (persistent) knowledge from lhs state to current state *)
+            let lhs_pfs = State.get_pfs lhs_state.state |> PFS.to_list in
+            let lhs_alocs =
+              List.fold_left
+                (fun acc pf -> SS.union acc (Formula.alocs pf))
+                SS.empty lhs_pfs
+            in
+            let current_sstate = State.add_spec_vars astate.state lhs_alocs in
+            match
+              State.assume_a ~matching:true ~production:true current_sstate
+                lhs_pfs
+            with
+            | Some current_sstate ->
+                {
+                  lhs_state;
+                  current_state = { astate with state = current_sstate };
+                  subst;
+                }
+            | None ->
+                Fmt.kstr L.fail "Wand lhs pure contradicts with current state!")
         | _ :: _ ->
             Fmt.kstr L.fail "Wand lhs produced %d states!@\n%a"
               (List.length lhs_states)

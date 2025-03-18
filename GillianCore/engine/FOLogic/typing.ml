@@ -152,6 +152,8 @@ module Infer_types_to_gamma = struct
         tt = ListType && List.for_all (fun x -> f x ListType) les
     | LstSub (le1, le2, le3) ->
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
+    | LstSwap (le1, le2, le3) ->
+        tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
     | Exists (bt, le) ->
@@ -449,7 +451,7 @@ module Type_lexpr = struct
             (* | _ -> infer_type le NumberType constraints *))
     | _, _ -> def_neg
 
-  and type_lstsub gamma le1 le2 le3 =
+  and type_lstsub_lstswap gamma le1 le2 le3 =
     let f = f gamma in
     let infer_type = infer_type gamma in
     let _, ite1 = f le1 in
@@ -506,7 +508,8 @@ module Type_lexpr = struct
       | NOp (LstCat, les) ->
           let all_typable = typable_list ?target_type:(Some ListType) les in
           if all_typable then (Some ListType, true) else def_neg
-      | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
+      | LstSub (le1, le2, le3) -> type_lstsub_lstswap gamma le1 le2 le3
+      | LstSwap (le1, le2, le3) -> type_lstsub_lstswap gamma le1 le2 le3
     in
 
     result

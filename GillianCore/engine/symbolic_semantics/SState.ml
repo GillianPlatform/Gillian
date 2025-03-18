@@ -257,6 +257,7 @@ module Make (SMemory : SMemory.S) :
         | ESet es -> ESet (List.map f es)
         | NOp (op, es) -> NOp (op, List.map f es)
         | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)
+        | LstSwap (e1, e2, e3) -> LstSwap (f e1, f e2, f e3)
         (* Exists. We can just evaluate pvars because they cannot be quantified *)
         | Exists (bt, e) -> Exists (bt, f e)
         | EForall (bt, e) -> EForall (bt, f e)

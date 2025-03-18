@@ -135,6 +135,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | EList lst -> EList (List.map f lst)
     | ESet lst -> ESet (List.map f lst)
     | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
+    | LstSwap (le1, le2, le3) -> LstSwap (f le1, f le2, f le3)
     | Exists (bt, le) -> Exists (bt, f le)
     | EForall (bt, le) -> EForall (bt, f le)
     (*
@@ -1440,6 +1441,17 @@ and reduce_lexpr_loop
             eqs
         in
         f (List.hd cat)
+    | LstSwap (l, i, j) -> (
+        let fl, fi, fj = (f l, f i, f j) in
+        if Expr.equal fi fj then fl
+        else
+          match (fl, fl, fj) with
+          | EList les, Lit (Int i), Lit (Int j) ->
+              let new_list =
+                List_utils.list_swap les (Z.to_int i) (Z.to_int j)
+              in
+              EList new_list
+          | _ -> LstSwap (fl, fi, fj))
     | LstSub (e1, Lit (Int z), e3)
       when Z.equal z Z.zero
            && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> f e1
@@ -2567,8 +2579,9 @@ let rec reduce_formula_loop
           Eq (e, Lit (Num 0.))
       | Eq (BinOp (Lit (Int x), ITimes, e), Lit (Int z))
         when Z.equal z Z.zero && not (Z.equal x Z.zero) -> Eq (e, Expr.zero_i)
-      | Eq (lst, NOp (LstCat, [Expr.EList [ head ]; Expr.UnOp (Cdr, lst')])) when Expr.equal lst lst' ->
-        (* lst == ([head] @ (cdr lst)) *)
+      | Eq (lst, NOp (LstCat, [ Expr.EList [ head ]; Expr.UnOp (Cdr, lst') ]))
+        when Expr.equal lst lst' ->
+          (* lst == ([head] @ (cdr lst)) *)
           let open Formula.Infix in
           head #== (Expr.list_nth lst 0)
       | Eq (Lit (LList ll), Lit (LList lr)) -> if ll = lr then True else False

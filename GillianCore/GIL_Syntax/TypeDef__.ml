@@ -138,6 +138,7 @@ and expr =
   | UnOp of unop * expr
   | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr
+  | LstSwap of expr * expr * expr
   | NOp of nop * expr list
   | EList of expr list
   | ESet of expr list

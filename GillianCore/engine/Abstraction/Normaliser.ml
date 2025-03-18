@@ -182,7 +182,8 @@ module Make (SPState : PState.S) = struct
                             expression")
                   | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
                   | Exists _ | EForall _ -> Lit (Type BooleanType)
-                  | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
+                  | EList _ | LstSub _ | NOp (LstCat, _) | LstSwap _ ->
+                      Lit (Type ListType)
                   | NOp (_, _) | ESet _ -> Lit (Type SetType))
               | _ -> UnOp (uop, nle1)))
       | EList le_list ->
@@ -217,6 +218,17 @@ module Make (SPState : PState.S) = struct
           | _, Lit (Num _), Lit (Num _) ->
               raise (Failure "Sublist indexes non-integer")
           | _, _, _ -> LstSub (nle1, nle2, nle3))
+      | LstSwap (l, i, j) -> (
+          let fl, fi, fj = (f l, f i, f j) in
+          if Expr.equal fi fj then fl
+          else
+            match (fl, fl, fj) with
+            | EList les, Lit (Int i), Lit (Int j) ->
+                let new_list =
+                  List_utils.list_swap les (Z.to_int i) (Z.to_int j)
+                in
+                EList new_list
+            | _ -> LstSwap (fl, fi, fj))
       | Exists (bt, e) -> (
           let new_gamma = Type_env.copy gamma in
           List.iter

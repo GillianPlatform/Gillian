@@ -268,6 +268,53 @@ module Axiomatised_operations = struct
   let num2int = mk_fun_decl "num2int" [ t_real ] t_real
   let snth = mk_fun_decl "s-nth" [ t_int; t_real ] t_int
   let lrev = mk_fun_decl "l-rev" [ t_gil_literal_list ] t_gil_literal_list
+
+  let lswap =
+    let lswap =
+      mk_fun_decl "l-swap"
+        [ t_gil_literal_list; t_int; t_int ]
+        t_gil_literal_list
+    in
+    (* We need to only activate axioms when relevant... *)
+    let _axioms =
+      let l = atom "l" in
+      let i = atom "i" in
+      let j = atom "j" in
+      let same_length =
+        forall
+          [ ("l", t_gil_literal_list); ("i", t_int); ("j", t_int) ]
+          (eq (seq_len (lswap $$ [ l; i; j ])) (seq_len l))
+      in
+      let same_elements =
+        let l = atom "l" in
+        let i = atom "i" in
+        let j = atom "j" in
+        let k = atom "k" in
+        forall
+          [ ("l", t_gil_literal_list); ("i", t_int); ("j", t_int) ]
+          (forall
+             [ ("k", t_int) ]
+             (bool_ors
+                [
+                  eq i k;
+                  eq j k;
+                  eq (seq_nth (lswap $$ [ l; i; j ]) k) (seq_nth l k);
+                ]))
+      in
+      let swapped =
+        let l = atom "l" in
+        let i = atom "i" in
+        let j = atom "j" in
+        forall
+          [ ("l", t_gil_literal_list); ("i", t_int); ("j", t_int) ]
+          (bool_and
+             (eq (seq_nth (lswap $$ [ l; i; j ]) i) (seq_nth l j))
+             (eq (seq_nth (lswap $$ [ l; i; j ]) j) (seq_nth l i)))
+      in
+      List.map assume [ same_length; same_elements; swapped ]
+    in
+    (* init_decls := axioms @ !init_decls; *)
+    lswap
 end
 
 let t_gil_ext_literal = Ext_lit_operations.t_gil_ext_literal
@@ -765,6 +812,14 @@ let rec encode_logical_expression
       let start = get_int start in
       let len = get_int len in
       seq_extract lst start len >- ListType
+  | LstSwap (lst, i, j) ->
+      let>- lst = f lst in
+      let>- i = f i in
+      let>- j = f j in
+      let lst = get_list lst in
+      let i = get_int i in
+      let j = get_int j in
+      Axiomatised_operations.lswap $$ [ lst; i; j ] >- ListType
   | Exists (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:exists ~gamma ~llen_lvars ~list_elem_vars bt e

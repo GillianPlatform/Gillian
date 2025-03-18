@@ -533,6 +533,24 @@ and evaluate_lstsub (store : CStore.t) (e1 : Expr.t) (e2 : Expr.t) (e3 : Expr.t)
   | _ ->
       raise (Exceptions.Impossible "eval_expr concrete: lstsub type mismatch")
 
+and evaluate_lstswap
+    (store : CStore.t)
+    (e1 : Expr.t)
+    (e2 : Expr.t)
+    (e3 : Expr.t) : CVal.M.t =
+  let ee = evaluate_expr store in
+  let ve1 = ee e1 in
+  let ve2 = ee e2 in
+  let ve3 = ee e3 in
+  match (ve1, ve2, ve3) with
+  | LList les, Int i1, Int i2 ->
+      let i1 = Z.to_int i1 in
+      let i2 = Z.to_int i2 in
+      let swap_list = List_utils.list_swap les i1 i2 in
+      LList swap_list
+  | _ ->
+      raise (Exceptions.Impossible "eval_expr concrete: lstswap type mismatch")
+
 and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
   try
     let ee = evaluate_expr store in
@@ -553,6 +571,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | NOp (nop, le) -> evaluate_nop nop (List.map ee le)
     | EList ll -> evaluate_elist store ll
     | LstSub (e1, e2, e3) -> evaluate_lstsub store e1 e2 e3
+    | LstSwap (e1, e2, e3) -> evaluate_lstswap store e1 e2 e3
     | ALoc _ | LVar _ | ESet _ | Exists _ | EForall _ ->
         raise
           (Exceptions.Impossible "eval_expr concrete: aloc, lvar, set or exists")
