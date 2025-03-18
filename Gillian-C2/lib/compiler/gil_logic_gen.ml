@@ -264,8 +264,10 @@ let trans_unop : CUnOp.t -> UnOp.t = function
 let trans_nop : CNOp.t -> NOp.t = function
   | SetUnion -> SetUnion
 
-let trans_simpl_expr : CSimplExpr.t -> Expr.t = function
-  | PVar s -> PVar s
+let trans_simpl_expr ~pvar_map : CSimplExpr.t -> Expr.t = function
+  | PVar s ->
+      let s' = List.assoc_opt s pvar_map |> Option.value ~default:s in
+      PVar s'
   | LVar s -> LVar s
   | Loc s -> Lit (Loc s)
   | Int i -> Lit (Int i)
@@ -275,11 +277,11 @@ let trans_simpl_expr : CSimplExpr.t -> Expr.t = function
 (* The first element of the result should be a pure assertion : either a formula, or overlapping assertions,
    The second element is the list of created variables, the third is the expression to be used
 *)
-let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
+let trans_sval ~pvar_map (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
   let tnum = types Type.NumberType in
   let tint = types Type.IntType in
   let tloc = types Type.ObjectType in
-  let tse = trans_simpl_expr in
+  let tse = trans_simpl_expr ~pvar_map in
   match sv with
   | Sint se | Slong se ->
       let eg = tse se in
@@ -297,27 +299,28 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
 
 (** Returns assertions that are necessary to define the expression,
       the created variable for binding when necessary, and the used expression *)
-let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
+let rec trans_expr ~pvar_map (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
+  let te = trans_expr ~pvar_map in
   match e with
-  | CExpr.SExpr se -> ([], [], trans_simpl_expr se)
-  | SVal sv -> trans_sval sv
+  | CExpr.SExpr se -> ([], [], trans_simpl_expr ~pvar_map se)
+  | SVal sv -> trans_sval ~pvar_map sv
   | EList el ->
-      let asrt, vars, elp = split3_expr_comp (List.map trans_expr el) in
+      let asrt, vars, elp = split3_expr_comp (List.map te el) in
       (asrt, vars, Expr.EList elp)
   | ESet es ->
-      let asrt, vars, elp = split3_expr_comp (List.map trans_expr es) in
+      let asrt, vars, elp = split3_expr_comp (List.map te es) in
       (asrt, vars, Expr.ESet elp)
   | BinOp (e1, LstCat, e2) ->
-      let a1, v1, eg1 = trans_expr e1 in
-      let a2, v2, eg2 = trans_expr e2 in
+      let a1, v1, eg1 = te e1 in
+      let a2, v2, eg2 = te e2 in
       (a1 @ a2, v1 @ v2, Expr.list_cat eg1 eg2)
   | BinOp (e1, LstCons, e2) ->
-      let a1, v1, eg1 = trans_expr e1 in
-      let a2, v2, eg2 = trans_expr e2 in
+      let a1, v1, eg1 = te e1 in
+      let a2, v2, eg2 = te e2 in
       (a1 @ a2, v1 @ v2, Expr.list_cat (EList [ eg1 ]) eg2)
   | BinOp (e1, PtrPlus, e2) -> (
-      let a1, v1, ptr = trans_expr e1 in
-      let a2, v2, to_add = trans_expr e2 in
+      let a1, v1, ptr = te e1 in
+      let a2, v2, to_add = te e2 in
       match ptr with
       | Expr.EList [ loc; ofs ] ->
           (a1 @ a2, v1 @ v2, Expr.EList [ loc; Expr.Infix.( + ) ofs to_add ])
@@ -328,64 +331,67 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
             res_lvar :: (v1 @ v2),
             res ))
   | BinOp (e1, b, e2) ->
-      let a1, v1, eg1 = trans_expr e1 in
-      let a2, v2, eg2 = trans_expr e2 in
+      let a1, v1, eg1 = te e1 in
+      let a2, v2, eg2 = te e2 in
       (a1 @ a2, v1 @ v2, BinOp (eg1, trans_binop b, eg2))
   | UnOp (u, e) ->
-      let a, v, eg = trans_expr e in
+      let a, v, eg = te e in
       (a, v, UnOp (trans_unop u, eg))
   | NOp (nop, el) ->
-      let asrt, vs, elp = split3_expr_comp (List.map trans_expr el) in
+      let asrt, vs, elp = split3_expr_comp (List.map te el) in
       let gnop = trans_nop nop in
       (asrt, vs, Expr.NOp (gnop, elp))
   | LstSub (lst, start, len) ->
-      let a1, v1, lst = trans_expr lst in
-      let a2, v2, start = trans_expr start in
-      let a3, v3, len = trans_expr len in
+      let a1, v1, lst = te lst in
+      let a2, v2, start = te start in
+      let a3, v3, len = te len in
       (a1 @ a2 @ a3, v1 @ v2 @ v3, Expr.list_sub ~lst ~start ~size:len)
 
-let rec trans_form : CFormula.t -> Asrt.t * Var.t list * Expr.t = function
+let rec trans_form ~pvar_map (f : CFormula.t) : Asrt.t * Var.t list * Expr.t =
+  let te = trans_expr ~pvar_map in
+  let tf = trans_form ~pvar_map in
+  match f with
   | True -> ([], [], Expr.true_)
   | False -> ([], [], Expr.false_)
   | Eq (ce1, ce2) ->
-      let f1, v1, eg1 = trans_expr ce1 in
-      let f2, v2, eg2 = trans_expr ce2 in
+      let f1, v1, eg1 = te ce1 in
+      let f2, v2, eg2 = te ce2 in
       (f1 @ f2, v1 @ v2, eg1 == eg2)
   | LessEq (ce1, ce2) ->
-      let f1, v1, eg1 = trans_expr ce1 in
-      let f2, v2, eg2 = trans_expr ce2 in
+      let f1, v1, eg1 = te ce1 in
+      let f2, v2, eg2 = te ce2 in
       (f1 @ f2, v1 @ v2, eg1 <= eg2)
   | Less (ce1, ce2) ->
-      let f1, v1, eg1 = trans_expr ce1 in
-      let f2, v2, eg2 = trans_expr ce2 in
+      let f1, v1, eg1 = te ce1 in
+      let f2, v2, eg2 = te ce2 in
       (f1 @ f2, v1 @ v2, eg1 < eg2)
   | SetMem (ce1, ce2) ->
-      let f1, v1, eg1 = trans_expr ce1 in
-      let f2, v2, eg2 = trans_expr ce2 in
+      let f1, v1, eg1 = te ce1 in
+      let f2, v2, eg2 = te ce2 in
       (f1 @ f2, v1 @ v2, BinOp (eg1, SetMem, eg2))
   | Not fp ->
-      let a, v, fpp = trans_form fp in
+      let a, v, fpp = tf fp in
       (a, v, not fpp)
   | Or (f1, f2) ->
-      let a1, v1, fp1 = trans_form f1 in
-      let a2, v2, fp2 = trans_form f2 in
+      let a1, v1, fp1 = tf f1 in
+      let a2, v2, fp2 = tf f2 in
       (a1 @ a2, v1 @ v2, fp1 || fp2)
   | And (f1, f2) ->
-      let a1, v1, fp1 = trans_form f1 in
-      let a2, v2, fp2 = trans_form f2 in
+      let a1, v1, fp1 = tf f1 in
+      let a2, v2, fp2 = tf f2 in
       (a1 @ a2, v1 @ v2, fp1 && fp2)
   | Implies (f1, f2) ->
-      let a1, v1, fp1 = trans_form f1 in
-      let a2, v2, fp2 = trans_form f2 in
+      let a1, v1, fp1 = tf f1 in
+      let a2, v2, fp2 = tf f2 in
       (a1 @ a2, v1 @ v2, fp1 ==> fp2)
   | ForAll (lvts, f) ->
-      let a, v, fp = trans_form f in
+      let a, v, fp = tf f in
       (a, v, ForAll (lvts, fp))
 
 let malloc_chunk_asrt loc beg_ofs struct_sz =
   Constr.Others.malloced ~ptr:(loc, beg_ofs) ~total_size:struct_sz
 
-let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
+let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) ~pvar_map s c =
   let malloc =
     match typ with
     | Malloced -> true
@@ -393,9 +399,8 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
   in
   let gen_loc_var () = Expr.LVar (fresh_lvar ()) in
   let gen_ofs_var () = Expr.LVar (fresh_lvar ()) in
-  let cse = trans_simpl_expr in
-  (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
-  (* let zero = mk_num 0 in *)
+  let te = trans_expr ~pvar_map in
+  let tse = trans_simpl_expr ~pvar_map in
   let ptr_call p l o = Asrt.Pred (Internal_Predicates.ptr_get, [ p; l; o ]) in
   let sz x = CSVal.size_of ~ctx x |> Z.of_int in
   let interpret_s ~typ s =
@@ -419,7 +424,7 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
         let ofsv = Expr.int 0 in
         ([], loc, ofsv)
     | _ ->
-        let a_s, _, s_e = trans_expr s in
+        let a_s, _, s_e = te s in
         let locv = gen_loc_var () in
         let ofsv = gen_ofs_var () in
         let pc = ptr_call s_e locv ofsv in
@@ -437,15 +442,15 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
   | ConsExpr (SVal (Slong v as se)) ->
       let chunk = CSVal.chunk_of ~ctx se in
       let asrtfn = types (CSVal.gil_type_of se) in
-      let sval = cse v in
+      let sval = tse v in
       let siz = sz se in
       let ga =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval ~perm:(Some Freeable)
       in
       [ ga; asrtfn sval; malloc_chunk siz ] @ to_assert
   | ConsExpr (SVal (Sptr (sl, so) as se)) ->
-      let l = cse sl in
-      let o = cse so in
+      let l = tse sl in
+      let o = tse so in
       let chunk = CSVal.chunk_of ~ctx se in
       let siz = sz (Sptr (sl, so)) in
       let sval = mk_ptr l o in
@@ -471,22 +476,25 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) s c =
         let type_ = Ctx.tag_lookup ctx ("tag-" ^ sname) in
         Ctx.size_of ctx type_ |> Z.of_int
       in
-      let more_asrt, _, params_fields =
-        split3_expr_comp (List.map trans_expr el)
-      in
+      let more_asrt, _, params_fields = split3_expr_comp (List.map te el) in
       let pr =
         Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields) :: more_asrt
       in
       pr @ to_assert @ [ malloc_chunk size ]
 
-let rec trans_asrt ~ctx asrt =
+let rec trans_asrt ~ctx ~pvar_map asrt =
+  let ta = trans_asrt ~ctx ~pvar_map in
+  let te = trans_expr ~pvar_map in
   let a =
     match asrt with
-    | CAssert.Star (a1, a2) -> trans_asrt ~ctx a1 @ trans_asrt ~ctx a2
+    | CAssert.Star (a1, a2) ->
+        let a1 = ta a1 in
+        let a2 = ta a2 in
+        a1 @ a2
     | Array { ptr; chunk; size; content; malloced } ->
-        let a1, _, ptr = trans_expr ptr in
-        let a2, _, size = trans_expr size in
-        let a3, _, content = trans_expr content in
+        let a1, _, ptr = te ptr in
+        let a2, _, size = te size in
+        let a3, _, content = te content in
         let malloc_p =
           if malloced then
             let csize = Expr.int (Chunk.size chunk) in
@@ -498,33 +506,35 @@ let rec trans_asrt ~ctx asrt =
         @ [ Constr.Others.array_ptr ~ptr ~chunk ~size ~content ]
         @ malloc_p
     | Malloced (e1, e2) ->
-        let a1, _, ce1 = trans_expr e1 in
-        let a2, _, ce2 = trans_expr e2 in
+        let a1, _, ce1 = te e1 in
+        let a2, _, ce2 = te e2 in
         a1 @ a2 @ [ Constr.Others.malloced_abst ~ptr:ce1 ~total_size:ce2 ]
     | Zeros (e1, e2) ->
-        let a1, _, ce1 = trans_expr e1 in
-        let a2, _, ce2 = trans_expr e2 in
+        let a1, _, ce1 = te e1 in
+        let a2, _, ce2 = te e2 in
         a1 @ a2 @ [ Constr.Others.zeros_ptr_size ~ptr:ce1 ~size:ce2 ]
     | Undefs (e1, e2) ->
-        let a1, _, ce1 = trans_expr e1 in
-        let a2, _, ce2 = trans_expr e2 in
+        let a1, _, ce1 = te e1 in
+        let a2, _, ce2 = te e2 in
         a1 @ a2 @ [ Constr.Others.undefs_ptr_size ~ptr:ce1 ~size:ce2 ]
     | Pure f ->
-        let ma, _, fp = trans_form f in
+        let ma, _, fp = trans_form ~pvar_map f in
         Pure fp :: ma
     | Pred (p, cel) ->
-        let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
+        let ap, _, gel = split3_expr_comp (List.map te cel) in
         Pred (p, gel) :: ap
     | Emp -> [ Asrt.Emp ]
-    | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~ctx ~typ s c
+    | PointsTo { ptr = s; constr = c; typ } ->
+        trans_constr ~pvar_map ~ctx ~typ s c
   in
   match List.filter (fun x -> x <> Asrt.Emp) a with
   | [] -> [ Asrt.Emp ]
   | a -> a
 
-let rec trans_lcmd ~ctx lcmd =
+let rec trans_lcmd ~ctx ~pvar_map lcmd =
+  let trans_expr = trans_expr ~pvar_map in
   let trans_lcmd = trans_lcmd in
-  let trans_asrt = trans_asrt in
+  let trans_asrt = trans_asrt ~pvar_map in
   let make_assert ~bindings = function
     | [] | [ Asrt.Emp ] -> []
     | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
@@ -544,11 +554,11 @@ let rec trans_lcmd ~ctx lcmd =
   | Unfold_all pred_name -> `Normal [ SL (GUnfold pred_name) ]
   | Assert (a, ex) -> `Normal [ SL (SepAssert (trans_asrt ~ctx a, ex)) ]
   | Branch f ->
-      let to_assert, bindings, f_gil = trans_form f in
+      let to_assert, bindings, f_gil = trans_form ~pvar_map f in
       `Normal (make_assert ~bindings to_assert @ [ Branch f_gil ])
   | If (e, cl1, cl2) ->
       let trans_normal_lcmd lcmd =
-        match trans_lcmd ~ctx lcmd with
+        match trans_lcmd ~ctx ~pvar_map lcmd with
         | `Normal x -> x
         | `Invariant _ ->
             Fmt.failwith "Invariant inside if/else in logic command"
@@ -603,7 +613,8 @@ let trans_abs_pred ~filepath cl_pred =
       pred_normalised = false;
     }
 
-let trans_pred ~ctx ~filepath cl_pred =
+let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
+  let ta = trans_asrt ~ctx ~pvar_map in
   let CPred.
         {
           name = pred_name;
@@ -620,10 +631,10 @@ let trans_pred ~ctx ~filepath cl_pred =
     List.map
       (fun (d, a) ->
         match d with
-        | None -> (None, trans_asrt ~ctx a)
+        | None -> (None, ta a)
         | Some da ->
             let ada, gda = trans_asrt_annot da in
-            (Some gda, ada @ trans_asrt ~ctx a))
+            (Some gda, ada @ ta a))
       definitions
   in
   Pred.
@@ -645,13 +656,13 @@ let trans_pred ~ctx ~filepath cl_pred =
       pred_normalised = false;
     }
 
-let add_trans_pred ~ctx filepath ann cl_pred =
-  { ann with preds = trans_pred ~ctx ~filepath cl_pred :: ann.preds }
+let add_trans_pred ~ctx ~pvar_map filepath ann cl_pred =
+  { ann with preds = trans_pred ~ctx ~pvar_map ~filepath cl_pred :: ann.preds }
 
 let add_trans_abs_pred filepath ann cl_pred =
   { ann with preds = trans_abs_pred ~filepath cl_pred :: ann.preds }
 
-let trans_sspec ~ctx sspecs =
+let trans_sspec ~ctx ~pvar_map sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
   let tap, spa =
     match spec_annot with
@@ -660,7 +671,7 @@ let trans_sspec ~ctx sspecs =
         let a, (label, exs) = trans_asrt_annot spa in
         (a, Some (label, exs))
   in
-  let ta = trans_asrt ~ctx in
+  let ta = trans_asrt ~ctx ~pvar_map in
   Spec.
     {
       ss_pre = (tap @ ta pre, None);
@@ -672,10 +683,10 @@ let trans_sspec ~ctx sspecs =
       ss_label = spa;
     }
 
-let trans_lemma ~ctx ~filepath lemma =
+let trans_lemma ~ctx ~pvar_map ~filepath lemma =
   let CLemma.{ name; params; hypothesis; conclusions; proof } = lemma in
-  let trans_asrt = trans_asrt ~ctx in
-  let trans_lcmd = trans_lcmd ~ctx in
+  let trans_asrt = trans_asrt ~pvar_map ~ctx in
+  let trans_lcmd = trans_lcmd ~pvar_map ~ctx in
   let make_post p = (trans_asrt p, None) in
   let lemma_hyp = (trans_asrt hypothesis, None) in
   let lemma_concs = List.map make_post conclusions in
@@ -705,12 +716,17 @@ let trans_lemma ~ctx ~filepath lemma =
 
 let trans_spec ~ctx ?(only_spec = false) cl_spec =
   let CSpec.{ fname; params; sspecs } = cl_spec in
+  let pvar_map =
+    let f = Hashtbl.find ctx.Ctx.prog.funs fname in
+    f.param_map
+  in
+  let spec_params = List.map (fun p -> List.assoc p pvar_map) params in
   let result =
     Spec.
       {
         spec_name = fname;
-        spec_params = params;
-        spec_sspecs = List.map (trans_sspec ~ctx) sspecs;
+        spec_params;
+        spec_sspecs = List.map (trans_sspec ~ctx ~pvar_map) sspecs;
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
@@ -736,17 +752,20 @@ let add_trans_only_spec ~ctx ann cl_spec =
     onlyspecs = trans_spec ~ctx ~only_spec:true cl_spec :: ann.onlyspecs;
   }
 
-let add_trans_lemma ~ctx filepath ann cl_lemma =
-  { ann with lemmas = trans_lemma ~ctx ~filepath cl_lemma :: ann.lemmas }
+let add_trans_lemma ~ctx ~pvar_map filepath ann cl_lemma =
+  {
+    ann with
+    lemmas = trans_lemma ~ctx ~pvar_map ~filepath cl_lemma :: ann.lemmas;
+  }
 
-let trans_annots ~(ctx : Ctx.t) (lprog : C2_lprog.t) filepath =
+let trans_annots ~(ctx : Ctx.t) ?(pvar_map = []) (lprog : C2_lprog.t) filepath =
   let structs_not_annot = get_structs_not_annot ctx in
   let struct_annots =
     List.fold_left (gen_pred_of_struct ctx) empty structs_not_annot
   in
   let with_preds =
     List.fold_left
-      (add_trans_pred ~ctx filepath)
+      (add_trans_pred ~ctx ~pvar_map filepath)
       struct_annots lprog.CProg.preds
   in
   let with_abs_preds =
@@ -755,7 +774,9 @@ let trans_annots ~(ctx : Ctx.t) (lprog : C2_lprog.t) filepath =
       with_preds lprog.CProg.abs_preds
   in
   let with_lemmas =
-    List.fold_left (add_trans_lemma ~ctx filepath) with_abs_preds lprog.lemmas
+    List.fold_left
+      (add_trans_lemma ~ctx ~pvar_map filepath)
+      with_abs_preds lprog.lemmas
   in
   let with_specs =
     List.fold_left (add_trans_spec ~ctx) with_lemmas lprog.specs
