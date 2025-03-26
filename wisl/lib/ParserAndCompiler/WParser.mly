@@ -38,7 +38,7 @@
 %token <CodeLoc.t * string> STRING
 
 (* Binary operators *)
-%token EQUAL           /* = */
+%token EQUAL           /* == */
 %token LESSTHAN        /* < */
 %token GREATERTHAN     /* > */
 %token LESSEQUAL       /* <= */
@@ -62,23 +62,13 @@
 %token WAND           /* -*   */
 %token ARROW          /* ->   */
 %token BLOCK_ARROW    /* -b-> */
-%token LAND           /* /\   */
-%token LOR            /* \/   */
-%token LEQ            /* ==   */
-%token LLESS          /* <#   */
-%token LLESSEQ        /* <=#  */
-%token LGREATER       /* >#   */
-%token LGREATEREQ     /* >=#  */
 
 (* Logic *)
-%token <CodeLoc.t> EMP LTRUE LFALSE LSTNIL LNOT
+%token <CodeLoc.t> EMP LSTNIL
 %token <CodeLoc.t * string> LVAR
 
 (* Precedence *)
-%left LOR
-%left LAND separating_conjunction
-%nonassoc LEQ LLESS LLESSEQ LGREATER LGREATEREQ
-%nonassoc LNOT
+%left separating_conjunction
 %left OR
 %left AND
 %nonassoc EQUAL NEQ
@@ -535,50 +525,50 @@ logic_pure_formula:
     { let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.get la in
       WLFormula.make bare_form loc }
-  | le1 = logic_expression; LEQ; le2 = logic_expression
+  | le1 = logic_expression; EQUAL; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LEq (le1, le2) in
       WLFormula.make bare_form loc }
-  | le1 = logic_expression; LLESS; le2 = logic_expression
+  | le1 = logic_expression; LESSTHAN; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LLess (le1, le2) in
       WLFormula.make bare_form loc }
-  | le1 = logic_expression; LLESSEQ; le2 = logic_expression
+  | le1 = logic_expression; LESSEQUAL; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LLessEq (le1, le2) in
       WLFormula.make bare_form loc }
-  | le1 = logic_expression; LGREATEREQ; le2 = logic_expression
+  | le1 = logic_expression; GREATEREQUAL; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LGreaterEq (le1, le2) in
       WLFormula.make bare_form loc }
-  | le1 = logic_expression; LGREATER; le2 = logic_expression
+  | le1 = logic_expression; GREATERTHAN; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LGreater (le1, le2) in
       WLFormula.make bare_form loc }
-  | lstart = LNOT; la = logic_pure_formula
+  | lstart = NOT; la = logic_pure_formula
     { let bare_form = WLFormula.LNot la in
       let lend = WLFormula.get_loc la in
       let loc = CodeLoc.merge lstart lend in
       WLFormula.make bare_form loc }
-  | la1 = logic_pure_formula; LAND; la2 = logic_pure_formula
+  | la1 = logic_pure_formula; AND; la2 = logic_pure_formula
     { let lstart, lend = WLFormula.get_loc la1, WLFormula.get_loc la2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LAnd (la1, la2) in
       WLFormula.make bare_form loc }
-  | la1 = logic_pure_formula; LOR; la2 = logic_pure_formula
+  | la1 = logic_pure_formula; OR; la2 = logic_pure_formula
     { let lstart, lend = WLFormula.get_loc la1, WLFormula.get_loc la2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LOr (la1, la2) in
       WLFormula.make bare_form loc }
-  | loc = LTRUE
+  | loc = TRUE
     { let bare_form = WLFormula.LTrue in
       WLFormula.make bare_form loc }
-  | loc = LFALSE
+  | loc = FALSE
     { let bare_form = WLFormula.LFalse in
       WLFormula.make bare_form loc }
 
