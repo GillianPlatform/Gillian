@@ -30,8 +30,8 @@ module Error = struct
         Fmt.pf fmt "Analysis failures!\n%a\n"
           (Fmt.list ~sep:(Fmt.any "\n") Fmt.string)
           msgs
-    | CompilationError { msg; _ } ->
-        Fmt.pf fmt "Error during compilation.\n%s" msg
+    | CompilationError { msg; loc; _ } ->
+        Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc msg
     | OperationError o -> Fmt.pf fmt "%s" o
     | InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
 
