@@ -6,7 +6,7 @@ type tt =
   | LPointsTo of WLExpr.t * WLExpr.t list
       (** x -> a, b <=> (x -> a) * (x+1 -> b) *)
   | LBlockPointsTo of WLExpr.t * WLExpr.t list
-  | LPure of WLFormula.t
+  | LPure of WLExpr.t
 
 and t
 
@@ -20,7 +20,7 @@ val get_vars_and_lvars : t -> Set.Make(String).t * Set.Make(String).t
 val get_by_id :
   int ->
   t ->
-  [> `None | `WLExpr of WLExpr.t | `WLFormula of WLFormula.t | `WLAssert of t ]
+  [> `None | `WLExpr of WLExpr.t | `WLAssert of t ]
 
 val pp : Format.formatter -> t -> unit
 val str : t -> string

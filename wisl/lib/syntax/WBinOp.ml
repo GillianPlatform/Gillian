@@ -1,5 +1,4 @@
 type t =
-  | NEQ
   | EQUAL
   | LESSTHAN
   | GREATERTHAN
@@ -35,7 +34,6 @@ let pp fmt b =
   | MOD -> s "%"
   | AND -> s "&&"
   | OR -> s "||"
-  | NEQ -> s "!="
   | LSTCAT -> s "@"
   | LSTCONS -> s "::"
   | LSTNTH -> s "lnth"

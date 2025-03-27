@@ -149,10 +149,10 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
 (* compile_lexpr : WLExpr.t -> (string list * Asrt.t list * Expr.t)
     compiles a WLExpr into an output expression and a list of Global Assertions.
     the string list contains the name of the variables that are generated. They are existentials. *)
-let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
+let rec compile_lexpr  ?(fname = "main") (lexpr : WLExpr.t) :
     string list * Asrt.t * Expr.t =
   let gen_str = Generators.gen_str fname in
-  let compile_lexpr = compile_lexpr ~fname in
+  let compile_lexpr = compile_lexpr  ~fname in
   let expr_pname_of_binop b =
     WBinOp.(
       match b with
@@ -179,13 +179,6 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     | LVal v -> ([], [], Expr.Lit (compile_val v))
     | PVar x -> ([], [], Expr.PVar x)
     | LVar x -> ([], [], Expr.LVar x)
-    | LBinOp (e1, WBinOp.NEQ, e2) ->
-        let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
-        let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
-        let expr =
-          Expr.UnOp (UnOp.Not, Expr.BinOp (comp_expr1, BinOp.Equal, comp_expr2))
-        in
-        (gvars1 @ gvars2, asrtl1 @ asrtl2, expr)
     | LBinOp (e1, b, e2) when is_internal_pred b ->
         (* Operator corresponds to pointer arithmetics *)
         let lout = gen_str sgvar in
@@ -236,61 +229,11 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         in
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
 
-(* TODO: compile_lformula should return also the list of created existentials *)
-let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =
-  let gen_str = Generators.gen_str fname in
-  let compile_lformula = compile_lformula ~fname in
-  let compile_lexpr = compile_lexpr ~fname in
-  WLFormula.(
-    match get formula with
-    | LTrue -> ([], Expr.true_)
-    | LFalse -> ([], Expr.false_)
-    | LNot lf ->
-        let a1, c1 = compile_lformula lf in
-        (a1, UnOp (Not, c1))
-    | LAnd (lf1, lf2) ->
-        let a1, c1 = compile_lformula lf1 in
-        let a2, c2 = compile_lformula lf2 in
-        (a1 @ a2, BinOp (c1, And, c2))
-    | LOr (lf1, lf2) ->
-        let a1, c1 = compile_lformula lf1 in
-        let a2, c2 = compile_lformula lf2 in
-        (a1 @ a2, BinOp (c1, Or, c2))
-    | LEq (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        (a1 @ a2, BinOp (c1, Equal, c2))
-    | LLess (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
-    | LGreater (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
-    | LLessEq (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_leq, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
-    | LGreaterEq (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_geq, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_)))
-
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lassert = compile_lassert ~fname in
   let gen_str = Generators.gen_str fname in
   let compile_lexpr = compile_lexpr ~fname in
-  let compile_lformula = compile_lformula ~fname in
   let gil_add e k =
     (* builds GIL expression that is e + k *)
     let k_e = Expr.int k in
@@ -391,8 +334,12 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let al = List.concat (al1 @ al2) in
         (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
     | LPure lf ->
-        let al, f = compile_lformula lf in
-        ([], Asrt.Pure f :: al))
+        let _, al, e = compile_lexpr lf in
+        let e = match e with
+        | LVar _ -> Expr.BinOp (e, Equal, Expr.true_)
+        | _ -> e
+        in
+        ([], Asrt.Pure e :: al))
 
 let rec compile_lcmd ?(fname = "main") lcmd =
   let compile_lassert = compile_lassert ~fname in
@@ -486,7 +433,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         let px = WLExpr.PVar x in
         let px = WLExpr.make px invariant_loc in
         let lx = WLExpr.make lx invariant_loc in
-        let f = WLFormula.make (LEq (px, lx)) invariant_loc in
+        let f = WLExpr.make (LBinOp (px, EQUAL, lx)) invariant_loc in
         let new_a = WLAssert.make (LPure f) invariant_loc in
         match WLAssert.get acc with
         | LEmp -> new_a
@@ -515,8 +462,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     let post_guard =
       WLAssert.make
         (LPure
-           (WLFormula.not
-              (WLFormula.lexpr_is_true ~codeloc:guard_loc
+           (WLExpr.not
+              (WLExpr.as_bool_fml ~codeloc:guard_loc
                  (WLExpr.from_expr guard))))
         guard_loc
     in
@@ -527,12 +474,14 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         let new_name = if List.mem x var_exs then new_lv x else old_lv x in
         make_lexpr (LVar new_name)
       in
+      let ret_list = make_lexpr (LEList (List.map make_pvar_lexpr vars)) in
       WLAssert.make
         (LPure
-           (WLFormula.make
-              (LEq
+           (WLExpr.make
+              (LBinOp
                  ( make_var_lexpr "ret",
-                   make_lexpr (LEList (List.map make_pvar_lexpr vars)) ))
+                   EQUAL,
+                   ret_list ))
               while_loc))
         while_loc
     in
@@ -1040,7 +989,7 @@ let preprocess_lemma
         let ex = WLExpr.make (PVar x) lemma_loc in
         let elx = WLExpr.make (LVar lvarx) lemma_loc in
         Hashtbl.replace param_subst x (WLExpr.LVar lvarx);
-        let formula = WLFormula.make (LEq (ex, elx)) lemma_loc in
+        let formula = WLExpr.make (LBinOp (ex, EQUAL, elx)) lemma_loc in
         WLAssert.make (LPure formula) lemma_loc)
       lemma_params lvar_params
   in

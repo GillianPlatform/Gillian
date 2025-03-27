@@ -19,5 +19,4 @@ val get_by_id :
   [> `None
   | `WLAssert of WLAssert.t
   | `WLExpr of WLExpr.t
-  | `WLFormula of WLFormula.t
   | `WPred of t ]

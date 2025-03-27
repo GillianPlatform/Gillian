@@ -105,7 +105,6 @@
 %type <WLCmd.t list>                               proof_def
 %type <(string * WType.t option) * bool>           pred_param_ins
 %type <CodeLoc.t * string list>                    bindings_with_loc
-%type <WLFormula.t>                                logic_pure_formula
 %type <WLExpr.t>                                   logic_expression
 %type <WBinOp.t>                                   logic_binop
 %type <CodeLoc.t * WVal.t>                         logic_value_with_loc
@@ -294,6 +293,13 @@ expression:
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       WExpr.make bare_expr loc } %prec binop_prec
+  | e1 = expression; NEQ; e2 = expression
+    { let bare_expr = WExpr.BinOp (e1, EQUAL, e2) in
+      let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
+      let loc = CodeLoc.merge lstart lend in
+      let expr = WExpr.make bare_expr loc in
+      let bare_expr = WExpr.UnOp (NOT, expr) in
+      WExpr.make bare_expr loc } %prec binop_prec
   | lu = unop_with_loc; e = expression
     { let (lstart, u) = lu in
       let bare_expr = WExpr.UnOp (u, e) in
@@ -314,7 +320,6 @@ binop:
   | MOD          { WBinOp.MOD }
   | AND          { WBinOp.AND }
   | OR           { WBinOp.OR }
-  | NEQ          { WBinOp.NEQ }
 
 unop_with_loc:
   | loc = NOT  { (loc, WUnOp.NOT) }
@@ -515,62 +520,21 @@ logic_assertion:
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-  | formula = logic_pure_formula
+  | lstart = LBRACE; formula = logic_expression; lend = RBRACE;
     { let bare_assert = WLAssert.LPure formula in
-      let loc = WLFormula.get_loc formula in
+      let loc = CodeLoc.merge lstart lend in
+      WLAssert.make bare_assert loc }
+  | loc = TRUE
+    { let bare_lexpr = WLExpr.LVal (WVal.Bool true) in
+      let lexpr = WLExpr.make bare_lexpr loc in
+      let bare_assert = WLAssert.LPure lexpr in
+      WLAssert.make bare_assert loc }
+  | loc = FALSE
+    { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
+      let lexpr = WLExpr.make bare_lexpr loc in
+      let bare_assert = WLAssert.LPure lexpr in
       WLAssert.make bare_assert loc }
 
-logic_pure_formula:
-  | lstart = LBRACE; la = logic_pure_formula; lend = RBRACE;
-    { let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.get la in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; EQUAL; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LEq (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LESSTHAN; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LLess (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LESSEQUAL; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LLessEq (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; GREATEREQUAL; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LGreaterEq (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; GREATERTHAN; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LGreater (le1, le2) in
-      WLFormula.make bare_form loc }
-  | lstart = NOT; la = logic_pure_formula
-    { let bare_form = WLFormula.LNot la in
-      let lend = WLFormula.get_loc la in
-      let loc = CodeLoc.merge lstart lend in
-      WLFormula.make bare_form loc }
-  | la1 = logic_pure_formula; AND; la2 = logic_pure_formula
-    { let lstart, lend = WLFormula.get_loc la1, WLFormula.get_loc la2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LAnd (la1, la2) in
-      WLFormula.make bare_form loc }
-  | la1 = logic_pure_formula; OR; la2 = logic_pure_formula
-    { let lstart, lend = WLFormula.get_loc la1, WLFormula.get_loc la2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LOr (la1, la2) in
-      WLFormula.make bare_form loc }
-  | loc = TRUE
-    { let bare_form = WLFormula.LTrue in
-      WLFormula.make bare_form loc }
-  | loc = FALSE
-    { let bare_form = WLFormula.LFalse in
-      WLFormula.make bare_form loc }
 
 
 logic_expression:
@@ -594,7 +558,14 @@ logic_expression:
     { let bare_lexpr = WLExpr.LBinOp (e1, b, e2) in
       let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
-      WLExpr.make bare_lexpr loc } %prec binop_prec
+      WLExpr.make bare_lexpr loc }
+  | e1 = logic_expression; NEQ; e2 = logic_expression
+    { let bare_lexpr = WLExpr.LBinOp (e1, EQUAL, e2) in
+      let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
+      let loc = CodeLoc.merge lstart lend in
+      let expr = WLExpr.make bare_lexpr loc in
+      let bare_lexpr = WLExpr.LUnOp (NOT, expr) in
+      WLExpr.make bare_lexpr loc }
   | lstart = SUB; LBRACE; e1 = logic_expression; COMMA; e2 = logic_expression; COMMA; e3 = logic_expression; lend = RBRACE {
       let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LLSub(e1, e2, e3) in
