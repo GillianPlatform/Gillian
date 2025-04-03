@@ -34,7 +34,7 @@ lemma lseg_to_sll {
 
   proof:
     unfold lseg(x, null, alpha);
-    if (!(x == null)) {
+    if (x != null) {
       assert {bind:  #next, #beta} (x + 1 -> #next) * lseg(#next, null, #beta) ;
       apply lseg_to_sll(#next, #beta);
       fold sll(x, #alpha)
@@ -54,7 +54,7 @@ lemma concat_lseg_sll {
     if (y == null) {
       apply lseg_to_sll(x, alpha)
     } else {
-      assert (!(y == null));
+      assert (y != null);
       unfold sll(y, beta);
       assert {bind: #z, #t, #rest} (y -> #z, #t) * sll(#t, #rest) * (beta == #z::#rest);
       apply lseg_append(x, y, alpha, #z, #t);
@@ -69,7 +69,7 @@ lemma lseg_append {
 
   proof:
     unfold lseg(x, y, alpha);
-    if (!(alpha == [])) {
+    if (alpha != []) {
       assert {bind: #next, #beta} (x + 1 -> #next) * lseg(#next, y, #beta) ;
       apply lseg_append(#next, y, #beta, yval, ynext);
       fold lseg(x, ynext, alpha @ [yval])
@@ -87,7 +87,7 @@ function cc_slist_new() {
 }
 { cc_sll(ret, []) }
 
-{ (v == #v) * cc_sll(#v, #vs) * (x == #x) }
+{ (v == #v) * (x == #x) * cc_sll(#v, #vs) }
 function cc_slist_add_first(v, x) {
   node := new(2);
   [node] := x;
@@ -134,7 +134,7 @@ function cc_slist_add_last(v, x)
 }
 { cc_sll(ret, #vs @ [ #x ]) }
 
-{ (v == #v) * (i == #i) * cc_sll(#v, #vs) * (0 <= #i) * (#i < (len #vs)) * (!(#vs == nil)) }
+{ (v == #v) * (i == #i) * cc_sll(#v, #vs) * (0 <= #i) * (#i < (len #vs)) * (#vs != nil) }
 function get_node_at(v, i) {
     size := [v];
     if (i >= size) {
@@ -143,7 +143,10 @@ function get_node_at(v, i) {
       node := [v + 1];
       prev := null;
       j := 0;
-      [[ invariant (node == #vs lnth j) ]];
+      [[ assert {bind: #beta, #last } (#h == n) * lseg(#h, #t, #beta) * sll(#t, #end) ]];
+      [[ apply concat_lseg_sll(#h, #t, #beta, #end) ]];
+      [[ invariant {bind: node, j, #end, #next}
+        (node -b> #vs lnth j, #next) * sll(node, #end) ]];
       while (j < i) {
           prev := node;
           node := [node + 1];
@@ -155,7 +158,7 @@ function get_node_at(v, i) {
     };
     return r
 }
-{ (ret -b> #node, #prev) * cc_sll(#v, #vs) * (#node == #vs lnth #i) }
+{ (ret -b> #val, #prev) * cc_sll(#v, #vs) * (#val == #vs lnth #i) }
 
 
 { cc_sll(v, #vs) }
@@ -192,7 +195,7 @@ function unlinkn_all(v) {
       sll(n, #w) *
       (size == len #w) *
       v -b> size, #h, #t ]];
-    while (!(n == null)) {
+    while (n != null) {
       [[ assert {bind: #fst, #rest} (#w == #fst::#rest) ]];
       tmp := [n + 1];
       free(n);
@@ -206,4 +209,4 @@ function unlinkn_all(v) {
   };
   return non_emp
 }
-{ (ret == (!(#vs == []))) * (#v -b> 0, #h, #t) }
+{ (ret == (#vs != [])) * (#v -b> 0, #h, #t) }
