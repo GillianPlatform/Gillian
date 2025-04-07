@@ -4,6 +4,7 @@ type t = {
   context : WFun.t list;
   predicates : WPred.t list;
   lemmas : WLemma.t list;
+  datatypes : WDatatype.t list;
 }
 
 let get_context p = p.context

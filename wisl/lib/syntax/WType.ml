@@ -8,6 +8,7 @@ type t =
   | WInt
   | WAny
   | WSet
+  | WDatatype of string
 
 (** Are types t1 and t2 compatible *)
 let compatible t1 t2 =
@@ -36,6 +37,7 @@ let pp fmt t =
   | WInt -> s "Int"
   | WAny -> s "Any"
   | WSet -> s "Set"
+  | WDatatype t -> s t
 
 let to_gil = function
   | WList -> Gil_syntax.Type.ListType

@@ -27,7 +27,9 @@ let compile_type t =
     | WPtr -> Some Type.ObjectType
     | WInt -> Some Type.IntType
     | WSet -> Some Type.SetType
-    | WAny -> None)
+    | WAny -> None
+    | WDatatype _ -> None)
+(*TODO ??*)
 
 let compile_binop b =
   WBinOp.(
@@ -1144,7 +1146,8 @@ let compile_lemma
       lemma_existentials;
     }
 
-let compile ~filepath WProg.{ context; predicates; lemmas } =
+let compile ~filepath WProg.{ context; predicates; lemmas; _ } =
+  (* TODO: Compile user defined datatypes *)
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in

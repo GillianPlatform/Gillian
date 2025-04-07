@@ -37,6 +37,7 @@ rule read =
   | "dispose"{ DELETE (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
   | "predicate" { PREDICATE (curr lexbuf) }
+  | "datatype" { DATATYPE (curr lexbuf) }
   | "invariant" { INVARIANT (curr lexbuf) }
   | "return" { RETURN (curr lexbuf) }
   | "fold"   { FOLD (curr lexbuf) }
@@ -59,6 +60,7 @@ rule read =
   | "Int" { TINT (curr lexbuf) }
   | "Bool" { TBOOL (curr lexbuf) }
   | "String" { TSTRING (curr lexbuf) }
+  | "Any" { TANY (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }

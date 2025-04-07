@@ -2,7 +2,7 @@
 
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
-%token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
+%token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA DATATYPE
 %token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
@@ -29,6 +29,7 @@
 %token <CodeLoc.t> TINT
 %token <CodeLoc.t> TBOOL
 %token <CodeLoc.t> TSTRING
+%token <CodeLoc.t> TANY
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -95,51 +96,57 @@
 %start <WProg.t> prog
 %start <WLAssert.t> assert_only
 
-%type <WFun.t list * WPred.t list * WLemma.t list> definitions
-%type <WFun.t>                                     fct_with_specs
-%type <WFun.t>                                     fct
-%type <WPred.t>                                    predicate
-%type <WLemma.t>                                   lemma
-%type <string list>                                var_list
-%type <WStmt.t list * WExpr.t>                     statement_list_and_return
-%type <WStmt.t list>                               statement_list
-%type <WExpr.t>                                    expression
-%type <WExpr.t list>                               expr_list
-%type <WLCmd.t>                                    logic_command
-%type <WLAssert.t>                                 logic_assertion
-%type <CodeLoc.t * WVal.t>                         value_with_loc
-%type <CodeLoc.t * WUnOp.t>                        unop_with_loc
-%type <WBinOp.t>                                   binop
-%type <WLExpr.t>                                   variant_def
-%type <WLExpr.t>                                   with_variant_def
-%type <WLCmd.t list>                               proof_def
-%type <(string * WType.t option) * bool>           pred_param_ins
-%type <CodeLoc.t * string list>                    bindings_with_loc
-%type <WLFormula.t>                                logic_pure_formula
-%type <WLExpr.t>                                   logic_expression
-%type <WBinOp.t>                                   logic_binop
-%type <CodeLoc.t * WVal.t>                         logic_value_with_loc
+%type <WFun.t list * WPred.t list * WLemma.t list * WDatatype.t list> definitions
+%type <WFun.t>                                                        fct_with_specs
+%type <WFun.t>                                                        fct
+%type <WPred.t>                                                       predicate
+%type <WLemma.t>                                                      lemma
+%type <WDatatype.t>                                                   datatype
+%type <string list>                                                   var_list
+%type <WStmt.t list * WExpr.t>                                        statement_list_and_return
+%type <WStmt.t list>                                                  statement_list
+%type <WExpr.t>                                                       expression
+%type <WExpr.t list>                                                  expr_list
+%type <WLCmd.t>                                                       logic_command
+%type <WLAssert.t>                                                    logic_assertion
+%type <CodeLoc.t * WVal.t>                                            value_with_loc
+%type <CodeLoc.t * WUnOp.t>                                           unop_with_loc
+%type <WBinOp.t>                                                      binop
+%type <WLExpr.t>                                                      variant_def
+%type <WLExpr.t>                                                      with_variant_def
+%type <WLCmd.t list>                                                  proof_def
+%type <(string * WType.t option) * bool>                              pred_param_ins
+%type <CodeLoc.t * string list>                                       bindings_with_loc
+%type <WLFormula.t>                                                   logic_pure_formula
+%type <WLExpr.t>                                                      logic_expression
+%type <WBinOp.t>                                                      logic_binop
+%type <CodeLoc.t * WVal.t>                                            logic_value_with_loc
+%type <WConstructor.t>                                                constructor
+%type <WType.t list>                                                  constructor_fields
 %%
 
 prog:
-  | fcp = definitions; EOF {
-    let (fc, preds, lemmas) = fcp in
-    WProg.{ lemmas = lemmas; predicates = preds; context = fc } }
+  | defs = definitions; EOF {
+    let (fc, preds, lemmas, datatypes) = defs in
+    WProg.{ lemmas = lemmas; predicates = preds; context = fc; datatypes = datatypes } }
 
 assert_only:
   | la = logic_assertion; EOF { la }
 
 definitions:
-  | (* empty *) { ([], [], []) }
-  | fpdcl = definitions; p = predicate
-    { let (fs, ps,ls) = fpdcl in
-      (fs, p::ps, ls) }
-  | fpdcl = definitions; l = lemma
-    { let (fs, ps, ls) = fpdcl in
-      (fs, ps, l::ls) }
-  | fpdcl = definitions; f = fct_with_specs
-    { let (fs, ps, ls) = fpdcl in
-      (f::fs, ps, ls) }
+  | (* empty *) { ([], [], [], []) }
+  | defs = definitions; p = predicate
+    { let (fs, ps, ls, ds) = defs in
+      (fs, p::ps, ls, ds) }
+  | defs = definitions; l = lemma
+    { let (fs, ps, ls, ds) = defs in
+      (fs, ps, l::ls, ds) }
+  | defs = definitions; f = fct_with_specs
+    { let (fs, ps, ls, ds) = defs in
+      (f::fs, ps, ls, ds) }
+  | defs = definitions; d = datatype
+    { let (fs, ps, ls, ds) = defs in
+      (fs, ps, ls, d::ds) }
 
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
@@ -195,6 +202,8 @@ type_target:
   | TINT { WType.WInt }
   | TBOOL { WType.WBool }
   | TSTRING { WType.WString }
+  | TANY { WType.WAny }
+  | datatype = IDENTIFIER { let (_, datatype) = datatype in WType.WDatatype datatype }
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -388,7 +397,7 @@ predicate:
       (* ins looks like [Some 0, Some 2] *)
       let ins = List.map Option.get ins in
       (* ins looks like [0, 2] *)
-  		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
+      let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
       (* if ins is empty then everything is an in *)
       let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
@@ -640,3 +649,28 @@ logic_value_with_loc:
     { let (_, vl) = List.split lvl in
       let loc = CodeLoc.merge lstart lend in
       (loc, WVal.VList vl) } */
+
+
+(* ADT definitions *)
+
+datatype:
+  | lstart = DATATYPE; name = IDENTIFIER; LCBRACE;
+    constructors = separated_nonempty_list(SEMICOLON, constructor);
+    lend = RCBRACE;
+    {
+      let (_, name) = name in
+      let loc = CodeLoc.merge lstart lend in
+      WDatatype.{
+        name;
+        constructors;
+        loc;
+      }
+    }
+
+constructor:
+  | name = IDENTIFIER; fields = option(constructor_fields)
+    { let (_, name) = name in WConstructor.{name; fields = Option.value ~default:[] fields} }
+
+constructor_fields:
+  | LBRACE; args = separated_list(COMMA, type_target); RBRACE
+    { args }

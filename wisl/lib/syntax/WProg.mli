@@ -2,6 +2,7 @@ type t = {
   context : WFun.t list;
   predicates : WPred.t list;
   lemmas : WLemma.t list;
+  datatypes : WDatatype.t list;
 }
 
 val get_context : t -> WFun.t list

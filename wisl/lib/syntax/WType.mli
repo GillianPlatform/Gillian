@@ -1,4 +1,13 @@
-type t = WList | WNull | WBool | WString | WPtr | WInt | WAny | WSet
+type t =
+  | WList
+  | WNull
+  | WBool
+  | WString
+  | WPtr
+  | WInt
+  | WAny
+  | WSet
+  | WDatatype of string
 
 val compatible : t -> t -> bool
 val strongest : t -> t -> t
