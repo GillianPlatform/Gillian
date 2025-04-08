@@ -1,0 +1,27 @@
+
+// Define a list ADT for use in specification language
+datatype MyList {
+  Nil;
+  Cons(Any, MyList)
+}
+
+
+//
+// Standard over-approximating SLL predicate with contents
+//
+predicate SLL(+x, vs) {
+  // Empty SLL
+  (x == null) * (vs == Nil);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL(#next, #vs) *
+  (vs == Cons(#v, #vs))
+}
+
+//
+// Pure predicate for list membership
+//
+predicate list_member(+vs, +v, r : Bool){
+  (vs == Nil) * (r == false);
+  (vs == Cons(v, #rest)) * (r == true) * list_member(#rest, v, #mem);
+  (vs == Cons(#v, #rest)) * (! (#v == v)) * list_member(#rest, v, r)
+}

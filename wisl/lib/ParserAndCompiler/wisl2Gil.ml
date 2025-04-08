@@ -236,7 +236,10 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)
         in
-        (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
+        (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs)
+    | LConstructor _ ->
+        (* TODO *)
+        failwith "TODO")
 
 (* TODO: compile_lformula should return also the list of created existentials *)
 let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =

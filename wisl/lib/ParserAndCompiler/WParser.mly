@@ -632,6 +632,11 @@ logic_expression:
     { let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LESet l in
       WLExpr.make bare_lexpr loc }
+  | lname = IDENTIFIER; LBRACE; l = separated_list(COMMA, logic_expression); lend = RBRACE
+    { let (lstart, name) = lname in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LConstructor (name, l) in
+      WLExpr.make bare_lexpr loc }
 
 
 (* We also have lists in the logic *)

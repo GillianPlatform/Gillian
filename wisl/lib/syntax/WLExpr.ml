@@ -9,6 +9,8 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
+  (* TODO: Double check handling of LConstructor in functions that manipulate WLExpr *)
+  | LConstructor of string * t list
 
 and t = { wleid : int; wleloc : CodeLoc.t; wlenode : tt }
 
@@ -71,6 +73,10 @@ let rec pp fmt lexpr =
   | LESet lel ->
       WPrettyUtils.pp_list ~pre:(format_of_string "@[-{")
         ~suf:(format_of_string "}-@]") pp fmt lel
+  | LConstructor (name, lel) ->
+      Format.fprintf fmt "@[%s" name;
+      WPrettyUtils.pp_list ~pre:(format_of_string "(")
+        ~suf:(format_of_string ")@]") ~empty:(format_of_string "@]") pp fmt lel
 
 let str = Format.asprintf "%a" pp
 
@@ -87,5 +93,6 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
     | LLSub (e1, e2, e3) -> LLSub (f e1, f e2, f e3)
     | LEList le -> LEList (List.map f le)
     | LESet le -> LESet (List.map f le)
+    | LConstructor (name, le) -> LConstructor (name, List.map f le)
   in
   { wleid; wleloc; wlenode }
