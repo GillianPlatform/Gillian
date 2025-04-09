@@ -239,6 +239,21 @@ and lemma = {
   lemma_existentials : string list;
 }
 
+and datatype = {
+  datatype_name : string;
+  datatype_source_path : string option;
+  datatype_loc : location option;
+  datatype_constructors : constructor list;
+}
+
+and constructor = {
+  constructor_name : string;
+  constructor_source_path : string option;
+  constructor_loc : location option;
+  constructor_num_fields : int;
+  constructor_fields : typ list;
+}
+
 and single_spec = {
   ss_pre : assertion * location option;
   ss_posts : (assertion * location option) list;

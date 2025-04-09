@@ -1061,6 +1061,8 @@ let trans_program
         imports = [];
         lemmas = Hashtbl.create 1;
         preds = Hashtbl.create 1;
+        datatypes = Hashtbl.create 1;
+        constructors = Hashtbl.create 1;
         only_specs = Hashtbl.create 1;
         macros = Hashtbl.create 1;
         bi_specs = make_hashtbl (fun p -> p.BiSpec.bispec_name) bi_specs;

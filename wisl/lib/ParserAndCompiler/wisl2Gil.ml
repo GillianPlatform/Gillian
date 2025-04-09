@@ -1201,4 +1201,5 @@ let compile ~filepath WProg.{ context; predicates; lemmas; _ } =
     ~imports:(List.map (fun imp -> (imp, false)) WislConstants.internal_imports)
     ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
     ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
-    ~predecessors:(Hashtbl.create 1) ()
+    ~predecessors:(Hashtbl.create 1) () (* TODO *)
+    ~datatypes:(Hashtbl.create 1) ~constructors:(Hashtbl.create 1)

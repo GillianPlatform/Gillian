@@ -722,6 +722,25 @@ module Lemma : sig
   val add_param_bindings : t -> t
 end
 
+module Datatype : sig
+  type t = {
+    datatype_name : string;
+    datatype_source_path : string option;
+    datatype_loc : Location.t option;
+    datatype_constructors : Constructor.t list;
+  }
+end
+
+module Constructor : sig
+  type t = {
+    constructor_name : string;
+    constructor_source_path : string option;
+    constructor_loc : Location.t option;
+    constructor_num_fields : int;
+    constructor_fields : Type.t list;
+  }
+end
+
 (** @canonical Gillian.Gil_syntax.Macro *)
 module Macro : sig
   (** GIL Macros *)
@@ -951,6 +970,8 @@ module Prog : sig
         (** List of imported GIL files, and whether each has to be verified *)
     lemmas : (string, Lemma.t) Hashtbl.t;  (** Lemmas *)
     preds : (string, Pred.t) Hashtbl.t;  (** Predicates *)
+    datatypes : (string, Datatype.t) Hashtbl.t;
+    constructors : (string, Constructor.t) Hashtbl.t;
     only_specs : (string, Spec.t) Hashtbl.t;
         (** Specs without function definitions *)
     procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Proceudes *)
@@ -966,6 +987,8 @@ module Prog : sig
     imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
+    datatypes:(string, Datatype.t) Hashtbl.t ->
+    constructors:(string, Constructor.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     procs:(string, ('annot, 'label) Proc.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
@@ -981,6 +1004,8 @@ module Prog : sig
     imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
+    datatypes:(string, Datatype.t) Hashtbl.t ->
+    constructors:(string, Constructor.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
@@ -994,6 +1019,8 @@ module Prog : sig
     predecessors:(string * int * int * int) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
+    datatypes:(string, Datatype.t) Hashtbl.t ->
+    constructors:(string, Constructor.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
@@ -1344,6 +1371,8 @@ module Visitors : sig
          ; visit_position : 'c -> Location.position -> Location.position
          ; visit_location : 'c -> Location.t -> Location.t
          ; visit_constant : 'c -> Constant.t -> Constant.t
+         ; visit_constructor : 'c -> Constructor.t -> Constructor.t
+         ; visit_datatype : 'c -> Datatype.t -> Datatype.t
          ; visit_expr : 'c -> Expr.t -> Expr.t
          ; visit_flag : 'c -> Flag.t -> Flag.t
          ; visit_lcmd : 'c -> LCmd.t -> LCmd.t
@@ -1611,6 +1640,8 @@ module Visitors : sig
     method visit_position : 'c -> Location.position -> Location.position
     method visit_location : 'c -> Location.t -> Location.t
     method visit_constant : 'c -> Constant.t -> Constant.t
+    method visit_constructor : 'c -> Constructor.t -> Constructor.t
+    method visit_datatype : 'c -> Datatype.t -> Datatype.t
     method visit_expr : 'c -> Expr.t -> Expr.t
     method visit_flag : 'c -> Flag.t -> Flag.t
     method private visit_float : 'env. 'env -> float -> float
@@ -1862,6 +1893,8 @@ module Visitors : sig
          ; visit_position : 'c -> Location.position -> 'f
          ; visit_location : 'c -> Location.t -> 'f
          ; visit_constant : 'c -> Constant.t -> 'f
+         ; visit_constructor : 'c -> Constructor.t -> 'f
+         ; visit_datatype : 'c -> Datatype.t -> 'f
          ; visit_expr : 'c -> Expr.t -> 'f
          ; visit_flag : 'c -> Flag.t -> 'f
          ; visit_lcmd : 'c -> LCmd.t -> 'f
@@ -2085,6 +2118,8 @@ module Visitors : sig
     method visit_position : 'c -> Location.position -> 'f
     method visit_location : 'c -> Location.t -> 'f
     method visit_constant : 'c -> Constant.t -> 'f
+    method visit_constructor : 'c -> Constructor.t -> 'f
+    method visit_datatype : 'c -> Datatype.t -> 'f
     method visit_expr : 'c -> Expr.t -> 'f
     method visit_flag : 'c -> Flag.t -> 'f
     method visit_lcmd : 'c -> LCmd.t -> 'f
@@ -2306,6 +2341,8 @@ module Visitors : sig
          ; visit_position : 'c -> Location.position -> unit
          ; visit_location : 'c -> Location.t -> unit
          ; visit_constant : 'c -> Constant.t -> unit
+         ; visit_constructor : 'c -> Constructor.t -> unit
+         ; visit_datatype : 'c -> Datatype.t -> unit
          ; visit_expr : 'c -> Expr.t -> unit
          ; visit_flag : 'c -> Flag.t -> unit
          ; visit_lcmd : 'c -> LCmd.t -> unit
@@ -2542,6 +2579,8 @@ module Visitors : sig
     method visit_position : 'c -> Location.position -> unit
     method visit_location : 'c -> Location.t -> unit
     method visit_constant : 'c -> Constant.t -> unit
+    method visit_constructor : 'c -> Constructor.t -> unit
+    method visit_datatype : 'c -> Datatype.t -> unit
     method visit_expr : 'c -> Expr.t -> unit
     method visit_flag : 'c -> Flag.t -> unit
     method private visit_float : 'env. 'env -> float -> unit
