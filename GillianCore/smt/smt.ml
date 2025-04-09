@@ -778,6 +778,7 @@ let rec encode_logical_expression
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
+  | Constructor _ -> failwith "TODO" (* TODO *)
 
 let encode_assertion_top_level
     ~(gamma : typenv)

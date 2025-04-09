@@ -153,6 +153,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
           KB.add_seq (List.to_seq bt |> Seq.map (fun (x, _) -> Expr.LVar x)) kb
         in
         f' kb' e
+    | Constructor _ -> failwith "TODO" (* TODO *)
 
 (** [is_known kb e] returns true if the expression [e] is known
     under knowledge base [kb], and false otherwise *)
@@ -170,6 +171,7 @@ let rec learn_expr
     (e : Expr.t) : outs =
   let f = learn_expr kb in
   match e with
+  | Constructor _ -> failwith "TODO" (* TODO *)
   (* Literals, abstract locations, sublists, and sets are never invertible *)
   | Lit _ | LstSub _ | ESet _ -> []
   (* Nothing is learned if the top-level expr is a program or a logical variable *)
@@ -441,6 +443,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
       List.map minimise_matchables ins
   | Lit _ | PVar _ | LVar _ | ALoc _ | LstSub _ | NOp _ | EList _ | ESet _ -> []
+  | Constructor _ -> failwith "TODO" (* TODO *)
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)

@@ -254,6 +254,7 @@ module Make (SMemory : SMemory.S) :
         | Exists (bt, e) -> Exists (bt, f e)
         | ForAll (bt, e) -> ForAll (bt, f e)
         | Lit _ | LVar _ | ALoc _ -> expr
+        | Constructor _ -> failwith "TODO" (* TODO *)
       in
       (* Perform reduction *)
       if no_reduce then result

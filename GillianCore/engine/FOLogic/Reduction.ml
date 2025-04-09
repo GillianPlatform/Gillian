@@ -64,6 +64,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
   let result =
     let exn msg = ReductionException (le, msg) in
     match (le : Expr.t) with
+    | Constructor _ -> failwith "TODO" (* TODO *)
     (* Literals **)
     | Lit (LList lst) -> Expr.from_lit_list (LList lst)
     (* Literals, variables, alocs *)
@@ -880,6 +881,7 @@ and reduce_lexpr_loop
 
   let result : Expr.t =
     match le with
+    | Constructor _ -> failwith "TODO"
     (* -------------------------
               Base cases
        ------------------------- *)
