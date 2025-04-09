@@ -1,1 +1,6 @@
-type t = { name : string; fields : WType.t list }
+type t = {
+  constructor_name : string;
+  constructor_fields : WType.t list;
+  constructor_loc: CodeLoc.t;
+  constructor_id: int;
+}

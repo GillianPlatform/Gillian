@@ -122,7 +122,7 @@
 %type <WBinOp.t>                                                      logic_binop
 %type <CodeLoc.t * WVal.t>                                            logic_value_with_loc
 %type <WConstructor.t>                                                constructor
-%type <WType.t list>                                                  constructor_fields
+%type <WType.t list * CodeLoc.t>                                      constructor_fields
 %%
 
 prog:
@@ -659,23 +659,36 @@ logic_value_with_loc:
 (* ADT definitions *)
 
 datatype:
-  | lstart = DATATYPE; name = IDENTIFIER; LCBRACE;
-    constructors = separated_nonempty_list(SEMICOLON, constructor);
+  | lstart = DATATYPE; ldname = IDENTIFIER; LCBRACE;
+    datatype_constructors = separated_nonempty_list(SEMICOLON, constructor);
     lend = RCBRACE;
     {
-      let (_, name) = name in
-      let loc = CodeLoc.merge lstart lend in
+      let (_, datatype_name) = ldname in
+      let datatype_loc = CodeLoc.merge lstart lend in
+      let datatype_id = Generators.gen_id () in
       WDatatype.{
-        name;
-        constructors;
-        loc;
+        datatype_name;
+        datatype_constructors;
+        datatype_loc;
+        datatype_id;
       }
     }
 
 constructor:
-  | name = IDENTIFIER; fields = option(constructor_fields)
-    { let (_, name) = name in WConstructor.{name; fields = Option.value ~default:[] fields} }
+  | lcname = IDENTIFIER; fields_lend = option(constructor_fields)
+    {
+      let (lstart, constructor_name) = lcname in
+      let (constructor_fields, lend) = Option.value ~default:([], lstart) fields_lend in
+      let constructor_loc = CodeLoc.merge lstart lend in
+      let constructor_id = Generators.gen_id () in
+      WConstructor.{
+          constructor_name;
+          constructor_fields;
+          constructor_loc;
+          constructor_id;
+      }
+    }
 
 constructor_fields:
-  | LBRACE; args = separated_list(COMMA, type_target); RBRACE
-    { args }
+  | LBRACE; args = separated_list(COMMA, type_target); lend = RBRACE
+    { (args, lend) }
