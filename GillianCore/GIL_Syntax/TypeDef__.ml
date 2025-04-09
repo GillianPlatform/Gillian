@@ -29,6 +29,7 @@ and typ =
   | ListType
   | TypeType
   | SetType
+  | Datatype of string
 
 and literal =
   | Undefined

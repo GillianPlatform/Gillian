@@ -61,6 +61,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
+    | Datatype of string
   [@@deriving yojson, eq, show]
 
   (** Printer *)
@@ -1222,6 +1223,7 @@ module Visitors : sig
              Expr.t list ->
              Expr.t list ->
              Asrt.atom
+         ; visit_Datatype : 'c -> Type.t -> string -> Type.t
          ; visit_Wand :
              'c ->
              Asrt.atom ->
@@ -1478,6 +1480,8 @@ module Visitors : sig
 
     method visit_CorePred :
       'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
+
+    method visit_Datatype : 'c -> Type.t -> string -> Type.t
 
     method visit_Wand :
       'c ->
@@ -1756,6 +1760,7 @@ module Visitors : sig
              'f
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+         ; visit_Datatype : 'c -> string -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
          ; visit_Goto : 'c -> 'g -> 'f
@@ -1984,6 +1989,7 @@ module Visitors : sig
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+    method visit_Datatype : 'c -> string -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
     method visit_Goto : 'c -> 'g -> 'f
@@ -2212,6 +2218,7 @@ module Visitors : sig
              unit
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
+         ; visit_Datatype : 'c -> string -> unit
          ; visit_Wand :
              'c -> string * Expr.t list -> string * Expr.t list -> unit
          ; visit_GUnfold : 'c -> string -> unit
@@ -2439,6 +2446,7 @@ module Visitors : sig
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
+    method visit_Datatype : 'c -> string -> unit
 
     method visit_Wand :
       'c -> string * Expr.t list -> string * Expr.t list -> unit
