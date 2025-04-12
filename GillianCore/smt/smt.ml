@@ -308,7 +308,7 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
-    | Datatype _ -> failwith "TODO" (* TODO *)
+    | DatatypeType _ -> failwith "TODO" (* TODO *)
   with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
@@ -328,7 +328,7 @@ module Encoding = struct
     | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
     | SetType -> t_gil_literal_set
     | TypeType -> t_gil_type
-    | Datatype _ -> failwith "TODO"
+    | DatatypeType _ -> failwith "TODO"
 
   type t = {
     consts : (string * sexp) Hashset.t; [@default Hashset.empty ()]
@@ -411,7 +411,7 @@ module Encoding = struct
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
-          | Datatype _ -> failwith "TODO"
+          | DatatypeType _ -> failwith "TODO"
         in
         construct expr
     | Extended_wrapped -> Ext_lit_operations.Gil_sing_elem.access expr
