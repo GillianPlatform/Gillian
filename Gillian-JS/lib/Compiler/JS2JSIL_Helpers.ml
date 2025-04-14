@@ -198,6 +198,7 @@ let var_args = "x__args"
 let var_er = "x__er"
 let var_er_metadata = "x__er_m"
 let var_sc_first = "x__sc_fst"
+let checkNonZero = "check_nonzero"
 
 let js2jsil_spec_vars =
   [ var_this; var_scope; var_scope_final; var_se; var_te; var_er ]
