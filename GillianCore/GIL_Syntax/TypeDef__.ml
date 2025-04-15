@@ -253,7 +253,7 @@ and constructor = {
   constructor_source_path : string option;
   constructor_loc : location option;
   constructor_num_fields : int;
-  constructor_fields : typ list;
+  constructor_fields : typ option list;
 }
 
 and single_spec = {

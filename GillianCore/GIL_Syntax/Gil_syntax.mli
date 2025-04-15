@@ -48,7 +48,7 @@ end
 module Type : sig
   (** GIL Types *)
 
-  type t =
+  type t = TypeDef__.typ =
     | UndefinedType  (** Type of Undefined *)
     | NullType  (** Type of Null *)
     | EmptyType  (** Type of Empty *)
@@ -725,7 +725,7 @@ module Lemma : sig
 end
 
 module Datatype : sig
-  type t = {
+  type t = TypeDef__.datatype = {
     datatype_name : string;
     datatype_source_path : string option;
     datatype_loc : Location.t option;
@@ -734,12 +734,12 @@ module Datatype : sig
 end
 
 module Constructor : sig
-  type t = {
+  type t = TypeDef__.constructor = {
     constructor_name : string;
     constructor_source_path : string option;
     constructor_loc : Location.t option;
     constructor_num_fields : int;
-    constructor_fields : Type.t list;
+    constructor_fields : Type.t option list;
   }
 end
 

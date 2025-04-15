@@ -50,6 +50,7 @@ let rec get_by_id id lexpr =
     | LUnOp (_, lep) -> getter lep
     | LEList lel -> list_visitor lel
     | LESet lel -> list_visitor lel
+    | LConstructor (_, lel) -> list_visitor lel
     | _ -> `None
   in
   let self_or_none = if get_id lexpr = id then `WLExpr lexpr else `None in

@@ -27,9 +27,8 @@ let compile_type t =
     | WPtr -> Some Type.ObjectType
     | WInt -> Some Type.IntType
     | WSet -> Some Type.SetType
-    | WAny -> None
-    | WDatatype _ -> None)
-(*TODO ??*)
+    | WDatatype n -> Some (Type.DatatypeType n)
+    | WAny -> None)
 
 let compile_binop b =
   WBinOp.(
@@ -237,9 +236,11 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
           list_split_3 (List.map compile_lexpr l)
         in
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs)
-    | LConstructor _ ->
-        (* TODO *)
-        failwith "TODO")
+    | LConstructor (n, l) ->
+        let gvars, asrtsl, comp_exprs =
+          list_split_3 (List.map compile_lexpr l)
+        in
+        (List.concat gvars, List.concat asrtsl, Expr.Constructor (n, comp_exprs)))
 
 (* TODO: compile_lformula should return also the list of created existentials *)
 let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =
@@ -1149,8 +1150,38 @@ let compile_lemma
       lemma_existentials;
     }
 
-let compile ~filepath WProg.{ context; predicates; lemmas; _ } =
-  (* TODO: Compile user defined datatypes *)
+let compile_constructor
+    filepath
+    WConstructor.{ constructor_name; constructor_fields; constructor_loc; _ } =
+  let comp_fields = List.map compile_type constructor_fields in
+  let constructor_loc = Some (CodeLoc.to_location constructor_loc) in
+  let constructor_num_fields = List.length comp_fields in
+  Constructor.
+    {
+      constructor_name;
+      constructor_source_path = Some filepath;
+      constructor_loc;
+      constructor_num_fields;
+      constructor_fields = comp_fields;
+    }
+
+let compile_datatype
+    filepath
+    WDatatype.{ datatype_name; datatype_constructors; datatype_loc; _ } =
+  let comp_constructors =
+    List.map (compile_constructor filepath) datatype_constructors
+  in
+  let datatype_loc = Some (CodeLoc.to_location datatype_loc) in
+  ( Datatype.
+      {
+        datatype_name;
+        datatype_source_path = Some filepath;
+        datatype_loc;
+        datatype_constructors = comp_constructors;
+      },
+    comp_constructors )
+
+let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in
@@ -1162,6 +1193,10 @@ let compile ~filepath WProg.{ context; predicates; lemmas; _ } =
   let get_proc_name proc = proc.Proc.proc_name in
   let get_pred_name pred = pred.Pred.pred_name in
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
+  let get_datatype_name datatype = datatype.Datatype.datatype_name in
+  let get_constructor_name constructor =
+    constructor.Constructor.constructor_name
+  in
   (* compile everything *)
   let comp_context = List.map (compile_function filepath) context in
   let comp_preds = List.map (compile_pred filepath) predicates in
@@ -1170,10 +1205,17 @@ let compile ~filepath WProg.{ context; predicates; lemmas; _ } =
       (fun lemma -> compile_lemma filepath (preprocess_lemma lemma))
       lemmas
   in
+  let comp_datatypes, comp_constructors =
+    List.split (List.map (compile_datatype filepath) datatypes)
+  in
   (* build the hashtables *)
   let gil_procs = make_hashtbl get_proc_name (List.concat comp_context) in
   let gil_preds = make_hashtbl get_pred_name comp_preds in
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
+  let gil_datatypes = make_hashtbl get_datatype_name comp_datatypes in
+  let gil_constructors =
+    make_hashtbl get_constructor_name (List.concat comp_constructors)
+  in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
   let bi_specs = Hashtbl.create 1 in
   if Gillian.Utils.(Exec_mode.is_biabduction_exec !Config.current_exec_mode)
@@ -1202,4 +1244,4 @@ let compile ~filepath WProg.{ context; predicates; lemmas; _ } =
     ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
     ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
     ~predecessors:(Hashtbl.create 1) () (* TODO *)
-    ~datatypes:(Hashtbl.create 1) ~constructors:(Hashtbl.create 1)
+    ~datatypes:gil_datatypes ~constructors:gil_constructors
