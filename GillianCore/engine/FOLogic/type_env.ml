@@ -7,9 +7,10 @@ module L = Logging
 type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
 
 type t = {
-  var_types: (string, Type.t) Hashtbl.t;
-  constructor_defs: constructors_tbl_t;
-} [@@deriving yojson]
+  var_types : (string, Type.t) Hashtbl.t;
+  constructor_defs : constructors_tbl_t;
+}
+[@@deriving yojson]
 
 let as_hashtbl x = x.var_types
 
@@ -19,22 +20,19 @@ let as_hashtbl x = x.var_types
 (*************************************)
 
 (* Initialisation *)
-let init ?(constructor_defs = Hashtbl.create Config.medium_tbl_size) () : t = {
-  var_types = Hashtbl.create Config.medium_tbl_size;
-  constructor_defs;
-}
+let init ?(constructor_defs = Hashtbl.create Config.medium_tbl_size) () : t =
+  { var_types = Hashtbl.create Config.medium_tbl_size; constructor_defs }
 
 (* Copy *)
-let copy {
-    var_types;
-    constructor_defs;
-  } : t =  {
-  var_types = Hashtbl.copy var_types;
-  constructor_defs = Hashtbl.copy constructor_defs;
-}
+let copy { var_types; constructor_defs } : t =
+  {
+    var_types = Hashtbl.copy var_types;
+    constructor_defs = Hashtbl.copy constructor_defs;
+  }
 
 (* Type of a variable *)
-let get (x : t) (var : string) : Type.t option = Hashtbl.find_opt x.var_types var
+let get (x : t) (var : string) : Type.t option =
+  Hashtbl.find_opt x.var_types var
 
 (* Membership *)
 let mem (x : t) (v : string) : bool = Hashtbl.mem x.var_types v
@@ -70,10 +68,12 @@ let get_vars_of_type (x : t) (tt : Type.t) : string list =
     x.var_types []
 
 (* Get all var-type pairs as a list *)
-let get_var_type_pairs (x : t) : (string * Type.t) Seq.t = Hashtbl.to_seq x.var_types
+let get_var_type_pairs (x : t) : (string * Type.t) Seq.t =
+  Hashtbl.to_seq x.var_types
 
 (* Iteration *)
-let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x.var_types
+let iter (x : t) (f : string -> Type.t -> unit) : unit =
+  Hashtbl.iter f x.var_types
 
 let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
   Hashtbl.fold f x.var_types init
@@ -177,7 +177,6 @@ let filter_with_info relevant_info (x : t) =
   let relevant = List.fold_left SS.union SS.empty [ pvars; lvars; locs ] in
   filter x (fun x -> SS.mem x relevant)
 
-
 (*************************************)
 (** Typing Environment Functions    **)
 
@@ -185,16 +184,22 @@ let filter_with_info relevant_info (x : t) =
 
 let get_constructor_type (x : t) (cname : string) : Type.t option =
   let constructor = Hashtbl.find_opt x.constructor_defs cname in
-  Option.map (fun (c : Constructor.t) -> Type.DatatypeType c.constructor_datatype) constructor
+  Option.map
+    (fun (c : Constructor.t) -> Type.DatatypeType c.constructor_datatype)
+    constructor
 
 let get_constructor_type_unsafe (x : t) (cname : string) : Type.t =
   let constructor = Hashtbl.find_opt x.constructor_defs cname in
   match constructor with
   | Some c -> Type.DatatypeType c.constructor_datatype
   | None ->
-      raise (Failure ("Type_env.get_constructor_type_unsafe: constructor " ^ cname ^ " not found."))
+      raise
+        (Failure
+           ("Type_env.get_constructor_type_unsafe: constructor " ^ cname
+          ^ " not found."))
 
-let get_constructor_field_types (x : t) (cname : string) : Type.t option list option =
+let get_constructor_field_types (x : t) (cname : string) :
+    Type.t option list option =
   let constructor = Hashtbl.find_opt x.constructor_defs cname in
   Option.map (fun (c : Constructor.t) -> c.constructor_fields) constructor
 
