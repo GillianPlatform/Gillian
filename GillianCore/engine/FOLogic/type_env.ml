@@ -4,9 +4,14 @@ open Names
 open SVal
 module L = Logging
 
-type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
+type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
 
-let as_hashtbl x = x
+type t = {
+  var_types: (string, Type.t) Hashtbl.t;
+  constructor_defs: constructors_tbl_t;
+} [@@deriving yojson]
+
+let as_hashtbl x = x.var_types
 
 (*************************************)
 (** Typing Environment Functions    **)
@@ -14,55 +19,64 @@ let as_hashtbl x = x
 (*************************************)
 
 (* Initialisation *)
-let init () : t = Hashtbl.create Config.medium_tbl_size
+let init ?(constructor_defs = Hashtbl.create Config.medium_tbl_size) () : t = {
+  var_types = Hashtbl.create Config.medium_tbl_size;
+  constructor_defs;
+}
 
 (* Copy *)
-let copy (x : t) : t = Hashtbl.copy x
+let copy {
+    var_types;
+    constructor_defs;
+  } : t =  {
+  var_types = Hashtbl.copy var_types;
+  constructor_defs = Hashtbl.copy constructor_defs;
+}
 
 (* Type of a variable *)
-let get (x : t) (var : string) : Type.t option = Hashtbl.find_opt x var
+let get (x : t) (var : string) : Type.t option = Hashtbl.find_opt x.var_types var
 
 (* Membership *)
-let mem (x : t) (v : string) : bool = Hashtbl.mem x v
+let mem (x : t) (v : string) : bool = Hashtbl.mem x.var_types v
 
 (* Empty *)
-let empty (x : t) : bool = Hashtbl.length x == 0
+let empty (x : t) : bool = Hashtbl.length x.var_types == 0
 
 (* Type of a variable *)
 let get_unsafe (x : t) (var : string) : Type.t =
-  match Hashtbl.find_opt x var with
+  match Hashtbl.find_opt x.var_types var with
   | Some t -> t
   | None ->
       raise (Failure ("Type_env.get_unsafe: variable " ^ var ^ " not found."))
 
 (* Get all matchable elements *)
 let matchables (x : t) : SS.t =
-  Hashtbl.fold (fun var _ ac -> SS.add var ac) x SS.empty
+  Hashtbl.fold (fun var _ ac -> SS.add var ac) x.var_types SS.empty
 
 (* Get all variables *)
 let vars (x : t) : SS.t =
-  Hashtbl.fold (fun var _ ac -> SS.add var ac) x SS.empty
+  Hashtbl.fold (fun var _ ac -> SS.add var ac) x.var_types SS.empty
 
 (* Get all logical variables *)
 let lvars (x : t) : SS.t =
   Hashtbl.fold
     (fun var _ ac -> if is_lvar_name var then SS.add var ac else ac)
-    x SS.empty
+    x.var_types SS.empty
 
 (* Get all variables of specific type *)
 let get_vars_of_type (x : t) (tt : Type.t) : string list =
   Hashtbl.fold
     (fun var t ac_vars -> if t = tt then var :: ac_vars else ac_vars)
-    x []
+    x.var_types []
 
 (* Get all var-type pairs as a list *)
-let get_var_type_pairs (x : t) : (string * Type.t) Seq.t = Hashtbl.to_seq x
+let get_var_type_pairs (x : t) : (string * Type.t) Seq.t = Hashtbl.to_seq x.var_types
 
 (* Iteration *)
-let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x
+let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x.var_types
 
 let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
-  Hashtbl.fold f x init
+  Hashtbl.fold f x.var_types init
 
 let pp fmt tenv =
   let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
@@ -81,20 +95,20 @@ let pp_by_need vars fmt tenv =
 
 let update (te : t) (x : string) (t : Type.t) : unit =
   match get te x with
-  | None -> Hashtbl.replace te x t
+  | None -> Hashtbl.replace te.var_types x t
   | Some t' when t' = t -> ()
   | Some t' ->
       Fmt.failwith
         "Type_env update: Conflict: %s has type %s but required extension is %s"
         x (Type.str t') (Type.str t)
 
-let remove (te : t) (x : string) : unit = Hashtbl.remove te x
+let remove (te : t) (x : string) : unit = Hashtbl.remove te.var_types x
 
 (* Extend gamma with more_gamma *)
 let extend (x : t) (y : t) : unit =
   iter y (fun v t ->
-      match Hashtbl.find_opt x v with
-      | None -> Hashtbl.replace x v t
+      match Hashtbl.find_opt x.var_types v with
+      | None -> Hashtbl.replace x.var_types v t
       | Some t' ->
           if t <> t' then
             raise (Failure "Typing environment cannot be extended."))
@@ -140,7 +154,7 @@ let to_list_expr (x : t) : (Expr.t * Type.t) list =
       (fun x t (pairs : (Expr.t * Type.t) list) ->
         if Names.is_lvar_name x then (LVar x, t) :: pairs
         else (PVar x, t) :: pairs)
-      x []
+      x.var_types []
   in
   le_type_pairs
 
@@ -148,13 +162,13 @@ let to_list (x : t) : (Var.t * Type.t) list =
   let le_type_pairs =
     Hashtbl.fold
       (fun x t (pairs : (Var.t * Type.t) list) -> (x, t) :: pairs)
-      x []
+      x.var_types []
   in
   le_type_pairs
 
 let reset (x : t) (reset : (Var.t * Type.t) list) =
-  Hashtbl.clear x;
-  List.iter (fun (y, t) -> Hashtbl.replace x y t) reset
+  Hashtbl.clear x.var_types;
+  List.iter (fun (y, t) -> Hashtbl.replace x.var_types y t) reset
 
 let is_well_formed (_ : t) : bool = true
 
@@ -162,3 +176,28 @@ let filter_with_info relevant_info (x : t) =
   let pvars, lvars, locs = relevant_info in
   let relevant = List.fold_left SS.union SS.empty [ pvars; lvars; locs ] in
   filter x (fun x -> SS.mem x relevant)
+
+
+(*************************************)
+(** Typing Environment Functions    **)
+
+(*************************************)
+
+let get_constructor_type (x : t) (cname : string) : Type.t option =
+  let constructor = Hashtbl.find_opt x.constructor_defs cname in
+  Option.map (fun (c : Constructor.t) -> Type.DatatypeType c.constructor_datatype) constructor
+
+let get_constructor_type_unsafe (x : t) (cname : string) : Type.t =
+  let constructor = Hashtbl.find_opt x.constructor_defs cname in
+  match constructor with
+  | Some c -> Type.DatatypeType c.constructor_datatype
+  | None ->
+      raise (Failure ("Type_env.get_constructor_type_unsafe: constructor " ^ cname ^ " not found."))
+
+let get_constructor_field_types (x : t) (cname : string) : Type.t option list option =
+  let constructor = Hashtbl.find_opt x.constructor_defs cname in
+  Option.map (fun (c : Constructor.t) -> c.constructor_fields) constructor
+
+let copy_constructors (x : t) : t =
+  let constructor_defs = Hashtbl.copy x.constructor_defs in
+  init ~constructor_defs ()

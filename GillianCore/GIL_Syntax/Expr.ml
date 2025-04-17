@@ -479,7 +479,8 @@ let rec is_concrete (le : t) : bool =
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
-  | Constructor (_, _) -> false (* TODO: ?? *)
+  | Constructor (_, _) -> false
+(* TODO: Pretty sure constructors are not concrete, but double check *)
 
 let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z

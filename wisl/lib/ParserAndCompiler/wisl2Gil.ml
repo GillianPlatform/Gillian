@@ -1152,7 +1152,14 @@ let compile_lemma
 
 let compile_constructor
     filepath
-    WConstructor.{ constructor_name; constructor_fields; constructor_loc; _ } =
+    WConstructor.
+      {
+        constructor_name;
+        constructor_fields;
+        constructor_loc;
+        constructor_datatype;
+        _;
+      } =
   let comp_fields = List.map compile_type constructor_fields in
   let constructor_loc = Some (CodeLoc.to_location constructor_loc) in
   let constructor_num_fields = List.length comp_fields in
@@ -1163,6 +1170,7 @@ let compile_constructor
       constructor_loc;
       constructor_num_fields;
       constructor_fields = comp_fields;
+      constructor_datatype;
     }
 
 let compile_datatype

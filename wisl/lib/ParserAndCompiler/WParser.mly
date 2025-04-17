@@ -121,7 +121,7 @@
 %type <WLExpr.t>                                                      logic_expression
 %type <WBinOp.t>                                                      logic_binop
 %type <CodeLoc.t * WVal.t>                                            logic_value_with_loc
-%type <WConstructor.t>                                                constructor
+%type <string * WType.t list * CodeLoc.t * int>                       constructor
 %type <WType.t list * CodeLoc.t>                                      constructor_fields
 %%
 
@@ -660,12 +660,24 @@ logic_value_with_loc:
 
 datatype:
   | lstart = DATATYPE; ldname = IDENTIFIER; LCBRACE;
-    datatype_constructors = separated_nonempty_list(SEMICOLON, constructor);
+    raw_constructors = separated_nonempty_list(SEMICOLON, constructor);
     lend = RCBRACE;
     {
       let (_, datatype_name) = ldname in
       let datatype_loc = CodeLoc.merge lstart lend in
       let datatype_id = Generators.gen_id () in
+      let datatype_constructors =
+        List.map
+          (fun (constructor_name, constructor_fields, constructor_loc, constructor_id) ->
+             WConstructor.{
+               constructor_name;
+               constructor_fields;
+               constructor_loc;
+               constructor_id;
+               constructor_datatype = datatype_name;
+             })
+          raw_constructors
+      in
       WDatatype.{
         datatype_name;
         datatype_constructors;
@@ -681,12 +693,8 @@ constructor:
       let (constructor_fields, lend) = Option.value ~default:([], lstart) fields_lend in
       let constructor_loc = CodeLoc.merge lstart lend in
       let constructor_id = Generators.gen_id () in
-      WConstructor.{
-          constructor_name;
-          constructor_fields;
-          constructor_loc;
-          constructor_id;
-      }
+      (* Constructor_datatype is added later in the datatype rule *)
+      (constructor_name, constructor_fields, constructor_loc, constructor_id)
     }
 
 constructor_fields:

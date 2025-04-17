@@ -152,8 +152,22 @@ module Infer_types_to_gamma = struct
     | LstSub (le1, le2, le3) ->
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
-    | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
-    | Constructor _ -> failwith "TODO" (* TODO *)
+    | BinOp (le1, op, le2) ->
+        infer_binop flag gamma new_gamma op le1 le2 tt
+    | Constructor (n, les) -> (
+        let field_types = Type_env.get_constructor_field_types gamma n in
+        let check_field le tt =
+          match tt with
+          | Some tt -> f le tt
+          | None -> true
+        in
+        match field_types with
+        | Some tts ->
+            if List.length tts <> List.length les then false
+            else
+              tt = Type_env.get_constructor_type_unsafe gamma n
+              && List.for_all2 check_field les tts
+        | None -> false)
     | Exists (bt, le) | ForAll (bt, le) ->
         if not (tt = BooleanType) then false
         else
@@ -170,7 +184,9 @@ module Infer_types_to_gamma = struct
                 Type_env.remove new_gamma_copy x)
               bt
           in
-          let ret = f' gamma_copy new_gamma_copy le BooleanType in
+          let ret =
+            f' gamma_copy new_gamma_copy le BooleanType
+          in
           (* We've updated our new_gamma_copy with a bunch of things.
              We need to import everything except the quantified variables to the new_gamma *)
           Type_env.iter new_gamma_copy (fun x t ->
@@ -185,15 +201,19 @@ let reverse_type_lexpr
     (flag : bool)
     (gamma : Type_env.t)
     (e_types : (Expr.t * Type.t) list) : Type_env.t option =
-  let new_gamma = Type_env.init () in
+  let new_gamma = Type_env.copy_constructors gamma in
   let ret =
     List.fold_left
-      (fun ac (e, t) -> ac && infer_types_to_gamma flag gamma new_gamma e t)
+      (fun ac (e, t) ->
+        ac && infer_types_to_gamma flag gamma new_gamma e t)
       true e_types
   in
   if ret then Some new_gamma else None
 
-let safe_extend_gamma (gamma : Type_env.t) (le : Expr.t) (t : Type.t) : unit =
+let safe_extend_gamma
+    (gamma : Type_env.t)
+    (le : Expr.t)
+    (t : Type.t) : unit =
   let new_gamma = reverse_type_lexpr true gamma [ (le, t) ] in
   match new_gamma with
   | Some new_gamma -> Type_env.extend gamma new_gamma
@@ -297,25 +317,40 @@ module Type_lexpr = struct
         | false -> def_neg
         | true -> (None, true))
 
-  let rec typable_list gamma ?(target_type : Type.t option) les =
+  let rec typable_list
+      gamma
+      ?(target_type : Type.t option)
+      ?(target_types : Type.t option list option)
+      les =
     let f = f gamma in
-    List.for_all
-      (fun elem ->
-        let t, ite =
-          let t, ite = f elem in
-          match t with
-          | Some _ -> (t, ite)
-          | None -> (
-              match target_type with
-              | None -> (t, ite)
-              | Some tt -> infer_type gamma elem tt)
-        in
-        let correct_type =
-          let ( = ) = Option.equal Type.equal in
-          target_type = None || t = target_type
-        in
-        correct_type && ite)
-      les
+    let n = List.length les in
+    let target_types =
+      match target_type with
+      | Some tt -> List.init n (Fun.const (Some tt))
+      | None -> (
+          match target_types with
+          | Some tts -> tts
+          | None -> List.init n (Fun.const None))
+    in
+    if n == List.length target_types then
+      List.for_all2
+        (fun elem target_type ->
+          let t, ite =
+            let t, ite = f elem in
+            match t with
+            | Some _ -> (t, ite)
+            | None -> (
+                match target_type with
+                | None -> (t, ite)
+                | Some tt -> infer_type gamma elem tt)
+          in
+          let correct_type =
+            let ( = ) = Option.equal Type.equal in
+            target_type = None || t = target_type
+          in
+          correct_type && ite)
+        les target_types
+    else false
 
   and type_unop gamma le (op : UnOp.t) e =
     let f = f gamma in
@@ -443,14 +478,28 @@ module Type_lexpr = struct
         bt
     in
     let _, ite = f gamma_copy e in
-    if not ite then def_neg else infer_type gamma le BooleanType
+    if not ite then def_neg
+    else infer_type gamma le BooleanType
+
+  and type_constructor gamma n les =
+    let tts_opt = Type_env.get_constructor_field_types gamma n in
+    match tts_opt with
+    | Some tts ->
+        if
+          typable_list gamma
+            ?target_types:(Some tts) les
+        then def_pos (Type_env.get_constructor_type gamma n)
+        else def_neg
+    | None -> def_neg
 
   (** This function returns a triple [(t_opt, b, fs)] where
       - [t_opt] is the type of [le] if we can find one
       - [b] indicates if the thing is typable
       - [fs] indicates the constraints that must be satisfied for [le] to be typable
   *)
-  and f (gamma : Type_env.t) (le : Expr.t) : Type.t option * bool =
+  and f
+      (gamma : Type_env.t)
+      (le : Expr.t) : Type.t option * bool =
     let typable_list = typable_list gamma in
 
     let result =
@@ -465,7 +514,8 @@ module Type_lexpr = struct
       | EList _ -> def_pos (Some ListType)
       (* Sets are always typable *)
       | ESet _ -> def_pos (Some SetType)
-      | Exists (bt, e) | ForAll (bt, e) -> type_quantified_expr gamma le bt e
+      | Exists (bt, e) | ForAll (bt, e) ->
+          type_quantified_expr gamma le bt e
       | UnOp (op, e) -> type_unop gamma le op e
       | BinOp (e1, op, e2) -> type_binop gamma le op e1 e2
       | NOp (SetUnion, les) | NOp (SetInter, les) ->
@@ -475,7 +525,7 @@ module Type_lexpr = struct
           let all_typable = typable_list ?target_type:(Some ListType) les in
           if all_typable then (Some ListType, true) else def_neg
       | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
-      | Constructor _ -> failwith "TODO" (* TODO *)
+      | Constructor (n, les) -> type_constructor gamma n les
     in
 
     result

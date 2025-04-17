@@ -740,7 +740,9 @@ module Constructor : sig
     constructor_loc : Location.t option;
     constructor_num_fields : int;
     constructor_fields : Type.t option list;
+    constructor_datatype : string;
   }
+  [@@deriving yojson]
 end
 
 (** @canonical Gillian.Gil_syntax.Macro *)

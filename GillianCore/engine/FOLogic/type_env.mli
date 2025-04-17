@@ -7,6 +7,8 @@ open SVal
 (** @canonical Gillian.Symbolic.Type_env.t *)
 type t [@@deriving yojson]
 
+type constructors_tbl_t [@@deriving yojson]
+
 val as_hashtbl : t -> (string, Type.t) Hashtbl.t
 val copy : t -> t
 val extend : t -> t -> unit
@@ -18,7 +20,7 @@ val get : t -> string -> Type.t option
 val get_unsafe : t -> string -> Type.t
 val get_var_type_pairs : t -> (string * Type.t) Seq.t
 val get_vars_of_type : t -> Type.t -> string list
-val init : unit -> t
+val init : ?constructor_defs:constructors_tbl_t -> unit -> t
 val mem : t -> string -> bool
 val empty : t -> bool
 val pp : Format.formatter -> t -> unit
@@ -38,3 +40,8 @@ val is_well_formed : t -> bool
 
 val filter_with_info :
   Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t
+
+val get_constructor_type : t -> string -> Type.t option
+val get_constructor_type_unsafe : t -> string -> Type.t
+val get_constructor_field_types : t -> string -> Type.t option list option
+val copy_constructors : t -> t
