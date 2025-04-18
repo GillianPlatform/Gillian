@@ -64,7 +64,6 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
   let result =
     let exn msg = ReductionException (le, msg) in
     match (le : Expr.t) with
-    | Constructor _ -> failwith "TODO" (* TODO *)
     (* Literals **)
     | Lit (LList lst) -> Expr.from_lit_list (LList lst)
     (* Literals, variables, alocs *)
@@ -137,6 +136,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
     | Exists (bt, le) -> Exists (bt, f le)
     | ForAll (bt, le) -> ForAll (bt, f le)
+    | Constructor (n, les) -> Constructor (n, List.map f les)
     (*
     | LstSub(le1, le2, le3) ->
       (match f le1, f le2, f le3 with
@@ -881,7 +881,6 @@ and reduce_lexpr_loop
 
   let result : Expr.t =
     match le with
-    | Constructor _ -> failwith "TODO"
     (* -------------------------
               Base cases
        ------------------------- *)
@@ -904,6 +903,10 @@ and reduce_lexpr_loop
                  ESet
        ------------------------- *)
     | ESet les -> ESet (Expr.Set.elements @@ Expr.Set.of_list @@ List.map f les)
+    (* -------------------------
+             Constructors
+       ------------------------- *)
+    | Constructor (n, les) -> Constructor (n, List.map f les)
     (* -------------------------
             ForAll + Exists
        ------------------------- *)
@@ -1783,6 +1786,16 @@ and reduce_lexpr_loop
       when t <> StringType -> Expr.false_
     | BinOp (UnOp (TypeOf, BinOp (_, SetMem, _)), Equal, Lit (Type t))
       when t <> BooleanType -> Expr.false_
+    (* BinOps: Equalities (Constructors) *)
+    | BinOp (Constructor (ln, lles), Equal, Constructor (rn, rles)) ->
+        if ln = rn && List.length lles = List.length rles then
+          Expr.conjunct
+            (List.map2 (fun le re -> Expr.BinOp (le, Equal, re)) lles rles)
+        else Expr.false_
+    | BinOp (Constructor _, Equal, rle) as le -> (
+        match rle with
+        | LVar _ | Constructor _ -> le
+        | _ -> Expr.false_)
     (* BinOps: Logic *)
     | BinOp (Lit (Bool true), And, e)
     | BinOp (e, And, Lit (Bool true))
