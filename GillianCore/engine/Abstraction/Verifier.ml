@@ -123,6 +123,7 @@ struct
       ~(init_data : SPState.init_data)
       (func_or_lemma_name : string)
       (preds : (string, MP.pred) Hashtbl.t)
+      (constructors : Type_env.constructors_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
@@ -272,7 +273,7 @@ struct
       (* Step 1 - normalise the precondition *)
       match
         Normaliser.normalise_assertion ~init_data ~pred_defs:preds
-          ~pvars:(SS.of_list params) (fst pre)
+          ~constructor_defs:constructors ~pvars:(SS.of_list params) (fst pre)
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
@@ -302,6 +303,7 @@ struct
       ~init_data
       (spec_name : string)
       (preds : MP.preds_tbl_t)
+      (constructors : Type_env.constructors_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
@@ -309,8 +311,8 @@ struct
       (sspec : Spec.st) : (t option * Spec.st option) list =
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
-      testify ~init_data spec_name preds pred_ins name params id sspec.ss_pre
-        sspec.ss_posts sspec.ss_variant (Some sspec.ss_flag)
+      testify ~init_data spec_name preds constructors pred_ins name params id
+        sspec.ss_pre sspec.ss_posts sspec.ss_variant (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -325,6 +327,7 @@ struct
       ~init_data
       (spec_name : string)
       (preds : MP.preds_tbl_t)
+      (constructors : Type_env.constructors_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (spec : Spec.t) : t list * Spec.t =
     if not spec.spec_to_verify then ([], spec)
@@ -350,8 +353,8 @@ struct
         List.fold_left
           (fun (id, tests, sspecs) sspec ->
             let tests_and_specs =
-              testify_sspec ~init_data spec_name preds pred_ins spec.spec_name
-                spec.spec_params id sspec
+              testify_sspec ~init_data spec_name preds constructors pred_ins
+                spec.spec_name spec.spec_params id sspec
             in
             let new_tests, new_specs =
               List.fold_left
@@ -379,15 +382,16 @@ struct
   let testify_lemma
       ~init_data
       (preds : MP.preds_tbl_t)
+      (constructors : Type_env.constructors_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
         (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
           let to_verify = Option.is_some lemma.lemma_proof in
-          testify ~init_data lemma.lemma_name preds pred_ins lemma.lemma_name
-            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant None
-            None to_verify)
+          testify ~init_data lemma.lemma_name preds constructors pred_ins
+            lemma.lemma_name lemma.lemma_params 0 lemma_hyp lemma_concs
+            lemma_spec_variant None None to_verify)
         lemma.lemma_specs
     in
     let tests, specs =
@@ -768,7 +772,8 @@ struct
           List.concat_map
             (fun (spec : Spec.t) ->
               let tests, new_spec =
-                testify_spec ~init_data spec.spec_name preds pred_ins spec
+                testify_spec ~init_data spec.spec_name preds prog.constructors
+                  pred_ins spec
               in
               let proc = Prog.get_proc_exn prog spec.spec_name in
               Hashtbl.replace prog.procs proc.proc_name
@@ -797,7 +802,7 @@ struct
           List.concat_map
             (fun lemma ->
               let tests, new_lemma =
-                testify_lemma ~init_data preds pred_ins lemma
+                testify_lemma ~init_data preds prog.constructors pred_ins lemma
               in
               Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
               tests)
@@ -1026,7 +1031,8 @@ struct
         specs
         |> List.filter_map (fun (spec : Spec.t) ->
                let tests, new_spec =
-                 testify_spec ~init_data spec.spec_name preds pred_ins spec
+                 testify_spec ~init_data spec.spec_name preds prog.constructors
+                   pred_ins spec
                in
                if List.length tests > 1 then
                  DL.log (fun m ->

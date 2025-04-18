@@ -7,7 +7,7 @@ open SVal
 (** @canonical Gillian.Symbolic.Type_env.t *)
 type t [@@deriving yojson]
 
-type constructors_tbl_t [@@deriving yojson]
+type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
 
 val as_hashtbl : t -> (string, Type.t) Hashtbl.t
 val copy : t -> t
