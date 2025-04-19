@@ -3,3 +3,9 @@
  (public_name gillian-llvm)
  (libraries gillian_llvm_lib gillian llvm_memory_model lifter)
  (package gillian-llvm))
+
+(executable
+ (name gillian_llvm_runtime_gen)
+ (public_name gillian-llvm-runtime-gen)
+ (libraries gillian_llvm_lib gillian llvm_memory_model lifter)
+ (package gillian-llvm))

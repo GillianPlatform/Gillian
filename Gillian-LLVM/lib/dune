@@ -4,6 +4,7 @@
   gillian
   gillian.parserAndCompiler
   llvm_memory_model
+  llvm_runtime_gen
   yojson
   irep_lib
   dune-site
