@@ -10,7 +10,7 @@ datatype MyList {
 //
 predicate SLL(+x, vs) {
   // Empty SLL
-  (x == null) * (vs == Nil);
+  (x == null) * (vs == Nil());
   // One SLL node and the rest
   (x -b> #v, #next) * SLL(#next, #vs) *
   (vs == Cons(#v, #vs))
@@ -19,11 +19,11 @@ predicate SLL(+x, vs) {
 //
 // Pure predicate for list membership
 //
-predicate list_member(+vs, +v, r : Bool){
-  (vs == Nil) * (r == false);
-  (vs == Cons(v, #rest)) * (r == true) * list_member(#rest, v, #mem);
-  (vs == Cons(#v, #rest)) * (! (#v == v)) * list_member(#rest, v, r)
-}
+// predicate list_member(+vs, +v, r : Bool){
+//   (vs == Nil) * (r == false);
+//   (vs == Cons(v, #rest)) * (r == true) * list_member(#rest, v, #mem);
+//   (vs == Cons(#v, #rest)) * (! (#v == v)) * list_member(#rest, v, r)
+// }
 
 // 00. Allocating an SLL node with the given value
 { v == #v }
@@ -66,44 +66,44 @@ function SLL_copy(x){
 { SLL(#x, #vs) * SLL(ret, #vs) }
 
 // 08. Checking if a given value is in a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #r) }
-function SLL_member(x, k){
-  found := false;
-  if (x = null){
-    skip
-  } else {
-    v := [x];
-    if (v = k){
-      found := true
-    } else {
-      t := [x + 1];
-      found := SLL_member(t, k)
-    }
-  };
-  return found
-}
-{ SLL(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
+// { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #r) }
+// function SLL_member(x, k){
+//   found := false;
+//   if (x = null){
+//     skip
+//   } else {
+//     v := [x];
+//     if (v = k){
+//       found := true
+//     } else {
+//       t := [x + 1];
+//       found := SLL_member(t, k)
+//     }
+//   };
+//   return found
+// }
+// { SLL(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
 
 // 09. Removing a given value from a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #mem) }
-function SLL_remove(x, k) {
-  if (x = null) {
-    skip
-  } else {
-    v := [x];
-    next := [x + 1];
-    if (v = k){
-      free(x);
-      x := SLL_remove(next, k)
-    } else {
-       z := SLL_remove(next, k);
-       [x + 1] := z
-    }
-  };
-  [[ fold list_member(Nil, #k, false) ]];
-  return x
-}
-{ SLL(ret, #nvs) * list_member(#nvs, #k, false) }
+// { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #mem) }
+// function SLL_remove(x, k) {
+//   if (x = null) {
+//     skip
+//   } else {
+//     v := [x];
+//     next := [x + 1];
+//     if (v = k){
+//       free(x);
+//       x := SLL_remove(next, k)
+//     } else {
+//        z := SLL_remove(next, k);
+//        [x + 1] := z
+//     }
+//   };
+//   [[ fold list_member(Nil, #k, false) ]];
+//   return x
+// }
+// { SLL(ret, #nvs) * list_member(#nvs, #k, false) }
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL(#x, #vs) }
