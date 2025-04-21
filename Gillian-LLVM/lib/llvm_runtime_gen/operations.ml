@@ -175,14 +175,28 @@ let op_function
     (name : string)
     (arity : int)
     (f : Gil_syntax.Expr.t list -> unit Codegenerator.t) :
-    ('annot, string) Gil_syntax.Proc.t =
+    (Annot.Basic.t, string) Gil_syntax.Proc.t =
   let open Codegenerator in
-  let* _ = add_cmd (Gil_syntax.Cmd.Function (name, arity)) in
-  let* _ =
-    f (List.init arity (fun _ -> Expr.PVar (Gillian.Utils.Names.fresh_sym ())))
+  let open Gil_syntax.Proc in
+  let params = List.init arity (fun _ -> Codegenerator.fresh_sym ()) in
+  let body = f (List.map (fun p -> Expr.PVar p) params) in
+  let _, cmds = compile (empty_state ()) body in
+  let annotated =
+    List.map (fun c -> (Annot.Basic.make (), fst c, snd c)) cmds
   in
-  let* _ = add_cmd Gil_syntax.Cmd.EndFunction in
-  return ()
+  let p =
+    {
+      proc_name = name;
+      proc_source_path = None;
+      proc_internal = false;
+      proc_body = Array.of_list annotated;
+      proc_params = params;
+      proc_spec = None;
+      proc_aliases = [];
+      proc_calls = [];
+    }
+  in
+  p
 
 (** Builds out a bitvector only function over a set of expr arguments *)
 let example_compilation_for_less_than_10 =
