@@ -182,6 +182,7 @@ module Type_operations = struct
   module List = (val nul "ListType" : Nullary)
   module Type = (val nul "TypeType" : Nullary)
   module Set = (val nul "SetType" : Nullary)
+  module Datatype = (val un "DatatypeType" "datatype-id" t_int)
 
   let t_gil_type =
     mk_datatype "GIL_Type" []
@@ -198,6 +199,7 @@ module Type_operations = struct
         (module List : Variant.S);
         (module Type : Variant.S);
         (module Set : Variant.S);
+        (module Datatype : Variant.S);
       ]
 end
 
@@ -308,7 +310,8 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
-    | DatatypeType _ -> failwith "TODO" (* TODO *)
+    | DatatypeType name ->
+        name |> encode_string |> Type_operations.Datatype.construct
   with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
