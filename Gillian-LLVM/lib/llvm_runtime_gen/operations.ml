@@ -16,6 +16,7 @@ module type S = sig
   val add_cmd : cmd -> unit t
   val set_state : state -> unit t
   val get_state : state t
+  val if_ : Gil_syntax.Expr.t -> true_case:'a t -> 'a t
 
   val ite :
     Gil_syntax.Expr.t -> true_case:'a t -> false_case:'b t -> ('a * 'b) t
@@ -80,6 +81,16 @@ module Codegenerator : S with type label = string = struct
     let blocks = cstate.blocks in
     set_state { curr_block; blocks }
 
+  let if_ expr ~true_case =
+    let* tval = true_case in
+    let tlable = fresh_sym () in
+    let flabel = fresh_sym () in
+    let* _ = add_cmd (Gil_syntax.Cmd.GuardedGoto (expr, tlable, flabel)) in
+    let* _ = new_block tlable in
+    let* tval = true_case in
+    let* _ = new_block flabel in
+    return tval
+
   let ite expr ~true_case ~false_case =
     let* tval = true_case in
     let tlable = fresh_sym () in
@@ -134,7 +145,19 @@ let add_return_of_value (value : Gil_syntax.Expr.t) =
       (Gil_syntax.Cmd.Assignment (Gillian.Utils.Names.return_variable, value))
   in
   let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
-  return get_current_block_label
+  get_current_block_label
+
+let fail_cmd (err_type : string) (args : Gil_syntax.Expr.t list) =
+  Gil_syntax.Cmd.Fail (err_type, args)
+
+let type_fail (expr_and_type : (Gil_syntax.Expr.t * LLVMRuntimeTypes.t) list) =
+  let exprs =
+    List.map
+      (fun (expr, rty) ->
+        Expr.list [ expr; LLVMRuntimeTypes.rtype_to_gil_type rty |> Expr.type_ ])
+      expr_and_type
+  in
+  fail_cmd "Type mismatch" exprs
 
 let op_bv_scheme
     (literals : int list)
@@ -144,17 +167,22 @@ let op_bv_scheme
   let open Codegenerator in
   let open Gil_syntax.Expr in
   let open Gil_syntax.Expr.Infix in
-  let check =
+  let expr_with_type =
     List.map
       (fun (expr, width) ->
-        is_type_of_expr expr (Llvm_memory_model.LLVMRuntimeTypes.Int width))
+        (expr, Llvm_memory_model.LLVMRuntimeTypes.Int width))
       width
+  in
+  let check =
+    List.map (fun (expr, rty) -> is_type_of_expr expr rty) expr_with_type
     |> fun lst -> List.fold_right (fun x acc -> x && acc) lst Expr.true_
   in
   let* _ =
     ite check
       ~true_case:
-        (let converted_args = List.map (fun (x, w) -> BvExpr (x, w)) width in
+        (let converted_args =
+           List.map (fun (x, w) -> BvExpr (Expr.list_nth x 1, w)) width
+         in
          let args =
            List.append
              (List.map (fun x -> Expr.Literal x) literals)
@@ -166,7 +194,8 @@ let op_bv_scheme
          in
          return get_current_block_label)
       ~false_case:
-        (let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
+        (let* _ = add_cmd (type_fail expr_with_type) in
+         let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
          return get_current_block_label)
   in
   return ()
@@ -197,6 +226,125 @@ let op_function
     }
   in
   p
+
+module TypePatterns = struct
+  type t = {
+    exprs : Gil_syntax.Expr.t list;
+    types_ : LLVMRuntimeTypes.t list;
+    case_stat : unit Codegenerator.t;
+  }
+
+  let pattern_check
+      (exprs : Gil_syntax.Expr.t list)
+      (types_ : LLVMRuntimeTypes.t list) : Expr.t =
+    let open Codegenerator in
+    let open Gil_syntax.Expr in
+    let open Gil_syntax.Expr.Infix in
+    let check_expr =
+      List.map2 (fun expr type_ -> is_type_of_expr expr type_) exprs types_
+      |> fun lst -> List.fold_right (fun x acc -> x && acc) lst Expr.true_
+    in
+    check_expr
+
+  let rec type_dispatch
+      (patterns : t list)
+      (default_stat : unit Codegenerator.t) : unit Codegenerator.t =
+    let open Codegenerator in
+    match patterns with
+    | [] -> default_stat
+    | pattern :: patterns ->
+        let check = pattern_check pattern.exprs pattern.types_ in
+        let* _ = if_ check ~true_case:pattern.case_stat in
+        let* _ = type_dispatch patterns default_stat in
+        return ()
+end
+
+let update_pointer (ptr_exp : Expr.t) (offset : Expr.t) =
+  let _ = Expr.list_nth (Expr.list_nth ptr_exp 1) 1 in
+  let pointer_object = Expr.list_nth (Expr.list_nth ptr_exp 1) 0 in
+  let pointer_ty =
+    LLVMRuntimeTypes.type_to_string LLVMRuntimeTypes.Ptr |> Expr.string
+  in
+  Expr.EList [ pointer_ty; Expr.EList [ pointer_object; offset ] ]
+
+let pattern_function
+    (expr1 : Expr.t)
+    (expr2 : Expr.t)
+    (ptr_width : int)
+    (op : BVOps.t)
+    (commutative : bool) =
+  let open Codegenerator in
+  let open TypePatterns in
+  let open Gil_syntax.Expr.Infix in
+  let case_statement_for_ptr (pval : Expr.t) (regular_val : Expr.t) =
+    let pointer_offset = Expr.list_nth (Expr.list_nth pval 1) 1 in
+
+    let int_val = Expr.list_nth regular_val 1 in
+    let* _ =
+      add_return_of_value
+        (update_pointer pval
+           (Expr.BVExprIntrinsic
+              ( op,
+                [
+                  BvExpr (pointer_offset, ptr_width); BvExpr (int_val, ptr_width);
+                ],
+                Some ptr_width )))
+    in
+    return ()
+  in
+  let case_statement_for_int (regular_val0 : Expr.t) (regular_val1 : Expr.t) =
+    let int_valx = Expr.list_nth regular_val0 1 in
+    let int_valy = Expr.list_nth regular_val1 1 in
+    let* _ =
+      add_return_of_value
+        (Expr.EList
+           [
+             Expr.list_nth regular_val0 0;
+             Expr.list_nth regular_val1 0;
+             Expr.BVExprIntrinsic
+               ( op,
+                 [ BvExpr (int_valx, ptr_width); BvExpr (int_valy, ptr_width) ],
+                 Some ptr_width );
+           ])
+    in
+    return ()
+  in
+  let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
+  let non_commutative_patterns =
+    [
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.Ptr; LLVMRuntimeTypes.Int ptr_width ];
+        case_stat = case_statement_for_ptr expr1 expr2;
+      };
+      {
+        exprs = [ expr1; expr2 ];
+        types_ =
+          [ LLVMRuntimeTypes.Int ptr_width; LLVMRuntimeTypes.Int ptr_width ];
+        case_stat = case_statement_for_int expr1 expr2;
+      };
+    ]
+  in
+  let patterns =
+    if commutative then
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.Int ptr_width; LLVMRuntimeTypes.Ptr ];
+        case_stat = case_statement_for_ptr expr2 expr1;
+      }
+      :: non_commutative_patterns
+    else non_commutative_patterns
+  in
+
+  let* _ = type_dispatch patterns default_statement in
+  return ()
+
+let add_function =
+  op_function "add" 2 (function
+    | [ x; y ] -> pattern_function x y 32 BVOps.BVPlus true
+    | _ -> failwith "Invalid number of arguments")
+
+let () = Format.printf "%a" (Proc.pp_labeled ~pp_annot:Fmt.nop) add_function
 
 (** Builds out a bitvector only function over a set of expr arguments *)
 let example_compilation_for_less_than_10 =
