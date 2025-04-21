@@ -198,7 +198,7 @@ let reverse_type_lexpr
     (flag : bool)
     (gamma : Type_env.t)
     (e_types : (Expr.t * Type.t) list) : Type_env.t option =
-  let new_gamma = Type_env.copy_constructors gamma in
+  let new_gamma = Type_env.keeping_datatypes gamma in
   let ret =
     List.fold_left
       (fun ac (e, t) -> ac && infer_types_to_gamma flag gamma new_gamma e t)

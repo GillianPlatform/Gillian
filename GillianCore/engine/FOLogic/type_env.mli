@@ -8,6 +8,7 @@ open SVal
 type t [@@deriving yojson]
 
 type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
+type datatypes_tbl_t = (string, Datatype.t) Hashtbl.t [@@deriving yojson]
 
 val as_hashtbl : t -> (string, Type.t) Hashtbl.t
 val copy : t -> t
@@ -20,7 +21,7 @@ val get : t -> string -> Type.t option
 val get_unsafe : t -> string -> Type.t
 val get_var_type_pairs : t -> (string * Type.t) Seq.t
 val get_vars_of_type : t -> Type.t -> string list
-val init : ?constructor_defs:constructors_tbl_t -> unit -> t
+val init : ?datatype_defs:datatypes_tbl_t -> unit -> t
 val mem : t -> string -> bool
 val empty : t -> bool
 val pp : Format.formatter -> t -> unit
@@ -44,4 +45,4 @@ val filter_with_info :
 val get_constructor_type : t -> string -> Type.t option
 val get_constructor_type_unsafe : t -> string -> Type.t
 val get_constructor_field_types : t -> string -> Type.t option list option
-val copy_constructors : t -> t
+val keeping_datatypes : t -> t

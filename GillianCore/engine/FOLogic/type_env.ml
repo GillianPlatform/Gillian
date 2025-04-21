@@ -5,10 +5,12 @@ open SVal
 module L = Logging
 
 type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
+type datatypes_tbl_t = (string, Datatype.t) Hashtbl.t [@@deriving yojson]
 
 type t = {
   var_types : (string, Type.t) Hashtbl.t;
   constructor_defs : constructors_tbl_t;
+  datatype_defs : datatypes_tbl_t;
 }
 [@@deriving yojson]
 
@@ -20,13 +22,26 @@ let as_hashtbl x = x.var_types
 (*************************************)
 
 (* Initialisation *)
-let init ?(constructor_defs = Hashtbl.create Config.medium_tbl_size) () : t =
-  { var_types = Hashtbl.create Config.medium_tbl_size; constructor_defs }
+let init ?(datatype_defs = Hashtbl.create Config.medium_tbl_size) () : t =
+  let constructor_defs = Hashtbl.create Config.medium_tbl_size in
+  let add_constructor_to_tbl (constructor : Constructor.t) =
+    Hashtbl.add constructor_defs constructor.constructor_name constructor
+  in
+  let add_constructors_to_tbl _ (datatype : Datatype.t) =
+    List.iter add_constructor_to_tbl datatype.datatype_constructors
+  in
+  let () = Hashtbl.iter add_constructors_to_tbl datatype_defs in
+  {
+    var_types = Hashtbl.create Config.medium_tbl_size;
+    datatype_defs;
+    constructor_defs;
+  }
 
 (* Copy *)
-let copy { var_types; constructor_defs } : t =
+let copy { var_types; datatype_defs; constructor_defs } : t =
   {
     var_types = Hashtbl.copy var_types;
+    datatype_defs = Hashtbl.copy datatype_defs;
     constructor_defs = Hashtbl.copy constructor_defs;
   }
 
@@ -178,7 +193,7 @@ let filter_with_info relevant_info (x : t) =
   filter x (fun x -> SS.mem x relevant)
 
 (*************************************)
-(** Typing Environment Functions    **)
+(**     Datatype Functions          **)
 
 (*************************************)
 
@@ -203,6 +218,6 @@ let get_constructor_field_types (x : t) (cname : string) :
   let constructor = Hashtbl.find_opt x.constructor_defs cname in
   Option.map (fun (c : Constructor.t) -> c.constructor_fields) constructor
 
-let copy_constructors (x : t) : t =
-  let constructor_defs = Hashtbl.copy x.constructor_defs in
-  init ~constructor_defs ()
+let keeping_datatypes (x : t) : t =
+  let datatype_defs = Hashtbl.copy x.datatype_defs in
+  init ~datatype_defs ()

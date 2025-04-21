@@ -731,6 +731,7 @@ module Datatype : sig
     datatype_loc : Location.t option;
     datatype_constructors : Constructor.t list;
   }
+  [@@deriving yojson]
 end
 
 module Constructor : sig
@@ -975,7 +976,6 @@ module Prog : sig
     lemmas : (string, Lemma.t) Hashtbl.t;  (** Lemmas *)
     preds : (string, Pred.t) Hashtbl.t;  (** Predicates *)
     datatypes : (string, Datatype.t) Hashtbl.t;
-    constructors : (string, Constructor.t) Hashtbl.t;
     only_specs : (string, Spec.t) Hashtbl.t;
         (** Specs without function definitions *)
     procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Proceudes *)
@@ -992,7 +992,6 @@ module Prog : sig
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
     datatypes:(string, Datatype.t) Hashtbl.t ->
-    constructors:(string, Constructor.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     procs:(string, ('annot, 'label) Proc.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
@@ -1009,7 +1008,6 @@ module Prog : sig
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
     datatypes:(string, Datatype.t) Hashtbl.t ->
-    constructors:(string, Constructor.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
@@ -1024,7 +1022,6 @@ module Prog : sig
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
     datatypes:(string, Datatype.t) Hashtbl.t ->
-    constructors:(string, Constructor.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->

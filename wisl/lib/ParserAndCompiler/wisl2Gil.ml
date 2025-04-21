@@ -1180,14 +1180,13 @@ let compile_datatype
     List.map (compile_constructor filepath) datatype_constructors
   in
   let datatype_loc = Some (CodeLoc.to_location datatype_loc) in
-  ( Datatype.
-      {
-        datatype_name;
-        datatype_source_path = Some filepath;
-        datatype_loc;
-        datatype_constructors = comp_constructors;
-      },
-    comp_constructors )
+  Datatype.
+    {
+      datatype_name;
+      datatype_source_path = Some filepath;
+      datatype_loc;
+      datatype_constructors = comp_constructors;
+    }
 
 let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
   (* stuff useful to build hashtables *)
@@ -1202,9 +1201,6 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
   let get_pred_name pred = pred.Pred.pred_name in
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
   let get_datatype_name datatype = datatype.Datatype.datatype_name in
-  let get_constructor_name constructor =
-    constructor.Constructor.constructor_name
-  in
   (* compile everything *)
   let comp_context = List.map (compile_function filepath) context in
   let comp_preds = List.map (compile_pred filepath) predicates in
@@ -1213,17 +1209,12 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
       (fun lemma -> compile_lemma filepath (preprocess_lemma lemma))
       lemmas
   in
-  let comp_datatypes, comp_constructors =
-    List.split (List.map (compile_datatype filepath) datatypes)
-  in
+  let comp_datatypes = List.map (compile_datatype filepath) datatypes in
   (* build the hashtables *)
   let gil_procs = make_hashtbl get_proc_name (List.concat comp_context) in
   let gil_preds = make_hashtbl get_pred_name comp_preds in
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
   let gil_datatypes = make_hashtbl get_datatype_name comp_datatypes in
-  let gil_constructors =
-    make_hashtbl get_constructor_name (List.concat comp_constructors)
-  in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
   let bi_specs = Hashtbl.create 1 in
   if Gillian.Utils.(Exec_mode.is_biabduction_exec !Config.current_exec_mode)
@@ -1252,4 +1243,4 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
     ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
     ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
     ~predecessors:(Hashtbl.create 1) () (* TODO *)
-    ~datatypes:gil_datatypes ~constructors:gil_constructors
+    ~datatypes:gil_datatypes
