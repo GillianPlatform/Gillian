@@ -65,7 +65,7 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
       Arg.info [] ~docv:"OUTPUT_FILE"
         ~doc:"The file to write the generated code to"
     in
-    Arg.required (Arg.pos 1 (Arg.some Arg.file) None info)
+    Arg.required (Arg.pos 1 (Arg.some Arg.string) None info)
 
   let cmd_generate =
     Cmd.v (Cmd.info "Runtime code generator")
@@ -73,4 +73,6 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     let+ target_file = target_file and+ output_file = output_file in
     let widths = fl_to_widths target_file in
     produce_file output_file widths
+
+  let () = if !Sys.interactive then () else exit (Cmd.eval cmd_generate)
 end

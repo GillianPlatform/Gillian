@@ -159,19 +159,20 @@ let type_fail (expr_and_type : (Gil_syntax.Expr.t * LLVMRuntimeTypes.t) list) =
   in
   fail_cmd "Type mismatch" exprs
 
+type bv_op_shape = { args : int list; width_of_result : int option }
+type bv_op_function = Expr.t list -> bv_op_shape -> Expr.t
+
 let op_bv_scheme
-    (literals : int list)
-    (width : (Gil_syntax.Expr.t * int) list)
-    (op : BVOps.t)
-    (width_of_result : int option) : unit Codegenerator.t =
+    (inputs : Expr.t list)
+    (op : bv_op_function)
+    (shape : bv_op_shape) : unit Codegenerator.t =
   let open Codegenerator in
   let open Gil_syntax.Expr in
   let open Gil_syntax.Expr.Infix in
   let expr_with_type =
-    List.map
-      (fun (expr, width) ->
-        (expr, Llvm_memory_model.LLVMRuntimeTypes.Int width))
-      width
+    List.map2
+      (fun expr width -> (expr, Llvm_memory_model.LLVMRuntimeTypes.Int width))
+      inputs shape.args
   in
   let check =
     List.map (fun (expr, rty) -> is_type_of_expr expr rty) expr_with_type
@@ -180,18 +181,7 @@ let op_bv_scheme
   let* _ =
     ite check
       ~true_case:
-        (let converted_args =
-           List.map (fun (x, w) -> BvExpr (Expr.list_nth x 1, w)) width
-         in
-         let args =
-           List.append
-             (List.map (fun x -> Expr.Literal x) literals)
-             converted_args
-         in
-         let* _ =
-           add_return_of_value
-             (Expr.BVExprIntrinsic (op, args, width_of_result))
-         in
+        (let* _ = add_return_of_value (op inputs shape) in
          return get_current_block_label)
       ~false_case:
         (let* _ = add_cmd (type_fail expr_with_type) in
@@ -271,24 +261,21 @@ let pattern_function
     (expr1 : Expr.t)
     (expr2 : Expr.t)
     (ptr_width : int)
-    (op : BVOps.t)
+    (op : bv_op_function)
     (commutative : bool) =
   let open Codegenerator in
   let open TypePatterns in
   let open Gil_syntax.Expr.Infix in
+  let shape =
+    { args = [ ptr_width; ptr_width ]; width_of_result = Some ptr_width }
+  in
   let case_statement_for_ptr (pval : Expr.t) (regular_val : Expr.t) =
     let pointer_offset = Expr.list_nth (Expr.list_nth pval 1) 1 in
 
     let int_val = Expr.list_nth regular_val 1 in
     let* _ =
       add_return_of_value
-        (update_pointer pval
-           (Expr.BVExprIntrinsic
-              ( op,
-                [
-                  BvExpr (pointer_offset, ptr_width); BvExpr (int_val, ptr_width);
-                ],
-                Some ptr_width )))
+        (update_pointer pval (op [ pointer_offset; int_val ] shape))
     in
     return ()
   in
@@ -298,14 +285,7 @@ let pattern_function
     let* _ =
       add_return_of_value
         (Expr.EList
-           [
-             Expr.list_nth regular_val0 0;
-             Expr.list_nth regular_val1 0;
-             Expr.BVExprIntrinsic
-               ( op,
-                 [ BvExpr (int_valx, ptr_width); BvExpr (int_valy, ptr_width) ],
-                 Some ptr_width );
-           ])
+           [ Expr.list_nth regular_val0 0; op [ int_valx; int_valy ] shape ])
     in
     return ()
   in
@@ -339,12 +319,30 @@ let pattern_function
   let* _ = type_dispatch patterns default_statement in
   return ()
 
+module OpFunctions = struct
+  let zip_args_with_shape (inputs : Expr.t list) (shape : bv_op_shape) :
+      Expr.bv_arg list =
+    List.map2 (fun expr width -> Expr.BvExpr (expr, width)) inputs shape.args
+
+  let bv_op_function (op : BVOps.t) inputs shape =
+    let args = zip_args_with_shape inputs shape in
+    Expr.BVExprIntrinsic (op, args, shape.width_of_result)
+
+  let add_op_function = bv_op_function BVOps.BVPlus
+  let neg_function = bv_op_function BVOps.BVNeg
+
+  let sub_function inputs shape =
+    let first_shape = { shape with args = [ List.hd shape.args ] } in
+    match inputs with
+    | [ x; y ] ->
+        bv_op_function BVOps.BVPlus [ neg_function [ y ] first_shape; x ] shape
+    | _ -> failwith "Invalid number of arguments"
+end
+
 let add_function =
   op_function "add" 2 (function
-    | [ x; y ] -> pattern_function x y 32 BVOps.BVPlus true
+    | [ x; y ] -> pattern_function x y 32 OpFunctions.add_op_function true
     | _ -> failwith "Invalid number of arguments")
-
-let () = Format.printf "%a" (Proc.pp_labeled ~pp_annot:Fmt.nop) add_function
 
 (** Builds out a bitvector only function over a set of expr arguments *)
 let example_compilation_for_less_than_10 =
@@ -371,3 +369,34 @@ let example_compilation_for_less_than_10 =
         Gil_syntax.Cmd.pp_labeled c)
     cmds;
   ()
+
+let template_from_pattern
+    ~(op : bv_op_function)
+    ~(commutative : bool)
+    (name : string)
+    (width : int) =
+  op_function name 2 (function
+    | [ x; y ] -> pattern_function x y width op commutative
+    | _ -> failwith "Invalid number of arguments")
+
+module LLVMTemplates : Monomorphizer.OpTemplates = struct
+  open Monomorphizer
+
+  let operations =
+    [
+      {
+        name = "add";
+        generator =
+          ValueOp
+            (template_from_pattern ~op:OpFunctions.add_op_function
+               ~commutative:true);
+      };
+      {
+        name = "sub";
+        generator =
+          ValueOp
+            (template_from_pattern ~op:OpFunctions.sub_function
+               ~commutative:false);
+      };
+    ]
+end
