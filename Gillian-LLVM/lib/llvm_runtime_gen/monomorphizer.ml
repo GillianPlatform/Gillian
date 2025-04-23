@@ -80,7 +80,7 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     in
     let prog = { (Prog.create ()) with procs = proc_table } in
     let fl = open_out name in
-    Prog.pp ~show_labels:false ~pp_label:Fmt.string
+    Prog.pp ~show_labels:true ~pp_label:Fmt.string
       (Format.formatter_of_out_channel fl)
       prog;
     close_out fl
