@@ -3,45 +3,63 @@ open Gillian
 
 type basic_proc = (Annot.Basic.t, string) Proc.t
 
-type generator =
-  | ValueOp of (string -> int -> basic_proc)
-  | SimpleOp of (string -> basic_proc)
+module Template = struct
+  type flags = NoUnsignedWrap | NoSignedWrap [@@deriving yojson]
 
-type op_template = { name : string; generator : generator }
+  type bv_op_shape = { args : int list; width_of_result : int option }
+  [@@deriving yojson]
+
+  type op_spec =
+    | ValueSpec of { flags : flags list; shape : bv_op_shape }
+    | SimpleSpec
+  [@@deriving yojson]
+
+  type generator =
+    | ValueOp of (string -> bv_op_shape -> basic_proc)
+    | SimpleOp of (string -> basic_proc)
+
+  type op_template = { name : string; generator : generator }
+end
 
 module type OpTemplates = sig
-  val operations : op_template list
+  val operations : Template.op_template list
 end
 
 module MonomorphizerCLI (OpT : OpTemplates) = struct
   open Cmdliner
   open Cmdliner.Term.Syntax
 
-  let proc_name (name : string) (width : int option) =
-    match width with
-    | Some w -> Printf.sprintf "%s_%d" name w
-    | None -> name
+  let op_map =
+    let open Template in
+    Hashtbl.of_seq
+      (List.to_seq (OpT.operations |> List.map (fun x -> (x.name, x))))
 
-  let fl_to_widths (fl : string) : int list =
-    let json = Yojson.Basic.from_file fl in
-    let widths = Yojson.Basic.Util.to_list json in
-    List.map
-      (fun w ->
-        match w with
-        | `Int i -> i
-        | _ -> failwith "Expected an integer")
-      widths
+  type op_decl = {
+    name : string;
+    output_name : string;
+    spec : Template.op_spec;
+  }
+  [@@deriving yojson]
 
-  let apply_template (op : op_template) (widths : int list) : basic_proc list =
-    match op.generator with
-    | ValueOp f -> List.map (fun w -> f (proc_name op.name (Some w)) w) widths
-    | SimpleOp f -> [ f (proc_name op.name None) ]
+  let parse_op_decl (value : Yojson.Safe.t) : op_decl =
+    op_decl_of_yojson value |> Result.get_ok
 
-  let produce_file (name : string) (widths : int list) =
+  let fl_to_decls (fl : string) : op_decl list =
+    let json = Yojson.Safe.from_file fl in
+    let specs = Yojson.Safe.Util.to_list json in
+    List.map parse_op_decl specs
+
+  let apply_template (op : Template.op_template) (spec : op_decl) : basic_proc =
+    let open Template in
+    match (op.generator, spec.spec) with
+    | ValueOp f, ValueSpec nspec -> f spec.output_name nspec.shape
+    | SimpleOp f, SimpleSpec -> f spec.output_name
+    | _ -> failwith "Invalid template or spec"
+
+  let produce_file (name : string) (decls : op_decl list) =
     let open Proc in
     let procs =
-      List.map (fun op -> apply_template op widths) OpT.operations
-      |> List.flatten
+      List.map (fun op -> apply_template (Hashtbl.find op_map op.name) op) decls
     in
     let proc_table =
       Hashtbl.of_seq
@@ -71,8 +89,8 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     Cmd.v (Cmd.info "Runtime code generator")
     @@
     let+ target_file = target_file and+ output_file = output_file in
-    let widths = fl_to_widths target_file in
-    produce_file output_file widths
+    let decls = fl_to_decls target_file in
+    produce_file output_file decls
 
   let () = if !Sys.interactive then () else exit (Cmd.eval cmd_generate)
 end

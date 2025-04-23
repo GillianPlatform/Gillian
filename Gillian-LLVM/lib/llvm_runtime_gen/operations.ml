@@ -1,5 +1,6 @@
 open Gil_syntax
 open Llvm_memory_model
+open Monomorphizer.Template
 
 module Types = struct
   type label = string
@@ -159,7 +160,6 @@ let type_fail (expr_and_type : (Gil_syntax.Expr.t * LLVMRuntimeTypes.t) list) =
   in
   fail_cmd "Type mismatch" exprs
 
-type bv_op_shape = { args : int list; width_of_result : int option }
 type bv_op_function = Expr.t list -> bv_op_shape -> Expr.t
 
 let op_bv_scheme
@@ -260,14 +260,16 @@ let update_pointer (ptr_exp : Expr.t) (offset : Expr.t) =
 let pattern_function
     (expr1 : Expr.t)
     (expr2 : Expr.t)
-    (ptr_width : int)
+    (shape : bv_op_shape)
     (op : bv_op_function)
     (commutative : bool) =
   let open Codegenerator in
   let open TypePatterns in
   let open Gil_syntax.Expr.Infix in
-  let shape =
-    { args = [ ptr_width; ptr_width ]; width_of_result = Some ptr_width }
+  let ptr_width =
+    match shape.width_of_result with
+    | Some width -> width
+    | None -> failwith "Pointer operations should have a result"
   in
   let case_statement_for_ptr (pval : Expr.t) (regular_val : Expr.t) =
     let pointer_offset = Expr.list_nth (Expr.list_nth pval 1) 1 in
@@ -339,48 +341,18 @@ module OpFunctions = struct
     | _ -> failwith "Invalid number of arguments"
 end
 
-let add_function =
-  op_function "add" 2 (function
-    | [ x; y ] -> pattern_function x y 32 OpFunctions.add_op_function true
-    | _ -> failwith "Invalid number of arguments")
-
-(** Builds out a bitvector only function over a set of expr arguments *)
-let example_compilation_for_less_than_10 =
-  let open Codegenerator in
-  let open Gil_syntax.Expr in
-  let open Gil_syntax.Expr.Infix in
-  let prog =
-    let comp = int 1 < int 2 in
-    let* _ =
-      ite comp
-        ~true_case:
-          (let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
-           return get_current_block_label)
-        ~false_case:
-          (let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
-           return get_current_block_label)
-    in
-    return ()
-  in
-  let _, cmds = compile (empty_state ()) prog in
-  List.iter
-    (fun (lab, c) ->
-      Format.printf "%a:%a\n" (Fmt.option Fmt.string) lab
-        Gil_syntax.Cmd.pp_labeled c)
-    cmds;
-  ()
-
 let template_from_pattern
     ~(op : bv_op_function)
     ~(commutative : bool)
     (name : string)
-    (width : int) =
+    (shape : bv_op_shape) =
   op_function name 2 (function
-    | [ x; y ] -> pattern_function x y width op commutative
+    | [ x; y ] -> pattern_function x y shape op commutative
     | _ -> failwith "Invalid number of arguments")
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
+  open Monomorphizer.Template
 
   let operations =
     [
