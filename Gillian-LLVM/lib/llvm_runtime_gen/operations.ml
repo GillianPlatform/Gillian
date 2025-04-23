@@ -344,11 +344,15 @@ end
 let template_from_pattern
     ~(op : bv_op_function)
     ~(commutative : bool)
+    ~(pointer_width : int)
     (name : string)
     (shape : bv_op_shape) =
-  op_function name 2 (function
-    | [ x; y ] -> pattern_function x y shape op commutative
-    | _ -> failwith "Invalid number of arguments")
+  match shape.width_of_result with
+  | Some width when width = pointer_width ->
+      op_function name 2 (function
+        | [ x; y ] -> pattern_function x y shape op commutative
+        | _ -> failwith "Invalid number of arguments")
+  | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op shape)
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer

@@ -15,8 +15,8 @@ module Template = struct
   [@@deriving yojson]
 
   type generator =
-    | ValueOp of (string -> bv_op_shape -> basic_proc)
-    | SimpleOp of (string -> basic_proc)
+    | ValueOp of (pointer_width:int -> string -> bv_op_shape -> basic_proc)
+    | SimpleOp of (pointer_width:int -> string -> basic_proc)
 
   type op_template = { name : string; generator : generator }
 end
@@ -41,25 +41,38 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
   }
   [@@deriving yojson]
 
-  let parse_op_decl (value : Yojson.Safe.t) : op_decl =
-    op_decl_of_yojson value |> Result.get_ok
+  type runtime_spec = { pointer_width : int; op_requests : op_decl list }
+  [@@deriving yojson]
 
-  let fl_to_decls (fl : string) : op_decl list =
+  let parse_runtime_spec (value : Yojson.Safe.t) : runtime_spec =
+    match runtime_spec_of_yojson value with
+    | Ok spec -> spec
+    | Error e ->
+        Format.eprintf "Error parsing runtime spec: %s@." e;
+        failwith "Invalid runtime spec"
+
+  let fl_to_decls (fl : string) : runtime_spec =
     let json = Yojson.Safe.from_file fl in
-    let specs = Yojson.Safe.Util.to_list json in
-    List.map parse_op_decl specs
+    parse_runtime_spec json
 
-  let apply_template (op : Template.op_template) (spec : op_decl) : basic_proc =
+  let apply_template
+      (op : Template.op_template)
+      (pointer_width : int)
+      (spec : op_decl) : basic_proc =
     let open Template in
     match (op.generator, spec.spec) with
-    | ValueOp f, ValueSpec nspec -> f spec.output_name nspec.shape
-    | SimpleOp f, SimpleSpec -> f spec.output_name
+    | ValueOp f, ValueSpec nspec ->
+        f ~pointer_width spec.output_name nspec.shape
+    | SimpleOp f, SimpleSpec -> f ~pointer_width spec.output_name
     | _ -> failwith "Invalid template or spec"
 
-  let produce_file (name : string) (decls : op_decl list) =
+  let produce_file (name : string) (rtspec : runtime_spec) =
     let open Proc in
     let procs =
-      List.map (fun op -> apply_template (Hashtbl.find op_map op.name) op) decls
+      List.map
+        (fun op ->
+          apply_template (Hashtbl.find op_map op.name) rtspec.pointer_width op)
+        rtspec.op_requests
     in
     let proc_table =
       Hashtbl.of_seq
@@ -89,8 +102,8 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     Cmd.v (Cmd.info "Runtime code generator")
     @@
     let+ target_file = target_file and+ output_file = output_file in
-    let decls = fl_to_decls target_file in
-    produce_file output_file decls
+    let rtspec = fl_to_decls target_file in
+    produce_file output_file rtspec
 
   let () = if !Sys.interactive then () else exit (Cmd.eval cmd_generate)
 end
