@@ -83,7 +83,6 @@ module Codegenerator : S with type label = string = struct
     set_state { curr_block; blocks }
 
   let if_ expr ~true_case =
-    let* tval = true_case in
     let tlable = fresh_sym () in
     let flabel = fresh_sym () in
     let* _ = add_cmd (Gil_syntax.Cmd.GuardedGoto (expr, tlable, flabel)) in
@@ -93,7 +92,6 @@ module Codegenerator : S with type label = string = struct
     return tval
 
   let ite expr ~true_case ~false_case =
-    let* tval = true_case in
     let tlable = fresh_sym () in
     let flabel = fresh_sym () in
     let* _ = add_cmd (Gil_syntax.Cmd.GuardedGoto (expr, tlable, flabel)) in
