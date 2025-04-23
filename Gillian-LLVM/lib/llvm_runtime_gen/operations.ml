@@ -255,6 +255,47 @@ let update_pointer (ptr_exp : Expr.t) (offset : Expr.t) =
   in
   Expr.EList [ pointer_ty; Expr.EList [ pointer_object; offset ] ]
 
+let pattern_function_unary
+    (expr : Expr.t)
+    (shape : bv_op_shape)
+    (op : bv_op_function) =
+  let open Codegenerator in
+  let open TypePatterns in
+  let ptr_width =
+    match shape.width_of_result with
+    | Some width -> width
+    | None -> failwith "Pointer operations should have a result"
+  in
+  let case_statement_for_ptr (pval : Expr.t) =
+    let pointer_offset = Expr.list_nth (Expr.list_nth pval 1) 1 in
+    let* _ =
+      add_return_of_value (update_pointer pval (op [ pointer_offset ] shape))
+    in
+    return ()
+  in
+  let case_statement_for_int (regular_val : Expr.t) =
+    let int_val = Expr.list_nth regular_val 1 in
+    let* _ = add_return_of_value (op [ int_val ] shape) in
+    return ()
+  in
+  let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
+  let patterns =
+    [
+      {
+        exprs = [ expr ];
+        types_ = [ LLVMRuntimeTypes.Ptr ];
+        case_stat = case_statement_for_ptr expr;
+      };
+      {
+        exprs = [ expr ];
+        types_ = [ LLVMRuntimeTypes.Int ptr_width ];
+        case_stat = case_statement_for_int expr;
+      };
+    ]
+  in
+  let* _ = type_dispatch patterns default_statement in
+  return ()
+
 let pattern_function
     (expr1 : Expr.t)
     (expr2 : Expr.t)
@@ -361,6 +402,18 @@ module OpFunctions = struct
     | _ -> failwith "Invalid number of arguments"
 end
 
+let template_from_pattern_unary
+    ~(op : bv_op_function)
+    ~(pointer_width : int)
+    (name : string)
+    (shape : bv_op_shape) =
+  match shape.width_of_result with
+  | Some width when width = pointer_width ->
+      op_function name 1 (function
+        | [ x ] -> pattern_function_unary x shape op
+        | _ -> failwith "Invalid number of arguments")
+  | _ -> op_function name 1 (fun xs -> op_bv_scheme xs op shape)
+
 let template_from_pattern
     ~(op : bv_op_function)
     ~(commutative : bool)
@@ -393,6 +446,11 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
           ValueOp
             (template_from_pattern ~op:OpFunctions.sub_function
                ~commutative:false);
+      };
+      {
+        name = "zext";
+        generator =
+          ValueOp (template_from_pattern_unary ~op:OpFunctions.zext_function);
       };
     ]
 end
