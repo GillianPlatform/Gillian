@@ -103,7 +103,6 @@ let needs_to_be expr t knownp =
   | Some tp -> TypeMap.add bare_expr (strongest t tp) knownp
   | None -> TypeMap.add bare_expr t knownp
 
-
 let same_type e1 e2 knownp =
   let bare_e1, bare_e2 = (WLExpr.get e1, WLExpr.get e2) in
   let topt1 = TypeMap.find_opt bare_e1 knownp in
@@ -112,14 +111,13 @@ let same_type e1 e2 knownp =
   | Some t1, Some t2 when not (compatible t1 t2) ->
       failwith
         (Format.asprintf
-            "Expressions %a and %a should have the same type but are of types \
+           "Expressions %a and %a should have the same type but are of types \
             %a and %a."
-            WLExpr.pp e1 WLExpr.pp e2 pp t1 pp t2)
+           WLExpr.pp e1 WLExpr.pp e2 pp t1 pp t2)
   | Some t1, Some t2 -> Some (strongest t1 t2)
   | Some t1, None -> Some t1
   | None, Some t2 -> Some t2
   | None, None -> None
-
 
 (** Infers a TypeMap from a logic_expr *)
 let rec infer_logic_expr knownp lexpr =

@@ -49,9 +49,7 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     inherit Jsonrpc2.server
 
     (* one env per document *)
-    val buffers : (DocumentUri.t, buffer_state) Hashtbl.t =
-      Hashtbl.create 4
-
+    val buffers : (DocumentUri.t, buffer_state) Hashtbl.t = Hashtbl.create 4
     method spawn_query_handler f = spawn f
 
     (* We define here a helper method that will:

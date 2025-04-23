@@ -149,10 +149,10 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
 (* compile_lexpr : WLExpr.t -> (string list * Asrt.t list * Expr.t)
     compiles a WLExpr into an output expression and a list of Global Assertions.
     the string list contains the name of the variables that are generated. They are existentials. *)
-let rec compile_lexpr  ?(fname = "main") (lexpr : WLExpr.t) :
+let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     string list * Asrt.t * Expr.t =
   let gen_str = Generators.gen_str fname in
-  let compile_lexpr = compile_lexpr  ~fname in
+  let compile_lexpr = compile_lexpr ~fname in
   let expr_pname_of_binop b =
     WBinOp.(
       match b with
@@ -335,9 +335,10 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
     | LPure lf ->
         let _, al, e = compile_lexpr lf in
-        let e = match e with
-        | LVar _ -> Expr.BinOp (e, Equal, Expr.true_)
-        | _ -> e
+        let e =
+          match e with
+          | LVar _ -> Expr.BinOp (e, Equal, Expr.true_)
+          | _ -> e
         in
         ([], Asrt.Pure e :: al))
 
@@ -463,8 +464,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       WLAssert.make
         (LPure
            (WLExpr.not
-              (WLExpr.as_bool_fml ~codeloc:guard_loc
-                 (WLExpr.from_expr guard))))
+              (WLExpr.as_bool_fml ~codeloc:guard_loc (WLExpr.from_expr guard))))
         guard_loc
     in
     let post_ret =
@@ -478,10 +478,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       WLAssert.make
         (LPure
            (WLExpr.make
-              (LBinOp
-                 ( make_var_lexpr "ret",
-                   EQUAL,
-                   ret_list ))
+              (LBinOp (make_var_lexpr "ret", EQUAL, ret_list))
               while_loc))
         while_loc
     in

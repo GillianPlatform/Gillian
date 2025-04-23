@@ -18,10 +18,7 @@ val get_loc : t -> CodeLoc.t
 val get_by_id :
   int ->
   t ->
-  [> `None
-  | `WLAssert of WLAssert.t
-  | `WLExpr of WLExpr.t
-  | `WSpec of t ]
+  [> `None | `WLAssert of WLAssert.t | `WLExpr of WLExpr.t | `WSpec of t ]
 
 val make :
   ?existentials:string * string list ->

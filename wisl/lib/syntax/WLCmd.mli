@@ -22,10 +22,7 @@ val is_unfold : t -> bool
 val get_by_id :
   int ->
   t ->
-  [> `None
-  | `WLExpr of WLExpr.t
-  | `WLAssert of WLAssert.t
-  | `WLCmd of t ]
+  [> `None | `WLExpr of WLExpr.t | `WLAssert of WLAssert.t | `WLCmd of t ]
 
 val pp : Format.formatter -> t -> unit
 val str : t -> string

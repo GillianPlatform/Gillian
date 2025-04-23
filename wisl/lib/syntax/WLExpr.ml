@@ -40,13 +40,15 @@ let rec get_vars_and_lvars le =
   match get le with
   | LVar v -> (SS.empty, SS.singleton v)
   | PVar v -> (SS.singleton v, SS.empty)
-  | LBinOp (le1, _, le2) -> double_union (get_vars_and_lvars le1) (get_vars_and_lvars le2)
+  | LBinOp (le1, _, le2) ->
+      double_union (get_vars_and_lvars le1) (get_vars_and_lvars le2)
   | LUnOp (_, lep) -> get_vars_and_lvars lep
   | LLSub (le1, le2, le3) ->
       double_union (get_vars_and_lvars le1)
         (double_union (get_vars_and_lvars le2) (get_vars_and_lvars le3))
   | LEList lel | LESet lel ->
-      List.fold_left double_union (SS.empty, SS.empty) (List.map get_vars_and_lvars lel)
+      List.fold_left double_union (SS.empty, SS.empty)
+        (List.map get_vars_and_lvars lel)
   | _ -> (SS.empty, SS.empty)
 
 let rec get_by_id id lexpr =
@@ -110,7 +112,7 @@ let rec not e =
   | LBinOp (e1, LESSTHAN, e2) -> make (LBinOp (e1, GREATEREQUAL, e2))
   | LBinOp (e1, LESSEQUAL, e2) -> make (LBinOp (e1, GREATERTHAN, e2))
   | LBinOp (e1, GREATERTHAN, e2) -> make (LBinOp (e1, LESSEQUAL, e2))
-  | LBinOp (e1, EQUAL, { wlenode = LVal (Bool b) ;_}) ->
+  | LBinOp (e1, EQUAL, { wlenode = LVal (Bool b); _ }) ->
       make (LBinOp (e1, EQUAL, make (LVal (Bool (Stdlib.not b)))))
   | LBinOp (e1, GREATEREQUAL, e2) -> make (LBinOp (e1, LESSTHAN, e2))
   | _ -> make (LUnOp (NOT, e))
@@ -123,10 +125,10 @@ let rec as_bool_fml ?(codeloc = CodeLoc.dummy) lexpr =
     | LVal _ -> LVal (Bool false)
     | LBinOp (e1, AND, e2) -> LBinOp (f e1, AND, f e2)
     | LBinOp (e1, OR, e2) -> LBinOp (f e1, OR, f e2)
-    | LBinOp (_, (LESSTHAN|LESSEQUAL|GREATERTHAN|GREATEREQUAL|EQUAL), _) as e -> e
+    | LBinOp (_, (LESSTHAN | LESSEQUAL | GREATERTHAN | GREATEREQUAL | EQUAL), _)
+      as e -> e
     | LUnOp (NOT, e) -> LUnOp (NOT, f e)
-    | LVar _
-    | PVar _ ->
+    | LVar _ | PVar _ ->
         let ttrue = make (LVal (Bool true)) codeloc in
         LBinOp (lexpr, EQUAL, ttrue)
     | _ -> LVal (Bool false)

@@ -112,7 +112,9 @@ let pred_names : t -> string list =
 
 (* Returns a list with the pure assertions that occur in --a-- *)
 let pure_asrts : t -> Expr.t list =
-  List.filter_map @@ function | Pure f -> Some f | _ -> None
+  List.filter_map @@ function
+  | Pure f -> Some f
+  | _ -> None
 
 (* Check if --a-- is a pure assertion *)
 let is_pure_asrt : atom -> bool = function
