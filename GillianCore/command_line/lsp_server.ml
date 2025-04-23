@@ -65,6 +65,7 @@ class lsp_server (f : string -> unit Gillian_result.t) =
       let () = Hashtbl.replace Config.file_content_overrides path contents in
       let result = f path in
       let diags = result_to_diagnostics ~path result in
+      let () = Config.reset_config () in
       notify_back#send_diagnostic diags
 
     (* We now override the [on_notify_doc_did_open] method that will be called

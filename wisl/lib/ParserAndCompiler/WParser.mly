@@ -4,7 +4,7 @@
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
-%token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
+%token <CodeLoc.t> STATEMENT WITH VARIANT PROOF CONFIG
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
@@ -82,53 +82,66 @@
 %nonassoc unop_prec
 
 (* Types and start *)
-%start <WProg.t> prog
+%start <WProg.t * WConfigStmt.t list> prog
 %start <WLAssert.t> assert_only
 
-%type <WFun.t list * WPred.t list * WLemma.t list> definitions
-%type <WFun.t>                                     fct_with_specs
-%type <WFun.t>                                     fct
-%type <WPred.t>                                    predicate
-%type <WLemma.t>                                   lemma
-%type <string list>                                var_list
-%type <WStmt.t list * WExpr.t>                     statement_list_and_return
-%type <WStmt.t list>                               statement_list
-%type <WExpr.t>                                    expression
-%type <WExpr.t list>                               expr_list
-%type <WLCmd.t>                                    logic_command
-%type <WLAssert.t>                                 logic_assertion
-%type <CodeLoc.t * WVal.t>                         value_with_loc
-%type <CodeLoc.t * WUnOp.t>                        unop_with_loc
-%type <WBinOp.t>                                   binop
-%type <WLExpr.t>                                   variant_def
-%type <WLExpr.t>                                   with_variant_def
-%type <WLCmd.t list>                               proof_def
-%type <(string * WType.t option) * bool>           pred_param_ins
-%type <CodeLoc.t * string list>                    bindings_with_loc
-%type <WLExpr.t>                                   logic_expression
-%type <WBinOp.t>                                   logic_binop
-%type <CodeLoc.t * WVal.t>                         logic_value_with_loc
+%type <WFun.t list * WPred.t list * WLemma.t list * WConfigStmt.t list>
+                                         definitions
+%type <WConfigStmt.t>                    config
+%type <WFun.t>                           fct_with_specs
+%type <WFun.t>                           fct
+%type <WPred.t>                          predicate
+%type <WLemma.t>                         lemma
+%type <string list>                      var_list
+%type <WStmt.t list * WExpr.t>           statement_list_and_return
+%type <WStmt.t list>                     statement_list
+%type <WExpr.t>                          expression
+%type <WExpr.t list>                     expr_list
+%type <WLCmd.t>                          logic_command
+%type <WLAssert.t>                       logic_assertion
+%type <CodeLoc.t * WVal.t>               value_with_loc
+%type <CodeLoc.t * WUnOp.t>              unop_with_loc
+%type <WBinOp.t>                         binop
+%type <WLExpr.t>                         variant_def
+%type <WLExpr.t>                         with_variant_def
+%type <WLCmd.t list>                     proof_def
+%type <(string * WType.t option) * bool> pred_param_ins
+%type <CodeLoc.t * string list>          bindings_with_loc
+%type <WLExpr.t>                         logic_expression
+%type <WBinOp.t>                         logic_binop
+%type <CodeLoc.t * WVal.t>               logic_value_with_loc
 %%
 
 prog:
   | fcp = definitions; EOF {
-    let (fc, preds, lemmas) = fcp in
-    WProg.{ lemmas = lemmas; predicates = preds; context = fc } }
+    let (fc, preds, lemmas, configs) = fcp in
+    let prog = WProg.{ lemmas = lemmas; predicates = preds; context = fc } in
+    prog, configs }
 
 assert_only:
   | la = logic_assertion; EOF { la }
 
 definitions:
-  | (* empty *) { ([], [], []) }
-  | fpdcl = definitions; p = predicate
-    { let (fs, ps,ls) = fpdcl in
-      (fs, p::ps, ls) }
-  | fpdcl = definitions; l = lemma
-    { let (fs, ps, ls) = fpdcl in
-      (fs, ps, l::ls) }
-  | fpdcl = definitions; f = fct_with_specs
-    { let (fs, ps, ls) = fpdcl in
-      (f::fs, ps, ls) }
+  | (* empty *) { ([], [], [], []) }
+  | defs = definitions; p = config
+    { let (fs, ps, ls, cs) = defs in
+      (fs, ps, ls, p::cs) }
+  | defs = definitions; p = predicate
+    { let (fs, ps, ls, cs) = defs in
+      (fs, p::ps, ls, cs) }
+  | defs = definitions; l = lemma
+    { let (fs, ps, ls, cs) = defs in
+      (fs, ps, l::ls, cs) }
+  | defs = definitions; f = fct_with_specs
+    { let (fs, ps, ls, cs) = defs in
+      (f::fs, ps, ls, cs) }
+
+config:
+  | lstart = CONFIG; id = IDENTIFIER; COLON; value = value_with_loc
+    { let (_, id) = id in
+      let (lend, value) = value in
+      let loc = CodeLoc.merge lstart lend in
+      id, value, loc }
 
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;

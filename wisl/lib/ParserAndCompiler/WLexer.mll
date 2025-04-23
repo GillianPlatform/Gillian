@@ -21,6 +21,7 @@ let newline = '\r' | '\n' | "\r\n"
 rule read =
   parse
   (* keywords *)
+  | "@config" { CONFIG (curr lexbuf) }
   | "true"   { TRUE (curr lexbuf) }
   | "false"  { FALSE (curr lexbuf) }
   | "nil"    { LSTNIL (curr lexbuf) }
