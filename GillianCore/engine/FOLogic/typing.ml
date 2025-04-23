@@ -154,7 +154,7 @@ module Infer_types_to_gamma = struct
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
     | Constructor (n, les) -> (
-        let field_types = Type_env.get_constructor_field_types gamma n in
+        let field_types = Type_env.get_constructor_field_types n in
         let check_field le tt =
           match tt with
           | Some tt -> f le tt
@@ -164,7 +164,7 @@ module Infer_types_to_gamma = struct
         | Some tts ->
             if List.length tts <> List.length les then false
             else
-              tt = Type_env.get_constructor_type_unsafe gamma n
+              tt = Type_env.get_constructor_type_unsafe n
               && List.for_all2 check_field les tts
         | None -> false)
     | Exists (bt, le) | ForAll (bt, le) ->
@@ -198,7 +198,7 @@ let reverse_type_lexpr
     (flag : bool)
     (gamma : Type_env.t)
     (e_types : (Expr.t * Type.t) list) : Type_env.t option =
-  let new_gamma = Type_env.keeping_datatypes gamma in
+  let new_gamma = Type_env.init () in
   let ret =
     List.fold_left
       (fun ac (e, t) -> ac && infer_types_to_gamma flag gamma new_gamma e t)
@@ -474,11 +474,11 @@ module Type_lexpr = struct
     if not ite then def_neg else infer_type gamma le BooleanType
 
   and type_constructor gamma n les =
-    let tts_opt = Type_env.get_constructor_field_types gamma n in
+    let tts_opt = Type_env.get_constructor_field_types n in
     match tts_opt with
     | Some tts ->
         if typable_list gamma ?target_types:(Some tts) les then
-          def_pos (Type_env.get_constructor_type gamma n)
+          def_pos (Type_env.get_constructor_type n)
         else def_neg
     | None -> def_neg
 

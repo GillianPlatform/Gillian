@@ -5,7 +5,6 @@ module Make (SPState : PState.S) : sig
       It returns the appropriate predicate state and all learned bindings. *)
   val normalise_assertion :
     pred_defs:MP.preds_tbl_t ->
-    ?datatype_defs:Type_env.datatypes_tbl_t ->
     init_data:SPState.init_data ->
     ?pvars:Utils.Containers.SS.t ->
     Asrt.t ->

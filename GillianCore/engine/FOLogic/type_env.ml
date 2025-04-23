@@ -6,15 +6,11 @@ module L = Logging
 
 type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
 type datatypes_tbl_t = (string, Datatype.t) Hashtbl.t [@@deriving yojson]
+type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
 
-type t = {
-  var_types : (string, Type.t) Hashtbl.t;
-  constructor_defs : constructors_tbl_t;
-  datatype_defs : datatypes_tbl_t;
-}
-[@@deriving yojson]
-
-let as_hashtbl x = x.var_types
+let constructor_defs : constructors_tbl_t ref = ref (Hashtbl.create 1)
+let datatype_defs : datatypes_tbl_t ref = ref (Hashtbl.create 1)
+let as_hashtbl x = x
 
 (*************************************)
 (** Typing Environment Functions    **)
@@ -22,76 +18,55 @@ let as_hashtbl x = x.var_types
 (*************************************)
 
 (* Initialisation *)
-let init ?(datatype_defs = Hashtbl.create Config.medium_tbl_size) () : t =
-  let constructor_defs = Hashtbl.create Config.medium_tbl_size in
-  let add_constructor_to_tbl (constructor : Constructor.t) =
-    Hashtbl.add constructor_defs constructor.constructor_name constructor
-  in
-  let add_constructors_to_tbl _ (datatype : Datatype.t) =
-    List.iter add_constructor_to_tbl datatype.datatype_constructors
-  in
-  let () = Hashtbl.iter add_constructors_to_tbl datatype_defs in
-  {
-    var_types = Hashtbl.create Config.medium_tbl_size;
-    datatype_defs;
-    constructor_defs;
-  }
+let init () : t = Hashtbl.create Config.medium_tbl_size
 
 (* Copy *)
-let copy { var_types; datatype_defs; constructor_defs } : t =
-  {
-    var_types = Hashtbl.copy var_types;
-    datatype_defs = Hashtbl.copy datatype_defs;
-    constructor_defs = Hashtbl.copy constructor_defs;
-  }
+let copy x : t = Hashtbl.copy x
 
 (* Type of a variable *)
-let get (x : t) (var : string) : Type.t option =
-  Hashtbl.find_opt x.var_types var
+let get (x : t) (var : string) : Type.t option = Hashtbl.find_opt x var
 
 (* Membership *)
-let mem (x : t) (v : string) : bool = Hashtbl.mem x.var_types v
+let mem (x : t) (v : string) : bool = Hashtbl.mem x v
 
 (* Empty *)
-let empty (x : t) : bool = Hashtbl.length x.var_types == 0
+let empty (x : t) : bool = Hashtbl.length x == 0
 
 (* Type of a variable *)
 let get_unsafe (x : t) (var : string) : Type.t =
-  match Hashtbl.find_opt x.var_types var with
+  match Hashtbl.find_opt x var with
   | Some t -> t
   | None ->
       raise (Failure ("Type_env.get_unsafe: variable " ^ var ^ " not found."))
 
 (* Get all matchable elements *)
 let matchables (x : t) : SS.t =
-  Hashtbl.fold (fun var _ ac -> SS.add var ac) x.var_types SS.empty
+  Hashtbl.fold (fun var _ ac -> SS.add var ac) x SS.empty
 
 (* Get all variables *)
 let vars (x : t) : SS.t =
-  Hashtbl.fold (fun var _ ac -> SS.add var ac) x.var_types SS.empty
+  Hashtbl.fold (fun var _ ac -> SS.add var ac) x SS.empty
 
 (* Get all logical variables *)
 let lvars (x : t) : SS.t =
   Hashtbl.fold
     (fun var _ ac -> if is_lvar_name var then SS.add var ac else ac)
-    x.var_types SS.empty
+    x SS.empty
 
 (* Get all variables of specific type *)
 let get_vars_of_type (x : t) (tt : Type.t) : string list =
   Hashtbl.fold
     (fun var t ac_vars -> if t = tt then var :: ac_vars else ac_vars)
-    x.var_types []
+    x []
 
 (* Get all var-type pairs as a list *)
-let get_var_type_pairs (x : t) : (string * Type.t) Seq.t =
-  Hashtbl.to_seq x.var_types
+let get_var_type_pairs (x : t) : (string * Type.t) Seq.t = Hashtbl.to_seq x
 
 (* Iteration *)
-let iter (x : t) (f : string -> Type.t -> unit) : unit =
-  Hashtbl.iter f x.var_types
+let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x
 
 let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
-  Hashtbl.fold f x.var_types init
+  Hashtbl.fold f x init
 
 let pp fmt tenv =
   let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
@@ -110,20 +85,20 @@ let pp_by_need vars fmt tenv =
 
 let update (te : t) (x : string) (t : Type.t) : unit =
   match get te x with
-  | None -> Hashtbl.replace te.var_types x t
+  | None -> Hashtbl.replace te x t
   | Some t' when t' = t -> ()
   | Some t' ->
       Fmt.failwith
         "Type_env update: Conflict: %s has type %s but required extension is %s"
         x (Type.str t') (Type.str t)
 
-let remove (te : t) (x : string) : unit = Hashtbl.remove te.var_types x
+let remove (te : t) (x : string) : unit = Hashtbl.remove te x
 
 (* Extend gamma with more_gamma *)
 let extend (x : t) (y : t) : unit =
   iter y (fun v t ->
-      match Hashtbl.find_opt x.var_types v with
-      | None -> Hashtbl.replace x.var_types v t
+      match Hashtbl.find_opt x v with
+      | None -> Hashtbl.replace x v t
       | Some t' ->
           if t <> t' then
             raise (Failure "Typing environment cannot be extended."))
@@ -169,7 +144,7 @@ let to_list_expr (x : t) : (Expr.t * Type.t) list =
       (fun x t (pairs : (Expr.t * Type.t) list) ->
         if Names.is_lvar_name x then (LVar x, t) :: pairs
         else (PVar x, t) :: pairs)
-      x.var_types []
+      x []
   in
   le_type_pairs
 
@@ -177,13 +152,13 @@ let to_list (x : t) : (Var.t * Type.t) list =
   let le_type_pairs =
     Hashtbl.fold
       (fun x t (pairs : (Var.t * Type.t) list) -> (x, t) :: pairs)
-      x.var_types []
+      x []
   in
   le_type_pairs
 
 let reset (x : t) (reset : (Var.t * Type.t) list) =
-  Hashtbl.clear x.var_types;
-  List.iter (fun (y, t) -> Hashtbl.replace x.var_types y t) reset
+  Hashtbl.clear x;
+  List.iter (fun (y, t) -> Hashtbl.replace x y t) reset
 
 let is_well_formed (_ : t) : bool = true
 
@@ -194,17 +169,28 @@ let filter_with_info relevant_info (x : t) =
 
 (*************************************)
 (**     Datatype Functions          **)
-
 (*************************************)
 
-let get_constructor_type (x : t) (cname : string) : Type.t option =
-  let constructor = Hashtbl.find_opt x.constructor_defs cname in
+let init_datatypes (datatypes : datatypes_tbl_t) =
+  let constructors = Hashtbl.create Config.medium_tbl_size in
+  let add_constructor_to_tbl (c : Constructor.t) =
+    Hashtbl.add constructors c.constructor_name c
+  in
+  let add_constructors_to_tbl cs = List.iter add_constructor_to_tbl cs in
+  Hashtbl.iter
+    (fun _ (d : Datatype.t) -> add_constructors_to_tbl d.datatype_constructors)
+    datatypes;
+  datatype_defs := datatypes;
+  constructor_defs := constructors
+
+let get_constructor_type (cname : string) : Type.t option =
+  let constructor = Hashtbl.find_opt !constructor_defs cname in
   Option.map
     (fun (c : Constructor.t) -> Type.DatatypeType c.constructor_datatype)
     constructor
 
-let get_constructor_type_unsafe (x : t) (cname : string) : Type.t =
-  let constructor = Hashtbl.find_opt x.constructor_defs cname in
+let get_constructor_type_unsafe (cname : string) : Type.t =
+  let constructor = Hashtbl.find_opt !constructor_defs cname in
   match constructor with
   | Some c -> Type.DatatypeType c.constructor_datatype
   | None ->
@@ -213,11 +199,11 @@ let get_constructor_type_unsafe (x : t) (cname : string) : Type.t =
            ("Type_env.get_constructor_type_unsafe: constructor " ^ cname
           ^ " not found."))
 
-let get_constructor_field_types (x : t) (cname : string) :
-    Type.t option list option =
-  let constructor = Hashtbl.find_opt x.constructor_defs cname in
+let get_constructor_field_types (cname : string) : Type.t option list option =
+  let constructor = Hashtbl.find_opt !constructor_defs cname in
   Option.map (fun (c : Constructor.t) -> c.constructor_fields) constructor
 
-let keeping_datatypes (x : t) : t =
-  let datatype_defs = Hashtbl.copy x.datatype_defs in
-  init ~datatype_defs ()
+let get_datatypes () : Datatype.t list =
+  List.of_seq (Hashtbl.to_seq_values !datatype_defs)
+
+let get_constructors () : constructors_tbl_t = !constructor_defs

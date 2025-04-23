@@ -22,8 +22,8 @@ let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
-let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
+let initialised : bool ref = ref false
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -34,6 +34,7 @@ let is_true = function
   | _ -> false
 
 type typenv = (string, Type.t) Hashtbl.t [@@deriving to_yojson]
+type constructorstbl = (string, Constructor.t) Hashtbl.t [@@deriving to_yojson]
 
 let fs_to_yojson fs = fs |> Expr.Set.to_list |> list_to_yojson Expr.to_yojson
 
@@ -116,6 +117,10 @@ module Variant = struct
     val access : sexp -> sexp
   end
 
+  module type Nary = sig
+    include S
+  end
+
   let nul ?recognizer name =
     let recognizer = Option.value recognizer ~default:("is" ^ name) in
     let module M = struct
@@ -138,6 +143,18 @@ module Variant = struct
       let access x = accessor <| x
     end in
     (module M : Unary)
+
+  let n ?recognizer name param_typs =
+    let module N = (val nul ?recognizer name : Nullary) in
+    let module M = struct
+      include N
+
+      let params =
+        List.mapi
+          (fun i param_typ -> ("param-" ^ string_of_int i, param_typ))
+          param_typs
+    end in
+    (module M : Nary)
 end
 
 let declare_recognizer ~name ~constructor ~typ =
@@ -146,7 +163,7 @@ let declare_recognizer ~name ~constructor ~typ =
     t_bool
     (list [ atom "_"; atom "is"; atom constructor ] <| atom "x")
 
-let mk_datatype name type_params (variants : (module Variant.S) list) =
+let mk_datatype' name type_params (variants : (module Variant.S) list) =
   let constructors, recognizer_defs =
     variants
     |> List.map (fun v ->
@@ -159,9 +176,28 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
            (constructor, recognizer_def))
     |> List.split
   in
+  let datatype = (name, type_params, constructors) in
+  (datatype, recognizer_defs)
+
+let mk_datatype name type_params (variants : (module Variant.S) list) =
+  let (_, _, constructors), recognizer_defs =
+    mk_datatype' name type_params variants
+  in
   let decl = declare_datatype name type_params constructors in
-  let () = init_decls := recognizer_defs @ (decl :: !init_decls) in
-  atom name
+  decl :: recognizer_defs
+
+(* Mutually recursive Datatypes *)
+let mk_datatypes
+    (datatypes : (string * string list * (module Variant.S) list) list) =
+  let datatypes, recognizer_defs =
+    List.split
+      (List.map
+         (fun (name, type_params, variants) ->
+           mk_datatype' name type_params variants)
+         datatypes)
+  in
+  let decl = declare_datatypes datatypes in
+  decl :: List.concat recognizer_defs
 
 let mk_fun_decl name param_types result_type =
   let decl = declare_fun name param_types result_type in
@@ -184,8 +220,11 @@ module Type_operations = struct
   module Set = (val nul "SetType" : Nullary)
   module Datatype = (val un "DatatypeType" "datatype-id" t_int)
 
-  let t_gil_type =
-    mk_datatype "GIL_Type" []
+  let gil_type_name = "GIL_Type"
+  let t_gil_type = atom gil_type_name
+
+  let init_decls =
+    mk_datatype gil_type_name []
       [
         (module Undefined : Variant.S);
         (module Null : Variant.S);
@@ -210,6 +249,52 @@ module Lit_operations = struct
 
   let gil_literal_name = "GIL_Literal"
   let t_gil_literal = atom gil_literal_name
+  let t_gil_literal_list = t_seq t_gil_literal
+  let t_gil_literal_set = t_set t_gil_literal
+
+  let native_sort_of_type =
+    let open Type in
+    function
+    | IntType | StringType | ObjectType -> t_int
+    | ListType -> t_seq t_gil_literal
+    | BooleanType -> t_bool
+    | NumberType -> t_real
+    | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
+    | SetType -> t_set t_gil_literal
+    | TypeType -> t_gil_type
+    | DatatypeType name -> atom name
+
+  let mk_constructor Constructor.{ constructor_name; constructor_fields; _ } =
+    let param_typ t =
+      Option.map native_sort_of_type t |> Option.value ~default:t_gil_literal
+    in
+    let param_typs = List.map param_typ constructor_fields in
+    let module N = (val n constructor_name param_typs : Variant.Nary) in
+    (module N : Variant.S)
+
+  let mk_user_def_datatype Datatype.{ datatype_name; datatype_constructors; _ }
+      =
+    let variants = List.map mk_constructor datatype_constructors in
+    (datatype_name, [], variants)
+
+  let mk_user_def_datatypes (datatypes : Datatype.t list) =
+    List.map mk_user_def_datatype datatypes
+
+  let user_def_datatype_lit_variant_name (datatype_name : string) =
+    "Datatype" ^ datatype_name
+
+  let user_def_datatype_lit_param_name (datatype_name : string) =
+    datatype_name ^ "Value"
+
+  let mk_user_def_datatype_lit_variant Datatype.{ datatype_name; _ } =
+    let variant_name = user_def_datatype_lit_variant_name datatype_name in
+    let t_datatype = atom datatype_name in
+    let parameter_name = user_def_datatype_lit_param_name datatype_name in
+    let module N = (val un variant_name parameter_name t_datatype : Unary) in
+    (module N : Variant.S)
+
+  let mk_user_def_datatype_lit_variants datatypes =
+    List.map mk_user_def_datatype_lit_variant datatypes
 
   module Undefined = (val nul "Undefined" : Nullary)
   module Null = (val nul "Null" : Nullary)
@@ -223,8 +308,13 @@ module Lit_operations = struct
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
   module None = (val nul "None" : Nullary)
 
-  let _ =
-    mk_datatype gil_literal_name []
+  module Datatype = struct
+    let access (name : string) (x : sexp) =
+      atom (user_def_datatype_lit_param_name name) <| x
+  end
+
+  let init_decls user_def_datatypes =
+    let gil_literal_variants =
       [
         (module Undefined : Variant.S);
         (module Null : Variant.S);
@@ -238,11 +328,22 @@ module Lit_operations = struct
         (module List : Variant.S);
         (module None : Variant.S);
       ]
+    in
+    let gil_literal_user_def_variants =
+      mk_user_def_datatype_lit_variants user_def_datatypes
+    in
+    let gil_literal_datatype =
+      ( gil_literal_name,
+        [],
+        gil_literal_variants @ gil_literal_user_def_variants )
+    in
+    mk_datatypes
+      (gil_literal_datatype :: mk_user_def_datatypes user_def_datatypes)
 end
 
 let t_gil_literal = Lit_operations.t_gil_literal
-let t_gil_literal_list = t_seq t_gil_literal
-let t_gil_literal_set = t_set t_gil_literal
+let t_gil_literal_list = Lit_operations.t_gil_literal_list
+let t_gil_literal_set = Lit_operations.t_gil_literal_set
 
 let seq_of ~typ = function
   | [] -> as_type (atom "seq.empty") typ
@@ -263,7 +364,10 @@ module Ext_lit_operations = struct
 
   module Gil_set = (val un "Set" "setElem" t_gil_literal_set : Unary)
 
-  let t_gil_ext_literal =
+  let gil_ext_literal_name = "Extended_GIL_Literal"
+  let t_gil_ext_literal = atom gil_ext_literal_name
+
+  let init_decls =
     mk_datatype "Extended_GIL_Literal" []
       [ (module Gil_sing_elem : Variant.S); (module Gil_set : Variant.S) ]
 end
@@ -331,7 +435,7 @@ module Encoding = struct
     | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
     | SetType -> t_gil_literal_set
     | TypeType -> t_gil_type
-    | DatatypeType _ -> failwith "TODO"
+    | DatatypeType name -> atom name
 
   type t = {
     consts : (string * sexp) Hashset.t; [@default Hashset.empty ()]
@@ -411,10 +515,10 @@ module Encoding = struct
           | TypeType -> Type.construct
           | BooleanType -> Bool.construct
           | ListType -> List.construct
+          | DatatypeType name -> ( <| ) (atom ("Datatype" ^ name))
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
-          | DatatypeType _ -> failwith "TODO"
         in
         construct expr
     | Extended_wrapped -> Ext_lit_operations.Gil_sing_elem.access expr
@@ -437,6 +541,24 @@ module Encoding = struct
     | _ -> failwith "wrong encoding of set"
 
   let get_string = get_native ~accessor:Lit_operations.String.access
+
+  let get_native_of_type ~(typ : Type.t) =
+    let open Lit_operations in
+    let accessor =
+      match typ with
+      | IntType -> Int.access
+      | NumberType -> Num.access
+      | StringType -> String.access
+      | ObjectType -> Loc.access
+      | TypeType -> Type.access
+      | BooleanType -> Bool.access
+      | ListType -> List.access
+      | DatatypeType name -> Datatype.access name
+      | UndefinedType | NullType | EmptyType | NoneType | SetType ->
+          Fmt.failwith "Cannot get native value of type %s"
+            (Gil_syntax.Type.str typ)
+    in
+    get_native ~accessor
 end
 
 let typeof_simple e =
@@ -678,12 +800,14 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
 let encode_quantified_expr
     ~(encode_expr :
        gamma:typenv ->
+       constructor_defs:constructorstbl ->
        llen_lvars:SS.t ->
        list_elem_vars:SS.t ->
        'a ->
        Encoding.t)
     ~mk_quant
     ~gamma
+    ~constructor_defs
     ~llen_lvars
     ~list_elem_vars
     quantified_vars
@@ -693,7 +817,9 @@ let encode_quantified_expr
     match quantified_vars with
     | [] ->
         (* A quantified assertion with no quantified variables is just the assertion *)
-        Some (encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion)
+        Some
+          (encode_expr ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars
+             assertion)
     | _ -> None
   in
   (* Start by updating gamma with the information provided by quantifier types.
@@ -708,7 +834,9 @@ let encode_quantified_expr
   in
   (* Not the same gamma now!*)
   let encoded_assertion, consts, extra_asrts =
-    match encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion with
+    match
+      encode_expr ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars assertion
+    with
     | { kind = Native BooleanType; expr; consts; extra_asrts } ->
         (expr, consts, extra_asrts)
     | _ -> failwith "the thing inside forall is not boolean!"
@@ -734,11 +862,15 @@ let encode_quantified_expr
 
 let rec encode_logical_expression
     ~(gamma : typenv)
+    ~(constructor_defs : constructorstbl)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
     (le : Expr.t) : Encoding.t =
   let open Encoding in
-  let f = encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars in
+  let f =
+    encode_logical_expression ~gamma ~constructor_defs ~llen_lvars
+      ~list_elem_vars
+  in
 
   match le with
   | Lit lit -> encode_lit lit
@@ -780,20 +912,34 @@ let rec encode_logical_expression
       seq_extract lst start len >- ListType
   | Exists (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
-        ~mk_quant:exists ~gamma ~llen_lvars ~list_elem_vars bt e
+        ~mk_quant:exists ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars bt
+        e
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
-        ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
-  | Constructor _ -> failwith "TODO" (* TODO *)
+        ~mk_quant:forall ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars bt
+        e
+  | Constructor (name, les) ->
+      let c = Hashtbl.find constructor_defs name in
+      let param_typs = c.constructor_fields in
+      let simple_wrap_or_native typopt =
+        match typopt with
+        | Some typ -> get_native_of_type ~typ
+        | None -> simple_wrap
+      in
+      let>-- args = List.map f les in
+      let args = List.map2 simple_wrap_or_native param_typs args in
+      let sexp = atom name $$ args in
+      sexp >- DatatypeType c.constructor_datatype
 
 let encode_assertion_top_level
     ~(gamma : typenv)
+    ~(constructor_defs : constructorstbl)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
     (a : Expr.t) : Encoding.t =
   try
-    encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
-      (Expr.push_in_negations a)
+    encode_logical_expression ~gamma ~constructor_defs ~llen_lvars
+      ~list_elem_vars (Expr.push_in_negations a)
   with e ->
     let s = Printexc.to_string e in
     let msg =
@@ -866,14 +1012,19 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
       SS.union new_lvars acc)
     assertions SS.empty
 
-let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
+let encode_assertions
+    (fs : Expr.Set.t)
+    (gamma : typenv)
+    (constructor_defs : constructorstbl) : sexp list =
   let open Encoding in
   let- () = Hashtbl.find_opt encoding_cache fs in
   let llen_lvars = lvars_only_in_llen fs in
   let list_elem_vars = lvars_as_list_elements fs in
   let encoded =
     Expr.Set.elements fs
-    |> List.map (encode_assertion_top_level ~gamma ~llen_lvars ~list_elem_vars)
+    |> List.map
+         (encode_assertion_top_level ~gamma ~constructor_defs ~llen_lvars
+            ~list_elem_vars)
   in
   let consts =
     Hashtbl.fold
@@ -929,21 +1080,43 @@ module Dump = struct
           cmds)
 end
 
-let reset_solver () =
-  let () = cmd (pop 1) in
-  let () = RepeatCache.clear () in
-  let () = cmd (push 1) in
-  ()
+let init_solver (user_def_datatypes : Datatype.t list) =
+  let init_decls =
+    [
+      Type_operations.init_decls;
+      Lit_operations.init_decls user_def_datatypes;
+      Ext_lit_operations.init_decls;
+    ]
+  in
+  let decls = List.concat init_decls in
+  let () = decls |> List.iter cmd in
+  cmd (push 1)
 
-let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
+let init_or_reset_solver (user_def_datatypes : Datatype.t list) =
+  if not !initialised then (
+    (* If solver has not been initialised, initialise it *)
+    init_solver user_def_datatypes;
+    initialised := true)
+  else
+    (* Otherwise reset it *)
+    let () = cmd (pop 1) in
+    let () = RepeatCache.clear () in
+    let () = cmd (push 1) in
+    ()
+
+let exec_sat'
+    (fs : Expr.Set.t)
+    (gamma : typenv)
+    (constructor_defs : constructorstbl)
+    (datatype_defs : Datatype.t list) : sexp option =
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Expr.Set.iter Expr.pp)
           fs pp_typenv gamma)
   in
-  let () = reset_solver () in
-  let encoded_assertions = encode_assertions fs gamma in
+  let () = init_or_reset_solver datatype_defs in
+  let encoded_assertions = encode_assertions fs gamma constructor_defs in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
   let () = List.iter cmd !builtin_funcs in
   let () = List.iter cmd encoded_assertions in
@@ -977,8 +1150,12 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   in
   ret
 
-let exec_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
-  try exec_sat' fs gamma
+let exec_sat
+    (fs : Expr.Set.t)
+    (gamma : typenv)
+    (constructor_defs : constructorstbl)
+    (datatype_defs : Datatype.t list) : sexp option =
+  try exec_sat' fs gamma constructor_defs datatype_defs
   with UnexpectedSolverResponse _ as e ->
     let additional_data =
       [
@@ -989,7 +1166,11 @@ let exec_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
     in
     raise Gillian_result.Exc.(internal_error ~additional_data "SMT failure")
 
-let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
+let check_sat
+    (fs : Expr.Set.t)
+    (gamma : typenv)
+    (constructor_defs : constructorstbl)
+    (datatype_defs : Datatype.t list) : sexp option =
   match Hashtbl.find_opt sat_cache fs with
   | Some result ->
       let () =
@@ -999,7 +1180,7 @@ let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
       result
   | None ->
       let () = L.verbose (fun m -> m "SAT check not found in cache") in
-      let ret = exec_sat fs gamma in
+      let ret = exec_sat fs gamma constructor_defs datatype_defs in
       let () =
         L.verbose (fun m ->
             let f = Expr.conjunct (Expr.Set.elements fs) in
@@ -1008,15 +1189,20 @@ let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
       let () = Hashtbl.replace sat_cache fs ret in
       ret
 
-let is_sat (fs : Expr.Set.t) (gamma : typenv) : bool =
-  check_sat fs gamma |> Option.is_some
+let is_sat
+    (fs : Expr.Set.t)
+    (gamma : typenv)
+    (constructor_defs : constructorstbl)
+    (datatype_defs : Datatype.t list) : bool =
+  check_sat fs gamma constructor_defs datatype_defs |> Option.is_some
 
 let lift_model
     (model : sexp)
     (gamma : typenv)
+    (datatype_defs : Datatype.t list)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  let () = reset_solver () in
+  let () = init_or_reset_solver datatype_defs in
   let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
@@ -1072,8 +1258,3 @@ let lift_model
                m "SMT binding for %s: %s\n" x binding)
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
-
-let () =
-  let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
-  cmd (push 1)

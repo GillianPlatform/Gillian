@@ -822,7 +822,6 @@ module Make (SPState : PState.S) = struct
   (** Given an assertion creates a symbolic state and a substitution *)
   let normalise_assertion
       ~(pred_defs : MP.preds_tbl_t)
-      ?(datatype_defs : Type_env.datatypes_tbl_t option)
       ~(init_data : SPState.init_data)
       ?(pvars : SS.t option)
       (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
@@ -839,7 +838,7 @@ module Make (SPState : PState.S) = struct
 
     (* Step 2a -- Create empty symbolic heap, symbolic store, typing environment, and substitution *)
     let store = SStore.init [] in
-    let gamma = Type_env.init ?datatype_defs () in
+    let gamma = Type_env.init () in
     let subst = SESubst.init [] in
 
     (* Step 2b -- Separate assertion *)

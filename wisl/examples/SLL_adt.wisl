@@ -32,7 +32,7 @@ function SLL_allocate_node(v){
   [t] := v;
   return t
 }
-{ SLL(ret, Cons(#v, Nil)) }
+{ SLL(ret, Cons(#v, Nil())) }
 
 
 //
