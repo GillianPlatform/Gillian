@@ -324,12 +324,34 @@ module OpFunctions = struct
       Expr.bv_arg list =
     List.map2 (fun expr width -> Expr.BvExpr (expr, width)) inputs shape.args
 
-  let bv_op_function (op : BVOps.t) inputs shape =
+  let bv_op_function ?(literals : int list option) (op : BVOps.t) inputs shape =
+    let lits = Option.to_list literals |> List.flatten in
     let args = zip_args_with_shape inputs shape in
-    Expr.BVExprIntrinsic (op, args, shape.width_of_result)
+    Expr.BVExprIntrinsic
+      (op, List.map (fun x -> Expr.Literal x) lits @ args, shape.width_of_result)
 
   let add_op_function = bv_op_function BVOps.BVPlus
   let neg_function = bv_op_function BVOps.BVNeg
+
+  let unop_function
+      ?(compute_lits : (input:int -> output:int -> int list) option)
+      (op : BVOps.t)
+      inputs
+      shape =
+    match shape.width_of_result with
+    | Some width ->
+        let input = List.hd shape.args in
+        let lits = Option.map (fun f -> f ~input ~output:width) compute_lits in
+        bv_op_function ?literals:lits op inputs shape
+    | None -> failwith "Unop function requires a result width"
+
+  let zext_function =
+    unop_function
+      ~compute_lits:(fun ~input ~output ->
+        if input > output then
+          failwith "Zext requires a larger or equal output width then input"
+        else [ output - input ])
+      BVOps.BVZeroExtend
 
   let sub_function inputs shape =
     let first_shape = { shape with args = [ List.hd shape.args ] } in
