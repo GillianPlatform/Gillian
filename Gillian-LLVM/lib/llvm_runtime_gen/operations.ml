@@ -179,7 +179,16 @@ let op_bv_scheme
   let* _ =
     ite check
       ~true_case:
-        (let* _ = add_return_of_value (op inputs shape) in
+        (let* _ =
+           add_return_of_value
+             (Expr.EList
+                [
+                  Expr.string
+                    (LLVMRuntimeTypes.type_to_string
+                       (LLVMRuntimeTypes.Int (Option.get shape.width_of_result)));
+                  op inputs shape;
+                ])
+         in
          return get_current_block_label)
       ~false_case:
         (let* _ = add_cmd (type_fail expr_with_type) in
@@ -275,7 +284,10 @@ let pattern_function_unary
   in
   let case_statement_for_int (regular_val : Expr.t) =
     let int_val = Expr.list_nth regular_val 1 in
-    let* _ = add_return_of_value (op [ int_val ] shape) in
+    let* _ =
+      add_return_of_value
+        (Expr.EList [ Expr.list_nth regular_val 0; op [ int_val ] shape ])
+    in
     return ()
   in
   let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
@@ -407,7 +419,7 @@ let template_from_pattern_unary
     ~(pointer_width : int)
     (name : string)
     (shape : bv_op_shape) =
-  match shape.width_of_result with
+  match List.nth_opt shape.args 0 with
   | Some width when width = pointer_width ->
       op_function name 1 (function
         | [ x ] -> pattern_function_unary x shape op
@@ -420,7 +432,7 @@ let template_from_pattern
     ~(pointer_width : int)
     (name : string)
     (shape : bv_op_shape) =
-  match shape.width_of_result with
+  match List.nth_opt shape.args 0 with
   | Some width when width = pointer_width ->
       op_function name 2 (function
         | [ x; y ] -> pattern_function x y shape op commutative
