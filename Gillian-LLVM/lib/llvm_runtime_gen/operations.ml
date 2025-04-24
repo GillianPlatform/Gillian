@@ -401,6 +401,8 @@ let pattern_function
   return ()
 
 module OpFunctions = struct
+  open Gil_syntax
+
   let zip_args_with_shape (inputs : Expr.t list) (shape : bv_op_shape) :
       Expr.bv_arg list =
     List.map2 (fun expr width -> Expr.BvExpr (expr, width)) inputs shape.args
@@ -430,6 +432,28 @@ module OpFunctions = struct
   let add_op_nuw = bv_check_function BVOps.BVUAddO
   let add_op_nsw = bv_check_function BVOps.BVSAddO
   let neg_function = bv_op_function BVOps.BVNeg
+
+  let negated_function
+      (f : Expr.t list -> bv_op_shape -> Expr.t)
+      (inputs : Expr.t list)
+      (shape : bv_op_shape) =
+    let orig_res = f inputs shape in
+    let negated_res = Expr.UnOp (UnOp.Not, orig_res) in
+    negated_res
+
+  let icmp_eq =
+    raise
+      (Failure "Not implemented, this needs to be implemented as a speical case")
+
+  let icmp_ne = negated_function icmp_eq
+  let icmp_ugt = negated_function (bv_op_function BVOps.BVUleq)
+  let imcp_uge = negated_function (bv_op_function BVOps.BVUlt)
+  let icmp_ult = bv_op_function BVOps.BVUlt
+  let icmp_ule = bv_op_function BVOps.BVUleq
+  let icmp_sgt = negated_function (bv_op_function BVOps.BVSleq)
+  let icmp_sge = negated_function (bv_op_function BVOps.BVSlt)
+  let icmp_slt = bv_op_function BVOps.BVSlt
+  let icmp_sle = bv_op_function BVOps.BVSleq
 
   let unop_function
       ?(compute_lits : (input:int -> output:int -> int list) option)
