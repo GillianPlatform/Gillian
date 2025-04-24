@@ -402,13 +402,30 @@ module OpFunctions = struct
       Expr.bv_arg list =
     List.map2 (fun expr width -> Expr.BvExpr (expr, width)) inputs shape.args
 
-  let bv_op_function ?(literals : int list option) (op : BVOps.t) inputs shape =
+  let bv_op_function_custom_res
+      ?(literals : int list option)
+      (op : BVOps.t)
+      inputs
+      shape
+      res =
     let lits = Option.to_list literals |> List.flatten in
     let args = zip_args_with_shape inputs shape in
     Expr.BVExprIntrinsic
-      (op, List.map (fun x -> Expr.Literal x) lits @ args, shape.width_of_result)
+      (op, List.map (fun x -> Expr.Literal x) lits @ args, res)
+
+  let bv_op_function ?(literals : int list option) (op : BVOps.t) inputs shape =
+    bv_op_function_custom_res ?literals op inputs shape shape.width_of_result
+
+  let bv_check_function
+      ?(literals : int list option)
+      (op : BVOps.t)
+      inputs
+      shape =
+    bv_op_function_custom_res ?literals op inputs shape None
 
   let add_op_function = bv_op_function BVOps.BVPlus
+  let add_op_nuw = bv_check_function BVOps.BVUAddO
+  let add_op_nsw = bv_check_function BVOps.BVSAddO
   let neg_function = bv_op_function BVOps.BVNeg
 
   let unop_function
@@ -439,6 +456,16 @@ module OpFunctions = struct
         else [ output - input ])
       BVOps.BVSignExtend
 
+  let sub_function_overflow
+      (op : BVOps.t)
+      (inputs : Expr.t list)
+      (shape : bv_op_shape) =
+    let first_shape = { shape with args = [ List.hd shape.args ] } in
+    match inputs with
+    | [ x; y ] ->
+        bv_check_function op [ neg_function [ y ] first_shape; x ] shape
+    | _ -> failwith "Invalid number of arguments"
+
   let sub_function inputs shape =
     let first_shape = { shape with args = [ List.hd shape.args ] } in
     match inputs with
@@ -450,6 +477,7 @@ end
 let template_from_pattern_unary
     ~(op : bv_op_function)
     ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
     (name : string)
     (shape : bv_op_shape) =
   match List.nth_opt shape.args 0 with
@@ -457,12 +485,13 @@ let template_from_pattern_unary
       op_function name 1 (function
         | [ x ] -> pattern_function_unary x shape op
         | _ -> failwith "Invalid number of arguments")
-  | _ -> op_function name 1 (fun xs -> op_bv_scheme xs op None shape)
+  | _ -> op_function name 1 (fun xs -> op_bv_scheme xs op flag_checks shape)
 
 let template_from_pattern
     ~(op : bv_op_function)
     ~(commutative : bool)
     ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
     (name : string)
     (shape : bv_op_shape) =
   match List.nth_opt shape.args 0 with
@@ -470,11 +499,55 @@ let template_from_pattern
       op_function name 2 (function
         | [ x; y ] -> pattern_function x y shape op commutative
         | _ -> failwith "Invalid number of arguments")
-  | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op None shape)
+  | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op flag_checks shape)
+
+(*
+let flags_to_check_ops (flags : Monomorphizer.Template.flags list) :
+    bv_op_function list option =
+  let open Codegenerator in
+  let open Gil_syntax.Expr in
+  let open Gil_syntax.Expr.Infix in
+  let open Monomorphizer.Template in
+  match flags with
+  | [] -> None
+  | _ ->
+      Some
+        (List.map
+           (fun flag ->
+             match flag with
+             | NoSignedWrap -> Some OpFunctions.sub_function
+             | NoUnsignedWrap -> Some OpFunctions.add_op_function
+             | _ -> None)
+           flags)*)
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
   open Monomorphizer.Template
+
+  let flag_template_function
+      (f :
+        pointer_width:int ->
+        flag_checks:bv_op_function list option ->
+        string ->
+        bv_op_shape ->
+        basic_proc)
+      (ops : (flags * bv_op_function) list) :
+      flags:flags list ->
+      pointer_width:int ->
+      string ->
+      bv_op_shape ->
+      basic_proc =
+    let new_f ~flags ~pointer_width name shape =
+      let module S = Set.Make (Template.Flags) in
+      let target_set = S.of_list flags in
+      let checks =
+        List.filter (fun (flags, _) -> S.mem flags target_set) ops
+        |> List.map (fun (_, op) -> op)
+      in
+      let checks_or_opt = if List.is_empty checks then None else Some checks in
+      f ~flag_checks:checks_or_opt ~pointer_width name shape
+    in
+    new_f
 
   let operations =
     [
@@ -482,25 +555,42 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
         name = "add";
         generator =
           ValueOp
-            (template_from_pattern ~op:OpFunctions.add_op_function
-               ~commutative:true);
+            (flag_template_function
+               (template_from_pattern ~op:OpFunctions.add_op_function
+                  ~commutative:true)
+               [
+                 (NoSignedWrap, OpFunctions.add_op_nsw);
+                 (NoUnsignedWrap, OpFunctions.add_op_nuw);
+               ]);
       };
       {
         name = "sub";
         generator =
           ValueOp
-            (template_from_pattern ~op:OpFunctions.sub_function
-               ~commutative:false);
+            (flag_template_function
+               (template_from_pattern ~op:OpFunctions.sub_function
+                  ~commutative:false)
+               [
+                 (NoSignedWrap, OpFunctions.sub_function_overflow BVOps.BVSAddO);
+                 ( NoUnsignedWrap,
+                   OpFunctions.sub_function_overflow BVOps.BVUAddO );
+               ]);
       };
       {
         name = "zext";
         generator =
-          ValueOp (template_from_pattern_unary ~op:OpFunctions.zext_function);
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_unary ~op:OpFunctions.zext_function)
+               []);
       };
       {
         name = "sext";
         generator =
-          ValueOp (template_from_pattern_unary ~op:OpFunctions.sext_function);
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_unary ~op:OpFunctions.sext_function)
+               []);
       };
     ]
 end

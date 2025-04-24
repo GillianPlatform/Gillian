@@ -4,18 +4,27 @@ open Gillian
 type basic_proc = (Annot.Basic.t, string) Proc.t
 
 module Template = struct
-  type flags = NoUnsignedWrap | NoSignedWrap [@@deriving yojson]
+  module Flags = struct
+    type t = NoUnsignedWrap | NoSignedWrap [@@deriving yojson, ord]
+  end
+
+  type flags = Flags.t [@@deriving yojson, ord]
 
   type bv_op_shape = { args : int list; width_of_result : int option }
-  [@@deriving yojson]
+  [@@deriving yojson, ord]
 
   type op_spec =
     | ValueSpec of { flags : flags list; shape : bv_op_shape }
     | SimpleSpec
-  [@@deriving yojson]
+  [@@deriving yojson, ord]
 
   type generator =
-    | ValueOp of (pointer_width:int -> string -> bv_op_shape -> basic_proc)
+    | ValueOp of
+        (flags:flags list ->
+        pointer_width:int ->
+        string ->
+        bv_op_shape ->
+        basic_proc)
     | SimpleOp of (pointer_width:int -> string -> basic_proc)
 
   type op_template = { name : string; generator : generator }
@@ -62,7 +71,7 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     let open Template in
     match (op.generator, spec.spec) with
     | ValueOp f, ValueSpec nspec ->
-        f ~pointer_width spec.output_name nspec.shape
+        f ~flags:nspec.flags ~pointer_width spec.output_name nspec.shape
     | SimpleOp f, SimpleSpec -> f ~pointer_width spec.output_name
     | _ -> failwith "Invalid template or spec"
 
