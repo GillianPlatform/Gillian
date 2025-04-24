@@ -509,25 +509,6 @@ let template_from_pattern
         | _ -> failwith "Invalid number of arguments")
   | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op flag_checks shape)
 
-(*
-let flags_to_check_ops (flags : Monomorphizer.Template.flags list) :
-    bv_op_function list option =
-  let open Codegenerator in
-  let open Gil_syntax.Expr in
-  let open Gil_syntax.Expr.Infix in
-  let open Monomorphizer.Template in
-  match flags with
-  | [] -> None
-  | _ ->
-      Some
-        (List.map
-           (fun flag ->
-             match flag with
-             | NoSignedWrap -> Some OpFunctions.sub_function
-             | NoUnsignedWrap -> Some OpFunctions.add_op_function
-             | _ -> None)
-           flags)*)
-
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
   open Monomorphizer.Template
