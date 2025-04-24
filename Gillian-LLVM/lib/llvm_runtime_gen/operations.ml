@@ -160,9 +160,33 @@ let type_fail (expr_and_type : (Gil_syntax.Expr.t * LLVMRuntimeTypes.t) list) =
 
 type bv_op_function = Expr.t list -> bv_op_shape -> Expr.t
 
+let add_overflow_check
+    (check_ops : bv_op_function list option)
+    (inputs : Expr.t list)
+    (shape : bv_op_shape) =
+  let open Codegenerator in
+  let open Gil_syntax.Expr in
+  let open Gil_syntax.Expr.Infix in
+  match check_ops with
+  | Some ops ->
+      let check_expr =
+        List.fold_right (fun op acc -> op inputs shape || acc) ops Expr.false_
+      in
+      let* _ =
+        ite check_expr
+          ~true_case:
+            (let* _ = add_cmd (fail_cmd "Detected forbidden overflow" inputs) in
+             let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
+             return ())
+          ~false_case:(return ())
+      in
+      return ()
+  | None -> return ()
+
 let op_bv_scheme
     (inputs : Expr.t list)
     (op : bv_op_function)
+    (check_ops : bv_op_function list option)
     (shape : bv_op_shape) : unit Codegenerator.t =
   let open Codegenerator in
   let open Gil_syntax.Expr in
@@ -179,7 +203,8 @@ let op_bv_scheme
   let* _ =
     ite check
       ~true_case:
-        (let* _ =
+        (let* _ = add_overflow_check check_ops inputs shape in
+         let* _ =
            add_return_of_value
              (Expr.EList
                 [
@@ -432,7 +457,7 @@ let template_from_pattern_unary
       op_function name 1 (function
         | [ x ] -> pattern_function_unary x shape op
         | _ -> failwith "Invalid number of arguments")
-  | _ -> op_function name 1 (fun xs -> op_bv_scheme xs op shape)
+  | _ -> op_function name 1 (fun xs -> op_bv_scheme xs op None shape)
 
 let template_from_pattern
     ~(op : bv_op_function)
@@ -445,7 +470,7 @@ let template_from_pattern
       op_function name 2 (function
         | [ x; y ] -> pattern_function x y shape op commutative
         | _ -> failwith "Invalid number of arguments")
-  | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op shape)
+  | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op None shape)
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
