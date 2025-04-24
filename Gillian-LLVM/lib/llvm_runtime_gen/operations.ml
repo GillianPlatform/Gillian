@@ -203,7 +203,8 @@ let op_bv_scheme
   let* _ =
     ite check
       ~true_case:
-        (let* _ = add_overflow_check check_ops inputs shape in
+        (let extracted_inputs = List.map (fun i -> Expr.list_nth i 1) inputs in
+         let* _ = add_overflow_check check_ops extracted_inputs shape in
          let* _ =
            add_return_of_value
              (Expr.EList
@@ -211,7 +212,7 @@ let op_bv_scheme
                   Expr.string
                     (LLVMRuntimeTypes.type_to_string
                        (LLVMRuntimeTypes.Int (Option.get shape.width_of_result)));
-                  op inputs shape;
+                  op extracted_inputs shape;
                 ])
          in
          return get_current_block_label)
@@ -338,7 +339,8 @@ let pattern_function
     (expr2 : Expr.t)
     (shape : bv_op_shape)
     (op : bv_op_function)
-    (commutative : bool) =
+    (commutative : bool)
+    (flag_checks : bv_op_function list option) =
   let open Codegenerator in
   let open TypePatterns in
   let open Gil_syntax.Expr.Infix in
@@ -360,6 +362,7 @@ let pattern_function
   let case_statement_for_int (regular_val0 : Expr.t) (regular_val1 : Expr.t) =
     let int_valx = Expr.list_nth regular_val0 1 in
     let int_valy = Expr.list_nth regular_val1 1 in
+    let* _ = add_overflow_check flag_checks [ int_valx; int_valy ] shape in
     let* _ =
       add_return_of_value
         (Expr.EList
@@ -494,10 +497,15 @@ let template_from_pattern
     ~(flag_checks : bv_op_function list option)
     (name : string)
     (shape : bv_op_shape) =
+  let () =
+    Fmt.pf Format.std_formatter "Template from pattern: %s %a\n" name
+      (Fmt.option ~none:Fmt.nop (Fmt.list ~sep:Fmt.comma (Fmt.any "Some")))
+      flag_checks
+  in
   match List.nth_opt shape.args 0 with
   | Some width when width = pointer_width ->
       op_function name 2 (function
-        | [ x; y ] -> pattern_function x y shape op commutative
+        | [ x; y ] -> pattern_function x y shape op commutative flag_checks
         | _ -> failwith "Invalid number of arguments")
   | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op flag_checks shape)
 
