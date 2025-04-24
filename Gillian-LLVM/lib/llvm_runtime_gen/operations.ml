@@ -406,6 +406,14 @@ module OpFunctions = struct
         else [ output - input ])
       BVOps.BVZeroExtend
 
+  let sext_function =
+    unop_function
+      ~compute_lits:(fun ~input ~output ->
+        if input > output then
+          failwith "Sext requires a larger or equal output width then input"
+        else [ output - input ])
+      BVOps.BVSignExtend
+
   let sub_function inputs shape =
     let first_shape = { shape with args = [ List.hd shape.args ] } in
     match inputs with
@@ -463,6 +471,11 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
         name = "zext";
         generator =
           ValueOp (template_from_pattern_unary ~op:OpFunctions.zext_function);
+      };
+      {
+        name = "sext";
+        generator =
+          ValueOp (template_from_pattern_unary ~op:OpFunctions.sext_function);
       };
     ]
 end
