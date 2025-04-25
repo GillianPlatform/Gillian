@@ -523,9 +523,9 @@ module OpFunctions = struct
     let negated_res = Expr.UnOp (UnOp.Not, orig_res) in
     negated_res
 
-  let icmp_eq _ =
-    raise
-      (Failure "Not implemented, this needs to be implemented as a speical case")
+  let icmp_eq (inputs : Expr.t list) (shape : bv_op_shape) =
+    let open Gil_syntax in
+    Expr.BinOp (List.hd inputs, BinOp.Equal, List.hd (List.tl inputs))
 
   let icmp_ne = negated_function icmp_eq
   let icmp_ugt = negated_function (bv_op_function BVOps.BVUleq)
