@@ -334,6 +334,88 @@ let pattern_function_unary
   let* _ = type_dispatch patterns default_statement in
   return ()
 
+let cmp_patterns
+    ~(pointer_width : int)
+    (expr1 : Expr.t)
+    (expr2 : Expr.t)
+    (op : bv_op_function)
+    (shape : bv_op_shape) =
+  let open Codegenerator in
+  let open TypePatterns in
+  let open Gil_syntax.Expr.Infix in
+  let can_use_pointer = List.for_all (fun x -> x = pointer_width) shape.args in
+  let add_return_of_bool_value (bool_val : Expr.t) =
+    let type_of_bool =
+      LLVMRuntimeTypes.type_to_string (LLVMRuntimeTypes.Int 1) |> Expr.string
+    in
+    let* _ =
+      ite bool_val
+        ~true_case:
+          (add_return_of_value
+             (Expr.EList [ type_of_bool; Expr.int_to_bv ~width:1 1 ]))
+        ~false_case:
+          (add_return_of_value
+             (Expr.EList [ type_of_bool; Expr.int_to_bv ~width:1 0 ]))
+    in
+    return ()
+  in
+  let case_statement_for_ptr (pval1 : Expr.t) (pval2 : Expr.t) =
+    let pointer_offset1 = Expr.list_nth (Expr.list_nth pval1 1) 1 in
+    let pointer_offset2 = Expr.list_nth (Expr.list_nth pval2 1) 1 in
+    let abs_obj1 = Expr.list_nth pval1 0 in
+    let abs_obj2 = Expr.list_nth pval2 0 in
+    let* _ =
+      ite (abs_obj1 == abs_obj2)
+        ~true_case:
+          (let* _ =
+             add_return_of_bool_value
+               (op [ pointer_offset1; pointer_offset2 ] shape)
+           in
+           return ())
+        ~false_case:
+          (let* _ =
+             add_cmd (fail_cmd "Incomparable pointers" [ expr1; expr2 ])
+           in
+           let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
+           return ())
+    in
+    return ()
+  in
+  let case_statement_for_int (regular_val1 : Expr.t) (regular_val2 : Expr.t) =
+    let int_val1 = Expr.list_nth regular_val1 1 in
+    let int_val2 = Expr.list_nth regular_val2 1 in
+    let* _ = add_return_of_bool_value (op [ int_val1; int_val2 ] shape) in
+    return ()
+  in
+  let ptr_patterns =
+    if can_use_pointer then
+      [
+        {
+          exprs = [ expr1; expr2 ];
+          types_ = [ LLVMRuntimeTypes.Ptr; LLVMRuntimeTypes.Ptr ];
+          case_stat = case_statement_for_ptr expr1 expr2;
+        };
+      ]
+    else []
+  in
+  let int_patterns =
+    [
+      {
+        exprs = [ expr1; expr2 ];
+        types_ =
+          [
+            LLVMRuntimeTypes.Int (List.hd shape.args);
+            LLVMRuntimeTypes.Int (List.nth shape.args 1);
+          ];
+        case_stat = case_statement_for_int expr1 expr2;
+      };
+    ]
+  in
+  let patterns = int_patterns @ ptr_patterns in
+  let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
+  let* _ = type_dispatch patterns default_statement in
+  return ()
+
 let pattern_function
     (expr1 : Expr.t)
     (expr2 : Expr.t)
@@ -441,7 +523,7 @@ module OpFunctions = struct
     let negated_res = Expr.UnOp (UnOp.Not, orig_res) in
     negated_res
 
-  let icmp_eq =
+  let icmp_eq _ =
     raise
       (Failure "Not implemented, this needs to be implemented as a speical case")
 
@@ -521,17 +603,22 @@ let template_from_pattern
     ~(flag_checks : bv_op_function list option)
     (name : string)
     (shape : bv_op_shape) =
-  let () =
-    Fmt.pf Format.std_formatter "Template from pattern: %s %a\n" name
-      (Fmt.option ~none:Fmt.nop (Fmt.list ~sep:Fmt.comma (Fmt.any "Some")))
-      flag_checks
-  in
   match List.nth_opt shape.args 0 with
   | Some width when width = pointer_width ->
       op_function name 2 (function
         | [ x; y ] -> pattern_function x y shape op commutative flag_checks
         | _ -> failwith "Invalid number of arguments")
   | _ -> op_function name 2 (fun xs -> op_bv_scheme xs op flag_checks shape)
+
+let template_from_pattern_cmp
+    ~(op : bv_op_function)
+    ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
+    (name : string)
+    (shape : bv_op_shape) =
+  op_function name 2 (function
+    | [ x; y ] -> cmp_patterns ~pointer_width x y op shape
+    | _ -> failwith "Invalid number of arguments")
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
@@ -603,6 +690,14 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
           ValueOp
             (flag_template_function
                (template_from_pattern_unary ~op:OpFunctions.sext_function)
+               []);
+      };
+      {
+        name = "icmp_ult";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_ult)
                []);
       };
     ]
