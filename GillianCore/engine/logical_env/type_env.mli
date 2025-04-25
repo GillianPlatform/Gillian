@@ -41,10 +41,3 @@ val is_well_formed : t -> bool
 
 val filter_with_info :
   Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t
-
-val get_constructor_type : string -> Type.t option
-val get_constructor_type_unsafe : string -> Type.t
-val get_constructor_field_types : string -> Type.t option list option
-val get_datatypes : unit -> Datatype.t list
-val get_constructors : unit -> constructors_tbl_t
-val init_datatypes : datatypes_tbl_t -> unit

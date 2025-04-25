@@ -2,31 +2,14 @@ open Gil_syntax
 
 exception SMT_unknown
 
-val exec_sat :
-  Expr.Set.t ->
-  (string, Type.t) Hashtbl.t ->
-  (string, Constructor.t) Hashtbl.t ->
-  Datatype.t list ->
-  Sexplib.Sexp.t option
-
-val is_sat :
-  Expr.Set.t ->
-  (string, Type.t) Hashtbl.t ->
-  (string, Constructor.t) Hashtbl.t ->
-  Datatype.t list ->
-  bool
-
-val check_sat :
-  Expr.Set.t ->
-  (string, Type.t) Hashtbl.t ->
-  (string, Constructor.t) Hashtbl.t ->
-  Datatype.t list ->
-  Sexplib.Sexp.t option
+val init : unit -> unit
+val exec_sat : Expr.Set.t -> Type_env.t -> Sexplib.Sexp.t option
+val is_sat : Expr.Set.t -> Type_env.t -> bool
+val check_sat : Expr.Set.t -> Type_env.t -> Sexplib.Sexp.t option
 
 val lift_model :
   Sexplib.Sexp.t ->
-  (string, Type.t) Hashtbl.t ->
-  Datatype.t list ->
+  Type_env.t ->
   (string -> Expr.t -> unit) ->
   Expr.Set.t ->
   unit

@@ -33,15 +33,10 @@ let is_true = function
   | Sexplib.Sexp.Atom "true" -> true
   | _ -> false
 
-type typenv = (string, Type.t) Hashtbl.t [@@deriving to_yojson]
-type constructorstbl = (string, Constructor.t) Hashtbl.t [@@deriving to_yojson]
-
 let fs_to_yojson fs = fs |> Expr.Set.to_list |> list_to_yojson Expr.to_yojson
 
 let sexps_to_yojson sexps =
   `List (List.map (fun sexp -> `String (Sexplib.Sexp.to_string_hum sexp)) sexps)
-
-let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
 
 let encoding_cache : (Expr.Set.t, sexp list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
@@ -799,15 +794,13 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
 
 let encode_quantified_expr
     ~(encode_expr :
-       gamma:typenv ->
-       constructor_defs:constructorstbl ->
+       gamma:Type_env.t ->
        llen_lvars:SS.t ->
        list_elem_vars:SS.t ->
        'a ->
        Encoding.t)
     ~mk_quant
     ~gamma
-    ~constructor_defs
     ~llen_lvars
     ~list_elem_vars
     quantified_vars
@@ -817,26 +810,22 @@ let encode_quantified_expr
     match quantified_vars with
     | [] ->
         (* A quantified assertion with no quantified variables is just the assertion *)
-        Some
-          (encode_expr ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars
-             assertion)
+        Some (encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion)
     | _ -> None
   in
   (* Start by updating gamma with the information provided by quantifier types.
      There's very few foralls, so it's ok to copy the gamma entirely *)
-  let gamma = Hashtbl.copy gamma in
+  let gamma = Type_env.copy gamma in
   let () =
     quantified_vars
     |> List.iter (fun (x, typ) ->
            match typ with
-           | None -> Hashtbl.remove gamma x
-           | Some typ -> Hashtbl.replace gamma x typ)
+           | None -> Type_env.remove gamma x
+           | Some typ -> Type_env.update gamma x typ)
   in
   (* Not the same gamma now!*)
   let encoded_assertion, consts, extra_asrts =
-    match
-      encode_expr ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars assertion
-    with
+    match encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion with
     | { kind = Native BooleanType; expr; consts; extra_asrts } ->
         (expr, consts, extra_asrts)
     | _ -> failwith "the thing inside forall is not boolean!"
@@ -861,22 +850,18 @@ let encode_quantified_expr
   native ~consts ~extra_asrts BooleanType expr
 
 let rec encode_logical_expression
-    ~(gamma : typenv)
-    ~(constructor_defs : constructorstbl)
+    ~(gamma : Type_env.t)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
     (le : Expr.t) : Encoding.t =
   let open Encoding in
-  let f =
-    encode_logical_expression ~gamma ~constructor_defs ~llen_lvars
-      ~list_elem_vars
-  in
+  let f = encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars in
 
   match le with
   | Lit lit -> encode_lit lit
   | LVar var ->
       let kind, typ =
-        match Hashtbl.find_opt gamma var with
+        match Type_env.get gamma var with
         | Some typ -> (Native typ, native_sort_of_type typ)
         | None ->
             if SS.mem var list_elem_vars then (Simple_wrapped, t_gil_literal)
@@ -912,39 +897,40 @@ let rec encode_logical_expression
       seq_extract lst start len >- ListType
   | Exists (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
-        ~mk_quant:exists ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars bt
-        e
+        ~mk_quant:exists ~gamma ~llen_lvars ~list_elem_vars bt e
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
-        ~mk_quant:forall ~gamma ~constructor_defs ~llen_lvars ~list_elem_vars bt
-        e
-  | Constructor (name, les) ->
-      let c = Hashtbl.find constructor_defs name in
-      let param_typs = c.constructor_fields in
-      let simple_wrap_or_native typopt =
-        match typopt with
-        | Some typ -> get_native_of_type ~typ
-        | None -> simple_wrap
-      in
-      let>-- args = List.map f les in
-      let args = List.map2 simple_wrap_or_native param_typs args in
-      let sexp = atom name $$ args in
-      sexp >- DatatypeType c.constructor_datatype
+        ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
+  | Constructor (name, les) -> (
+      let param_typs = Datatype_env.get_constructor_field_types name in
+      match param_typs with
+      | Some param_typs ->
+          let simple_wrap_or_native typopt =
+            match typopt with
+            | Some typ -> get_native_of_type ~typ
+            | None -> simple_wrap
+          in
+          let>-- args = List.map f les in
+          let args = List.map2 simple_wrap_or_native param_typs args in
+          let sexp = atom name $$ args in
+          sexp >- Datatype_env.get_constructor_type_unsafe name
+      | None ->
+          let msg = "SMT - Undefined constructor: " ^ name in
+          raise (Failure msg))
 
 let encode_assertion_top_level
-    ~(gamma : typenv)
-    ~(constructor_defs : constructorstbl)
+    ~(gamma : Type_env.t)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
     (a : Expr.t) : Encoding.t =
   try
-    encode_logical_expression ~gamma ~constructor_defs ~llen_lvars
-      ~list_elem_vars (Expr.push_in_negations a)
+    encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
+      (Expr.push_in_negations a)
   with e ->
     let s = Printexc.to_string e in
     let msg =
       Fmt.str "Failed to encode %a in gamma %a with error %s\n" Expr.pp a
-        pp_typenv gamma s
+        Type_env.pp gamma s
     in
     let () = L.print_to_all msg in
     raise e
@@ -1012,19 +998,14 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
       SS.union new_lvars acc)
     assertions SS.empty
 
-let encode_assertions
-    (fs : Expr.Set.t)
-    (gamma : typenv)
-    (constructor_defs : constructorstbl) : sexp list =
+let encode_assertions (fs : Expr.Set.t) (gamma : Type_env.t) : sexp list =
   let open Encoding in
   let- () = Hashtbl.find_opt encoding_cache fs in
   let llen_lvars = lvars_only_in_llen fs in
   let list_elem_vars = lvars_as_list_elements fs in
   let encoded =
     Expr.Set.elements fs
-    |> List.map
-         (encode_assertion_top_level ~gamma ~constructor_defs ~llen_lvars
-            ~list_elem_vars)
+    |> List.map (encode_assertion_top_level ~gamma ~llen_lvars ~list_elem_vars)
   in
   let consts =
     Hashtbl.fold
@@ -1075,28 +1056,31 @@ module Dump = struct
           (Format.formatter_of_out_channel c)
           "GIL query:\nFS: %a\nGAMMA: %a\nEncoded as SMT Query:\n%a@?"
           (Fmt.iter ~sep:Fmt.comma Expr.Set.iter Expr.pp)
-          fs pp_typenv gamma
+          fs Type_env.pp gamma
           (Fmt.list ~sep:(Fmt.any "\n") Sexplib.Sexp.pp_hum)
           cmds)
 end
 
-let init_solver (user_def_datatypes : Datatype.t list) =
+let init () =
+  if !initialised then
+    (* Solver has already been initialised *)
+    (* Pop off initial declarations if necessary *)
+    cmd (pop 2);
+  cmd (push 1);
   let init_decls =
     [
       Type_operations.init_decls;
-      Lit_operations.init_decls user_def_datatypes;
+      Lit_operations.init_decls (Datatype_env.get_datatypes ());
       Ext_lit_operations.init_decls;
     ]
   in
   let decls = List.concat init_decls in
   let () = decls |> List.iter cmd in
-  cmd (push 1)
+  cmd (push 1);
+  initialised := true
 
-let init_or_reset_solver (user_def_datatypes : Datatype.t list) =
-  if not !initialised then (
-    (* If solver has not been initialised, initialise it *)
-    init_solver user_def_datatypes;
-    initialised := true)
+let init_or_reset () =
+  if not !initialised then init ()
   else
     (* Otherwise reset it *)
     let () = cmd (pop 1) in
@@ -1104,19 +1088,15 @@ let init_or_reset_solver (user_def_datatypes : Datatype.t list) =
     let () = cmd (push 1) in
     ()
 
-let exec_sat'
-    (fs : Expr.Set.t)
-    (gamma : typenv)
-    (constructor_defs : constructorstbl)
-    (datatype_defs : Datatype.t list) : sexp option =
+let exec_sat' (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Expr.Set.iter Expr.pp)
-          fs pp_typenv gamma)
+          fs Type_env.pp gamma)
   in
-  let () = init_or_reset_solver datatype_defs in
-  let encoded_assertions = encode_assertions fs gamma constructor_defs in
+  let () = init_or_reset () in
+  let encoded_assertions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
   let () = List.iter cmd !builtin_funcs in
   let () = List.iter cmd encoded_assertions in
@@ -1138,7 +1118,7 @@ let exec_sat'
           let additional_data =
             [
               ("expressions", fs_to_yojson fs);
-              ("gamma", typenv_to_yojson gamma);
+              ("gamma", Type_env.to_yojson gamma);
               ("encoded_assertions", sexps_to_yojson encoded_assertions);
             ]
           in
@@ -1150,27 +1130,19 @@ let exec_sat'
   in
   ret
 
-let exec_sat
-    (fs : Expr.Set.t)
-    (gamma : typenv)
-    (constructor_defs : constructorstbl)
-    (datatype_defs : Datatype.t list) : sexp option =
-  try exec_sat' fs gamma constructor_defs datatype_defs
+let exec_sat (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
+  try exec_sat' fs gamma
   with UnexpectedSolverResponse _ as e ->
     let additional_data =
       [
         ("smt_error", `String (Printexc.to_string e));
         ("expressions", fs_to_yojson fs);
-        ("gamma", typenv_to_yojson gamma);
+        ("gamma", Type_env.to_yojson gamma);
       ]
     in
     raise Gillian_result.Exc.(internal_error ~additional_data "SMT failure")
 
-let check_sat
-    (fs : Expr.Set.t)
-    (gamma : typenv)
-    (constructor_defs : constructorstbl)
-    (datatype_defs : Datatype.t list) : sexp option =
+let check_sat (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
   match Hashtbl.find_opt sat_cache fs with
   | Some result ->
       let () =
@@ -1180,7 +1152,7 @@ let check_sat
       result
   | None ->
       let () = L.verbose (fun m -> m "SAT check not found in cache") in
-      let ret = exec_sat fs gamma constructor_defs datatype_defs in
+      let ret = exec_sat fs gamma in
       let () =
         L.verbose (fun m ->
             let f = Expr.conjunct (Expr.Set.elements fs) in
@@ -1189,20 +1161,15 @@ let check_sat
       let () = Hashtbl.replace sat_cache fs ret in
       ret
 
-let is_sat
-    (fs : Expr.Set.t)
-    (gamma : typenv)
-    (constructor_defs : constructorstbl)
-    (datatype_defs : Datatype.t list) : bool =
-  check_sat fs gamma constructor_defs datatype_defs |> Option.is_some
+let is_sat (fs : Expr.Set.t) (gamma : Type_env.t) : bool =
+  check_sat fs gamma |> Option.is_some
 
 let lift_model
     (model : sexp)
-    (gamma : typenv)
-    (datatype_defs : Datatype.t list)
+    (gamma : Type_env.t)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  let () = init_or_reset_solver datatype_defs in
+  let () = init_or_reset () in
   let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
@@ -1221,7 +1188,7 @@ let lift_model
   in
 
   let lift_val (x : string) : Literal.t option =
-    let* gil_type = Hashtbl.find_opt gamma x in
+    let* gil_type = Type_env.get gamma x in
     let* v = get_val x in
     match gil_type with
     | NumberType ->

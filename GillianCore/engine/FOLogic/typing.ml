@@ -153,20 +153,24 @@ module Infer_types_to_gamma = struct
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
-    | Constructor (n, les) -> (
-        let field_types = Type_env.get_constructor_field_types n in
-        let check_field le tt =
-          match tt with
-          | Some tt -> f le tt
-          | None -> true
-        in
-        match field_types with
-        | Some tts ->
-            if List.length tts <> List.length les then false
-            else
-              tt = Type_env.get_constructor_type_unsafe n
-              && List.for_all2 check_field les tts
-        | None -> false)
+    | Constructor (n, les) ->
+        if Datatype_env.is_initialised () then
+          let field_types = Datatype_env.get_constructor_field_types n in
+          let check_field le tt =
+            match tt with
+            | Some tt -> f le tt
+            | None -> true
+          in
+          match field_types with
+          | Some tts ->
+              if List.length tts <> List.length les then false
+              else
+                tt = Datatype_env.get_constructor_type_unsafe n
+                && List.for_all2 check_field les tts
+          | None -> false
+        else
+          (* Can't say for certain whether or not the constructor is typable *)
+          true
     | Exists (bt, le) | ForAll (bt, le) ->
         if not (tt = BooleanType) then false
         else
@@ -474,13 +478,15 @@ module Type_lexpr = struct
     if not ite then def_neg else infer_type gamma le BooleanType
 
   and type_constructor gamma n les =
-    let tts_opt = Type_env.get_constructor_field_types n in
-    match tts_opt with
-    | Some tts ->
-        if typable_list gamma ?target_types:(Some tts) les then
-          def_pos (Type_env.get_constructor_type n)
-        else def_neg
-    | None -> def_neg
+    if Datatype_env.is_initialised () then
+      let tts_opt = Datatype_env.get_constructor_field_types n in
+      match tts_opt with
+      | Some tts ->
+          if typable_list gamma ?target_types:(Some tts) les then
+            def_pos (Datatype_env.get_constructor_type n)
+          else def_neg
+      | None -> def_neg
+    else (None, true)
 
   (** This function returns a triple [(t_opt, b, fs)] where
       - [t_opt] is the type of [le] if we can find one

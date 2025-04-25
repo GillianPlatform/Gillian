@@ -8,8 +8,6 @@ type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
 type datatypes_tbl_t = (string, Datatype.t) Hashtbl.t [@@deriving yojson]
 type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
 
-let constructor_defs : constructors_tbl_t ref = ref (Hashtbl.create 1)
-let datatype_defs : datatypes_tbl_t ref = ref (Hashtbl.create 1)
 let as_hashtbl x = x
 
 (*************************************)
@@ -166,44 +164,3 @@ let filter_with_info relevant_info (x : t) =
   let pvars, lvars, locs = relevant_info in
   let relevant = List.fold_left SS.union SS.empty [ pvars; lvars; locs ] in
   filter x (fun x -> SS.mem x relevant)
-
-(*************************************)
-(**     Datatype Functions          **)
-(*************************************)
-
-let init_datatypes (datatypes : datatypes_tbl_t) =
-  let constructors = Hashtbl.create Config.medium_tbl_size in
-  let add_constructor_to_tbl (c : Constructor.t) =
-    Hashtbl.add constructors c.constructor_name c
-  in
-  let add_constructors_to_tbl cs = List.iter add_constructor_to_tbl cs in
-  Hashtbl.iter
-    (fun _ (d : Datatype.t) -> add_constructors_to_tbl d.datatype_constructors)
-    datatypes;
-  datatype_defs := datatypes;
-  constructor_defs := constructors
-
-let get_constructor_type (cname : string) : Type.t option =
-  let constructor = Hashtbl.find_opt !constructor_defs cname in
-  Option.map
-    (fun (c : Constructor.t) -> Type.DatatypeType c.constructor_datatype)
-    constructor
-
-let get_constructor_type_unsafe (cname : string) : Type.t =
-  let constructor = Hashtbl.find_opt !constructor_defs cname in
-  match constructor with
-  | Some c -> Type.DatatypeType c.constructor_datatype
-  | None ->
-      raise
-        (Failure
-           ("Type_env.get_constructor_type_unsafe: constructor " ^ cname
-          ^ " not found."))
-
-let get_constructor_field_types (cname : string) : Type.t option list option =
-  let constructor = Hashtbl.find_opt !constructor_defs cname in
-  Option.map (fun (c : Constructor.t) -> c.constructor_fields) constructor
-
-let get_datatypes () : Datatype.t list =
-  List.of_seq (Hashtbl.to_seq_values !datatype_defs)
-
-let get_constructors () : constructors_tbl_t = !constructor_defs
