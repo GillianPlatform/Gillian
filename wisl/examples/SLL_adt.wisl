@@ -34,6 +34,15 @@ function SLL_allocate_node(v){
 }
 { SLL(ret, Cons(#v, Nil())) }
 
+// This incorrect spec should fail to verify
+{ (v == #v) * (u == #u) }
+function SLL_allocate_node_fails(u, v){
+  t := new(2);
+  [t] := v;
+  return t
+}
+{ SLL(ret, Cons(#u, Nil())) }
+
 
 //
 // RECURSIVE SLL MANIPULATION

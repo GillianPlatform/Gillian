@@ -442,8 +442,15 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
       let ins_pf = f pf in
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
       List.map minimise_matchables ins
-  | Lit _ | PVar _ | LVar _ | ALoc _ | LstSub _ | NOp _ | EList _ | ESet _ -> []
-  | Constructor _ -> [] (* TODO *)
+  | Lit _
+  | PVar _
+  | LVar _
+  | ALoc _
+  | LstSub _
+  | NOp _
+  | EList _
+  | ESet _
+  | Constructor _ -> []
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)
