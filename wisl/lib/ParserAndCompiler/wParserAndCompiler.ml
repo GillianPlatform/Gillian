@@ -52,6 +52,7 @@ let create_compilation_result path prog wprog =
   }
 
 let parse_and_compile_files files =
+  let () = WUtils.Generators.reset () in
   let f files =
     let path = List.hd files in
     let* wprog, configs = parse_file path in
