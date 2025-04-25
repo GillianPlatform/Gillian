@@ -529,7 +529,7 @@ module OpFunctions = struct
 
   let icmp_ne = negated_function icmp_eq
   let icmp_ugt = negated_function (bv_op_function BVOps.BVUleq)
-  let imcp_uge = negated_function (bv_op_function BVOps.BVUlt)
+  let icmp_uge = negated_function (bv_op_function BVOps.BVUlt)
   let icmp_ult = bv_op_function BVOps.BVUlt
   let icmp_ule = bv_op_function BVOps.BVUleq
   let icmp_sgt = negated_function (bv_op_function BVOps.BVSleq)
@@ -693,11 +693,83 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                []);
       };
       {
+        name = "icmp_eq";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_eq)
+               []);
+      };
+      {
+        name = "icmp_ne";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_ne)
+               []);
+      };
+      {
+        name = "icmp_ugt";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_ugt)
+               []);
+      };
+      {
+        name = "icmp_uge";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_uge)
+               []);
+      };
+      {
         name = "icmp_ult";
         generator =
           ValueOp
             (flag_template_function
                (template_from_pattern_cmp ~op:OpFunctions.icmp_ult)
+               []);
+      };
+      {
+        name = "icmp_ule";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_ule)
+               []);
+      };
+      {
+        name = "icmp_sgt";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_sgt)
+               []);
+      };
+      {
+        name = "icmp_sge";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_sge)
+               []);
+      };
+      {
+        name = "icmp_slt";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_slt)
+               []);
+      };
+      {
+        name = "icmp_sle";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.icmp_sle)
                []);
       };
     ]
