@@ -1541,6 +1541,9 @@ and reduce_lexpr_loop
         else
           List.map2 (fun x y -> Expr.Infix.( == ) x (Lit y)) le ll
           |> Expr.conjunct
+    (* Z3 edge case: A list can't contain itself *)
+    | BinOp (EList [ x ], Equal, y) when Expr.equal x y -> Expr.false_
+    | BinOp (x, Equal, EList [ y ]) when Expr.equal x y -> Expr.false_
     | BinOp (EList ll, Equal, EList lr) ->
         if List.length ll <> List.length lr then Expr.(false_)
         else if ll = [] then Expr.(true_)
