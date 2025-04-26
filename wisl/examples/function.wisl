@@ -1,0 +1,10 @@
+function inc(x : Int) {
+  x + 1
+}
+
+{ x == #x }
+proc increment(x) {
+  y := x + 1;
+  return y
+}
+{ ret == inc(#x) }

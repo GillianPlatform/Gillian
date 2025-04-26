@@ -27,7 +27,7 @@ predicate SLL(+x, vs) {
 
 // 00. Allocating an SLL node with the given value
 { v == #v }
-function SLL_allocate_node(v){
+proc SLL_allocate_node(v){
   t := new(2);
   [t] := v;
   return t
@@ -36,7 +36,7 @@ function SLL_allocate_node(v){
 
 // This incorrect spec should fail to verify
 { (v == #v) * (u == #u) }
-function SLL_allocate_node_fails(u, v){
+proc SLL_allocate_node_fails(u, v){
   t := new(2);
   [t] := v;
   return t
@@ -50,7 +50,7 @@ function SLL_allocate_node_fails(u, v){
 
 // 01. Prepending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #vs) }
-function SLL_prepend(x, k){
+proc SLL_prepend(x, k){
     z := SLL_allocate_node(k);
     [z + 1] := x;
     return z
@@ -59,7 +59,7 @@ function SLL_prepend(x, k){
 
 // 05. Copying a given SLL
 { (x == #x) * SLL(#x, #vs) }
-function SLL_copy(x){
+proc SLL_copy(x){
   y := null;
   if (not (x = null)) {
     k := [x];
@@ -76,7 +76,7 @@ function SLL_copy(x){
 
 // 08. Checking if a given value is in a given SLL
 // { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #r) }
-// function SLL_member(x, k){
+// proc SLL_member(x, k){
 //   found := false;
 //   if (x = null){
 //     skip
@@ -95,7 +95,7 @@ function SLL_copy(x){
 
 // 09. Removing a given value from a given SLL
 // { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #mem) }
-// function SLL_remove(x, k) {
+// proc SLL_remove(x, k) {
 //   if (x = null) {
 //     skip
 //   } else {
@@ -116,7 +116,7 @@ function SLL_copy(x){
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL(#x, #vs) }
-function SLL_free(x){
+proc SLL_free(x){
   if (x = null) {
     skip
   } else {

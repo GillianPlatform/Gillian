@@ -6,7 +6,7 @@ type tt =
   | Dispose of WExpr.t  (** free(e) *)
   | Lookup of string * WExpr.t  (** x := [e] *)
   | Update of WExpr.t * WExpr.t  (** [e] := [e] *)
-  | FunCall of string * string * WExpr.t list * (string * string list) option
+  | ProcCall of string * string * WExpr.t list * (string * string list) option
       (** x := f(e1, ..., en), last bit should be ignored *)
   | While of WExpr.t * t list  (** while (e) \{ s \} *)
   | If of WExpr.t * t list * t list  (** if (e) \{ s \} else \{ s \} *)
@@ -39,6 +39,6 @@ val get_by_id :
   | `WLFormula of WLFormula.t
   | `WStmt of t ]
 
-val functions_called_by_list : t list -> string list
+val procs_called_by_list : t list -> string list
 
 (* val check_consistency : t list -> CodeLoc.t -> unit *)

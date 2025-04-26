@@ -67,12 +67,12 @@ let rec compile_val v =
   | Str s -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
-let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
+let rec compile_expr ?(proc_name = "main") ?(is_loop_prefix = false) expr :
     (WAnnot.t * string option * string Cmd.t) list * Expr.t =
-  let gen_str = Generators.gen_str fname in
-  let compile_expr = compile_expr ~fname ~is_loop_prefix in
+  let gen_str = Generators.gen_str proc_name in
+  let compile_expr = compile_expr ~proc_name ~is_loop_prefix in
   let expr_of_string s = Expr.Lit (Literal.String s) in
-  let expr_fname_of_binop b =
+  let expr_pname_of_binop b =
     WBinOp.(
       match b with
       | PLUS -> expr_of_string internal_add
@@ -83,11 +83,10 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       | GREATERTHAN -> expr_of_string internal_gt
       | _ ->
           failwith
-            (Format.asprintf
-               "Binop %a does not correspond to an internal function" WBinOp.pp
-               b))
+            (Format.asprintf "Binop %a does not correspond to an internal proc"
+               WBinOp.pp b))
   in
-  let is_internal_func =
+  let is_internal_proc =
     WBinOp.(
       function
       | PLUS | MINUS | LESSEQUAL | LESSTHAN | GREATEREQUAL | GREATERTHAN -> true
@@ -115,15 +114,15 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       let cmdl2, comp_expr2 = compile_expr e2 in
       let expr = Expr.NOp (LstCat, [ comp_expr1; comp_expr2 ]) in
       (cmdl1 @ cmdl2, expr)
-  | BinOp (e1, b, e2) when is_internal_func b ->
+  | BinOp (e1, b, e2) when is_internal_proc b ->
       (* Operator corresponds to pointer arithmetics *)
       let call_var = gen_str gvar in
-      let internal_func = expr_fname_of_binop b in
+      let internal_proc = expr_pname_of_binop b in
       let cmdl1, comp_expr1 = compile_expr e1 in
       let cmdl2, comp_expr2 = compile_expr e2 in
       let call_i_plus =
         Cmd.Call
-          (call_var, internal_func, [ comp_expr1; comp_expr2 ], None, None)
+          (call_var, internal_proc, [ comp_expr1; comp_expr2 ], None, None)
       in
       ( cmdl1 @ cmdl2
         @ [
@@ -150,10 +149,10 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
 (* compile_lexpr : WLExpr.t -> (string list * Asrt.t list * Expr.t)
     compiles a WLExpr into an output expression and a list of Global Assertions.
     the string list contains the name of the variables that are generated. They are existentials. *)
-let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
+let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
     string list * Asrt.t * Expr.t =
-  let gen_str = Generators.gen_str fname in
-  let compile_lexpr = compile_lexpr ~fname in
+  let gen_str = Generators.gen_str proc_name in
+  let compile_lexpr = compile_lexpr ~proc_name in
   let expr_pname_of_binop b =
     WBinOp.(
       match b with
@@ -165,9 +164,8 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
       | GREATERTHAN -> internal_pred_gt
       | _ ->
           failwith
-            (Format.asprintf
-               "Binop %a does not correspond to an internal function" WBinOp.pp
-               b))
+            (Format.asprintf "Binop %a does not correspond to an internal proc"
+               WBinOp.pp b))
   in
   let is_internal_pred =
     WBinOp.(
@@ -243,10 +241,10 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         (List.concat gvars, List.concat asrtsl, Expr.Constructor (n, comp_exprs)))
 
 (* TODO: compile_lformula should return also the list of created existentials *)
-let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =
-  let gen_str = Generators.gen_str fname in
-  let compile_lformula = compile_lformula ~fname in
-  let compile_lexpr = compile_lexpr ~fname in
+let rec compile_lformula ?(proc_name = "main") formula : Asrt.t * Expr.t =
+  let gen_str = Generators.gen_str proc_name in
+  let compile_lformula = compile_lformula ~proc_name in
+  let compile_lexpr = compile_lexpr ~proc_name in
   WLFormula.(
     match get formula with
     | LTrue -> ([], Expr.true_)
@@ -292,11 +290,11 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =
         (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_)))
 
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
-let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
-  let compile_lassert = compile_lassert ~fname in
-  let gen_str = Generators.gen_str fname in
-  let compile_lexpr = compile_lexpr ~fname in
-  let compile_lformula = compile_lformula ~fname in
+let rec compile_lassert ?(proc_name = "main") asser : string list * Asrt.t =
+  let compile_lassert = compile_lassert ~proc_name in
+  let gen_str = Generators.gen_str proc_name in
+  let compile_lexpr = compile_lexpr ~proc_name in
+  let compile_lformula = compile_lformula ~proc_name in
   let gil_add e k =
     (* builds GIL expression that is e + k *)
     let k_e = Expr.int k in
@@ -400,10 +398,10 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let al, f = compile_lformula lf in
         ([], Asrt.Pure f :: al))
 
-let rec compile_lcmd ?(fname = "main") lcmd =
-  let compile_lassert = compile_lassert ~fname in
-  let compile_lcmd = compile_lcmd ~fname in
-  let compile_lexpr = compile_lexpr ~fname in
+let rec compile_lcmd ?(proc_name = "main") lcmd =
+  let compile_lassert = compile_lassert ~proc_name in
+  let compile_lcmd = compile_lcmd ~proc_name in
+  let compile_lexpr = compile_lexpr ~proc_name in
   let build_assert existentials lasrts =
     match lasrts with
     | [] -> None
@@ -461,11 +459,11 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       (None, LCmd.SL (SLCmd.SepAssert (comp_la, exs @ lb)))
   | Invariant _ -> failwith "Invariant is not before a loop."
 
-let compile_inv_and_while ~fname ~while_stmt ~invariant =
+let compile_inv_and_while ~proc_name ~while_stmt ~invariant =
   (* FIXME: Variables that are in the invariant but not existential might be wrong. *)
   let loopretvar = "loopretvar__" in
-  let gen_str = Generators.gen_str fname in
-  let loop_fname = gen_str (fname ^ "_loop") in
+  let gen_str = Generators.gen_str proc_name in
+  let loop_proc_name = gen_str (proc_name ^ "_loop") in
   let while_loc = WStmt.get_loc while_stmt in
   let invariant_loc = WLCmd.get_loc invariant in
   let inv_asrt, inv_exs, inv_variant =
@@ -516,7 +514,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     in
     Hashtbl.of_seq (List.to_seq (var_subst @ lvar_subst))
   in
-  let loop_funct =
+  let loop_proc =
     let guard_loc = WExpr.get_loc guard in
     let post_guard =
       WLAssert.make
@@ -557,15 +555,15 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
           (* FIGURE OUT VARIANT *)
           variant = inv_variant;
           spid = Generators.gen_id ();
-          fname = loop_fname;
-          fparams = vars;
+          proc_name = loop_proc_name;
+          proc_params = vars;
           sploc = while_loc;
           existentials = None;
         }
     in
     let pvars = List.map (fun x -> WExpr.make (Var x) while_loc) vars in
     let rec_call =
-      WStmt.make (FunCall (loopretvar, loop_fname, pvars, None)) while_loc
+      WStmt.make (ProcCall (loopretvar, loop_proc_name, pvars, None)) while_loc
     in
     let allvars = WExpr.make (WExpr.List pvars) while_loc in
     let ret_not_rec = WStmt.make (VarAssign (loopretvar, allvars)) while_loc in
@@ -574,9 +572,9 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         WStmt.make (If (guard, wcmds @ [ rec_call ], [ ret_not_rec ])) while_loc;
       ]
     in
-    WFun.
+    WProc.
       {
-        name = loop_fname;
+        name = loop_proc_name;
         params = vars;
         body;
         spec = Some spec;
@@ -590,7 +588,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let call_cmd =
     Cmd.Call
       ( retv,
-        Lit (String loop_fname),
+        Lit (String loop_proc_name),
         List.map (fun x -> Expr.PVar x) vars,
         None,
         None )
@@ -618,19 +616,20 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     | [] -> List.rev acc
   in
   let annot_call_while =
-    { annot_while with nest_kind = Some (LoopBody loop_fname) }
+    { annot_while with nest_kind = Some (LoopBody loop_proc_name) }
   in
   let lab_cmds =
     (annot_call_while, None, call_cmd) :: map_reassign_vars [] reassign_vars
   in
-  (lab_cmds, loop_funct)
+  (lab_cmds, loop_proc)
 
-let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
+let rec compile_stmt_list ?(proc_name = "main") ?(is_loop_prefix = false) stmtl
+    =
   (* create generator that works in the context of this function *)
-  let compile_expr = compile_expr ~fname in
-  let compile_lcmd = compile_lcmd ~fname in
-  let compile_list = compile_stmt_list ~fname in
-  let gen_str = Generators.gen_str fname in
+  let compile_expr = compile_expr ~proc_name in
+  let compile_lcmd = compile_lcmd ~proc_name in
+  let compile_list = compile_stmt_list ~proc_name in
+  let gen_str = Generators.gen_str proc_name in
   let gil_expr_of_str s = Expr.Lit (Literal.String s) in
   let get_or_create_lab cmdl pre =
     match cmdl with
@@ -653,16 +652,16 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Logic invariant; _ } :: while_stmt :: rest
     when WLCmd.is_inv invariant && WStmt.is_while while_stmt
          && !Gillian.Utils.Config.current_exec_mode = Verification ->
-      let cmds, fct = compile_inv_and_while ~fname ~while_stmt ~invariant in
-      let comp_rest, new_functions = compile_list rest in
-      (cmds @ comp_rest, fct :: new_functions)
+      let cmds, fct = compile_inv_and_while ~proc_name ~while_stmt ~invariant in
+      let comp_rest, new_procs = compile_list rest in
+      (cmds @ comp_rest, fct :: new_procs)
   | { snode = While _; _ } :: _
     when !Gillian.Utils.Config.current_exec_mode = Verification ->
       failwith "While loop without invariant in Verification mode!"
   | { snode = While (e, sl); sid = sid_while; sloc } :: rest ->
       let looplab = gen_str loop_lab in
       let cmdle, guard = compile_expr e in
-      let comp_body, new_functions = compile_list sl in
+      let comp_body, new_procs = compile_list sl in
       let comp_body, bodlab = get_or_create_lab comp_body lbody_lab in
       let endlab = gen_str end_lab in
       let annot =
@@ -680,19 +679,19 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let backcmd_lab = (annot_hidden, None, backcmd) in
       let endcmd = Cmd.Skip in
       let endcmd_lab = (annot_hidden, Some endlab, endcmd) in
-      let comp_rest, new_functions_2 = compile_list rest in
+      let comp_rest, new_procs_2 = compile_list rest in
       ( [ headcmd_lab ] @ cmdle @ [ loopcmd_lab ] @ comp_body
         @ [ backcmd_lab; endcmd_lab ]
         @ comp_rest,
-        new_functions @ new_functions_2 )
+        new_procs @ new_procs_2 )
   (* Skip *)
   | { snode = Skip; sid; sloc } :: rest ->
       let cmd = Cmd.Skip in
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
-      let comp_rest, new_functions = compile_list rest in
-      ((annot, None, cmd) :: comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      ((annot, None, cmd) :: comp_rest, new_procs)
   (* Variable assignment *)
   | { snode = VarAssign (v, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
@@ -700,16 +699,16 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
-      let comp_rest, new_functions = compile_list rest in
-      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_procs)
   (* Fresh s-var *)
   | { snode = Fresh v; sid; sloc } :: rest ->
       let cmd = Cmd.Logic (LCmd.FreshSVar v) in
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
-      let comp_rest, new_functions = compile_list rest in
-      ((annot, None, cmd) :: comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      ((annot, None, cmd) :: comp_rest, new_procs)
   (* Object Deletion *)
   | { snode = Dispose e; sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
@@ -727,7 +726,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let g_var = gen_str gvar in
       let failcmd = Cmd.Fail ("InvalidBlockPointer", [ comp_e ]) in
       let cmd = Cmd.LAction (g_var, dispose, [ nth comp_e 0 ]) in
-      let comp_rest, new_functions = compile_list rest in
+      let comp_rest, new_procs = compile_list rest in
       ( cmdle
         @ [
             (annot, None, testcmd);
@@ -735,7 +734,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
             (annot_final, Some ctnlab, cmd);
           ]
         @ comp_rest,
-        new_functions )
+        new_procs )
   (* Delete e =>
           ce := Ce(e); // (bunch of commands and then assign the result to e)
           v_get := [getcell](ce[0], ce[1]);
@@ -772,8 +771,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
           (annot_final, None, getvalcmd);
         ]
       in
-      let comp_rest, new_functions = compile_list rest in
-      (cmdle @ cmds @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (cmdle @ cmds @ comp_rest, new_procs)
   (*
           x := [e] =>
           ce := Ce(e); // (bunch of commands and then assign the result to ce)
@@ -797,10 +796,10 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let setcmd =
         Cmd.LAction (v_set, setcell, [ nth e_v_get 0; nth e_v_get 1; comp_e2 ])
       in
-      let comp_rest, new_functions = compile_list rest in
+      let comp_rest, new_procs = compile_list rest in
       ( cmdle1 @ cmdle2
         @ ((get_annot, None, getcmd) :: (set_annot, None, setcmd) :: comp_rest),
-        new_functions )
+        new_procs )
   (* [e1] := e2 =>
           ce1 := Ce(e1);
           ce2 := Ce(e2);
@@ -819,13 +818,13 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let newcmd =
         Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int (Z.of_int k)) ])
       in
-      let comp_rest, new_functions = compile_list rest in
-      ((annot, None, newcmd) :: comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      ((annot, None, newcmd) :: comp_rest, new_procs)
   (* x := new(k) =>
           x := [alloc](k); // this is already a pointer
   *)
-  (* Function call *)
-  | { snode = FunCall (x, fn, el, to_bind); sid; sloc } :: rest ->
+  (* Proc call *)
+  | { snode = ProcCall (x, fn, el, to_bind); sid; sloc } :: rest ->
       let expr_fn = gil_expr_of_str fn in
       let cmdles, params = List.split (List.map compile_expr el) in
       let bindings =
@@ -837,10 +836,10 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-          ~nest_kind:(FunCall fn) ()
+          ~nest_kind:(ProcCall fn) ()
       in
-      let comp_rest, new_functions = compile_list rest in
-      (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_procs)
   (* If-Else bloc *)
   | { snode = If (e, sl1, sl2); sid; sloc } :: rest ->
       let annot =
@@ -855,8 +854,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         { annot with stmt_kind; branch_kind }
       in
       let cmdle, guard = compile_expr e in
-      let comp_sl1, new_functions1 = compile_list sl1 in
-      let comp_sl2, new_functions2 = compile_list sl2 in
+      let comp_sl1, new_procs1 = compile_list sl1 in
+      let comp_sl2, new_procs2 = compile_list sl2 in
       let endlab = gen_str endif_lab in
       let comp_sl1, thenlab = get_or_create_lab comp_sl1 then_lab in
       let comp_sl2, elselab = get_or_create_lab comp_sl2 else_lab in
@@ -866,12 +865,12 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let gotoendcmd_lab = (annot_hidden, None, gotoendcmd) in
       let endcmd = Cmd.Skip in
       let endcmd_lab = (annot_hidden, Some endlab, endcmd) in
-      let comp_rest, new_functions3 = compile_list rest in
+      let comp_rest, new_procs3 = compile_list rest in
       ( cmdle
         @ (ifelsecmd_lab :: comp_sl1)
         @ (gotoendcmd_lab :: comp_sl2)
         @ [ endcmd_lab ] @ comp_rest,
-        new_functions1 @ new_functions2 @ new_functions3 )
+        new_procs1 @ new_procs2 @ new_procs3 )
   (* Logic commands *)
   | { snode = Logic lcmd; sid; sloc } :: rest ->
       let annot =
@@ -886,24 +885,24 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let cmds_with_annot =
         List.map (fun lcmdp -> (annot, None, Cmd.Logic lcmdp)) lcmds
       in
-      let comp_rest, new_functions = compile_list rest in
-      (cmds_with_annot @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (cmds_with_annot @ comp_rest, new_procs)
   | { snode = Assert e; sid; sloc } :: rest ->
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle, comp_e = compile_expr e in
       let cmd = Cmd.Logic (Assert (BinOp (comp_e, Equal, Expr.true_))) in
-      let comp_rest, new_functions = compile_list rest in
-      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_procs)
   | { snode = Assume e; sid; sloc } :: rest ->
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle, comp_e = compile_expr e in
       let cmd = Cmd.Logic (Assume (BinOp (comp_e, Equal, Expr.true_))) in
-      let comp_rest, new_functions = compile_list rest in
-      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_procs)
   | { snode = AssumeType (e, t); sid; sloc } :: rest ->
       let typ = WType.to_gil t in
       let annot =
@@ -911,19 +910,19 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let cmdle, comp_e = compile_expr e in
       let cmd = Cmd.Logic (AssumeType (comp_e, typ)) in
-      let comp_rest, new_functions = compile_list rest in
-      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+      let comp_rest, new_procs = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_procs)
 
 let compile_spec
-    ?(fname = "main")
-    WSpec.{ pre; post; variant; fparams; existentials; _ } =
+    ?(proc_name = "main")
+    WSpec.{ pre; post; variant; proc_params; existentials; _ } =
   let comp_pre =
-    let _, comp_pre = compile_lassert ~fname pre in
+    let _, comp_pre = compile_lassert ~proc_name pre in
     let loc = WLAssert.get_loc pre |> CodeLoc.to_location in
     (comp_pre, Some loc)
   in
   let comp_post =
-    let _, comp_post = compile_lassert ~fname post in
+    let _, comp_post = compile_lassert ~proc_name post in
     let loc = WLAssert.get_loc post |> CodeLoc.to_location in
     (comp_post, Some loc)
   in
@@ -947,7 +946,7 @@ let compile_spec
         Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
           true
   in
-  Spec.init fname fparams [ single_spec ] false false true
+  Spec.init proc_name proc_params [ single_spec ] false false true
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
@@ -985,16 +984,14 @@ let compile_pred filepath pred =
       pred_nounfold = pred.pred_nounfold;
     }
 
-let rec compile_function
+let rec compile_proc
     filepath
-    WFun.{ name; params; body; spec; return_expr; is_loop_body; _ } =
-  let lbodylist, new_functions =
-    compile_stmt_list ~fname:name ~is_loop_prefix:is_loop_body body
+    WProc.{ name; params; body; spec; return_expr; is_loop_body; _ } =
+  let lbodylist, new_procs =
+    compile_stmt_list ~proc_name:name ~is_loop_prefix:is_loop_body body
   in
-  let other_procs =
-    List.concat (List.map (compile_function filepath) new_functions)
-  in
-  let cmdle, comp_ret_expr = compile_expr ~fname:name return_expr in
+  let other_procs = List.concat (List.map (compile_proc filepath) new_procs) in
+  let cmdle, comp_ret_expr = compile_expr ~proc_name:name return_expr in
   let ret_annot, final_ret_annot =
     WAnnot.make_multi
       ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
@@ -1011,7 +1008,7 @@ let rec compile_function
   let retcmd = (final_ret_annot, None, Cmd.ReturnNormal) in
   let lbody_withret = lbodylist @ retassigncmds @ [ retcmd ] in
   let gil_body = Array.of_list lbody_withret in
-  let gil_spec = Option.map (compile_spec ~fname:name) spec in
+  let gil_spec = Option.map (compile_spec ~proc_name:name) spec in
   Proc.
     {
       proc_name = name;
@@ -1096,9 +1093,9 @@ let compile_lemma
         lemma_conclusion;
         _;
       } =
-  let compile_lcmd = compile_lcmd ~fname:lemma_name in
-  let compile_lexpr = compile_lexpr ~fname:lemma_name in
-  let compile_lassert = compile_lassert ~fname:lemma_name in
+  let compile_lcmd = compile_lcmd ~proc_name:lemma_name in
+  let compile_lexpr = compile_lexpr ~proc_name:lemma_name in
+  let compile_lassert = compile_lassert ~proc_name:lemma_name in
   let compile_and_agregate_lcmd lcmd =
     let a_opt, clcmd = compile_lcmd lcmd in
     match a_opt with
@@ -1202,7 +1199,7 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
   let get_datatype_name datatype = datatype.Datatype.datatype_name in
   (* compile everything *)
-  let comp_context = List.map (compile_function filepath) context in
+  let comp_context = List.map (compile_proc filepath) context in
   let comp_preds = List.map (compile_pred filepath) predicates in
   let comp_lemmas =
     List.map

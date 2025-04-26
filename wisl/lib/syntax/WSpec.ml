@@ -6,9 +6,9 @@ type t = {
   variant : WLExpr.t option;
   existentials : (string * string list) option;
   spid : int;
-  fname : string;
+  proc_name : string;
   (* name of the function *)
-  fparams : string list;
+  proc_params : string list;
   (* parameters of the function *)
   sploc : CodeLoc.t;
 }
@@ -23,14 +23,14 @@ let get_by_id id spec =
   let self_or_none = if get_id spec = id then `WSpec spec else `None in
   self_or_none |>> (lassert_getter, spec.pre) |>> (lassert_getter, spec.post)
 
-let make ?existentials pre post variant fname fparams loc =
+let make ?existentials pre post variant proc_name proc_params loc =
   {
     pre;
     post;
     variant;
     spid = Generators.gen_id ();
     sploc = loc;
-    fname;
-    fparams;
+    proc_name;
+    proc_params;
     existentials;
   }

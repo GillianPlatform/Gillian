@@ -9,7 +9,7 @@ type t = {
   code : string;
   severity : severity;
   related_information : related_info_t list;
-  function_name : string;
+  proc_name : string;
 }
 
 type error_code_t =
@@ -19,8 +19,8 @@ type error_code_t =
   | SyntaxError
   | MissingResource
   | UnconsistentStmtBloc
-  | FunctionNotVerified
-  | UndefinedFunction
+  | ProcNotVerified
+  | UndefinedProc
   | UndefinedLemma
   | MissingInvariant
 

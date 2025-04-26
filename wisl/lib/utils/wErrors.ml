@@ -16,7 +16,7 @@ type t = {
   code : string;
   severity : severity;
   related_information : related_info_t list;
-  function_name : string;
+  proc_name : string;
 }
 
 type res_t = (unit, t) result
@@ -28,8 +28,8 @@ type error_code_t =
   | SyntaxError
   | MissingResource
   | UnconsistentStmtBloc
-  | FunctionNotVerified
-  | UndefinedFunction
+  | ProcNotVerified
+  | UndefinedProc
   | UndefinedLemma
   | MissingInvariant
 
@@ -40,8 +40,8 @@ let str_error_code = function
   | SyntaxError -> "SyntaxError"
   | MissingResource -> "MissingResource"
   | UnconsistentStmtBloc -> "UnconsistentStmtBloc"
-  | FunctionNotVerified -> "FunctionNotVerified"
-  | UndefinedFunction -> "UndefinedFonction"
+  | ProcNotVerified -> "ProcNotVerified"
+  | UndefinedProc -> "UndefinedProc"
   | UndefinedLemma -> "UndefinedLemma"
   | MissingInvariant -> "MissingInvariant"
 
@@ -53,21 +53,21 @@ let get_errors results =
   in
   get_errors' [] results
 
-let build_consistency_error message range function_name =
+let build_consistency_error message range proc_name =
   let code = str_error_code UnconsistentStmtBloc in
   let severity = SevError in
   let related_information = [] in
-  { message; range; code; severity; related_information; function_name }
+  { message; range; code; severity; related_information; proc_name }
 
-let build_warning_not_called range function_name =
-  let code = str_error_code FunctionNotVerified in
+let build_warning_not_called range proc_name =
+  let code = str_error_code ProcNotVerified in
   let message =
     "This function is never verified because it has no specification and is \
      never called from a function that is verified"
   in
   let severity = SevWarning in
   let related_information = [] in
-  { code; message; severity; related_information; range; function_name }
+  { code; message; severity; related_information; range; proc_name }
 
 let build_warning_invariant range =
   let code = str_error_code MissingInvariant in
@@ -77,7 +77,7 @@ let build_warning_invariant range =
   in
   let severity = SevWarning in
   let related_information = [] in
-  { code; message; severity; related_information; range; function_name = "" }
+  { code; message; severity; related_information; range; proc_name = "" }
 
 let build_err_string error_code id loc message =
   Format.sprintf "%s;%i;%s;%s"

@@ -4,7 +4,7 @@ predicate list(+x, alpha) {
 }
 
 { (x == #x) * list(#x, #alpha) }
-function llen(x) {
+proc llen(x) {
     if (x = null) {
         n := 0
     } else {
@@ -17,7 +17,7 @@ function llen(x) {
 { list(#x, #alpha) * (ret == len(#alpha)) }
 
 { (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
-function concat(x, y) {
+proc concat(x, y) {
     if (x = null) {
         r := y
     } else {
@@ -32,7 +32,7 @@ function concat(x, y) {
 
 
 // { list(#x, #alpha) * (v == #v) }
-// function append(x, v) {
+// proc append(x, v) {
 //     if (x = null) {
 //         y := new(2);
 //         [y] := v
@@ -47,7 +47,7 @@ function concat(x, y) {
 // { list(ret, #alpha@[#v]) }
 
 // { list(x, #alpha) * (x == #x) }
-// function copy(x) {
+// proc copy(x) {
 //     if (x = null) {
 //         ch := null
 //     } else {
@@ -63,7 +63,7 @@ function concat(x, y) {
 // { list(#x, #alpha) * list(ret, #alpha) }
 
 // { list(x, #alpha) }
-// function dispose_list(x) {
+// proc dispose_list(x) {
 //     if (x = null) {
 //         skip
 //     } else {

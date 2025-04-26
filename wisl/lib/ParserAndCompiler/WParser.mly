@@ -2,7 +2,7 @@
 
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
-%token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA DATATYPE
+%token <CodeLoc.t> PROC FUNCTION RETURN PREDICATE LEMMA DATATYPE
 %token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
@@ -96,9 +96,9 @@
 %start <WProg.t> prog
 %start <WLAssert.t> assert_only
 
-%type <WFun.t list * WPred.t list * WLemma.t list * WDatatype.t list> definitions
-%type <WFun.t>                                                        fct_with_specs
-%type <WFun.t>                                                        fct
+%type <WProc.t list * WPred.t list * WLemma.t list * WDatatype.t list> definitions
+%type <WProc.t>                                                        proc_with_specs
+%type <WProc.t>                                                        proc
 %type <WPred.t>                                                       predicate
 %type <WLemma.t>                                                      lemma
 %type <WDatatype.t>                                                   datatype
@@ -141,31 +141,31 @@ definitions:
   | defs = definitions; l = lemma
     { let (fs, ps, ls, ds) = defs in
       (fs, ps, l::ls, ds) }
-  | defs = definitions; f = fct_with_specs
+  | defs = definitions; f = proc_with_specs
     { let (fs, ps, ls, ds) = defs in
       (f::fs, ps, ls, ds) }
   | defs = definitions; d = datatype
     { let (fs, ps, ls, ds) = defs in
       (fs, ps, ls, d::ds) }
 
-fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+proc_with_specs:
+  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); p = proc; LCBRACE;
     post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
-      WFun.add_spec f pre post variant loc }
-  | f = fct { f }
+      WProc.add_spec p pre post variant loc }
+  | p = proc { p }
 
-fct:
-  | lstart = FUNCTION; lf = IDENTIFIER; LBRACE; params = var_list; RBRACE; (* block_start = *) LCBRACE;
+proc:
+  | lstart = PROC; lp = IDENTIFIER; LBRACE; params = var_list; RBRACE; (* block_start = *) LCBRACE;
     stmtsandret = statement_list_and_return; lend = RCBRACE;
-    { let (_, f) = lf in
+    { let (_, p) = lp in
       let (stmts, e) = stmtsandret in
       (* let block_loc = CodeLoc.merge block_start lend in
          let () = WStmt.check_consistency stmts block_loc in *)
       let floc = CodeLoc.merge lstart lend in
       let fid = Generators.gen_id () in
-      WFun.{
-        name = f;
+      WProc.{
+        name = p;
         params = params;
         body = stmts;
         return_expr = e;
@@ -242,7 +242,7 @@ statement:
   | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
     { let (lstart, x) = lx in
       let (_, f) = lf in
-      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+      let bare_stmt = WStmt.ProcCall (x, f, params, None) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }

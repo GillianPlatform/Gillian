@@ -8,7 +8,7 @@ type tt =
   | Dispose of WExpr.t
   | Lookup of string * WExpr.t (* x := [e] *)
   | Update of WExpr.t * WExpr.t (* [e] := [e] *)
-  | FunCall of string * string * WExpr.t list * (string * string list) option
+  | ProcCall of string * string * WExpr.t list * (string * string list) option
     (* The last bit is only for internal use *)
   | While of WExpr.t * t list
   | If of WExpr.t * t list * t list
@@ -40,7 +40,7 @@ and pp fmt stmt =
   | Lookup (v, e) -> Format.fprintf fmt "@[%s := [%a]@]" v WExpr.pp e
   | Update (e1, e2) ->
       Format.fprintf fmt "@[[%a] := %a@]" WExpr.pp e1 WExpr.pp e2
-  | FunCall (v, f, el, _) ->
+  | ProcCall (v, f, el, _) ->
       Format.fprintf fmt "@[%s := %s(%a)@]" v f
         (WPrettyUtils.pp_list WExpr.pp)
         el
@@ -78,10 +78,11 @@ let is_unfold s =
   | Logic lcmd when WLCmd.is_unfold lcmd -> true
   | _ -> false
 
-let functions_called_by_list sl =
+let procs_called_by_list sl =
   let rec aux already = function
     | [] -> already
-    | { snode = FunCall (_, fname, _, _); _ } :: r -> aux (fname :: already) r
+    | { snode = ProcCall (_, proc_name, _, _); _ } :: r ->
+        aux (proc_name :: already) r
     | { snode = While (_, slp); _ } :: r -> aux (aux already slp @ already) r
     | { snode = If (_, slp1, slp2); _ } :: r ->
         aux (aux already slp1 @ aux already slp2 @ already) r
@@ -103,7 +104,7 @@ let rec get_by_id id stmt =
     | Assume e
     | AssumeType (e, _) -> expr_getter e
     | Update (e1, e2) -> expr_getter e1 |>> (expr_getter, e2)
-    | FunCall (_, _, el, _) -> expr_list_visitor el
+    | ProcCall (_, _, el, _) -> expr_list_visitor el
     | While (e, sl) -> expr_getter e |>> (list_visitor, sl)
     | If (e, sl1, sl2) ->
         expr_getter e |>> (list_visitor, sl1) |>> (list_visitor, sl2)

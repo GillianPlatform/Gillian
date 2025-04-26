@@ -219,7 +219,7 @@ lemma list_member_concat {
 //
 // 00. Allocating an SLL node with the given value
 //
-function SLL_allocate_node(v){
+proc SLL_allocate_node(v){
   t := new(2);
   [t] := v;
   return t
@@ -247,7 +247,7 @@ predicate SLL_prepend_post(+def, +x, +xs, +k, +vs, +n, +retval) {
 
 // Specified algorithm
 { (x == #x) * (k == #k) * SLL_prepend_pre(#def, #x, #xs, #vs, #n) }
-function SLL_prepend(x, k){
+proc SLL_prepend(x, k){
     z := SLL_allocate_node(k);
     [z + 1] := x;
     return z
@@ -280,7 +280,7 @@ predicate SLL_length_post(+def, +x, +retval) {
 
 // Specified algorithm
 { (x == #x) * SLL_length_pre(#def, #x, #var) } with variant: #var
-function SLL_length(x) {
+proc SLL_length(x) {
   if (x = null){
     n := 0
   } else {
@@ -298,7 +298,7 @@ function SLL_length(x) {
 
 // Specified algorithm
 { (x == #x) * SLL_len(x, #n) }
-function SLL_length_iter(x) {
+proc SLL_length_iter(x) {
   y := x;
   n := 0;
   [[ invariant {bind: n, y, #ny}
@@ -336,7 +336,7 @@ predicate SLL_concat_post(+def, +x, +y, +xx, +xy, +vx, +vy, +nx, +ny, +retval) {
 
 // Specified algorithm
 {(x == #x) * (y == #y) * SLL_concat_pre(#def, #x, #y, #xx, #xy, #vx, #vy, #nx, #ny, #var) } with variant: #var
-function SLL_concat(x, y) {
+proc SLL_concat(x, y) {
   if (x = null){
     x := y
   } else {
@@ -354,7 +354,7 @@ function SLL_concat(x, y) {
 
 // Specified algorithm
 {(x == #x) * (y == #y) * SLL_vals(#x, #vx) * SLL_vals(#y, #vy) }
-function SLL_concat_iter(x, y){
+proc SLL_concat_iter(x, y){
   if (x = null) {
     head := y
   } else {
@@ -399,7 +399,7 @@ predicate SLL_reverse_post(+def, +x, +xs, +vs, +n, +retval) {
 
 // Specified algorithm
 { (x == #x) * SLL_reverse_pre(#def, #x, #xs, #vs, #n, #var) } with variant: #var
-function SLL_reverse(x){
+proc SLL_reverse(x){
   if (not (x = null)) {
     t := [x + 1];
     [x + 1] := null;
@@ -431,7 +431,7 @@ predicate nounfold SLL_member_post(+def, +x, +vs) {
 
 // Specified algorithm
 { (x == #x) * (k == #k) * SLL_member_pre(#def, #x, #vs, #var) * list_member(#vs, #k, #r) } with variant: #var
-function SLL_member(x, k){
+proc SLL_member(x, k){
   found := false;
   if (x = null){
     skip
@@ -452,7 +452,7 @@ function SLL_member(x, k){
 // 05i. List membership
 //
 { (x == #x) * (k == #k) * SLL_vals(#x, #vs) * list_member(#vs, #k, #r) }
-function SLL_member_iter(x, k) {
+proc SLL_member_iter(x, k) {
   found := false;
   next := x;
   [[ invariant {bind: found, next, #beta, #gamma, #rg}
@@ -505,7 +505,7 @@ predicate SLL_free_post(+def, +x, +xs) {
 
 // Specified algorithm
 { (x == #x) * SLL_free_pre(#def, #x, #xs, #var) } with variant: #var
-function SLL_free(x){
+proc SLL_free(x){
   if (x = null) {
     skip
   } else {

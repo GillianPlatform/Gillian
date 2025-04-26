@@ -44,7 +44,7 @@ lemma lseg_append(x, y, alpha, a, z) {
 }
 
 { (x == #x) * list(#x, #alpha) }
-function llen(x) {
+proc llen(x) {
   y := x;
   n := 0;
   [[ fold lseg(#x, y, []) ]];
