@@ -114,6 +114,9 @@ module Variant = struct
 
   module type Nary = sig
     include S
+
+    val num_params : int
+    val construct : sexp list -> sexp
   end
 
   let nul ?recognizer name =
@@ -148,6 +151,20 @@ module Variant = struct
         List.mapi
           (fun i param_typ -> ("param-" ^ string_of_int i, param_typ))
           param_typs
+
+      let num_params = List.length params
+
+      let construct xs =
+        let num_params_provided = List.length xs in
+        if num_params_provided == num_params then atom name $$ xs
+        else
+          let msg =
+            Printf.sprintf
+              "Invalid number of parameters for the constructor %s. %d \
+               parameters were provided, but %d were expected."
+              name num_params_provided num_params
+          in
+          raise (Failure msg)
     end in
     (module M : Nary)
 end
@@ -259,12 +276,19 @@ module Lit_operations = struct
     | TypeType -> t_gil_type
     | DatatypeType name -> atom name
 
+  let constructor_variants : (string, (module Variant.Nary)) Hashtbl.t ref =
+    ref (Hashtbl.create 1)
+
+  let datatype_lit_variants : (string, (module Variant.Unary)) Hashtbl.t ref =
+    ref (Hashtbl.create 1)
+
   let mk_constructor Constructor.{ constructor_name; constructor_fields; _ } =
     let param_typ t =
       Option.map native_sort_of_type t |> Option.value ~default:t_gil_literal
     in
     let param_typs = List.map param_typ constructor_fields in
     let module N = (val n constructor_name param_typs : Variant.Nary) in
+    Hashtbl.add !constructor_variants constructor_name (module N : Variant.Nary);
     (module N : Variant.S)
 
   let mk_user_def_datatype Datatype.{ datatype_name; datatype_constructors; _ }
@@ -286,10 +310,25 @@ module Lit_operations = struct
     let t_datatype = atom datatype_name in
     let parameter_name = user_def_datatype_lit_param_name datatype_name in
     let module N = (val un variant_name parameter_name t_datatype : Unary) in
+    Hashtbl.add !datatype_lit_variants datatype_name (module N : Unary);
     (module N : Variant.S)
 
   let mk_user_def_datatype_lit_variants datatypes =
     List.map mk_user_def_datatype_lit_variant datatypes
+
+  let get_constructor_variant cname =
+    match Hashtbl.find_opt !constructor_variants cname with
+    | Some (module N) -> (module N : Nary)
+    | None ->
+        let msg = "SMT - Undefined constructor: " ^ cname in
+        raise (Failure msg)
+
+  let get_datatype_lit_variant dname =
+    match Hashtbl.find_opt !datatype_lit_variants dname with
+    | Some (module U) -> (module U : Unary)
+    | None ->
+        let msg = "SMT - Undefined datatype: " ^ dname in
+        raise (Failure msg)
 
   module Undefined = (val nul "Undefined" : Nullary)
   module Null = (val nul "Null" : Nullary)
@@ -309,6 +348,9 @@ module Lit_operations = struct
   end
 
   let init_decls user_def_datatypes =
+    (* Reset variants tables on reinitialisation *)
+    constructor_variants := Hashtbl.create Config.medium_tbl_size;
+    datatype_lit_variants := Hashtbl.create Config.medium_tbl_size;
     let gil_literal_variants =
       [
         (module Undefined : Variant.S);
@@ -510,7 +552,11 @@ module Encoding = struct
           | TypeType -> Type.construct
           | BooleanType -> Bool.construct
           | ListType -> List.construct
-          | DatatypeType name -> ( <| ) (atom ("Datatype" ^ name))
+          | DatatypeType name ->
+              let (module U : Variant.Unary) =
+                Lit_operations.get_datatype_lit_variant name
+              in
+              U.construct
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
@@ -912,7 +958,10 @@ let rec encode_logical_expression
           in
           let>-- args = List.map f les in
           let args = List.map2 simple_wrap_or_native param_typs args in
-          let sexp = atom name $$ args in
+          let (module V : Variant.Nary) =
+            Lit_operations.get_constructor_variant name
+          in
+          let sexp = V.construct args in
           sexp >- Datatype_env.get_constructor_type_unsafe name
       | None ->
           let msg = "SMT - Undefined constructor: " ^ name in
