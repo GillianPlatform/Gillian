@@ -72,7 +72,7 @@ let rec pp fmt lexpr =
   | PVar x -> Format.fprintf fmt "@[%s@]" x
   | LBinOp (le1, b, le2) ->
       Format.fprintf fmt "@[(%a %a %a)@]" pp le1 WBinOp.pp b pp le2
-  | LUnOp (u, le) -> Format.fprintf fmt "@[(%a %a)@]" WUnOp.pp u pp le
+  | LUnOp (u, le) -> Format.fprintf fmt "@[%a%a@]" WUnOp.pp u pp le
   | LLSub (le1, le2, le3) ->
       Format.fprintf fmt "@[sub(%a, %a, %a)@]" pp le1 pp le2 pp le3
   | LEList lel ->

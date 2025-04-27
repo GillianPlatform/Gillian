@@ -22,7 +22,7 @@ type t =
 let pp fmt b =
   let s = Format.fprintf fmt "@[%s@]" in
   match b with
-  | EQUAL -> s "="
+  | EQUAL -> s "=="
   | LESSTHAN -> s "<"
   | GREATERTHAN -> s ">"
   | LESSEQUAL -> s "<="

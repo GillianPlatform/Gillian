@@ -73,7 +73,7 @@ let rec pp fmt asser =
       Format.fprintf fmt "@[(%a) -> %a@]" WLExpr.pp le1 pp_params le2
   | LBlockPointsTo (le1, le2) ->
       Format.fprintf fmt "@[(%a) -b-> %a@]" WLExpr.pp le1 pp_params le2
-  | LPure f -> Format.fprintf fmt "@[%a@]" WLExpr.pp f
+  | LPure f -> Format.fprintf fmt "@[(%a)@]" WLExpr.pp f
 
 let str = Format.asprintf "%a" pp
 
