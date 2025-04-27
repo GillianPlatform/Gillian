@@ -74,8 +74,12 @@ let rec pp fmt lexpr =
   | LESet lel ->
       WPrettyUtils.pp_list ~pre:(format_of_string "@[-{")
         ~suf:(format_of_string "}-@]") pp fmt lel
-  | LFuncApp (name, lel) | LConstructorApp (name, lel) ->
+  | LFuncApp (name, lel) ->
       Format.fprintf fmt "@[%s" name;
+      WPrettyUtils.pp_list ~pre:(format_of_string "(")
+        ~suf:(format_of_string ")@]") ~empty:(format_of_string "@]") pp fmt lel
+  | LConstructorApp (name, lel) ->
+      Format.fprintf fmt "@['%s" name;
       WPrettyUtils.pp_list ~pre:(format_of_string "(")
         ~suf:(format_of_string ")@]") ~empty:(format_of_string "@]") pp fmt lel
 
