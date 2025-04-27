@@ -9,8 +9,8 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
-  (* TODO: Double check handling of LConstructor in functions that manipulate WLExpr *)
-  | LConstructor of string * t list
+  | LFuncApp of string * t list (* Function application *)
+  | LConstructorApp of string * t list (* Constructor application *)
 
 and t = { wleid : int; wleloc : CodeLoc.t; wlenode : tt }
 
@@ -50,7 +50,7 @@ let rec get_by_id id lexpr =
     | LUnOp (_, lep) -> getter lep
     | LEList lel -> list_visitor lel
     | LESet lel -> list_visitor lel
-    | LConstructor (_, lel) -> list_visitor lel
+    | LFuncApp (_, lel) | LConstructorApp (_, lel) -> list_visitor lel
     | _ -> `None
   in
   let self_or_none = if get_id lexpr = id then `WLExpr lexpr else `None in
@@ -74,7 +74,7 @@ let rec pp fmt lexpr =
   | LESet lel ->
       WPrettyUtils.pp_list ~pre:(format_of_string "@[-{")
         ~suf:(format_of_string "}-@]") pp fmt lel
-  | LConstructor (name, lel) ->
+  | LFuncApp (name, lel) | LConstructorApp (name, lel) ->
       Format.fprintf fmt "@[%s" name;
       WPrettyUtils.pp_list ~pre:(format_of_string "(")
         ~suf:(format_of_string ")@]") ~empty:(format_of_string "@]") pp fmt lel
@@ -94,6 +94,7 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
     | LLSub (e1, e2, e3) -> LLSub (f e1, f e2, f e3)
     | LEList le -> LEList (List.map f le)
     | LESet le -> LESet (List.map f le)
-    | LConstructor (name, le) -> LConstructor (name, List.map f le)
+    | LFuncApp (name, le) | LConstructorApp (name, le) ->
+        LFuncApp (name, List.map f le)
   in
   { wleid; wleloc; wlenode }

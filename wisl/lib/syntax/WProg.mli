@@ -3,6 +3,7 @@ type t = {
   predicates : WPred.t list;
   lemmas : WLemma.t list;
   datatypes : WDatatype.t list;
+  functions : WFunc.t list;
 }
 
 val get_context : t -> WProc.t list

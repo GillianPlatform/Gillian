@@ -135,7 +135,7 @@ let rec infer_logic_expr knownp lexpr =
       TypeMap.add bare_lexpr WList (List.fold_left infer_logic_expr knownp lel)
   | LESet lel ->
       TypeMap.add bare_lexpr WSet (List.fold_left infer_logic_expr knownp lel)
-  | LConstructor (n, lel) ->
+  | LFuncApp (n, lel) | LConstructorApp (n, lel) ->
       TypeMap.add bare_lexpr (WDatatype n)
         (List.fold_left infer_logic_expr knownp lel)
 

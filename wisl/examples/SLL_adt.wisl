@@ -1,4 +1,3 @@
-// Define a list ADT for use in specification language
 datatype MyList {
   Nil;
   Cons(Any, MyList)
@@ -6,122 +5,73 @@ datatype MyList {
 
 
 //
-// Standard over-approximating SLL predicate with contents
+// Standard over-approximating sll predicate with contents
 //
-predicate SLL(+x, vs) {
-  // Empty SLL
-  (x == null) * (vs == Nil());
-  // One SLL node and the rest
-  (x -b> #v, #next) * SLL(#next, #vs) *
-  (vs == Cons(#v, #vs))
+predicate sll(+x, vs) {
+  // Empty sll
+  (x == null) * (vs == 'Nil);
+  // One sll node and the rest
+  (x -b> #v, #next) * sll(#next, #vs) *
+  (vs == 'Cons(#v, #vs))
 }
 
-//
-// Pure predicate for list membership
-//
-// predicate list_member(+vs, +v, r : Bool){
-//   (vs == Nil) * (r == false);
-//   (vs == Cons(v, #rest)) * (r == true) * list_member(#rest, v, #mem);
-//   (vs == Cons(#v, #rest)) * (! (#v == v)) * list_member(#rest, v, r)
-// }
-
-// 00. Allocating an SLL node with the given value
+// 00. Allocating an sll node with the given value
 { v == #v }
-proc SLL_allocate_node(v){
+proc sll_allocate_node(v){
   t := new(2);
   [t] := v;
   return t
 }
-{ SLL(ret, Cons(#v, Nil())) }
+{ sll(ret, 'Cons(#v, 'Nil)) }
 
 // This incorrect spec should fail to verify
 { (v == #v) * (u == #u) }
-proc SLL_allocate_node_fails(u, v){
+proc sll_allocate_node_fails(u, v){
   t := new(2);
   [t] := v;
   return t
 }
-{ SLL(ret, Cons(#u, Nil())) }
+{ sll(ret, 'Cons(#u, 'Nil)) }
 
 
 //
-// RECURSIVE SLL MANIPULATION
+// RECURSIVE sll MANIPULATION
 //
 
-// 01. Prepending a given value to a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
-proc SLL_prepend(x, k){
-    z := SLL_allocate_node(k);
+// 01. Prepending a given value to a given sll
+{ (x == #x) * (k == #k) * sll(#x, #vs) }
+proc sll_prepend(x, k){
+    z := sll_allocate_node(k);
     [z + 1] := x;
     return z
 }
-{ SLL(ret, Cons(#k, #vs)) }
+{ sll(ret, 'Cons(#k, #vs)) }
 
-// 05. Copying a given SLL
-{ (x == #x) * SLL(#x, #vs) }
-proc SLL_copy(x){
+// 05. Copying a given sll
+{ (x == #x) * sll(#x, #vs) }
+proc sll_copy(x){
   y := null;
   if (not (x = null)) {
     k := [x];
-    y := SLL_allocate_node(k);
+    y := sll_allocate_node(k);
     t := [x + 1];
-    z := SLL_copy(t);
+    z := sll_copy(t);
     [y + 1] := z
   } else {
     skip
   };
   return y
 }
-{ SLL(#x, #vs) * SLL(ret, #vs) }
+{ sll(#x, #vs) * sll(ret, #vs) }
 
-// 08. Checking if a given value is in a given SLL
-// { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #r) }
-// proc SLL_member(x, k){
-//   found := false;
-//   if (x = null){
-//     skip
-//   } else {
-//     v := [x];
-//     if (v = k){
-//       found := true
-//     } else {
-//       t := [x + 1];
-//       found := SLL_member(t, k)
-//     }
-//   };
-//   return found
-// }
-// { SLL(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
-
-// 09. Removing a given value from a given SLL
-// { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #mem) }
-// proc SLL_remove(x, k) {
-//   if (x = null) {
-//     skip
-//   } else {
-//     v := [x];
-//     next := [x + 1];
-//     if (v = k){
-//       free(x);
-//       x := SLL_remove(next, k)
-//     } else {
-//        z := SLL_remove(next, k);
-//        [x + 1] := z
-//     }
-//   };
-//   [[ fold list_member(Nil, #k, false) ]];
-//   return x
-// }
-// { SLL(ret, #nvs) * list_member(#nvs, #k, false) }
-
-// 10. Freeing a given SLL
-{ (x == #x) * SLL(#x, #vs) }
-proc SLL_free(x){
+// 10. Freeing a given sll
+{ (x == #x) * sll(#x, #vs) }
+proc sll_free(x){
   if (x = null) {
     skip
   } else {
     t := [x + 1];
-    z := SLL_free(t);
+    z := sll_free(t);
     free(x)
   };
   return null

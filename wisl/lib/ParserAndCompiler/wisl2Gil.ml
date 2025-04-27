@@ -234,11 +234,12 @@ let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
           list_split_3 (List.map compile_lexpr l)
         in
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs)
-    | LConstructor (n, l) ->
+    | LConstructorApp (n, l) ->
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)
         in
-        (List.concat gvars, List.concat asrtsl, Expr.Constructor (n, comp_exprs)))
+        (List.concat gvars, List.concat asrtsl, Expr.Constructor (n, comp_exprs))
+    | LFuncApp (_, _) -> failwith "TODO")
 
 (* TODO: compile_lformula should return also the list of created existentials *)
 let rec compile_lformula ?(proc_name = "main") formula : Asrt.t * Expr.t =
@@ -1185,7 +1186,7 @@ let compile_datatype
       datatype_constructors = comp_constructors;
     }
 
-let compile ~filepath WProg.{ context; predicates; lemmas; datatypes } =
+let compile ~filepath WProg.{ context; predicates; lemmas; datatypes; _ } =
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in

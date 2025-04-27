@@ -93,6 +93,7 @@ rule read =
   | ','      { COMMA (curr lexbuf) }
   | "."      { DOT (curr lexbuf) }
   | ';'      { SEMICOLON (curr lexbuf) }
+  | '\''     { QUOTE (curr lexbuf) }
   | "|-"     { VDASH (curr lexbuf) }
   (* binary operators *)
   | "::"     { LSTCONS }
