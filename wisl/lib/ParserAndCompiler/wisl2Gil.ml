@@ -238,7 +238,9 @@ let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)
         in
-        (List.concat gvars, List.concat asrtsl, Expr.Constructor (n, comp_exprs))
+        ( List.concat gvars,
+          List.concat asrtsl,
+          Expr.ConstructorApp (n, comp_exprs) )
     | LFuncApp (_, _) -> failwith "TODO")
 
 (* TODO: compile_lformula should return also the list of created existentials *)

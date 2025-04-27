@@ -153,7 +153,7 @@ and expr =
   | ESet of expr list
   | Exists of (string * typ option) list * expr
   | ForAll of (string * typ option) list * expr
-  | Constructor of string * expr list
+  | ConstructorApp of string * expr list
 
 and assertion_atom =
   | Emp

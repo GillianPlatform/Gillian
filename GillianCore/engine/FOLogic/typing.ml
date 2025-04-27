@@ -153,7 +153,7 @@ module Infer_types_to_gamma = struct
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
-    | Constructor (n, les) ->
+    | ConstructorApp (n, les) ->
         if Datatype_env.is_initialised () then
           let field_types = Datatype_env.get_constructor_field_types n in
           let check_field le tt =
@@ -518,7 +518,7 @@ module Type_lexpr = struct
           let all_typable = typable_list ?target_type:(Some ListType) les in
           if all_typable then (Some ListType, true) else def_neg
       | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
-      | Constructor (n, les) -> type_constructor gamma n les
+      | ConstructorApp (n, les) -> type_constructor gamma n les
     in
 
     result

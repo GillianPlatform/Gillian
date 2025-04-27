@@ -251,7 +251,7 @@ module Expr : sig
     | Exists of (string * Type.t option) list * t
         (** Existential quantification. *)
     | ForAll of (string * Type.t option) list * t
-    | Constructor of string * t list
+    | ConstructorApp of string * t list
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -1178,7 +1178,8 @@ module Visitors : sig
          ; visit_Car : 'c -> UnOp.t -> UnOp.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
          ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
-         ; visit_Constructor : 'c -> Expr.t -> string -> Expr.t list -> Expr.t
+         ; visit_ConstructorApp :
+             'c -> Expr.t -> string -> Expr.t list -> Expr.t
          ; visit_ECall :
              'c ->
              'f Cmd.t ->
@@ -1439,7 +1440,9 @@ module Visitors : sig
     method visit_Car : 'c -> UnOp.t -> UnOp.t
     method visit_Cdr : 'c -> UnOp.t -> UnOp.t
     method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
-    method visit_Constructor : 'c -> Expr.t -> string -> Expr.t list -> Expr.t
+
+    method visit_ConstructorApp :
+      'c -> Expr.t -> string -> Expr.t list -> Expr.t
 
     method visit_ECall :
       'c -> 'f Cmd.t -> string -> Expr.t -> Expr.t list -> 'f option -> 'f Cmd.t
@@ -1736,7 +1739,7 @@ module Visitors : sig
          ; visit_Car : 'c -> 'f
          ; visit_Cdr : 'c -> 'f
          ; visit_Constant : 'c -> Constant.t -> 'f
-         ; visit_Constructor : 'c -> string -> Expr.t list -> 'f
+         ; visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
          ; visit_IDiv : 'c -> 'f
          ; visit_FDiv : 'c -> 'f
          ; visit_ECall :
@@ -1961,7 +1964,7 @@ module Visitors : sig
     method visit_Car : 'c -> 'f
     method visit_Cdr : 'c -> 'f
     method visit_Constant : 'c -> Constant.t -> 'f
-    method visit_Constructor : 'c -> string -> Expr.t list -> 'f
+    method visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
     method visit_IDiv : 'c -> 'f
     method visit_FDiv : 'c -> 'f
 
@@ -2188,7 +2191,7 @@ module Visitors : sig
          ; visit_Car : 'c -> unit
          ; visit_Cdr : 'c -> unit
          ; visit_Constant : 'c -> Constant.t -> unit
-         ; visit_Constructor : 'c -> string -> Expr.t list -> unit
+         ; visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
          ; visit_ECall :
              'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
          ; visit_EList : 'c -> Expr.t list -> unit
@@ -2412,7 +2415,7 @@ module Visitors : sig
     method visit_Car : 'c -> unit
     method visit_Cdr : 'c -> unit
     method visit_Constant : 'c -> Constant.t -> unit
-    method visit_Constructor : 'c -> string -> Expr.t list -> unit
+    method visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
 
     method visit_ECall :
       'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit

@@ -136,7 +136,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
     | Exists (bt, le) -> Exists (bt, f le)
     | ForAll (bt, le) -> ForAll (bt, f le)
-    | Constructor (n, les) -> Constructor (n, List.map f les)
+    | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
     (*
     | LstSub(le1, le2, le3) ->
       (match f le1, f le2, f le3 with
@@ -906,7 +906,7 @@ and reduce_lexpr_loop
     (* -------------------------
              Constructors
        ------------------------- *)
-    | Constructor (n, les) -> Constructor (n, List.map f les)
+    | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
     (* -------------------------
             ForAll + Exists
        ------------------------- *)
@@ -1787,14 +1787,14 @@ and reduce_lexpr_loop
     | BinOp (UnOp (TypeOf, BinOp (_, SetMem, _)), Equal, Lit (Type t))
       when t <> BooleanType -> Expr.false_
     (* BinOps: Equalities (Constructors) *)
-    | BinOp (Constructor (ln, lles), Equal, Constructor (rn, rles)) ->
+    | BinOp (ConstructorApp (ln, lles), Equal, ConstructorApp (rn, rles)) ->
         if ln = rn && List.length lles = List.length rles then
           Expr.conjunct
             (List.map2 (fun le re -> Expr.BinOp (le, Equal, re)) lles rles)
         else Expr.false_
-    | BinOp (Constructor _, Equal, rle) as le -> (
+    | BinOp (ConstructorApp _, Equal, rle) as le -> (
         match rle with
-        | LVar _ | Constructor _ -> le
+        | LVar _ | ConstructorApp _ -> le
         | _ -> Expr.false_)
     (* BinOps: Logic *)
     | BinOp (Lit (Bool true), And, e)
