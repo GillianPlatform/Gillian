@@ -947,6 +947,7 @@ let rec encode_logical_expression
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
+  | FuncApp _ -> failwith "TODO"
   | ConstructorApp (name, les) -> (
       let param_typs = Datatype_env.get_constructor_field_types name in
       match param_typs with

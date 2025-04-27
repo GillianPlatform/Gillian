@@ -17,6 +17,7 @@ type t = TypeDef__.expr =
   | ForAll of (string * Type.t option) list * t
       (** Universal quantification. *)
   | ConstructorApp of string * t list  (** Datatype constructor *)
+  | FuncApp of string * t list  (** Function application *)
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -380,6 +381,7 @@ let rec map_opt
             | _ -> None)
         | ConstructorApp (n, les) ->
             aux les (fun les -> ConstructorApp (n, les))
+        | FuncApp (n, les) -> aux les (fun les -> FuncApp (n, les))
       in
       Option.map f_after mapped_expr
 
@@ -418,7 +420,8 @@ let rec pp fmt e =
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
   | ConstructorApp (n, ll) ->
-      Fmt.pf fmt "%s(%a)" n (Fmt.list ~sep:Fmt.comma pp) ll
+      Fmt.pf fmt "'%s(%a)" n (Fmt.list ~sep:Fmt.comma pp) ll
+  | FuncApp (n, ll) -> Fmt.pf fmt "%s(%a)" n (Fmt.list ~sep:Fmt.comma pp) ll
 
 let rec full_pp fmt e =
   match e with
@@ -481,8 +484,8 @@ let rec is_concrete (le : t) : bool =
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
-  | ConstructorApp (_, _) -> false
-(* TODO: Pretty sure constructors are not concrete, but double check *)
+  | ConstructorApp (_, _) | FuncApp _ -> false
+(* TODO: Pretty sure constructors / func app are not concrete, but double check *)
 
 let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z

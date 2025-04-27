@@ -154,6 +154,7 @@ and expr =
   | Exists of (string * typ option) list * expr
   | ForAll of (string * typ option) list * expr
   | ConstructorApp of string * expr list
+  | FuncApp of string * expr list
 
 and assertion_atom =
   | Emp
@@ -246,6 +247,15 @@ and datatype = {
   datatype_source_path : string option;
   datatype_loc : location option;
   datatype_constructors : constructor list;
+}
+
+and func = {
+  func_name : string;
+  func_source_path : string option;
+  func_loc : location option;
+  func_num_params : int;
+  func_params : (string * typ option) list;
+  func_definition : expr;
 }
 
 and constructor = {

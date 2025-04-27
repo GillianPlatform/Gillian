@@ -101,6 +101,7 @@ module Make (SPState : PState.S) = struct
 
     let result : Expr.t =
       match (le : Expr.t) with
+      | FuncApp _ -> failwith "TODO"
       | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
       | Lit _ -> le
       | LVar lvar ->
@@ -178,6 +179,7 @@ module Make (SPState : PState.S) = struct
                   | Exists _ | ForAll _ -> Lit (Type BooleanType)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
                   | NOp (_, _) | ESet _ -> Lit (Type SetType)
+                  | FuncApp _ -> failwith "TODO"
                   | ConstructorApp (n, _) as c -> (
                       match Datatype_env.get_constructor_type n with
                       | Some t -> Lit (Type t)

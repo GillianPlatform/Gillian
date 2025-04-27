@@ -171,6 +171,7 @@ module Infer_types_to_gamma = struct
         else
           (* Can't say for certain whether or not the constructor is typable *)
           true
+    | FuncApp _ -> failwith "TODO"
     | Exists (bt, le) | ForAll (bt, le) ->
         if not (tt = BooleanType) then false
         else
@@ -519,6 +520,7 @@ module Type_lexpr = struct
           if all_typable then (Some ListType, true) else def_neg
       | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
       | ConstructorApp (n, les) -> type_constructor gamma n les
+      | FuncApp _ -> failwith "TODO"
     in
 
     result

@@ -140,6 +140,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     (* The remaining cases proceed recursively *)
     | UnOp (_, e) -> f e
     | BinOp (e1, _, e2) -> join [ e1; e2 ]
+    | FuncApp _ -> failwith "TODO"
     | NOp (_, le) | EList le | ESet le | ConstructorApp (_, le) -> join le
     | LstSub (e1, e2, e3) ->
         let result = join [ e1; e2; e3 ] in
@@ -170,6 +171,7 @@ let rec learn_expr
     (e : Expr.t) : outs =
   let f = learn_expr kb in
   match e with
+  | FuncApp _ -> failwith "TODO"
   (* TODO: Constructors aren't invertible unless we have destructors *)
   | ConstructorApp _ -> []
   (* Literals, abstract locations, sublists, and sets are never invertible *)
@@ -451,6 +453,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
   | EList _
   | ESet _
   | ConstructorApp _ -> []
+  | FuncApp _ -> failwith "TODO"
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)

@@ -9,6 +9,7 @@ module Constant = Constant
 module Constructor = Constructor
 module Datatype = Datatype
 module Expr = Expr
+module Func = Func
 module Flag = Flag
 module LCmd = LCmd
 module Lemma = Lemma

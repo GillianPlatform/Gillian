@@ -255,6 +255,7 @@ module Make (SMemory : SMemory.S) :
         | ForAll (bt, e) -> ForAll (bt, f e)
         | Lit _ | LVar _ | ALoc _ -> expr
         | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
+        | FuncApp _ -> failwith "TODO"
       in
       (* Perform reduction *)
       if no_reduce then result

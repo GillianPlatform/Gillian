@@ -1243,4 +1243,4 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes; _ } =
     ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
     ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
     ~predecessors:(Hashtbl.create 1) () (* TODO *)
-    ~datatypes:gil_datatypes
+    ~datatypes:gil_datatypes ~funcs:(Hashtbl.create 1)

@@ -1061,6 +1061,7 @@ let trans_program
         imports = [];
         lemmas = Hashtbl.create 1;
         preds = Hashtbl.create 1;
+        funcs = Hashtbl.create 1;
         datatypes = Hashtbl.create 1;
         only_specs = Hashtbl.create 1;
         macros = Hashtbl.create 1;

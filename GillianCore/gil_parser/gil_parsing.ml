@@ -294,6 +294,7 @@ module Make (Annot : Annot.S) = struct
     in
     Prog.make_indexed ~lemmas:ext_program.lemmas ~preds:ext_program.preds
       ~only_specs:ext_program.only_specs ~procs ~predecessors
+      ~funcs:(Hashtbl.create 1) (* TODO *)
       ~macros:ext_program.macros ~bi_specs:ext_program.bi_specs
       ~datatypes:ext_program.datatypes ()
 
