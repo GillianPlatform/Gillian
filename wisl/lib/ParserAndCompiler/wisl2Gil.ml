@@ -241,7 +241,11 @@ let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
         ( List.concat gvars,
           List.concat asrtsl,
           Expr.ConstructorApp (n, comp_exprs) )
-    | LFuncApp (_, _) -> failwith "TODO")
+    | LFuncApp (n, l) ->
+        let gvars, asrtsl, comp_exprs =
+          list_split_3 (List.map compile_lexpr l)
+        in
+        (List.concat gvars, List.concat asrtsl, Expr.FuncApp (n, comp_exprs)))
 
 (* TODO: compile_lformula should return also the list of created existentials *)
 let rec compile_lformula ?(proc_name = "main") formula : Asrt.t * Expr.t =
@@ -987,6 +991,26 @@ let compile_pred filepath pred =
       pred_nounfold = pred.pred_nounfold;
     }
 
+let compile_func
+    filepath
+    WFunc.{ func_name; func_params; func_definition; func_loc } =
+  let types = WType.infer_types_func func_params func_definition in
+  let get_wisl_type x = (x, WType.of_variable x types) in
+  let param_wisl_types = List.map (fun (x, _) -> get_wisl_type x) func_params in
+  let get_gil_type (x, t) = (x, Option.join (Option.map compile_type t)) in
+  let comp_func_params = List.map get_gil_type param_wisl_types in
+  let _, _, comp_func_def = compile_lexpr func_definition in
+  let comp_func_loc = Some (CodeLoc.to_location func_loc) in
+  Func.
+    {
+      func_name;
+      func_source_path = Some filepath;
+      func_loc = comp_func_loc;
+      func_num_params = List.length comp_func_params;
+      func_params = comp_func_params;
+      func_definition = comp_func_def;
+    }
+
 let rec compile_proc
     filepath
     WProc.{ name; params; body; spec; return_expr; is_loop_body; _ } =
@@ -1188,7 +1212,9 @@ let compile_datatype
       datatype_constructors = comp_constructors;
     }
 
-let compile ~filepath WProg.{ context; predicates; lemmas; datatypes; _ } =
+let compile
+    ~filepath
+    WProg.{ context; predicates; lemmas; datatypes; functions } =
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in
@@ -1200,6 +1226,7 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes; _ } =
   let get_proc_name proc = proc.Proc.proc_name in
   let get_pred_name pred = pred.Pred.pred_name in
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
+  let get_func_name func = func.Func.func_name in
   let get_datatype_name datatype = datatype.Datatype.datatype_name in
   (* compile everything *)
   let comp_context = List.map (compile_proc filepath) context in
@@ -1209,11 +1236,13 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes; _ } =
       (fun lemma -> compile_lemma filepath (preprocess_lemma lemma))
       lemmas
   in
+  let comp_funcs = List.map (compile_func filepath) functions in
   let comp_datatypes = List.map (compile_datatype filepath) datatypes in
   (* build the hashtables *)
   let gil_procs = make_hashtbl get_proc_name (List.concat comp_context) in
   let gil_preds = make_hashtbl get_pred_name comp_preds in
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
+  let gil_funcs = make_hashtbl get_func_name comp_funcs in
   let gil_datatypes = make_hashtbl get_datatype_name comp_datatypes in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
   let bi_specs = Hashtbl.create 1 in
@@ -1243,4 +1272,4 @@ let compile ~filepath WProg.{ context; predicates; lemmas; datatypes; _ } =
     ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
     ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
     ~predecessors:(Hashtbl.create 1) () (* TODO *)
-    ~datatypes:gil_datatypes ~funcs:(Hashtbl.create 1)
+    ~datatypes:gil_datatypes ~funcs:gil_funcs
