@@ -167,7 +167,7 @@ fct:
         spec = None;
         floc;
         fid;
-        is_loop_body = false;
+        loop_body_of = None;
       } }
 
 

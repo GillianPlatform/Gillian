@@ -653,6 +653,8 @@ gproc_target:
         proc_spec;
         proc_aliases = [];
         proc_calls = [];
+        proc_display_name = None;
+        proc_hidden = false;
       }
   }
 ;

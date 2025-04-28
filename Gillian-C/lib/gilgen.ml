@@ -833,6 +833,8 @@ let trans_function
       proc_spec = None;
       proc_aliases = [ original_fname ];
       proc_calls = callees;
+      proc_display_name = None;
+      proc_hidden = false;
     }
 
 let set_global_var symbol v =
@@ -1033,6 +1035,8 @@ let make_init_proc init_cmds =
       proc_body = Array.of_list all_cmds;
       proc_aliases = [];
       proc_calls = [];
+      proc_display_name = None;
+      proc_hidden = false;
     }
 
 let trans_program

@@ -403,7 +403,7 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       (None, LCmd.SL (SLCmd.SepAssert (comp_la, exs @ lb)))
   | Invariant _ -> failwith "Invariant is not before a loop."
 
-let compile_inv_and_while ~fname ~while_stmt ~invariant =
+let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
   (* FIXME: Variables that are in the invariant but not existential might be wrong. *)
   let loopretvar = "loopretvar__" in
   let gen_str = Generators.gen_str fname in
@@ -514,6 +514,11 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         WStmt.make (If (guard, wcmds @ [ rec_call ], [ ret_not_rec ])) while_loc;
       ]
     in
+    let loop_body_of =
+      match loop_body_of with
+      | Some _ -> loop_body_of
+      | None -> Some fname
+    in
     WFun.
       {
         name = loop_fname;
@@ -523,7 +528,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         return_expr = WExpr.make (Var loopretvar) while_loc;
         floc = while_loc;
         fid = Generators.gen_id ();
-        is_loop_body = true;
+        loop_body_of;
       }
   in
   let retv = gen_str gvar in
@@ -565,11 +570,15 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   in
   (lab_cmds, loop_funct)
 
-let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
+let rec compile_stmt_list
+    ?(fname = "main")
+    ?(is_loop_prefix = false)
+    ?loop_body_of
+    stmtl =
   (* create generator that works in the context of this function *)
   let compile_expr = compile_expr ~fname in
   let compile_lcmd = compile_lcmd ~fname in
-  let compile_list = compile_stmt_list ~fname in
+  let compile_list = compile_stmt_list ~fname ?loop_body_of in
   let gen_str = Generators.gen_str fname in
   let gil_expr_of_str s = Expr.Lit (Literal.String s) in
   let get_or_create_lab cmdl pre =
@@ -593,7 +602,9 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Logic invariant; _ } :: while_stmt :: rest
     when WLCmd.is_inv invariant && WStmt.is_while while_stmt
          && !Gillian.Utils.Config.current_exec_mode = Verification ->
-      let cmds, fct = compile_inv_and_while ~fname ~while_stmt ~invariant in
+      let cmds, fct =
+        compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of
+      in
       let comp_rest, new_functions = compile_list rest in
       (cmds @ comp_rest, fct :: new_functions)
   | { snode = While _; _ } :: _
@@ -927,9 +938,15 @@ let compile_pred filepath pred =
 
 let rec compile_function
     filepath
-    WFun.{ name; params; body; spec; return_expr; is_loop_body; _ } =
+    WFun.{ name; params; body; spec; return_expr; loop_body_of; _ } =
+  let is_loop_body, proc_display_name =
+    match loop_body_of with
+    | Some p -> (true, Some ("Loop body", p))
+    | None -> (false, None)
+  in
   let lbodylist, new_functions =
-    compile_stmt_list ~fname:name ~is_loop_prefix:is_loop_body body
+    compile_stmt_list ~fname:name ~is_loop_prefix:is_loop_body ?loop_body_of
+      body
   in
   let other_procs =
     List.concat (List.map (compile_function filepath) new_functions)
@@ -963,6 +980,8 @@ let rec compile_function
       proc_aliases = [];
       proc_calls = [];
       (* TODO *)
+      proc_display_name;
+      proc_hidden = is_loop_body;
     }
   :: other_procs
 

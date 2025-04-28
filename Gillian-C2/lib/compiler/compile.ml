@@ -142,6 +142,8 @@ let set_global_env_proc (ctx : Ctx.t) =
       (* TODO *)
       proc_aliases = [];
       proc_calls = [];
+      proc_display_name = None;
+      proc_hidden = false;
     }
 
 let compile_free_locals ~cmd_kind (ctx : Ctx.t) =
@@ -269,6 +271,8 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
       (* TODO *)
       proc_aliases = [];
       proc_calls = [];
+      proc_display_name = None;
+      proc_hidden = false;
     }
 
 module Start_for_harness = struct
