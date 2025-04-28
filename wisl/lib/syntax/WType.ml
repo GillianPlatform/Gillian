@@ -76,7 +76,7 @@ let of_unop u =
 (** returns (x, y, z) when binop takes types x and y and returns type z *)
 let of_binop b =
   match b with
-  | WBinOp.NEQ | WBinOp.EQUAL -> (WAny, WAny, WBool)
+  | WBinOp.EQUAL -> (WAny, WAny, WBool)
   | WBinOp.LESSTHAN
   | WBinOp.GREATERTHAN
   | WBinOp.LESSEQUAL
@@ -103,12 +103,35 @@ let needs_to_be expr t knownp =
   | Some tp -> TypeMap.add bare_expr (strongest t tp) knownp
   | None -> TypeMap.add bare_expr t knownp
 
+let same_type e1 e2 knownp =
+  let bare_e1, bare_e2 = (WLExpr.get e1, WLExpr.get e2) in
+  let topt1 = TypeMap.find_opt bare_e1 knownp in
+  let topt2 = TypeMap.find_opt bare_e2 knownp in
+  match (topt1, topt2) with
+  | Some t1, Some t2 when not (compatible t1 t2) ->
+      failwith
+        (Format.asprintf
+           "Expressions %a and %a should have the same type but are of types \
+            %a and %a."
+           WLExpr.pp e1 WLExpr.pp e2 pp t1 pp t2)
+  | Some t1, Some t2 -> Some (strongest t1 t2)
+  | Some t1, None -> Some t1
+  | None, Some t2 -> Some t2
+  | None, None -> None
+
 (** Infers a TypeMap from a logic_expr *)
 let rec infer_logic_expr knownp lexpr =
   let open WLExpr in
   let bare_lexpr = get lexpr in
   match bare_lexpr with
   | LVal v -> TypeMap.add bare_lexpr (of_val v) knownp
+  | LBinOp (le1, EQUAL, le2) -> (
+      let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
+      let inferred = infer_logic_expr (infer_logic_expr knownp le1) le2 in
+      let topt = same_type le1 le2 inferred in
+      match topt with
+      | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t inferred)
+      | None -> inferred)
   | LBinOp (le1, b, le2) ->
       let inferred = infer_logic_expr (infer_logic_expr knownp le1) le2 in
       let t1, t2, t3 = of_binop b in
@@ -136,45 +159,6 @@ let rec infer_logic_expr knownp lexpr =
 
 (** Single step of inference for that gets a TypeMap from a single assertion *)
 let rec infer_single_assert_step asser known =
-  let same_type e1 e2 knownp =
-    let bare_e1, bare_e2 = (WLExpr.get e1, WLExpr.get e2) in
-    let topt1 = TypeMap.find_opt bare_e1 knownp in
-    let topt2 = TypeMap.find_opt bare_e2 knownp in
-    match (topt1, topt2) with
-    | Some t1, Some t2 when not (compatible t1 t2) ->
-        failwith
-          (Format.asprintf
-             "Expressions %a and %a should have the same type but are of types \
-              %a and %a in assertion %a at location %s"
-             WLExpr.pp e1 WLExpr.pp e2 pp t1 pp t2 WLAssert.pp asser
-             (CodeLoc.str (WLAssert.get_loc asser)))
-    | Some t1, Some t2 -> Some (strongest t1 t2)
-    | Some t1, None -> Some t1
-    | None, Some t2 -> Some t2
-    | None, None -> None
-  in
-  let rec infer_formula f k =
-    match WLFormula.get f with
-    | WLFormula.LTrue | WLFormula.LFalse -> k
-    | WLFormula.LNot f -> infer_formula f k
-    | WLFormula.LAnd (f1, f2) | WLFormula.LOr (f1, f2) ->
-        infer_formula f2 (infer_formula f1 known)
-    | WLFormula.LEq (le1, le2) -> (
-        let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
-        let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
-        let topt = same_type le1 le2 inferred in
-        match topt with
-        | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t inferred)
-        | None -> inferred)
-    | WLFormula.LLess (le1, le2)
-    | WLFormula.LGreater (le1, le2)
-    | WLFormula.LLessEq (le1, le2)
-    | WLFormula.LGreaterEq (le1, le2) ->
-        let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
-        let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
-        let inferredp = needs_to_be le1 WInt (needs_to_be le2 WInt inferred) in
-        TypeMap.add bare_le1 WInt (TypeMap.add bare_le2 WInt inferredp)
-  in
   match WLAssert.get asser with
   | WLAssert.LEmp -> known
   | WLAssert.LStar (la1, la2) ->
@@ -193,7 +177,7 @@ let rec infer_single_assert_step asser known =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
       needs_to_be le1 WList inferred
-  | WLAssert.LPure f -> infer_formula f known
+  | WLAssert.LPure f -> infer_logic_expr known f
 
 let infer_single_assert known asser =
   let rec find_fixed_point f a =

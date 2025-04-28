@@ -32,11 +32,23 @@ let rec from_expr expr =
   in
   { wleid; wleloc; wlenode }
 
-let get_vars_and_lvars le =
+let rec get_vars_and_lvars le =
   let module SS = Set.Make (String) in
+  let double_union (sa1, sb1) (sa2, sb2) =
+    (SS.union sa1 sa2, SS.union sb1 sb2)
+  in
   match get le with
   | LVar v -> (SS.empty, SS.singleton v)
   | PVar v -> (SS.singleton v, SS.empty)
+  | LBinOp (le1, _, le2) ->
+      double_union (get_vars_and_lvars le1) (get_vars_and_lvars le2)
+  | LUnOp (_, lep) -> get_vars_and_lvars lep
+  | LLSub (le1, le2, le3) ->
+      double_union (get_vars_and_lvars le1)
+        (double_union (get_vars_and_lvars le2) (get_vars_and_lvars le3))
+  | LEList lel | LESet lel ->
+      List.fold_left double_union (SS.empty, SS.empty)
+        (List.map get_vars_and_lvars lel)
   | _ -> (SS.empty, SS.empty)
 
 let rec get_by_id id lexpr =
@@ -60,7 +72,7 @@ let rec pp fmt lexpr =
   | PVar x -> Format.fprintf fmt "@[%s@]" x
   | LBinOp (le1, b, le2) ->
       Format.fprintf fmt "@[(%a %a %a)@]" pp le1 WBinOp.pp b pp le2
-  | LUnOp (u, le) -> Format.fprintf fmt "@[(%a %a)@]" WUnOp.pp u pp le
+  | LUnOp (u, le) -> Format.fprintf fmt "@[%a%a@]" WUnOp.pp u pp le
   | LLSub (le1, le2, le3) ->
       Format.fprintf fmt "@[sub(%a, %a, %a)@]" pp le1 pp le2 pp le3
   | LEList lel ->
@@ -89,3 +101,36 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
     | LESet le -> LESet (List.map f le)
   in
   { wleid; wleloc; wlenode }
+
+let rec not e =
+  let make ep = make ep (get_loc e) in
+  match get e with
+  | LVal (Bool b) -> make (LVal (Bool (Stdlib.not b)))
+  | LUnOp (NOT, e) -> e
+  | LBinOp (f1, AND, f2) -> make (LBinOp (not f1, OR, not f2))
+  | LBinOp (f1, OR, f2) -> make (LBinOp (not f1, AND, not f2))
+  | LBinOp (e1, LESSTHAN, e2) -> make (LBinOp (e1, GREATEREQUAL, e2))
+  | LBinOp (e1, LESSEQUAL, e2) -> make (LBinOp (e1, GREATERTHAN, e2))
+  | LBinOp (e1, GREATERTHAN, e2) -> make (LBinOp (e1, LESSEQUAL, e2))
+  | LBinOp (e1, EQUAL, { wlenode = LVal (Bool b); _ }) ->
+      make (LBinOp (e1, EQUAL, make (LVal (Bool (Stdlib.not b)))))
+  | LBinOp (e1, GREATEREQUAL, e2) -> make (LBinOp (e1, LESSTHAN, e2))
+  | _ -> make (LUnOp (NOT, e))
+
+let rec as_bool_fml ?(codeloc = CodeLoc.dummy) lexpr =
+  let f = as_bool_fml ~codeloc in
+  let bare =
+    match get lexpr with
+    | LVal (Bool true) -> LVal (Bool true)
+    | LVal _ -> LVal (Bool false)
+    | LBinOp (e1, AND, e2) -> LBinOp (f e1, AND, f e2)
+    | LBinOp (e1, OR, e2) -> LBinOp (f e1, OR, f e2)
+    | LBinOp (_, (LESSTHAN | LESSEQUAL | GREATERTHAN | GREATEREQUAL | EQUAL), _)
+      as e -> e
+    | LUnOp (NOT, e) -> LUnOp (NOT, f e)
+    | LVar _ | PVar _ ->
+        let ttrue = make (LVal (Bool true)) codeloc in
+        LBinOp (lexpr, EQUAL, ttrue)
+    | _ -> LVal (Bool false)
+  in
+  make bare codeloc

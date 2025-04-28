@@ -15,15 +15,44 @@ let z3_config =
     ("timeout", "30000");
   ]
 
-let solver = new_solver z3
-let cmd s = ack_command solver s
-let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+let () = Sys.(set_signal sigpipe Signal_ignore)
 
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
 let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
+
+let solver =
+  ref
+    {
+      command = (fun _ -> failwith "Uninitialized solver");
+      stop = (fun () -> failwith "Uninitialized solver");
+      force_stop = (fun () -> failwith "Uninitialized solver");
+      config = z3;
+    }
+
+let cmd s = ack_command !solver s
+
+let rec init_solver () =
+  let z3 = new_solver z3 in
+  let command s =
+    try z3.command s
+    with Sys_error s ->
+      let msg = Fmt.str "Error when calling SMT solver: %s" s in
+      Logging.normal (fun m -> m "%s" msg);
+      init_solver ();
+      raise (Gillian_result.Exc.internal_error msg)
+  in
+  let () = solver := { z3 with command } in
+  (* Config, initial decls *)
+  let () =
+    z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+  in
+  let decls = List.rev !init_decls in
+  let () = decls |> List.iter cmd in
+  let () = cmd (push 1) in
+  ()
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -941,7 +970,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () = List.iter cmd !builtin_funcs in
   let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");
-  let result = check solver in
+  let result = check !solver in
   L.verbose (fun m ->
       let r =
         match result with
@@ -965,7 +994,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
           raise
             Gillian_result.Exc.(
               internal_error ~additional_data "SMT returned unknown")
-    | Sat -> Some (get_model solver)
+    | Sat -> Some (get_model !solver)
     | Unsat -> None
   in
   ret
@@ -1010,7 +1039,7 @@ let lift_model
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
   let () = reset_solver () in
-  let model_eval = (model_eval' solver model).eval [] in
+  let model_eval = (model_eval' !solver model).eval [] in
 
   let get_val x =
     try
@@ -1066,7 +1095,4 @@ let lift_model
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
 
-let () =
-  let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
-  cmd (push 1)
+let () = init_solver ()

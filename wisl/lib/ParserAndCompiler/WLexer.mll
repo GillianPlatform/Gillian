@@ -21,10 +21,9 @@ let newline = '\r' | '\n' | "\r\n"
 rule read =
   parse
   (* keywords *)
+  | "@config" { CONFIG (curr lexbuf) }
   | "true"   { TRUE (curr lexbuf) }
   | "false"  { FALSE (curr lexbuf) }
-  | "True"   { LTRUE (curr lexbuf) }
-  | "False"  { LFALSE (curr lexbuf) }
   | "nil"    { LSTNIL (curr lexbuf) }
   | "null"   { NULL (curr lexbuf) }
   | "while"  { WHILE (curr lexbuf) }
@@ -67,13 +66,8 @@ rule read =
   | "-*"     { WAND }
   | "->"     { ARROW }
   | "-b>"   { BLOCK_ARROW }
-  | "/\\"    { LAND }
-  | "\\/"    { LOR }
-  | "=="     { LEQ }
-  | "<#"     { LLESS }
-  | "<=#"    { LLESSEQ }
-  | ">#"     { LGREATER }
-  | ">=#"    { LGREATEREQ }
+  | "/\\"    { AND }
+  | "\\/"    { OR }
   (* punctuation *)
   | "-{"     { SETOPEN (curr lexbuf) }
   | "}-"     { SETCLOSE (curr lexbuf) }
@@ -94,7 +88,7 @@ rule read =
   (* binary operators *)
   | "::"     { LSTCONS }
   | '@'      { LSTCAT }
-  | '='      { EQUAL }
+  | "=="     { EQUAL }
   | ">="     { GREATEREQUAL }
   | '>'      { GREATERTHAN }
   | '<'      { LESSTHAN }
@@ -109,14 +103,13 @@ rule read =
   | "!="     { NEQ }
   | "lnth"   { LSTNTH }
   (* unary operators *)
-  | "not"    { NOT (curr lexbuf) }
   | "emp"    { EMP (curr lexbuf) }
   | "len"    { LEN (curr lexbuf) }
   | "hd"     { HEAD (curr lexbuf) }
   | "tl"     { TAIL (curr lexbuf) }
   | "rev"    { REV (curr lexbuf) }
   | "sub"    { SUB (curr lexbuf) }
-  | '!'      { LNOT (curr lexbuf) }
+  | '!'      { NOT (curr lexbuf) }
   (* identifiers *)
   | white    { read lexbuf }
   | newline  { new_line lexbuf; read lexbuf }

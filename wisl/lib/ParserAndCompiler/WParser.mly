@@ -4,7 +4,7 @@
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
-%token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
+%token <CodeLoc.t> STATEMENT WITH VARIANT PROOF CONFIG
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
@@ -38,7 +38,7 @@
 %token <CodeLoc.t * string> STRING
 
 (* Binary operators *)
-%token EQUAL           /* = */
+%token EQUAL           /* == */
 %token LESSTHAN        /* < */
 %token GREATERTHAN     /* > */
 %token LESSEQUAL       /* <= */
@@ -62,23 +62,13 @@
 %token WAND           /* -*   */
 %token ARROW          /* ->   */
 %token BLOCK_ARROW    /* -b-> */
-%token LAND           /* /\   */
-%token LOR            /* \/   */
-%token LEQ            /* ==   */
-%token LLESS          /* <#   */
-%token LLESSEQ        /* <=#  */
-%token LGREATER       /* >#   */
-%token LGREATEREQ     /* >=#  */
 
 (* Logic *)
-%token <CodeLoc.t> EMP LTRUE LFALSE LSTNIL LNOT
+%token <CodeLoc.t> EMP LSTNIL
 %token <CodeLoc.t * string> LVAR
 
 (* Precedence *)
-%left LOR
-%left LAND separating_conjunction
-%nonassoc LEQ LLESS LLESSEQ LGREATER LGREATEREQ
-%nonassoc LNOT
+%left separating_conjunction
 %left OR
 %left AND
 %nonassoc EQUAL NEQ
@@ -92,54 +82,66 @@
 %nonassoc unop_prec
 
 (* Types and start *)
-%start <WProg.t> prog
+%start <WProg.t * WConfigStmt.t list> prog
 %start <WLAssert.t> assert_only
 
-%type <WFun.t list * WPred.t list * WLemma.t list> definitions
-%type <WFun.t>                                     fct_with_specs
-%type <WFun.t>                                     fct
-%type <WPred.t>                                    predicate
-%type <WLemma.t>                                   lemma
-%type <string list>                                var_list
-%type <WStmt.t list * WExpr.t>                     statement_list_and_return
-%type <WStmt.t list>                               statement_list
-%type <WExpr.t>                                    expression
-%type <WExpr.t list>                               expr_list
-%type <WLCmd.t>                                    logic_command
-%type <WLAssert.t>                                 logic_assertion
-%type <CodeLoc.t * WVal.t>                         value_with_loc
-%type <CodeLoc.t * WUnOp.t>                        unop_with_loc
-%type <WBinOp.t>                                   binop
-%type <WLExpr.t>                                   variant_def
-%type <WLExpr.t>                                   with_variant_def
-%type <WLCmd.t list>                               proof_def
-%type <(string * WType.t option) * bool>           pred_param_ins
-%type <CodeLoc.t * string list>                    bindings_with_loc
-%type <WLFormula.t>                                logic_pure_formula
-%type <WLExpr.t>                                   logic_expression
-%type <WBinOp.t>                                   logic_binop
-%type <CodeLoc.t * WVal.t>                         logic_value_with_loc
+%type <WFun.t list * WPred.t list * WLemma.t list * WConfigStmt.t list>
+                                         definitions
+%type <WConfigStmt.t>                    config
+%type <WFun.t>                           fct_with_specs
+%type <WFun.t>                           fct
+%type <WPred.t>                          predicate
+%type <WLemma.t>                         lemma
+%type <string list>                      var_list
+%type <WStmt.t list * WExpr.t>           statement_list_and_return
+%type <WStmt.t list>                     statement_list
+%type <WExpr.t>                          expression
+%type <WExpr.t list>                     expr_list
+%type <WLCmd.t>                          logic_command
+%type <WLAssert.t>                       logic_assertion
+%type <CodeLoc.t * WVal.t>               value_with_loc
+%type <CodeLoc.t * WUnOp.t>              unop_with_loc
+%type <WBinOp.t>                         binop
+%type <WLExpr.t>                         variant_def
+%type <WLExpr.t>                         with_variant_def
+%type <WLCmd.t list>                     proof_def
+%type <(string * WType.t option) * bool> pred_param_ins
+%type <CodeLoc.t * string list>          bindings_with_loc
+%type <WLExpr.t>                         logic_expression
+%type <WBinOp.t>                         logic_binop
+%type <CodeLoc.t * WVal.t>               logic_value_with_loc
 %%
 
 prog:
   | fcp = definitions; EOF {
-    let (fc, preds, lemmas) = fcp in
-    WProg.{ lemmas = lemmas; predicates = preds; context = fc } }
+    let (fc, preds, lemmas, configs) = fcp in
+    let prog = WProg.{ lemmas = lemmas; predicates = preds; context = fc } in
+    prog, configs }
 
 assert_only:
   | la = logic_assertion; EOF { la }
 
 definitions:
-  | (* empty *) { ([], [], []) }
-  | fpdcl = definitions; p = predicate
-    { let (fs, ps,ls) = fpdcl in
-      (fs, p::ps, ls) }
-  | fpdcl = definitions; l = lemma
-    { let (fs, ps, ls) = fpdcl in
-      (fs, ps, l::ls) }
-  | fpdcl = definitions; f = fct_with_specs
-    { let (fs, ps, ls) = fpdcl in
-      (f::fs, ps, ls) }
+  | (* empty *) { ([], [], [], []) }
+  | defs = definitions; p = config
+    { let (fs, ps, ls, cs) = defs in
+      (fs, ps, ls, p::cs) }
+  | defs = definitions; p = predicate
+    { let (fs, ps, ls, cs) = defs in
+      (fs, p::ps, ls, cs) }
+  | defs = definitions; l = lemma
+    { let (fs, ps, ls, cs) = defs in
+      (fs, ps, l::ls, cs) }
+  | defs = definitions; f = fct_with_specs
+    { let (fs, ps, ls, cs) = defs in
+      (f::fs, ps, ls, cs) }
+
+config:
+  | lstart = CONFIG; id = IDENTIFIER; COLON; value = value_with_loc
+    { let (_, id) = id in
+      let (lend, value) = value in
+      let loc = CodeLoc.merge lstart lend in
+      id, value, loc }
 
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
@@ -304,6 +306,13 @@ expression:
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       WExpr.make bare_expr loc } %prec binop_prec
+  | e1 = expression; NEQ; e2 = expression
+    { let bare_expr = WExpr.BinOp (e1, EQUAL, e2) in
+      let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
+      let loc = CodeLoc.merge lstart lend in
+      let expr = WExpr.make bare_expr loc in
+      let bare_expr = WExpr.UnOp (NOT, expr) in
+      WExpr.make bare_expr loc } %prec binop_prec
   | lu = unop_with_loc; e = expression
     { let (lstart, u) = lu in
       let bare_expr = WExpr.UnOp (u, e) in
@@ -324,7 +333,6 @@ binop:
   | MOD          { WBinOp.MOD }
   | AND          { WBinOp.AND }
   | OR           { WBinOp.OR }
-  | NEQ          { WBinOp.NEQ }
 
 unop_with_loc:
   | loc = NOT  { (loc, WUnOp.NOT) }
@@ -525,62 +533,21 @@ logic_assertion:
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-  | formula = logic_pure_formula
+  | lstart = LBRACE; formula = logic_expression; lend = RBRACE;
     { let bare_assert = WLAssert.LPure formula in
-      let loc = WLFormula.get_loc formula in
+      let loc = CodeLoc.merge lstart lend in
+      WLAssert.make bare_assert loc }
+  | loc = TRUE
+    { let bare_lexpr = WLExpr.LVal (WVal.Bool true) in
+      let lexpr = WLExpr.make bare_lexpr loc in
+      let bare_assert = WLAssert.LPure lexpr in
+      WLAssert.make bare_assert loc }
+  | loc = FALSE
+    { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
+      let lexpr = WLExpr.make bare_lexpr loc in
+      let bare_assert = WLAssert.LPure lexpr in
       WLAssert.make bare_assert loc }
 
-logic_pure_formula:
-  | lstart = LBRACE; la = logic_pure_formula; lend = RBRACE;
-    { let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.get la in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LEQ; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LEq (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LLESS; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LLess (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LLESSEQ; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LLessEq (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LGREATEREQ; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LGreaterEq (le1, le2) in
-      WLFormula.make bare_form loc }
-  | le1 = logic_expression; LGREATER; le2 = logic_expression
-    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LGreater (le1, le2) in
-      WLFormula.make bare_form loc }
-  | lstart = LNOT; la = logic_pure_formula
-    { let bare_form = WLFormula.LNot la in
-      let lend = WLFormula.get_loc la in
-      let loc = CodeLoc.merge lstart lend in
-      WLFormula.make bare_form loc }
-  | la1 = logic_pure_formula; LAND; la2 = logic_pure_formula
-    { let lstart, lend = WLFormula.get_loc la1, WLFormula.get_loc la2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LAnd (la1, la2) in
-      WLFormula.make bare_form loc }
-  | la1 = logic_pure_formula; LOR; la2 = logic_pure_formula
-    { let lstart, lend = WLFormula.get_loc la1, WLFormula.get_loc la2 in
-      let loc = CodeLoc.merge lstart lend in
-      let bare_form = WLFormula.LOr (la1, la2) in
-      WLFormula.make bare_form loc }
-  | loc = LTRUE
-    { let bare_form = WLFormula.LTrue in
-      WLFormula.make bare_form loc }
-  | loc = LFALSE
-    { let bare_form = WLFormula.LFalse in
-      WLFormula.make bare_form loc }
 
 
 logic_expression:
@@ -604,7 +571,14 @@ logic_expression:
     { let bare_lexpr = WLExpr.LBinOp (e1, b, e2) in
       let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
-      WLExpr.make bare_lexpr loc } %prec binop_prec
+      WLExpr.make bare_lexpr loc }
+  | e1 = logic_expression; NEQ; e2 = logic_expression
+    { let bare_lexpr = WLExpr.LBinOp (e1, EQUAL, e2) in
+      let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
+      let loc = CodeLoc.merge lstart lend in
+      let expr = WLExpr.make bare_lexpr loc in
+      let bare_lexpr = WLExpr.LUnOp (NOT, expr) in
+      WLExpr.make bare_lexpr loc }
   | lstart = SUB; LBRACE; e1 = logic_expression; COMMA; e2 = logic_expression; COMMA; e3 = logic_expression; lend = RBRACE {
       let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LLSub(e1, e2, e3) in

@@ -1,5 +1,4 @@
 type t =
-  | NEQ
   | EQUAL
   | LESSTHAN
   | GREATERTHAN

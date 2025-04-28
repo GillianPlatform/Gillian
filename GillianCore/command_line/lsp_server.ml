@@ -1,4 +1,5 @@
 open Linol_lwt
+open Linol.Lsp.Types
 
 type buffer_state = { path : string; content : string }
 
@@ -48,9 +49,7 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     inherit Jsonrpc2.server
 
     (* one env per document *)
-    val buffers : (Lsp.Types.DocumentUri.t, buffer_state) Hashtbl.t =
-      Hashtbl.create 4
-
+    val buffers : (DocumentUri.t, buffer_state) Hashtbl.t = Hashtbl.create 4
     method spawn_query_handler f = spawn f
 
     (* We define here a helper method that will:
@@ -60,12 +59,13 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     *)
     method private _on_doc
         ~(notify_back : Jsonrpc2.notify_back)
-        (uri : Lsp.Types.DocumentUri.t)
+        (uri : DocumentUri.t)
         (contents : string) =
-      let path = Lsp.Types.DocumentUri.to_path uri in
+      let path = DocumentUri.to_path uri in
       let () = Hashtbl.replace Config.file_content_overrides path contents in
       let result = f path in
       let diags = result_to_diagnostics ~path result in
+      let () = Config.reset_config () in
       notify_back#send_diagnostic diags
 
     (* We now override the [on_notify_doc_did_open] method that will be called
@@ -86,7 +86,7 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     (* On document closes, we remove the state associated to the file from the global
         hashtable state, to avoid leaking memory. *)
     method on_notif_doc_did_close ~notify_back:_ d : unit t =
-      let path = Lsp.Types.DocumentUri.to_path d.uri in
+      let path = DocumentUri.to_path d.uri in
       Hashtbl.remove Config.file_content_overrides path;
       Hashtbl.remove buffers d.uri;
       return ()

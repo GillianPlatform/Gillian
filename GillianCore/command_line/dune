@@ -13,7 +13,6 @@
   incrementalAnalysis
   debug_adapter
   memtrace
-  lsp
   linol
   linol-lwt)
  (preprocess
