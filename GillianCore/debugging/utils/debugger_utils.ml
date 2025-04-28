@@ -32,6 +32,17 @@ type frame = {
 }
 [@@deriving make]
 
+let proc_id_prefix = "proc__"
+let proc_id_prefix_len = String.length proc_id_prefix
+
+let proc_name_of_id s =
+  if String.starts_with ~prefix:proc_id_prefix s then
+    let proc_name =
+      String.sub s proc_id_prefix_len (String.length s - proc_id_prefix_len)
+    in
+    Some proc_name
+  else None
+
 (** Describes an exception *)
 type exception_info = { id : string; description : string option }
 
