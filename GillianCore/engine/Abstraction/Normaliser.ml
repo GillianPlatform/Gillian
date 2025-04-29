@@ -101,8 +101,6 @@ module Make (SPState : PState.S) = struct
 
     let result : Expr.t =
       match (le : Expr.t) with
-      | FuncApp _ -> failwith "TODO"
-      | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
       | Lit _ -> le
       | LVar lvar ->
           Option.value ~default:(Expr.LVar lvar) (SESubst.get subst le)
@@ -175,11 +173,11 @@ module Make (SPState : PState.S) = struct
                         (Exceptions.Impossible
                            "normalise_lexpr: program variable in normalised \
                             expression")
-                  | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
+                  | BinOp (_, _, _) | UnOp (_, _) | FuncApp _ ->
+                      UnOp (TypeOf, nle1)
                   | Exists _ | ForAll _ -> Lit (Type BooleanType)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
                   | NOp (_, _) | ESet _ -> Lit (Type SetType)
-                  | FuncApp _ -> failwith "TODO"
                   | ConstructorApp (n, _) as c -> (
                       match Datatype_env.get_constructor_type n with
                       | Some t -> Lit (Type t)
@@ -233,6 +231,8 @@ module Make (SPState : PState.S) = struct
           | _, Exists _ -> Exists (bt, ne)
           | _, ForAll _ -> ForAll (bt, ne)
           | _, _ -> failwith "Impossible")
+      | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
+      | FuncApp (n, les) -> FuncApp (n, List.map f les)
     in
 
     if not no_types then Typing.infer_types_expr gamma result;

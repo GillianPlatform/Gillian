@@ -140,8 +140,8 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     (* The remaining cases proceed recursively *)
     | UnOp (_, e) -> f e
     | BinOp (e1, _, e2) -> join [ e1; e2 ]
-    | FuncApp _ -> failwith "TODO"
-    | NOp (_, le) | EList le | ESet le | ConstructorApp (_, le) -> join le
+    | NOp (_, le) | EList le | ESet le | ConstructorApp (_, le) | FuncApp (_, le)
+      -> join le
     | LstSub (e1, e2, e3) ->
         let result = join [ e1; e2; e3 ] in
         L.verbose (fun fmt ->
@@ -171,9 +171,6 @@ let rec learn_expr
     (e : Expr.t) : outs =
   let f = learn_expr kb in
   match e with
-  | FuncApp _ -> failwith "TODO"
-  (* TODO: Constructors aren't invertible unless we have destructors *)
-  | ConstructorApp _ -> []
   (* Literals, abstract locations, sublists, and sets are never invertible *)
   | Lit _ | LstSub _ | ESet _ -> []
   (* Nothing is learned if the top-level expr is a program or a logical variable *)
@@ -291,6 +288,10 @@ let rec learn_expr
   | BinOp _ -> []
   (* Can we learn anything from Exists? *)
   | Exists _ | ForAll _ -> []
+  (* TODO: Constructors aren't invertible unless we have destructors *)
+  | ConstructorApp _ -> []
+  (* Function application isn't invertible *)
+  | FuncApp _ -> []
 
 and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* L.(verbose (fun m -> m "Entering learn_expr_list: \nKB: %a\nList: %a" kb_pp kb Fmt.(brackets (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))) le)); *)

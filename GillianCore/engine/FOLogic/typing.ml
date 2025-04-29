@@ -171,7 +171,24 @@ module Infer_types_to_gamma = struct
         else
           (* Can't say for certain whether or not the constructor is typable *)
           true
-    | FuncApp _ -> failwith "TODO"
+    | FuncApp (n, les) ->
+        if Function_env.is_initialised () then
+          let check_field le tt =
+            match tt with
+            | Some tt -> f le tt
+            | None -> true
+          in
+          let param_types = Function_env.get_function_param_types n in
+          match param_types with
+          | Some tts ->
+              if List.length tts <> List.length les then false
+              else
+                (* Only check param types, we don't check return type of function *)
+                List.for_all2 check_field les tts
+          | None -> false
+        else
+          (* Can't say for certain whether or not the constructor is typable *)
+          true
     | Exists (bt, le) | ForAll (bt, le) ->
         if not (tt = BooleanType) then false
         else
@@ -478,9 +495,23 @@ module Type_lexpr = struct
     let _, ite = f gamma_copy e in
     if not ite then def_neg else infer_type gamma le BooleanType
 
-  and type_constructor gamma n les =
+  and type_constructor_app gamma n les =
     if Datatype_env.is_initialised () then
       let tts_opt = Datatype_env.get_constructor_field_types n in
+      match tts_opt with
+      | Some tts ->
+          if typable_list gamma ?target_types:(Some tts) les then
+            (* TODO: We don't attempt to infer the type of function applications *)
+            (* How would we handle recursive functions? *)
+            (* Requires signifcant change to typing algorithm *)
+            (None, true)
+          else def_neg
+      | None -> def_neg
+    else (None, true)
+
+  and type_func_app gamma n les =
+    if Function_env.is_initialised () then
+      let tts_opt = Function_env.get_function_param_types n in
       match tts_opt with
       | Some tts ->
           if typable_list gamma ?target_types:(Some tts) les then
@@ -519,8 +550,8 @@ module Type_lexpr = struct
           let all_typable = typable_list ?target_type:(Some ListType) les in
           if all_typable then (Some ListType, true) else def_neg
       | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
-      | ConstructorApp (n, les) -> type_constructor gamma n les
-      | FuncApp _ -> failwith "TODO"
+      | ConstructorApp (n, les) -> type_constructor_app gamma n les
+      | FuncApp (n, les) -> type_func_app gamma n les
     in
 
     result

@@ -137,7 +137,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | Exists (bt, le) -> Exists (bt, f le)
     | ForAll (bt, le) -> ForAll (bt, f le)
     | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
-    | FuncApp _ -> failwith "TODO"
+    | FuncApp (n, les) -> FuncApp (n, List.map f les)
     (*
     | LstSub(le1, le2, le3) ->
       (match f le1, f le2, f le3 with
@@ -908,7 +908,10 @@ and reduce_lexpr_loop
              Constructors
        ------------------------- *)
     | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
-    | FuncApp _ -> failwith "TODO"
+    (* -------------------------
+         Function Application
+       ------------------------- *)
+    | FuncApp (n, les) -> FuncApp (n, List.map f les)
     (* -------------------------
             ForAll + Exists
        ------------------------- *)
