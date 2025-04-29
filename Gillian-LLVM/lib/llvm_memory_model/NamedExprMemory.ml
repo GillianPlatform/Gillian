@@ -13,7 +13,7 @@ end
 
 module M : States.MyMonadicSMemory.S with type t = StringEnv.t = struct
   type t = StringEnv.t [@@deriving yojson]
-  type err_t = unit [@@deriving show, yojson]
+  type err_t = InvalidLocation [@@deriving show, yojson]
   type action = GetDef
   type pred = unit
 
@@ -25,7 +25,17 @@ module M : States.MyMonadicSMemory.S with type t = StringEnv.t = struct
   let empty () = SMap.empty
 
   (* Execute action *)
-  let execute_action GetDef s args = failwith "Invalid C GEnv execute_action"
+  let execute_action GetDef s = function
+    | [ loc ] ->
+        let open DR.Syntax in
+        let** expr =
+          Delayed_result.of_do ~none:InvalidLocation (Delayed.resolve_loc loc)
+        in
+        let vl = SMap.find_opt expr s in
+        let** res = Delayed_result.of_option ~none:InvalidLocation vl in
+        DR.ok (s, [ res ])
+    | _ -> failwith "Invalid arguments for GetDef"
+
   let consume () _ _ = failwith "Invalid C GEnv consume"
   let produce () _ _ = failwith "Invalid C GEnv produce"
   let compose _ _ = Delayed.vanish () (* TODO *)
@@ -37,8 +47,8 @@ module M : States.MyMonadicSMemory.S with type t = StringEnv.t = struct
   (* Core predicates: pred * ins * outs, converted to Asrt.CorePred *)
   let assertions _ = []
   let assertions_others _ = []
-  let can_fix () = false
-  let get_fixes () = []
+  let can_fix _ = false
+  let get_fixes _ = []
   let lvars _ = Gillian.Utils.Containers.SS.empty
   let alocs _ = Gillian.Utils.Containers.SS.empty
   let substitution_in_place _ s = Delayed.return s
