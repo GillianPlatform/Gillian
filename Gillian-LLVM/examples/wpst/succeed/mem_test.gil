@@ -23,7 +23,7 @@ proc main() {
     sum1 := bvadd(Bitvector(newx,32i), Bitvector(newy,32i): 32i);
     ptrptr_l := [alloc](0i, 8i);
     ptrptr := l-nth(ptrptr_l, 0i);
-    xptr_l := [alloc](0i, 32i);
+    xptr_l := [alloc](0i, 4i);
     xptr := l-nth(xptr_l, 0i);
     xptr_with_offset := {{"ptr", {{ xptr, 0i }}}};
     b := [store]("i-or-ptr", ptrptr, 0i, xptr_with_offset);
