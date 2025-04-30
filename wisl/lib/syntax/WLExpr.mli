@@ -9,7 +9,9 @@ type tt =
   | LESet of t list
   | LFuncApp of string * t list
   | LConstructorApp of string * t list
+  | LCases of t * case list
 
+and case = { constructor : string; binders : string list; lexpr : t }
 and t
 
 val get : t -> tt

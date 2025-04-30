@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
 %token <CodeLoc.t> PROC FUNCTION RETURN PREDICATE LEMMA DATATYPE
-%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL CASE
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -126,6 +126,8 @@
 %type <string * WType.t list * CodeLoc.t * int>                                       constructor
 %type <WType.t list * CodeLoc.t>                                                      constructor_fields
 %type <string * WType.t option>                                                       func_param
+%type <string list>                                                                   tuple_binders
+%type <WLExpr.case>                                                                   logic_case
 %%
 
 prog:
@@ -650,9 +652,12 @@ logic_expression:
       let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LConstructorApp (name, l) in
       WLExpr.make bare_lexpr loc }
-
-logic_constructor_app_params:
-  | LBRACE; lst = separated_list(COMMA, logic_expression); lend = RBRACE; { (lst, lend) }
+  | lstart = CASE; scrutinee = logic_expression; LCBRACE; cases = separated_list(SEMICOLON, logic_case); lend = RCBRACE
+    {
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LCases(scrutinee, cases) in
+      WLExpr.make bare_lexpr loc
+    }
 
 (* We also have lists in the logic *)
 logic_binop:
@@ -669,6 +674,22 @@ logic_value_with_loc:
     { let (_, vl) = List.split lvl in
       let loc = CodeLoc.merge lstart lend in
       (loc, WVal.VList vl) } */
+
+logic_constructor_app_params:
+  | LBRACE; lst = separated_list(COMMA, logic_expression); lend = RBRACE; { (lst, lend) }
+
+logic_case:
+  | cname = IDENTIFIER; binders = option(tuple_binders); ARROW; expr = logic_expression
+    {
+      let binders = Option.value ~default:[] binders in
+      { WLExpr.constructor = snd cname;
+        binders = binders;
+        lexpr = expr }
+    }
+
+tuple_binders:
+  | LBRACE; xs = separated_list(COMMA, IDENTIFIER); RBRACE
+    { List.map snd xs }
 
 
 (* ADT definitions *)

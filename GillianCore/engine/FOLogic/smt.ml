@@ -1132,7 +1132,6 @@ let encode_functions (fs : Func.t list) : sexp list =
     let list_elem_vars =
       lvars_as_list_elements ~exclude:param_names function_def
     in
-    Printf.printf "%i" (SS.cardinal list_elem_vars);
     let encoded_def =
       Encoding.extend_wrap
       @@ encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars

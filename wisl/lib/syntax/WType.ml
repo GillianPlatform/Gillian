@@ -135,9 +135,14 @@ let rec infer_logic_expr knownp lexpr =
       TypeMap.add bare_lexpr WList (List.fold_left infer_logic_expr knownp lel)
   | LESet lel ->
       TypeMap.add bare_lexpr WSet (List.fold_left infer_logic_expr knownp lel)
-  | LFuncApp (n, lel) | LConstructorApp (n, lel) ->
+  | LFuncApp (_, lel) -> List.fold_left infer_logic_expr knownp lel
+  | LConstructorApp (n, lel) ->
       TypeMap.add bare_lexpr (WDatatype n)
         (List.fold_left infer_logic_expr knownp lel)
+  | LCases (le, cs) ->
+      let lel = List.map (fun (c : case) -> c.lexpr) cs in
+      let inferred = infer_logic_expr knownp le in
+      List.fold_left infer_logic_expr inferred lel
 
 (** Single step of inference for that gets a TypeMap from a single assertion *)
 let rec infer_single_assert_step asser known =

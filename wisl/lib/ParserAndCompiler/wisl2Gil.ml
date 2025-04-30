@@ -248,7 +248,8 @@ let rec compile_lexpr
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)
         in
-        (List.concat gvars, List.concat asrtsl, Expr.FuncApp (n, comp_exprs)))
+        (List.concat gvars, List.concat asrtsl, Expr.FuncApp (n, comp_exprs))
+    | LCases _ -> failwith "TODO")
 
 (* TODO: compile_lformula should return also the list of created existentials *)
 let rec compile_lformula ?(proc_name = "main") formula : Asrt.t * Expr.t =
