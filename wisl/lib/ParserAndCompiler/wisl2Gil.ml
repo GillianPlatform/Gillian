@@ -313,34 +313,37 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           Asrt.CorePred (cell, [ eloc; eoffs ], [ e2 ])
           :: (bound @ la1 @ la2 @ la3) )
   in
-  WLAssert.(
-    match get asser with
-    | LEmp -> ([], [])
-    | LStar (la1, la2) ->
-        let exs1, cla1 = compile_lassert la1 in
-        let exs2, cla2 = compile_lassert la2 in
-        (exs1 @ exs2, cla1 @ cla2)
-    | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
-    | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
-    | LPred (pr, lel) ->
-        let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
-        let exs = List.concat exsl in
-        let al = List.concat all in
-        (exs, Asrt.Pred (pr, el) :: al)
-    | LWand { lhs = lname, largs; rhs = rname, rargs } ->
-        let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
-        let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
-        let exs = List.concat (exs1 @ exs2) in
-        let al = List.concat (al1 @ al2) in
-        (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
-    | LPure lf ->
-        let _, al, e = compile_lexpr lf in
-        let e =
-          match e with
-          | LVar _ -> Expr.BinOp (e, Equal, Expr.true_)
-          | _ -> e
-        in
-        ([], Asrt.Pure e :: al))
+  let open WLAssert in
+  match get asser with
+  | LEmp -> ([], [])
+  | LStar (la1, la2) ->
+      let exs1, cla1 = compile_lassert la1 in
+      let exs2, cla2 = compile_lassert la2 in
+      (exs1 @ exs2, cla1 @ cla2)
+  | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
+  | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
+  | LPred (pr, lel) ->
+      let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
+      let exs = List.concat exsl in
+      let al = List.concat all in
+      (exs, Asrt.Pred (pr, el) :: al)
+  | LWand { lhs = lname, largs; rhs = rname, rargs } ->
+      let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
+      let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
+      let exs = List.concat (exs1 @ exs2) in
+      let al = List.concat (al1 @ al2) in
+      (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
+  | LPure lf ->
+      let _, al, e = compile_lexpr lf in
+      let e =
+        match e with
+        | LVar _ -> Expr.BinOp (e, Equal, Expr.true_)
+        | _ -> e
+      in
+      ([], Asrt.Pure e :: al)
+  | LType (le, ty) ->
+      let _, al, el = compile_lexpr le in
+      ([], Asrt.Types [ (el, WType.to_gil ty) ] :: al)
 
 let rec compile_lcmd ?(fname = "main") lcmd =
   let compile_lassert = compile_lassert ~fname in
@@ -905,8 +908,8 @@ let compile_pred filepath pred =
       =
     pred
   in
-  let types = WType.infer_types_pred pred_params pred_definitions in
-  let getWISLTypes str = (str, WType.of_variable str types) in
+  let types = WTypeMap.infer_types_pred pred_params pred_definitions in
+  let getWISLTypes str = (str, WTypeMap.type_of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
     (str, Option.fold ~some:compile_type ~none:None t)
