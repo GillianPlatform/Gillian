@@ -652,7 +652,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
   let operations =
     [
       {
-        name = "add";
+        name = "bvadd";
         generator =
           ValueOp
             (flag_template_function
@@ -664,7 +664,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                ]);
       };
       {
-        name = "sub";
+        name = "bvsub";
         generator =
           ValueOp
             (flag_template_function
@@ -677,7 +677,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                ]);
       };
       {
-        name = "zext";
+        name = "bvzext";
         generator =
           ValueOp
             (flag_template_function
@@ -685,7 +685,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                []);
       };
       {
-        name = "sext";
+        name = "bvsext";
         generator =
           ValueOp
             (flag_template_function
