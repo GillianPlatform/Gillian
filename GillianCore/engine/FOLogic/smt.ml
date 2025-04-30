@@ -534,6 +534,7 @@ module Encoding = struct
         accessor (Ext_lit_operations.Gil_sing_elem.access expr)
 
   let simply_wrapped = make ~kind:Simple_wrapped
+  let extended_wrapped = make ~kind:Extended_wrapped
 
   (** Takes a value either natively encoded or simply wrapped
     and returns a value simply wrapped.
@@ -947,11 +948,27 @@ let rec encode_logical_expression
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
-  | FuncApp _ -> failwith "TODO"
+  | FuncApp (name, les) -> (
+      let param_typs = Function_env.get_function_param_types name in
+      match param_typs with
+      | Some param_typs ->
+          let extend_wrap_or_native typopt =
+            match typopt with
+            | Some typ -> get_native_of_type ~typ
+            | None -> extend_wrap
+          in
+          let>-- args = List.map f les in
+          let args = List.map2 extend_wrap_or_native param_typs args in
+          let sexp = app_ name args in
+          extended_wrapped sexp
+      | None ->
+          let msg = "SMT - Undefined function: " ^ name in
+          raise (Failure msg))
   | ConstructorApp (name, les) -> (
       let param_typs = Datatype_env.get_constructor_field_types name in
       match param_typs with
       | Some param_typs ->
+          (* TODO: Should we be extend wrapping here? *)
           let simple_wrap_or_native typopt =
             match typopt with
             | Some typ -> get_native_of_type ~typ
@@ -1003,7 +1020,8 @@ let lvars_only_in_llen (fs : Expr.Set.t) : SS.t =
   fs |> Expr.Set.iter (inspector#visit_expr ());
   inspector#get_diff
 
-let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
+let lvars_as_list_elements ?(exclude = SS.empty) (assertions : Expr.Set.t) :
+    SS.t =
   let collector =
     object (self)
       inherit [_] Visitors.reduce
@@ -1044,7 +1062,7 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
   in
   Expr.Set.fold
     (fun f acc ->
-      let new_lvars = collector#visit_expr (SS.empty, false) f in
+      let new_lvars = collector#visit_expr (exclude, false) f in
       SS.union new_lvars acc)
     assertions SS.empty
 
@@ -1070,6 +1088,63 @@ let encode_assertions (fs : Expr.Set.t) (gamma : Type_env.t) : sexp list =
   let encoded = consts @ asrts in
   let () = Hashtbl.replace encoding_cache fs encoded in
   encoded
+
+let defn_funs_rec fs =
+  let mk_param_type (x, t) = list [ atom x; t ] in
+  let mk_param_types pts = list (List.map mk_param_type pts) in
+  let mk_decl (name, param_types, ret_type, _) =
+    list [ atom name; mk_param_types param_types; ret_type ]
+  in
+
+  let decls = list (List.map mk_decl fs) in
+  let defns = list (List.map (fun (_, _, _, d) -> d) fs) in
+  app_ "define-funs-rec" [ decls; defns ]
+
+let encode_functions (fs : Func.t list) : sexp list =
+  let encode_function (f : Func.t) =
+    let name = f.func_name in
+    let param_types =
+      List.map
+        (fun (x, t) ->
+          match t with
+          | Some t -> (x, Encoding.native_sort_of_type t)
+          | None -> (x, t_gil_ext_literal))
+        f.func_params
+    in
+    let ret_type = t_gil_ext_literal in
+    let gamma = Type_env.init () in
+    let () =
+      List.iter
+        (fun (x, t) ->
+          match t with
+          | Some t -> Type_env.update gamma x t
+          | None -> ())
+        f.func_params
+    in
+    let function_def = Expr.Set.singleton f.func_definition in
+    let param_names = List.map fst param_types in
+    let param_names = SS.of_seq (List.to_seq param_names) in
+    let llen_lvars = lvars_only_in_llen function_def in
+    (* By excluding params, we ensure they are always encoded as
+         Extended GIL Literals in the encoded definition.
+        This allows us to make the assumption that if the type of a
+       function paramater is not known, then it is t_gil_ext_literal *)
+    let list_elem_vars =
+      lvars_as_list_elements ~exclude:param_names function_def
+    in
+    Printf.printf "%i" (SS.cardinal list_elem_vars);
+    let encoded_def =
+      Encoding.extend_wrap
+      @@ encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
+           f.func_definition
+    in
+    (name, param_types, ret_type, encoded_def)
+  in
+  [ defn_funs_rec (List.map encode_function fs) ]
+
+module Function_operations = struct
+  let init_decls fs = encode_functions fs
+end
 
 module Dump = struct
   let counter = ref 0
@@ -1122,6 +1197,7 @@ let init () =
       Type_operations.init_decls;
       Lit_operations.init_decls (Datatype_env.get_datatypes ());
       Ext_lit_operations.init_decls;
+      Function_operations.init_decls (Function_env.get_functions ());
     ]
   in
   let decls = List.concat init_decls in

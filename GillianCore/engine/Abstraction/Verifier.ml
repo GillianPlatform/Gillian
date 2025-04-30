@@ -941,6 +941,7 @@ struct
     let open ChangeTracker in
     (* Prepare datatype env *)
     let () = Datatype_env.init prog.datatypes in
+    let () = Function_env.init prog.funcs in
     let () = Smt.init () in
 
     if incremental && prev_results_exist () then (

@@ -12,3 +12,8 @@ let get_function_param_types fname =
   in
   let types = Option.map (List.map snd) param_types in
   types
+
+let get_functions () =
+  let phi = !function_env in
+  Option.value ~default:[]
+  @@ Option.map (fun phi -> List.of_seq (Hashtbl.to_seq_values phi)) phi

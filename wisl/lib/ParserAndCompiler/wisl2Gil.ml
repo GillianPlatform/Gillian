@@ -149,10 +149,12 @@ let rec compile_expr ?(proc_name = "main") ?(is_loop_prefix = false) expr :
 (* compile_lexpr : WLExpr.t -> (string list * Asrt.t list * Expr.t)
     compiles a WLExpr into an output expression and a list of Global Assertions.
     the string list contains the name of the variables that are generated. They are existentials. *)
-let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
-    string list * Asrt.t * Expr.t =
+let rec compile_lexpr
+    ?(proc_name = "main")
+    ?(is_func_body = false)
+    (lexpr : WLExpr.t) : string list * Asrt.t * Expr.t =
   let gen_str = Generators.gen_str proc_name in
-  let compile_lexpr = compile_lexpr ~proc_name in
+  let compile_lexpr = compile_lexpr ~proc_name ~is_func_body in
   let expr_pname_of_binop b =
     WBinOp.(
       match b with
@@ -176,6 +178,7 @@ let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
   WLExpr.(
     match get lexpr with
     | LVal v -> ([], [], Expr.Lit (compile_val v))
+    | PVar x when is_func_body -> ([], [], Expr.LVar x)
     | PVar x -> ([], [], Expr.PVar x)
     | LVar x -> ([], [], Expr.LVar x)
     | LBinOp (e1, WBinOp.NEQ, e2) ->
@@ -185,7 +188,7 @@ let rec compile_lexpr ?(proc_name = "main") (lexpr : WLExpr.t) :
           Expr.UnOp (UnOp.Not, Expr.BinOp (comp_expr1, BinOp.Equal, comp_expr2))
         in
         (gvars1 @ gvars2, asrtl1 @ asrtl2, expr)
-    | LBinOp (e1, b, e2) when is_internal_pred b ->
+    | LBinOp (e1, b, e2) when is_internal_pred b && not is_func_body ->
         (* Operator corresponds to pointer arithmetics *)
         let lout = gen_str sgvar in
         let internal_pred = expr_pname_of_binop b in
@@ -999,7 +1002,7 @@ let compile_func
   let param_wisl_types = List.map (fun (x, _) -> get_wisl_type x) func_params in
   let get_gil_type (x, t) = (x, Option.join (Option.map compile_type t)) in
   let comp_func_params = List.map get_gil_type param_wisl_types in
-  let _, _, comp_func_def = compile_lexpr func_definition in
+  let _, _, comp_func_def = compile_lexpr ~is_func_body:true func_definition in
   let comp_func_loc = Some (CodeLoc.to_location func_loc) in
   Func.
     {

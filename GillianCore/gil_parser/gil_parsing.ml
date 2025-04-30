@@ -294,9 +294,8 @@ module Make (Annot : Annot.S) = struct
     in
     Prog.make_indexed ~lemmas:ext_program.lemmas ~preds:ext_program.preds
       ~only_specs:ext_program.only_specs ~procs ~predecessors
-      ~funcs:(Hashtbl.create 1) (* TODO *)
-      ~macros:ext_program.macros ~bi_specs:ext_program.bi_specs
-      ~datatypes:ext_program.datatypes ()
+      ~funcs:ext_program.funcs ~macros:ext_program.macros
+      ~bi_specs:ext_program.bi_specs ~datatypes:ext_program.datatypes ()
 
   let parse_literal lexbuf = parse GIL_Parser.lit_target lexbuf
   let parse_expression lexbuf = parse GIL_Parser.top_level_expr_target lexbuf

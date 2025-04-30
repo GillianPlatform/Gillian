@@ -453,8 +453,8 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
   | NOp _
   | EList _
   | ESet _
-  | ConstructorApp _ -> []
-  | FuncApp _ -> failwith "TODO"
+  | ConstructorApp _
+  | FuncApp _ -> []
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)

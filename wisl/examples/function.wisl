@@ -1,10 +1,10 @@
-function inc(x : Int) {
-  x + 1
+function double(x : Int) {
+  x + x
 }
 
 { x == #x }
-proc increment(x) {
-  y := x + 1;
+proc times_two(x) {
+  y := x * 2;
   return y
 }
-{ ret == inc(#x) }
+{ ret == double(#x) }
