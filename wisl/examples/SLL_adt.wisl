@@ -10,6 +10,19 @@ function append(xs : MyList, x) {
   }
 }
 
+function length(xs : MyList) {
+  case xs {
+    Nil         -> 0;
+    Cons(x, xs) -> 1 + length(xs)
+  }
+}
+
+function double_length(xs : MyList) {
+  case xs {
+    Nil         -> 0;
+    Cons(x, xs) -> 2 + length(xs)
+  }
+}
 
 //
 // Standard over-approximating sll predicate with contents
@@ -55,18 +68,48 @@ proc sll_prepend(x, k){
 { sll(ret, 'Cons(#k, #vs)) }
 
 // 02. Appending a given value to a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
-proc SLL_append(x, k){
+{ (x == #x) * (k == #k) * sll(#x, #vs) }
+proc sll_append(x, k){
   if (x = null) {
-    x := SLL_allocate_node(k)
+    x := sll_allocate_node(k)
     } else {
       t := [x + 1];
-      z := SLL_append(t, k);
+      z := sll_append(t, k);
       [x + 1] := z
   };
   return x
 }
-{ SLL(ret,  append(#vs, #k)) }
+{ sll(ret,  append(#vs, #k)) }
+
+// 06. Calculating the length of a given SLL
+{ (x == #x) *  sll(#x, #vs) }
+proc sll_length(x) {
+  n := 0;
+  if (x = null){
+    n := 0
+  } else {
+    t := [x + 1];
+    n := sll_length(t);
+    n := 1 + n
+  };
+  return n
+}
+{ ret == length(#vs) }
+
+// This spec fails to verify
+{ (x == #x) *  sll(#x, #vs) }
+proc sll_length_fails(x) {
+  n := 0;
+  if (x = null){
+    n := 0
+  } else {
+    t := [x + 1];
+    n := sll_length(t);
+    n := 1 + n
+  };
+  return n
+}
+{ ret == double_length(#vs) }
 
 // 05. Copying a given sll
 { (x == #x) * sll(#x, #vs) }

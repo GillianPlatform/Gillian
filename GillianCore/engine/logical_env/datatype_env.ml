@@ -62,7 +62,7 @@ let get_constructor_type_unsafe cname : Type.t =
   | None ->
       raise
         (Failure
-           ("Type_env.get_constructor_type_unsafe: constructor " ^ cname
+           ("Datatype_env.get_constructor_type_unsafe: constructor " ^ cname
           ^ " not found."))
 
 let get_constructor_field_types cname : Type.t option list option =
@@ -73,6 +73,16 @@ let get_constructor_field_types cname : Type.t option list option =
   Option.map
     (fun (c : Constructor.t) -> c.constructor_fields)
     (Option.join constructor)
+
+let get_constructor_field_types_unsafe cname : Type.t option list =
+  let ts = get_constructor_field_types cname in
+  match ts with
+  | Some ts -> ts
+  | None ->
+      raise
+        (Failure
+           ("Datatype_env.get_constructor_field_types_unsafe: constructor "
+          ^ cname ^ " not found."))
 
 let get_datatypes () : Datatype.t list =
   let res =

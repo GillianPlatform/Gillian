@@ -256,6 +256,8 @@ module Make (SMemory : SMemory.S) :
         | Lit _ | LVar _ | ALoc _ -> expr
         | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
         | FuncApp (n, les) -> FuncApp (n, List.map f les)
+        | Cases (le, cs) ->
+            Cases (f le, List.map (fun (c, bs, le) -> (c, bs, f le)) cs)
       in
       (* Perform reduction *)
       if no_reduce then result

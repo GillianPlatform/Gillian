@@ -155,6 +155,7 @@ and expr =
   | ForAll of (string * typ option) list * expr
   | ConstructorApp of string * expr list
   | FuncApp of string * expr list
+  | Cases of expr * (string * string list * expr) list
 
 and assertion_atom =
   | Emp

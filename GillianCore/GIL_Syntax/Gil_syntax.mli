@@ -253,6 +253,7 @@ module Expr : sig
     | ForAll of (string * Type.t option) list * t
     | ConstructorApp of string * t list
     | FuncApp of string * t list
+    | Cases of t * (string * string list * t) list
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -1192,6 +1193,12 @@ module Visitors : sig
              (string * (string * Expr.t) list) option ->
              'f Cmd.t
          ; visit_Car : 'c -> UnOp.t -> UnOp.t
+         ; visit_Cases :
+             'c ->
+             Expr.t ->
+             Expr.t ->
+             (string * string list * Expr.t) list ->
+             Expr.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
          ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
          ; visit_ConstructorApp :
@@ -1456,6 +1463,10 @@ module Visitors : sig
       'f Cmd.t
 
     method visit_Car : 'c -> UnOp.t -> UnOp.t
+
+    method visit_Cases :
+      'c -> Expr.t -> Expr.t -> (string * string list * Expr.t) list -> Expr.t
+
     method visit_Cdr : 'c -> UnOp.t -> UnOp.t
     method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
 
@@ -1757,6 +1768,8 @@ module Visitors : sig
              (string * (string * Expr.t) list) option ->
              'f
          ; visit_Car : 'c -> 'f
+         ; visit_Cases :
+             'c -> Expr.t -> (string * string list * Expr.t) list -> 'f
          ; visit_Cdr : 'c -> 'f
          ; visit_Constant : 'c -> Constant.t -> 'f
          ; visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
@@ -1984,6 +1997,10 @@ module Visitors : sig
       'f
 
     method visit_Car : 'c -> 'f
+
+    method visit_Cases :
+      'c -> Expr.t -> (string * string list * Expr.t) list -> 'f
+
     method visit_Cdr : 'c -> 'f
     method visit_Constant : 'c -> Constant.t -> 'f
     method visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
@@ -2213,6 +2230,8 @@ module Visitors : sig
              Cmd.logic_bindings_t option ->
              unit
          ; visit_Car : 'c -> unit
+         ; visit_Cases :
+             'c -> Expr.t -> (string * string list * Expr.t) list -> unit
          ; visit_Cdr : 'c -> unit
          ; visit_Constant : 'c -> Constant.t -> unit
          ; visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
@@ -2439,6 +2458,10 @@ module Visitors : sig
       unit
 
     method visit_Car : 'c -> unit
+
+    method visit_Cases :
+      'c -> Expr.t -> (string * string list * Expr.t) list -> unit
+
     method visit_Cdr : 'c -> unit
     method visit_Constant : 'c -> Constant.t -> unit
     method visit_ConstructorApp : 'c -> string -> Expr.t list -> unit

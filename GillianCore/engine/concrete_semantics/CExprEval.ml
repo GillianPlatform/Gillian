@@ -336,10 +336,11 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | Exists _
     | ForAll _
     | ConstructorApp _
-    | FuncApp _ ->
+    | FuncApp _
+    | Cases _ ->
         raise
           (Exceptions.Impossible
-             "eval_expr concrete: aloc, lvar, set, exists, for all, \
+             "eval_expr concrete: aloc, lvar, set, exists, for all, case, \
               constructor or function application")
   with
   | TypeError msg -> raise (TypeError (msg ^ Fmt.str " in %a" Expr.pp e))

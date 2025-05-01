@@ -189,6 +189,85 @@ module Infer_types_to_gamma = struct
         else
           (* Can't say for certain whether or not the constructor is typable *)
           true
+    | Cases (le, cs) ->
+        let scrutinee_type_check =
+          if Datatype_env.is_initialised () then
+            let constructors = List.map (fun (c, _, _) -> c) cs in
+            let constructor_types =
+              List.map Datatype_env.get_constructor_type constructors
+            in
+            let constructors_type =
+              match List.filter_map (fun t -> t) constructor_types with
+              | [] -> None (* No constructor type was 'Some' *)
+              | t :: ts ->
+                  if
+                    List.for_all (( = ) t) ts
+                    && Stdlib.( = )
+                         (List.length constructor_types)
+                         (List.length (t :: ts))
+                  then Some t (* All constructors have type t *)
+                  else None (* Not all constructors have type t *)
+            in
+            (* We expect the scrutinee to have the same type as the constructors *)
+            (* against which it is being matched. *)
+            Option.fold ~none:false ~some:(f le) constructors_type
+          else
+            (* Can't type check scrutinee - we don't know types of constructors *)
+            (* Assume it type checks *)
+            true
+        in
+
+        let case_type_check (c, bs, le) =
+          let gamma_copy = Type_env.copy gamma in
+          let new_gamma_copy = Type_env.copy new_gamma in
+          let binders_okay =
+            if Datatype_env.is_initialised () then
+              let binder_types = Datatype_env.get_constructor_field_types c in
+              match binder_types with
+              | None ->
+                  (* Datatype env is initialised but can't find constructor *)
+                  false
+              | Some ts ->
+                  (* Update type info of binders *)
+                  if List.length ts <> List.length bs then false
+                  else
+                    let () =
+                      List.iter2
+                        (fun b t ->
+                          let () =
+                            match t with
+                            | Some t -> Type_env.update gamma_copy b t
+                            | None -> Type_env.remove gamma_copy b
+                          in
+                          Type_env.remove new_gamma_copy b)
+                        bs ts
+                    in
+                    true
+            else
+              (* Type info not known about binders - simply remove them *)
+              let () =
+                List.iter
+                  (fun b ->
+                    let () = Type_env.remove gamma_copy b in
+                    Type_env.remove new_gamma_copy b)
+                  bs
+              in
+              true
+          in
+          let ret =
+            if binders_okay then
+              (* We expect le to have type tt *)
+              f' gamma_copy new_gamma_copy le tt
+            else false
+          in
+          (* We've updated our new_gamma_copy with a bunch of things.
+             We need to import everything except the bound variables to the new_gamma *)
+          Type_env.iter new_gamma_copy (fun x t ->
+              if not (List.exists (fun y -> String.equal x y) bs) then
+                Type_env.update new_gamma x t);
+          ret
+        in
+        scrutinee_type_check && List.for_all case_type_check cs
     | Exists (bt, le) | ForAll (bt, le) ->
         if not (tt = BooleanType) then false
         else
@@ -520,6 +599,54 @@ module Type_lexpr = struct
       | None -> def_neg
     else (None, true)
 
+  and type_case gamma t_scrutinee (c, bs, le) =
+    if Datatype_env.is_initialised () then
+      let t_constructor = Datatype_env.get_constructor_type c in
+      let types_match =
+        match (t_scrutinee, t_constructor) with
+        | _, None -> false (* Constructor not found in datatype env *)
+        | Some t1, Some t2 when Type.equal t1 t2 -> true
+        | None, _ -> true
+        | _ -> false
+      in
+      if not types_match then def_neg
+      else
+        (* Set up gamma copy with the binders' type info *)
+        let gamma_copy = Type_env.copy gamma in
+        (* By this point we know c is in datatype env *)
+        let ts = Datatype_env.get_constructor_field_types_unsafe c in
+        let () =
+          List.iter2
+            (fun b t ->
+              match t with
+              | Some t -> Type_env.update gamma_copy b t
+              | None -> Type_env.remove gamma_copy b)
+            bs ts
+        in
+        f gamma_copy le
+    else
+      let gamma_copy = Type_env.copy gamma in
+      let () = List.iter (fun b -> Type_env.remove gamma_copy b) bs in
+      f gamma_copy le
+
+  and type_cases gamma le cs =
+    let topt, ite = f gamma le in
+    if not ite then def_neg
+    else
+      let cases = List.map (type_case gamma topt) cs in
+      if not (List.for_all (fun (_, ite) -> ite) cases) then def_neg
+      else
+        let known_case_types = List.filter_map (fun (topt, _) -> topt) cases in
+        let cases_type =
+          match known_case_types with
+          | [] -> None
+          | t :: ts when List.for_all (Type.equal t) ts -> Some t
+          | _ -> None
+        in
+        match cases_type with
+        | Some t -> infer_type gamma (Cases (le, cs)) t
+        | None -> (None, true)
+
   (** This function returns a triple [(t_opt, b, fs)] where
       - [t_opt] is the type of [le] if we can find one
       - [b] indicates if the thing is typable
@@ -552,6 +679,7 @@ module Type_lexpr = struct
       | LstSub (le1, le2, le3) -> type_lstsub gamma le1 le2 le3
       | ConstructorApp (n, les) -> type_constructor_app gamma n les
       | FuncApp (n, les) -> type_func_app gamma n les
+      | Cases (le, cs) -> type_cases gamma le cs
     in
 
     result

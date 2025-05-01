@@ -249,7 +249,16 @@ let rec compile_lexpr
           list_split_3 (List.map compile_lexpr l)
         in
         (List.concat gvars, List.concat asrtsl, Expr.FuncApp (n, comp_exprs))
-    | LCases _ -> failwith "TODO")
+    | LCases (le, cs) ->
+        let compile_case { constructor; binders; lexpr } =
+          let gvars, asrtsl, comp_lexpr = compile_lexpr lexpr in
+          (gvars, asrtsl, (constructor, binders, comp_lexpr))
+        in
+        let gvar, asrtl, comp_le = compile_lexpr le in
+        let gvars, asrtsl, comp_cs = list_split_3 (List.map compile_case cs) in
+        ( List.concat (gvar :: gvars),
+          List.concat (asrtl :: asrtsl),
+          Expr.Cases (comp_le, comp_cs) ))
 
 (* TODO: compile_lformula should return also the list of created existentials *)
 let rec compile_lformula ?(proc_name = "main") formula : Asrt.t * Expr.t =

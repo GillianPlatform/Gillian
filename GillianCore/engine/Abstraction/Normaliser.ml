@@ -173,7 +173,7 @@ module Make (SPState : PState.S) = struct
                         (Exceptions.Impossible
                            "normalise_lexpr: program variable in normalised \
                             expression")
-                  | BinOp (_, _, _) | UnOp (_, _) | FuncApp _ ->
+                  | BinOp (_, _, _) | UnOp (_, _) | FuncApp _ | Cases _ ->
                       UnOp (TypeOf, nle1)
                   | Exists _ | ForAll _ -> Lit (Type BooleanType)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
@@ -233,6 +233,8 @@ module Make (SPState : PState.S) = struct
           | _, _ -> failwith "Impossible")
       | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
       | FuncApp (n, les) -> FuncApp (n, List.map f les)
+      | Cases (le, cs) ->
+          Cases (f le, List.map (fun (c, bs, le) -> (c, bs, f le)) cs)
     in
 
     if not no_types then Typing.infer_types_expr gamma result;

@@ -342,11 +342,6 @@ module Lit_operations = struct
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
   module None = (val nul "None" : Nullary)
 
-  module Datatype = struct
-    let access (name : string) (x : sexp) =
-      atom (user_def_datatype_lit_param_name name) <| x
-  end
-
   let init_decls user_def_datatypes =
     (* Reset variants tables on reinitialisation *)
     constructor_variants := Hashtbl.create Config.medium_tbl_size;
@@ -595,7 +590,9 @@ module Encoding = struct
       | TypeType -> Type.access
       | BooleanType -> Bool.access
       | ListType -> List.access
-      | DatatypeType name -> Datatype.access name
+      | DatatypeType name ->
+          let (module U : Variant.Unary) = get_datatype_lit_variant name in
+          U.access
       | UndefinedType | NullType | EmptyType | NoneType | SetType ->
           Fmt.failwith "Cannot get native value of type %s"
             (Gil_syntax.Type.str typ)
@@ -605,6 +602,13 @@ end
 
 let typeof_simple e =
   let open Type in
+  let datatype_guards =
+    Hashtbl.to_seq !Lit_operations.datatype_lit_variants
+    |> Seq.map (fun (dname, (module U : Variant.Unary)) ->
+           (U.recognize, DatatypeType dname))
+    |> List.of_seq
+  in
+
   let guards =
     Lit_operations.
       [
@@ -620,6 +624,7 @@ let typeof_simple e =
         (Type.recognize, TypeType);
         (List.recognize, ListType);
       ]
+    @ datatype_guards
   in
   List.fold_left
     (fun acc (guard, typ) -> ite (guard e) (encode_type typ) acc)
@@ -839,6 +844,49 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       let () = L.print_to_all msg in
       raise (Failure msg)
 
+let encode_bound_expr
+    ~(encode_expr :
+       gamma:Type_env.t ->
+       llen_lvars:SS.t ->
+       list_elem_vars:SS.t ->
+       'a ->
+       Encoding.t)
+    ~gamma
+    ~llen_lvars
+    ~list_elem_vars
+    bound_vars
+    (expr : 'a) =
+  let open Encoding in
+  (* Start by updating gamma with the information provided by quantifier types.
+     There's very few foralls, so it's ok to copy the gamma entirely *)
+  let gamma = Type_env.copy gamma in
+  let () =
+    bound_vars
+    |> List.iter (fun (x, typ) ->
+           match typ with
+           | None -> Type_env.remove gamma x
+           | Some typ -> Type_env.update gamma x typ)
+  in
+  (* Not the same gamma now!*)
+  let encoded = encode_expr ~gamma ~llen_lvars ~list_elem_vars expr in
+  (* Don't declare consts for quantified vars *)
+  let bound_vars =
+    bound_vars
+    |> List.map (fun (x, t) ->
+           let sort =
+             match t with
+             | None -> t_gil_ext_literal
+             | Some typ -> Encoding.native_sort_of_type typ
+           in
+           (x, sort))
+  in
+  let () =
+    encoded.consts
+    |> Hashtbl.filter_map_inplace (fun c () ->
+           if List.mem c bound_vars then None else Some ())
+  in
+  (bound_vars, encoded)
+
 let encode_quantified_expr
     ~(encode_expr :
        gamma:Type_env.t ->
@@ -860,38 +908,15 @@ let encode_quantified_expr
         Some (encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion)
     | _ -> None
   in
-  (* Start by updating gamma with the information provided by quantifier types.
-     There's very few foralls, so it's ok to copy the gamma entirely *)
-  let gamma = Type_env.copy gamma in
-  let () =
-    quantified_vars
-    |> List.iter (fun (x, typ) ->
-           match typ with
-           | None -> Type_env.remove gamma x
-           | Some typ -> Type_env.update gamma x typ)
+  let quantified_vars, encoded =
+    encode_bound_expr ~encode_expr ~gamma ~llen_lvars ~list_elem_vars
+      quantified_vars assertion
   in
-  (* Not the same gamma now!*)
   let encoded_assertion, consts, extra_asrts =
-    match encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion with
+    match encoded with
     | { kind = Native BooleanType; expr; consts; extra_asrts } ->
         (expr, consts, extra_asrts)
     | _ -> failwith "the thing inside forall is not boolean!"
-  in
-  let quantified_vars =
-    quantified_vars
-    |> List.map (fun (x, t) ->
-           let sort =
-             match t with
-             | None -> t_gil_ext_literal
-             | Some typ -> Encoding.native_sort_of_type typ
-           in
-           (x, sort))
-  in
-  (* Don't declare consts for quantified vars *)
-  let () =
-    consts
-    |> Hashtbl.filter_map_inplace (fun c () ->
-           if List.mem c quantified_vars then None else Some ())
   in
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
@@ -964,11 +989,42 @@ let rec encode_logical_expression
       | None ->
           let msg = "SMT - Undefined function: " ^ name in
           raise (Failure msg))
+  | Cases (le, cs) ->
+      (* Type checking should ensure that all constructors belong to the same datatype *)
+      let constructors_t =
+        match cs with
+        | (cname, _, _) :: _ -> Datatype_env.get_constructor_type_unsafe cname
+        | [] ->
+            let msg = "SMT - No cases given in case statement" in
+            raise (Failure msg)
+      in
+      let>- le = f le in
+      (* Convert to native *)
+      let le_native = get_native_of_type ~typ:constructors_t le in
+      (* Encode match cases *)
+      let cs, encs =
+        List.split
+          (List.map
+             (fun (c, bs, e) ->
+               let (module N : Variant.Nary) =
+                 Lit_operations.get_constructor_variant c
+               in
+               let pat = PCon (c, bs) in
+               let ts = Datatype_env.get_constructor_field_types_unsafe c in
+               let bts = List.combine bs ts in
+               let _, encoded =
+                 encode_bound_expr ~encode_expr:encode_logical_expression ~gamma
+                   ~llen_lvars ~list_elem_vars bts e
+               in
+               ((pat, extend_wrap encoded), encoded))
+             cs)
+      in
+      let>-- _ = encs in
+      extended_wrapped (match_datatype le_native cs)
   | ConstructorApp (name, les) -> (
       let param_typs = Datatype_env.get_constructor_field_types name in
       match param_typs with
       | Some param_typs ->
-          (* TODO: Should we be extend wrapping here? *)
           let simple_wrap_or_native typopt =
             match typopt with
             | Some typ -> get_native_of_type ~typ
@@ -1050,6 +1106,19 @@ let lvars_as_list_elements ?(exclude = SS.empty) (assertions : Expr.Set.t) :
                 let inner = self#visit_expr (exclude, true) e in
                 Containers.SS.union acc inner)
           Containers.SS.empty es
+
+      method! visit_ConstructorApp (exclude, _) _ les =
+        List.fold_left
+          (fun acc e ->
+            match e with
+            | Expr.LVar x ->
+                if not (Containers.SS.mem x exclude) then
+                  Containers.SS.add x acc
+                else acc
+            | _ ->
+                let inner = self#visit_expr (exclude, true) e in
+                Containers.SS.union acc inner)
+          Containers.SS.empty les
 
       method! visit_LVar (exclude, is_in_list) x =
         if is_in_list && not (Containers.SS.mem x exclude) then
@@ -1191,13 +1260,16 @@ let init () =
     (* Pop off initial declarations if necessary *)
     cmd (pop 2);
   cmd (push 1);
+  let type_init_decls = Type_operations.init_decls in
+  let lit_init_decls =
+    Lit_operations.init_decls (Datatype_env.get_datatypes ())
+  in
+  let ext_lit_init_decls = Ext_lit_operations.init_decls in
+  let func_init_decls =
+    Function_operations.init_decls (Function_env.get_functions ())
+  in
   let init_decls =
-    [
-      Type_operations.init_decls;
-      Lit_operations.init_decls (Datatype_env.get_datatypes ());
-      Ext_lit_operations.init_decls;
-      Function_operations.init_decls (Function_env.get_functions ());
-    ]
+    [ type_init_decls; lit_init_decls; ext_lit_init_decls; func_init_decls ]
   in
   let decls = List.concat init_decls in
   let () = decls |> List.iter cmd in
