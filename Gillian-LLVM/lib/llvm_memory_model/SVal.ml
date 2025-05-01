@@ -109,9 +109,18 @@ module SVal = struct
 
   let zero_of_chunk (chunk : Chunk.t) =
     let make value = make ~chunk ~value in
+    let make_bv w =
+      make
+        (Expr.list
+           [
+             Expr.string
+               (LLVMRuntimeTypes.type_to_string (LLVMRuntimeTypes.Int w));
+             Expr.zero_bv w;
+           ])
+    in
     match chunk with
-    | IntegerChunk w -> make (Expr.zero_bv w)
-    | IntegerOrPtrChunk -> make (Expr.zero_bv (Llvmconfig.ptr_width ()))
+    | IntegerChunk w -> make_bv w
+    | IntegerOrPtrChunk -> make_bv (Llvmconfig.ptr_width ())
     | F32 -> make (Lit (Num 0.))
     | F64 -> make (Lit (Num 0.))
 
@@ -293,7 +302,8 @@ module SVArray = struct
 
   let singleton SVal.{ chunk; value } = { chunk; values = Expr.EList [ value ] }
 
-  (** This assumes chunks are properly respected outside of the call of this function *)
+  (** This assumes chunks are properly respected outside of the call of this
+      function *)
   let cons_same_chunk (el : SVal.t) (arr : t) =
     concat_same_chunk (singleton el) arr
 
