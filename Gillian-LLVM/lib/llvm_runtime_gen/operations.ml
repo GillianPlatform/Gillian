@@ -763,7 +763,7 @@ module MemoryLib = struct
           SimpleOp (construct_simple_op ~arity:2 ~f:displace_pointer_op);
       };
       {
-        name = "llvm_alloc";
+        name = "llvm_alloca";
         generator = SimpleOp (construct_simple_op ~arity:2 ~f:alloc_op);
       };
     ]
