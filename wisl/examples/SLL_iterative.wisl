@@ -57,7 +57,7 @@ lemma lseg_append(x, y, alpha, yval, ynext) {
 
 
 { (#x == x) * list(#x, #alpha) }
-proc llen(x) {
+function llen(x) {
   y := x;
   n := 0;
   [[invariant {exists: #a1, #a2} lseg(#x, y, #a1) * list(y, #a2) * (#alpha == #a1@#a2) * (n == len #a1) ]];
@@ -76,7 +76,7 @@ proc llen(x) {
 
 
 { (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
-proc concat(x, y) {
+function concat(x, y) {
   if (x = null) {
     x := y
   } else {

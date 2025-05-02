@@ -53,7 +53,7 @@ lemma list_member_concat {
 
 // 00. Allocating an SLL node with the given value
 { v == #v }
-proc SLL_allocate_node(v){
+function SLL_allocate_node(v){
   t := new(2);
   [t] := v;
   return t
@@ -67,7 +67,7 @@ proc SLL_allocate_node(v){
 
 // 01. Prepending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #vs) }
-proc SLL_prepend(x, k){
+function SLL_prepend(x, k){
     z := SLL_allocate_node(k);
     [z + 1] := x;
     return z
@@ -76,7 +76,7 @@ proc SLL_prepend(x, k){
 
 // 02. Appending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #vs) }
-proc SLL_append(x, k){
+function SLL_append(x, k){
   if (x = null) {
     x := SLL_allocate_node(k)
     } else {
@@ -90,7 +90,7 @@ proc SLL_append(x, k){
 
 // 03. Appending a given SLL node to a given SLL
 { (x == #x) * (y == #y) * SLL(#x, #vs) * SLL(#y, [#vy]) }
-proc SLL_append_node(x, y) {
+function SLL_append_node(x, y) {
   if (x = null) {
     x := y
   } else {
@@ -104,7 +104,7 @@ proc SLL_append_node(x, y) {
 
 // 04. Concatenating two lists
 {(x == #x) * (y == #y) * SLL(#x, #vx) * SLL(#y, #vy) }
-proc SLL_concat(x, y) {
+function SLL_concat(x, y) {
   if (x = null){
     x := y
   } else {
@@ -118,7 +118,7 @@ proc SLL_concat(x, y) {
 
 // 05. Copying a given SLL
 { (x == #x) * SLL(#x, #vs) }
-proc SLL_copy(x){
+function SLL_copy(x){
   y := null;
   if (not (x = null)) {
     k := [x];
@@ -135,7 +135,7 @@ proc SLL_copy(x){
 
 // 06. Calculating the length of a given SLL
 { (x == #x) *  SLL(#x, #vs) }
-proc SLL_length(x) {
+function SLL_length(x) {
   n := 0;
   if (x = null){
     n := 0
@@ -150,7 +150,7 @@ proc SLL_length(x) {
 
 // 07. Reversing a given SLL
 { (x == #x) *  SLL(#x, #vs) }
-proc SLL_reverse(x){
+function SLL_reverse(x){
   if (not (x = null)) {
     t := [x + 1];
     [x + 1] := null;
@@ -165,7 +165,7 @@ proc SLL_reverse(x){
 
 // 08. Checking if a given value is in a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #r) }
-proc SLL_member(x, k){
+function SLL_member(x, k){
   found := false;
   if (x = null){
     skip
@@ -184,7 +184,7 @@ proc SLL_member(x, k){
 
 // 09. Removing a given value from a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #vs) * list_member(#vs, #k, #mem) }
-proc SLL_remove(x, k) {
+function SLL_remove(x, k) {
   if (x = null) {
     skip
   } else {
@@ -205,7 +205,7 @@ proc SLL_remove(x, k) {
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL(#x, #vs) }
-proc SLL_free(x){
+function SLL_free(x){
   if (x = null) {
     skip
   } else {
@@ -284,7 +284,7 @@ lemma SLLseg_to_SLL {
 
 // 02. Appending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #vx) }
-proc SLL_append_iter(x, k){
+function SLL_append_iter(x, k){
   y := SLL_allocate_node(k);
   if (x = null) {
     x := y
@@ -313,7 +313,7 @@ proc SLL_append_iter(x, k){
 
 // 03. Appending a given node to a given SLL
 { (x == #x) * (y == #y) * SLL(#x, #vs) * SLL(#y, [#vy]) }
-proc SLL_append_node_iter(x, y){
+function SLL_append_node_iter(x, y){
   if (x = null) {
     x := y
   } else {
@@ -341,7 +341,7 @@ proc SLL_append_node_iter(x, y){
 
 // 04. Concatenating two lists
 {(x == #x) * (y == #y) * SLL(#x, #vx) * SLL(#y, #vy) }
-proc SLL_concat_iter(x, y){
+function SLL_concat_iter(x, y){
   if (x = null) {
     head := y
   } else {
@@ -368,7 +368,7 @@ proc SLL_concat_iter(x, y){
 
 // 05. Copying a given SLL
 { (x == #x) * SLL(#x, #alpha) }
-proc SLL_copy_iter(x){
+function SLL_copy_iter(x){
     y := null;
     if (x = null){
         skip
@@ -406,7 +406,7 @@ proc SLL_copy_iter(x){
 
 // 06. Calculating the length of a given SLL
 { (x == #x) * SLL(x, #vx) }
-proc SLL_length_iter(x) {
+function SLL_length_iter(x) {
   y := x;
   n := 0;
   [[invariant {bind: n, y, #nvx,  #nvy}
@@ -427,7 +427,7 @@ proc SLL_length_iter(x) {
 
 // 07. Reversing a given SLL
 // { (x == #x) * SLL(#x, #vx) }
-// proc SLL_reverse_iter(x) {
+// function SLL_reverse_iter(x) {
 //    y := null;
 //    [[ invariant {bind: x, y, z, #nvx, #nvy}
 //        SLL(x, #nvx) * SLL(y, #nvy) * (#vx == ((rev #nvy) @ #nvx)) ]];
@@ -443,7 +443,7 @@ proc SLL_length_iter(x) {
 
 // 08. Checking if a given value is in a given SLL
 { (x == #x) * (k == #k) * SLL(#x, #alpha) * list_member(#alpha, #k, #r) }
-proc SLL_member_iter(x, k) {
+function SLL_member_iter(x, k) {
   found := false;
   next := x;
   [[ invariant {bind: found, next, #beta, #gamma, #rg}
@@ -472,7 +472,7 @@ proc SLL_member_iter(x, k) {
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL(#x, #vs) }
-proc SLL_free_iter(x) {
+function SLL_free_iter(x) {
   [[ invariant {bind: x, #rvs} SLL(x, #rvs) ]];
   while (not (x = null)) {
     y := x;

@@ -26,4 +26,4 @@ val of_variable : string -> t TypeMap.t -> t option
 val infer_types_pred :
   (string * t option) list -> WLAssert.t list -> t TypeMap.t
 
-val infer_types_func : (string * t option) list -> WLExpr.t -> t TypeMap.t
+val infer_types_pure_fun : (string * t option) list -> WLExpr.t -> t TypeMap.t

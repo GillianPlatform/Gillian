@@ -112,7 +112,7 @@ lemma dlseg_concat {
 // List concatenation
 { (x_a == #x_a) * (v_a == #v_a) * (x_b == #x_b) * (v_b == #v_b) *
   dlist(#x_a, #v_a, #alpha, #llena) * dlist(#x_b, #v_b, #beta, #llenb) }
-proc concat(x_a, v_a, x_b, v_b) {
+function concat(x_a, v_a, x_b, v_b) {
   r := new(2);
   if (x_a = null) {
     [r] := x_b;

@@ -1,21 +1,21 @@
 type t = {
-  context : WProc.t list;
+  context : WFun.t list;
   predicates : WPred.t list;
   lemmas : WLemma.t list;
   datatypes : WDatatype.t list;
-  functions : WFunc.t list;
+  pure_functions : WPureFun.t list;
 }
 
-val get_context : t -> WProc.t list
+val get_context : t -> WFun.t list
 
 val get_by_id :
-  ?proc_name:string option ->
+  ?fname:string option ->
   t ->
   int option ->
   [> `None
   | `Return of WExpr.t
   | `WExpr of WExpr.t
-  | `WProc of WProc.t
+  | `WFun of WFun.t
   | `WLAssert of WLAssert.t
   | `WLCmd of WLCmd.t
   | `WLExpr of WLExpr.t
@@ -26,8 +26,8 @@ val get_by_id :
   | `WStmt of WStmt.t ]
 
 val get_pred : t -> string -> WPred.t option
-val get_proc : t -> string -> WProc.t option
-val never_called_during_symb : t -> WProc.t list
-val pp_context : Format.formatter -> WProc.t list -> unit
+val get_fun : t -> string -> WFun.t option
+val never_called_during_symb : t -> WFun.t list
+val pp_context : Format.formatter -> WFun.t list -> unit
 val pp : Format.formatter -> t -> unit
-val get_proc_name_of_element : t -> int -> string
+val get_function_name_of_element : t -> int -> string

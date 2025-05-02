@@ -3,21 +3,21 @@ datatype MyList {
   Cons(Any, MyList)
 }
 
-function append(xs : MyList, x) {
+pure function append(xs : MyList, x) {
   case xs {
     Nil         -> 'Cons(x, 'Nil);
     Cons(y, ys) -> 'Cons(y, append(ys, x))
   }
 }
 
-function length(xs : MyList) {
+pure function length(xs : MyList) {
   case xs {
     Nil         -> 0;
     Cons(x, xs) -> 1 + length(xs)
   }
 }
 
-function double_length(xs : MyList) {
+pure function double_length(xs : MyList) {
   case xs {
     Nil         -> 0;
     Cons(x, xs) -> 2 + length(xs)
@@ -37,7 +37,7 @@ predicate sll(+x, vs) {
 
 // 00. Allocating an sll node with the given value
 { v == #v }
-proc sll_allocate_node(v){
+function sll_allocate_node(v){
   t := new(2);
   [t] := v;
   return t
@@ -46,7 +46,7 @@ proc sll_allocate_node(v){
 
 // This incorrect spec should fail to verify
 { (v == #v) * (u == #u) }
-proc sll_allocate_node_fails(u, v){
+function sll_allocate_node_fails(u, v){
   t := new(2);
   [t] := v;
   return t
@@ -60,7 +60,7 @@ proc sll_allocate_node_fails(u, v){
 
 // 01. Prepending a given value to a given sll
 { (x == #x) * (k == #k) * sll(#x, #vs) }
-proc sll_prepend(x, k){
+function sll_prepend(x, k){
     z := sll_allocate_node(k);
     [z + 1] := x;
     return z
@@ -69,7 +69,7 @@ proc sll_prepend(x, k){
 
 // 02. Appending a given value to a given SLL
 { (x == #x) * (k == #k) * sll(#x, #vs) }
-proc sll_append(x, k){
+function sll_append(x, k){
   if (x = null) {
     x := sll_allocate_node(k)
     } else {
@@ -83,7 +83,7 @@ proc sll_append(x, k){
 
 // 06. Calculating the length of a given SLL
 { (x == #x) *  sll(#x, #vs) }
-proc sll_length(x) {
+function sll_length(x) {
   n := 0;
   if (x = null){
     n := 0
@@ -98,7 +98,7 @@ proc sll_length(x) {
 
 // This spec fails to verify
 { (x == #x) *  sll(#x, #vs) }
-proc sll_length_fails(x) {
+function sll_length_fails(x) {
   n := 0;
   if (x = null){
     n := 0
@@ -113,7 +113,7 @@ proc sll_length_fails(x) {
 
 // 05. Copying a given sll
 { (x == #x) * sll(#x, #vs) }
-proc sll_copy(x){
+function sll_copy(x){
   y := null;
   if (not (x = null)) {
     k := [x];
@@ -130,7 +130,7 @@ proc sll_copy(x){
 
 // 10. Freeing a given sll
 { (x == #x) * sll(#x, #vs) }
-proc sll_free(x){
+function sll_free(x){
   if (x = null) {
     skip
   } else {

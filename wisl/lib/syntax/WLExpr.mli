@@ -7,7 +7,7 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
-  | LFuncApp of string * t list
+  | LPureFunApp of string * t list
   | LConstructorApp of string * t list
   | LCases of t * case list
 

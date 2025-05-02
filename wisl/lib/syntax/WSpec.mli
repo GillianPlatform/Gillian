@@ -4,8 +4,8 @@ type t = {
   variant : WLExpr.t option;  (** Variant *)
   existentials : (string * string list) option;  (** Existentials in the spec *)
   spid : int;  (** Unique identifier of AST el *)
-  proc_name : string;  (** Name of the function the spec is attached to *)
-  proc_params : string list;
+  fname : string;  (** Name of the function the spec is attached to *)
+  fparams : string list;
       (** Parameters of the function the spec is attached to *)
   sploc : CodeLoc.t;  (** Code location of the spec *)
 }

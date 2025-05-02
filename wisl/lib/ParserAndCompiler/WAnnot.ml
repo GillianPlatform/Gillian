@@ -1,7 +1,7 @@
 type nest_kind =
   | LoopBody of string
-      (** This command nests its loop body an (abstracted) proc call *)
-  | ProcCall of string  (** This command nests the body of a proc call *)
+      (** This command nests its loop body an (abstracted) function call *)
+  | FunCall of string  (** This command nests the body of a function call *)
 [@@deriving yojson]
 
 (** How does this command map to a WISL statment? *)
@@ -11,7 +11,7 @@ type stmt_kind =
   | Return of bool
       (** Same as [Normal], but specific to the return statement *)
   | Hidden  (** A command that doesn't map to a particular WISL statement *)
-  | LoopPrefix  (** A command in the prefix of a loop body proc *)
+  | LoopPrefix  (** A command in the prefix of a loop body function *)
 [@@deriving yojson, show]
 
 type t = {

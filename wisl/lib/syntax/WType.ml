@@ -135,7 +135,7 @@ let rec infer_logic_expr knownp lexpr =
       TypeMap.add bare_lexpr WList (List.fold_left infer_logic_expr knownp lel)
   | LESet lel ->
       TypeMap.add bare_lexpr WSet (List.fold_left infer_logic_expr knownp lel)
-  | LFuncApp (_, lel) -> List.fold_left infer_logic_expr knownp lel
+  | LPureFunApp (_, lel) -> List.fold_left infer_logic_expr knownp lel
   | LConstructorApp (n, lel) ->
       TypeMap.add bare_lexpr (WDatatype n)
         (List.fold_left infer_logic_expr knownp lel)
@@ -243,7 +243,7 @@ let infer_types_pred (params : (string * t option) list) assert_list =
   in
   result
 
-let infer_types_func (params : (string * t option) list) func_def =
+let infer_types_pure_fun (params : (string * t option) list) pure_fun_def =
   let join _ param_t inferred_t =
     match (param_t, inferred_t) with
     | Some param_t, Some inferred_t when param_t = inferred_t -> Some param_t
@@ -259,5 +259,5 @@ let infer_types_func (params : (string * t option) list) func_def =
         | Some t -> TypeMap.add (PVar x) t map)
       TypeMap.empty params
   in
-  let infer_on_func_def = infer_logic_expr TypeMap.empty func_def in
-  TypeMap.merge join infers_on_params infer_on_func_def
+  let infer_on_def = infer_logic_expr TypeMap.empty pure_fun_def in
+  TypeMap.merge join infers_on_params infer_on_def

@@ -9,7 +9,7 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
-  | LFuncApp of string * t list (* Function application *)
+  | LPureFunApp of string * t list (* Pure function application *)
   | LConstructorApp of string * t list (* Constructor application *)
   | LCases of t * case list
 
@@ -52,7 +52,7 @@ let rec get_by_id id lexpr =
     | LUnOp (_, lep) -> getter lep
     | LEList lel -> list_visitor lel
     | LESet lel -> list_visitor lel
-    | LFuncApp (_, lel) | LConstructorApp (_, lel) -> list_visitor lel
+    | LPureFunApp (_, lel) | LConstructorApp (_, lel) -> list_visitor lel
     | _ -> `None
   in
   let self_or_none = if get_id lexpr = id then `WLExpr lexpr else `None in
@@ -76,7 +76,7 @@ let rec pp fmt lexpr =
   | LESet lel ->
       WPrettyUtils.pp_list ~pre:(format_of_string "@[-{")
         ~suf:(format_of_string "}-@]") pp fmt lel
-  | LFuncApp (name, lel) ->
+  | LPureFunApp (name, lel) ->
       Format.fprintf fmt "@[%s" name;
       WPrettyUtils.pp_list ~pre:(format_of_string "(")
         ~suf:(format_of_string ")@]") ~empty:(format_of_string "@]") pp fmt lel
@@ -112,8 +112,8 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
     | LLSub (e1, e2, e3) -> LLSub (f e1, f e2, f e3)
     | LEList le -> LEList (List.map f le)
     | LESet le -> LESet (List.map f le)
-    | LFuncApp (name, le) | LConstructorApp (name, le) ->
-        LFuncApp (name, List.map f le)
+    | LPureFunApp (name, le) | LConstructorApp (name, le) ->
+        LPureFunApp (name, List.map f le)
     | LCases (e, cs) ->
         let cs = List.map (fun c -> { c with lexpr = f c.lexpr }) cs in
         LCases (e, cs)

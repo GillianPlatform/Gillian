@@ -64,17 +64,18 @@ struct
     | `WLCmd lcmd -> Some (Fmt.str "%a" WLCmd.pp lcmd)
     | `WStmt stmt -> Some (Fmt.str "%a" WStmt.pp_head stmt)
     | `WLExpr le -> Some (Fmt.str "LEXpr: %a" WLExpr.pp le)
-    | `WProc f -> Some (Fmt.str "WProc: %s" f.name)
+    | `WFun f -> Some (Fmt.str "WFun: %s" f.name)
     | `None -> None
     | _ -> failwith "get_origin_node_str: Unknown Kind of Node"
 
-  let get_proc_call_name exec_data =
+  let get_fun_call_name exec_data =
     let cmd = CmdReport.(exec_data.cmd_report.cmd) in
     match cmd with
     | Cmd.Call (_, name_expr, _, _, _) -> (
         match name_expr with
         | Expr.Lit (Literal.String name) -> Some name
-        | _ -> failwith "get_proc_call_name: proc name wasn't a literal expr!")
+        | _ ->
+            failwith "get_fun_call_name: function name wasn't a literal expr!")
     | _ -> None
 
   type cmd_data = {
@@ -87,7 +88,7 @@ struct
     loc : string * int;
     prev : (id * Branch_case.t option) option;
     callers : id list;
-    proc_return_label : (string * int) option;
+    func_return_label : (string * int) option;
   }
   [@@deriving yojson]
 
@@ -168,10 +169,10 @@ struct
         =
       let- () =
         match (nest_kind, ends) with
-        | Some (ProcCall _), [ (Unknown, bdata) ] ->
-            Some (Ok [ (ProcExitPlaceholder, bdata) ])
-        | Some (ProcCall _), _ ->
-            Some (Error "Unexpected branching in cmd with ProcCall nest!")
+        | Some (FunCall _), [ (Unknown, bdata) ] ->
+            Some (Ok [ (FuncExitPlaceholder, bdata) ])
+        | Some (FunCall _), _ ->
+            Some (Error "Unexpected branching in cmd with FunCall nest!")
         | _ -> None
       in
       let counts = Hashtbl.create 0 in
@@ -202,8 +203,8 @@ struct
       | Return _ -> true
       | _ -> false
 
-    let is_loop_end ~is_loop_proc ~proc_name exec_data =
-      is_loop_proc && get_proc_call_name exec_data = Some proc_name
+    let is_loop_end ~is_loop_func ~proc_name exec_data =
+      is_loop_func && get_fun_call_name exec_data = Some proc_name
 
     let finish ~exec_data partial =
       let ({ prev; all_ids; ends; nest_kind; matches; errors; has_return; _ }
@@ -334,7 +335,7 @@ struct
           ~id
           ~tl_ast
           ~annot
-          ~is_loop_proc
+          ~is_loop_func
           ~proc_name
           ~exec_data
           (partial : partial_data) =
@@ -344,7 +345,7 @@ struct
               match get_origin_node_str tl_ast (Some origin_id) with
               | Some display -> Ok (display, false)
               | None ->
-                  if is_loop_end ~is_loop_proc ~proc_name exec_data then
+                  if is_loop_end ~is_loop_func ~proc_name exec_data then
                     Ok ("<end of loop>", true)
                   else Error "Couldn't get display!"
             in
@@ -395,19 +396,19 @@ struct
 
       let update_submap ~prog ~(annot : Annot.t) partial =
         match (partial.nest_kind, annot.nest_kind) with
-        | None, Some (ProcCall fn) ->
+        | None, Some (FunCall fn) ->
             let () =
               if not (is_fcall_using_spec fn prog) then
-                partial.nest_kind <- Some (ProcCall fn)
+                partial.nest_kind <- Some (FunCall fn)
             in
             Ok ()
         | None, nest ->
             partial.nest_kind <- nest;
             Ok ()
-        | Some _, (None | Some (ProcCall _)) -> Ok ()
+        | Some _, (None | Some (FunCall _)) -> Ok ()
         | Some _, Some _ -> Error "HORROR - multiple submaps!"
 
-      let f ~tl_ast ~prog ~prev_id ~is_loop_proc ~proc_name exec_data partial =
+      let f ~tl_ast ~prog ~prev_id ~is_loop_func ~proc_name exec_data partial =
         let { id; cmd_report; errors; matches; _ } = exec_data in
         let annot = CmdReport.(cmd_report.annot) in
         let** branch_kind, branch_case =
@@ -415,7 +416,7 @@ struct
         in
         let** () = update_paths ~exec_data ~branch_case ~branch_kind partial in
         let** () =
-          update_canonical_cmd_info ~id ~tl_ast ~annot ~exec_data ~is_loop_proc
+          update_canonical_cmd_info ~id ~tl_ast ~annot ~exec_data ~is_loop_func
             ~proc_name partial
         in
         let** () = update_submap ~prog ~annot partial in
@@ -456,7 +457,7 @@ struct
         ~tl_ast
         ~prog
         ~get_prev
-        ~is_loop_proc
+        ~is_loop_func
         ~proc_name
         ~prev_id
         exec_data =
@@ -466,7 +467,7 @@ struct
       in
       Hashtbl.replace partials exec_data.id partial;
       let result =
-        update ~tl_ast ~prog ~prev_id ~is_loop_proc ~proc_name exec_data partial
+        update ~tl_ast ~prog ~prev_id ~is_loop_func ~proc_name exec_data partial
         |> Result_utils.or_else (fun e ->
                failwith ~exec_data ~partial ~partials e)
       in
@@ -486,10 +487,10 @@ struct
     tl_ast : tl_ast; [@to_yojson fun _ -> `Null]
     partial_cmds : Partial_cmds.t;
     map : map;
-    mutable is_loop_proc : bool;
+    mutable is_loop_func : bool;
     prog : (annot, int) Prog.t; [@to_yojson fun _ -> `Null]
-    proc_return_map : (id, string * int ref) Hashtbl.t;
-    mutable proc_return_count : int;
+    func_return_map : (id, string * int ref) Hashtbl.t;
+    mutable func_return_count : int;
   }
   [@@deriving to_yojson]
 
@@ -531,11 +532,11 @@ struct
           ])
         ("WislLifter.insert_new_cmd: " ^ msg)
 
-    let new_proc_return_label caller_id state =
-      state.proc_return_count <- state.proc_return_count + 1;
-      let label = int_to_letters state.proc_return_count in
+    let new_function_return_label caller_id state =
+      state.func_return_count <- state.func_return_count + 1;
+      let label = int_to_letters state.func_return_count in
       let count = ref 0 in
-      Hashtbl.add state.proc_return_map caller_id (label, count);
+      Hashtbl.add state.func_return_map caller_id (label, count);
       (label, count)
 
     let update_caller_branches ~caller_id ~cont_id (label, ix) state =
@@ -544,8 +545,8 @@ struct
             let new_next =
               match node.next with
               | Some (Branch nexts) ->
-                  let nexts = List.remove_assoc ProcExitPlaceholder nexts in
-                  let case = Case (ProcExit label, ix) in
+                  let nexts = List.remove_assoc FuncExitPlaceholder nexts in
+                  let case = Case (FuncExit label, ix) in
                   let bdata = (cont_id, None) in
                   let nexts = nexts @ [ (case, (None, bdata)) ] in
                   Ok (Some (Branch nexts))
@@ -571,16 +572,16 @@ struct
           Fmt.error "update_caller_branches - caller %a not found" pp_id
             caller_id
 
-    let resolve_proc_branches ~state finished_partial =
+    let resolve_func_branches ~state finished_partial =
       let Partial_cmds.{ all_ids; next_kind; callers; has_return; _ } =
         finished_partial
       in
       match (next_kind, has_return, callers) with
       | Zero, true, caller_id :: _ ->
           let label, count =
-            match Hashtbl.find_opt state.proc_return_map caller_id with
+            match Hashtbl.find_opt state.func_return_map caller_id with
             | Some (label, count) -> (label, count)
-            | None -> new_proc_return_label caller_id state
+            | None -> new_function_return_label caller_id state
           in
           incr count;
           let label = (label, !count) in
@@ -589,7 +590,7 @@ struct
           Ok (Some label)
       | _ -> Ok None
 
-    let make_new_cmd ~proc_return_label finished_partial =
+    let make_new_cmd ~func_return_label finished_partial =
       let Partial_cmds.
             {
               all_ids;
@@ -616,7 +617,7 @@ struct
           submap;
           prev;
           callers;
-          proc_return_label;
+          func_return_label;
           loc;
         }
       in
@@ -711,7 +712,7 @@ struct
       let- () = insert_to_empty_map ~state ~prev ~stack_direction new_cmd in
       match (stack_direction, prev) with
       | _, None -> Error "inserting to non-empty map with no prev!"
-      | Some In, Some (parent_id, Some ProcExitPlaceholder)
+      | Some In, Some (parent_id, Some FuncExitPlaceholder)
       | Some In, Some (parent_id, None) ->
           let new_cmd = new_cmd |> with_prev None in
           let++ () = insert_as_submap ~state ~parent_id new_cmd.data.id in
@@ -723,12 +724,12 @@ struct
           new_cmd
       | Some (Out prev_id), Some (inner_prev_id, _) ->
           let** case =
-            let proc_return_label =
-              (get_exn state.map inner_prev_id).data.proc_return_label
+            let func_return_label =
+              (get_exn state.map inner_prev_id).data.func_return_label
             in
-            match proc_return_label with
-            | Some (label, ix) -> Ok (Case (ProcExit label, ix))
-            | None -> Error "stepping out without proc return label!"
+            match func_return_label with
+            | Some (label, ix) -> Ok (Case (FuncExit label, ix))
+            | None -> Error "stepping out without function return label!"
           in
           let new_cmd = new_cmd |> with_prev (Some (prev_id, Some case)) in
           let++ () = insert_as_next ~state ~prev_id ~case new_cmd.data.id in
@@ -739,10 +740,10 @@ struct
         let Partial_cmds.{ id; all_ids; prev; stack_direction; _ } =
           finished_partial
         in
-        let** proc_return_label =
-          resolve_proc_branches ~state finished_partial
+        let** func_return_label =
+          resolve_func_branches ~state finished_partial
         in
-        let new_cmd = make_new_cmd ~proc_return_label finished_partial in
+        let new_cmd = make_new_cmd ~func_return_label finished_partial in
         let** new_cmd = insert_cmd ~state ~prev ~stack_direction new_cmd in
         let () = insert state.map ~id ~all_ids new_cmd in
         let () =
@@ -756,9 +757,9 @@ struct
   let insert_new_cmd = Insert_new_cmd.f
 
   module Init_or_handle = struct
-    (** Loop body procs have some boilerplate we want to ignore.
+    (** Loop body functions have some boilerplate we want to ignore.
         This would normally be [Hidden], but we want to only consider
-        the true case of the proc *)
+        the true case of the function *)
     let handle_loop_prefix exec_data =
       let { cmd_report; id; _ } = exec_data in
       let annot = CmdReport.(cmd_report.annot) in
@@ -799,19 +800,19 @@ struct
     let f ~state ?prev_id ?gil_case (exec_data : exec_data) =
       let- () =
         let+ id, case = handle_loop_prefix exec_data in
-        state.is_loop_proc <- true;
+        state.is_loop_func <- true;
         Either.Left (id, case)
       in
       let gil_case =
         Option_utils.coalesce gil_case exec_data.cmd_report.branch_case
       in
-      let { tl_ast; partial_cmds = partials; is_loop_proc; proc_name; prog; _ }
+      let { tl_ast; partial_cmds = partials; is_loop_func; proc_name; prog; _ }
           =
         state
       in
       match
         let get_prev = get_prev ~state ~gil_case ~prev_id in
-        Partial_cmds.handle ~partials ~tl_ast ~prog ~get_prev ~is_loop_proc
+        Partial_cmds.handle ~partials ~tl_ast ~prog ~get_prev ~is_loop_func
           ~proc_name ~prev_id exec_data
       with
       | Finished finished ->
@@ -980,10 +981,10 @@ struct
   (* If a FinalCmd is in a function call, get the caller ID
      and the relevant branch case for stepping forward,
      while checking that it actually exists. *)
-  let get_next_from_end state { callers; proc_return_label; _ } =
+  let get_next_from_end state { callers; func_return_label; _ } =
     let* caller_id = List_utils.hd_opt callers in
-    let* label, ix = proc_return_label in
-    let case = Case (ProcExit label, ix) in
+    let* label, ix = func_return_label in
+    let case = Case (FuncExit label, ix) in
     let* _ =
       match (get_exn state.map caller_id).next with
       | Some (Branch nexts) -> List.assoc_opt case nexts
@@ -996,8 +997,8 @@ struct
     match (node.next, case, node.data.submap) with
     | (None | Some (Single _)), Some _, _ ->
         failwith "HORROR - tried to step case for non-branch cmd"
-    | ( Some (Branch [ (ProcExitPlaceholder, _) ]),
-        Some ProcExitPlaceholder,
+    | ( Some (Branch [ (FuncExitPlaceholder, _) ]),
+        Some FuncExitPlaceholder,
         Submap submap_id ) -> Either.left submap_id
     | Some (Single (None, _)), None, _ ->
         let id = List.hd (List.rev node.data.all_ids) in
@@ -1101,7 +1102,7 @@ struct
     (* Bodge: step in if on func exit placeholder *)
     let- () =
       match (case, cmd.data.submap) with
-      | Some ProcExitPlaceholder, Submap submap_id ->
+      | Some FuncExitPlaceholder, Submap submap_id ->
           Some (submap_id, Debugger_utils.Step)
       | _ -> None
     in
@@ -1124,8 +1125,8 @@ struct
       let () =
         match (node.next, node.data.submap) with
         | Some (Branch nexts), (NoSubmap | Proc _) ->
-            if List.mem_assoc ProcExitPlaceholder nexts then
-              step state id (Some ProcExitPlaceholder) |> ignore
+            if List.mem_assoc FuncExitPlaceholder nexts then
+              step state id (Some FuncExitPlaceholder) |> ignore
         | _ -> ()
       in
       let node = get_exn state.map id in
@@ -1140,7 +1141,7 @@ struct
     let node = get_exn state.map id in
     (* Failsafe in case of error paths in submap *)
     match node.next with
-    | Some (Branch [ (ProcExitPlaceholder, _) ]) -> (id, Debugger_utils.Step)
+    | Some (Branch [ (FuncExitPlaceholder, _) ]) -> (id, Debugger_utils.Step)
     | _ -> step_branch state id None
 
   let step_back state id =
@@ -1202,10 +1203,10 @@ struct
         tl_ast;
         partial_cmds;
         map = Exec_map.make ();
-        is_loop_proc = false;
+        is_loop_func = false;
         prog;
-        proc_return_map = Hashtbl.create 0;
-        proc_return_count = 0;
+        func_return_map = Hashtbl.create 0;
+        func_return_count = 0;
       }
     in
     let finish_init () =

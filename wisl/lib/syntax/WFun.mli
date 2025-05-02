@@ -17,7 +17,7 @@ val get_spec : t -> WSpec.t option
 val add_spec :
   t -> WLAssert.t -> WLAssert.t -> WLExpr.t option -> CodeLoc.t -> t
 
-val procs_called : t -> string list
+val functions_called : t -> string list
 val has_spec : t -> bool
 
 val get_by_id :
@@ -26,7 +26,7 @@ val get_by_id :
   [> `None
   | `Return of WExpr.t
   | `WExpr of WExpr.t
-  | `WProc of t
+  | `WFun of t
   | `WLAssert of WLAssert.t
   | `WLCmd of WLCmd.t
   | `WLExpr of WLExpr.t

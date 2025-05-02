@@ -4,7 +4,7 @@ predicate tree(+t) {
 }
 
 { (x == #x) * tree(#x) }
-proc tree_dispose(x) {
+function tree_dispose(x) {
   if (x != null) {
     y := [x+1];
     z := [x+2];
