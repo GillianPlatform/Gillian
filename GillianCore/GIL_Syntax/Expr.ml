@@ -502,8 +502,8 @@ let rec pp fmt e =
 
 and pp_bv_arg fmt (arg : bv_arg) =
   match arg with
-  | Literal w -> Fmt.pf fmt "lit(%d)" w
-  | BvExpr (e, w) -> Fmt.pf fmt "expr(%a, %d)" pp e w
+  | Literal w -> Fmt.pf fmt "%d" w
+  | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %d)" pp e w
 
 let rec full_pp fmt e =
   match e with
