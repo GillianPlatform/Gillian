@@ -470,7 +470,7 @@ let rec pp fmt e =
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
   | BVExprIntrinsic (op, es, w) ->
-      Fmt.pf fmt "%s(%a: %a)" (BVOps.str op)
+      Fmt.pf fmt "%s(%a: %ai)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp_bv_arg)
         es
         (Fmt.option ~none:Fmt.nop Fmt.int)
@@ -502,8 +502,8 @@ let rec pp fmt e =
 
 and pp_bv_arg fmt (arg : bv_arg) =
   match arg with
-  | Literal w -> Fmt.pf fmt "%d" w
-  | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %d)" pp e w
+  | Literal w -> Fmt.pf fmt "%di" w
+  | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %di)" pp e w
 
 let rec full_pp fmt e =
   match e with
