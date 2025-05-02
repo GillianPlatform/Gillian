@@ -38,7 +38,7 @@ let str (x : t) =
   | BVAnd -> "bvand"
   | BVOr -> "bvor"
   | BVNeg -> "bvneg"
-  | BVPlus -> "bvplus"
+  | BVPlus -> "bvadd"
   | BVMul -> "bvmul"
   | BVUDiv -> "bvudiv"
   | BVUrem -> "bvurem"

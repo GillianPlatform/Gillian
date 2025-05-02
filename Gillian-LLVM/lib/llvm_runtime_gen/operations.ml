@@ -156,7 +156,7 @@ let type_fail (expr_and_type : (Gil_syntax.Expr.t * LLVMRuntimeTypes.t) list) =
         Expr.list [ expr; LLVMRuntimeTypes.rtype_to_gil_type rty |> Expr.type_ ])
       expr_and_type
   in
-  fail_cmd "Type mismatch" exprs
+  fail_cmd "Type_mismatch" exprs
 
 type bv_op_function = Expr.t list -> bv_op_shape -> Expr.t
 
@@ -175,7 +175,7 @@ let add_overflow_check
       let* _ =
         ite check_expr
           ~true_case:
-            (let* _ = add_cmd (fail_cmd "Detected forbidden overflow" inputs) in
+            (let* _ = add_cmd (fail_cmd "Detected_forbidden_overflow" inputs) in
              let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
              return ())
           ~false_case:(return ())
@@ -316,7 +316,7 @@ let pattern_function_unary
     in
     return ()
   in
-  let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
+  let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
   let patterns =
     [
       {
@@ -374,7 +374,7 @@ let cmp_patterns
            return ())
         ~false_case:
           (let* _ =
-             add_cmd (fail_cmd "Incomparable pointers" [ expr1; expr2 ])
+             add_cmd (fail_cmd "Incomparable_pointers" [ expr1; expr2 ])
            in
            let* _ = add_cmd Gil_syntax.Cmd.ReturnNormal in
            return ())
@@ -412,7 +412,7 @@ let cmp_patterns
     ]
   in
   let patterns = int_patterns @ ptr_patterns in
-  let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
+  let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
   let* _ = type_dispatch patterns default_statement in
   return ()
 
@@ -452,7 +452,7 @@ let pattern_function
     in
     return ()
   in
-  let default_statement = add_cmd (fail_cmd "No type pattern matched" []) in
+  let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
   let non_commutative_patterns =
     [
       {
@@ -650,7 +650,7 @@ module MemoryLib = struct
            return ())
         ~false_case:
           (let* _ =
-             add_cmd (fail_cmd "Pointer operation on non-pointer" [ ptr ])
+             add_cmd (fail_cmd "Pointer_operation_on_non_pointer" [ ptr ])
            in
            return ())
     in
@@ -733,7 +733,7 @@ module MemoryLib = struct
             ~false_case:
               (let* _ =
                  add_cmd
-                   (fail_cmd "Pointer operation on non-pointer" [ ptr; offset ])
+                   (fail_cmd "Pointer_operation_on_non_pointer" [ ptr; offset ])
                in
                return ())
         in
