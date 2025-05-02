@@ -620,6 +620,155 @@ let template_from_pattern_cmp
     | [ x; y ] -> cmp_patterns ~pointer_width x y op shape
     | _ -> failwith "Invalid number of arguments")
 
+module MemoryLib = struct
+  let alloc_name = "alloc"
+  let store_name = "store"
+  let load_name = "load"
+
+  module M = Memories.LLVM_ALoc.MonadicSMemory
+
+  type ptr = { base : Expr.t; offset : Expr.t }
+
+  let access_ptr (expr : Expr.t) : ptr =
+    let vl = Expr.list_nth expr 1 in
+    let base = Expr.list_nth vl 0 in
+    let offset = Expr.list_nth vl 1 in
+    { base; offset }
+
+  let pointer_op ~(is_ptr_case : string -> unit Codegenerator.t) (ptr : Expr.t)
+      : unit Codegenerator.t =
+    let open Codegenerator in
+    let open Gil_syntax in
+    let open Expr.Infix in
+    let* _ =
+      ite
+        (is_type_of_expr ptr LLVMRuntimeTypes.Ptr)
+        ~true_case:
+          (let to_bind = fresh_sym () in
+           let* _ = is_ptr_case to_bind in
+           let* _ = add_return_of_value (Expr.PVar to_bind) in
+           return ())
+        ~false_case:
+          (let* _ =
+             add_cmd (fail_cmd "Pointer operation on non-pointer" [ ptr ])
+           in
+           return ())
+    in
+    return ()
+
+  let load_op ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    match exp_list with
+    | [ ptr ] ->
+        let { base; offset } = access_ptr ptr in
+        pointer_op
+          ~is_ptr_case:(fun bindr ->
+            let tmp = fresh_sym () in
+            (* bind a tmp because after the load we have {{ {{value type, value}}}}*)
+            let* _ = add_cmd (Cmd.LAction (tmp, load_name, [ base; offset ])) in
+            let* _ =
+              add_cmd (Cmd.Assignment (bindr, Expr.list_nth (Expr.PVar tmp) 0))
+            in
+            return ())
+          ptr
+    | _ -> failwith "Invalid number of arguments"
+
+  let store_op ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    match exp_list with
+    | [ ptr; value ] ->
+        let { base; offset } = access_ptr ptr in
+        pointer_op
+          ~is_ptr_case:(fun bindr ->
+            (* in store we just return out the {{}}*)
+            let* _ =
+              add_cmd (Cmd.LAction (bindr, store_name, [ base; offset; value ]))
+            in
+            return ())
+          ptr
+    | _ -> failwith "Invalid number of arguments"
+
+  let alloc_op ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    match exp_list with
+    | [ low; hi ] ->
+        let bindr = fresh_sym () in
+        let* _ = add_cmd (Cmd.LAction (bindr, alloc_name, [ low; hi ])) in
+        let* _ = add_return_of_value (Expr.list_nth (Expr.PVar bindr) 0) in
+        return ()
+    | _ -> failwith "Invalid number of arguments"
+
+  let displace_pointer_op ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    let open Expr.Infix in
+    match exp_list with
+    | [ ptr; offset ] ->
+        let type_checks =
+          [
+            is_type_of_expr ptr LLVMRuntimeTypes.Ptr;
+            is_type_of_expr offset (LLVMRuntimeTypes.Int pointer_width);
+          ]
+        in
+        let ty_check =
+          List.fold_left (fun acc check -> acc && check) Expr.true_ type_checks
+        in
+        let* _ =
+          ite ty_check
+            ~true_case:
+              (let { base; offset = ptr_offset } = access_ptr ptr in
+               let new_offset =
+                 OpFunctions.add_op_function [ ptr_offset; offset ]
+                   {
+                     width_of_result = Some pointer_width;
+                     args = [ pointer_width; pointer_width ];
+                   }
+               in
+               let new_ptr = update_pointer ptr new_offset in
+               let* _ = add_return_of_value new_ptr in
+               return ())
+            ~false_case:
+              (let* _ =
+                 add_cmd
+                   (fail_cmd "Pointer operation on non-pointer" [ ptr; offset ])
+               in
+               return ())
+        in
+        return ()
+    | _ -> failwith "Invalid number of arguments"
+
+  let construct_simple_op
+      ~(arity : int)
+      ~(f : pointer_width:int -> Expr.t list -> unit Codegenerator.t)
+      ~(pointer_width : int)
+      (name : string) : Monomorphizer.basic_proc =
+    op_function name arity (f ~pointer_width)
+
+  let ops =
+    [
+      {
+        name = "llvm_load";
+        generator = SimpleOp (construct_simple_op ~arity:1 ~f:load_op);
+      };
+      {
+        name = "llvm_store";
+        generator = SimpleOp (construct_simple_op ~arity:2 ~f:store_op);
+      };
+      {
+        name = "llvm_displace_pointer";
+        generator =
+          SimpleOp (construct_simple_op ~arity:2 ~f:displace_pointer_op);
+      };
+      {
+        name = "llvm_alloc";
+        generator = SimpleOp (construct_simple_op ~arity:2 ~f:alloc_op);
+      };
+    ]
+end
+
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
   open Monomorphizer.Template
@@ -773,4 +922,5 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                []);
       };
     ]
+    @ MemoryLib.ops
 end
