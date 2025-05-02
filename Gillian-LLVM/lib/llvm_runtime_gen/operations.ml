@@ -721,7 +721,8 @@ module MemoryLib = struct
             ~true_case:
               (let { base; offset = ptr_offset } = access_ptr ptr in
                let new_offset =
-                 OpFunctions.add_op_function [ ptr_offset; offset ]
+                 OpFunctions.add_op_function
+                   [ ptr_offset; Expr.list_nth offset 1 ]
                    {
                      width_of_result = Some pointer_width;
                      args = [ pointer_width; pointer_width ];
