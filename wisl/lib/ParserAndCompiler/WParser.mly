@@ -102,6 +102,7 @@
 %type <WExpr.t>                                 expression
 %type <WExpr.t list>                            expr_list
 %type <WLCmd.t>                                 logic_command
+%type <WLAssert.t>                              logic_assertion_top_level
 %type <WLAssert.t>                              logic_assertion
 %type <CodeLoc.t * WVal.t>                      value_with_loc
 %type <CodeLoc.t * WUnOp.t>                     unop_with_loc
@@ -128,7 +129,7 @@ prog:
     prog, configs }
 
 assert_only:
-  | la = logic_assertion; EOF { la }
+  | la = logic_assertion_top_level; EOF { la }
 
 definitions:
   | (* empty *) { ([], [], [], [], [], []) }
@@ -159,8 +160,8 @@ config:
       id, value, loc }
 
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
-    post = logic_assertion; lend = RCBRACE
+  | lstart = LCBRACE; pre = logic_assertion_top_level; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+    post = logic_assertion_top_level; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
   | f = fct { f }
@@ -372,7 +373,7 @@ lemma:
   | lstart = LEMMA; lname = IDENTIFIER; LCBRACE;
       STATEMENT; COLON;
       FORALL lemma_params = var_list; DOT;
-      lemma_hypothesis = logic_assertion; VDASH; lemma_conclusion = logic_assertion;
+      lemma_hypothesis = logic_assertion_top_level; VDASH; lemma_conclusion = logic_assertion_top_level;
       lemma_variant = option(variant_def);
       lemma_proof = option(proof_def);
       lend = RCBRACE
@@ -402,7 +403,7 @@ proof_def:
 
 predicate:
   | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
+    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion_top_level);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
       let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
@@ -470,13 +471,13 @@ logic_command:
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, []) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
-  | lstart = ASSERT; lbopt = option(bindings_with_loc); a = logic_assertion;
+  | lstart = ASSERT; lbopt = option(bindings_with_loc); a = logic_assertion_top_level;
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
       let bare_lcmd = WLCmd.Assert (a, b) in
       WLCmd.make bare_lcmd loc }
-  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion; variant = option(with_variant_def);
+  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion_top_level; variant = option(with_variant_def);
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
@@ -504,6 +505,12 @@ wand:
       ((lname, largs), (rname, rargs), loc)
     }
 
+logic_assertion_top_level:
+  | formula = logic_expression;
+    { let bare_assert = WLAssert.LPure formula in
+      let loc = WLExpr.get_loc formula in
+      WLAssert.make bare_assert loc }
+  | la = logic_assertion; { la }
 
 logic_assertion:
   | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
@@ -553,16 +560,6 @@ logic_assertion:
   | lstart = LBRACE; formula = logic_expression; lend = RBRACE;
     { let bare_assert = WLAssert.LPure formula in
       let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
-  | loc = TRUE
-    { let bare_lexpr = WLExpr.LVal (WVal.Bool true) in
-      let lexpr = WLExpr.make bare_lexpr loc in
-      let bare_assert = WLAssert.LPure lexpr in
-      WLAssert.make bare_assert loc }
-  | loc = FALSE
-    { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
-      let lexpr = WLExpr.make bare_lexpr loc in
-      let bare_assert = WLAssert.LPure lexpr in
       WLAssert.make bare_assert loc }
 
 
