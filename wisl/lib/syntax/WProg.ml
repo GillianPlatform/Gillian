@@ -27,8 +27,8 @@ let never_called_during_symb prog =
       StringMap.empty prog.context
   in
   let allf = StringSet.of_list (List.map WFun.get_name prog.context) in
-  let has_spec pname =
-    let f = StringMap.find pname fmap in
+  let has_spec fname =
+    let f = StringMap.find fname fmap in
     WFun.has_spec f
   in
   let have_spec = StringSet.filter has_spec allf in

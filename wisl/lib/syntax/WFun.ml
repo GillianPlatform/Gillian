@@ -48,7 +48,7 @@ let pp fmt f =
         f.params pp_list_stmt f.body WExpr.pp f.return_expr
   | Some spec ->
       Format.fprintf fmt
-        "@[{ %a }@]@[<v 2>@[<h 0>proc %s(%a)@] {@,\
+        "@[{ %a }@]@[<v 2>@[<h 0>function %s(%a)@] {@,\
          %a;@,\
          @[<h 0>return@ %a@]@]@\n\
          }@\n\

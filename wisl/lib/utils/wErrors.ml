@@ -41,7 +41,7 @@ let str_error_code = function
   | MissingResource -> "MissingResource"
   | UnconsistentStmtBloc -> "UnconsistentStmtBloc"
   | FunctionNotVerified -> "FunctionNotVerified"
-  | UndefinedFunction -> "UndefinedFunction"
+  | UndefinedFunction -> "UndefinedFonction"
   | UndefinedLemma -> "UndefinedLemma"
   | MissingInvariant -> "MissingInvariant"
 

@@ -848,7 +848,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* x := new(k) =>
           x := [alloc](k); // this is already a pointer
   *)
-  (* Proc call *)
+  (* Function call *)
   | { snode = FunCall (x, fn, el, to_bind); sid; sloc } :: rest ->
       let expr_fn = gil_expr_of_str fn in
       let cmdles, params = List.split (List.map compile_expr el) in
