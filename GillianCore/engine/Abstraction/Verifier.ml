@@ -289,14 +289,15 @@ struct
           in
           result
     with Failure msg ->
-      let new_msg =
-        Printf.sprintf
-          "WARNING: testify failed for %s. Cause: normalisation with msg: %s.\n"
-          name msg
+      let msg =
+        Fmt.str "Preprocessing %s failed during normalisation\n%s" name msg
       in
-      Printf.printf "%s" new_msg;
-      L.normal (fun m -> m "%s" new_msg);
-      [ (None, None) ]
+      let loc = snd pre in
+      let error =
+        Gillian_result.Error.(
+          CompilationError { msg; loc; additional_data = None })
+      in
+      raise (Gillian_result.Exc.Gillian_error error)
 
   let testify_sspec
       ~init_data
@@ -529,7 +530,7 @@ struct
             let () = Fmt.pr "s @?" in
             Ok ()
           else
-            let msg = "Postcondition not matchable" in
+            let msg = "Failed to match against postcondition" in
             let () =
               L.normal (fun m ->
                   m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
@@ -582,7 +583,7 @@ struct
            in
            None
          else
-           let msg = "Postcondition not matchable" in
+           let msg = "Failed to match against postcondition" in
            let () =
              L.normal (fun m ->
                  m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name

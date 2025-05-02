@@ -1,0 +1,212 @@
+predicate sll(+x, alpha) {
+    // empty
+    (x == null) * (alpha == nil);
+    // non-empty
+    (x -b> #v, #z) * sll(#z, #beta) * (alpha == #v::#beta)
+}
+predicate lseg(+x, +y, alpha) {
+  (x == y) * (alpha == nil);
+  (x -b> #v, #z) * lseg(#z, y, #beta) * (alpha == #v::#beta)
+}
+
+predicate cc_sll_ht(+x, +h, +t, alpha) {
+  // Full cc_slist_s object: length, head, tail
+  (x -b> 0, h, t) *
+  (alpha == []) *
+  (h == null) * (t == null);
+
+  (x -b> l, h, t) *
+  (h == #h) * (t == #t) *
+  lseg(#h, #t, #beta) *
+  sll(#t, [ #last ]) *
+  (alpha == #beta @ [ #last ]) *
+  (l == (len #beta) + 1)
+}
+
+predicate cc_sll(+x, alpha) {
+  cc_sll_ht(x, #h, #t, alpha)
+}
+
+lemma lseg_to_sll {
+  statement:
+    forall x, alpha.
+      lseg(x, null, alpha) |- sll(x, alpha)
+
+  proof:
+    unfold lseg(x, null, alpha);
+    if (x != null) {
+      assert {bind:  #next, #beta} (x + 1 -> #next) * lseg(#next, null, #beta) ;
+      apply lseg_to_sll(#next, #beta);
+      fold sll(x, #alpha)
+    } else {
+      fold sll(x, #alpha)
+    }
+}
+
+
+lemma concat_lseg_sll {
+  statement:
+    forall x, y, alpha, beta.
+      lseg(x, y, alpha) * sll(y, beta) |- sll(x, alpha @ beta)
+
+  proof:
+    unfold sll(y, beta);
+    if (y == null) {
+      apply lseg_to_sll(x, alpha)
+    } else {
+      assert (y != null);
+      unfold sll(y, beta);
+      assert {bind: #z, #t, #rest} (y -> #z, #t) * sll(#t, #rest) * (beta == #z::#rest);
+      apply lseg_append(x, y, alpha, #z, #t);
+      apply concat_lseg_sll(x, #t, alpha @ [ #z ], #rest)
+    }
+}
+
+lemma lseg_append {
+  statement:
+    forall x, y, alpha, yval, ynext.
+      lseg(x, y, alpha) * (y -b> yval, ynext) |- lseg(x, ynext, alpha @ [ yval ])
+
+  proof:
+    unfold lseg(x, y, alpha);
+    if (alpha != []) {
+      assert {bind: #next, #beta} (x + 1 -> #next) * lseg(#next, y, #beta) ;
+      apply lseg_append(#next, y, #beta, yval, ynext);
+      fold lseg(x, ynext, alpha @ [yval])
+    } else {
+      fold lseg(x, ynext, alpha @ [yval])
+    }
+}
+
+
+{ true }
+function cc_slist_new() {
+  l := new(3);
+  [l] := 0;
+  return l
+}
+{ cc_sll(ret, []) }
+
+{ (v == #v) * (x == #x) * cc_sll(#v, #vs) }
+function cc_slist_add_first(v, x) {
+  node := new(2);
+  [node] := x;
+  size := [v];
+  if (size == 0) {
+    [v + 1] := node;
+    [v + 2] := node;
+    [[ fold lseg(node, node, []) ]];
+    [[ fold sll(node, [ #x ]) ]];
+    [[ fold cc_sll(v, [ #x ]) ]]
+  } else {
+    [[ assert {bind: #l, #h, #t, #beta} (#v -b> #l, #h, #t) * lseg(#h, #t, #beta) ]];
+    head := [v + 1];
+    [node + 1] := head;
+    [v + 1] := node;
+    [[ fold lseg(node, #t, #x :: #beta) ]]
+  };
+  [v] := size + 1;
+  return v
+}
+{ cc_sll(ret, #x::#vs) }
+
+{ (v == #v) * cc_sll(#v, #vs) * (x == #x) }
+function cc_slist_add_last(v, x)
+{
+  node := new(2);
+  [node] := x;
+  size := [v];
+  if (size == 0) {
+    [v + 1] := node;
+    [v + 2] := node
+  } else {
+    [[ assert {bind: #l, #h, #t, #beta, #last}
+      (#v -b> #l, #h, #t) * lseg(#h, #t, #beta) * sll(#t, [ #last ]) ]];
+    [[ unfold sll(#t, [ #last ]) ]];
+    tail := [v + 2];
+    [tail + 1] := node;
+    [[ apply lseg_append(#h, #t, #beta, #last, node) ]];
+    [[ fold sll(node, [ #x ]) ]];
+    [v + 2] := node
+  };
+  [v] := size + 1;
+  return v
+}
+{ cc_sll(ret, #vs @ [ #x ]) }
+
+{ (v == #v) * (i == #i) * cc_sll(#v, #vs) * (0 <= #i) * (#i < (len #vs)) * (#vs != nil) }
+function get_node_at(v, i) {
+    size := [v];
+    if (i >= size) {
+        r := null
+    } else {
+      node := [v + 1];
+      prev := null;
+      j := 0;
+      [[ assert {bind: #beta, #last } (#h == n) * lseg(#h, #t, #beta) * sll(#t, #end) ]];
+      [[ apply concat_lseg_sll(#h, #t, #beta, #end) ]];
+      [[ invariant {bind: node, j, #end, #next}
+        (node -b> #vs lnth j, #next) * sll(node, #end) ]];
+      while (j < i) {
+          prev := node;
+          node := [node + 1];
+          j := j + 1
+      };
+      r := new(2);
+      [r] := node;
+      [r + 1] := prev
+    };
+    return r
+}
+{ (ret -b> #val, #prev) * cc_sll(#v, #vs) * (#val == #vs lnth #i) }
+
+
+{ cc_sll(v, #vs) }
+function cc_slist_destroy(v) {
+    x := cc_slist_remove_all(v);
+    free(v);
+    return null
+}
+{ (ret == null) }
+
+
+{ cc_sll(v, #vs) * (v == #v) }
+function cc_slist_remove_all(v) {
+  x := unlinkn_all(v);
+  if (x == true) {
+    [v + 1] := null;
+    [v + 2] := null
+  } else { skip };
+  return v
+}
+{ (ret == #v) * cc_sll(#v, []) }
+
+
+{ cc_sll_ht(v, #h, #t, #vs) * (v == #v) }
+function unlinkn_all(v) {
+  size := [v];
+  if (size == 0) {
+    non_emp := false
+  } else {
+    n := [v + 1];
+    [[ assert {bind: #beta, #last } (#h == n) * lseg(#h, #t, #beta) * sll(#t, [ #last ]) ]];
+    [[ apply concat_lseg_sll(#h, #t, #beta, [ #last ]) ]];
+    [[ invariant {bind: n, size, #w}
+      sll(n, #w) *
+      (size == len #w) *
+      v -b> size, #h, #t ]];
+    while (n != null) {
+      [[ assert {bind: #fst, #rest} (#w == #fst::#rest) ]];
+      tmp := [n + 1];
+      free(n);
+      n := tmp;
+      size := size - 1;
+      [v] := size;
+      [[ fold sll(n, #rest) ]]
+    };
+    [[ assert sll(n, nil) ]];
+    non_emp := true
+  };
+  return non_emp
+}
+{ (ret == (#vs != [])) * (#v -b> 0, #h, #t) }

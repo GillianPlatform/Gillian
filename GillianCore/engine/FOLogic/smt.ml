@@ -15,15 +15,24 @@ let z3_config =
     ("timeout", "30000");
   ]
 
-let solver = new_solver z3
-let cmd s = ack_command solver s
-let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+let () = Sys.(set_signal sigpipe Signal_ignore)
 
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
 let builtin_funcs : sexp list ref = ref []
 let initialised : bool ref = ref false
+
+let solver =
+  ref
+    {
+      command = (fun _ -> failwith "Uninitialized solver");
+      stop = (fun () -> failwith "Uninitialized solver");
+      force_stop = (fun () -> failwith "Uninitialized solver");
+      config = z3;
+    }
+
+let cmd s = ack_command !solver s
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -1254,11 +1263,32 @@ module Dump = struct
           cmds)
 end
 
+let rec init_solver () =
+  let z3 = new_solver z3 in
+  let command s =
+    try z3.command s
+    with Sys_error s ->
+      let msg = Fmt.str "Error when calling SMT solver: %s" s in
+      Logging.normal (fun m -> m "%s" msg);
+      init_solver ();
+      raise (Gillian_result.Exc.internal_error msg)
+  in
+  let () = solver := { z3 with command } in
+  (* Config, initial decls *)
+  let () =
+    z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+  in
+  ()
+
 let init () =
   if !initialised then
-    (* Solver has already been initialised *)
+    (* Initial declarations already exist *)
     (* Pop off initial declarations if necessary *)
-    cmd (pop 2);
+    cmd (pop 2)
+  else (* Need to set up Z3 *)
+    init_solver ();
+
+  (* In both cases, we (re-)declare the initial declarations *)
   cmd (push 1);
   let type_init_decls = Type_operations.init_decls in
   let lit_init_decls =
@@ -1298,7 +1328,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
   let () = List.iter cmd !builtin_funcs in
   let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");
-  let result = check solver in
+  let result = check !solver in
   L.verbose (fun m ->
       let r =
         match result with
@@ -1322,7 +1352,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
           raise
             Gillian_result.Exc.(
               internal_error ~additional_data "SMT returned unknown")
-    | Sat -> Some (get_model solver)
+    | Sat -> Some (get_model !solver)
     | Unsat -> None
   in
   ret
@@ -1367,7 +1397,7 @@ let lift_model
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
   let () = init_or_reset () in
-  let model_eval = (model_eval' solver model).eval [] in
+  let model_eval = (model_eval' !solver model).eval [] in
 
   let get_val x =
     try

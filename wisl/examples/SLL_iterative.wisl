@@ -13,7 +13,7 @@ lemma lseg_to_list(x, alpha) {
   hypothesis: (x == #x) * (alpha == #alpha) * lseg(#x, null, #alpha)
   conclusion: list(#x, #alpha)
   proof: unfold lseg(#x, null, #alpha);
-         if (not (#x = null)) {
+         if (#x != null) {
            assert {exists:  #next, #beta} (#x + 1 -> #next) * lseg(#next, null, #beta) ;
            apply lseg_to_list(#next, #beta);
            fold list(#x, #alpha)
@@ -27,7 +27,7 @@ lemma concat_lseg_list(x, y, beta) {
   hypothesis: (x == #x) * (y == #y) * (beta == #beta) * lseg(#x, #y, #alpha) * list(#y, #beta)
   conclusion: list(#x, #alpha @ #beta)
   proof: unfold list (#y, #beta);
-         if (#y = null) {
+         if (#y == null) {
            apply lseg_to_list(#x, #alpha)
          } else {
            assert (!(#y == null));
@@ -46,7 +46,7 @@ lemma lseg_append(x, y, alpha, yval, ynext) {
               lseg(#x, #y, #alpha) * (#y -> #yval, #ynext)
   conclusion: lseg(#x, #ynext, #alpha @ [ #yval ])
   proof: unfold lseg(#x, #y, #alpha);
-         if (not (#alpha = [])) {
+         if (#alpha != []) {
            assert {exists: #next, #beta} (#x + 1 -> #next) * lseg(#next, #y, #beta) ;
            apply lseg_append(#next, #y, #beta, #yval, #ynext); 
            fold lseg(#x, #ynext, #alpha @ [#yval])
@@ -77,7 +77,7 @@ function llen(x) {
 
 { (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
 function concat(x, y) {
-  if (x = null) {
+  if (x == null) {
     x := y
   } else {
     t := x;

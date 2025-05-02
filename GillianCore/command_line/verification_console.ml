@@ -118,6 +118,7 @@ module Make
       incremental
       procs_to_verify
       lemmas_to_verify
+      procs_only
       () =
     (* Attention: if you plan to add UX verification, you must be careful about predicates.
        In our current formalism, they must be stricly exact. *)
@@ -127,8 +128,13 @@ module Make
     let () = Config.current_exec_mode := Verification in
     let () = PC.initialize Verification in
     let () = Config.manual_proof := manual in
-    let () = Config.Verification.set_procs_to_verify procs_to_verify in
-    let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
+    let () =
+      match (procs_to_verify, lemmas_to_verify, procs_only) with
+      | [], [], true -> Config.Verification.things_to_verify := ProcsOnly
+      | _ ->
+          Config.Verification.set_procs_to_verify procs_to_verify;
+          Config.Verification.set_lemmas_to_verify lemmas_to_verify
+    in
     let r = verify files already_compiled outfile_opt no_unfold incremental in
     let () = if stats then Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
@@ -139,7 +145,8 @@ module Make
   let verify_t =
     Term.(
       const verify_once $ files $ already_compiled $ output_gil $ no_unfold
-      $ stats $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg)
+      $ stats $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg
+      $ procs_only)
 
   let verify_info =
     let doc = "Verifies a file of the target language" in

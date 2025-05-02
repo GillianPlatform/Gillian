@@ -20,5 +20,4 @@ val get_by_id :
   | `WLAssert of WLAssert.t
   | `WLCmd of WLCmd.t
   | `WLExpr of WLExpr.t
-  | `WLFormula of WLFormula.t
   | `WLemma of t ]

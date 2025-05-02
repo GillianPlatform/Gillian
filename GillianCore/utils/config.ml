@@ -110,3 +110,15 @@ module Verification = struct
         lemmas_to_verify := a;
         things_to_verify := Specific
 end
+
+(** {2 Resetting} 
+    With the addition of in-file config statements, we want to be able to "reset" the config
+    when analysis is run multiple times in one "instance", i.e. the LSP. *)
+let reset_config_f = ref None
+
+let reset_config () =
+  match !reset_config_f with
+  | Some f ->
+      reset_config_f := None;
+      f ()
+  | None -> ()

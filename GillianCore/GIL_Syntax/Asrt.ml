@@ -112,14 +112,9 @@ let pred_names : t -> string list =
 
 (* Returns a list with the pure assertions that occur in --a-- *)
 let pure_asrts : t -> Expr.t list =
-  let collector =
-    object
-      inherit [_] Visitors.reduce
-      inherit Visitors.Utils.non_ordered_list_monoid
-      method! visit_Pure () f = [ f ]
-    end
-  in
-  collector#visit_assertion ()
+  List.filter_map @@ function
+  | Pure f -> Some f
+  | _ -> None
 
 (* Check if --a-- is a pure assertion *)
 let is_pure_asrt : atom -> bool = function
