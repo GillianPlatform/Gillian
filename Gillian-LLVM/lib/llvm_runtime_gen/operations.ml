@@ -812,6 +812,27 @@ produces modules of the OpTemplates type by appending their
 dependencies and template_operations and renaming the deps to keep things separate etc etc.
 *)
 module Libc = struct
+  let libc_prefix = "libc_"
+  let libc_mul_name = libc_prefix ^ "bvmul_sizet"
+
+  let libc_dependencies ~(pointer_width : int) =
+    [
+      {
+        name = "bvmul";
+        output_name = libc_mul_name;
+        spec =
+          ValueSpec
+            {
+              flags = [ NoSignedWrap; NoUnsignedWrap ];
+              shape =
+                {
+                  args = [ pointer_width; pointer_width ];
+                  width_of_result = Some pointer_width;
+                };
+            };
+      };
+    ]
+
   let type_checked
       (exp_list : Expr.t list)
       (type_ : LLVMRuntimeTypes.t list)
@@ -884,7 +905,10 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
     in
     new_f
 
-  let dependencies = []
+  let dep_funcs = [ Libc.libc_dependencies ]
+
+  let dependencies ~pointer_width =
+    List.map (fun dep -> dep ~pointer_width) dep_funcs |> List.flatten
 
   let template_operations =
     [

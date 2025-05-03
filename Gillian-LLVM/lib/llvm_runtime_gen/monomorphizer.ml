@@ -34,7 +34,7 @@ module Template = struct
 end
 
 module type OpTemplates = sig
-  val dependencies : Template.op_decl list
+  val dependencies : pointer_width:int -> Template.op_decl list
   val template_operations : Template.op_template list
 end
 
@@ -85,7 +85,8 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
       List.map
         (fun op ->
           apply_template (Hashtbl.find op_map op.name) rtspec.pointer_width op)
-        (OpT.dependencies @ rtspec.op_requests)
+        (OpT.dependencies ~pointer_width:rtspec.pointer_width
+        @ rtspec.op_requests)
     in
     let proc_table =
       Hashtbl.of_seq
