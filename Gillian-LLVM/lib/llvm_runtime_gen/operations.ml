@@ -814,6 +814,7 @@ dependencies and template_operations and renaming the deps to keep things separa
 module Libc = struct
   let libc_prefix = "libc_"
   let libc_mul_name = libc_prefix ^ "bvmul_sizet"
+  let libc_alloca_name = libc_prefix ^ "_llvm_alloca"
 
   let libc_dependencies ~(pointer_width : int) =
     [
@@ -830,6 +831,11 @@ module Libc = struct
                   width_of_result = Some pointer_width;
                 };
             };
+      };
+      {
+        name = "llvm_alloca";
+        output_name = libc_alloca_name;
+        spec = SimpleSpec;
       };
     ]
 
@@ -871,7 +877,28 @@ module Libc = struct
           ]
         in
         type_check_with_failure exp_list types
-          (let* _ = failwith "Not implemented" in
+          (* TODO(Ian): we can probably have some like combinator that gens a fresh sym for a bind and then forwards it to the next expr to make these things cleaner *)
+          (let to_bind = fresh_sym () in
+           let* _ =
+             add_cmd
+               (Cmd.Call
+                  ( to_bind,
+                    Expr.string libc_mul_name,
+                    [ count; size ],
+                    None,
+                    None ))
+           in
+           let alloc_result = fresh_sym () in
+           let size_var = Expr.PVar to_bind in
+           let zero_const =
+             Expr.list [ Expr.list_nth size_var 0; Expr.int 0 ]
+           in
+           let* _ =
+             add_cmd
+               (Cmd.LAction
+                  (alloc_result, libc_alloca_name, [ zero_const; size_var ]))
+           in
+           let* _ = add_return_of_value (Expr.PVar alloc_result) in
            return ())
     | _ -> failwith "Invalid number of arguments"
 end
