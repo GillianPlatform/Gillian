@@ -85,7 +85,7 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
       List.map
         (fun op ->
           apply_template (Hashtbl.find op_map op.name) rtspec.pointer_width op)
-        rtspec.op_requests
+        (OpT.dependencies @ rtspec.op_requests)
     in
     let proc_table =
       Hashtbl.of_seq
