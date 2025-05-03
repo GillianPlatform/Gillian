@@ -839,6 +839,7 @@ module Libc = struct
       };
       { name = "printf"; output_name = "printf"; spec = SimpleSpec };
       { name = "calloc"; output_name = "calloc"; spec = SimpleSpec };
+      { name = "exit"; output_name = "exit"; spec = SimpleSpec };
     ]
 
   let constant_return_func
@@ -920,6 +921,17 @@ module Libc = struct
            return ())
     | _ -> failwith "Invalid number of arguments"
 
+  (* TODO(Ian): bit of a hack *)
+  let exit ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    match exp_list with
+    | [ code ] ->
+        let* _ = add_cmd (Cmd.Logic (LCmd.Assume Expr.false_)) in
+        let* _ = add_cmd Cmd.ReturnNormal in
+        return ()
+    | _ -> failwith "Invalid number of arguments"
+
   let libc_ops =
     [
       {
@@ -931,6 +943,10 @@ module Libc = struct
         generator =
           SimpleOp
             (MemoryLib.construct_simple_op ~arity:1 ~f:const_success_func);
+      };
+      {
+        name = "exit";
+        generator = SimpleOp (MemoryLib.construct_simple_op ~arity:1 ~f:exit);
       };
     ]
 end
