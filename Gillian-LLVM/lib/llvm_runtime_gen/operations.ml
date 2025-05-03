@@ -839,6 +839,22 @@ module Libc = struct
       };
     ]
 
+  let constant_return_func
+      ~(const : Expr.t)
+      ~(pointer_width : int)
+      (exp_list : Expr.t list) : unit Codegenerator.t =
+    let open Codegenerator in
+    let* _ = add_return_of_value const in
+    return ()
+
+  let const_success_func ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    constant_return_func
+      ~const:
+        (LLVMRuntimeTypes.make_expr_of_type_unsafe (Expr.int 0)
+           (LLVMRuntimeTypes.Int pointer_width))
+      ~pointer_width exp_list
+
   let type_checked
       (exp_list : Expr.t list)
       (type_ : LLVMRuntimeTypes.t list)
@@ -907,6 +923,12 @@ module Libc = struct
       {
         name = "calloc";
         generator = SimpleOp (MemoryLib.construct_simple_op ~arity:2 ~f:calloc);
+      };
+      {
+        name = "printf";
+        generator =
+          SimpleOp
+            (MemoryLib.construct_simple_op ~arity:1 ~f:const_success_func);
       };
     ]
 end
