@@ -693,11 +693,36 @@ module MemoryLib = struct
   let alloc_op ~(pointer_width : int) (exp_list : Expr.t list) :
       unit Codegenerator.t =
     let open Codegenerator in
+    let open Expr.Infix in
+    let ty_check =
+      List.fold_left
+        (fun acc check -> acc && check)
+        Expr.true_
+        (List.map
+           (fun expr ->
+             is_type_of_expr expr (LLVMRuntimeTypes.Int pointer_width))
+           exp_list)
+    in
     match exp_list with
     | [ low; hi ] ->
-        let bindr = fresh_sym () in
-        let* _ = add_cmd (Cmd.LAction (bindr, alloc_name, [ low; hi ])) in
-        let* _ = add_return_of_value (Expr.list_nth (Expr.PVar bindr) 0) in
+        let low = Expr.list_nth low 1 in
+        let hi = Expr.list_nth hi 1 in
+
+        let* _ =
+          ite ty_check
+            ~true_case:
+              (let bindr = fresh_sym () in
+               let* _ =
+                 add_cmd (Cmd.LAction (bindr, alloc_name, [ low; hi ]))
+               in
+               let* _ =
+                 add_return_of_value (Expr.list_nth (Expr.PVar bindr) 0)
+               in
+               return ())
+            ~false_case:
+              (let* _ = add_cmd (fail_cmd "Alloc_failed" exp_list) in
+               return ())
+        in
         return ()
     | _ -> failwith "Invalid number of arguments"
 
@@ -768,6 +793,50 @@ module MemoryLib = struct
         generator = SimpleOp (construct_simple_op ~arity:2 ~f:alloc_op);
       };
     ]
+end
+
+module Libc = struct
+  let type_checked
+      (exp_list : Expr.t list)
+      (type_ : LLVMRuntimeTypes.t list)
+      (success : unit Codegenerator.t)
+      (failure : unit Codegenerator.t) : unit Codegenerator.t =
+    let open Codegenerator in
+    let open Expr.Infix in
+    let ty_check =
+      List.fold_left
+        (fun acc check -> acc && check)
+        Expr.true_
+        (List.map2 (fun ty expr -> is_type_of_expr expr ty) type_ exp_list)
+    in
+    let* _ = ite ty_check ~true_case:success ~false_case:failure in
+    return ()
+
+  let type_check_with_failure
+      (exp_list : Expr.t list)
+      (type_ : LLVMRuntimeTypes.t list)
+      (success : unit Codegenerator.t) : unit Codegenerator.t =
+    let open Codegenerator in
+    let open Expr.Infix in
+    type_checked exp_list type_ success
+      (let* _ = add_cmd (fail_cmd "Type_check_failed" exp_list) in
+       return ())
+
+  let calloc ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    match exp_list with
+    | [ count; size ] ->
+        let types =
+          [
+            LLVMRuntimeTypes.Int pointer_width;
+            LLVMRuntimeTypes.Int pointer_width;
+          ]
+        in
+        type_check_with_failure exp_list types
+          (let* _ = failwith "Not implemented" in
+           return ())
+    | _ -> failwith "Invalid number of arguments"
 end
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
