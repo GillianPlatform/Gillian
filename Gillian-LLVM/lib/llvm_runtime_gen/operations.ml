@@ -901,6 +901,14 @@ module Libc = struct
            let* _ = add_return_of_value (Expr.PVar alloc_result) in
            return ())
     | _ -> failwith "Invalid number of arguments"
+
+  let libc_ops =
+    [
+      {
+        name = "calloc";
+        generator = SimpleOp (MemoryLib.construct_simple_op ~arity:2 ~f:calloc);
+      };
+    ]
 end
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
@@ -1072,5 +1080,5 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                []);
       };
     ]
-    @ MemoryLib.ops
+    @ MemoryLib.ops @ Libc.libc_ops
 end
