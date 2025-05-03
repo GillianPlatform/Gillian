@@ -837,6 +837,8 @@ module Libc = struct
         output_name = libc_alloca_name;
         spec = SimpleSpec;
       };
+      { name = "printf"; output_name = "printf"; spec = SimpleSpec };
+      { name = "calloc"; output_name = "calloc"; spec = SimpleSpec };
     ]
 
   let constant_return_func
