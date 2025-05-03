@@ -938,11 +938,18 @@ module Libc = struct
         name = "calloc";
         generator = SimpleOp (MemoryLib.construct_simple_op ~arity:2 ~f:calloc);
       };
+      (* NOTE(Ian): Variadics add an argument that aggregates additional args into a list*)
       {
         name = "printf";
         generator =
           SimpleOp
-            (MemoryLib.construct_simple_op ~arity:1 ~f:const_success_func);
+            (MemoryLib.construct_simple_op ~arity:2 ~f:const_success_func);
+      };
+      {
+        name = "fprintf";
+        generator =
+          SimpleOp
+            (MemoryLib.construct_simple_op ~arity:3 ~f:const_success_func);
       };
       {
         name = "exit";
