@@ -514,6 +514,9 @@ module OpFunctions = struct
   let add_op_nuw = bv_check_function BVOps.BVUAddO
   let add_op_nsw = bv_check_function BVOps.BVSAddO
   let neg_function = bv_op_function BVOps.BVNeg
+  let mul_op_function = bv_op_function BVOps.BVMul
+  let mul_op_nuw = bv_check_function BVOps.BVUMulO
+  let mul_op_nsw = bv_check_function BVOps.BVSMulO
 
   let negated_function
       (f : Expr.t list -> bv_op_shape -> Expr.t)
@@ -619,6 +622,14 @@ let template_from_pattern_cmp
   op_function name 2 (function
     | [ x; y ] -> cmp_patterns ~pointer_width x y op shape
     | _ -> failwith "Invalid number of arguments")
+
+let template_from_integer_op
+    ~(op : bv_op_function)
+    ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
+    (name : string)
+    (shape : bv_op_shape) =
+  op_function name 2 (fun xs -> op_bv_scheme xs op flag_checks shape)
 
 module MemoryLib = struct
   let alloc_name = "alloc"
@@ -795,6 +806,11 @@ module MemoryLib = struct
     ]
 end
 
+(*
+TODO(Ian): there's probably a nice way to make a product functor that
+produces modules of the OpTemplates type by appending their 
+dependencies and template_operations and renaming the deps to keep things separate etc etc.
+*)
 module Libc = struct
   let type_checked
       (exp_list : Expr.t list)
@@ -868,8 +884,21 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
     in
     new_f
 
-  let operations =
+  let dependencies = []
+
+  let template_operations =
     [
+      {
+        name = "bvmul";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.mul_op_function)
+               [
+                 (NoSignedWrap, OpFunctions.mul_op_nsw);
+                 (NoUnsignedWrap, OpFunctions.mul_op_nuw);
+               ]);
+      };
       {
         name = "bvadd";
         generator =

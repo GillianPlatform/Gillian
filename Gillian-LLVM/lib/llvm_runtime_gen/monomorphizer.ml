@@ -28,27 +28,30 @@ module Template = struct
     | SimpleOp of (pointer_width:int -> string -> basic_proc)
 
   type op_template = { name : string; generator : generator }
+
+  type op_decl = { name : string; output_name : string; spec : op_spec }
+  [@@deriving yojson]
 end
 
 module type OpTemplates = sig
-  val operations : Template.op_template list
+  val dependencies : Template.op_decl list
+  val template_operations : Template.op_template list
 end
 
 module MonomorphizerCLI (OpT : OpTemplates) = struct
   open Cmdliner
   open Cmdliner.Term.Syntax
 
+  type op_decl = Template.op_decl [@@deriving yojson]
+
   let op_map =
     let open Template in
-    Hashtbl.of_seq
-      (List.to_seq (OpT.operations |> List.map (fun x -> (x.name, x))))
-
-  type op_decl = {
-    name : string;
-    output_name : string;
-    spec : Template.op_spec;
-  }
-  [@@deriving yojson]
+    let op_pairs =
+      List.map
+        (fun (x : Template.op_template) -> (x.name, x))
+        OpT.template_operations
+    in
+    Hashtbl.of_seq (List.to_seq op_pairs)
 
   type runtime_spec = { pointer_width : int; op_requests : op_decl list }
   [@@deriving yojson]
@@ -76,6 +79,7 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     | _ -> failwith "Invalid template or spec"
 
   let produce_file (name : string) (rtspec : runtime_spec) =
+    let open Template in
     let open Proc in
     let procs =
       List.map
