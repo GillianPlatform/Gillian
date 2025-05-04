@@ -4,6 +4,8 @@ open Names
 open SVal
 module L = Logging
 
+type constructors_tbl_t = (string, Constructor.t) Hashtbl.t [@@deriving yojson]
+type datatypes_tbl_t = (string, Datatype.t) Hashtbl.t [@@deriving yojson]
 type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
 
 let as_hashtbl x = x
@@ -17,7 +19,7 @@ let as_hashtbl x = x
 let init () : t = Hashtbl.create Config.medium_tbl_size
 
 (* Copy *)
-let copy (x : t) : t = Hashtbl.copy x
+let copy x : t = Hashtbl.copy x
 
 (* Type of a variable *)
 let get (x : t) (var : string) : Type.t option = Hashtbl.find_opt x var

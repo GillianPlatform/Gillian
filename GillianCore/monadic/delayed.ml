@@ -1,5 +1,6 @@
 module Expr = Gil_syntax.Expr
 module Type = Gil_syntax.Type
+module Smt = Engine.Smt
 
 exception NonExhaustiveEntailment of Expr.t list
 

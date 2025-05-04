@@ -1,4 +1,13 @@
-type t = WList | WNull | WBool | WString | WPtr | WInt | WAny | WSet
+type t =
+  | WList
+  | WNull
+  | WBool
+  | WString
+  | WPtr
+  | WInt
+  | WAny
+  | WSet
+  | WDatatype of string
 
 val compatible : t -> t -> bool
 val strongest : t -> t -> t
@@ -16,3 +25,5 @@ val of_variable : string -> t TypeMap.t -> t option
 
 val infer_types_pred :
   (string * t option) list -> WLAssert.t list -> t TypeMap.t
+
+val infer_types_pure_fun : (string * t option) list -> WLExpr.t -> t TypeMap.t

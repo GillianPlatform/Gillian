@@ -502,6 +502,9 @@ let jsil2core_prog (prog : EProg.t) : ('a, string) GProg.t =
       ~procs:new_procs
       ~macros:(translate_tbl prog.macros jsil2gil_macro)
       ~bi_specs:(translate_tbl prog.bi_specs jsil2gil_bispec)
-      ~proc_names:prog.proc_names ~predecessors:(Hashtbl.create 1) ()
+      ~proc_names:prog.proc_names ~predecessors:(Hashtbl.create 1)
+      ~datatypes:(Hashtbl.create 1)
+      ~funcs:(Hashtbl.create 1) (* TODO *)
+      ()
   in
   result

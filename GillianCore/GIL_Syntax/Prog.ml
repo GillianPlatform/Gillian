@@ -7,6 +7,8 @@ type ('annot, 'label) t = {
   (* Lemmas *)
   preds : (string, Pred.t) Hashtbl.t;
   (* Predicates = Name : String --> Definition *)
+  funcs : (string, Func.t) Hashtbl.t;
+  datatypes : (string, Datatype.t) Hashtbl.t;
   only_specs : (string, Spec.t) Hashtbl.t;
   (* Specs = Name : String --> Spec *)
   procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;
@@ -23,6 +25,8 @@ let make
     ~imports
     ~lemmas
     ~preds
+    ~funcs
+    ~datatypes
     ~only_specs
     ~procs
     ~macros
@@ -34,6 +38,8 @@ let make
     imports;
     lemmas;
     preds;
+    funcs;
+    datatypes;
     only_specs;
     procs;
     macros;
@@ -66,6 +72,8 @@ let create () =
   make_labeled ~imports:[]
     ~lemmas:(Hashtbl.create medium_tbl_size)
     ~preds:(Hashtbl.create big_tbl_size)
+    ~funcs:(Hashtbl.create medium_tbl_size)
+    ~datatypes:(Hashtbl.create medium_tbl_size)
     ~only_specs:(Hashtbl.create medium_tbl_size)
     ~procs:(Hashtbl.create big_tbl_size)
     ~macros:(Hashtbl.create small_tbl_size)

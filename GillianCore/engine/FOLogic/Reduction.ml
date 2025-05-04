@@ -136,6 +136,10 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
     | Exists (bt, le) -> Exists (bt, f le)
     | ForAll (bt, le) -> ForAll (bt, f le)
+    | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
+    | FuncApp (n, les) -> FuncApp (n, List.map f les)
+    | Cases (le, cs) ->
+        Cases (f le, List.map (fun (c, bs, le) -> (c, bs, f le)) cs)
     (*
     | LstSub(le1, le2, le3) ->
       (match f le1, f le2, f le3 with
@@ -902,6 +906,39 @@ and reduce_lexpr_loop
                  ESet
        ------------------------- *)
     | ESet les -> ESet (Expr.Set.elements @@ Expr.Set.of_list @@ List.map f les)
+    (* -------------------------
+             Constructors
+       ------------------------- *)
+    | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
+    (* -------------------------
+         Function Application
+       ------------------------- *)
+    | FuncApp (n, les) -> FuncApp (n, List.map f les)
+    (* -------------------------
+                 Cases
+       ------------------------- *)
+    | Cases (ConstructorApp (c, les), cs) -> (
+        let bles =
+          List.filter_map
+            (fun (c', bs, e) -> if c = c' then Some (bs, e) else None)
+            cs
+        in
+        match bles with
+        | [ (bs, e) ] when List.length bs = List.length les ->
+            let le =
+              List.fold_left2
+                (fun acc b le ->
+                  Expr.subst_expr_for_expr ~to_subst:(Expr.LVar b)
+                    ~subst_with:le acc)
+                e bs les
+            in
+            f le
+        | _ -> raise (ReductionException (le, "No case match found")))
+    | Cases (le, cs) ->
+        let le' = f le in
+        let f' = if not (Expr.equal le le') then f else Fun.id in
+        let cs' = List.map (fun (c, bs, e) -> (c, bs, f e)) cs in
+        f' (Cases (le', cs'))
     (* -------------------------
             ForAll + Exists
        ------------------------- *)
@@ -1784,6 +1821,16 @@ and reduce_lexpr_loop
       when t <> StringType -> Expr.false_
     | BinOp (UnOp (TypeOf, BinOp (_, SetMem, _)), Equal, Lit (Type t))
       when t <> BooleanType -> Expr.false_
+    (* BinOps: Equalities (Constructors) *)
+    | BinOp (ConstructorApp (ln, lles), Equal, ConstructorApp (rn, rles)) ->
+        if ln = rn && List.length lles = List.length rles then
+          Expr.conjunct
+            (List.map2 (fun le re -> Expr.BinOp (le, Equal, re)) lles rles)
+        else Expr.false_
+    | BinOp (ConstructorApp _, Equal, rle) as le -> (
+        match rle with
+        | LVar _ | ConstructorApp _ | FuncApp _ | Cases _ -> le
+        | _ -> Expr.false_)
     (* BinOps: Logic *)
     | BinOp (Lit (Bool true), And, e)
     | BinOp (e, And, Lit (Bool true))

@@ -101,8 +101,7 @@ let minimise_matchables (kb : KB.t) : KB.t =
 let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
   let f' = missing_expr in
   let f = missing_expr kb in
-  let join (le : Expr.t list) =
-    let mle = List.map f le in
+  let join' (mle : KB.t list list) =
     let cpmle = List_utils.list_product mle in
     let umle =
       List.map
@@ -110,6 +109,10 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
         cpmle
     in
     if umle = [] || List.mem KB.empty umle then [ KB.empty ] else umle
+  in
+  let join (le : Expr.t list) =
+    let mle = List.map f le in
+    join' mle
   in
   if KB.mem e kb then [ KB.empty ]
   else
@@ -140,7 +143,8 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     (* The remaining cases proceed recursively *)
     | UnOp (_, e) -> f e
     | BinOp (e1, _, e2) -> join [ e1; e2 ]
-    | NOp (_, le) | EList le | ESet le -> join le
+    | NOp (_, le) | EList le | ESet le | ConstructorApp (_, le) | FuncApp (_, le)
+      -> join le
     | LstSub (e1, e2, e3) ->
         let result = join [ e1; e2; e3 ] in
         L.verbose (fun fmt ->
@@ -148,6 +152,12 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
               Fmt.(brackets (list ~sep:semi kb_pp))
               result);
         result
+    | Cases (le, cs) ->
+        let kb' bs =
+          KB.add_seq (List.to_seq bs |> Seq.map (fun x -> Expr.LVar x)) kb
+        in
+        let mle = f le :: List.map (fun (_, bs, e) -> f' (kb' bs) e) cs in
+        join' mle
     | Exists (bt, e) | ForAll (bt, e) ->
         let kb' =
           KB.add_seq (List.to_seq bt |> Seq.map (fun (x, _) -> Expr.LVar x)) kb
@@ -287,6 +297,29 @@ let rec learn_expr
   | BinOp _ -> []
   (* Can we learn anything from Exists? *)
   | Exists _ | ForAll _ -> []
+  | ConstructorApp (cname, le) ->
+      let num_fields = List.length le in
+      let param_str = Printf.sprintf "param-%d" in
+      let base_expr_nth_field n =
+        let case =
+          (cname, List.init num_fields param_str, Expr.LVar (param_str n))
+        in
+        Expr.Cases (base_expr, [ case ])
+      in
+      let le_with_base_exprs =
+        List.mapi (fun i e -> (e, base_expr_nth_field i)) le
+      in
+      L.(
+        verbose (fun m ->
+            m "List of expressions: %a"
+              Fmt.(
+                brackets
+                  (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp))))
+              le_with_base_exprs));
+      learn_expr_list kb le_with_base_exprs
+  (* Function application isn't invertible *)
+  | FuncApp _ -> []
+  | Cases _ -> []
 
 and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   (* L.(verbose (fun m -> m "Entering learn_expr_list: \nKB: %a\nList: %a" kb_pp kb Fmt.(brackets (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))) le)); *)
@@ -440,7 +473,17 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
       let ins_pf = f pf in
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
       List.map minimise_matchables ins
-  | Lit _ | PVar _ | LVar _ | ALoc _ | LstSub _ | NOp _ | EList _ | ESet _ -> []
+  | Lit _
+  | PVar _
+  | LVar _
+  | ALoc _
+  | LstSub _
+  | NOp _
+  | EList _
+  | ESet _
+  | ConstructorApp _
+  | FuncApp _
+  | Cases _ -> []
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)

@@ -1,0 +1,29 @@
+pure function double(x : Int) {
+  x + x
+}
+
+pure function triple(x : Int) {
+ x + x + x
+}
+
+{ x == #x }
+function times_two(x) {
+  y := x * 2;
+  return y
+}
+{ ret == double(#x) }
+
+{ x == #x }
+function times_three(x) {
+  y := x * 3;
+  return y
+}
+{ ret == triple(#x) }
+
+// This spec fails to verify
+{ x == #x }
+function times_four(x) {
+  y := x * 4;
+  return y
+}
+{ ret == triple(#x) }

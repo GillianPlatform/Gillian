@@ -20,8 +20,8 @@ let () = Sys.(set_signal sigpipe Signal_ignore)
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
-let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
+let initialised : bool ref = ref false
 
 let solver =
   ref
@@ -34,26 +34,6 @@ let solver =
 
 let cmd s = ack_command !solver s
 
-let rec init_solver () =
-  let z3 = new_solver z3 in
-  let command s =
-    try z3.command s
-    with Sys_error s ->
-      let msg = Fmt.str "Error when calling SMT solver: %s" s in
-      Logging.normal (fun m -> m "%s" msg);
-      init_solver ();
-      raise (Gillian_result.Exc.internal_error msg)
-  in
-  let () = solver := { z3 with command } in
-  (* Config, initial decls *)
-  let () =
-    z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
-  in
-  let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
-  let () = cmd (push 1) in
-  ()
-
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
   Str.global_replace pattern "$$"
@@ -62,14 +42,10 @@ let is_true = function
   | Sexplib.Sexp.Atom "true" -> true
   | _ -> false
 
-type typenv = (string, Type.t) Hashtbl.t [@@deriving to_yojson]
-
 let fs_to_yojson fs = fs |> Expr.Set.to_list |> list_to_yojson Expr.to_yojson
 
 let sexps_to_yojson sexps =
   `List (List.map (fun sexp -> `String (Sexplib.Sexp.to_string_hum sexp)) sexps)
-
-let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
 
 let encoding_cache : (Expr.Set.t, sexp list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
@@ -145,6 +121,13 @@ module Variant = struct
     val access : sexp -> sexp
   end
 
+  module type Nary = sig
+    include S
+
+    val num_params : int
+    val construct : sexp list -> sexp
+  end
+
   let nul ?recognizer name =
     let recognizer = Option.value recognizer ~default:("is" ^ name) in
     let module M = struct
@@ -167,6 +150,32 @@ module Variant = struct
       let access x = accessor <| x
     end in
     (module M : Unary)
+
+  let n ?recognizer name param_typs =
+    let module N = (val nul ?recognizer name : Nullary) in
+    let module M = struct
+      include N
+
+      let params =
+        List.mapi
+          (fun i param_typ -> ("param-" ^ string_of_int i, param_typ))
+          param_typs
+
+      let num_params = List.length params
+
+      let construct xs =
+        let num_params_provided = List.length xs in
+        if num_params_provided == num_params then atom name $$ xs
+        else
+          let msg =
+            Printf.sprintf
+              "Invalid number of parameters for the constructor %s. %d \
+               parameters were provided, but %d were expected."
+              name num_params_provided num_params
+          in
+          raise (Failure msg)
+    end in
+    (module M : Nary)
 end
 
 let declare_recognizer ~name ~constructor ~typ =
@@ -175,7 +184,7 @@ let declare_recognizer ~name ~constructor ~typ =
     t_bool
     (list [ atom "_"; atom "is"; atom constructor ] <| atom "x")
 
-let mk_datatype name type_params (variants : (module Variant.S) list) =
+let mk_datatype' name type_params (variants : (module Variant.S) list) =
   let constructors, recognizer_defs =
     variants
     |> List.map (fun v ->
@@ -188,9 +197,28 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
            (constructor, recognizer_def))
     |> List.split
   in
+  let datatype = (name, type_params, constructors) in
+  (datatype, recognizer_defs)
+
+let mk_datatype name type_params (variants : (module Variant.S) list) =
+  let (_, _, constructors), recognizer_defs =
+    mk_datatype' name type_params variants
+  in
   let decl = declare_datatype name type_params constructors in
-  let () = init_decls := recognizer_defs @ (decl :: !init_decls) in
-  atom name
+  decl :: recognizer_defs
+
+(* Mutually recursive Datatypes *)
+let mk_datatypes
+    (datatypes : (string * string list * (module Variant.S) list) list) =
+  let datatypes, recognizer_defs =
+    List.split
+      (List.map
+         (fun (name, type_params, variants) ->
+           mk_datatype' name type_params variants)
+         datatypes)
+  in
+  let decl = declare_datatypes datatypes in
+  decl :: List.concat recognizer_defs
 
 let mk_fun_decl name param_types result_type =
   let decl = declare_fun name param_types result_type in
@@ -211,9 +239,13 @@ module Type_operations = struct
   module List = (val nul "ListType" : Nullary)
   module Type = (val nul "TypeType" : Nullary)
   module Set = (val nul "SetType" : Nullary)
+  module Datatype = (val un "DatatypeType" "datatype-id" t_int)
 
-  let t_gil_type =
-    mk_datatype "GIL_Type" []
+  let gil_type_name = "GIL_Type"
+  let t_gil_type = atom gil_type_name
+
+  let init_decls =
+    mk_datatype gil_type_name []
       [
         (module Undefined : Variant.S);
         (module Null : Variant.S);
@@ -227,6 +259,7 @@ module Type_operations = struct
         (module List : Variant.S);
         (module Type : Variant.S);
         (module Set : Variant.S);
+        (module Datatype : Variant.S);
       ]
 end
 
@@ -237,6 +270,74 @@ module Lit_operations = struct
 
   let gil_literal_name = "GIL_Literal"
   let t_gil_literal = atom gil_literal_name
+  let t_gil_literal_list = t_seq t_gil_literal
+  let t_gil_literal_set = t_set t_gil_literal
+
+  let native_sort_of_type =
+    let open Type in
+    function
+    | IntType | StringType | ObjectType -> t_int
+    | ListType -> t_seq t_gil_literal
+    | BooleanType -> t_bool
+    | NumberType -> t_real
+    | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
+    | SetType -> t_set t_gil_literal
+    | TypeType -> t_gil_type
+    | DatatypeType name -> atom name
+
+  let constructor_variants : (string, (module Variant.Nary)) Hashtbl.t ref =
+    ref (Hashtbl.create 1)
+
+  let datatype_lit_variants : (string, (module Variant.Unary)) Hashtbl.t ref =
+    ref (Hashtbl.create 1)
+
+  let mk_constructor Constructor.{ constructor_name; constructor_fields; _ } =
+    let param_typ t =
+      Option.map native_sort_of_type t |> Option.value ~default:t_gil_literal
+    in
+    let param_typs = List.map param_typ constructor_fields in
+    let module N = (val n constructor_name param_typs : Variant.Nary) in
+    Hashtbl.add !constructor_variants constructor_name (module N : Variant.Nary);
+    (module N : Variant.S)
+
+  let mk_user_def_datatype Datatype.{ datatype_name; datatype_constructors; _ }
+      =
+    let variants = List.map mk_constructor datatype_constructors in
+    (datatype_name, [], variants)
+
+  let mk_user_def_datatypes (datatypes : Datatype.t list) =
+    List.map mk_user_def_datatype datatypes
+
+  let user_def_datatype_lit_variant_name (datatype_name : string) =
+    "Datatype" ^ datatype_name
+
+  let user_def_datatype_lit_param_name (datatype_name : string) =
+    datatype_name ^ "Value"
+
+  let mk_user_def_datatype_lit_variant Datatype.{ datatype_name; _ } =
+    let variant_name = user_def_datatype_lit_variant_name datatype_name in
+    let t_datatype = atom datatype_name in
+    let parameter_name = user_def_datatype_lit_param_name datatype_name in
+    let module N = (val un variant_name parameter_name t_datatype : Unary) in
+    Hashtbl.add !datatype_lit_variants datatype_name (module N : Unary);
+    (module N : Variant.S)
+
+  let mk_user_def_datatype_lit_variants datatypes =
+    List.map mk_user_def_datatype_lit_variant datatypes
+
+  let get_constructor_variant cname =
+    match Hashtbl.find_opt !constructor_variants cname with
+    | Some (module N) -> (module N : Nary)
+    | None ->
+        let msg = "SMT - Undefined constructor: " ^ cname in
+        raise (Failure msg)
+
+  let get_datatype_lit_variant dname =
+    match Hashtbl.find_opt !datatype_lit_variants dname with
+    | Some (module U) -> (module U : Unary)
+    | None ->
+        let msg = "SMT - Undefined datatype: " ^ dname in
+        raise (Failure msg)
 
   module Undefined = (val nul "Undefined" : Nullary)
   module Null = (val nul "Null" : Nullary)
@@ -250,8 +351,11 @@ module Lit_operations = struct
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
   module None = (val nul "None" : Nullary)
 
-  let _ =
-    mk_datatype gil_literal_name []
+  let init_decls user_def_datatypes =
+    (* Reset variants tables on reinitialisation *)
+    constructor_variants := Hashtbl.create Config.medium_tbl_size;
+    datatype_lit_variants := Hashtbl.create Config.medium_tbl_size;
+    let gil_literal_variants =
       [
         (module Undefined : Variant.S);
         (module Null : Variant.S);
@@ -265,11 +369,22 @@ module Lit_operations = struct
         (module List : Variant.S);
         (module None : Variant.S);
       ]
+    in
+    let gil_literal_user_def_variants =
+      mk_user_def_datatype_lit_variants user_def_datatypes
+    in
+    let gil_literal_datatype =
+      ( gil_literal_name,
+        [],
+        gil_literal_variants @ gil_literal_user_def_variants )
+    in
+    mk_datatypes
+      (gil_literal_datatype :: mk_user_def_datatypes user_def_datatypes)
 end
 
 let t_gil_literal = Lit_operations.t_gil_literal
-let t_gil_literal_list = t_seq t_gil_literal
-let t_gil_literal_set = t_set t_gil_literal
+let t_gil_literal_list = Lit_operations.t_gil_literal_list
+let t_gil_literal_set = Lit_operations.t_gil_literal_set
 
 let seq_of ~typ = function
   | [] -> as_type (atom "seq.empty") typ
@@ -290,7 +405,10 @@ module Ext_lit_operations = struct
 
   module Gil_set = (val un "Set" "setElem" t_gil_literal_set : Unary)
 
-  let t_gil_ext_literal =
+  let gil_ext_literal_name = "Extended_GIL_Literal"
+  let t_gil_ext_literal = atom gil_ext_literal_name
+
+  let init_decls =
     mk_datatype "Extended_GIL_Literal" []
       [ (module Gil_sing_elem : Variant.S); (module Gil_set : Variant.S) ]
 end
@@ -337,6 +455,8 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
+    | DatatypeType name ->
+        name |> encode_string |> Type_operations.Datatype.construct
   with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
@@ -356,6 +476,7 @@ module Encoding = struct
     | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
     | SetType -> t_gil_literal_set
     | TypeType -> t_gil_type
+    | DatatypeType name -> atom name
 
   type t = {
     consts : (string * sexp) Hashset.t; [@default Hashset.empty ()]
@@ -407,24 +528,39 @@ module Encoding = struct
     in
     { enc' with consts; extra_asrts }
 
-  let get_native ~accessor { expr; kind; _ } =
+  let get_native
+      ~accessor
+      ~recognizer
+      ~typ
+      ({ expr; kind; extra_asrts; _ } as enc) : t =
     (* No additional check is performed on native type,
        it should be already type checked *)
-    match kind with
-    | Native _ -> expr
-    | Simple_wrapped -> accessor expr
-    | Extended_wrapped ->
-        accessor (Ext_lit_operations.Gil_sing_elem.access expr)
+    let expr, guards =
+      match kind with
+      | Native _ -> (expr, [])
+      | Simple_wrapped -> (accessor expr, [ recognizer expr ])
+      | Extended_wrapped ->
+          let simply_wrapped = Ext_lit_operations.Gil_sing_elem.access expr in
+          ( accessor simply_wrapped,
+            [
+              recognizer simply_wrapped;
+              Ext_lit_operations.Gil_sing_elem.recognize expr;
+            ] )
+    in
+    let extra_asrts = guards @ extra_asrts in
+    let kind = Native typ in
+    { enc with expr; extra_asrts; kind }
 
   let simply_wrapped = make ~kind:Simple_wrapped
+  let extended_wrapped = make ~kind:Extended_wrapped
 
   (** Takes a value either natively encoded or simply wrapped
     and returns a value simply wrapped.
     Careful: do not use wrap with a a set, as they cannot be simply wrapped *)
-  let simple_wrap { expr; kind; _ } =
+  let simple_wrap ({ expr; kind; extra_asrts; _ } as enc) =
     let open Lit_operations in
     match kind with
-    | Simple_wrapped -> expr
+    | Simple_wrapped -> enc
     | Native typ ->
         let construct =
           match typ with
@@ -435,35 +571,94 @@ module Encoding = struct
           | TypeType -> Type.construct
           | BooleanType -> Bool.construct
           | ListType -> List.construct
+          | DatatypeType name ->
+              let (module U : Variant.Unary) =
+                Lit_operations.get_datatype_lit_variant name
+              in
+              U.construct
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
         in
-        construct expr
-    | Extended_wrapped -> Ext_lit_operations.Gil_sing_elem.access expr
+        { enc with expr = construct expr; kind = Simple_wrapped }
+    | Extended_wrapped ->
+        let guard = Ext_lit_operations.Gil_sing_elem.recognize expr in
+        let extra_asrts = guard :: extra_asrts in
+        let expr = Ext_lit_operations.Gil_sing_elem.access expr in
+        { enc with extra_asrts; expr; kind = Simple_wrapped }
 
-  let extend_wrap e =
-    match e.kind with
-    | Extended_wrapped -> e.expr
-    | Native SetType -> Ext_lit_operations.Gil_set.construct (simple_wrap e)
-    | _ -> Ext_lit_operations.Gil_sing_elem.construct (simple_wrap e)
-
-  let get_num = get_native ~accessor:Lit_operations.Num.access
-  let get_int = get_native ~accessor:Lit_operations.Int.access
-  let get_bool = get_native ~accessor:Lit_operations.Bool.access
-  let get_list = get_native ~accessor:Lit_operations.List.access
-
-  let get_set { kind; expr; _ } =
+  let extend_wrap ({ expr; kind; _ } as enc) =
     match kind with
-    | Native SetType -> expr
-    | Extended_wrapped -> Ext_lit_operations.Gil_set.access expr
+    | Extended_wrapped -> enc
+    | Native SetType ->
+        let expr = Ext_lit_operations.Gil_set.construct expr in
+        { enc with expr; kind = Extended_wrapped }
+    | _ ->
+        let ({ expr; _ } as enc) = simple_wrap enc in
+        let expr = Ext_lit_operations.Gil_sing_elem.construct expr in
+        { enc with expr; kind = Extended_wrapped }
+
+  let get_num =
+    get_native ~accessor:Lit_operations.Num.access
+      ~recognizer:Lit_operations.Num.recognize ~typ:NumberType
+
+  let get_int =
+    get_native ~accessor:Lit_operations.Int.access
+      ~recognizer:Lit_operations.Int.recognize ~typ:IntType
+
+  let get_bool =
+    get_native ~accessor:Lit_operations.Bool.access
+      ~recognizer:Lit_operations.Bool.recognize ~typ:BooleanType
+
+  let get_list =
+    get_native ~accessor:Lit_operations.List.access
+      ~recognizer:Lit_operations.List.recognize ~typ:ListType
+
+  let get_set ({ kind; expr; extra_asrts; _ } as enc) : t =
+    match kind with
+    | Native SetType -> enc
+    | Extended_wrapped ->
+        let guard = Ext_lit_operations.Gil_set.recognize expr in
+        let extra_asrts = guard :: extra_asrts in
+        let expr = Ext_lit_operations.Gil_set.access expr in
+        let kind = Native SetType in
+        { enc with extra_asrts; expr; kind }
     | _ -> failwith "wrong encoding of set"
 
-  let get_string = get_native ~accessor:Lit_operations.String.access
+  let get_string =
+    get_native ~accessor:Lit_operations.String.access
+      ~recognizer:Lit_operations.String.recognize ~typ:StringType
+
+  let get_native_of_type ~(typ : Type.t) =
+    let open Lit_operations in
+    let accessor, recognizer =
+      match typ with
+      | IntType -> (Int.access, Int.recognize)
+      | NumberType -> (Num.access, Num.recognize)
+      | StringType -> (String.access, String.recognize)
+      | ObjectType -> (Loc.access, Loc.recognize)
+      | TypeType -> (Type.access, Type.recognize)
+      | BooleanType -> (Bool.access, Bool.recognize)
+      | ListType -> (List.access, List.recognize)
+      | DatatypeType name ->
+          let (module U : Variant.Unary) = get_datatype_lit_variant name in
+          (U.access, U.recognize)
+      | UndefinedType | NullType | EmptyType | NoneType | SetType ->
+          Fmt.failwith "Cannot get native value of type %s"
+            (Gil_syntax.Type.str typ)
+    in
+    get_native ~accessor ~recognizer ~typ
 end
 
 let typeof_simple e =
   let open Type in
+  let datatype_guards =
+    Hashtbl.to_seq !Lit_operations.datatype_lit_variants
+    |> Seq.map (fun (dname, (module U : Variant.Unary)) ->
+           (U.recognize, DatatypeType dname))
+    |> List.of_seq
+  in
+
   let guards =
     Lit_operations.
       [
@@ -479,6 +674,7 @@ let typeof_simple e =
         (Type.recognize, TypeType);
         (List.recognize, ListType);
       ]
+    @ datatype_guards
   in
   List.fold_left
     (fun acc (guard, typ) -> ite (guard e) (encode_type typ) acc)
@@ -545,7 +741,8 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
     | Loc l -> encode_string l >- ObjectType
     | Type t -> encode_type t >- TypeType
     | LList lits ->
-        let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
+        let>-- args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
+        let args = List.map (fun arg -> arg.expr) args in
         list args >- ListType
     | Constant _ -> raise (Exceptions.Unsupported "Z3 encoding: constants")
   with Failure msg ->
@@ -555,23 +752,24 @@ let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
   let open Encoding in
   let>- _ = p1 in
   let>- _ = p2 in
-  let res =
-    match (p1.kind, p2.kind) with
-    | Native t1, Native t2 when Type.equal t1 t2 ->
-        if Type.equal t1 BooleanType then
-          if is_true p1.expr then p2.expr
-          else if is_true p2.expr then p1.expr
-          else eq p1.expr p2.expr
-        else eq p1.expr p2.expr
-    | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
-        eq p1.expr p2.expr
-    | Native _, Native _ -> failwith "incompatible equality, type error!"
-    | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
-        eq (simple_wrap p1) (simple_wrap p2)
-    | Extended_wrapped, _ | _, Extended_wrapped ->
-        eq (extend_wrap p1) (extend_wrap p2)
-  in
-  res >- BooleanType
+  match (p1.kind, p2.kind) with
+  | Native t1, Native t2 when Type.equal t1 t2 ->
+      if Type.equal t1 BooleanType then
+        if is_true p1.expr then p2.expr >- BooleanType
+        else if is_true p2.expr then p1.expr >- BooleanType
+        else eq p1.expr p2.expr >- BooleanType
+      else eq p1.expr p2.expr >- BooleanType
+  | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
+      eq p1.expr p2.expr >- BooleanType
+  | Native _, Native _ -> failwith "incompatible equality, type error!"
+  | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
+      let>- p1 = simple_wrap p1 in
+      let>- p2 = simple_wrap p2 in
+      eq p1.expr p2.expr >- BooleanType
+  | Extended_wrapped, _ | _, Extended_wrapped ->
+      let>- p1 = extend_wrap p1 in
+      let>- p2 = extend_wrap p2 in
+      eq p1.expr p2.expr >- BooleanType
 
 let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
     =
@@ -584,37 +782,96 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
      It is expected that values of unknown type are already wrapped into their constructors.
   *)
   match op with
-  | IPlus -> num_add (get_int p1) (get_int p2) >- IntType
-  | IMinus -> num_sub (get_int p1) (get_int p2) >- IntType
-  | ITimes -> num_mul (get_int p1) (get_int p2) >- IntType
-  | IDiv -> num_div (get_int p1) (get_int p2) >- IntType
-  | IMod -> num_mod (get_int p1) (get_int p2) >- IntType
-  | ILessThan -> num_lt (get_int p1) (get_int p2) >- BooleanType
-  | ILessThanEqual -> num_leq (get_int p1) (get_int p2) >- BooleanType
-  | FPlus -> num_add (get_num p1) (get_num p2) >- NumberType
-  | FMinus -> num_sub (get_num p1) (get_num p2) >- NumberType
-  | FTimes -> num_mul (get_num p1) (get_num p2) >- NumberType
-  | FDiv -> num_div (get_num p1) (get_num p2) >- NumberType
-  | FLessThan -> num_lt (get_num p1) (get_num p2) >- BooleanType
-  | FLessThanEqual -> num_leq (get_num p1) (get_num p2) >- BooleanType
+  | IPlus ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_add p1.expr p2.expr >- IntType
+  | IMinus ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_sub p1.expr p2.expr >- IntType
+  | ITimes ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_mul p1.expr p2.expr >- IntType
+  | IDiv ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_div p1.expr p2.expr >- IntType
+  | IMod ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_mod p1.expr p2.expr >- IntType
+  | ILessThan ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_lt p1.expr p2.expr >- IntType
+  | ILessThanEqual ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_leq p1.expr p2.expr >- IntType
+  | FPlus ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_add p1.expr p2.expr >- NumberType
+  | FMinus ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_sub p1.expr p2.expr >- NumberType
+  | FTimes ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_mul p1.expr p2.expr >- NumberType
+  | FDiv ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_div p1.expr p2.expr >- NumberType
+  | FLessThan ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_lt p1.expr p2.expr >- NumberType
+  | FLessThanEqual ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_leq p1.expr p2.expr >- NumberType
   | Equal -> encode_equality p1 p2
-  | Or -> bool_or (get_bool p1) (get_bool p2) >- BooleanType
-  | Impl -> bool_implies (get_bool p1) (get_bool p2) >- BooleanType
-  | And -> bool_and (get_bool p1) (get_bool p2) >- BooleanType
+  | Or ->
+      let>- p1 = get_bool p1 in
+      let>- p2 = get_bool p2 in
+      bool_or p1.expr p2.expr >- BooleanType
+  | Impl ->
+      let>- p1 = get_bool p1 in
+      let>- p2 = get_bool p2 in
+      bool_implies p1.expr p2.expr >- BooleanType
+  | And ->
+      let>- p1 = get_bool p1 in
+      let>- p2 = get_bool p2 in
+      bool_and p1.expr p2.expr >- BooleanType
   | SetMem ->
       (* p2 has to be already wrapped *)
-      set_member Z3 (simple_wrap p1) (get_set p2) >- BooleanType
-  | SetDiff -> set_difference Z3 (get_set p1) (get_set p2) >- SetType
-  | SetSub -> set_subset Z3 (get_set p1) (get_set p2) >- BooleanType
-  | LstNth -> seq_nth (get_list p1) (get_int p2) |> simply_wrapped
+      let>- p1 = simple_wrap p1 in
+      let>- p2 = get_set p2 in
+      set_member Z3 p1.expr p2.expr >- BooleanType
+  | SetDiff ->
+      let>- p1 = get_set p1 in
+      let>- p2 = get_set p2 in
+      set_difference Z3 p1.expr p2.expr >- SetType
+  | SetSub ->
+      let>- p1 = get_set p1 in
+      let>- p2 = get_set p2 in
+      set_subset Z3 p1.expr p2.expr >- BooleanType
+  | LstNth ->
+      let>- p1 = get_list p1 in
+      let>- p2 = get_list p2 in
+      seq_nth p1.expr p2.expr |> simply_wrapped
   | LstRepeat ->
-      let x = simple_wrap p1 in
-      let n = get_int p2 in
-      RepeatCache.get x n
+      let>- x = simple_wrap p1 in
+      let>- n = get_int p2 in
+      RepeatCache.get x.expr n.expr
   | StrNth ->
-      let str' = get_string p1 in
-      let index' = get_num p2 in
-      let res = Axiomatised_operations.snth $$ [ str'; index' ] in
+      let>- str' = get_string p1 in
+      let>- index' = get_num p2 in
+      let res = Axiomatised_operations.snth $$ [ str'.expr; index'.expr ] in
       res >- StringType
   | FMod
   | StrLess
@@ -647,31 +904,58 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   let open Axiomatised_operations in
   let>- _ = le in
   match op with
-  | IUnaryMinus -> num_neg (get_int le) >- IntType
-  | FUnaryMinus -> num_neg (get_num le) >- NumberType
+  | IUnaryMinus ->
+      let>- le = get_int le in
+      num_neg le.expr >- IntType
+  | FUnaryMinus ->
+      let>- le = get_num le in
+      num_neg le.expr >- NumberType
   | LstLen ->
       (* If we only use an LVar as an argument to llen, then encode it as an uninterpreted function. *)
+      let>- le = get_list le in
       let enc =
         match e with
-        | Expr.LVar l when SS.mem l llen_lvars -> llen <| get_list le
-        | _ -> seq_len (get_list le)
+        | Expr.LVar l when SS.mem l llen_lvars -> llen <| le.expr
+        | _ -> seq_len le.expr
       in
       enc >- IntType
-  | StrLen -> slen <| get_string le >- NumberType
-  | ToStringOp -> Axiomatised_operations.num2str <| get_num le >- StringType
-  | ToNumberOp -> Axiomatised_operations.str2num <| get_string le >- NumberType
-  | ToIntOp -> Axiomatised_operations.num2int <| get_num le >- NumberType
-  | Not -> bool_not (get_bool le) >- BooleanType
+  | StrLen ->
+      let>- le = get_string le in
+      slen <| le.expr >- NumberType
+  | ToStringOp ->
+      let>- le = get_num le in
+      Axiomatised_operations.num2str <| le.expr >- StringType
+  | ToNumberOp ->
+      let>- le = get_string le in
+      Axiomatised_operations.str2num <| le.expr >- NumberType
+  | ToIntOp ->
+      let>- le = get_num le in
+      Axiomatised_operations.num2int <| le.expr >- NumberType
+  | Not ->
+      let>- le = get_bool le in
+      bool_not le.expr >- BooleanType
   | Cdr ->
-      let list = get_list le in
-      seq_extract list (int_k 1) (seq_len list) >- ListType
-  | Car -> seq_nth (get_list le) (int_k 0) |> simply_wrapped
+      let>- list = get_list le in
+      seq_extract list.expr (int_k 1) (seq_len list.expr) >- ListType
+  | Car ->
+      let>- list = get_list le in
+      seq_nth list.expr (int_k 0) |> simply_wrapped
   | TypeOf -> typeof_expression le >- TypeType
-  | ToUint32Op -> get_num le |> real_to_int |> int_to_real >- NumberType
-  | LstRev -> Axiomatised_operations.lrev <| get_list le >- ListType
-  | NumToInt -> get_num le |> real_to_int >- IntType
-  | IntToNum -> get_int le |> int_to_real >- NumberType
-  | IsInt -> num_divisible (get_num le) 1 >- BooleanType
+  | ToUint32Op ->
+      let>- le = get_num le in
+      le.expr |> real_to_int |> int_to_real >- NumberType
+  | LstRev ->
+      let>- list = get_list le in
+      Axiomatised_operations.lrev <| list.expr >- ListType
+  | NumToInt ->
+      let>- le = get_num le in
+      le.expr |> real_to_int >- IntType
+  | IntToNum ->
+      let>- le = get_int le in
+      le.expr |> int_to_real >- NumberType
+  | IsInt ->
+      let>- le = get_num le in
+      num_divisible le.expr 1 >- BooleanType
   | BitwiseNot
   | M_isNaN
   | M_abs
@@ -698,9 +982,66 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       let () = L.print_to_all msg in
       raise (Failure msg)
 
+let encode_bound_expr
+    ~(encode_expr :
+       gamma:Type_env.t ->
+       llen_lvars:SS.t ->
+       list_elem_vars:SS.t ->
+       'a ->
+       Encoding.t)
+    ~gamma
+    ~llen_lvars
+    ~list_elem_vars
+    bound_vars
+    (expr : 'a) =
+  let open Encoding in
+  (* Start by updating gamma with the information provided by quantifier types.
+     There's very few foralls, so it's ok to copy the gamma entirely *)
+  let gamma = Type_env.copy gamma in
+  let () =
+    bound_vars
+    |> List.iter (fun (x, typ) ->
+           match typ with
+           | None -> Type_env.remove gamma x
+           | Some typ -> Type_env.update gamma x typ)
+  in
+  (* Not the same gamma now!*)
+  let encoded = encode_expr ~gamma ~llen_lvars ~list_elem_vars expr in
+
+  (* Extra asrts could contain these bound variables - separate these *)
+  let rec atoms (sexp : sexp) =
+    match sexp with
+    | Atom s -> SS.singleton s
+    | List lst -> List.fold_left SS.union SS.empty (List.map atoms lst)
+  in
+  let bs = SS.of_list (List.map fst bound_vars) in
+  let contains_bound_vars asrt = not (SS.disjoint bs (atoms asrt)) in
+  let bound_asrts, extra_asrts =
+    List.partition contains_bound_vars encoded.extra_asrts
+  in
+  let encoded = { encoded with extra_asrts } in
+
+  (* Don't declare consts for quantified vars *)
+  let bound_vars =
+    bound_vars
+    |> List.map (fun (x, t) ->
+           let sort =
+             match t with
+             | None -> t_gil_ext_literal
+             | Some typ -> Encoding.native_sort_of_type typ
+           in
+           (x, sort))
+  in
+  let () =
+    encoded.consts
+    |> Hashtbl.filter_map_inplace (fun c () ->
+           if List.mem c bound_vars then None else Some ())
+  in
+  (bound_vars, bound_asrts, encoded)
+
 let encode_quantified_expr
     ~(encode_expr :
-       gamma:typenv ->
+       gamma:Type_env.t ->
        llen_lvars:SS.t ->
        list_elem_vars:SS.t ->
        'a ->
@@ -719,44 +1060,22 @@ let encode_quantified_expr
         Some (encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion)
     | _ -> None
   in
-  (* Start by updating gamma with the information provided by quantifier types.
-     There's very few foralls, so it's ok to copy the gamma entirely *)
-  let gamma = Hashtbl.copy gamma in
-  let () =
-    quantified_vars
-    |> List.iter (fun (x, typ) ->
-           match typ with
-           | None -> Hashtbl.remove gamma x
-           | Some typ -> Hashtbl.replace gamma x typ)
+  let quantified_vars, bound_asrts, encoded =
+    encode_bound_expr ~encode_expr ~gamma ~llen_lvars ~list_elem_vars
+      quantified_vars assertion
   in
-  (* Not the same gamma now!*)
   let encoded_assertion, consts, extra_asrts =
-    match encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion with
+    match encoded with
     | { kind = Native BooleanType; expr; consts; extra_asrts } ->
         (expr, consts, extra_asrts)
     | _ -> failwith "the thing inside forall is not boolean!"
   in
-  let quantified_vars =
-    quantified_vars
-    |> List.map (fun (x, t) ->
-           let sort =
-             match t with
-             | None -> t_gil_ext_literal
-             | Some typ -> Encoding.native_sort_of_type typ
-           in
-           (x, sort))
-  in
-  (* Don't declare consts for quantified vars *)
-  let () =
-    consts
-    |> Hashtbl.filter_map_inplace (fun c () ->
-           if List.mem c quantified_vars then None else Some ())
-  in
+  let encoded_assertion = bool_ands (encoded_assertion :: bound_asrts) in
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
 let rec encode_logical_expression
-    ~(gamma : typenv)
+    ~(gamma : Type_env.t)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
     (le : Expr.t) : Encoding.t =
@@ -767,7 +1086,7 @@ let rec encode_logical_expression
   | Lit lit -> encode_lit lit
   | LVar var ->
       let kind, typ =
-        match Hashtbl.find_opt gamma var with
+        match Type_env.get gamma var with
         | Some typ -> (Native typ, native_sort_of_type typ)
         | None ->
             if SS.mem var list_elem_vars then (Simple_wrapped, t_gil_literal)
@@ -780,36 +1099,120 @@ let rec encode_logical_expression
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
-      les |> List.map get_set |> set_union' Z3 >- SetType
+      let>-- sets = List.map get_set les in
+      let sets = List.map (fun set -> set.expr) sets in
+      set_union' Z3 sets >- SetType
   | NOp (SetInter, les) ->
       let>-- les = List.map f les in
-      les |> List.map get_set |> set_intersection' Z3 >- SetType
+      let>-- sets = List.map get_set les in
+      let sets = List.map (fun set -> set.expr) sets in
+      set_intersection' Z3 sets >- SetType
   | NOp (LstCat, les) ->
       let>-- les = List.map f les in
-      les |> List.map get_list |> seq_concat >- ListType
+      let>-- lists = List.map get_list les in
+      let lists = List.map (fun list -> list.expr) lists in
+      seq_concat lists >- ListType
   | EList les ->
       let>-- args = List.map f les in
-      args |> List.map simple_wrap |> seq_of ~typ:t_gil_literal_list >- ListType
+      let>-- args = List.map simple_wrap args in
+      let args = List.map (fun arg -> arg.expr) args in
+      seq_of ~typ:t_gil_literal_list args >- ListType
   | ESet les ->
       let>-- args = List.map f les in
-      args |> List.map simple_wrap |> set_of >- SetType
+      let>-- args = List.map simple_wrap args in
+      let args = List.map (fun arg -> arg.expr) args in
+      set_of args >- SetType
   | LstSub (lst, start, len) ->
       let>- lst = f lst in
       let>- start = f start in
       let>- len = f len in
-      let lst = get_list lst in
-      let start = get_int start in
-      let len = get_int len in
-      seq_extract lst start len >- ListType
+      let>- lst = get_list lst in
+      let>- start = get_int start in
+      let>- len = get_int len in
+      seq_extract lst.expr start.expr len.expr >- ListType
   | Exists (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:exists ~gamma ~llen_lvars ~list_elem_vars bt e
   | ForAll (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:forall ~gamma ~llen_lvars ~list_elem_vars bt e
+  | FuncApp (name, les) -> (
+      let param_typs = Function_env.get_function_param_types name in
+      match param_typs with
+      | Some param_typs ->
+          let extend_wrap_or_native typopt =
+            match typopt with
+            | Some typ -> get_native_of_type ~typ
+            | None -> extend_wrap
+          in
+          let>-- args = List.map f les in
+          let>-- args = List.map2 extend_wrap_or_native param_typs args in
+          let args = List.map (fun arg -> arg.expr) args in
+          let sexp = app_ name args in
+          extended_wrapped sexp
+      | None ->
+          let msg = "SMT - Undefined function: " ^ name in
+          raise (Failure msg))
+  | Cases (le, cs) ->
+      (* Type checking should ensure that all constructors belong to the same datatype *)
+      let constructors_t =
+        match cs with
+        | (cname, _, _) :: _ -> Datatype_env.get_constructor_type_unsafe cname
+        | [] ->
+            let msg = "SMT - No cases given in case statement" in
+            raise (Failure msg)
+      in
+      let>- le = f le in
+      (* Convert to native *)
+      let>- le_native = get_native_of_type ~typ:constructors_t le in
+      (* Encode match cases *)
+      let cs, encs =
+        List.split
+          (List.map
+             (fun (c, bs, e) ->
+               let (module N : Variant.Nary) =
+                 Lit_operations.get_constructor_variant c
+               in
+               let pat = PCon (c, bs) in
+               let ts = Datatype_env.get_constructor_field_types_unsafe c in
+               let bts = List.combine bs ts in
+               (* TODO: How to handle extra asrts involving bound vars?? *)
+               (* Using ite and mapping to undefined values when extra asrts are false causes queries to time out *)
+               let _, _, encoded =
+                 encode_bound_expr ~encode_expr:encode_logical_expression ~gamma
+                   ~llen_lvars ~list_elem_vars bts e
+               in
+               let encoded = extend_wrap encoded in
+               let encoded_expr = encoded.expr in
+               ((pat, encoded_expr), encoded))
+             cs)
+      in
+      let fallback = (PVar "_", (extend_wrap undefined_encoding).expr) in
+      let>-- _ = encs in
+      extended_wrapped (match_datatype le_native.expr (cs @ [ fallback ]))
+  | ConstructorApp (name, les) -> (
+      let param_typs = Datatype_env.get_constructor_field_types name in
+      match param_typs with
+      | Some param_typs ->
+          let simple_wrap_or_native typopt =
+            match typopt with
+            | Some typ -> get_native_of_type ~typ
+            | None -> simple_wrap
+          in
+          let>-- args = List.map f les in
+          let>-- args = List.map2 simple_wrap_or_native param_typs args in
+          let (module V : Variant.Nary) =
+            Lit_operations.get_constructor_variant name
+          in
+          let args = List.map (fun arg -> arg.expr) args in
+          let sexp = V.construct args in
+          sexp >- Datatype_env.get_constructor_type_unsafe name
+      | None ->
+          let msg = "SMT - Undefined constructor: " ^ name in
+          raise (Failure msg))
 
 let encode_assertion_top_level
-    ~(gamma : typenv)
+    ~(gamma : Type_env.t)
     ~(llen_lvars : SS.t)
     ~(list_elem_vars : SS.t)
     (a : Expr.t) : Encoding.t =
@@ -820,7 +1223,7 @@ let encode_assertion_top_level
     let s = Printexc.to_string e in
     let msg =
       Fmt.str "Failed to encode %a in gamma %a with error %s\n" Expr.pp a
-        pp_typenv gamma s
+        Type_env.pp gamma s
     in
     let () = L.print_to_all msg in
     raise e
@@ -843,7 +1246,8 @@ let lvars_only_in_llen (fs : Expr.Set.t) : SS.t =
   fs |> Expr.Set.iter (inspector#visit_expr ());
   inspector#get_diff
 
-let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
+let lvars_as_list_elements ?(exclude = SS.empty) (assertions : Expr.Set.t) :
+    SS.t =
   let collector =
     object (self)
       inherit [_] Visitors.reduce
@@ -873,6 +1277,37 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
                 Containers.SS.union acc inner)
           Containers.SS.empty es
 
+      method! visit_ConstructorApp (exclude, _) _ les =
+        List.fold_left
+          (fun acc e ->
+            match e with
+            | Expr.LVar x ->
+                if not (Containers.SS.mem x exclude) then
+                  Containers.SS.add x acc
+                else acc
+            | _ ->
+                let inner = self#visit_expr (exclude, true) e in
+                Containers.SS.union acc inner)
+          Containers.SS.empty les
+
+      method! visit_Cases (exclude, is_in_list) le cs =
+        let cases =
+          List.fold_left
+            (fun acc (_, bs, e) ->
+              (* Treat binders as though they are in a list *)
+              let binders =
+                bs
+                |> List.filter (fun b -> not (Containers.SS.mem b exclude))
+                |> List.to_seq
+              in
+              let binders = Containers.SS.add_seq binders acc in
+              let inner = self#visit_expr (exclude, is_in_list) e in
+              Containers.SS.union binders inner)
+            Containers.SS.empty cs
+        in
+        let scrutinee = self#visit_expr (exclude, is_in_list) le in
+        Containers.SS.union scrutinee cases
+
       method! visit_LVar (exclude, is_in_list) x =
         if is_in_list && not (Containers.SS.mem x exclude) then
           Containers.SS.singleton x
@@ -884,11 +1319,11 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
   in
   Expr.Set.fold
     (fun f acc ->
-      let new_lvars = collector#visit_expr (SS.empty, false) f in
+      let new_lvars = collector#visit_expr (exclude, false) f in
       SS.union new_lvars acc)
     assertions SS.empty
 
-let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
+let encode_assertions (fs : Expr.Set.t) (gamma : Type_env.t) : sexp list =
   let open Encoding in
   let- () = Hashtbl.find_opt encoding_cache fs in
   let llen_lvars = lvars_only_in_llen fs in
@@ -910,6 +1345,71 @@ let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
   let encoded = consts @ asrts in
   let () = Hashtbl.replace encoding_cache fs encoded in
   encoded
+
+let defn_funs_rec fs =
+  let mk_param_type (x, t) = list [ atom x; t ] in
+  let mk_param_types pts = list (List.map mk_param_type pts) in
+  let mk_decl (name, param_types, ret_type, _) =
+    list [ atom name; mk_param_types param_types; ret_type ]
+  in
+
+  let decls = list (List.map mk_decl fs) in
+  let defns = list (List.map (fun (_, _, _, d) -> d) fs) in
+  app_ "define-funs-rec" [ decls; defns ]
+
+let encode_functions (fs : Func.t list) : sexp list =
+  let encode_function (f : Func.t) =
+    let name = f.func_name in
+    let param_types =
+      List.map
+        (fun (x, t) ->
+          let x = sanitize_identifier x in
+          match t with
+          | Some t -> (x, Encoding.native_sort_of_type t)
+          | None -> (x, t_gil_ext_literal))
+        f.func_params
+    in
+    let ret_type = t_gil_ext_literal in
+    let gamma = Type_env.init () in
+    let () =
+      List.iter
+        (fun (x, t) ->
+          match t with
+          | Some t -> Type_env.update gamma x t
+          | None -> ())
+        f.func_params
+    in
+    let function_def = Expr.Set.singleton f.func_definition in
+    let param_names = List.map fst param_types in
+    let param_names = SS.of_seq (List.to_seq param_names) in
+    let llen_lvars = lvars_only_in_llen function_def in
+    (* By excluding params, we ensure they are always encoded as
+         Extended GIL Literals in the encoded definition.
+        This allows us to make the assumption that if the type of a
+       function paramater is not known, then it is t_gil_ext_literal *)
+    let list_elem_vars =
+      lvars_as_list_elements ~exclude:param_names function_def
+    in
+    let encoded_def =
+      Encoding.extend_wrap
+      @@ encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
+           f.func_definition
+    in
+    let func_body =
+      if List.length encoded_def.extra_asrts == 0 then encoded_def.expr
+      else
+        ite
+          (bool_ands encoded_def.extra_asrts)
+          encoded_def.expr
+          (Encoding.extend_wrap Encoding.undefined_encoding).expr
+    in
+    (name, param_types, ret_type, func_body)
+  in
+  [ defn_funs_rec (List.map encode_function fs) ]
+
+module Function_operations = struct
+  let init_decls fs = encode_functions fs
+end
 
 module Dump = struct
   let counter = ref 0
@@ -946,25 +1446,71 @@ module Dump = struct
           (Format.formatter_of_out_channel c)
           "GIL query:\nFS: %a\nGAMMA: %a\nEncoded as SMT Query:\n%a@?"
           (Fmt.iter ~sep:Fmt.comma Expr.Set.iter Expr.pp)
-          fs pp_typenv gamma
+          fs Type_env.pp gamma
           (Fmt.list ~sep:(Fmt.any "\n") Sexplib.Sexp.pp_hum)
           cmds)
 end
 
-let reset_solver () =
-  let () = cmd (pop 1) in
-  let () = RepeatCache.clear () in
-  let () = cmd (push 1) in
+let rec init_solver () =
+  let z3 = new_solver z3 in
+  let command s =
+    try z3.command s
+    with Sys_error s ->
+      let msg = Fmt.str "Error when calling SMT solver: %s" s in
+      Logging.normal (fun m -> m "%s" msg);
+      init_solver ();
+      raise (Gillian_result.Exc.internal_error msg)
+  in
+  let () = solver := { z3 with command } in
+  (* Config, initial decls *)
+  let () =
+    z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+  in
   ()
 
-let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
+let init () =
+  if !initialised then
+    (* Initial declarations already exist *)
+    (* Pop off initial declarations if necessary *)
+    cmd (pop 2)
+  else (* Need to set up Z3 *)
+    init_solver ();
+
+  (* In both cases, we (re-)declare the initial declarations *)
+  cmd (push 1);
+  let type_init_decls = Type_operations.init_decls in
+  let lit_init_decls =
+    Lit_operations.init_decls (Datatype_env.get_datatypes ())
+  in
+  let ext_lit_init_decls = Ext_lit_operations.init_decls in
+  let func_init_decls =
+    Function_operations.init_decls (Function_env.get_functions ())
+  in
+  let init_decls =
+    [ type_init_decls; lit_init_decls; ext_lit_init_decls; func_init_decls ]
+  in
+  let decls = List.concat init_decls in
+  let () = decls |> List.iter cmd in
+  cmd (push 1);
+  initialised := true
+
+let init_or_reset () =
+  if not !initialised then init ()
+  else
+    (* Otherwise reset it *)
+    let () = cmd (pop 1) in
+    let () = RepeatCache.clear () in
+    let () = cmd (push 1) in
+    ()
+
+let exec_sat' (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
   let () =
     L.verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Expr.Set.iter Expr.pp)
-          fs pp_typenv gamma)
+          fs Type_env.pp gamma)
   in
-  let () = reset_solver () in
+  let () = init_or_reset () in
   let encoded_assertions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
   let () = List.iter cmd !builtin_funcs in
@@ -987,7 +1533,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
           let additional_data =
             [
               ("expressions", fs_to_yojson fs);
-              ("gamma", typenv_to_yojson gamma);
+              ("gamma", Type_env.to_yojson gamma);
               ("encoded_assertions", sexps_to_yojson encoded_assertions);
             ]
           in
@@ -999,19 +1545,19 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   in
   ret
 
-let exec_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
+let exec_sat (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
   try exec_sat' fs gamma
   with UnexpectedSolverResponse _ as e ->
     let additional_data =
       [
         ("smt_error", `String (Printexc.to_string e));
         ("expressions", fs_to_yojson fs);
-        ("gamma", typenv_to_yojson gamma);
+        ("gamma", Type_env.to_yojson gamma);
       ]
     in
     raise Gillian_result.Exc.(internal_error ~additional_data "SMT failure")
 
-let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
+let check_sat (fs : Expr.Set.t) (gamma : Type_env.t) : sexp option =
   match Hashtbl.find_opt sat_cache fs with
   | Some result ->
       let () =
@@ -1030,15 +1576,15 @@ let check_sat (fs : Expr.Set.t) (gamma : typenv) : sexp option =
       let () = Hashtbl.replace sat_cache fs ret in
       ret
 
-let is_sat (fs : Expr.Set.t) (gamma : typenv) : bool =
+let is_sat (fs : Expr.Set.t) (gamma : Type_env.t) : bool =
   check_sat fs gamma |> Option.is_some
 
 let lift_model
     (model : sexp)
-    (gamma : typenv)
+    (gamma : Type_env.t)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  let () = reset_solver () in
+  let () = init_or_reset () in
   let model_eval = (model_eval' !solver model).eval [] in
 
   let get_val x =
@@ -1057,7 +1603,7 @@ let lift_model
   in
 
   let lift_val (x : string) : Literal.t option =
-    let* gil_type = Hashtbl.find_opt gamma x in
+    let* gil_type = Type_env.get gamma x in
     let* v = get_val x in
     match gil_type with
     | NumberType ->
@@ -1094,5 +1640,3 @@ let lift_model
                m "SMT binding for %s: %s\n" x binding)
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
-
-let () = init_solver ()

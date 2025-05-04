@@ -940,6 +940,11 @@ struct
     L.Phase.with_normal ~title:"Program verification" @@ fun () ->
     let open ResultsDir in
     let open ChangeTracker in
+    (* Prepare datatype env *)
+    let () = Datatype_env.init prog.datatypes in
+    let () = Function_env.init prog.funcs in
+    let () = Smt.init () in
+
     if incremental && prev_results_exist () then (
       (* Only verify changed procedures and lemmas *)
       let cur_source_files =

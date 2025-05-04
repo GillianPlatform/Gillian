@@ -2,8 +2,8 @@
 
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
-%token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
+%token <CodeLoc.t> PURE FUNCTION RETURN PREDICATE LEMMA DATATYPE
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL CASE
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF CONFIG
 
 (* punctuation *)
@@ -23,12 +23,14 @@
 %token <CodeLoc.t> SETOPEN          /* -{ */
 %token <CodeLoc.t> SETCLOSE         /* }- */
 %token <CodeLoc.t> VDASH            /* |- */
+%token <CodeLoc.t> QUOTE            /* '  */
 
 (* types *)
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
 %token <CodeLoc.t> TBOOL
 %token <CodeLoc.t> TSTRING
+%token <CodeLoc.t> TANY
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -85,56 +87,70 @@
 %start <WProg.t * WConfigStmt.t list> prog
 %start <WLAssert.t> assert_only
 
-%type <WFun.t list * WPred.t list * WLemma.t list * WConfigStmt.t list>
-                                         definitions
-%type <WConfigStmt.t>                    config
-%type <WFun.t>                           fct_with_specs
-%type <WFun.t>                           fct
-%type <WPred.t>                          predicate
-%type <WLemma.t>                         lemma
-%type <string list>                      var_list
-%type <WStmt.t list * WExpr.t>           statement_list_and_return
-%type <WStmt.t list>                     statement_list
-%type <WExpr.t>                          expression
-%type <WExpr.t list>                     expr_list
-%type <WLCmd.t>                          logic_command
-%type <WLAssert.t>                       logic_assertion
-%type <CodeLoc.t * WVal.t>               value_with_loc
-%type <CodeLoc.t * WUnOp.t>              unop_with_loc
-%type <WBinOp.t>                         binop
-%type <WLExpr.t>                         variant_def
-%type <WLExpr.t>                         with_variant_def
-%type <WLCmd.t list>                     proof_def
-%type <(string * WType.t option) * bool> pred_param_ins
-%type <CodeLoc.t * string list>          bindings_with_loc
-%type <WLExpr.t>                         logic_expression
-%type <WBinOp.t>                         logic_binop
-%type <CodeLoc.t * WVal.t>               logic_value_with_loc
+%type <WFun.t list * WPred.t list * WLemma.t list * WDatatype.t list * WPureFun.t list * WConfigStmt.t list>
+                                                definitions
+%type <WConfigStmt.t>                           config
+%type <WFun.t>                                  fct_with_specs
+%type <WFun.t>                                  fct
+%type <WPred.t>                                 predicate
+%type <WLemma.t>                                lemma
+%type <WDatatype.t>                             datatype
+%type <WPureFun.t>                              pure_function
+%type <string list>                             var_list
+%type <WStmt.t list * WExpr.t>                  statement_list_and_return
+%type <WStmt.t list>                            statement_list
+%type <WExpr.t>                                 expression
+%type <WExpr.t list>                            expr_list
+%type <WLCmd.t>                                 logic_command
+%type <WLAssert.t>                              logic_assertion_top_level
+%type <WLAssert.t>                              logic_assertion
+%type <CodeLoc.t * WVal.t>                      value_with_loc
+%type <CodeLoc.t * WUnOp.t>                     unop_with_loc
+%type <WBinOp.t>                                binop
+%type <WLExpr.t>                                variant_def
+%type <WLExpr.t>                                with_variant_def
+%type <WLCmd.t list>                            proof_def
+%type <(string * WType.t option) * bool>        pred_param_ins
+%type <CodeLoc.t * string list>                 bindings_with_loc
+%type <WLExpr.t>                                logic_expression
+%type <WBinOp.t>                                logic_binop
+%type <CodeLoc.t * WVal.t>                      logic_value_with_loc
+%type <string * WType.t list * CodeLoc.t * int> constructor
+%type <WType.t list * CodeLoc.t>                constructor_fields
+%type <string * WType.t option>                 pure_function_param
+%type <string list>                             tuple_binders
+%type <WLExpr.case>                             logic_case
 %%
 
 prog:
-  | fcp = definitions; EOF {
-    let (fc, preds, lemmas, configs) = fcp in
-    let prog = WProg.{ lemmas = lemmas; predicates = preds; context = fc } in
+  | defs = definitions; EOF {
+    let (fc, preds, lemmas, datatypes, pure_funcs, configs) = defs in
+    let prog = WProg.{ lemmas = lemmas; predicates = preds; context = fc; datatypes = datatypes; pure_functions = pure_funcs} in
     prog, configs }
 
 assert_only:
-  | la = logic_assertion; EOF { la }
+  | la = logic_assertion_top_level; EOF { la }
 
 definitions:
-  | (* empty *) { ([], [], [], []) }
-  | defs = definitions; p = config
-    { let (fs, ps, ls, cs) = defs in
-      (fs, ps, ls, p::cs) }
+  | (* empty *) { ([], [], [], [], [], []) }
   | defs = definitions; p = predicate
-    { let (fs, ps, ls, cs) = defs in
-      (fs, p::ps, ls, cs) }
+    { let (fs, ps, ls, ds, pfs, cs) = defs in
+      (fs, p::ps, ls, ds, pfs, cs) }
   | defs = definitions; l = lemma
-    { let (fs, ps, ls, cs) = defs in
-      (fs, ps, l::ls, cs) }
+    { let (fs, ps, ls, ds, pfs, cs) = defs in
+      (fs, ps, l::ls, ds, pfs, cs) }
   | defs = definitions; f = fct_with_specs
-    { let (fs, ps, ls, cs) = defs in
-      (f::fs, ps, ls, cs) }
+    { let (fs, ps, ls, ds, pfs, cs) = defs in
+      (f::fs, ps, ls, ds, pfs, cs) }
+  | defs = definitions; d = datatype
+    { let (fs, ps, ls, ds, pfs, cs) = defs in
+      (fs, ps, ls, d::ds, pfs, cs) }
+  | defs = definitions; pf = pure_function
+    { let (fs, ps, ls, ds, pfs, cs) = defs in
+      (fs, ps, ls, ds, pf::pfs, cs) }
+  | defs = definitions; c = config
+    { let (fs, ps, ls, ds, pfs, cs) = defs in
+      (fs, ps, ls, ds, pfs, c::cs) }
 
 config:
   | lstart = CONFIG; id = IDENTIFIER; COLON; value = value_with_loc
@@ -144,8 +160,8 @@ config:
       id, value, loc }
 
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
-    post = logic_assertion; lend = RCBRACE
+  | lstart = LCBRACE; pre = logic_assertion_top_level; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+    post = logic_assertion_top_level; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
   | f = fct { f }
@@ -197,6 +213,8 @@ type_target:
   | TINT { WType.WInt }
   | TBOOL { WType.WBool }
   | TSTRING { WType.WString }
+  | TANY { WType.WAny }
+  | datatype = IDENTIFIER { let (_, datatype) = datatype in WType.WDatatype datatype }
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -355,7 +373,7 @@ lemma:
   | lstart = LEMMA; lname = IDENTIFIER; LCBRACE;
       STATEMENT; COLON;
       FORALL lemma_params = var_list; DOT;
-      lemma_hypothesis = logic_assertion; VDASH; lemma_conclusion = logic_assertion;
+      lemma_hypothesis = logic_assertion_top_level; VDASH; lemma_conclusion = logic_assertion_top_level;
       lemma_variant = option(variant_def);
       lemma_proof = option(proof_def);
       lend = RCBRACE
@@ -385,7 +403,7 @@ proof_def:
 
 predicate:
   | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
+    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion_top_level);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
       let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
@@ -396,7 +414,7 @@ predicate:
       (* ins looks like [Some 0, Some 2] *)
       let ins = List.map Option.get ins in
       (* ins looks like [0, 2] *)
-  		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
+      let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
       (* if ins is empty then everything is an in *)
       let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
@@ -453,13 +471,13 @@ logic_command:
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, []) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
-  | lstart = ASSERT; lbopt = option(bindings_with_loc); a = logic_assertion;
+  | lstart = ASSERT; lbopt = option(bindings_with_loc); a = logic_assertion_top_level;
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
       let bare_lcmd = WLCmd.Assert (a, b) in
       WLCmd.make bare_lcmd loc }
-  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion; variant = option(with_variant_def);
+  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion_top_level; variant = option(with_variant_def);
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
@@ -487,6 +505,12 @@ wand:
       ((lname, largs), (rname, rargs), loc)
     }
 
+logic_assertion_top_level:
+  | formula = logic_expression;
+    { let bare_assert = WLAssert.LPure formula in
+      let loc = WLExpr.get_loc formula in
+      WLAssert.make bare_assert loc }
+  | la = logic_assertion; { la }
 
 logic_assertion:
   | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
@@ -536,16 +560,6 @@ logic_assertion:
   | lstart = LBRACE; formula = logic_expression; lend = RBRACE;
     { let bare_assert = WLAssert.LPure formula in
       let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
-  | loc = TRUE
-    { let bare_lexpr = WLExpr.LVal (WVal.Bool true) in
-      let lexpr = WLExpr.make bare_lexpr loc in
-      let bare_assert = WLAssert.LPure lexpr in
-      WLAssert.make bare_assert loc }
-  | loc = FALSE
-    { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
-      let lexpr = WLExpr.make bare_lexpr loc in
-      let bare_assert = WLAssert.LPure lexpr in
       WLAssert.make bare_assert loc }
 
 
@@ -597,7 +611,24 @@ logic_expression:
     { let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LESet l in
       WLExpr.make bare_lexpr loc }
-
+  | lpf = IDENTIFIER; LBRACE; l = separated_list(COMMA, logic_expression); lend = RBRACE
+    { let (lstart, pf) = lpf in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LPureFunApp (pf, l) in
+      WLExpr.make bare_lexpr loc }
+  | lstart = QUOTE; lname = IDENTIFIER;
+    llend = option(logic_constructor_app_params)
+    { let (_, name) = lname in
+      let (l, lend) = Option.value ~default:([], lstart) llend in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LConstructorApp (name, l) in
+      WLExpr.make bare_lexpr loc }
+  | lstart = CASE; scrutinee = logic_expression; LCBRACE; cases = separated_list(SEMICOLON, logic_case); lend = RCBRACE
+    {
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LCases(scrutinee, cases) in
+      WLExpr.make bare_lexpr loc
+    }
 
 (* We also have lists in the logic *)
 logic_binop:
@@ -614,3 +645,86 @@ logic_value_with_loc:
     { let (_, vl) = List.split lvl in
       let loc = CodeLoc.merge lstart lend in
       (loc, WVal.VList vl) } */
+
+logic_constructor_app_params:
+  | LBRACE; lst = separated_list(COMMA, logic_expression); lend = RBRACE; { (lst, lend) }
+
+logic_case:
+  | cname = IDENTIFIER; binders = option(tuple_binders); ARROW; expr = logic_expression
+    {
+      let binders = Option.value ~default:[] binders in
+      { WLExpr.constructor = snd cname;
+        binders = binders;
+        lexpr = expr }
+    }
+
+tuple_binders:
+  | LBRACE; xs = separated_list(COMMA, IDENTIFIER); RBRACE
+    { List.map snd xs }
+
+
+(* ADT definitions *)
+
+datatype:
+  | lstart = DATATYPE; ldname = IDENTIFIER; LCBRACE;
+    raw_constructors = separated_nonempty_list(SEMICOLON, constructor);
+    lend = RCBRACE;
+    {
+      let (_, datatype_name) = ldname in
+      let datatype_loc = CodeLoc.merge lstart lend in
+      let datatype_id = Generators.gen_id () in
+      let datatype_constructors =
+        List.map
+          (fun (constructor_name, constructor_fields, constructor_loc, constructor_id) ->
+             WConstructor.{
+               constructor_name;
+               constructor_fields;
+               constructor_loc;
+               constructor_id;
+               constructor_datatype = datatype_name;
+             })
+          raw_constructors
+      in
+      WDatatype.{
+        datatype_name;
+        datatype_constructors;
+        datatype_loc;
+        datatype_id;
+      }
+    }
+
+constructor:
+  | lcname = IDENTIFIER; fields_lend = option(constructor_fields)
+    {
+      let (lstart, constructor_name) = lcname in
+      let (constructor_fields, lend) = Option.value ~default:([], lstart) fields_lend in
+      let constructor_loc = CodeLoc.merge lstart lend in
+      let constructor_id = Generators.gen_id () in
+      (* Constructor_datatype is added later in the datatype rule *)
+      (constructor_name, constructor_fields, constructor_loc, constructor_id)
+    }
+
+constructor_fields:
+  | LBRACE; args = separated_list(COMMA, type_target); lend = RBRACE
+    { (args, lend) }
+
+
+(* Pure Functions *)
+
+pure_function:
+  | lstart = PURE; FUNCTION; lpfname = IDENTIFIER; LBRACE; pure_fun_params = separated_list(COMMA, pure_function_param);
+    RBRACE; LCBRACE; pure_fun_definition=logic_expression; lend = RCBRACE
+    {
+      let pure_fun_loc = CodeLoc.merge lstart lend in
+      let (_, pure_fun_name) = lpfname in
+      WPureFun.{
+          pure_fun_name;
+          pure_fun_params;
+          pure_fun_definition;
+          pure_fun_loc;
+      }
+    }
+
+pure_function_param:
+  | lx = IDENTIFIER; typ = option(preceded(COLON, type_target))
+  { let (_, x) = lx in (x, typ) }

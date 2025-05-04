@@ -330,10 +330,18 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | NOp (nop, le) -> evaluate_nop nop (List.map ee le)
     | EList ll -> evaluate_elist store ll
     | LstSub (e1, e2, e3) -> evaluate_lstsub store e1 e2 e3
-    | ALoc _ | LVar _ | ESet _ | Exists _ | ForAll _ ->
+    | ALoc _
+    | LVar _
+    | ESet _
+    | Exists _
+    | ForAll _
+    | ConstructorApp _
+    | FuncApp _
+    | Cases _ ->
         raise
           (Exceptions.Impossible
-             "eval_expr concrete: aloc, lvar, set, exists or for all")
+             "eval_expr concrete: aloc, lvar, set, exists, for all, case, \
+              constructor or function application")
   with
   | TypeError msg -> raise (TypeError (msg ^ Fmt.str " in %a" Expr.pp e))
   | EvaluationError msg ->

@@ -29,6 +29,7 @@ and typ =
   | ListType
   | TypeType
   | SetType
+  | DatatypeType of string
 
 and literal =
   | Undefined
@@ -152,6 +153,9 @@ and expr =
   | ESet of expr list
   | Exists of (string * typ option) list * expr
   | ForAll of (string * typ option) list * expr
+  | ConstructorApp of string * expr list
+  | FuncApp of string * expr list
+  | Cases of expr * (string * string list * expr) list
 
 and assertion_atom =
   | Emp
@@ -237,6 +241,31 @@ and lemma = {
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
   lemma_existentials : string list;
+}
+
+and datatype = {
+  datatype_name : string;
+  datatype_source_path : string option;
+  datatype_loc : location option;
+  datatype_constructors : constructor list;
+}
+
+and func = {
+  func_name : string;
+  func_source_path : string option;
+  func_loc : location option;
+  func_num_params : int;
+  func_params : (string * typ option) list;
+  func_definition : expr;
+}
+
+and constructor = {
+  constructor_name : string;
+  constructor_source_path : string option;
+  constructor_loc : location option;
+  constructor_num_fields : int;
+  constructor_fields : typ option list;
+  constructor_datatype : string;
 }
 
 and single_spec = {
