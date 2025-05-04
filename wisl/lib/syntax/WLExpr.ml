@@ -124,8 +124,8 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
     | LLSub (e1, e2, e3) -> LLSub (f e1, f e2, f e3)
     | LEList le -> LEList (List.map f le)
     | LESet le -> LESet (List.map f le)
-    | LPureFunApp (name, le) | LConstructorApp (name, le) ->
-        LPureFunApp (name, List.map f le)
+    | LPureFunApp (name, le) -> LPureFunApp (name, List.map f le)
+    | LConstructorApp (name, le) -> LConstructorApp (name, List.map f le)
     | LCases (e, cs) ->
         let cs = List.map (fun c -> { c with lexpr = f c.lexpr }) cs in
         LCases (e, cs)

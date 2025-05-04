@@ -17,11 +17,47 @@ pure function length(xs : MyList) {
   }
 }
 
+pure function concatenate(xs : MyList, ys : MyList) {
+  case xs {
+    Nil         -> ys;
+    Cons(x, xs) -> 'Cons(x, concatenate(xs, ys))
+  }
+}
+
 pure function double_length(xs : MyList) {
   case xs {
     Nil         -> 0;
     Cons(x, xs) -> 2 + length(xs)
   }
+}
+
+pure function reverse(xs : MyList) {
+  case xs {
+    Nil         -> 'Nil;
+    Cons(x, xs) -> append(reverse(xs), x)
+  }
+}
+
+pure function list_member(xs : MyList, x) {
+  case xs {
+    Nil         -> false;
+    Cons(y, ys) -> (y == x) || list_member(ys, x)
+  }
+}
+
+//
+// Lemma: List membership concat
+//
+lemma list_member_concat {
+  statement:
+    forall vs1, vs2, v.
+      (list_member(vs1, v) == #r1) * (list_member(vs2, v) == #r2) |- (list_member(concatenate(vs1, vs2), v) == (#r1 || #r2))
+
+  proof:
+    if (vs1 != 'Nil) {
+      assert {bind: #nv1, #nvs1, #nr1} ('Cons(#nv1, #nvs1) == vs1) * (list_member(#nvs1, v) == #nr1);
+      apply list_member_concat(#nvs1, vs2, v)
+    }
 }
 
 //
@@ -81,6 +117,51 @@ function SLL_append(x, k){
 }
 { SLL(ret,  append(#vs, #k)) }
 
+// 03. Appending a given SLL node to a given SLL
+{ (x == #x) * (y == #y) * SLL(#x, #vs) * SLL(#y, 'Cons(#vy, 'Nil)) }
+function SLL_append_node(x, y) {
+  if (x == null) {
+    x := y
+  } else {
+    t := [x + 1];
+    z := SLL_append_node(t, y);
+    [x + 1] := z
+  };
+  return x
+}
+{ SLL(ret, append(#vs, #vy)) }
+
+// 04. Concatenating two lists
+{(x == #x) * (y == #y) * SLL(#x, #vx) * SLL(#y, #vy) }
+function SLL_concat(x, y) {
+  if (x == null){
+    x := y
+  } else {
+    t := [x + 1];
+    z := SLL_concat(t, y);
+    [x + 1] := z
+  };
+  return x
+}
+{ SLL(ret,  concatenate(#vx, #vy)) }
+
+// 05. Copying a given SLL
+{ (x == #x) * SLL(#x, #vs) }
+function SLL_copy(x){
+  y := null;
+  if (x != null) {
+    k := [x];
+    y := SLL_allocate_node(k);
+    t := [x + 1];
+    z := SLL_copy(t);
+    [y + 1] := z
+  } else {
+    skip
+  };
+  return y
+}
+{ SLL(#x, #vs) * SLL(ret, #vs) }
+
 // 06. Calculating the length of a given SLL
 { (x == #x) *  SLL(#x, #vs) }
 function SLL_length(x) {
@@ -111,27 +192,104 @@ function SLL_length_fails(x) {
 }
 { ret == double_length(#vs) }
 
-// 05. Copying a given SLL
-{ (x == #x) * SLL(#x, #vs) }
-function SLL_copy(x){
-  y := null;
+// 07. Reversing a given SLL
+{ (x == #x) *  SLL(#x, #vs) }
+function SLL_reverse(x){
   if (x != null) {
-    k := [x];
-    y := SLL_allocate_node(k);
     t := [x + 1];
-    z := SLL_copy(t);
-    [y + 1] := z
+    [x + 1] := null;
+    z := SLL_reverse(t);
+    y := SLL_append_node(z, x)
   } else {
-    skip
+    y := null
   };
   return y
 }
-{ SLL(#x, #vs) * SLL(ret, #vs) }
+{ SLL(ret, reverse(#vs)) }
+
+// 08. Checking if a given value is in a given SLL
+{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+function SLL_member(x, k){
+  found := false;
+  if (x == null){
+    skip
+  } else {
+    v := [x];
+    if (v == k){
+      found := true
+    } else {
+      t := [x + 1];
+      found := SLL_member(t, k)
+    }
+  };
+  return found
+}
+{ SLL(#x, #vs) * (ret == list_member(#vs, #k)) }
+
+// 09. Removing a given value from a given SLL
+{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+function SLL_remove(x, k) {
+  if (x == null) {
+    skip
+  } else {
+    v := [x];
+    next := [x + 1];
+    if (v == k){
+      free(x);
+      x := SLL_remove(next, k)
+    } else {
+       z := SLL_remove(next, k);
+       [x + 1] := z
+    }
+  };
+  return x
+}
+{ SLL(ret, #nvs) * (list_member(#nvs, #k) == false) }
+
+// This spec should fail
+{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+function SLL_remove_fails_1(x, k) {
+  if (x == null) {
+    skip
+  } else {
+    v := [x];
+    next := [x + 1];
+    if (v == k){
+      free(x);
+      x := SLL_remove(next, k)
+    } else {
+       z := SLL_remove(next, k);
+       [x + 1] := z
+    }
+  };
+  return x
+}
+{ SLL(ret, #nvs) * (list_member(#nvs, #k) == true) }
+
+// So should this one
+{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+function SLL_remove_fails_2(x, k) {
+  if (x == null) {
+    skip
+  } else {
+    v := [x];
+    next := [x + 1];
+    if (v == k){
+      z := SLL_remove(next, k);
+      [x + 1] := z
+    } else {
+      z := SLL_remove(next, k);
+      [x + 1] := z
+    }
+  };
+  return x
+}
+{ SLL(ret, #nvs) * (list_member(#nvs, #k) == false) }
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL(#x, #vs) }
 function SLL_free(x){
-  if (x != null) {
+  if (x == null) {
     skip
   } else {
     t := [x + 1];

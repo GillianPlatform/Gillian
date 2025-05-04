@@ -455,6 +455,18 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Expression resulting from the substitution. No fresh locations are created.
   *)
   let rec subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
+    let subst_in_bound_expr bs e =
+      (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
+      List.iter
+        (fun x ->
+          let lvar = Expr.LVar x in
+          let lvar_e = Option.get (Val.from_expr lvar) in
+          Hashtbl.add subst lvar lvar_e)
+        bs;
+      let e' = subst_in_expr_opt subst e in
+      List.iter (fun x -> Hashtbl.remove subst (Expr.LVar x)) bs;
+      e'
+    in
     let f_before (le : Expr.t) =
       match (le : Expr.t) with
       | LVar _ | ALoc _ | PVar _ ->
@@ -462,29 +474,25 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       | (UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _)) when mem subst le ->
           (Option.map Val.to_expr (get subst le), false)
       | Exists (bt, e) ->
-          (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
-          List.iter
-            (fun (x, _) ->
-              let lvar = Expr.LVar x in
-              let lvar_e = Option.get (Val.from_expr lvar) in
-              Hashtbl.add subst lvar lvar_e)
-            bt;
-          let e' = subst_in_expr_opt subst e in
-          List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
+          let e' = subst_in_bound_expr (List.map fst bt) e in
           let result = Option.map (fun e' -> Expr.Exists (bt, e')) e' in
           (result, false)
       | ForAll (bt, e) ->
-          (* We use Hashtbl.add so that we can later remove the binding and recover the old one! *)
-          List.iter
-            (fun (x, _) ->
-              let lvar = Expr.LVar x in
-              let lvar_e = Option.get (Val.from_expr lvar) in
-              Hashtbl.add subst lvar lvar_e)
-            bt;
-          let e' = subst_in_expr_opt subst e in
-          List.iter (fun (x, _) -> Hashtbl.remove subst (Expr.LVar x)) bt;
+          let e' = subst_in_bound_expr (List.map fst bt) e in
           let result = Option.map (fun e' -> Expr.ForAll (bt, e')) e' in
           (result, false)
+      | Cases (le, cs) -> (
+          let cs =
+            List_utils.flaky_map
+              (fun (c, bs, e) ->
+                let e' = subst_in_bound_expr bs e in
+                Option.map (fun e' -> (c, bs, e')) e')
+              cs
+          in
+          let le = subst_in_expr_opt subst le in
+          match (cs, le) with
+          | Some cs, Some le -> (Some (Expr.Cases (le, cs)), false)
+          | _ -> (None, false))
       | _ -> (Some le, true)
     in
     Expr.map_opt f_before None le

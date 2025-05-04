@@ -297,8 +297,26 @@ let rec learn_expr
   | BinOp _ -> []
   (* Can we learn anything from Exists? *)
   | Exists _ | ForAll _ -> []
-  (* TODO: Constructors aren't invertible unless we have destructors *)
-  | ConstructorApp _ -> []
+  | ConstructorApp (cname, le) ->
+      let num_fields = List.length le in
+      let param_str = Printf.sprintf "param-%d" in
+      let base_expr_nth_field n =
+        let case =
+          (cname, List.init num_fields param_str, Expr.LVar (param_str n))
+        in
+        Expr.Cases (base_expr, [ case ])
+      in
+      let le_with_base_exprs =
+        List.mapi (fun i e -> (e, base_expr_nth_field i)) le
+      in
+      L.(
+        verbose (fun m ->
+            m "List of expressions: %a"
+              Fmt.(
+                brackets
+                  (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp))))
+              le_with_base_exprs));
+      learn_expr_list kb le_with_base_exprs
   (* Function application isn't invertible *)
   | FuncApp _ -> []
   | Cases _ -> []

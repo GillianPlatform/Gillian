@@ -1028,8 +1028,9 @@ let rec encode_logical_expression
                ((pat, extend_wrap encoded), encoded))
              cs)
       in
+      let fallback = (PVar "_", extend_wrap undefined_encoding) in
       let>-- _ = encs in
-      extended_wrapped (match_datatype le_native cs)
+      extended_wrapped (match_datatype le_native (cs @ [ fallback ]))
   | ConstructorApp (name, les) -> (
       let param_typs = Datatype_env.get_constructor_field_types name in
       match param_typs with
@@ -1129,6 +1130,24 @@ let lvars_as_list_elements ?(exclude = SS.empty) (assertions : Expr.Set.t) :
                 Containers.SS.union acc inner)
           Containers.SS.empty les
 
+      method! visit_Cases (exclude, is_in_list) le cs =
+        let cases =
+          List.fold_left
+            (fun acc (_, bs, e) ->
+              (* Treat binders as though they are in a list *)
+              let binders =
+                bs
+                |> List.filter (fun b -> not (Containers.SS.mem b exclude))
+                |> List.to_seq
+              in
+              let binders = Containers.SS.add_seq binders acc in
+              let inner = self#visit_expr (exclude, is_in_list) e in
+              Containers.SS.union binders inner)
+            Containers.SS.empty cs
+        in
+        let scrutinee = self#visit_expr (exclude, is_in_list) le in
+        Containers.SS.union scrutinee cases
+
       method! visit_LVar (exclude, is_in_list) x =
         if is_in_list && not (Containers.SS.mem x exclude) then
           Containers.SS.singleton x
@@ -1184,6 +1203,7 @@ let encode_functions (fs : Func.t list) : sexp list =
     let param_types =
       List.map
         (fun (x, t) ->
+          let x = sanitize_identifier x in
           match t with
           | Some t -> (x, Encoding.native_sort_of_type t)
           | None -> (x, t_gil_ext_literal))
