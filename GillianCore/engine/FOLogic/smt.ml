@@ -528,14 +528,28 @@ module Encoding = struct
     in
     { enc' with consts; extra_asrts }
 
-  let get_native ~accessor { expr; kind; _ } =
+  let get_native
+      ~accessor
+      ~recognizer
+      ~typ
+      ({ expr; kind; extra_asrts; _ } as enc) : t =
     (* No additional check is performed on native type,
        it should be already type checked *)
-    match kind with
-    | Native _ -> expr
-    | Simple_wrapped -> accessor expr
-    | Extended_wrapped ->
-        accessor (Ext_lit_operations.Gil_sing_elem.access expr)
+    let expr, guards =
+      match kind with
+      | Native _ -> (expr, [])
+      | Simple_wrapped -> (accessor expr, [ recognizer expr ])
+      | Extended_wrapped ->
+          let simply_wrapped = Ext_lit_operations.Gil_sing_elem.access expr in
+          ( accessor simply_wrapped,
+            [
+              recognizer simply_wrapped;
+              Ext_lit_operations.Gil_sing_elem.recognize expr;
+            ] )
+    in
+    let extra_asrts = guards @ extra_asrts in
+    let kind = Native typ in
+    { enc with expr; extra_asrts; kind }
 
   let simply_wrapped = make ~kind:Simple_wrapped
   let extended_wrapped = make ~kind:Extended_wrapped
@@ -543,10 +557,10 @@ module Encoding = struct
   (** Takes a value either natively encoded or simply wrapped
     and returns a value simply wrapped.
     Careful: do not use wrap with a a set, as they cannot be simply wrapped *)
-  let simple_wrap { expr; kind; _ } =
+  let simple_wrap ({ expr; kind; extra_asrts; _ } as enc) =
     let open Lit_operations in
     match kind with
-    | Simple_wrapped -> expr
+    | Simple_wrapped -> enc
     | Native typ ->
         let construct =
           match typ with
@@ -566,47 +580,74 @@ module Encoding = struct
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
         in
-        construct expr
-    | Extended_wrapped -> Ext_lit_operations.Gil_sing_elem.access expr
+        { enc with expr = construct expr; kind = Simple_wrapped }
+    | Extended_wrapped ->
+        let guard = Ext_lit_operations.Gil_sing_elem.recognize expr in
+        let extra_asrts = guard :: extra_asrts in
+        let expr = Ext_lit_operations.Gil_sing_elem.access expr in
+        { enc with extra_asrts; expr; kind = Simple_wrapped }
 
-  let extend_wrap e =
-    match e.kind with
-    | Extended_wrapped -> e.expr
-    | Native SetType -> Ext_lit_operations.Gil_set.construct (simple_wrap e)
-    | _ -> Ext_lit_operations.Gil_sing_elem.construct (simple_wrap e)
-
-  let get_num = get_native ~accessor:Lit_operations.Num.access
-  let get_int = get_native ~accessor:Lit_operations.Int.access
-  let get_bool = get_native ~accessor:Lit_operations.Bool.access
-  let get_list = get_native ~accessor:Lit_operations.List.access
-
-  let get_set { kind; expr; _ } =
+  let extend_wrap ({ expr; kind; _ } as enc) =
     match kind with
-    | Native SetType -> expr
-    | Extended_wrapped -> Ext_lit_operations.Gil_set.access expr
+    | Extended_wrapped -> enc
+    | Native SetType ->
+        let expr = Ext_lit_operations.Gil_set.construct expr in
+        { enc with expr; kind = Extended_wrapped }
+    | _ ->
+        let ({ expr; _ } as enc) = simple_wrap enc in
+        let expr = Ext_lit_operations.Gil_sing_elem.construct expr in
+        { enc with expr; kind = Extended_wrapped }
+
+  let get_num =
+    get_native ~accessor:Lit_operations.Num.access
+      ~recognizer:Lit_operations.Num.recognize ~typ:NumberType
+
+  let get_int =
+    get_native ~accessor:Lit_operations.Int.access
+      ~recognizer:Lit_operations.Int.recognize ~typ:IntType
+
+  let get_bool =
+    get_native ~accessor:Lit_operations.Bool.access
+      ~recognizer:Lit_operations.Bool.recognize ~typ:BooleanType
+
+  let get_list =
+    get_native ~accessor:Lit_operations.List.access
+      ~recognizer:Lit_operations.List.recognize ~typ:ListType
+
+  let get_set ({ kind; expr; extra_asrts; _ } as enc) : t =
+    match kind with
+    | Native SetType -> enc
+    | Extended_wrapped ->
+        let guard = Ext_lit_operations.Gil_set.recognize expr in
+        let extra_asrts = guard :: extra_asrts in
+        let expr = Ext_lit_operations.Gil_set.access expr in
+        let kind = Native SetType in
+        { enc with extra_asrts; expr; kind }
     | _ -> failwith "wrong encoding of set"
 
-  let get_string = get_native ~accessor:Lit_operations.String.access
+  let get_string =
+    get_native ~accessor:Lit_operations.String.access
+      ~recognizer:Lit_operations.String.recognize ~typ:StringType
 
   let get_native_of_type ~(typ : Type.t) =
     let open Lit_operations in
-    let accessor =
+    let accessor, recognizer =
       match typ with
-      | IntType -> Int.access
-      | NumberType -> Num.access
-      | StringType -> String.access
-      | ObjectType -> Loc.access
-      | TypeType -> Type.access
-      | BooleanType -> Bool.access
-      | ListType -> List.access
+      | IntType -> (Int.access, Int.recognize)
+      | NumberType -> (Num.access, Num.recognize)
+      | StringType -> (String.access, String.recognize)
+      | ObjectType -> (Loc.access, Loc.recognize)
+      | TypeType -> (Type.access, Type.recognize)
+      | BooleanType -> (Bool.access, Bool.recognize)
+      | ListType -> (List.access, List.recognize)
       | DatatypeType name ->
           let (module U : Variant.Unary) = get_datatype_lit_variant name in
-          U.access
+          (U.access, U.recognize)
       | UndefinedType | NullType | EmptyType | NoneType | SetType ->
           Fmt.failwith "Cannot get native value of type %s"
             (Gil_syntax.Type.str typ)
     in
-    get_native ~accessor
+    get_native ~accessor ~recognizer ~typ
 end
 
 let typeof_simple e =
@@ -700,7 +741,8 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
     | Loc l -> encode_string l >- ObjectType
     | Type t -> encode_type t >- TypeType
     | LList lits ->
-        let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
+        let>-- args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
+        let args = List.map (fun arg -> arg.expr) args in
         list args >- ListType
     | Constant _ -> raise (Exceptions.Unsupported "Z3 encoding: constants")
   with Failure msg ->
@@ -710,23 +752,24 @@ let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
   let open Encoding in
   let>- _ = p1 in
   let>- _ = p2 in
-  let res =
-    match (p1.kind, p2.kind) with
-    | Native t1, Native t2 when Type.equal t1 t2 ->
-        if Type.equal t1 BooleanType then
-          if is_true p1.expr then p2.expr
-          else if is_true p2.expr then p1.expr
-          else eq p1.expr p2.expr
-        else eq p1.expr p2.expr
-    | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
-        eq p1.expr p2.expr
-    | Native _, Native _ -> failwith "incompatible equality, type error!"
-    | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
-        eq (simple_wrap p1) (simple_wrap p2)
-    | Extended_wrapped, _ | _, Extended_wrapped ->
-        eq (extend_wrap p1) (extend_wrap p2)
-  in
-  res >- BooleanType
+  match (p1.kind, p2.kind) with
+  | Native t1, Native t2 when Type.equal t1 t2 ->
+      if Type.equal t1 BooleanType then
+        if is_true p1.expr then p2.expr >- BooleanType
+        else if is_true p2.expr then p1.expr >- BooleanType
+        else eq p1.expr p2.expr >- BooleanType
+      else eq p1.expr p2.expr >- BooleanType
+  | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
+      eq p1.expr p2.expr >- BooleanType
+  | Native _, Native _ -> failwith "incompatible equality, type error!"
+  | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
+      let>- p1 = simple_wrap p1 in
+      let>- p2 = simple_wrap p2 in
+      eq p1.expr p2.expr >- BooleanType
+  | Extended_wrapped, _ | _, Extended_wrapped ->
+      let>- p1 = extend_wrap p1 in
+      let>- p2 = extend_wrap p2 in
+      eq p1.expr p2.expr >- BooleanType
 
 let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
     =
@@ -739,37 +782,96 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
      It is expected that values of unknown type are already wrapped into their constructors.
   *)
   match op with
-  | IPlus -> num_add (get_int p1) (get_int p2) >- IntType
-  | IMinus -> num_sub (get_int p1) (get_int p2) >- IntType
-  | ITimes -> num_mul (get_int p1) (get_int p2) >- IntType
-  | IDiv -> num_div (get_int p1) (get_int p2) >- IntType
-  | IMod -> num_mod (get_int p1) (get_int p2) >- IntType
-  | ILessThan -> num_lt (get_int p1) (get_int p2) >- BooleanType
-  | ILessThanEqual -> num_leq (get_int p1) (get_int p2) >- BooleanType
-  | FPlus -> num_add (get_num p1) (get_num p2) >- NumberType
-  | FMinus -> num_sub (get_num p1) (get_num p2) >- NumberType
-  | FTimes -> num_mul (get_num p1) (get_num p2) >- NumberType
-  | FDiv -> num_div (get_num p1) (get_num p2) >- NumberType
-  | FLessThan -> num_lt (get_num p1) (get_num p2) >- BooleanType
-  | FLessThanEqual -> num_leq (get_num p1) (get_num p2) >- BooleanType
+  | IPlus ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_add p1.expr p2.expr >- IntType
+  | IMinus ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_sub p1.expr p2.expr >- IntType
+  | ITimes ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_mul p1.expr p2.expr >- IntType
+  | IDiv ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_div p1.expr p2.expr >- IntType
+  | IMod ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_mod p1.expr p2.expr >- IntType
+  | ILessThan ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_lt p1.expr p2.expr >- IntType
+  | ILessThanEqual ->
+      let>- p1 = get_int p1 in
+      let>- p2 = get_int p2 in
+      num_leq p1.expr p2.expr >- IntType
+  | FPlus ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_add p1.expr p2.expr >- NumberType
+  | FMinus ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_sub p1.expr p2.expr >- NumberType
+  | FTimes ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_mul p1.expr p2.expr >- NumberType
+  | FDiv ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_div p1.expr p2.expr >- NumberType
+  | FLessThan ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_lt p1.expr p2.expr >- NumberType
+  | FLessThanEqual ->
+      let>- p1 = get_num p1 in
+      let>- p2 = get_num p2 in
+      num_leq p1.expr p2.expr >- NumberType
   | Equal -> encode_equality p1 p2
-  | Or -> bool_or (get_bool p1) (get_bool p2) >- BooleanType
-  | Impl -> bool_implies (get_bool p1) (get_bool p2) >- BooleanType
-  | And -> bool_and (get_bool p1) (get_bool p2) >- BooleanType
+  | Or ->
+      let>- p1 = get_bool p1 in
+      let>- p2 = get_bool p2 in
+      bool_or p1.expr p2.expr >- BooleanType
+  | Impl ->
+      let>- p1 = get_bool p1 in
+      let>- p2 = get_bool p2 in
+      bool_implies p1.expr p2.expr >- BooleanType
+  | And ->
+      let>- p1 = get_bool p1 in
+      let>- p2 = get_bool p2 in
+      bool_and p1.expr p2.expr >- BooleanType
   | SetMem ->
       (* p2 has to be already wrapped *)
-      set_member Z3 (simple_wrap p1) (get_set p2) >- BooleanType
-  | SetDiff -> set_difference Z3 (get_set p1) (get_set p2) >- SetType
-  | SetSub -> set_subset Z3 (get_set p1) (get_set p2) >- BooleanType
-  | LstNth -> seq_nth (get_list p1) (get_int p2) |> simply_wrapped
+      let>- p1 = simple_wrap p1 in
+      let>- p2 = get_set p2 in
+      set_member Z3 p1.expr p2.expr >- BooleanType
+  | SetDiff ->
+      let>- p1 = get_set p1 in
+      let>- p2 = get_set p2 in
+      set_difference Z3 p1.expr p2.expr >- SetType
+  | SetSub ->
+      let>- p1 = get_set p1 in
+      let>- p2 = get_set p2 in
+      set_subset Z3 p1.expr p2.expr >- BooleanType
+  | LstNth ->
+      let>- p1 = get_list p1 in
+      let>- p2 = get_list p2 in
+      seq_nth p1.expr p2.expr |> simply_wrapped
   | LstRepeat ->
-      let x = simple_wrap p1 in
-      let n = get_int p2 in
-      RepeatCache.get x n
+      let>- x = simple_wrap p1 in
+      let>- n = get_int p2 in
+      RepeatCache.get x.expr n.expr
   | StrNth ->
-      let str' = get_string p1 in
-      let index' = get_num p2 in
-      let res = Axiomatised_operations.snth $$ [ str'; index' ] in
+      let>- str' = get_string p1 in
+      let>- index' = get_num p2 in
+      let res = Axiomatised_operations.snth $$ [ str'.expr; index'.expr ] in
       res >- StringType
   | FMod
   | StrLess
@@ -802,31 +904,58 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   let open Axiomatised_operations in
   let>- _ = le in
   match op with
-  | IUnaryMinus -> num_neg (get_int le) >- IntType
-  | FUnaryMinus -> num_neg (get_num le) >- NumberType
+  | IUnaryMinus ->
+      let>- le = get_int le in
+      num_neg le.expr >- IntType
+  | FUnaryMinus ->
+      let>- le = get_num le in
+      num_neg le.expr >- NumberType
   | LstLen ->
       (* If we only use an LVar as an argument to llen, then encode it as an uninterpreted function. *)
+      let>- le = get_list le in
       let enc =
         match e with
-        | Expr.LVar l when SS.mem l llen_lvars -> llen <| get_list le
-        | _ -> seq_len (get_list le)
+        | Expr.LVar l when SS.mem l llen_lvars -> llen <| le.expr
+        | _ -> seq_len le.expr
       in
       enc >- IntType
-  | StrLen -> slen <| get_string le >- NumberType
-  | ToStringOp -> Axiomatised_operations.num2str <| get_num le >- StringType
-  | ToNumberOp -> Axiomatised_operations.str2num <| get_string le >- NumberType
-  | ToIntOp -> Axiomatised_operations.num2int <| get_num le >- NumberType
-  | Not -> bool_not (get_bool le) >- BooleanType
+  | StrLen ->
+      let>- le = get_string le in
+      slen <| le.expr >- NumberType
+  | ToStringOp ->
+      let>- le = get_num le in
+      Axiomatised_operations.num2str <| le.expr >- StringType
+  | ToNumberOp ->
+      let>- le = get_string le in
+      Axiomatised_operations.str2num <| le.expr >- NumberType
+  | ToIntOp ->
+      let>- le = get_num le in
+      Axiomatised_operations.num2int <| le.expr >- NumberType
+  | Not ->
+      let>- le = get_bool le in
+      bool_not le.expr >- BooleanType
   | Cdr ->
-      let list = get_list le in
-      seq_extract list (int_k 1) (seq_len list) >- ListType
-  | Car -> seq_nth (get_list le) (int_k 0) |> simply_wrapped
+      let>- list = get_list le in
+      seq_extract list.expr (int_k 1) (seq_len list.expr) >- ListType
+  | Car ->
+      let>- list = get_list le in
+      seq_nth list.expr (int_k 0) |> simply_wrapped
   | TypeOf -> typeof_expression le >- TypeType
-  | ToUint32Op -> get_num le |> real_to_int |> int_to_real >- NumberType
-  | LstRev -> Axiomatised_operations.lrev <| get_list le >- ListType
-  | NumToInt -> get_num le |> real_to_int >- IntType
-  | IntToNum -> get_int le |> int_to_real >- NumberType
-  | IsInt -> num_divisible (get_num le) 1 >- BooleanType
+  | ToUint32Op ->
+      let>- le = get_num le in
+      le.expr |> real_to_int |> int_to_real >- NumberType
+  | LstRev ->
+      let>- list = get_list le in
+      Axiomatised_operations.lrev <| list.expr >- ListType
+  | NumToInt ->
+      let>- le = get_num le in
+      le.expr |> real_to_int >- IntType
+  | IntToNum ->
+      let>- le = get_int le in
+      le.expr |> int_to_real >- NumberType
+  | IsInt ->
+      let>- le = get_num le in
+      num_divisible le.expr 1 >- BooleanType
   | BitwiseNot
   | M_isNaN
   | M_abs
@@ -878,6 +1007,20 @@ let encode_bound_expr
   in
   (* Not the same gamma now!*)
   let encoded = encode_expr ~gamma ~llen_lvars ~list_elem_vars expr in
+
+  (* Extra asrts could contain these bound variables - separate these *)
+  let rec atoms (sexp : sexp) =
+    match sexp with
+    | Atom s -> SS.singleton s
+    | List lst -> List.fold_left SS.union SS.empty (List.map atoms lst)
+  in
+  let bs = SS.of_list (List.map fst bound_vars) in
+  let contains_bound_vars asrt = not (SS.disjoint bs (atoms asrt)) in
+  let bound_asrts, extra_asrts =
+    List.partition contains_bound_vars encoded.extra_asrts
+  in
+  let encoded = { encoded with extra_asrts } in
+
   (* Don't declare consts for quantified vars *)
   let bound_vars =
     bound_vars
@@ -894,7 +1037,7 @@ let encode_bound_expr
     |> Hashtbl.filter_map_inplace (fun c () ->
            if List.mem c bound_vars then None else Some ())
   in
-  (bound_vars, encoded)
+  (bound_vars, bound_asrts, encoded)
 
 let encode_quantified_expr
     ~(encode_expr :
@@ -917,7 +1060,7 @@ let encode_quantified_expr
         Some (encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion)
     | _ -> None
   in
-  let quantified_vars, encoded =
+  let quantified_vars, bound_asrts, encoded =
     encode_bound_expr ~encode_expr ~gamma ~llen_lvars ~list_elem_vars
       quantified_vars assertion
   in
@@ -927,6 +1070,7 @@ let encode_quantified_expr
         (expr, consts, extra_asrts)
     | _ -> failwith "the thing inside forall is not boolean!"
   in
+  let encoded_assertion = bool_ands (encoded_assertion :: bound_asrts) in
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
@@ -955,27 +1099,37 @@ let rec encode_logical_expression
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
-      les |> List.map get_set |> set_union' Z3 >- SetType
+      let>-- sets = List.map get_set les in
+      let sets = List.map (fun set -> set.expr) sets in
+      set_union' Z3 sets >- SetType
   | NOp (SetInter, les) ->
       let>-- les = List.map f les in
-      les |> List.map get_set |> set_intersection' Z3 >- SetType
+      let>-- sets = List.map get_set les in
+      let sets = List.map (fun set -> set.expr) sets in
+      set_intersection' Z3 sets >- SetType
   | NOp (LstCat, les) ->
       let>-- les = List.map f les in
-      les |> List.map get_list |> seq_concat >- ListType
+      let>-- lists = List.map get_list les in
+      let lists = List.map (fun list -> list.expr) lists in
+      seq_concat lists >- ListType
   | EList les ->
       let>-- args = List.map f les in
-      args |> List.map simple_wrap |> seq_of ~typ:t_gil_literal_list >- ListType
+      let>-- args = List.map simple_wrap args in
+      let args = List.map (fun arg -> arg.expr) args in
+      seq_of ~typ:t_gil_literal_list args >- ListType
   | ESet les ->
       let>-- args = List.map f les in
-      args |> List.map simple_wrap |> set_of >- SetType
+      let>-- args = List.map simple_wrap args in
+      let args = List.map (fun arg -> arg.expr) args in
+      set_of args >- SetType
   | LstSub (lst, start, len) ->
       let>- lst = f lst in
       let>- start = f start in
       let>- len = f len in
-      let lst = get_list lst in
-      let start = get_int start in
-      let len = get_int len in
-      seq_extract lst start len >- ListType
+      let>- lst = get_list lst in
+      let>- start = get_int start in
+      let>- len = get_int len in
+      seq_extract lst.expr start.expr len.expr >- ListType
   | Exists (bt, e) ->
       encode_quantified_expr ~encode_expr:encode_logical_expression
         ~mk_quant:exists ~gamma ~llen_lvars ~list_elem_vars bt e
@@ -992,7 +1146,8 @@ let rec encode_logical_expression
             | None -> extend_wrap
           in
           let>-- args = List.map f les in
-          let args = List.map2 extend_wrap_or_native param_typs args in
+          let>-- args = List.map2 extend_wrap_or_native param_typs args in
+          let args = List.map (fun arg -> arg.expr) args in
           let sexp = app_ name args in
           extended_wrapped sexp
       | None ->
@@ -1009,7 +1164,7 @@ let rec encode_logical_expression
       in
       let>- le = f le in
       (* Convert to native *)
-      let le_native = get_native_of_type ~typ:constructors_t le in
+      let>- le_native = get_native_of_type ~typ:constructors_t le in
       (* Encode match cases *)
       let cs, encs =
         List.split
@@ -1021,16 +1176,20 @@ let rec encode_logical_expression
                let pat = PCon (c, bs) in
                let ts = Datatype_env.get_constructor_field_types_unsafe c in
                let bts = List.combine bs ts in
-               let _, encoded =
+               (* TODO: How to handle extra asrts involving bound vars?? *)
+               (* Using ite and mapping to undefined values when extra asrts are false causes queries to time out *)
+               let _, _, encoded =
                  encode_bound_expr ~encode_expr:encode_logical_expression ~gamma
                    ~llen_lvars ~list_elem_vars bts e
                in
-               ((pat, extend_wrap encoded), encoded))
+               let encoded = extend_wrap encoded in
+               let encoded_expr = encoded.expr in
+               ((pat, encoded_expr), encoded))
              cs)
       in
-      let fallback = (PVar "_", extend_wrap undefined_encoding) in
+      let fallback = (PVar "_", (extend_wrap undefined_encoding).expr) in
       let>-- _ = encs in
-      extended_wrapped (match_datatype le_native (cs @ [ fallback ]))
+      extended_wrapped (match_datatype le_native.expr (cs @ [ fallback ]))
   | ConstructorApp (name, les) -> (
       let param_typs = Datatype_env.get_constructor_field_types name in
       match param_typs with
@@ -1041,10 +1200,11 @@ let rec encode_logical_expression
             | None -> simple_wrap
           in
           let>-- args = List.map f les in
-          let args = List.map2 simple_wrap_or_native param_typs args in
+          let>-- args = List.map2 simple_wrap_or_native param_typs args in
           let (module V : Variant.Nary) =
             Lit_operations.get_constructor_variant name
           in
+          let args = List.map (fun arg -> arg.expr) args in
           let sexp = V.construct args in
           sexp >- Datatype_env.get_constructor_type_unsafe name
       | None ->
@@ -1235,7 +1395,15 @@ let encode_functions (fs : Func.t list) : sexp list =
       @@ encode_logical_expression ~gamma ~llen_lvars ~list_elem_vars
            f.func_definition
     in
-    (name, param_types, ret_type, encoded_def)
+    let func_body =
+      if List.length encoded_def.extra_asrts == 0 then encoded_def.expr
+      else
+        ite
+          (bool_ands encoded_def.extra_asrts)
+          encoded_def.expr
+          (Encoding.extend_wrap Encoding.undefined_encoding).expr
+    in
+    (name, param_types, ret_type, func_body)
   in
   [ defn_funs_rec (List.map encode_function fs) ]
 

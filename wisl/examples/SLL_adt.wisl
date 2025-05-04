@@ -46,6 +46,22 @@ pure function list_member(xs : MyList, x) {
 }
 
 //
+// Lemma: List membership append
+//
+lemma list_member_append {
+  statement:
+    forall vs, v, r, w.
+      (list_member(vs, v) == r) |- (list_member(append(vs, w), v) == (r || (w == v)))
+
+  proof:
+    if (w == v) {} else {}; // FIXME: THIS IS HORRIFIC
+    if (vs != 'Nil) {
+      assert {bind: #nv, #nvs, #nr} (vs == 'Cons(#nv, #nvs)) * (list_member(#nvs, #v) == #nr);
+      apply list_member_append(#nvs, v, #nr, w)
+    }
+}
+
+//
 // Lemma: List membership concat
 //
 lemma list_member_concat {
