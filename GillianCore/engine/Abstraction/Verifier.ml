@@ -228,13 +228,24 @@ struct
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_mp with
         | Error _ ->
-            let msg =
-              Printf.sprintf "Warning: testify failed for %s. Cause: post_mp \n"
-                name
+            let open Gillian_result in
+            let err =
+              let msg =
+                Fmt.str
+                  "Failed to create matching plan for post-condition of %s" name
+              in
+              let loc =
+                List.fold_left
+                  (fun acc (_, loc) ->
+                    match (acc, loc) with
+                    | Some l, Some l' -> Some (Location.merge l l')
+                    | Some l, None | None, Some l -> Some l
+                    | None, None -> None)
+                  None posts
+              in
+              Error.AnalysisFailures [ { msg; loc } ]
             in
-            Printf.printf "%s" msg;
-            L.verbose (fun m -> m "%s" msg);
-            (None, None)
+            raise (Exc.Gillian_error err)
         | Ok post_mp ->
             let pre' = SPState.to_assertions ss_pre in
             let ss_pre =
