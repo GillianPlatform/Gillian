@@ -30,20 +30,14 @@ let solver =
       stop = (fun () -> failwith "Uninitialized solver");
       force_stop = (fun () -> failwith "Uninitialized solver");
       config = z3;
+      raw_command = (fun _ -> failwith "Uninitialized solver");
     }
 
 let cmd s = ack_command !solver s
 
 let rec init_solver () =
   let z3 = new_solver z3 in
-  let command s =
-    try z3.command s
-    with Sys_error s ->
-      let msg = Fmt.str "Error when calling SMT solver: %s" s in
-      Logging.normal (fun m -> m "%s" msg);
-      init_solver ();
-      raise (Gillian_result.Exc.internal_error msg)
-  in
+  let command = protected_command z3 in
   let () = solver := { z3 with command } in
   (* Config, initial decls *)
   let () =
@@ -53,6 +47,25 @@ let rec init_solver () =
   let () = decls |> List.iter cmd in
   let () = cmd (push 1) in
   ()
+
+and protected_command solver s =
+  let open Sexplib in
+  let open Gillian_result.Exc in
+  let res =
+    try
+      let r = solver.command s in
+      (* Perform a "heartbeat" after each command so we know ASAP if the solver died *)
+      match solver.raw_command "(echo \"gillian\")" with
+      | Sexp.Atom "gillian" -> Ok r
+      | s -> Fmt.error "SMT heartbeat gave unexpected result: %a" Sexp.pp_hum s
+    with Sys_error s -> Fmt.error "Error when calling SMT solver: %s" s
+  in
+  match res with
+  | Ok r -> r
+  | Error msg ->
+      Logging.normal (fun m -> m "%s" msg);
+      init_solver ();
+      raise (internal_error msg)
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
