@@ -38,7 +38,7 @@
   (fmt
    (>= 0.8.8))
   (linol-lwt
-   (>= 0.8))
+   (>= 0.10))
   (memtrace
    (= 0.2.3))
   (menhir
