@@ -268,21 +268,21 @@ function list_length(x) {
 }
 { list(#x, #vx) * (ret == len(#vx)) }
 
-// // 07. Reversing a given SLL
-// { (x == #x) * list(#x, #vx) }
-// function list_reverse(x) {
-//   y := null;
-//   [[ invariant {bind: x, y, z, #nvx, #nvy}
-//       list(x, #nvx) * list(y, #nvy) * (#vx == ((rev #nvy) @ #nvx)) ]];
-//   while (x != null) {
-//     z := [x + 1];
-//     [x + 1] := y;
-//     y := x;
-//     x := z
-//   };
-//   return y
-// }
-// { list(ret, rev #vx) }
+// 07. Reversing a given SLL
+{ (x == #x) * list(#x, #vx) }
+function list_reverse(x) {
+  y := null;
+  [[ invariant {bind: x, y, z, #nvx, #nvy}
+      list(x, #nvx) * list(y, #nvy) * (#vx == ((rev #nvy) @ #nvx)) ]];
+  while (x != null) {
+    z := [x + 1];
+    [x + 1] := y;
+    y := x;
+    x := z
+  };
+  return y
+}
+{ list(ret, rev #vx) }
 
 // 08. Checking if a given value is in a given SLL
 { (x == #x) * (k == #k) * list(#x, #alpha) * list_member(#alpha, #k, #r) }

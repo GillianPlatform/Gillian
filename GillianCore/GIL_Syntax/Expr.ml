@@ -69,11 +69,12 @@ let list_nth_e x n =
   | Lit (Num _) -> failwith "l-nth of list and Num!"
   | _ -> BinOp (x, LstNth, n)
 
-let list_length x =
+let rec list_length x =
   match x with
   | EList l -> int (List.length l)
   | Lit (LList l) -> int (List.length l)
   | LstSub (_, _, len) -> len
+  | UnOp (LstRev, l) -> list_length l
   | _ -> UnOp (LstLen, x)
 
 let list_repeat x len =
