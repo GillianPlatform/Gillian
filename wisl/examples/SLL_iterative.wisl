@@ -1,99 +1,327 @@
-predicate list(+x, alpha) {
-    (x == null) * (alpha == nil);
-    (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
+//
+// Standard over-approximating SLL predicate with contents
+//
+predicate list(+x, vs) {
+  // Empty SLL
+  (x == null) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * list(#next, #vs) *
+  (vs == #v :: #vs)
 }
 
-predicate lseg(+x, +y, alpha) {
-  (x == y) * (alpha == nil);
-  (x -> #v, #z) * lseg(#z, y, #beta) * (alpha == #v::#beta)
+//
+// Pure predicate for list membership
+//
+predicate list_member(+vs, +v, r : Bool){
+  (vs == []) * (r == false);
+  (vs == v :: #rest) * (r == true) * list_member(#rest, v, #mem);
+  (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
 }
 
-lemma lseg_to_list(x, alpha) {
-  variant: len alpha
-  hypothesis: (x == #x) * (alpha == #alpha) * lseg(#x, null, #alpha)
-  conclusion: list(#x, #alpha)
-  proof: unfold lseg(#x, null, #alpha);
-         if (#x != null) {
-           assert {exists:  #next, #beta} (#x + 1 -> #next) * lseg(#next, null, #beta) ;
-           apply lseg_to_list(#next, #beta);
-           fold list(#x, #alpha)
-         } else {
-           fold list(#x, #alpha)
-         }
+//
+// Lemma: List membership append
+//
+lemma list_member_append {
+  statement:
+    forall vs, v, r, w.
+      list_member(vs, v, r) |- list_member(vs @ [ w ], v, (r || (w == v)))
+
+  proof:
+    if (w == v) {} else {}; // FIXME: THIS IS HORRIFIC
+    unfold list_member(vs, v, r);
+    if (vs != []) {
+      assert {bind: #nv, #nvs, #nr} (vs == #nv :: #nvs) * list_member(#nvs, #v, #nr);
+      apply list_member_append(#nvs, v, #nr, w)
+    }
 }
 
-lemma concat_lseg_list(x, y, beta) {
-  variant: len beta
-  hypothesis: (x == #x) * (y == #y) * (beta == #beta) * lseg(#x, #y, #alpha) * list(#y, #beta)
-  conclusion: list(#x, #alpha @ #beta)
-  proof: unfold list (#y, #beta);
-         if (#y == null) {
-           apply lseg_to_list(#x, #alpha)
-         } else {
-           assert (!(#y == null));
-           unfold list(#y, #beta);
-           assert (#y -> #z, #t) * list(#t, #rest) * (#beta == #z::#rest);
-           apply lseg_append(#x, #y, #alpha, #z, #t);
-           apply concat_lseg_list(#x, #t, #rest) 
-         }
+//
+// Lemma: List membership concat
+//
+lemma list_member_concat {
+  statement:
+    forall vs1, vs2, v.
+      list_member(vs1, v, #r1) * list_member(vs2, v, #r2) |- list_member(vs1 @ vs2, v, (#r1 || #r2))
+
+  proof:
+    unfold list_member(vs1, v, #r1);
+    if (vs1 != []) {
+      assert {bind: #nv1, #nvs1, #nr1} (vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v, #nr1);
+      apply list_member_concat(#nvs1, vs2, v)
+    }
 }
 
+// 00. Allocating an SLL node with the given value
+{ (v == #v) }
+function list_allocate_node(v){
+  t := new(2);
+  [t] := v;
+  return t
+}
+{ list(ret, [ #v ]) }
 
-lemma lseg_append(x, y, alpha, yval, ynext) {
-  variant: len alpha
-  hypothesis: (x == #x) * (y == #y) * (alpha == #alpha) *
-              (yval == #yval) * (ynext == #ynext) *
-              lseg(#x, #y, #alpha) * (#y -> #yval, #ynext)
-  conclusion: lseg(#x, #ynext, #alpha @ [ #yval ])
-  proof: unfold lseg(#x, #y, #alpha);
-         if (#alpha != []) {
-           assert {exists: #next, #beta} (#x + 1 -> #next) * lseg(#next, #y, #beta) ;
-           apply lseg_append(#next, #y, #beta, #yval, #ynext); 
-           fold lseg(#x, #ynext, #alpha @ [#yval])
-         } else {
-           fold lseg(#x, #ynext, #alpha @ [#yval])
-         }
+//
+// ITERATIVE LIST MANIPULATION
+//
+
+//
+// Standard over-approximating SLL segment predicate with contents
+//
+predicate lseg(+x, y, vs) {
+  (x == y) * (vs == []);
+  (x -b> #v, #next) * lseg(#next, y, #vs) * (vs == #v :: #vs)
 }
 
+//
+// Lemma: appending a given value to a given SLLseg
+//
+lemma lseg_append {
+  statement:
+    forall x, vs, v, z.
+      lseg(x, #y, vs) * (#y -b> v, z) |- lseg(x, z, vs @ [ v ])
 
-{ (#x == x) * list(#x, #alpha) }
-function llen(x) {
-  y := x;
-  n := 0;
-  [[invariant {exists: #a1, #a2} lseg(#x, y, #a1) * list(y, #a2) * (#alpha == #a1@#a2) * (n == len #a1) ]];
-  while (y != null) {
-    [[ assert {exists: #z} y == #z ]];
-    [[ assert {exists: #b, #t} #z -> #b, #t ]];
-    y := [y+1];
-    n := n+1;
-    [[ apply lseg_append(#x, #z, #a1, #b, #t) ]] 
-  };
-  [[ unfold list(null, #a2) ]];
-  [[ apply lseg_to_list(#x, #alpha) ]];
-  return n
+  proof:
+    unfold lseg(x, #y, vs);
+    if (x != #y) {
+      assert {bind: #nv, #nnext, #nvs}
+        (x -b> #nv, #nnext) * lseg(#nnext, #y, #nvs) *
+        (vs == #nv :: #nvs);
+      apply lseg_append(#nnext, #nvs, v, z);
+      fold lseg(x, z, vs @ [ v ])
+    } else {
+      fold lseg(#y, z, [ v ])
+    }
 }
-{ list(#x, #alpha) * (ret == len(#alpha)) }
 
+//
+// Lemma: an SLLseg followed by an SLL is an SLL
+//
+lemma lseg_concat_list {
+  statement:
+    forall x, y.
+      lseg(x, y, #vx) * list(y, #vy) |- list(x, #vx @ #vy)
 
-{ (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
-function concat(x, y) {
+  proof:
+    unfold lseg(x, y, #vx);
+    if (#vx != []){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply lseg_concat_list(#nnext, y)
+    }
+}
+
+//
+// Lemma: a null-terminating SLLseg is an SLL
+//
+lemma lseg_to_list {
+  statement:
+    forall x.
+      lseg(x, null, #vx) |- list(x, #vx)
+
+  proof:
+    unfold lseg(x, null, #vx);
+    if (#vx != []){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply lseg_to_list(#nnext)
+    }
+}
+
+// 02. Appending a given value to a given SLL
+{ (x == #x) * (k == #k) * list(#x, #vx) }
+function list_append(x, k){
+  y := list_allocate_node(k);
   if (x == null) {
     x := y
   } else {
-    t := x;
-    n := [x+1];
-    [[ invariant {exists: #a1, #a2, #b} lseg(#x, t, #a1) * (t -> #b, n) * list(n, #a2) * (#alpha == #a1 @ [#b] @ #a2) ]];
-    while (n != null) {
-      [[ assert {exists: #t} (t == #t) ]];
-      t := n;
-      n := [t+1];
-      [[ apply lseg_append(#x, #t, #a1, #b, t)  ]]
+    head := x;
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v}
+          lseg(head, prev, #vs1) * (prev -b> #v, next) * list(next,  #vs2) *
+           (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while(next != null){
+      [[ assert {bind: #prev} (prev == #prev) ]];
+      prev := next;
+      next := [next + 1];
+      [[ apply lseg_append(head,  #vs1, #v, prev) ]]
     };
-    [t+1] := y;
-    [[ assert {exists: #some_list, #z} lseg(#x, t, #some_list) * (t -> #z, #y) ]];
-    [[ apply lseg_append(#x, t, #some_list, #z, #y) ]];
-    [[ apply concat_lseg_list(#x, #y, #beta) ]]
+    [prev + 1] := y;
+    [[ assert {bind: #svs, #sv} lseg(head, prev, #svs) * (prev -b> #sv, y) ]];
+    [[ apply lseg_append(head, #svs, #sv, y) ]];
+    [[ assert (lseg(head, y, #vx)) ]];
+    [[ apply lseg_concat_list(head, y) ]]
   };
   return x
 }
-{ list(ret, #alpha @ #beta) }
+{ list(ret, #vx @ [ #k ]) }
+
+// 03. Appending a given node to a given SLL
+{ (x == #x) * (y == #y) * list(#x, #vs) * list(#y, [#vy]) }
+function list_append_node(x, y){
+  if (x == null) {
+    x := y
+  } else {
+    head := x;
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v}
+          lseg(head, prev, #vs1) * (prev -b> #v, next) * list(next,  #vs2) *
+           (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while(next != null){
+      [[ assert {bind: #prev} (prev == #prev) ]];
+      prev := next;
+      next := [next + 1];
+      [[ apply lseg_append(head,  #vs1, #v, prev) ]]
+    };
+    [prev + 1] := y;
+    [[ assert {bind: #svs, #sv} lseg(head, prev, #svs) * (prev -b> #sv, y) ]];
+    [[ apply lseg_append(head, #svs, #sv, y) ]];
+    [[ assert (lseg(head, y, #vs)) ]]; // <-- add deliberate bug to #vx
+    [[ apply lseg_concat_list(head, y) ]]
+  };
+  return x
+}
+{ list(ret, #vs @ [#vy]) }
+
+// 04. Concatenating two lists
+{(x == #x) * (y == #y) * list(#x, #vx) * list(#y, #vy) }
+function list_concat(x, y){
+  if (x == null) {
+    head := y
+  } else {
+    head := x;
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v}
+          lseg(head, prev, #vs1) * (prev -b> #v, next) * list(next,  #vs2) *
+           (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while (next != null) {
+        [[ assert {bind: #prev} (prev == #prev) ]];
+        prev := next;
+        next := [next + 1];
+        [[ apply lseg_append(head,  #vs1, #v, prev) ]]
+    };
+    [prev + 1] := y;
+    [[ assert {bind:#svs, #sv} lseg(head, prev, #svs) * (prev -b> #sv, y) ]];
+    [[ apply lseg_append(head, #svs, #sv, y) ]];
+    [[ apply lseg_concat_list(head, y) ]]
+  };
+  return head
+}
+{ list(ret, #vx @ #vy) }
+
+// 05. Copying a given SLL
+{ (x == #x) * list(#x, #alpha) }
+function list_copy(x){
+    y := null;
+    if (x == null){
+        skip
+    } else {
+        y := new(2);
+        v := [x];
+        [y] := v;
+        t := [x + 1];
+        p := y;
+        [[ fold lseg(x, t, [v]) ]];
+        [[ fold lseg(y, p, []) ]];
+        [[ invariant {bind: c, v, t, p, #alpha1, #alpha2, #alpha3, #a}
+          lseg(x, t, #alpha1) * list(t, #alpha2) * (v == #a) *
+            (#alpha == (#alpha1 @ #alpha2)) * lseg(y, p, #alpha3) * (p -b> #a, null) *
+                (#alpha1 == (#alpha3 @ [#a])) ]];
+        while (t != null){
+            [[ assert {bind: #t, #p} (t == #t) * (p == #p) ]];
+            v := [t];
+            c := new(2);
+            [c] := v;
+            [p + 1] := c;
+            p := c;
+            t := [t + 1];
+            [[ apply lseg_append(x, #alpha1, v, t) ]];
+            [[ apply lseg_append(y, #alpha3, #a, p) ]]
+        };
+        [[ assert {bind: #alpha3} lseg(y, p, #alpha3) ]];
+        [[ apply lseg_append(y, #alpha3, v, null) ]];
+        [[ apply lseg_to_list(x) ]];
+        [[ apply lseg_to_list(y) ]]
+    };
+    return y
+}
+{ list(#x, #alpha) * list(ret, #alpha) }
+
+// 06. Calculating the length of a given SLL
+{ (x == #x) * list(x, #vx) }
+function list_length(x) {
+  y := x;
+  n := 0;
+  [[ invariant {bind: n, y, #nvx,  #nvy}
+      lseg(x, y,  #nvx) * list(y, #nvy) *
+         (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
+  while (y != null) {
+    [[ assert {bind: #y} (y == #y) ]];
+    [[ assert {bind: #v, #z} #y -b> #v, #z ]];
+    y := [y+1];
+    n := n+1;
+    [[ apply lseg_append(x, #nvx, #v, y) ]]
+  };
+  [[ unfold list(null, #nvy)]];
+  [[ apply lseg_to_list(x) ]];
+  return n
+}
+{ list(#x, #vx) * (ret == len(#vx)) }
+
+// // 07. Reversing a given SLL
+// { (x == #x) * list(#x, #vx) }
+// function list_reverse(x) {
+//   y := null;
+//   [[ invariant {bind: x, y, z, #nvx, #nvy}
+//       list(x, #nvx) * list(y, #nvy) * (#vx == ((rev #nvy) @ #nvx)) ]];
+//   while (x != null) {
+//     z := [x + 1];
+//     [x + 1] := y;
+//     y := x;
+//     x := z
+//   };
+//   return y
+// }
+// { list(ret, rev #vx) }
+
+// 08. Checking if a given value is in a given SLL
+{ (x == #x) * (k == #k) * list(#x, #alpha) * list_member(#alpha, #k, #r) }
+function list_member(x, k) {
+  found := false;
+  next := x;
+  [[ invariant {bind: found, next, #beta, #gamma, #rg}
+       lseg(x, next, #beta) * list(next, #gamma) *
+         (#alpha == (#beta @ #gamma)) * (#r == (found || #rg)) *
+           list_member(#beta, k, found) * list_member(#gamma, k, #rg) ]];
+  while ((found == false) && (next != null)){
+    [[ assert (found == false) ]];
+    [[ assert {bind: #next} (next == #next) ]];
+    [[ assert {bind: #v, #z} #next -b> #v, #z ]];
+    v := [next];
+    found := (v == k);
+    next := [next + 1];
+    [[ apply lseg_append(x, #beta, #v, next) ]];
+    [[ unfold list_member(#gamma, k, #rg) ]];
+    [[ apply list_member_append(#beta, k, false, #v) ]]
+  };
+  [[ if (found == false) { apply lseg_to_list(#x); unfold list_member([], #k, false) } else {
+      assert {bind: #beta, #gamma} lseg(#x, next, #beta) * list(next, #gamma);
+      apply list_member_concat(#beta, #gamma, #k);
+      apply lseg_concat_list(#x, next)
+     } ]];
+  return found
+}
+{ list(#x, #alpha) * list_member(#alpha, #k, #r) * (ret == #r) }
+
+// 10. Freeing a given SLL
+{ (x == #x) * list(#x, #vs) }
+function list_free(x) {
+  [[ invariant {bind: x, #rvs} list(x, #rvs) ]];
+  while (x != null) {
+    y := x;
+    x := [x + 1];
+    free(y)
+  };
+  return null
+}
+{ (ret == null) }
