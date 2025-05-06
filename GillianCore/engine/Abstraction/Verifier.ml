@@ -304,10 +304,7 @@ struct
         Fmt.str "Preprocessing %s failed during normalisation\n%s" name msg
       in
       let loc = snd pre in
-      let error =
-        Gillian_result.Error.(
-          CompilationError { msg; loc; additional_data = None })
-      in
+      let error = Gillian_result.Error.(AnalysisFailures [ { msg; loc } ]) in
       raise (Gillian_result.Exc.Gillian_error error)
 
   let testify_sspec
