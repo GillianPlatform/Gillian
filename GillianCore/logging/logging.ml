@@ -86,19 +86,9 @@ module Parent = struct
   let with_id id f =
     match id with
     | None -> f ()
-    | Some id -> (
-        set id;
-        let result =
-          try Ok (f ())
-          with e ->
-            print_to_all
-              (Fmt.str "Original Backtrace:@\n%s" (Printexc.get_backtrace ()));
-            Error e
-        in
-        release (Some id);
-        match result with
-        | Ok ok -> ok
-        | Error e -> raise e)
+    | Some id ->
+        let () = set id in
+        Fun.protect ~finally:(fun () -> release (Some id)) f
 
   let with_specific ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
     let id =
