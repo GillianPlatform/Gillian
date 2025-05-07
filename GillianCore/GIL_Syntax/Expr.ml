@@ -69,6 +69,36 @@ let bv_extract (low_index : int) (high_index : int) (e : t) : t =
       [ Literal high_index; Literal low_index; BvExpr (e, src_width) ],
       Some nsize )
 
+let bv_ugt a b =
+  let width = extract_bv_width a in
+  UnOp
+    ( Not,
+      BVExprIntrinsic
+        (BVOps.BVUleq, [ BvExpr (a, width); BvExpr (b, width) ], None) )
+
+let bv_plus a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVPlus, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_mul a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVMul, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_sub a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVSub, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_ule a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic (BVOps.BVUleq, [ BvExpr (a, width); BvExpr (b, width) ], None)
+
+let bv_ult a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic (BVOps.BVUlt, [ BvExpr (a, width); BvExpr (b, width) ], None)
+
 let bv_extract_between_sz (src : int) (dst : int) (e : t) : t =
   let src_width = extract_bv_width e in
   assert (src = src_width);

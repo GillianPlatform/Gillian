@@ -60,8 +60,9 @@ type 'a or_error = ('a, err) Result.t
 type 'a d_or_error = ('a, err) DR.t
 
 module PathTaken = struct
-  (** Going through a tree can become quite expensive.
-      Remover is always called right after the getter, so we take note of the last path taken and on remove we just go for it directly.  *)
+  (** Going through a tree can become quite expensive. Remover is always called
+      right after the getter, so we take note of the last path taken and on
+      remove we just go for it directly. *)
 
   type t = Left | Right | Here [@@deriving yojson]
 end
@@ -96,13 +97,17 @@ module Range = struct
 
   let of_low_and_chunk low chunk =
     let open Expr.Infix in
-    let len = Expr.int (Chunk.size chunk) in
-    (low, low + len)
+    let len =
+      Expr.bv_z (Z.of_int (Chunk.size chunk)) (Llvmconfig.ptr_width ())
+    in
+    (low, Expr.bv_plus low len)
 
   let of_low_chunk_and_size low chunk size =
     let open Expr.Infix in
-    let sz_chunk = Expr.int (Chunk.size chunk) in
-    (low, low + (sz_chunk * size))
+    let sz_chunk =
+      Expr.bv_z (Z.of_int (Chunk.size chunk)) (Llvmconfig.ptr_width ())
+    in
+    (low, Expr.bv_plus low (Expr.bv_mul sz_chunk size))
 
   let is_equal (la, ha) (lb, hb) =
     let open Expr.Infix in
@@ -110,13 +115,13 @@ module Range = struct
 
   let is_inside (la, ha) (lb, hb) =
     let open Expr.Infix in
-    lb <= la && ha <= hb
+    Expr.bv_ule lb la && Expr.bv_ule ha hb
 
-  let size (a, b) = Expr.Infix.( - ) b a
+  let size (a, b) = Expr.bv_sub b a
 
   let point_strictly_inside x (l, h) =
     let open Expr.Infix in
-    l < x && x < h
+    Expr.bv_ult l x && Expr.bv_ult x h
 
   let split_at (l, h) x = ((l, x), (x, h))
   let lvars (a, b) = SS.union (Expr.lvars a) (Expr.lvars b)
@@ -236,11 +241,11 @@ module Node = struct
             (* The sound approach right now is to transform the value into an array
                of byte and then split that in two *)
             let* svarr = SVArr.byte_array_of_sval sval in
-            let at = Expr.Infix.(at - low) in
+            let at = Expr.bv_sub at low in
             let left, right = SVArr.split_at_offset ~at svarr in
             make_pair (Array left) (Array right)
         | Array arr ->
-            let at = Expr.Infix.(at - low) in
+            let at = Expr.bv_sub at low in
             let* left, right = SVArr.split_at_byte ~at arr in
             make_pair (Array left) (Array right)
         | Poisoned Partially | LazyValue ->
@@ -646,7 +651,7 @@ module Tree = struct
     let rl, rh = range in
     let sl, sh = t.span in
     let* t_with_left =
-      if%sat rl < sl then
+      if%sat Expr.bv_ult rl sl then
         let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
         let children = (new_left_tree, t) in
         Delayed.return
@@ -655,7 +660,7 @@ module Tree = struct
     in
     let sl, _ = t_with_left.span in
     let* result =
-      if%sat rh > sh then
+      if%sat Expr.bv_ugt rh sh then
         let new_right_tree = make ~node:(NotOwned Totally) ~span:(sh, rh) () in
         let children = (t_with_left, new_right_tree) in
         Delayed.return
@@ -929,6 +934,7 @@ module Tree = struct
     let open Delayed.Syntax in
     let open Perm.Infix in
     let range = Range.of_low_and_chunk low chunk in
+    Logging.tmi (fun m -> m "STORE: %a" Range.pp range);
     let replace_node node =
       match node.node with
       | NotOwned Totally ->
@@ -1183,7 +1189,7 @@ let weak_valid_pointer (t : t) (ofs : Expr.t) : (bool, err) DR.t =
     let open Expr.Infix in
     match bounds with
     | None -> Expr.false_
-    | Some (low, high) -> ofs < low || ofs > high
+    | Some (low, high) -> Expr.bv_ult ofs low || Expr.bv_ult high ofs
   in
   match t with
   | { bounds; root } -> (
@@ -1409,14 +1415,17 @@ let store t chunk ofs value =
   let open DR.Syntax in
   (* let** () = check_valid_alignment chunk ofs in *)
   let range = Range.of_low_and_chunk ofs chunk in
+  Logging.tmi (fun m -> m "Storing %a at %a" SVal.pp value Range.pp range);
   let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
+  Logging.tmi (fun m -> m "Span: %a" (Fmt.option Range.pp) span);
+  if%sat is_in_bounds range span then (
     let** root = DR.of_result (get_root t) in
+    Logging.tmi (fun m -> m "Root: %a" (Fmt.option Tree.pp) root);
     match root with
     | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** root = Tree.store root ofs chunk value in
-        DR.of_result (with_root t root)
+        DR.of_result (with_root t root))
   else DR.error BufferOverrun
 
 let zero_init t ofs size =
