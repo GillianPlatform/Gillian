@@ -516,6 +516,9 @@ module OpFunctions = struct
   let bv_op_function ?(literals : int list option) (op : BVOps.t) inputs shape =
     bv_op_function_custom_res ?literals op inputs shape shape.width_of_result
 
+  let bv_op_pred ?(literals : int list option) (op : BVOps.t) inputs shape =
+    bv_op_function_custom_res ?literals op inputs shape None
+
   let bv_check_function
       ?(literals : int list option)
       (op : BVOps.t)
@@ -550,14 +553,14 @@ module OpFunctions = struct
     Expr.BinOp (List.hd inputs, BinOp.Equal, List.hd (List.tl inputs))
 
   let icmp_ne = negated_function icmp_eq
-  let icmp_ugt = negated_function (bv_op_function BVOps.BVUleq)
-  let icmp_uge = negated_function (bv_op_function BVOps.BVUlt)
-  let icmp_ult = bv_op_function BVOps.BVUlt
-  let icmp_ule = bv_op_function BVOps.BVUleq
-  let icmp_sgt = negated_function (bv_op_function BVOps.BVSleq)
-  let icmp_sge = negated_function (bv_op_function BVOps.BVSlt)
-  let icmp_slt = bv_op_function BVOps.BVSlt
-  let icmp_sle = bv_op_function BVOps.BVSleq
+  let icmp_ugt = negated_function (bv_op_pred BVOps.BVUleq)
+  let icmp_uge = negated_function (bv_op_pred BVOps.BVUlt)
+  let icmp_ult = bv_op_pred BVOps.BVUlt
+  let icmp_ule = bv_op_pred BVOps.BVUleq
+  let icmp_sgt = negated_function (bv_op_pred BVOps.BVSleq)
+  let icmp_sge = negated_function (bv_op_pred BVOps.BVSlt)
+  let icmp_slt = bv_op_pred BVOps.BVSlt
+  let icmp_sle = bv_op_pred BVOps.BVSleq
 
   let unop_function
       ?(compute_lits : (input:int -> output:int -> int list) option)

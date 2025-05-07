@@ -470,10 +470,10 @@ let rec pp fmt e =
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
   | BVExprIntrinsic (op, es, w) ->
-      Fmt.pf fmt "%s(%a: %ai)" (BVOps.str op)
+      Fmt.pf fmt "%s(%a : %a)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp_bv_arg)
         es
-        (Fmt.option ~none:Fmt.nop Fmt.int)
+        (Fmt.option ~none:Fmt.nop (fun pf i -> Fmt.pf pf "%di" i))
         w
   | BinOp (e1, op, e2) -> (
       match op with
