@@ -973,7 +973,48 @@ module Libc = struct
 end
 
 module UtilityOps = struct
-  let abs_value_func = failwith "Not implemented"
+  let abs_op_function (exprs : Expr.t list) (shape : bv_op_shape) :
+      Expr.t Codegenerator.t =
+    let open Codegenerator in
+    match exprs with
+    | [ x ] ->
+        (* x is extracted so we setup something to bind with ite *)
+        let width = shape.width_of_result |> Option.get in
+        let bindr = fresh_sym () in
+        let join_block = fresh_sym () in
+        let bexpr =
+          Expr.BVExprIntrinsic
+            ( BVOps.BVSlt,
+              [ BvExpr (x, width); BvExpr (Expr.zero_bv width, width) ],
+              None )
+        in
+        let neg_expr =
+          Expr.BVExprIntrinsic (BVOps.BVNeg, [ BvExpr (x, width) ], Some width)
+        in
+        let* _ =
+          ite bexpr
+            ~true_case:
+              (*neg *)
+              (let* _ = add_cmd (Cmd.Assignment (bindr, neg_expr)) in
+               let* _ = add_cmd (Cmd.Goto join_block) in
+               return ())
+            ~false_case:
+              (let* _ = add_cmd (Cmd.Assignment (bindr, x)) in
+               let* _ = add_cmd (Cmd.Goto join_block) in
+               return ())
+        in
+        let* _ = new_block join_block in
+        return (Expr.PVar bindr)
+    | _ -> failwith "Invalid number of arguments"
+
+  let generic_template_function
+      ~(op : generalized_bv_op_function)
+      ~(pointer_width : int)
+      ~(flag_checks : bv_op_function list option)
+      (name : string)
+      (shape : bv_op_shape) =
+    op_function name 1 (fun exp_list ->
+        generalized_op_bv_scheme exp_list op flag_checks shape)
 end
 
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
@@ -1012,6 +1053,15 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
 
   let template_operations =
     [
+      {
+        name = "bvabs";
+        generator =
+          ValueOp
+            (flag_template_function
+               (UtilityOps.generic_template_function
+                  ~op:UtilityOps.abs_op_function)
+               []);
+      };
       {
         name = "bvmul";
         generator =
