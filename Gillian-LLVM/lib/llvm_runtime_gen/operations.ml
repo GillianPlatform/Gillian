@@ -528,9 +528,13 @@ module OpFunctions = struct
   let add_op_nsw = bv_check_function BVOps.BVSAddO
   let neg_function = bv_op_function BVOps.BVNeg
   let mul_op_function = bv_op_function BVOps.BVMul
-  let srem_op_function = bv_op_function BVOps.BVSrem
+  let sdiv_op_function = bv_op_function BVOps.BVSdiv
+  let srem_op_function = bv_op_function BVSrem
   let mul_op_nuw = bv_check_function BVOps.BVUMulO
   let mul_op_nsw = bv_check_function BVOps.BVSMulO
+  let and_op_function = bv_op_function BVOps.BVAnd
+  let or_op_function = bv_op_function BVOps.BVOr
+  let xor_op_function = bv_op_function BVOps.BVXor
 
   let negated_function
       (f : Expr.t list -> bv_op_shape -> Expr.t)
@@ -1064,6 +1068,41 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
       };
       {
         name = "bvmul";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.mul_op_function)
+               [
+                 (NoSignedWrap, OpFunctions.mul_op_nsw);
+                 (NoUnsignedWrap, OpFunctions.mul_op_nuw);
+               ]);
+      };
+      {
+        name = "bvand";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.and_op_function)
+               []);
+      };
+      {
+        name = "bvor";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.or_op_function)
+               []);
+      };
+      {
+        name = "bvxor";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.xor_op_function)
+               []);
+      };
+      {
+        name = "bvsdiv";
         generator =
           ValueOp
             (flag_template_function
