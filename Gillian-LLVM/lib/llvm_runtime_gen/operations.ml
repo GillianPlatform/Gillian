@@ -515,6 +515,7 @@ module OpFunctions = struct
   let add_op_nsw = bv_check_function BVOps.BVSAddO
   let neg_function = bv_op_function BVOps.BVNeg
   let mul_op_function = bv_op_function BVOps.BVMul
+  let srem_op_function = bv_op_function BVOps.BVSrem
   let mul_op_nuw = bv_check_function BVOps.BVUMulO
   let mul_op_nsw = bv_check_function BVOps.BVSMulO
 
@@ -958,6 +959,10 @@ module Libc = struct
     ]
 end
 
+module UtilityOps = struct
+  let abs_value_func = failwith "Not implemented"
+end
+
 module LLVMTemplates : Monomorphizer.OpTemplates = struct
   open Monomorphizer
   open Monomorphizer.Template
@@ -1004,6 +1009,14 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                  (NoSignedWrap, OpFunctions.mul_op_nsw);
                  (NoUnsignedWrap, OpFunctions.mul_op_nuw);
                ]);
+      };
+      {
+        name = "bvsrem";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.srem_op_function)
+               []);
       };
       {
         name = "bvadd";

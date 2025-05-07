@@ -84,7 +84,13 @@ module MonomorphizerCLI (OpT : OpTemplates) = struct
     let procs =
       List.map
         (fun op ->
-          apply_template (Hashtbl.find op_map op.name) rtspec.pointer_width op)
+          let target_template = Hashtbl.find_opt op_map op.name in
+          let temp =
+            match target_template with
+            | Some template -> apply_template template rtspec.pointer_width op
+            | None -> failwith ("Template not found for " ^ op.name)
+          in
+          temp)
         (OpT.dependencies ~pointer_width:rtspec.pointer_width
         @ rtspec.op_requests)
     in
