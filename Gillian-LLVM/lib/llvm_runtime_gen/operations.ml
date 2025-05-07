@@ -529,6 +529,7 @@ module OpFunctions = struct
   let neg_function = bv_op_function BVOps.BVNeg
   let mul_op_function = bv_op_function BVOps.BVMul
   let sdiv_op_function = bv_op_function BVOps.BVSdiv
+  let shl_op_function = bv_op_function BVOps.BVShl
   let srem_op_function = bv_op_function BVSrem
   let mul_op_nuw = bv_check_function BVOps.BVUMulO
   let mul_op_nsw = bv_check_function BVOps.BVSMulO
@@ -977,6 +978,37 @@ module Libc = struct
 end
 
 module UtilityOps = struct
+  let is_true_func ~(pointer_width : int) (exprs : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    let open Expr.Infix in
+    match exprs with
+    | [ x ] ->
+        let* _ =
+          Libc.type_check_with_failure [ x ] [ LLVMRuntimeTypes.Int 1 ]
+            (let bit = Expr.list_nth x 1 in
+             let is_bit_true = bit == Expr.bv_z Z.one 1 in
+             let* _ =
+               ite is_bit_true
+                 ~true_case:
+                   (let* _ = add_return_of_value Expr.true_ in
+                    return ())
+                 ~false_case:
+                   (let* _ = add_return_of_value Expr.false_ in
+                    return ())
+             in
+             return ())
+        in
+        return ()
+    | _ -> failwith "Invalid number of arguments"
+
+  let is_true_op =
+    {
+      name = "is_true";
+      generator =
+        SimpleOp (MemoryLib.construct_simple_op ~arity:1 ~f:is_true_func);
+    }
+
   let abs_op_function (exprs : Expr.t list) (shape : bv_op_shape) :
       Expr.t Codegenerator.t =
     let open Codegenerator in
@@ -1057,6 +1089,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
 
   let template_operations =
     [
+      UtilityOps.is_true_op;
       {
         name = "bvabs";
         generator =
@@ -1083,6 +1116,14 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
           ValueOp
             (flag_template_function
                (template_from_integer_op ~op:OpFunctions.and_op_function)
+               []);
+      };
+      {
+        name = "bvshl";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.shl_op_function)
                []);
       };
       {
