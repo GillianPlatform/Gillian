@@ -468,6 +468,10 @@ atomic_expr_target:
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.ForAll (vars, e) }
+  |itname=gbvpred; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON ; RBRACE
+    { Expr.BVExprIntrinsic(itname, es, None) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=INTEGER ; RBRACE
+      { Expr.BVExprIntrinsic(itname, es, Some (Z.to_int width)) }
 ;
 
 unary_expr:
@@ -599,10 +603,6 @@ implication_expr:
     { Expr.BinOp (e1, Impl, e2) }
 
 expr_target:
-    | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=INTEGER ; RBRACE
-      { Expr.BVExprIntrinsic(itname, es, Some (Z.to_int width)) }
-    | itname=gbvpred; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON ; RBRACE
-      { Expr.BVExprIntrinsic(itname, es, None) }
     | implication_expr { $1 }
 ;
 
