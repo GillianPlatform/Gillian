@@ -693,13 +693,15 @@ module MemoryLib = struct
       unit Codegenerator.t =
     let open Codegenerator in
     match exp_list with
-    | [ ptr ] ->
+    | [ chunk; ptr ] ->
         let { base; offset } = access_ptr ptr in
         pointer_op
           ~is_ptr_case:(fun bindr ->
             let tmp = fresh_sym () in
             (* bind a tmp because after the load we have {{ {{value type, value}}}}*)
-            let* _ = add_cmd (Cmd.LAction (tmp, load_name, [ base; offset ])) in
+            let* _ =
+              add_cmd (Cmd.LAction (tmp, load_name, [ chunk; base; offset ]))
+            in
             let* _ =
               add_cmd (Cmd.Assignment (bindr, Expr.list_nth (Expr.PVar tmp) 0))
             in
@@ -711,13 +713,14 @@ module MemoryLib = struct
       unit Codegenerator.t =
     let open Codegenerator in
     match exp_list with
-    | [ ptr; value ] ->
+    | [ chunk; ptr; value ] ->
         let { base; offset } = access_ptr ptr in
         pointer_op
           ~is_ptr_case:(fun bindr ->
             (* in store we just return out the {{}}*)
             let* _ =
-              add_cmd (Cmd.LAction (bindr, store_name, [ base; offset; value ]))
+              add_cmd
+                (Cmd.LAction (bindr, store_name, [ chunk; base; offset; value ]))
             in
             return ())
           ptr
@@ -749,7 +752,14 @@ module MemoryLib = struct
                  add_cmd (Cmd.LAction (bindr, alloc_name, [ low; hi ]))
                in
                let* _ =
-                 add_return_of_value (Expr.list_nth (Expr.PVar bindr) 0)
+                 add_return_of_value
+                   (LLVMRuntimeTypes.make_expr_of_type_unsafe
+                      (Expr.list
+                         [
+                           Expr.list_nth (Expr.PVar bindr) 0;
+                           Expr.zero_bv pointer_width;
+                         ])
+                      LLVMRuntimeTypes.Ptr)
                in
                return ())
             ~false_case:
@@ -810,11 +820,11 @@ module MemoryLib = struct
     [
       {
         name = "llvm_load";
-        generator = SimpleOp (construct_simple_op ~arity:1 ~f:load_op);
+        generator = SimpleOp (construct_simple_op ~arity:2 ~f:load_op);
       };
       {
         name = "llvm_store";
-        generator = SimpleOp (construct_simple_op ~arity:2 ~f:store_op);
+        generator = SimpleOp (construct_simple_op ~arity:3 ~f:store_op);
       };
       {
         name = "llvm_displace_pointer";
