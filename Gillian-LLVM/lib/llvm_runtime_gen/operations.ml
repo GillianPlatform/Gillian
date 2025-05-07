@@ -160,6 +160,9 @@ let type_fail (expr_and_type : (Gil_syntax.Expr.t * LLVMRuntimeTypes.t) list) =
 
 type bv_op_function = Expr.t list -> bv_op_shape -> Expr.t
 
+type generalized_bv_op_function =
+  Expr.t list -> bv_op_shape -> Expr.t Codegenerator.t
+
 let add_overflow_check
     (check_ops : bv_op_function list option)
     (inputs : Expr.t list)
@@ -183,9 +186,9 @@ let add_overflow_check
       return ()
   | None -> return ()
 
-let op_bv_scheme
+let generalized_op_bv_scheme
     (inputs : Expr.t list)
-    (op : bv_op_function)
+    (op : generalized_bv_op_function)
     (check_ops : bv_op_function list option)
     (shape : bv_op_shape) : unit Codegenerator.t =
   let open Codegenerator in
@@ -205,6 +208,7 @@ let op_bv_scheme
       ~true_case:
         (let extracted_inputs = List.map (fun i -> Expr.list_nth i 1) inputs in
          let* _ = add_overflow_check check_ops extracted_inputs shape in
+         let* res = op extracted_inputs shape in
          let* _ =
            add_return_of_value
              (Expr.EList
@@ -212,7 +216,7 @@ let op_bv_scheme
                   Expr.string
                     (LLVMRuntimeTypes.type_to_string
                        (LLVMRuntimeTypes.Int (Option.get shape.width_of_result)));
-                  op extracted_inputs shape;
+                  res;
                 ])
          in
          return get_current_block_label)
@@ -222,6 +226,15 @@ let op_bv_scheme
          return get_current_block_label)
   in
   return ()
+
+let op_bv_scheme
+    (inputs : Expr.t list)
+    (op : bv_op_function)
+    (check_ops : bv_op_function list option)
+    (shape : bv_op_shape) : unit Codegenerator.t =
+  let open Codegenerator in
+  let generalized_op = fun inputs shape -> return (op inputs shape) in
+  generalized_op_bv_scheme inputs generalized_op check_ops shape
 
 let op_function
     (name : string)
