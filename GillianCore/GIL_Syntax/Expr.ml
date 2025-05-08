@@ -78,6 +78,11 @@ let bv_plus a b =
   BVExprIntrinsic
     (BVOps.BVPlus, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
+let bv_urem a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVUrem, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
 let bv_mul a b =
   let width = extract_bv_width a in
   BVExprIntrinsic
@@ -87,6 +92,8 @@ let bv_sub a b =
   let width = extract_bv_width a in
   BVExprIntrinsic
     (BVOps.BVSub, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_width a = extract_bv_width a
 
 let bv_ule a b =
   let width = extract_bv_width a in

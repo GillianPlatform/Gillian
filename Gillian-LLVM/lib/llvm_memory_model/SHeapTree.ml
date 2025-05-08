@@ -93,7 +93,7 @@ module Range = struct
 
   let of_low_and_size low size =
     let open Expr.Infix in
-    (low, low + size)
+    (low, Expr.bv_plus low size)
 
   let of_low_and_chunk low chunk =
     let open Expr.Infix in
@@ -283,7 +283,8 @@ module Node = struct
               let chunk_size = Expr.int (Chunk.size chunk) in
               let zeros_can_be_converted_to_same_chunk =
                 let open Expr.Infix in
-                Expr.imod size_right chunk_size == Expr.zero_i
+                Expr.bv_urem size_right chunk_size
+                == Expr.zero_bv (Expr.bv_width size_right)
               in
               if%ent zeros_can_be_converted_to_same_chunk then
                 let+ zero_array =
@@ -313,7 +314,8 @@ module Node = struct
               let chunk_size = Expr.int (Chunk.size chunk) in
               let zeros_can_be_converted_to_same_chunk =
                 let open Expr.Infix in
-                Expr.imod size_left chunk_size == Expr.zero_i
+                Expr.bv_urem size_left chunk_size
+                == Expr.zero_bv (Expr.bv_width size_left)
               in
               if%ent zeros_can_be_converted_to_same_chunk then
                 let+ zero_array =
@@ -345,7 +347,8 @@ module Node = struct
               let chunk_size = Expr.int (Chunk.size chunk) in
               let zeros_can_be_converted_to_same_chunk =
                 let open Expr.Infix in
-                Expr.imod size_left chunk_size == Expr.zero_i
+                Expr.bv_urem size_left chunk_size
+                == Expr.zero_bv (Expr.bv_width size_left)
               in
               if%ent zeros_can_be_converted_to_same_chunk then
                 let+ zero_array =
@@ -366,7 +369,8 @@ module Node = struct
               let chunk_size = Expr.int (Chunk.size chunk) in
               let zeros_can_be_converted_to_same_chunk =
                 let open Expr.Infix in
-                Expr.imod size_right chunk_size == Expr.zero_i
+                Expr.bv_urem size_right chunk_size
+                == Expr.zero_bv (Expr.bv_width size_right)
               in
               if%ent zeros_can_be_converted_to_same_chunk then
                 let+ zero_array =
@@ -1397,7 +1401,8 @@ let _check_valid_alignment chunk ofs =
   let al_expr = Expr.int al in
   let divides x y =
     let open Expr.Infix in
-    y == Expr.int 0 || Expr.imod y x == Expr.int 0
+    let width = Expr.bv_width y in
+    y == Expr.zero_bv width || Expr.bv_urem y x == Expr.zero_bv width
   in
   if%sat divides al_expr ofs then DR.ok ()
   else DR.error (InvalidAlignment { offset = ofs; alignment = al })
