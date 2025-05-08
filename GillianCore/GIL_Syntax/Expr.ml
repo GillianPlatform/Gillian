@@ -71,10 +71,7 @@ let bv_extract (low_index : int) (high_index : int) (e : t) : t =
 
 let bv_ugt a b =
   let width = extract_bv_width a in
-  UnOp
-    ( Not,
-      BVExprIntrinsic
-        (BVOps.BVUleq, [ BvExpr (a, width); BvExpr (b, width) ], None) )
+  BVExprIntrinsic (BVOps.BVUlt, [ BvExpr (b, width); BvExpr (a, width) ], None)
 
 let bv_plus a b =
   let width = extract_bv_width a in

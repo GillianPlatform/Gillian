@@ -650,17 +650,25 @@ module Tree = struct
     let open Delayed.Syntax in
     let rl, rh = range in
     let sl, sh = t.span in
+    Logging.tmi (fun m -> m "EXTEND_IF_NEEDED: %a %a" Expr.pp rl Expr.pp sl);
+    Logging.tmi (fun m -> m "EXTEND_IF_NEEDED: %a %a" Expr.pp rh Expr.pp sh);
     let* t_with_left =
-      if%sat Expr.bv_ult rl sl then
+      if%sat Expr.bv_ult rl sl then (
+        Logging.tmi (fun m -> m "EXTEND_IF_NEEDED: left can be less than span");
+        failwith "left can be less than span"
+        (*;
         let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
         let children = (new_left_tree, t) in
         Delayed.return
-          (make ~node:(NotOwned Partially) ~span:(rl, sh) ~children ())
+          (make ~node:(NotOwned Partially) ~span:(rl, sh) ~children ()))*))
       else Delayed.return t
     in
     let sl, _ = t_with_left.span in
     let* result =
-      if%sat Expr.bv_ugt rh sh then
+      if%sat
+        log_string "EXTEND_IF_NEEDED: right is greater than span";
+        Expr.bv_ugt rh sh
+      then
         let new_right_tree = make ~node:(NotOwned Totally) ~span:(sh, rh) () in
         let children = (t_with_left, new_right_tree) in
         Delayed.return
@@ -819,6 +827,7 @@ module Tree = struct
     in
     let open Delayed.Syntax in
     let* root = extend_if_needed t range in
+    Logging.tmi (fun m -> m "Root after extend_if_needed: %a" pp_full root);
     frame_inside ~replace_node ~rebuild_parent root range
 
   let cons_node (t : t) range : (Node.t * t, err) DR.t =
@@ -1420,7 +1429,7 @@ let store t chunk ofs value =
   Logging.tmi (fun m -> m "Span: %a" (Fmt.option Range.pp) span);
   if%sat is_in_bounds range span then (
     let** root = DR.of_result (get_root t) in
-    Logging.tmi (fun m -> m "Root: %a" (Fmt.option Tree.pp) root);
+    Logging.tmi (fun m -> m "Root: %a" (Fmt.option Tree.pp_full) root);
     match root with
     | None -> DR.error (MissingResource Unfixable)
     | Some root ->
@@ -1600,10 +1609,14 @@ let assertions_others t =
   Option.fold t.root ~some:Tree.assertions_others ~none:[]
 
 let instantiate low high =
-  {
-    bounds = Some (Range.make low high);
-    root = Some (Tree.instantiate low high);
-  }
+  let res =
+    {
+      bounds = Some (Range.make low high);
+      root = Some (Tree.instantiate low high);
+    }
+  in
+  Logging.verbose (fun m -> m "Instantiated: %a" pp_full res);
+  res
 
 let is_concrete { bounds; root } =
   Option.fold ~none:true ~some:Range.is_concrete bounds
