@@ -872,6 +872,7 @@ module Libc = struct
       { name = "printf"; output_name = "printf"; spec = SimpleSpec };
       { name = "calloc"; output_name = "calloc"; spec = SimpleSpec };
       { name = "exit"; output_name = "exit"; spec = SimpleSpec };
+      { name = "getchar"; output_name = "getchar"; spec = SimpleSpec };
     ]
 
   let constant_return_func
@@ -964,8 +965,39 @@ module Libc = struct
         return ()
     | _ -> failwith "Invalid number of arguments"
 
+  let make_symbolic_of_type (ty : LLVMRuntimeTypes.t) : Expr.t Codegenerator.t =
+    let open Codegenerator in
+    let bindr = fresh_sym () in
+    let* _ = add_cmd (Cmd.Logic (LCmd.FreshSVar bindr)) in
+    let* _ =
+      add_cmd
+        (Cmd.Logic
+           (LCmd.AssumeType
+              (Expr.PVar bindr, ty |> LLVMRuntimeTypes.rtype_to_gil_type)))
+    in
+    let to_return = fresh_sym () in
+    let typeified =
+      LLVMRuntimeTypes.make_expr_of_type_unsafe (Expr.PVar bindr) ty
+    in
+    let* _ = add_cmd (Cmd.Assignment (to_return, typeified)) in
+    return (Expr.PVar to_return)
+
+  let getchar ~(pointer_width : int) (exp_list : Expr.t list) :
+      unit Codegenerator.t =
+    let open Codegenerator in
+    match exp_list with
+    | [] ->
+        let* symb_val = make_symbolic_of_type (LLVMRuntimeTypes.Int 32) in
+        let* _ = add_return_of_value symb_val in
+        return ()
+    | _ -> failwith "Invalid number of arguments"
+
   let libc_ops =
     [
+      {
+        name = "getchar";
+        generator = SimpleOp (MemoryLib.construct_simple_op ~arity:0 ~f:getchar);
+      };
       {
         name = "calloc";
         generator = SimpleOp (MemoryLib.construct_simple_op ~arity:2 ~f:calloc);
