@@ -45,10 +45,7 @@ jobs:
             cache-name: cache-ocaml
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0
-
+          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**.opam') }}
       - name: Install dependencies
         run: make init-ci
       - name: Build Gillian

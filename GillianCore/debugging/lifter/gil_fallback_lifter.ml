@@ -61,6 +61,25 @@ functor
     let memory_error_to_exception_info = TLLifter.memory_error_to_exception_info
     let add_variables = TLLifter.add_variables
 
+    let delegate_to_gil (id, case, exec_data, state) =
+      match state.finish_gil_init with
+      | Some finish_gil ->
+          let () = state.finish_gil_init <- None in
+          finish_gil exec_data
+      | None -> Gil_lifter.handle_cmd (Option.get id) case exec_data state.gil
+
+    let ignore_node_updated f x =
+      let open Effect.Deep in
+      try_with f x
+        {
+          effc =
+            (fun (type b) (eff : b Effect.t) ->
+              match eff with
+              | Node_updated _ ->
+                  Some (fun (k : (b, _) continuation) -> continue k ())
+              | _ -> None);
+        }
+
     let intercept_effect f state () =
       let open Effect.Deep in
       try_with f ()
@@ -73,13 +92,8 @@ functor
                     (fun (k : (a, _) continuation) ->
                       let exec_data = Effect.perform (Step s) in
                       let () =
-                        match state.finish_gil_init with
-                        | Some finish_gil ->
-                            let () = state.finish_gil_init <- None in
-                            finish_gil exec_data
-                        | None ->
-                            Gil_lifter.handle_cmd (Option.get id) case exec_data
-                              state.gil
+                        ignore_node_updated delegate_to_gil
+                          (id, case, exec_data, state)
                       in
                       Effect.Deep.continue k exec_data)
               | Gil_lifter.Step s ->

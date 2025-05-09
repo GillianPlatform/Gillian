@@ -167,7 +167,7 @@ fct:
         spec = None;
         floc;
         fid;
-        is_loop_body = false;
+        loop_body_of = None;
       } }
 
 
@@ -193,10 +193,10 @@ logic_cmds:
  */
 
 type_target:
-  | TLIST { WType.WList }
-  | TINT { WType.WInt }
-  | TBOOL { WType.WBool }
-  | TSTRING { WType.WString }
+  | loc = TLIST { WType.WList, loc }
+  | loc = TINT { WType.WInt, loc }
+  | loc = TBOOL { WType.WBool, loc }
+  | loc = TSTRING { WType.WString, loc }
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -279,7 +279,7 @@ statement:
     }
   | lstart = ASSUME_TYPE; LBRACE; e = expression; COMMA; t = type_target; lend = RBRACE;
     {
-      let bare_stmt = WStmt.AssumeType (e, t) in
+      let bare_stmt = WStmt.AssumeType (e, fst t) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
@@ -415,7 +415,7 @@ pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
     { let (_, x) = lx in
       let isin = Option.fold ~some:(fun _ -> true) ~none:false inp in
-      ((x, $3), isin) }
+      ((x, Option.map fst $3), isin) }
 
 
 logic_command:
@@ -546,6 +546,12 @@ logic_assertion:
     { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
       let lexpr = WLExpr.make bare_lexpr loc in
       let bare_assert = WLAssert.LPure lexpr in
+      WLAssert.make bare_assert loc }
+  | e = logic_expression; COLON; ty = type_target
+    { let (ty, lend) = ty in
+      let bare_assert = WLAssert.LType (e, ty) in
+      let lstart = WLExpr.get_loc e in
+      let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
 
 

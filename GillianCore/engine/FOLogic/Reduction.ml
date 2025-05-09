@@ -1392,6 +1392,7 @@ and reduce_lexpr_loop
             let les = List.map Expr.list_length les in
             List.fold_left Expr.Infix.( + ) (List.hd les) (List.tl les)
         | LstLen, LstSub (_, _, len) when lexpr_is_list gamma fle -> len
+        | LstLen, UnOp (LstRev, le) -> UnOp (LstLen, f le)
         | LstLen, _ when lexpr_is_list gamma fle -> def
         (* List operations: reverse *)
         | LstRev, EList le -> EList (List.rev le)

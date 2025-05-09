@@ -163,6 +163,7 @@ struct
 
       let show_id = Fmt.str "%a" L.Report_id.pp
       let show_id_opt = Option.map show_id
+      let show_proc_id proc_name = "proc__" ^ proc_name
 
       let add_node state ?id (node : Map_node.t) =
         let id = Option.value id ~default:node.id in
@@ -296,6 +297,35 @@ struct
             in
             Branch { cases }
 
+      let is_proc_hidden proc_name prog =
+        match Hashtbl.find_opt prog.procs proc_name with
+        | Some proc -> Proc.(proc.proc_hidden)
+        | None -> true
+
+      let add_root proc_name ?first_id state =
+        let id = show_proc_id proc_name in
+        let next = Map_node_next.Single { id = Option.map show_id first_id } in
+        let proc =
+          match Hashtbl.find_opt state.debug_state.prog.procs proc_name with
+          | Some p -> p
+          | None ->
+              Fmt.failwith "Can't add root for nonexistent proc %s" proc_name
+        in
+        let options =
+          let title, subtitle =
+            match proc.proc_display_name with
+            | Some ts -> ts
+            | None -> (proc_name, "")
+          in
+          Map_node_options.Root
+            { title; subtitle; zoomable = true; extras = [] }
+        in
+        let () =
+          if not proc.proc_hidden then
+            Hashtbl.add state.debug_state.roots proc_name id
+        in
+        Map_node.make ~id ~next ~options () |> add_node state
+
       let convert_node (node : Exec_map.Packaged.node) state =
         let id = show_id node.data.id in
         let aliases = node.data.all_ids |> List.map show_id in
@@ -309,7 +339,17 @@ struct
             match node.data.submap with
             | NoSubmap -> []
             | Submap id -> [ show_id id ]
-            | Proc p -> [ "proc " ^ p ]
+            | Proc p ->
+                let () =
+                  if
+                    match Hashtbl.find_opt state.procs p with
+                    | None -> true
+                    | Some proc_state -> not proc_state.root_created
+                  then
+                    (* Make a fake root so we have something to step from *)
+                    add_root p state
+                in
+                [ show_proc_id p ]
           in
           submaps @ matches
         in
@@ -324,20 +364,10 @@ struct
         in
         Map_node.make ~id ~aliases ~submaps ~next ~options () |> add_node state
 
-      let add_root proc root_id state =
-        let id = "proc__" ^ proc in
-        let next = Map_node_next.Single { id = Some (show_id root_id) } in
-        let options =
-          Map_node_options.Root
-            { title = proc; subtitle = ""; zoomable = true; extras = [] }
-        in
-        let () = Hashtbl.add state.debug_state.roots proc id in
-        Map_node.make ~id ~next ~options () |> add_node state
-
       let add_changed_node id node proc_state state =
         let () =
           if not proc_state.root_created then
-            let () = add_root proc_state.proc_name id state in
+            let () = add_root proc_state.proc_name ~first_id:id state in
             proc_state.root_created <- true
         in
         match node with

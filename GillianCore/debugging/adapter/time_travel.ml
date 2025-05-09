@@ -57,12 +57,18 @@ module Make (Debugger : Debugger.S) = struct
     DL.set_rpc_command_handler rpc ~name:"Step specific"
       (module Step_specific_command)
       (fun { step_id; branch_case } ->
-        let prev_id =
-          match Logging.Report_id.of_string_opt step_id with
-          | Some id -> id
-          | None -> raise (Failure "Invalid step id")
+        let result =
+          match proc_name_of_id step_id with
+          | Some proc_name -> dbg |> Debugger.start_proc proc_name
+          | None ->
+              let prev_id =
+                match Logging.Report_id.of_string_opt step_id with
+                | Some id -> id
+                | None -> raise (Failure "Invalid step id")
+              in
+              dbg |> Debugger.step_specific branch_case prev_id
         in
-        match dbg |> Debugger.step_specific branch_case prev_id with
+        match result with
         | Error e -> raise (Gillian_result.Exc.Gillian_error e)
         | Ok stop_reason ->
             send_stopped_events stop_reason;%lwt

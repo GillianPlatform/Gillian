@@ -6,7 +6,7 @@ type t = {
   return_expr : WExpr.t;
   floc : CodeLoc.t;
   fid : int;
-  is_loop_body : bool;
+  loop_body_of : string option;
 }
 
 val get_id : t -> int

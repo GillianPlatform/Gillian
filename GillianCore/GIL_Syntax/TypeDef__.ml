@@ -279,6 +279,8 @@ and ('annot, 'label) proc = {
   proc_spec : spec option;
   proc_aliases : string list;
   proc_calls : string list;
+  proc_display_name : (string * string) option;
+  proc_hidden : bool;
 }
 [@@deriving
   visitors { variety = "reduce" },

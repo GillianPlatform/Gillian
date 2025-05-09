@@ -476,6 +476,8 @@ let jsil2core_proc (proc : EProc.t) : ('a, string) GProc.t =
     proc_aliases = [];
     proc_calls = [];
     (* TODO *)
+    proc_display_name = None;
+    proc_hidden = false;
   }
 
 let translate_tbl (tbl : (string, 'a) Hashtbl.t) (f : 'a -> 'b) :

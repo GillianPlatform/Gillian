@@ -912,6 +912,8 @@ module Proc : sig
     proc_spec : Spec.t option;
     proc_aliases : string list;
     proc_calls : string list;
+    proc_display_name : (string * string) option;
+    proc_hidden : bool;
   }
   [@@deriving yojson]
 
