@@ -448,7 +448,7 @@ struct
                    in
                    Some substs'
                  in
-                 (proc_name, `List substs))
+                 (show_proc_id proc_name, `List substs))
           |> Seq.filter_map (fun x -> x)
           |> List.of_seq
         in
