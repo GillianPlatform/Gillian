@@ -178,12 +178,12 @@ var_list:
 
 
 statement_list_and_return:
-  | RETURN; e = expression { ([], e)  }
+  | RETURN; e = expression; SEMICOLON? { ([], e)  }
   | sm = statement; SEMICOLON; sle = statement_list_and_return
     { let (sl, e) = sle in (sm::sl, e) }
 
 statement_list:
-  | sl = separated_nonempty_list(SEMICOLON, statement) { sl }
+  | sl = separated_nonempty_list_option_trailing(SEMICOLON, statement) { sl }
 
 
 /* not useful at the moment */
@@ -620,3 +620,10 @@ logic_value_with_loc:
     { let (_, vl) = List.split lvl in
       let loc = CodeLoc.merge lstart lend in
       (loc, WVal.VList vl) } */
+
+/* https://discuss.ocaml.org/t/solving-shift-reduce-conflicts-for-optional-trailing-comma-in-menhir/15042 */
+separated_nonempty_list_option_trailing(SEP, X):
+  | x = X { [x] }
+  | x = X SEP xs = separated_nonempty_list_option_trailing(SEP, X);
+      { [x] @ xs }
+  | x = X SEP { [x] }
