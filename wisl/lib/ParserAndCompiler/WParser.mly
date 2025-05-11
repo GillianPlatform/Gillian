@@ -136,8 +136,22 @@ definitions:
     { let (fs, ps, ls, cs) = defs in
       (f::fs, ps, ls, cs) }
 
+config_val:
+  | v = value_with_loc
+    { v }
+  | vs = separated_nonempty_list(COMMA, IDENTIFIER)
+    { let (loc, id), vs = List.(hd vs, tl vs) in
+      let (loc, ids) = List.fold_left (fun (loc, ids) (loc', id) ->
+        let loc = CodeLoc.merge loc loc' in
+        let ids = (WVal.Str id) :: ids in
+        loc, ids)
+        (loc, [ WVal.Str id ]) vs
+      in
+      let v = WVal.VList ids in
+      loc, v }
+
 config:
-  | lstart = CONFIG; id = IDENTIFIER; COLON; value = value_with_loc
+  | lstart = CONFIG; id = IDENTIFIER; COLON; value = config_val
     { let (_, id) = id in
       let (lend, value) = value in
       let loc = CodeLoc.merge lstart lend in

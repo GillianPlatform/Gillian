@@ -97,6 +97,7 @@ module Verification = struct
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
   let things_to_verify = ref All
+  let things_to_exclude = ref Containers.SS.empty
 
   let set_procs_to_verify = function
     | [] -> ()
