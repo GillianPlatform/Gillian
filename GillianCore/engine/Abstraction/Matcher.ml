@@ -1528,15 +1528,16 @@ module Make (State : SState.S) :
                 match_mp' (rest_search_states, errs_so_far)
             | false, _, _ :: _ ->
                 (* Matching failed in OX. We try the next case *)
-                ignore
-                @@ MatchResultReport.log
-                     (Failure
-                        {
-                          astate = AstateRec.from astate;
-                          cur_step = Some step;
-                          subst;
-                          errors;
-                        });
+                let report =
+                  MatchResultReport.Failure
+                    {
+                      astate = AstateRec.from astate;
+                      cur_step = Some step;
+                      subst;
+                      errors;
+                    }
+                in
+                let _ = MatchResultReport.log report in
                 match_mp' (rest_search_states, errors @ errs_so_far)
             | _, [ state ], [] ->
                 match_mp'
