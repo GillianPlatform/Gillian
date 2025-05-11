@@ -231,3 +231,8 @@ let map_fst f (a, b) = (f a, b)
 let map_snd f (a, b) = (a, f b)
 let concat_map_fst f (a, b) = List.map (fun a' -> (a', b)) (f a)
 let concat_map_snd f (a, b) = List.map (fun b' -> (a, b')) (f b)
+
+let set_with_reset r x =
+  let prev = !r in
+  let () = r := x in
+  fun () -> r := prev
