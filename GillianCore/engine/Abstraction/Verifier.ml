@@ -538,7 +538,7 @@ struct
             let () = Fmt.pr "s @?" in
             Ok ()
           else
-            let msg = "Failed to match against postcondition" in
+            let msg = "Couldn't satisfy postcondition" in
             let () =
               L.normal (fun m ->
                   m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
@@ -591,7 +591,7 @@ struct
            in
            None
          else
-           let msg = "Failed to match against postcondition" in
+           let msg = "Couldn't satisfy postcondition" in
            let () =
              L.normal (fun m ->
                  m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
@@ -883,15 +883,19 @@ struct
     result
 
   let select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify =
-    match !Config.Verification.things_to_verify with
-    | All -> (procs_to_verify, lemmas_to_verify)
-    | ProcsOnly -> (procs_to_verify, SS.empty)
-    | LemmasOnly -> (SS.empty, lemmas_to_verify)
-    | Specific ->
-        ( SS.inter procs_to_verify
-            (SS.of_list !Config.Verification.procs_to_verify),
-          SS.inter lemmas_to_verify
-            (SS.of_list !Config.Verification.lemmas_to_verify) )
+    let module C = Config.Verification in
+    let ps, ls =
+      match !C.things_to_verify with
+      | All -> (procs_to_verify, lemmas_to_verify)
+      | ProcsOnly -> (procs_to_verify, SS.empty)
+      | LemmasOnly -> (SS.empty, lemmas_to_verify)
+      | Specific ->
+          ( SS.inter procs_to_verify (SS.of_list !C.procs_to_verify),
+            SS.inter lemmas_to_verify (SS.of_list !C.lemmas_to_verify) )
+    in
+    let ps = SS.diff ps !C.things_to_exclude in
+    let ls = SS.diff ls !C.things_to_exclude in
+    (ps, ls)
 
   let verify_up_to_procs
       ?(proc_name : string option)
