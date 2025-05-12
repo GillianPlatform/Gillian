@@ -38,7 +38,7 @@ struct
     mutable cur_report_id : L.Report_id.t option;
     (* TODO: The below fields only depend on the
             cur_report_id and could be refactored to use this *)
-    mutable top_level_scopes : Variable.scope list;
+    mutable variable_scopes : Variable.scope list;
     mutable frames : frame list;
     mutable variables : Variable.ts; [@default Hashtbl.create 0]
     mutable errors : err_t list;
@@ -525,15 +525,6 @@ struct
       let get_match_map id { debug_state; _ } = get_match_map id debug_state
     end
 
-    let top_level_scopes : Variable.scope list =
-      let top_level_scope_names =
-        (* [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ] *)
-        [ "Pure Formulae"; "Typing Environment"; "Predicates" ]
-      in
-      List.mapi
-        (fun i name -> Variable.{ name; id = i + 1 })
-        top_level_scope_names
-
     let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
     let get_pure_formulae_vars (state : state_t) : Variable.t list =
@@ -703,42 +694,6 @@ struct
                 let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
                 Some (cmd, annot))
 
-      let create_variables (state : state_t option) (is_gil_file : bool) :
-          Variable.scope list * Variable.ts =
-        let variables = Hashtbl.create 0 in
-        (* New scope ids must be higher than last top level scope id to prevent
-           duplicate scope ids *)
-        let scope_id = ref (List.length top_level_scopes) in
-        let get_new_scope_id () =
-          let () = scope_id := !scope_id + 1 in
-          !scope_id
-        in
-        let lifted_scopes =
-          match state with
-          | None -> []
-          | Some state ->
-              let store = State.get_store state |> Store.bindings in
-              let memory = State.get_heap state in
-              let lifted_scopes =
-                Lifter.add_variables ~store ~memory ~is_gil_file
-                  ~get_new_scope_id variables
-              in
-              let pure_formulae_vars = get_pure_formulae_vars state in
-              let type_env_vars = get_type_env_vars state in
-              let pred_vars = get_pred_vars state in
-              let vars_list =
-                [ pure_formulae_vars; type_env_vars; pred_vars ]
-              in
-              let () =
-                List.iter2
-                  (fun (scope : Variable.scope) vars ->
-                    Hashtbl.replace variables scope.id vars)
-                  top_level_scopes vars_list
-              in
-              lifted_scopes
-        in
-        (lifted_scopes, variables)
-
       let f report_id cfg state =
         let cmd = get_cmd report_id in
         state.cur_report_id <- Some report_id;
@@ -746,11 +701,17 @@ struct
         state.frames <-
           call_stack_to_frames cmd.callstack cmd.proc_line cfg.prog;
         let lifted_scopes, variables =
-          create_variables (Some cmd.state) (is_gil_file cfg.source_file)
+          let store = State.get_store cmd.state |> Store.bindings in
+          let memory = State.get_heap cmd.state in
+          let pfs = State.get_pfs cmd.state in
+          let types = State.get_typ_env cmd.state in
+          let preds = State.get_preds cmd.state in
+          Lifter.get_variables state.lifter_state ~store ~memory ~pfs ~types
+            ~preds report_id
         in
         state.variables <- variables;
-        state.top_level_scopes <-
-          List.concat [ lifted_scopes; top_level_scopes ];
+        state.variable_scopes <-
+          List.concat [ lifted_scopes; Variable.top_level_scopes ];
         (* TODO: fix *)
         (* let () = dbg.errors <- cmd_result.errors in *)
         state.cur_cmd <- get_cur_cmd cmd cfg
@@ -969,9 +930,7 @@ struct
                           Inspect.add_changed_node id node proc_state state
                         in
                         continue k ())
-                | _ ->
-                    let s = Printexc.to_string (Effect.Unhandled eff) in
-                    Fmt.failwith "HORROR: effect leak!\n%s" s);
+                | _ -> None);
           }
 
       let lifter_call lifter_func proc_state state =
@@ -1044,7 +1003,8 @@ struct
                in
                let proc_state =
                  let make ext =
-                   make_base_proc_state ~proc_name ~cont_func ~top_level_scopes
+                   let variable_scopes = Variable.top_level_scopes in
+                   make_base_proc_state ~proc_name ~cont_func ~variable_scopes
                      ~lifter_state ~report_state ~ext ()
                  in
                  let ext = Debugger_impl.init_proc debug_state (make ()) in
@@ -1135,9 +1095,7 @@ struct
       let { frames; _ } = get_proc_state_exn state in
       frames
 
-    let get_scopes state =
-      let { top_level_scopes; _ } = get_proc_state_exn state in
-      top_level_scopes
+    let get_scopes state = (get_proc_state_exn state).variable_scopes
 
     let get_variables (var_ref : int) (state : t) : Variable.t list =
       let { variables; _ } = get_proc_state_exn state in

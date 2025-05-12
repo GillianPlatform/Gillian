@@ -240,6 +240,62 @@ functor
       let () = Hashtbl.replace variables memory_id memory_vars in
       scopes
 
+    module Variables = struct
+      open Variable
+
+      let get_type_env_vars (types : Type_env.t) : Variable.t list =
+        Type_env.to_list types
+        |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
+        |> List.map (fun (name, value) ->
+               let value = Type.str value in
+               { name; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+
+      let get_pred_vars (preds : Preds.t) : Variable.t list =
+        preds |> Preds.to_list
+        |> List.map (fun pred ->
+               let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
+               { name = ""; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+
+      let get_pure_formulae_vars (pfs : PFS.t) : Variable.t list =
+        pfs |> PFS.to_list
+        |> List.map (fun formula ->
+               let value = Fmt.to_to_string (Fmt.hbox Expr.pp) formula in
+               { name = ""; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+
+      let get_variables _ ~store ~memory ~pfs ~types ~preds _ =
+        let variables = Hashtbl.create 0 in
+        (* New scope ids must be higher than last top level scope id to prevent
+            duplicate scope ids *)
+        let scope_id = ref (List.length top_level_scopes) in
+        let get_new_scope_id () =
+          let () = scope_id := !scope_id + 1 in
+          !scope_id
+        in
+        let lifted_scopes =
+          let lifted_scopes =
+            add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
+              variables
+          in
+          let pure_formulae_vars = get_pure_formulae_vars pfs in
+          let type_env_vars = get_type_env_vars types in
+          let pred_vars = get_pred_vars preds in
+          let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
+          let () =
+            List.iter2
+              (fun (scope : scope) vars ->
+                Hashtbl.replace variables scope.id vars)
+              top_level_scopes vars_list
+          in
+          lifted_scopes
+        in
+        (lifted_scopes, variables)
+    end
+
+    include Variables
+
     let select_case nexts =
       let case, _ =
         List.fold_left

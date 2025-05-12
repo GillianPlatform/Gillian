@@ -5,7 +5,8 @@ module Make : Make =
 functor
   (SMemory : SMemory.S)
   (PC : ParserAndCompiler.S)
-  (TLLifter : functor (Gil : Gil_lifter_with_state)
+  (TLLifter : functor
+     (Gil : Gil_lifter_with_state with type Lifter.memory = SMemory.t)
      (V : Verifier.S with type annot = PC.Annot.t) ->
      S
        with type memory = SMemory.t
@@ -51,6 +52,64 @@ functor
           (Logging.Report_id.t option * Branch_case.t option * Branch_case.path)
           -> cmd_report executed_cmd_data Effect.t
 
+    module Defer = struct
+      let delegate_to_gil (id, case, exec_data, state) =
+        match state.finish_gil_init with
+        | Some finish_gil ->
+            let () = state.finish_gil_init <- None in
+            finish_gil exec_data
+        | None -> Gil_lifter.handle_cmd (Option.get id) case exec_data state.gil
+
+      let ignore_node_updated f x =
+        let open Effect.Deep in
+        try_with f x
+          {
+            effc =
+              (fun (type b) (eff : b Effect.t) ->
+                match eff with
+                | Node_updated _ ->
+                    Some (fun (k : (b, _) continuation) -> continue k ())
+                | _ -> None);
+          }
+
+      let intercept_effect f state () =
+        let open Effect.Deep in
+        try_with f ()
+          {
+            effc =
+              (fun (type a) (eff : a Effect.t) ->
+                match eff with
+                | TLLifter.Step ((id, case, _) as s) ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        let exec_data = Effect.perform (Step s) in
+                        let () =
+                          ignore_node_updated delegate_to_gil
+                            (id, case, exec_data, state)
+                        in
+                        Effect.Deep.continue k exec_data)
+                | Gil_lifter.Step s ->
+                    Some
+                      (fun (k : (a, _) continuation) ->
+                        let exec_data = Effect.perform (Step s) in
+                        Effect.Deep.continue k exec_data)
+                | _ -> None);
+          }
+
+      let defer tl_f gil_f state =
+        let f =
+          match state.tl with
+          | Some tl -> fun () -> tl_f tl
+          | None -> fun () -> gil_f state.gil
+        in
+        intercept_effect f state ()
+
+      let defer_with_id tl_f gil_f state id =
+        defer (fun s -> tl_f s id) (fun s -> gil_f s id) state
+    end
+
+    open Defer
+
     let dump = to_yojson
 
     let get_matches_at_id id { gil; tl; _ } =
@@ -59,73 +118,24 @@ functor
       | None -> gil |> Gil_lifter.get_matches_at_id id
 
     let memory_error_to_exception_info = TLLifter.memory_error_to_exception_info
-    let add_variables = TLLifter.add_variables
 
-    let delegate_to_gil (id, case, exec_data, state) =
-      match state.finish_gil_init with
-      | Some finish_gil ->
-          let () = state.finish_gil_init <- None in
-          finish_gil exec_data
-      | None -> Gil_lifter.handle_cmd (Option.get id) case exec_data state.gil
-
-    let ignore_node_updated f x =
-      let open Effect.Deep in
-      try_with f x
-        {
-          effc =
-            (fun (type b) (eff : b Effect.t) ->
-              match eff with
-              | Node_updated _ ->
-                  Some (fun (k : (b, _) continuation) -> continue k ())
-              | _ -> None);
-        }
-
-    let intercept_effect f state () =
-      let open Effect.Deep in
-      try_with f ()
-        {
-          effc =
-            (fun (type a) (eff : a Effect.t) ->
-              match eff with
-              | TLLifter.Step ((id, case, _) as s) ->
-                  Some
-                    (fun (k : (a, _) continuation) ->
-                      let exec_data = Effect.perform (Step s) in
-                      let () =
-                        ignore_node_updated delegate_to_gil
-                          (id, case, exec_data, state)
-                      in
-                      Effect.Deep.continue k exec_data)
-              | Gil_lifter.Step s ->
-                  Some
-                    (fun (k : (a, _) continuation) ->
-                      let exec_data = Effect.perform (Step s) in
-                      Effect.Deep.continue k exec_data)
-              | _ -> None);
-        }
-
-    let defer_with_id tl_f gil_f state id =
-      let f =
-        match state.tl with
-        | Some tl -> fun () -> tl_f tl id
-        | None -> fun () -> gil_f state.gil id
-      in
-      intercept_effect f state ()
+    let get_variables state ~store ~memory ~pfs ~types ~preds id =
+      defer
+        (fun s -> TLLifter.get_variables s ~store ~memory ~pfs ~types ~preds id)
+        (fun s ->
+          Gil_lifter.get_variables s ~store ~memory ~pfs ~types ~preds id)
+        state
 
     let step_over = defer_with_id TLLifter.step_over Gil_lifter.step_over
     let step_in = defer_with_id TLLifter.step_in Gil_lifter.step_in
     let step_out = defer_with_id TLLifter.step_out Gil_lifter.step_out
+    let step_back = defer_with_id TLLifter.step_back Gil_lifter.step_back
 
-    let step_back state =
-      defer_with_id TLLifter.step_back Gil_lifter.step_back state
-
-    let step_branch state id case =
-      let f =
-        match state.tl with
-        | Some tl -> fun () -> TLLifter.step_branch tl id case
-        | None -> fun () -> Gil_lifter.step_branch state.gil id case
-      in
-      intercept_effect f state ()
+    let step_branch state case =
+      defer
+        (fun s -> TLLifter.step_branch s case)
+        (fun s -> Gil_lifter.step_branch s case)
+        state
 
     let continue = defer_with_id TLLifter.continue Gil_lifter.continue
 
