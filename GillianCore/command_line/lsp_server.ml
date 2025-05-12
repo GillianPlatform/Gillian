@@ -33,7 +33,7 @@ let mk_diagnostic
 let analysis_failure_to_diagnostic
     ~path
     ({ loc; msg; _ } : Gillian_result.Error.analysis_failure) =
-  mk_diagnostic ~severity:DiagnosticSeverity.Warning ~path ?loc msg
+  mk_diagnostic ~severity:DiagnosticSeverity.Information ~path ?loc msg
 
 let result_to_diagnostics ~path : unit Gillian_result.t -> Diagnostic.t list =
   function
