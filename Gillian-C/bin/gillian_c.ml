@@ -11,7 +11,7 @@ struct
 
   let add_variables = MonadicSMemory.Lift.add_variables
 
-  let get_variables _ ~store ~memory ~pfs ~types ~preds _ =
+  let get_variables _ ~store ~memory ?pfs ?types ?preds _ =
     let open Debugger_utils.Variable in
     let variables = Hashtbl.create 0 in
     (* New scope ids must be higher than last top level scope id to prevent
@@ -26,9 +26,11 @@ struct
         add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
           variables
       in
-      let pure_formulae_vars = get_pure_formulae_vars pfs in
-      let type_env_vars = get_type_env_vars types in
-      let pred_vars = get_pred_vars preds in
+      let pure_formulae_vars =
+        Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
+      in
+      let type_env_vars = Option.fold ~some:get_type_env_vars types ~none:[] in
+      let pred_vars = Option.fold ~some:get_pred_vars preds ~none:[] in
       let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
       let () =
         List.iter2

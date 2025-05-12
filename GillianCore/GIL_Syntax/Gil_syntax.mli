@@ -351,6 +351,8 @@ module Expr : sig
   val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
 
   (** Pretty-printer *)
+  val pp_custom : pp:t Fmt.t -> t Fmt.t
+
   val pp : t Fmt.t
 
   (** Pretty-printer with constructors (will not parse) *)

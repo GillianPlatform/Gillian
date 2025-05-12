@@ -964,37 +964,6 @@ struct
     in
     { id; description }
 
-  let add_variables = WislSMemory.add_debugger_variables
-
-  let get_variables _ ~store ~memory ~pfs ~types ~preds _ =
-    let open Gil_lifter in
-    let open Variable in
-    let variables = Hashtbl.create 0 in
-    (* New scope ids must be higher than last top level scope id to prevent
-        duplicate scope ids *)
-    let scope_id = ref (List.length top_level_scopes) in
-    let get_new_scope_id () =
-      let () = scope_id := !scope_id + 1 in
-      !scope_id
-    in
-    let lifted_scopes =
-      let lifted_scopes =
-        add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
-          variables
-      in
-      let pure_formulae_vars = get_pure_formulae_vars pfs in
-      let type_env_vars = get_type_env_vars types in
-      let pred_vars = get_pred_vars preds in
-      let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
-      let () =
-        List.iter2
-          (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
-          top_level_scopes vars_list
-      in
-      lifted_scopes
-    in
-    (lifted_scopes, variables)
-
   let select_case nexts =
     let result =
       List.fold_left
@@ -1266,4 +1235,270 @@ struct
   let parse_and_compile_files ~entrypoint files =
     WParserAndCompiler.parse_and_compile_files files
     |> Result.map (fun r -> (r, entrypoint))
+
+  let pp_comma_sep pp = Fmt.list ~sep:(Fmt.any ", ") pp
+
+  module Expr_pp = struct
+    let rec pp_lit ft =
+      let open Literal in
+      function
+      | Int i -> Fmt.pf ft "%a" Z.pp_print i
+      | LList ll -> Fmt.pf ft "[%a]" (pp_comma_sep pp_lit) ll
+      | l -> Fmt.pf ft "%a" Literal.pp l
+
+    let pp_binop ft =
+      let open BinOp in
+      function
+      | ILessThanEqual -> Fmt.string ft "<="
+      | ILessThan -> Fmt.string ft "<"
+      | IPlus -> Fmt.string ft "+"
+      | IMinus -> Fmt.string ft "-"
+      | ITimes -> Fmt.string ft "*"
+      | IDiv -> Fmt.string ft "/"
+      | IMod -> Fmt.string ft "%"
+      | StrLess -> Fmt.string ft "<"
+      | op -> Fmt.pf ft "%s" (BinOp.str op)
+
+    let rec pp_expr' ~outermost ft =
+      ignore outermost;
+      let open Expr in
+      let pp = pp_expr' ~outermost:false in
+      let pp_o = pp_expr' ~outermost:true in
+      function
+      | Lit l -> Fmt.pf ft "%a" pp_lit l
+      | UnOp (LstLen, e) -> Fmt.pf ft "length(%a)" pp_o e
+      | BinOp (e1, LstNth, e2) -> Fmt.pf ft "%a[%a]" pp e1 pp_o e2
+      | BinOp (e1, op, e2) when outermost ->
+          Fmt.pf ft "%a %a %a" pp e1 pp_binop op pp e2
+      | BinOp (e1, op, e2) -> Fmt.pf ft "(%a %a %a)" pp e1 pp_binop op pp e2
+      | EList ll -> Fmt.pf ft "[%a]" (pp_comma_sep pp_o) ll
+      | ESet ll -> Fmt.pf ft "{%a}" (pp_comma_sep pp_o) ll
+      | NOp (LstCat, ll) ->
+          Fmt.pf ft "(%a)" (Fmt.list ~sep:(Fmt.any " %@ ") pp) ll
+      | e -> Fmt.pf ft "%a" (pp_custom ~pp) e
+
+    let f = Fmt.hbox (pp_expr' ~outermost:true)
+  end
+
+  let pp_expr = Expr_pp.f
+
+  module Lift_variables = struct
+    open Engine
+
+    module Scopes = struct
+      open Variable
+
+      let pvars = { id = 1; name = "Program variables" }
+      let heap = { id = 2; name = "Heap" }
+      let pfs = { id = 3; name = "Path condition" }
+      let preds = { id = 4; name = "Predicates" }
+      let types = { id = 5; name = "Types" }
+      let axioms = { id = 6; name = "Axioms" }
+      let all = [ pvars; heap; pfs; types; preds; axioms ]
+    end
+
+    let get_store_vars store =
+      List.filter_map
+        (fun (var, (value : Gil_syntax.Expr.t)) ->
+          if Str.string_match (Str.regexp "gvar") var 0 then None
+          else
+            let match_offset lst loc =
+              match lst with
+              | [ Expr.Lit (Int offset) ] ->
+                  Fmt.str "-> (%s, %d)" loc (Z.to_int offset)
+              | [ offset ] -> Fmt.str "-> (%s, %a)" loc pp_expr offset
+              | _ -> Fmt.to_to_string pp_expr value
+            in
+            let value =
+              match value with
+              | Expr.EList (Lit (Loc loc) :: rest)
+              | Expr.EList (LVar loc :: rest) -> match_offset rest loc
+              | _ -> Fmt.to_to_string pp_expr value
+            in
+            Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
+        store
+      |> List.sort Stdlib.compare
+
+    let add_heap_vars new_var_ref variables memory =
+      let vstr = Fmt.to_to_string pp_expr in
+      let compare_offsets (v, _) (w, _) =
+        try
+          let open Expr.Infix in
+          let difference = v - w in
+          match difference with
+          | Expr.Lit (Int f) ->
+              if Z.lt f Z.zero then -1 else if Z.gt f Z.zero then 1 else 0
+          | _ -> 0
+        with _ -> (* Do not sort the offsets if an exception has occurred *)
+                  0
+      in
+      let cell_vars l : Variable.t list =
+        List.sort compare_offsets l
+        |> List.map (fun (offset, value) : Variable.t ->
+               (* Display offset as a number to match the printing of WISL pointers *)
+               let offset_str =
+                 match offset with
+                 | Expr.Lit (Int o) -> Z.to_string o
+                 | Expr.BinOp (Lit (Int i), IPlus, o) ->
+                     (* Flip around e.g. (1 + #loc_5) to (#loc_5 + 1) *)
+                     vstr Expr.(BinOp (o, IPlus, Lit (Int i)))
+                 | other -> vstr other
+               in
+               Variable.create_leaf offset_str (vstr value) ())
+      in
+      memory |> WislSHeap.to_seq
+      |> Seq.map (fun (loc, blocks) ->
+             match blocks with
+             | None -> Variable.create_leaf loc "freed" ()
+             | Some (data, bound) ->
+                 let bound =
+                   match bound with
+                   | None -> "none"
+                   | Some bound -> string_of_int bound
+                 in
+                 let bound = Variable.create_leaf "bound" bound () in
+                 let cells_id = new_var_ref () in
+                 let () =
+                   Hashtbl.replace variables cells_id
+                     (cell_vars (SFVL.to_list data))
+                 in
+                 let cells = Variable.create_node "cells" cells_id () in
+                 let loc_id = new_var_ref () in
+                 let () = Hashtbl.replace variables loc_id [ bound; cells ] in
+                 Variable.create_node loc loc_id ~value:"allocated" ())
+      |> List.of_seq
+
+    let is_list_axiom =
+      let open Expr in
+      function
+      | BinOp (Lit (Int i), ILessThanEqual, UnOp (LstLen, _)) when i = Z.zero ->
+          true
+      | _ -> false
+
+    let get_pf_vars pfs =
+      let pfs_vars, axiom_vars =
+        pfs |> PFS.to_list
+        |> List.partition_map (fun formula ->
+               let value = Fmt.to_to_string pp_expr formula in
+               let var =
+                 Variable.{ name = ""; value; type_ = None; var_ref = 0 }
+               in
+               if is_list_axiom formula then Right var else Left var)
+      in
+      let pfs_vars = List.sort Stdlib.compare pfs_vars in
+      let axiom_vars = List.sort Stdlib.compare axiom_vars in
+      (pfs_vars, axiom_vars)
+
+    let get_pred_vars preds =
+      let open Variable in
+      preds |> Preds.to_list
+      |> List.map (fun (name, params) ->
+             let value = Fmt.str "%s(%a)" name (pp_comma_sep pp_expr) params in
+             { name = ""; value; type_ = None; var_ref = 0 })
+      |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+
+    let is_ptr_val =
+      let open Expr in
+      function
+      | EList [ (Lit (Loc _) | ALoc _); _ ] -> true
+      | EList [ (LVar v | PVar v); _ ] ->
+          Names.(is_aloc_name v || is_lloc_name v)
+      | _ -> false
+
+    let is_ptr_in_store ~store name =
+      match List.assoc_opt name store with
+      | Some v -> is_ptr_val v
+      | None -> false
+
+    let is_ptr_in_pfs ~pfs name =
+      let open Expr in
+      pfs
+      |> List.exists @@ fun pf ->
+         match pf with
+         | BinOp (LVar name', Equal, v) -> name = name' && is_ptr_val v
+         | _ -> false
+
+    let is_ptr ~store ~pfs name typ =
+      typ = Type.ListType
+      && (is_ptr_in_pfs ~pfs name || is_ptr_in_store ~store name)
+
+    let get_type_env_vars ~store ~pfs (types : Type_env.t) : Variable.t list =
+      types |> Type_env.to_list
+      |> List.map (fun (name, value) ->
+             let value =
+               if is_ptr ~store ~pfs name value then "Pointer"
+               else Type.str value
+             in
+             Variable.{ name; value; type_ = None; var_ref = 0 })
+      |> List.sort Variable.(fun v w -> Stdlib.compare v.name w.name)
+
+    let f _ ~store ~memory ?pfs ?types ?preds _ =
+      let variables = Hashtbl.create 0 in
+      (* Scopes and var refs share IDs; they can't clash *)
+      let new_var_ref =
+        let count = ref (List.length Scopes.all) in
+        fun () ->
+          let () = count := !count + 1 in
+          !count
+      in
+      let var_groups = [] in
+
+      (* Program variables *)
+      let var_groups =
+        let pvars = get_store_vars store in
+        (Scopes.pvars, pvars) :: var_groups
+      in
+
+      (* Heap *)
+      let var_groups =
+        let heap_vars = add_heap_vars new_var_ref variables memory in
+        (Scopes.heap, heap_vars) :: var_groups
+      in
+
+      (* Pure formulae *)
+      let var_groups, axioms =
+        match pfs with
+        | Some pfs ->
+            let pfs_vars, axiom_vars = get_pf_vars pfs in
+            ( (Scopes.pfs, pfs_vars) :: var_groups,
+              Some (Scopes.axioms, axiom_vars) )
+        | None -> (var_groups, None)
+      in
+
+      (* Predicates *)
+      let var_groups =
+        match preds with
+        | Some preds ->
+            let pred_vars = get_pred_vars preds in
+            (Scopes.preds, pred_vars) :: var_groups
+        | None -> var_groups
+      in
+
+      (* Type environment *)
+      let var_groups =
+        match types with
+        | Some types ->
+            let pfs = Option.fold ~some:PFS.to_list ~none:[] pfs in
+            let type_vars = get_type_env_vars ~store ~pfs types in
+            (Scopes.types, type_vars) :: var_groups
+        | None -> var_groups
+      in
+
+      (* Axioms *)
+      let var_groups =
+        match axioms with
+        | Some g -> g :: var_groups
+        | None -> var_groups
+      in
+
+      let scopes =
+        var_groups
+        |> List.rev_map @@ fun (scope, vars) ->
+           let () = Hashtbl.replace variables Variable.(scope.id) vars in
+           scope
+      in
+      (scopes, variables)
+  end
+
+  let get_variables = Lift_variables.f
 end

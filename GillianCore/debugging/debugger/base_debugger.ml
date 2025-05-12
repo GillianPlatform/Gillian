@@ -527,32 +527,6 @@ struct
 
     let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
-    let get_pure_formulae_vars (state : state_t) : Variable.t list =
-      let open Variable in
-      State.get_pfs state |> PFS.to_list
-      |> List.map (fun formula ->
-             let value = Fmt.to_to_string (Fmt.hbox Expr.pp) formula in
-             { name = ""; value; type_ = None; var_ref = 0 })
-      |> List.sort (fun v w -> Stdlib.compare v.value w.value)
-
-    let get_type_env_vars (state : state_t) : Variable.t list =
-      let open Variable in
-      let typ_env = State.get_typ_env state in
-      Type_env.to_list typ_env
-      |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
-      |> List.map (fun (name, value) ->
-             let value = Type.str value in
-             { name; value; type_ = None; var_ref = 0 })
-      |> List.sort (fun v w -> Stdlib.compare v.name w.name)
-
-    let get_pred_vars (state : state_t) : Variable.t list =
-      let open Variable in
-      State.get_preds state |> Preds.to_list
-      |> List.map (fun pred ->
-             let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
-             { name = ""; value; type_ = None; var_ref = 0 })
-      |> List.sort (fun v w -> Stdlib.compare v.value w.value)
-
     module Process_files = struct
       let get_progs_or_fail = function
         | Ok (progs, entrypoint) -> (
