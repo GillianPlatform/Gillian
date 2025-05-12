@@ -131,10 +131,10 @@ functor
     let step_out = defer_with_id TLLifter.step_out Gil_lifter.step_out
     let step_back = defer_with_id TLLifter.step_back Gil_lifter.step_back
 
-    let step_branch state case =
+    let step_branch state id case =
       defer
-        (fun s -> TLLifter.step_branch s case)
-        (fun s -> Gil_lifter.step_branch s case)
+        (fun s -> TLLifter.step_branch s id case)
+        (fun s -> Gil_lifter.step_branch s id case)
         state
 
     let continue = defer_with_id TLLifter.continue Gil_lifter.continue
