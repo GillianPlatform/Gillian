@@ -70,7 +70,7 @@ struct
     in
     cmds
 
-  let main () =
+  let main' () =
     Memtrace.trace_if_requested ();
 
     let doc = "An analysis toolchain" in
@@ -107,4 +107,15 @@ struct
       |> split_cmds
     in
     exit (Cmd.eval (Cmd.group info cmds))
+
+  let main () =
+    let open Effect.Deep in
+    try_with main' ()
+      {
+        effc =
+          (fun (type a) (eff : a Effect.t) ->
+            Some
+              (fun (k : (a, _) continuation) ->
+                discontinue k (Effect.Unhandled eff)));
+      }
 end
