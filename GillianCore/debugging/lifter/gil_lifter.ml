@@ -265,7 +265,7 @@ functor
                { name = ""; value; type_ = None; var_ref = 0 })
         |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-      let get_variables _ ~store ~memory ~pfs ~types ~preds _ =
+      let get_variables _ ~store ~memory ?pfs ?types ?preds _ =
         let variables = Hashtbl.create 0 in
         (* New scope ids must be higher than last top level scope id to prevent
             duplicate scope ids *)
@@ -279,9 +279,13 @@ functor
             add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
               variables
           in
-          let pure_formulae_vars = get_pure_formulae_vars pfs in
-          let type_env_vars = get_type_env_vars types in
-          let pred_vars = get_pred_vars preds in
+          let pure_formulae_vars =
+            Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
+          in
+          let type_env_vars =
+            Option.fold ~some:get_type_env_vars ~none:[] types
+          in
+          let pred_vars = Option.fold ~some:get_pred_vars preds ~none:[] in
           let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
           let () =
             List.iter2
