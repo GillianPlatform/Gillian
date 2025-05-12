@@ -38,9 +38,9 @@ struct
     mutable cur_report_id : L.Report_id.t option;
     (* TODO: The below fields only depend on the
             cur_report_id and could be refactored to use this *)
-    mutable variable_scopes : Variable.scope list;
     mutable frames : frame list;
-    mutable variables : Variable.ts; [@default Hashtbl.create 0]
+    mutable variables : (Variable.scope list * Variable.ts) option;
+        [@default None]
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable proc_name : string;
@@ -664,25 +664,25 @@ struct
           in
           frame :: call_stack_to_frames rest se.call_index prog
 
-    module Update_proc_state = struct
-      let get_cmd id =
-        match L.Log_queryer.get_report id with
-        | None ->
+    let get_cmd id =
+      match L.Log_queryer.get_report id with
+      | None ->
+          Fmt.failwith
+            "Unable to find report id '%a'. Check the logging level is set \
+             correctly"
+            L.Report_id.pp id
+      | Some (content, type_) ->
+          if type_ <> Content_type.cmd then
             Fmt.failwith
-              "Unable to find report id '%a'. Check the logging level is set \
-               correctly"
-              L.Report_id.pp id
-        | Some (content, type_) ->
-            if type_ <> Content_type.cmd then
-              Fmt.failwith
-                "Debugger: don't know how to handle report of type '%s'!" type_
-            else
-              let () =
-                DL.show_report ~v:true id
-                  ("Debugger.update...: Got report type " ^ type_)
-              in
-              content |> of_yojson_string Logging.ConfigReport.of_yojson
+              "Debugger: don't know how to handle report of type '%s'!" type_
+          else
+            let () =
+              DL.show_report ~v:true id
+                ("Debugger.update...: Got report type " ^ type_)
+            in
+            content |> of_yojson_string Logging.ConfigReport.of_yojson
 
+    module Update_proc_state = struct
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
         | [] -> None
@@ -700,18 +700,7 @@ struct
         state.selected_match_steps <- [];
         state.frames <-
           call_stack_to_frames cmd.callstack cmd.proc_line cfg.prog;
-        let lifted_scopes, variables =
-          let store = State.get_store cmd.state |> Store.bindings in
-          let memory = State.get_heap cmd.state in
-          let pfs = State.get_pfs cmd.state in
-          let types = State.get_typ_env cmd.state in
-          let preds = State.get_preds cmd.state in
-          Lifter.get_variables state.lifter_state ~store ~memory ~pfs ~types
-            ~preds report_id
-        in
-        state.variables <- variables;
-        state.variable_scopes <-
-          List.concat [ lifted_scopes; Variable.top_level_scopes ];
+        state.variables <- None;
         (* TODO: fix *)
         (* let () = dbg.errors <- cmd_result.errors in *)
         state.cur_cmd <- get_cur_cmd cmd cfg
@@ -1003,9 +992,8 @@ struct
                in
                let proc_state =
                  let make ext =
-                   let variable_scopes = Variable.top_level_scopes in
-                   make_base_proc_state ~proc_name ~cont_func ~variable_scopes
-                     ~lifter_state ~report_state ~ext ()
+                   make_base_proc_state ~proc_name ~cont_func ~lifter_state
+                     ~report_state ~ext ()
                  in
                  let ext = Debugger_impl.init_proc debug_state (make ()) in
                  make ext
@@ -1095,10 +1083,31 @@ struct
       let { frames; _ } = get_proc_state_exn state in
       frames
 
-    let get_scopes state = (get_proc_state_exn state).variable_scopes
+    let get_scopes_and_variables state =
+      let ({ variables; lifter_state; cur_report_id; _ } as proc_state) =
+        get_proc_state_exn state
+      in
+      let- () = variables in
+      match cur_report_id with
+      | None -> ([], Hashtbl.create 0)
+      | Some id ->
+          let vs =
+            let astate = (get_cmd id).state in
+            let store = State.get_store astate |> Store.bindings in
+            let memory = State.get_heap astate in
+            let pfs = State.get_pfs astate in
+            let types = State.get_typ_env astate in
+            let preds = State.get_preds astate in
+            Lifter.get_variables lifter_state ~store ~memory ~pfs ~types ~preds
+              id
+          in
+          proc_state.variables <- Some vs;
+          vs
+
+    let get_scopes state = fst (get_scopes_and_variables state)
 
     let get_variables (var_ref : int) (state : t) : Variable.t list =
-      let { variables; _ } = get_proc_state_exn state in
+      let variables = snd (get_scopes_and_variables state) in
       match Hashtbl.find_opt variables var_ref with
       | None -> []
       | Some vars -> vars
