@@ -219,16 +219,23 @@ struct
         match node with
         | Assertion (data, nexts) ->
             let next = make_basic_next nexts in
-            let options =
-              Map_node_options.Basic
-                { display = data.assertion; selectable = true; extras = [] }
-            in
-            let submaps, folds =
+            let submaps, folds, extras =
               match data.fold with
-              | None -> ([], [])
+              | None -> ([], [], [])
               | Some matching ->
                   let id = show_id matching.id in
-                  ([ id ], [ matching ])
+                  let badge =
+                    let tag = match matching.result with
+                    | Success -> "success"
+                    | Failure -> "fail"
+                    in
+                    Map_node_extra.Badge { text = "Fold"; tag }
+                  in
+                  ([ id ], [ matching ], [ badge ])
+            in
+            let options =
+              Map_node_options.Basic
+                { display = data.assertion; selectable = true; extras }
             in
             let () =
               Map_node.make ~id ~submaps ~next ~options () |> add_node state
