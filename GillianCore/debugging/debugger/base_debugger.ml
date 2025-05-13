@@ -206,9 +206,9 @@ struct
           Map_node_options.Root
             {
               title = "Match";
-              subtitle = show_match_kind matching;
-              zoomable = true;
-              extras = [];
+              subtitle = Some (show_match_kind matching);
+              zoomable = Some true;
+              extras = None;
             }
         in
         Map_node.make ~id ~next ~options () |> add_node state
@@ -221,33 +221,45 @@ struct
             let next = make_basic_next nexts in
             let submaps, folds, extras =
               match data.fold with
-              | None -> ([], [], [])
+              | None -> ([], [], None)
               | Some matching ->
                   let id = show_id matching.id in
                   let badge =
-                    let tag = match matching.result with
-                    | Success -> "success"
-                    | Failure -> "fail"
+                    let tag =
+                      match matching.result with
+                      | Success -> Some "success"
+                      | Failure -> Some "fail"
                     in
                     Map_node_extra.Badge { text = "Fold"; tag }
                   in
-                  ([ id ], [ matching ], [ badge ])
+                  ([ id ], [ matching ], Some [ badge ])
             in
             let options =
               Map_node_options.Basic
-                { display = data.assertion; selectable = true; extras }
+                {
+                  display = data.assertion;
+                  selectable = Some true;
+                  extras;
+                  highlight = None;
+                }
             in
             let () =
               Map_node.make ~id ~submaps ~next ~options () |> add_node state
             in
             (nexts, folds)
         | MatchResult (_, result) ->
+            let highlight =
+              match result with
+              | Success -> None
+              | Failure -> Some Map_node_options.Highlight.Error
+            in
             let options =
               Map_node_options.Basic
                 {
                   display = Match_map.show_match_result result;
-                  selectable = false;
-                  extras = [];
+                  selectable = Some false;
+                  extras = Some [];
+                  highlight;
                 }
             in
             let () =
@@ -275,18 +287,24 @@ struct
 
       let get_node_extras (node : Exec_map.Packaged.node) =
         let open Map_node_extra in
-        match node.data.matches with
-        | [] -> []
-        | matches ->
-            let tag =
-              if
-                List.for_all
-                  (fun (m : Match_map.matching) -> m.result = Success)
-                  matches
-              then "success"
-              else "fail"
-            in
-            [ Badge { text = "Match"; tag } ]
+        let badges =
+          match node.data.matches with
+          | [] -> []
+          | matches ->
+              let tag =
+                if
+                  List.for_all
+                    (fun (m : Match_map.matching) -> m.result = Success)
+                    matches
+                then Some "success"
+                else Some "fail"
+              in
+              [ Badge { text = "Match"; tag } ]
+        in
+        let tooltips =
+          node.data.errors |> List.map (fun err -> Tooltip { text = err })
+        in
+        Some (badges @ tooltips)
 
       let get_node_next (node : Exec_map.Packaged.node) =
         let open Map_node_next in
@@ -321,11 +339,11 @@ struct
         let options =
           let title, subtitle =
             match proc.proc_display_name with
-            | Some ts -> ts
-            | None -> (proc_name, "")
+            | Some (t, s) -> (t, Some s)
+            | None -> (proc_name, None)
           in
           Map_node_options.Root
-            { title; subtitle; zoomable = true; extras = [] }
+            { title; subtitle; zoomable = Some true; extras = None }
         in
         let () =
           if not proc.proc_hidden then
@@ -361,12 +379,18 @@ struct
           submaps @ matches
         in
         let next = get_node_next node in
+        let highlight =
+          match node.data.errors with
+          | [] -> None
+          | _ -> Some Map_node_options.Highlight.Error
+        in
         let options =
           Map_node_options.Basic
             {
               display = node.data.display;
-              selectable = true;
+              selectable = Some true;
               extras = get_node_extras node;
+              highlight;
             }
         in
         Map_node.make ~id ~aliases ~submaps ~next ~options () |> add_node state
@@ -721,12 +745,24 @@ struct
       | Exec_res.RSucc _ -> []
       | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
 
+    let errors_of_matches matches =
+      matches
+      |> List.filter_map (fun (m : Match_map.matching) ->
+             match m.result with
+             | Success -> None
+             | Failure -> (
+                 match m.kind with
+                 | Postcondition _ -> Some "Couldn't satisfy postcondition"
+                 | FunctionCall f ->
+                     Some (Fmt.str "Couldn't satisfy precondition of %s" f)
+                 | _ -> None))
+
     let build_final_cmd_data content result prev_id branch_path debug_state =
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       let exec_data =
         let proc_name = (List.hd cmd.callstack).pid in
-        let errors = show_result_errors result in
         let matches = match_final_cmd prev_id ~proc_name result debug_state in
+        let errors = show_result_errors result @ errors_of_matches matches in
         let next_kind = Exec_map.Zero in
         Lift.make_executed_cmd_data next_kind prev_id cmd ~matches ~errors
           branch_path
@@ -850,8 +886,10 @@ struct
               let report =
                 of_yojson_string Logging.ConfigReport.of_yojson content
               in
+              let errors = errors_of_matches matches in
               let exec_data =
-                Lift.make_executed_cmd_data cmd_kind id report ~matches path
+                Lift.make_executed_cmd_data cmd_kind id report ~matches ~errors
+                  path
               in
               (exec_data, cont_func)
           | EoB ->
