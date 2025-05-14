@@ -1266,7 +1266,7 @@ struct
       let pp_o = pp_expr' ~outermost:true in
       function
       | Lit l -> Fmt.pf ft "%a" pp_lit l
-      | UnOp (LstLen, e) -> Fmt.pf ft "length(%a)" pp_o e
+      | UnOp (LstLen, e) -> Fmt.pf ft "len(%a)" pp_o e
       | BinOp (e1, LstNth, e2) -> Fmt.pf ft "%a[%a]" pp e1 pp_o e2
       | BinOp (e1, op, e2) when outermost ->
           Fmt.pf ft "%a %a %a" pp e1 pp_binop op pp e2
@@ -1290,8 +1290,8 @@ struct
 
       let pvars = { id = 1; name = "Program variables" }
       let heap = { id = 2; name = "Heap" }
-      let pfs = { id = 3; name = "Path condition" }
-      let preds = { id = 4; name = "Predicates" }
+      let preds = { id = 3; name = "Predicates" }
+      let pfs = { id = 4; name = "Pure formulae" }
       let types = { id = 5; name = "Types" }
       let axioms = { id = 6; name = "Axioms" }
       let all = [ pvars; heap; pfs; types; preds; axioms ]
@@ -1455,6 +1455,15 @@ struct
         (Scopes.heap, heap_vars) :: var_groups
       in
 
+      (* Predicates *)
+      let var_groups =
+        match preds with
+        | Some preds ->
+            let pred_vars = get_pred_vars preds in
+            (Scopes.preds, pred_vars) :: var_groups
+        | None -> var_groups
+      in
+
       (* Pure formulae *)
       let var_groups, axioms =
         match pfs with
@@ -1463,15 +1472,6 @@ struct
             ( (Scopes.pfs, pfs_vars) :: var_groups,
               Some (Scopes.axioms, axiom_vars) )
         | None -> (var_groups, None)
-      in
-
-      (* Predicates *)
-      let var_groups =
-        match preds with
-        | Some preds ->
-            let pred_vars = get_pred_vars preds in
-            (Scopes.preds, pred_vars) :: var_groups
-        | None -> var_groups
       in
 
       (* Type environment *)
