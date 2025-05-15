@@ -123,3 +123,6 @@ let reset_config () =
       reset_config_f := None;
       f ()
   | None -> ()
+
+let usage_logs = ref false
+let usage_logs_file = ref "./gillian_usage_log.jsonl"

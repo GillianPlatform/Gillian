@@ -228,8 +228,7 @@ struct
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_mp with
         | Error _ ->
-            let open Gillian_result in
-            let err =
+            let exc =
               let msg =
                 Fmt.str
                   "Failed to create matching plan for post-condition of %s" name
@@ -243,9 +242,10 @@ struct
                     | None, None -> None)
                   None posts
               in
-              Error.AnalysisFailures [ { msg; loc } ]
+              Gillian_result.Exc.analysis_failure ?loc ~is_preprocessing:true
+                msg
             in
-            raise (Exc.Gillian_error err)
+            raise exc
         | Ok post_mp ->
             let pre' = SPState.to_assertions ss_pre in
             let ss_pre =
@@ -279,6 +279,7 @@ struct
             in
             (Some test, Some ((pre', snd pre), posts))
     in
+    Gillian_result.with_target func_or_lemma_name @@ fun () ->
     try
       (* Step 1 - normalise the precondition *)
       match
@@ -304,8 +305,10 @@ struct
         Fmt.str "Preprocessing %s failed during normalisation\n%s" name msg
       in
       let loc = snd pre in
-      let error = Gillian_result.Error.(AnalysisFailures [ { msg; loc } ]) in
-      raise (Gillian_result.Exc.Gillian_error error)
+      let exc =
+        Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg
+      in
+      raise exc
 
   let testify_sspec
       ~init_data
@@ -495,9 +498,9 @@ struct
           errors
           |> List.map @@ fun e ->
              let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
-             Gillian_result.Error.{ msg; loc }
+             Gillian_result.Error.make_analysis_failure ?loc msg
         in
-        Gillian_result.analysis_failures errors
+        Error (Gillian_result.Error.AnalysisFailures errors)
     | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } ->
         if Some fl <> test.flag then (
           let msg =
@@ -509,7 +512,8 @@ struct
                 (Fmt.Dump.pair Fmt.int Fmt.int)
                 test.id msg);
           Fmt.pr "f @?";
-          Gillian_result.analysis_failures [ { msg; loc } ])
+          let e = Gillian_result.Error.make_analysis_failures ?loc msg in
+          Error e)
         else
           let parent_id =
             match parent_id with
@@ -546,7 +550,10 @@ struct
                     test.id msg)
             in
             let () = Fmt.pr "f @?" in
-            Gillian_result.analysis_failures [ { msg; loc = test.post_loc } ]
+            let e =
+              Gillian_result.Error.make_analysis_failures ?loc:test.post_loc msg
+            in
+            Error e
 
   let analyse_proc_results
       (test : t)
@@ -598,12 +605,13 @@ struct
                    (Fmt.Dump.pair Fmt.int Fmt.int)
                    test.id msg)
            in
-           Some Gillian_result.Error.{ msg; loc = test.post_loc }
+           Some
+             (Gillian_result.Error.make_analysis_failure ?loc:test.post_loc msg)
     in
     let result =
       match errors with
       | [] -> Ok ()
-      | _ -> Gillian_result.analysis_failures errors
+      | _ -> Error (Gillian_result.Error.AnalysisFailures errors)
     in
     print_success_or_failure (Result.is_ok result);
     result
@@ -621,6 +629,7 @@ struct
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
   let verify (prog : annot MP.prog) (test : t) : unit Gillian_result.t =
+    Gillian_result.with_target test.name @@ fun () ->
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -659,10 +668,10 @@ struct
                   errors
                   |> List.map @@ fun e ->
                      let msg = Fmt.str "%a" SPState.pp_err e in
-                     Gillian_result.Error.{ msg; loc = None }
+                     Gillian_result.Error.make_analysis_failure msg
                 in
                 print_success_or_failure false;
-                Gillian_result.analysis_failures errors))
+                Error (Gillian_result.Error.AnalysisFailures errors)))
 
   let pred_extracting_visitor =
     object

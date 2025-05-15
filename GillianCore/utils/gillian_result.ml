@@ -1,17 +1,27 @@
 module Error = struct
-  type analysis_failure = { msg : string; loc : Location.t option }
+  type analysis_failure = {
+    msg : string;
+    loc : Location.t option;
+    is_preprocessing : bool;
+    in_target : string option;
+  }
+  [@@deriving yojson]
 
   type compilation_error = {
     msg : string;
     loc : Location.t option;
     additional_data : Yojson.Safe.t option;
   }
+  [@@deriving yojson]
 
   type internal_error = {
     msg : string;
     backtrace : string option;
     additional_data : Yojson.Safe.t option;
   }
+  [@@deriving yojson]
+
+  let current_target = ref None
 
   type t =
     | AnalysisFailures of analysis_failure list
@@ -19,12 +29,21 @@ module Error = struct
     | OperationError of string
         (** Handled failure unrelated to analysis, e.g. unable to read input file *)
     | InternalError of internal_error  (** Something went very wrong! *)
+  [@@deriving yojson]
+
+  let make_analysis_failure ?(is_preprocessing = false) ?in_target ?loc msg =
+    let in_target = Option_utils.coalesce in_target !current_target in
+    { msg; loc; is_preprocessing; in_target }
+
+  let make_analysis_failures ?is_preprocessing ?in_target ?loc msg =
+    AnalysisFailures
+      [ make_analysis_failure ?is_preprocessing ?in_target ?loc msg ]
 
   let pp fmt = function
     | AnalysisFailures es ->
         let msgs =
           es
-          |> List.mapi @@ fun i ({ msg; loc } : analysis_failure) ->
+          |> List.mapi @@ fun i ({ msg; loc; _ } : analysis_failure) ->
              Fmt.str "%d. %s%a" (i + 1) msg Location.pp_full loc
         in
         Fmt.pf fmt "Analysis failures!\n%a\n"
@@ -47,6 +66,12 @@ end
 
 open Error
 
+let with_target target f =
+  let old_target = !current_target in
+  current_target := Some target;
+  let finally () = current_target := old_target in
+  Fun.protect ~finally f
+
 module Exc = struct
   exception
     Gillian_internal_error of {
@@ -65,14 +90,14 @@ module Exc = struct
     in
     Gillian_internal_error { msg; additional_data }
 
-  let verification_failure ?loc msg =
-    Gillian_error (AnalysisFailures [ { msg; loc } ])
+  let analysis_failure ?(is_preprocessing = false) ?in_target ?loc msg =
+    Gillian_error (make_analysis_failures ~is_preprocessing ?in_target ?loc msg)
 end
 
 type 'a t = ('a, Error.t) result
 
-let analysis_failures errs = Error (AnalysisFailures errs)
-let analysis_failure ?loc msg = Error (AnalysisFailures [ { msg; loc } ])
+let analysis_failure ?is_preprocessing ?in_target ?loc msg =
+  Error (make_analysis_failures ?is_preprocessing ?in_target ?loc msg)
 
 let compilation_error ?additional_data ?loc msg =
   Error (CompilationError { msg; loc; additional_data })

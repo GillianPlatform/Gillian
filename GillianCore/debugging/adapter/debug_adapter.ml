@@ -65,7 +65,7 @@ functor
         fst (Lwt.task ())
       with Exit -> Lwt.return_unit
 
-    let start in_ out =
+    let start_async in_ out =
       try%lwt
         Utils.Prelude.disable_stdout ();
         Config.debug := true;
@@ -85,4 +85,9 @@ functor
         DL.to_file e;
         Lwt.pause ();%lwt
         raise f
+
+    let start () =
+      (* Looks like VSCode sends a SIGTERM when debugging stops, so whatever. *)
+      Usage_logs.Debug.with_session @@ fun () ->
+      Lwt_main.run (start_async Lwt_io.stdin Lwt_io.stdout)
   end
