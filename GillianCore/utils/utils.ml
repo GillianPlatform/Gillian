@@ -124,6 +124,12 @@ module Gillian_result = struct
   include Gillian_result
 end
 
+(** @canonical Gillian.Utils.Usage_logs *)
+module Usage_logs = struct
+  (** @inline *)
+  include Usage_logs
+end
+
 (**/**)
 
 module Preprocessing_utils = Preprocessing_utils

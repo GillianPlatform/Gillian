@@ -10,38 +10,39 @@ module Make (Debugger : Debugger.S) = struct
   let run { dbg; rpc; send_stopped_events; _ } =
     let promise, _ = Lwt.task () in
     Lwt.pause ();%lwt
-    DL.set_rpc_command_handler rpc ~name:"Continue"
+    DL.set_rpc_command_handler rpc ~name:"Continue" ~interaction:Continue
       (module Continue_command)
       (fun _ ->
         let stop_reason = Debugger.run dbg in
         send_stopped_events stop_reason;%lwt
         Lwt.return (Continue_command.Result.make ()));
-    DL.set_rpc_command_handler rpc ~name:"Next"
+    DL.set_rpc_command_handler rpc ~name:"Next" ~interaction:StepOver
       (module Next_command)
       (fun _ ->
         let stop_reason = Debugger.step dbg in
         send_stopped_events stop_reason);
     DL.set_rpc_command_handler rpc ~name:"Reverse continue"
+      ~interaction:ContinueBack
       (module Reverse_continue_command)
       (fun _ ->
         let stop_reason = Debugger.run ~reverse:true dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Step back"
+    DL.set_rpc_command_handler rpc ~name:"Step back" ~interaction:StepBack
       (module Step_back_command)
       (fun _ ->
         let stop_reason = Debugger.step ~reverse:true dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Step in"
+    DL.set_rpc_command_handler rpc ~name:"Step in" ~interaction:StepIn
       (module Step_in_command)
       (fun _ ->
         let stop_reason = Debugger.step_in dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Step out"
+    DL.set_rpc_command_handler rpc ~name:"Step out" ~interaction:StepOut
       (module Step_out_command)
       (fun _ ->
         let stop_reason = Debugger.step_out dbg in
         send_stopped_events stop_reason);
-    DL.set_rpc_command_handler rpc ~name:"Jump"
+    DL.set_rpc_command_handler rpc ~name:"Jump" ~interaction:Jump
       (module Jump_command)
       (fun { step_id } ->
         let id =
@@ -55,6 +56,7 @@ module Make (Debugger : Debugger.S) = struct
             send_stopped_events Step;%lwt
             Lwt.return ());
     DL.set_rpc_command_handler rpc ~name:"Step specific"
+      ~interaction:StepSpecific
       (module Step_specific_command)
       (fun { step_id; branch_case } ->
         let result =
