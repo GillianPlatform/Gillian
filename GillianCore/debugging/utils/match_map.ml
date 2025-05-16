@@ -41,7 +41,7 @@ functor
       in
       if aux id then Success else Failure
 
-    let build_assertion_data ~prev_substs id content =
+    let build_assertion_data ~pp_asrt ~prev_substs id content =
       let module Subst = SVal.SESubst in
       let asrt_report =
         content |> Yojson.Safe.from_string |> AssertionReport.of_yojson
@@ -49,7 +49,7 @@ functor
       in
       let assertion =
         let asrt, _ = asrt_report.step in
-        Fmt.str "%a" Asrt.pp_atom asrt
+        Fmt.str "%a" pp_asrt asrt
       in
       let substitutions =
         asrt_report.subst |> Subst.to_list_pp
@@ -83,9 +83,9 @@ functor
       in
       { id; fold; assertion; substitutions }
 
-    let rec build_map ?(prev_substs = []) ~nodes id type_ content =
+    let rec build_map ~pp_asrt ?(prev_substs = []) ~nodes id type_ content =
       if type_ = Content_type.assertion then
-        let data = build_assertion_data ~prev_substs id content in
+        let data = build_assertion_data ~pp_asrt ~prev_substs id content in
         let next_ids = L.Log_queryer.get_next_report_ids id in
         let result =
           let () =
@@ -99,8 +99,8 @@ functor
                 L.Log_queryer.get_report next_id |> Option.get
               in
               let result' =
-                build_map ~prev_substs:data.substitutions ~nodes next_id type_
-                  content
+                build_map ~pp_asrt ~prev_substs:data.substitutions ~nodes
+                  next_id type_ content
               in
               if result = Success then Success else result')
             Failure next_ids
@@ -124,7 +124,7 @@ functor
           "Match_map.build_seg: report %a has invalid type (%s) for match map!"
           L.Report_id.pp id type_
 
-    let f match_id =
+    let f ?(pp_asrt = Asrt.pp_atom) match_id =
       let kind =
         let content, _ = L.Log_queryer.get_report match_id |> Option.get in
         let match_report =
@@ -138,7 +138,7 @@ functor
       let roots, result =
         List.fold_left
           (fun (roots, result) (id, type_, content) ->
-            let result' = build_map ~nodes id type_ content in
+            let result' = build_map ~pp_asrt ~nodes id type_ content in
             let result = if result = Success then Success else result' in
             (id :: roots, result))
           ([], Failure) roots

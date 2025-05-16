@@ -50,7 +50,7 @@ include Types
 
 module type Build = sig
   (** Given the ID of a matching, build the representative matching map *)
-  val f : Logging.Report_id.t -> t
+  val f : ?pp_asrt:Asrt.atom Fmt.t -> Logging.Report_id.t -> t
 end
 
 module type Make_builder = functor (Verification : Verifier.S) -> Build

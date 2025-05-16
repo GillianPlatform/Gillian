@@ -89,7 +89,7 @@ struct
       let get_matches
           cur_report_id
           (debug_state : debug_state_ext base_debug_state)
-          _ =
+          (proc_state : proc_state_ext base_proc_state) =
         let { ext; _ } = debug_state in
         let match_ =
           let+ match_id, _ = L.Log_queryer.get_match_for cur_report_id in
@@ -97,7 +97,8 @@ struct
             match ext.match_maps |> List.assoc_opt match_id with
             | Some map -> map
             | None ->
-                let map = build_match_map match_id in
+                let pp_asrt = Lifter.pp_asrt proc_state.lifter_state in
+                let map = build_match_map ~pp_asrt match_id in
                 ext.match_maps <- (match_id, map) :: ext.match_maps;
                 map
           in
@@ -113,12 +114,13 @@ struct
         | None -> []
         | Some (id, kind, result) -> [ Match_map.{ id; kind; result } ]
 
-      let get_match_map match_id debug_state =
+      let get_match_map match_id debug_state proc_state =
         let ext = debug_state.ext in
         match ext.match_maps |> List.assoc_opt match_id with
         | Some map -> map
         | None ->
-            let map = build_match_map match_id in
+            let pp_asrt = Lifter.pp_asrt proc_state.lifter_state in
+            let map = build_match_map ~pp_asrt match_id in
             ext.match_maps <- (match_id, map) :: ext.match_maps;
             map
     end

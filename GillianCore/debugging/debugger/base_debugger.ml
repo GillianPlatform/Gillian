@@ -108,7 +108,10 @@ struct
         Match_map.matching list
 
       val get_match_map :
-        L.Report_id.t -> debug_state_ext base_debug_state -> Match_map.t
+        L.Report_id.t ->
+        debug_state_ext base_debug_state ->
+        proc_state_ext base_proc_state ->
+        Match_map.t
     end
   end
 
@@ -268,7 +271,8 @@ struct
             ([], [])
 
       let convert_match_map' state (matching : Match_map.matching) =
-        let map = get_match_map matching.id state.debug_state in
+        let proc_state = get_proc_state_exn state in
+        let map = get_match_map matching.id state.debug_state proc_state in
         let () = Hashtbl.add state.debug_state.matches matching.id map in
         let () = convert_match_root state matching map in
         let rec aux other_matches = function

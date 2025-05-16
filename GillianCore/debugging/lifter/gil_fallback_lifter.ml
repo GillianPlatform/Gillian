@@ -164,4 +164,6 @@ functor
       Some (init_exn ~proc_name ~all_procs tl_ast prog)
 
     let parse_and_compile_files = TLLifter.parse_and_compile_files
+    let pp_expr = defer TLLifter.pp_expr Gil_lifter.pp_expr
+    let pp_asrt = defer TLLifter.pp_asrt Gil_lifter.pp_asrt
   end
