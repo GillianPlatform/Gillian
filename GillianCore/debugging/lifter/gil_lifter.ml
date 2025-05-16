@@ -448,4 +448,7 @@ functor
 
     let parse_and_compile_files ~entrypoint files =
       PC.parse_and_compile_files files |> Result.map (fun r -> (r, entrypoint))
+
+    let pp_expr _ = Expr.pp
+    let pp_asrt _ = Asrt.pp_atom
   end

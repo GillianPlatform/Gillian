@@ -1282,6 +1282,30 @@ struct
 
   let pp_expr = Expr_pp.f
 
+  let pp_asrt ft =
+    let open Asrt in
+    function
+    | Emp -> Fmt.pf ft "emp"
+    | Pred (name, params) ->
+        Fmt.pf ft "%s(%a)" name (pp_comma_sep pp_expr) params
+    | Types tls ->
+        let pp_tl ft (e, t) = Fmt.pf ft "%a : %s" pp_expr e (Type.str t) in
+        Fmt.pf ft "%a" (pp_comma_sep pp_tl) tls
+    | Pure e -> Fmt.pf ft "%a" pp_expr e
+    | CorePred (a, ins, outs) -> (
+        match (WislLActions.ga_from_str a, ins, outs) with
+        | Some Cell, [ loc; offset ], [ value ] ->
+            Fmt.pf ft "[%a, %a] -> %a" pp_expr loc pp_expr offset pp_expr value
+        | Some Bound, [ loc ], [ bound ] ->
+            Fmt.pf ft "%a has bound %a" pp_expr loc pp_expr bound
+        | Some Freed, [ loc ], [] -> Fmt.pf ft "%a is freed" pp_expr loc
+        | _ ->
+            Fmt.pf ft "%s(%a, %a)" a (pp_comma_sep pp_expr) ins
+              (pp_comma_sep pp_expr) outs)
+    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+        Fmt.pf ft "%s(%a) -* %s(%a)" lname (pp_comma_sep pp_expr) largs rname
+          (pp_comma_sep pp_expr) rargs
+
   module Lift_variables = struct
     open Engine
 
@@ -1368,22 +1392,23 @@ struct
                  Variable.create_node loc loc_id ~value:"allocated" ())
       |> List.of_seq
 
-    let is_list_axiom =
+    let pr_list_axiom =
       let open Expr in
       function
-      | BinOp (Lit (Int i), ILessThanEqual, UnOp (LstLen, _)) when i = Z.zero ->
-          true
-      | _ -> false
+      | BinOp (Lit (Int i), ILessThanEqual, (UnOp (LstLen, _) as l))
+        when i = Z.zero -> Some (Fmt.str "%a >= 0" pp_expr l)
+      | _ -> None
 
     let get_pf_vars pfs =
       let pfs_vars, axiom_vars =
         pfs |> PFS.to_list
         |> List.partition_map (fun formula ->
-               let value = Fmt.to_to_string pp_expr formula in
-               let var =
-                 Variable.{ name = ""; value; type_ = None; var_ref = 0 }
-               in
-               if is_list_axiom formula then Right var else Left var)
+               let var = Variable.make ~name:"" in
+               match pr_list_axiom formula with
+               | None ->
+                   let value = Fmt.to_to_string pp_expr formula in
+                   Left (var ~value ())
+               | Some value -> Right (var ~value ()))
       in
       let pfs_vars = List.sort Stdlib.compare pfs_vars in
       let axiom_vars = List.sort Stdlib.compare axiom_vars in
@@ -1501,4 +1526,6 @@ struct
   end
 
   let get_variables = Lift_variables.f
+  let pp_expr _ = pp_expr
+  let pp_asrt _ = pp_asrt
 end

@@ -6,7 +6,13 @@
 type scope = { name : string; id : int }
 
 (** A variable *)
-type t = { name : string; value : string; type_ : string option; var_ref : int }
+type t = {
+  name : string;
+  value : string;
+  type_ : string option;
+  var_ref : int; [@default 0]
+}
+[@@deriving make]
 
 (** A map of scope IDs to variables *)
 type ts = (int, t list) Hashtbl.t

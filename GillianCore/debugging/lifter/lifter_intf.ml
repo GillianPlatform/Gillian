@@ -97,6 +97,9 @@ module type S = sig
   val memory_error_to_exception_info :
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
 
+  val pp_expr : t -> Expr.t Fmt.t
+  val pp_asrt : t -> Asrt.atom Fmt.t
+
   val get_variables :
     t ->
     store:(string * Expr.t) list ->

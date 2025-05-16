@@ -1192,4 +1192,7 @@ struct
     let () = Kconfig.harness := Some entrypoint in
     C2ParserAndCompiler.parse_and_compile_files files
     |> Result.map (fun r -> (r, Constants.CBMC_names.start))
+
+  let pp_expr _ = Gil_syntax.Expr.pp
+  let pp_asrt _ = Gil_syntax.Asrt.pp_atom
 end
