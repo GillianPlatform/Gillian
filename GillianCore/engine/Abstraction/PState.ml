@@ -320,15 +320,13 @@ module Make (State : SState.S) :
     let new_store =
       try SStore.init (List.combine params args)
       with Invalid_argument _ ->
-        let message =
-          Fmt.str
-            "Running spec of %s which takes %i parameters with the following \
-             %i arguments : %a"
-            name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
-            args
-        in
-        raise (Invalid_argument message)
+        Fmt.failwith
+          "Running spec of %s which takes %i parameters with the following %i \
+           arguments : %a"
+          name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
+          args
     in
+
     let astate' = set_store astate new_store in
     let existential_bindings = Option.value ~default:[] existential_bindings in
     let existential_bindings =

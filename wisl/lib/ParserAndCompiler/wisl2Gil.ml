@@ -870,7 +870,7 @@ let rec compile_stmt_list
 
 let compile_spec
     ?(fname = "main")
-    WSpec.{ pre; post; variant; fparams; existentials; _ } =
+    WSpec.{ pre; post; variant; fparams; existentials; sploc; _ } =
   let comp_pre =
     let _, comp_pre = compile_lassert ~fname pre in
     let loc = WLAssert.get_loc pre |> CodeLoc.to_location in
@@ -901,7 +901,8 @@ let compile_spec
         Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
           true
   in
-  Spec.init fname fparams [ single_spec ] false false true
+  let location = CodeLoc.to_location sploc in
+  Spec.init fname fparams [ single_spec ] false false true (Some location)
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
@@ -1056,6 +1057,7 @@ let compile_lemma
         lemma_variant;
         lemma_hypothesis;
         lemma_conclusion;
+        lemma_loc;
         _;
       } =
   let compile_lcmd = compile_lcmd ~fname:lemma_name in
@@ -1092,6 +1094,7 @@ let compile_lemma
     (post, Some loc)
   in
   let lemma_existentials = [] in
+  let lemma_location = Some (CodeLoc.to_location lemma_loc) in
   (* TODO: What about existentials for lemma in WISL ? *)
   Lemma.
     {
@@ -1110,6 +1113,7 @@ let compile_lemma
           };
         ];
       lemma_existentials;
+      lemma_location;
     }
 
 let compile ~filepath WProg.{ context; predicates; lemmas } =

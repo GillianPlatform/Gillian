@@ -773,6 +773,7 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_variant = None;
       lemma_specs;
       lemma_proof;
+      lemma_location = None;
     }
 
 let trans_spec ~ann ?(only_spec = false) cl_spec =
@@ -786,6 +787,7 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
+        spec_location = None;
       }
   in
   let _ =
