@@ -758,11 +758,13 @@ struct
       (lnames_to_verify : SS.t) : annot MP.prog * t list * t list =
     let ipreds = MP.init_preds prog.preds in
     match ipreds with
-    | Error e ->
+    | Error (e, loc) ->
         Fmt.pr "Creation of matching plans for predicates failed with:\n%a\n@?"
-          MP.pp_err e;
-        Fmt.failwith "Creation of matching plans for predicates failed."
-    | Ok preds -> (
+          MP.pp_err_ e;
+        let msg = "Creation of matching plans for predicates failed." in
+        raise
+          (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg)
+    | Ok preds ->
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
@@ -839,22 +841,14 @@ struct
 
         (* STEP 4: Create matching plans for specs and predicates *)
         (* Printf.printf "Creating matching plans: %f\n" (cur_time -. start_time); *)
-        match MP.init_prog ~preds_tbl:preds prog with
-        | Error e ->
-            Fmt.failwith "Creation of matching plans failed:@\n %a@\n@?"
-              MP.pp_err e
-        | Ok prog' ->
-            (* STEP 5: Determine static dependencies and add to call graph *)
-            List.iter
-              (fun test -> record_proc_dependencies test.name prog')
-              tests;
-            List.iter
-              (fun test -> record_lemma_dependencies test.name prog')
-              tests';
-            Hashtbl.iter
-              (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
-              prog'.preds;
-            (prog', tests', tests))
+        let prog' = MP.init_prog ~preds_tbl:preds prog in
+        (* STEP 5: Determine static dependencies and add to call graph *)
+        List.iter (fun test -> record_proc_dependencies test.name prog') tests;
+        List.iter (fun test -> record_lemma_dependencies test.name prog') tests';
+        Hashtbl.iter
+          (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
+          prog'.preds;
+        (prog', tests', tests)
 
   let verify_procs
       ~(init_data : SPState.init_data)

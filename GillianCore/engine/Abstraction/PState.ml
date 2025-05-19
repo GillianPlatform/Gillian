@@ -461,7 +461,8 @@ module Make (State : SState.S) :
       L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate));
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -639,7 +640,8 @@ module Make (State : SState.S) :
     else ();
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -963,7 +965,8 @@ module Make (State : SState.S) :
                 m "State after substitution:@\n@[%a@]\n" pp astate));
           let mp =
             match mp with
-            | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+            | Error asrts ->
+                raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
             | Ok mp -> mp
           in
           let bindings =

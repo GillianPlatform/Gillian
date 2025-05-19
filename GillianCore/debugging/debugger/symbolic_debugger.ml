@@ -26,11 +26,7 @@ struct
 
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
-      let prog =
-        match MP.init_prog debug_state.prog with
-        | Error _ -> failwith "Creation of matching plans failed"
-        | Ok prog -> prog
-      in
+      let prog = MP.init_prog debug_state.prog in
       Verification.SAInterpreter.init_evaluate_proc
         (fun x -> x)
         prog proc_name []
