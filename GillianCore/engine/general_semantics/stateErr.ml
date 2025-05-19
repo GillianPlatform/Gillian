@@ -3,11 +3,10 @@
 (** @canonical Gillian.General.StateErr.err_t *)
 type ('mem_err, 'value) t =
   | EMem of 'mem_err  (** Memory error, depends on instantiation *)
-  | EType of 'value * Type.t option * Type.t
-      (** Incorrect type, depends on value *)
   | EPure of Expr.t (* Missing formula that should be true *)
   | EVar of Var.t (* Undefined variable *)
-  | EAsrt of ('value list * Expr.t * Asrt.t list)
+  | EAsrt of ('value list * Expr.t)
+  (* Assertion that failed, with the relevant values for unfolding. *)
   | EOther of string
     (* We want all errors to be proper errors - this is a temporary placeholder *)
 [@@deriving yojson, show]
@@ -18,7 +17,7 @@ let get_recovery_tactic
   let f err =
     match err with
     | EMem err -> mem_recovery_tactics err
-    | EAsrt (xs, _, _) -> Recovery_tactic.try_unfold xs
+    | EAsrt (xs, _) -> Recovery_tactic.try_unfold xs
     | _ -> Recovery_tactic.none
   in
   List.fold_left
@@ -32,27 +31,21 @@ let pp_err
     (err : ('a, 'b) t) : unit =
   match err with
   | EMem m_err -> pp_m_err fmt m_err
-  | EType (v, t1, t2) ->
-      Fmt.pf fmt "EType(%a, %a, %s)" pp_v v
-        (Fmt.option ~none:(Fmt.any "None") (Fmt.of_to_string Type.str))
-        t1 (Type.str t2)
-  | EPure f -> Fmt.pf fmt "EPure(%a)" Expr.pp f
-  | EVar x -> Fmt.pf fmt "EVar(%s)" x
-  | EAsrt (vs, f, asrtss) ->
-      let pp_asrts fmt asrts = Fmt.pf fmt "[%a]" Asrt.pp asrts in
-      Fmt.pf fmt "EAsrt(%a; %a; %a)"
+  | EPure f -> Fmt.pf fmt "Pure assertion failed: %a" Expr.pp f
+  | EVar x -> Fmt.pf fmt "Undefined variable: %s" x
+  | EAsrt ([], f) -> Fmt.pf fmt "Assertion failed: %a" Expr.pp f
+  | EAsrt (vs, f) ->
+      Fmt.pf fmt "Assertion failed for %a: %a"
         (Fmt.list ~sep:(Fmt.any ", ") pp_v)
         vs Expr.pp f
-        (Fmt.list ~sep:(Fmt.any ", ") pp_asrts)
-        asrtss
   | EOther msg -> Fmt.pf fmt "%s" msg
 
 let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) t) : bool =
   match err with
   | EMem mem_err -> can_fix_mem mem_err
   | EPure pf -> Reduction.reduce_lexpr pf <> Expr.false_
-  | EAsrt (_, pf, _) ->
-      let result = Reduction.reduce_lexpr pf <> Expr.true_ in
+  | EAsrt (_, pf) ->
+      let result = Reduction.reduce_lexpr pf <> Expr.false_ in
       Logging.verbose (fun fmt -> fmt "Can fix: %a: %b" Expr.pp pf result);
       result
   | _ -> false
