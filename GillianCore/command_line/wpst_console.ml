@@ -216,9 +216,8 @@ module Make
     in
     Printf.printf "Compilation time: %fs\n" (Sys.time () -. t);
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
-    match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed"
-    | Ok prog' -> run prog' init_data incremental source_files_opt
+    let prog' = MP.init_prog prog in
+    run prog' init_data incremental source_files_opt
 
   let wpst
       files

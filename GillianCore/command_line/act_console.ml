@@ -117,14 +117,12 @@ struct
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.@\n") in
     let () = Config.unfolding := false in
     let prog = LogicPreprocessing.preprocess prog true in
-    match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed."
-    | Ok prog' ->
-        let () =
-          Abductor.test_prog ~init_data ~call_graph prog' incremental
-            source_files_opt
-        in
-        if should_emit_specs then emit_specs e_prog prog' file
+    let prog' = MP.init_prog prog in
+    let () =
+      Abductor.test_prog ~init_data ~call_graph prog' incremental
+        source_files_opt
+    in
+    if should_emit_specs then emit_specs e_prog prog' file
 
   let act
       files
