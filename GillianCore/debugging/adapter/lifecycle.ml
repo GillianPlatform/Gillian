@@ -39,12 +39,6 @@ module Make (Debugger : Debugger.S) = struct
             Stopped_event.Payload.(
               make ~reason:Stopped_event.Payload.Reason.Entry
                 ~thread_id:(Some 0) ()));
-    DL.set_rpc_command_handler rpc ~name:"Terminate"
-      (module Terminate_command)
-      (fun _ ->
-        Debugger.terminate dbg;
-        !cancel_debugger ();
-        Lwt.return ());
     DL.set_rpc_command_handler rpc ~name:"Disconnect"
       (module Disconnect_command)
       (fun _ ->
