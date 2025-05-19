@@ -35,6 +35,7 @@ module Types = struct
   type node =
     | Assertion of assertion_data * Logging.Report_id.t list
     | MatchResult of Logging.Report_id.t * match_result
+    | RecoveryTactic of Matcher.recovery_tactic * Logging.Report_id.t list
   [@@deriving yojson]
 
   type t = {

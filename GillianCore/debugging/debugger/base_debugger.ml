@@ -216,7 +216,7 @@ struct
         in
         Map_node.make ~id ~next ~options () |> add_node state
 
-      let convert_match_node state (map : Match_map.t) node_id =
+      let convert_match_node proc_state state (map : Match_map.t) node_id =
         let node = Hashtbl.find map.nodes node_id in
         let id = show_id node_id in
         match node with
@@ -250,6 +250,32 @@ struct
               Map_node.make ~id ~submaps ~next ~options () |> add_node state
             in
             (nexts, folds)
+        | RecoveryTactic (tactic, nexts) ->
+            let kind, pname, args =
+              match tactic with
+              | Try_fold (p, args) -> ("Fold", p, args)
+              | Try_unfold (p, args) -> ("Unfold", p, args)
+            in
+            let next = make_basic_next nexts in
+            let options =
+              let pp_exprs =
+                Fmt.(
+                  list ~sep:(any ", ") (Lifter.pp_expr proc_state.lifter_state))
+              in
+              let display = Fmt.str "%s %s(%a)" kind pname pp_exprs args in
+              let badge =
+                Map_node_extra.Badge { text = "Recovery tactic"; tag = None }
+              in
+              Map_node_options.Basic
+                {
+                  display;
+                  selectable = Some false;
+                  extras = Some [ badge ];
+                  highlight = None;
+                }
+            in
+            let () = Map_node.make ~id ~next ~options () |> add_node state in
+            (nexts, [])
         | MatchResult (_, result) ->
             let highlight =
               match result with
@@ -270,24 +296,25 @@ struct
             in
             ([], [])
 
-      let convert_match_map' state (matching : Match_map.matching) =
-        let proc_state = get_proc_state_exn state in
+      let convert_match_map' proc_state state (matching : Match_map.matching) =
         let map = get_match_map matching.id state.debug_state proc_state in
         let () = Hashtbl.add state.debug_state.matches matching.id map in
         let () = convert_match_root state matching map in
         let rec aux other_matches = function
           | [] -> other_matches
           | node_id :: rest ->
-              let nexts, folds = convert_match_node state map node_id in
+              let nexts, folds =
+                convert_match_node proc_state state map node_id
+              in
               aux (folds @ other_matches) (nexts @ rest)
         in
         aux [] map.roots
 
-      let rec convert_match_maps state = function
+      let rec convert_match_maps proc_state state = function
         | [] -> ()
         | matching :: rest ->
-            let folds = convert_match_map' state matching in
-            convert_match_maps state (folds @ rest)
+            let folds = convert_match_map' proc_state state matching in
+            convert_match_maps proc_state state (folds @ rest)
 
       let get_node_extras (node : Exec_map.Packaged.node) =
         let open Map_node_extra in
@@ -355,10 +382,10 @@ struct
         in
         Map_node.make ~id ~next ~options () |> add_node state
 
-      let convert_node (node : Exec_map.Packaged.node) state =
+      let convert_node proc_state state (node : Exec_map.Packaged.node) =
         let id = show_id node.data.id in
         let aliases = node.data.all_ids |> List.map show_id in
-        let () = convert_match_maps state node.data.matches in
+        let () = convert_match_maps proc_state state node.data.matches in
         let submaps =
           let matches =
             node.data.matches
@@ -406,7 +433,7 @@ struct
             proc_state.root_created <- true
         in
         match node with
-        | Some node -> convert_node node state
+        | Some node -> convert_node proc_state state node
         | None -> Hashtbl.remove_all state.debug_state.all_nodes (show_id id)
 
       let get_all_nodes state =
