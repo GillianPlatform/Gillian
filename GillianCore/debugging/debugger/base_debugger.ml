@@ -28,6 +28,7 @@ struct
   module Annot = PC.Annot
   module Content_type = L.Logging_constants.Content_type
   module State = Verification.SPState
+  module Store = Store
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
   type tl_ast = PC.tl_ast
@@ -78,6 +79,17 @@ struct
     debug_state : 'debug_state;
   }
 
+  let get_cmd id =
+    match L.Log_queryer.get_report id with
+    | None -> Fmt.failwith "get_cmd: couldn't find report %a" L.Report_id.pp id
+    | Some (content, type_) ->
+        if type_ <> Content_type.cmd then
+          Fmt.failwith "get_cmd: report %a has unexpected type %s"
+            L.Report_id.pp id type_
+        else
+          let open Verification.SAInterpreter.Logging in
+          content |> of_yojson_string ConfigReport.of_yojson
+
   module type Debugger_impl = sig
     type proc_state_ext
     type debug_state_ext
@@ -113,6 +125,11 @@ struct
         proc_state_ext base_proc_state ->
         Match_map.t
     end
+
+    val get_astate :
+      debug_state_ext base_debug_state ->
+      proc_state_ext base_proc_state ->
+      (L.Report_id.t * State.heap_t astate) option
   end
 
   module Make (Debugger_impl : Debugger_impl) = struct
@@ -137,7 +154,7 @@ struct
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       (List_utils.last cmd.callstack |> Option.get).pid
 
-    let get_proc_state ?cmd_id ?(activate_report_state = true) state =
+    let get_proc_state ?cmd_id ?(activate_report_state = true) (state : t) =
       let { debug_state; procs } = state in
       let proc_name =
         match cmd_id with
@@ -700,24 +717,6 @@ struct
           in
           frame :: call_stack_to_frames rest se.call_index prog
 
-    let get_cmd id =
-      match L.Log_queryer.get_report id with
-      | None ->
-          Fmt.failwith
-            "Unable to find report id '%a'. Check the logging level is set \
-             correctly"
-            L.Report_id.pp id
-      | Some (content, type_) ->
-          if type_ <> Content_type.cmd then
-            Fmt.failwith
-              "Debugger: don't know how to handle report of type '%s'!" type_
-          else
-            let () =
-              DL.show_report ~v:true id
-                ("Debugger.update...: Got report type " ^ type_)
-            in
-            content |> of_yojson_string Logging.ConfigReport.of_yojson
-
     module Update_proc_state = struct
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
@@ -1155,23 +1154,14 @@ struct
       frames
 
     let get_scopes_and_variables state =
-      let ({ variables; lifter_state; cur_report_id; _ } as proc_state) =
+      let ({ variables; lifter_state; _ } as proc_state) =
         get_proc_state_exn state
       in
       let- () = variables in
-      match cur_report_id with
+      match get_astate state.debug_state proc_state with
       | None -> ([], Hashtbl.create 0)
-      | Some id ->
-          let vs =
-            let astate = (get_cmd id).state in
-            let store = State.get_store astate |> Store.bindings in
-            let memory = State.get_heap astate in
-            let pfs = State.get_pfs astate in
-            let types = State.get_typ_env astate in
-            let preds = State.get_preds astate in
-            Lifter.get_variables lifter_state ~store ~memory ~pfs ~types ~preds
-              id
-          in
+      | Some (id, astate) ->
+          let vs = Lifter.get_variables lifter_state astate id in
           proc_state.variables <- Some vs;
           vs
 

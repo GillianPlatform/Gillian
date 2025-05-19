@@ -102,11 +102,7 @@ module type S = sig
 
   val get_variables :
     t ->
-    store:(string * Expr.t) list ->
-    memory:memory ->
-    ?pfs:PFS.t ->
-    ?types:Type_env.t ->
-    ?preds:Preds.t ->
+    memory astate ->
     Logging.Report_id.t ->
     Variable.scope list * Variable.ts
 
