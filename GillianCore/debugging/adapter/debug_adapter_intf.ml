@@ -1,5 +1,4 @@
 module type S = sig
-  val start_async : Lwt_io.input_channel -> Lwt_io.output_channel -> unit Lwt.t
   val start : unit -> unit
 end
 

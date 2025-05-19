@@ -104,9 +104,8 @@ let setup rpc =
 let dump_dbg : (unit -> Yojson.Safe.t) option ref = ref None
 let set_debug_state_dumper f = dump_dbg := Some f
 
-let set_rpc_command_handler rpc ?name ?interaction module_ f =
+let set_rpc_command_handler rpc ?name module_ f =
   let f x =
-    let () = Option.iter Utils.Usage_logs.Debug.log_interaction interaction in
     let name_json =
       match name with
       | Some name -> [ ("dap_cmd", `String name) ]

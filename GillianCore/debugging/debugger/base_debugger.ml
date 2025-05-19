@@ -724,12 +724,6 @@ struct
         Ok ()
       with Failure msg -> Gillian_result.internal_error msg
 
-    let jump_to_id id (state : t) =
-      let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
-      let** proc_state = get_proc_state ~cmd_id state in
-      let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
-      proc_state.selected_match_steps <- matches
-
     let handle_stop debug_state proc_state ?(is_end = false) id id' =
       let id =
         match id' with
@@ -945,34 +939,66 @@ struct
                 | _ -> None);
           }
 
-      let lifter_call lifter_func proc_state state =
+      let lifter_call ?interaction lifter_func proc_state state =
         let stop_id, stop_reason =
           with_lifter_effects lifter_func proc_state state
         in
         let++ () = jump_state_to_id stop_id state.debug_state proc_state in
+        let () =
+          interaction
+          |> Option.iter @@ fun kind ->
+             let breakpoint = stop_reason = Breakpoint in
+             Usage_logs.Debug.log_interaction (Dap_step { kind; breakpoint })
+        in
         stop_reason
 
-      let lifter_call_with_id state lifter_func =
+      let lifter_call_with_id ?interaction state lifter_func =
         let proc_state = get_proc_state_exn state in
         let { cur_report_id; lifter_state; _ } = proc_state in
         let id = Option.get cur_report_id in
         let f () = lifter_func lifter_state id in
-        lifter_call f proc_state state |> Result.get_ok
+        lifter_call ?interaction f proc_state state |> Result.get_ok
 
-      let over state = lifter_call_with_id state Lifter.step_over
-      let in_ state = lifter_call_with_id state Lifter.step_in
-      let out state = lifter_call_with_id state Lifter.step_out
+      let step_over state =
+        lifter_call_with_id ~interaction:Step_over state Lifter.step_over
 
-      let branch case id state =
+      let step_in state =
+        lifter_call_with_id ~interaction:Step_in state Lifter.step_in
+
+      let step_out state =
+        lifter_call_with_id ~interaction:Step_out state Lifter.step_out
+
+      let step_specific case id state =
         let proc_state = get_proc_state_exn ~cmd_id:id state in
         let { lifter_state; _ } = proc_state in
         let f () = Lifter.step_branch lifter_state id case in
-        lifter_call f proc_state state
+        let stop_reason = lifter_call f proc_state state in
+        let () =
+          let has_case = Option.is_some case in
+          Usage_logs.Debug.log_interaction (Step_specific { has_case })
+        in
+        stop_reason
 
-      let back state = lifter_call_with_id state Lifter.step_back
-      let continue state = lifter_call_with_id state Lifter.continue
-      let continue_back state = lifter_call_with_id state Lifter.continue_back
+      let step_back state =
+        lifter_call_with_id ~interaction:Step_back state Lifter.step_back
+
+      let continue state =
+        lifter_call_with_id ~interaction:Continue state Lifter.continue
+
+      let continue_back state =
+        lifter_call_with_id ~interaction:Continue_back state
+          Lifter.continue_back
+
+      let jump id (state : t) =
+        let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
+        let** proc_state = get_proc_state ~cmd_id state in
+        let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
+        let () = proc_state.selected_match_steps <- matches in
+        Usage_logs.Debug.log_interaction
+          (Jump { is_match = not (List.is_empty matches) })
     end
+
+    include Step
 
     module Launch_proc = struct
       open Gillian_result
@@ -1063,11 +1089,14 @@ struct
 
       let make_state debug_state = { debug_state; procs = Hashtbl.create 0 }
 
-      let f file_name proc_name : t Gillian_result.t =
+      let f filename proc_name : t Gillian_result.t =
         Fmt_tty.setup_std_outputs ();
         PC.initialize !Config.current_exec_mode;
         Config.stats := false;
-        let** debug_state, entrypoint = build_debug_state file_name proc_name in
+        let** debug_state, entrypoint = build_debug_state filename proc_name in
+        let () =
+          Usage_logs.Debug.start ~filename ~proc:debug_state.main_proc_name
+        in
         let proc_name = debug_state.main_proc_name in
         let state = make_state debug_state in
         let++ main_proc_state, _ = launch_proc proc_name ~entrypoint state in
@@ -1078,15 +1107,6 @@ struct
     end
 
     let launch = Launch.f
-    let step_in = Step.in_
-    let step ?(reverse = false) = if reverse then Step.back else Step.over
-    let step_specific = Step.branch
-    let step_out = Step.out
-
-    let run ?(reverse = false) ?(launch = false) =
-      ignore launch;
-      (* TODO *)
-      if reverse then Step.continue_back else Step.continue
 
     let start_proc proc_name state =
       let { debug_state; procs } = state in
@@ -1100,7 +1120,8 @@ struct
     let terminate state =
       L.Report_state.(activate global_state);
       Verification.postprocess_files state.debug_state.source_files;
-      if !Config.stats then Statistics.print_statistics ()
+      if !Config.stats then Statistics.print_statistics ();
+      Usage_logs.Debug.stop ()
 
     let get_frames state =
       let { frames; _ } = get_proc_state_exn state in

@@ -18,7 +18,7 @@ module Make (Debugger : Debugger.S) = struct
       (fun _ ->
         let open Launch_command.Arguments in
         if not launch_args.stop_on_entry then
-          let stop_reason = Debugger.run ~launch:true dbg in
+          let stop_reason = Debugger.continue dbg in
           match stop_reason with
           | Step ->
               DL.log (fun m ->
@@ -39,6 +39,12 @@ module Make (Debugger : Debugger.S) = struct
             Stopped_event.Payload.(
               make ~reason:Stopped_event.Payload.Reason.Entry
                 ~thread_id:(Some 0) ()));
+    DL.set_rpc_command_handler rpc ~name:"Terminate"
+      (module Terminate_command)
+      (fun _ ->
+        Debugger.terminate dbg;
+        !cancel_debugger ();
+        Lwt.return ());
     DL.set_rpc_command_handler rpc ~name:"Disconnect"
       (module Disconnect_command)
       (fun _ ->
