@@ -826,7 +826,8 @@ module Make (State : SState.S) :
         m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n" SVal.SESubst.pp
           subst)
 
-  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], Expr.true_, []))
+  (* TODO: why is this not EPure (Expr.false_) ? *)
+  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], Expr.false_))
 
   (* WARNING: At the moment, unfold behaves over-approximately, it will return only success of only error.
      We only use unfold and fold in OX mode right now, and we don't quite know the meaning of UX fold/unfold. *)
@@ -1030,9 +1031,8 @@ module Make (State : SState.S) :
         with
         | Success new_state -> Res_list.return { astate with state = new_state }
         | Abort fail_pf ->
-            let error =
-              StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
-            in
+            (* TODO: why is this not EPure (fail_pf) ? *)
+            let error = StateErr.EAsrt ([], fail_pf) in
             Res_list.error_with error
         | Vanish -> Res_list.vanish)
     | None ->
@@ -1089,9 +1089,8 @@ module Make (State : SState.S) :
                 Res_list.return
                   ({ state = new_state; wands; preds; pred_defs; variants }, vs)
             | Abort fail_pf ->
-                let error =
-                  StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
-                in
+                (* TODO: why is this not EPure (fail_pf) ? *)
+                let error = StateErr.EAsrt ([], fail_pf) in
                 Res_list.error_with error
             | Vanish -> Res_list.vanish))
     | None
@@ -1120,8 +1119,8 @@ module Make (State : SState.S) :
         consume_pred ~no_auto_fold ?fold_outs_info ~in_matching folded pname vs
     | _ ->
         let values = List.filter_map Fun.id vs in
-        (* The `False` as second parameter is required for the fixing mechanism to trigger *)
-        Res_list.error_with (StateErr.EAsrt (values, Expr.false_, []))
+        (* The `True` as second parameter is required for the fixing mechanism to trigger *)
+        Res_list.error_with (StateErr.EAsrt (values, Expr.true_))
 
   and match_ins_outs_lists
       (state : State.t)
@@ -1287,10 +1286,8 @@ module Make (State : SState.S) :
                     Res_list.return
                       { state = state'''; preds; wands; pred_defs; variants }
                 | Abort fail_pf ->
-                    let error =
-                      StateErr.EAsrt
-                        ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
-                    in
+                    (* TODO: why is this not EPure (fail_pf) ? *)
+                    let error = StateErr.EAsrt ([], fail_pf) in
                     Res_list.error_with error
                 | Vanish -> Res_list.vanish)
           | Pred (pname, les) ->
@@ -1397,9 +1394,7 @@ module Make (State : SState.S) :
                   | Vanish -> Res_list.vanish
                   | Abort _ ->
                       let vs = State.unfolding_vals state [ pf ] in
-                      let error =
-                        StateErr.EAsrt (vs, Expr.UnOp (Not, pf), [ [ Pure pf ] ])
-                      in
+                      let error = StateErr.EAsrt (vs, pf) in
                       Res_list.error_with error))
           | Types les -> (
               let corrections =
@@ -1435,10 +1430,7 @@ module Make (State : SState.S) :
                       List.filter_map (subst_in_expr_opt astate subst) les
                     in
                     let conjunct = Expr.conjunct corrections in
-                    let error =
-                      StateErr.EAsrt
-                        (les, UnOp (Not, conjunct), [ [ Pure conjunct ] ])
-                    in
+                    let error = StateErr.EAsrt (les, conjunct) in
                     Res_list.error_with error)
           (* LTrue, LFalse, LEmp, LStar *)
           | _ -> raise (Failure "Illegal Assertion in Matching Plan")
@@ -1473,8 +1465,7 @@ module Make (State : SState.S) :
           | Pure pf ->
               let { state = bstate; _ } = state in
               let vs = State.unfolding_vals bstate [ pf ] in
-              Res_list.error_with
-                (StateErr.EAsrt (vs, UnOp (Not, pf), [ [ Pure pf ] ]))
+              Res_list.error_with (StateErr.EAsrt (vs, pf))
           | asrt ->
               let other_error =
                 StateErr.EOther
@@ -2098,11 +2089,8 @@ module Make (State : SState.S) :
             || State.assert_a state.current_state.state [ equality ]
           then Ok acc
           else
-            Error
-              [
-                StateErr.EAsrt
-                  ([], Expr.Infix.not equality, [ [ Pure equality ] ]);
-              ])
+            (* TODO: why is this not EPure (equality) ? *)
+            Error [ StateErr.EAsrt ([], equality) ])
         (Ok state) obtained expected
 
     let rec package_case_step
