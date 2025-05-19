@@ -712,6 +712,7 @@ module Lemma : sig
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
     lemma_existentials : string list; (* Existentials *)
+    lemma_location : Location.t option;
   }
 
   (** Pretty-printer *)
@@ -784,6 +785,7 @@ module Spec : sig
     spec_normalised : bool;  (** If the spec is already normalised *)
     spec_incomplete : bool;  (**  If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
+    spec_location : Location.t option;
   }
 
   (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single specification with the given values *)
@@ -797,7 +799,15 @@ module Spec : sig
     st
 
   (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
-  val init : string -> string list -> st list -> bool -> bool -> bool -> t
+  val init :
+    string ->
+    string list ->
+    st list ->
+    bool ->
+    bool ->
+    bool ->
+    Location.t option ->
+    t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t

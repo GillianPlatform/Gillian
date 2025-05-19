@@ -19,6 +19,7 @@ type t = TypeDef__.lemma = {
   lemma_variant : Expr.t option;
   (* The paramater to treat as the variant. Will trigger termination checks *)
   lemma_existentials : string list;
+  lemma_location : Location.t option;
 }
 
 let init_tbl () : (string, t) Hashtbl.t = Hashtbl.create Config.small_tbl_size

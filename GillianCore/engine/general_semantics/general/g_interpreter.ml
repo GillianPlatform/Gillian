@@ -1641,6 +1641,13 @@ struct
             let fail_params = List.map (State.eval_expr state) fail_params in
             let err = Exec_err.EFailReached { fail_code; fail_params } in
             raise (Interpreter_error ([ err ], state))
+
+      let f cmd eval_state =
+        try f cmd eval_state
+        with Failure msg ->
+          raise
+            (Gillian_result.Exc.analysis_failure ?loc:eval_state.last_known_loc
+               msg)
     end
 
     let do_eval = Do_eval.f
