@@ -137,11 +137,8 @@ functor
     let f ?(pp_asrt = Asrt.pp_atom) match_id =
       let kind =
         let content, _ = L.Log_queryer.get_report match_id |> Option.get in
-        let match_report =
-          content |> Yojson.Safe.from_string |> MatchReport.of_yojson
-          |> Result.get_ok
-        in
-        match_report.match_kind
+        let report = of_yojson_string MatchReport.of_yojson content in
+        report.match_kind
       in
       let roots = L.Log_queryer.get_children_of ~roots_only:true match_id in
       let nodes = Hashtbl.create 1 in

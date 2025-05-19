@@ -1457,7 +1457,7 @@ struct
              Variable.{ name; value; type_ = None; var_ref = 0 })
       |> List.sort Variable.(fun v w -> Stdlib.compare v.name w.name)
 
-    let f _ ~store ~memory ?pfs ?types ?preds _ =
+    let f _ { store; memory; pfs; types; preds } _ =
       let variables = Hashtbl.create 0 in
       (* Scopes and var refs share IDs; they can't clash *)
       let new_var_ref =

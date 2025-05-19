@@ -32,6 +32,15 @@ type frame = {
 }
 [@@deriving make]
 
+type 'memory astate = {
+  store : (string * Expr.t) list;
+  memory : 'memory;
+  pfs : PFS.t option;
+  types : Type_env.t option;
+  preds : Preds.t option;
+}
+[@@deriving make]
+
 let proc_id_prefix = "proc__"
 let proc_id_prefix_len = String.length proc_id_prefix
 

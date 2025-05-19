@@ -119,11 +119,10 @@ functor
 
     let memory_error_to_exception_info = TLLifter.memory_error_to_exception_info
 
-    let get_variables state ~store ~memory ?pfs ?types ?preds id =
+    let get_variables state astate id =
       defer
-        (fun s -> TLLifter.get_variables s ~store ~memory ?pfs ?types ?preds id)
-        (fun s ->
-          Gil_lifter.get_variables s ~store ~memory ?pfs ?types ?preds id)
+        (fun s -> TLLifter.get_variables s astate id)
+        (fun s -> Gil_lifter.get_variables s astate id)
         state
 
     let step_over = defer_with_id TLLifter.step_over Gil_lifter.step_over

@@ -312,7 +312,7 @@ struct
       in
       scopes
 
-  let get_variables _ ~store ~memory ?pfs ?types ?preds _ =
+  let get_variables _ { store; memory; pfs; types; preds } _ =
     let open Gil_lifter in
     let open Variable in
     let variables = Hashtbl.create 0 in

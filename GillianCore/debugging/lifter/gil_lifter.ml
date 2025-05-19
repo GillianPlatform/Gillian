@@ -265,7 +265,7 @@ functor
                { name = ""; value; type_ = None; var_ref = 0 })
         |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-      let get_variables _ ~store ~memory ?pfs ?types ?preds _ =
+      let get_variables _ { store; memory; pfs; types; preds } _ =
         let variables = Hashtbl.create 0 in
         (* New scope ids must be higher than last top level scope id to prevent
             duplicate scope ids *)

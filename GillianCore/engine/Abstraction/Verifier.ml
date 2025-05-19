@@ -14,6 +14,9 @@ module type S = sig
        and type heap_t = heap_t
        and type m_err_t = m_err
 
+  module SState :
+    SState.S with type t = SPState.state_t and type heap_t = heap_t
+
   module SAInterpreter :
     G_interpreter.S
       with type vt = Expr.t
@@ -24,7 +27,7 @@ module type S = sig
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SMatcher : Matcher.S
+  module SMatcher : Matcher.S with type state_t = SPState.state_t
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -69,6 +72,7 @@ module Make
 struct
   module L = Logging
   module SSubst = SVal.SESubst
+  module SState = SState
   module SPState = SPState
 
   module SAInterpreter =
@@ -82,7 +86,7 @@ struct
   type m_err = SPState.m_err_t
   type annot = PC.Annot.t
 
-  module SMatcher = Matcher.Make (SState)
+  module SMatcher = SPState.SMatcher
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"

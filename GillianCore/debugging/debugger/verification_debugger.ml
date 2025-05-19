@@ -124,6 +124,56 @@ struct
             ext.match_maps <- (match_id, map) :: ext.match_maps;
             map
     end
+
+    let get_astate _ proc_state =
+      let { selected_match_steps; cur_report_id; _ } = proc_state in
+      let/ () =
+        match selected_match_steps with
+        | (id, _) :: _ ->
+            let content, type_ =
+              match L.Log_queryer.get_report id with
+              | None ->
+                  Fmt.failwith
+                    "get_astate: Couldn't find report id '%a' from selected \
+                     match steps"
+                    L.Report_id.pp id
+              | Some x -> x
+            in
+            let open L.Logging_constants.Content_type in
+            let open Verification.SMatcher.Logging in
+            let open Verification.SState in
+            let astate =
+              if type_ = assertion then
+                let report =
+                  of_yojson_string AssertionReport.of_yojson content
+                in
+                report.astate
+              else if type_ = match_recovery then
+                let report =
+                  of_yojson_string MatchRecoveryReport.of_yojson content
+                in
+                report.astate
+              else
+                Fmt.failwith "get_astate: report %a has unexpected type %s"
+                  L.Report_id.pp id type_
+            in
+            let store = get_store astate.state |> Store.bindings in
+            let memory = get_heap astate.state in
+            let pfs = get_pfs astate.state in
+            let types = get_typ_env astate.state in
+            let preds = astate.preds in
+            let astate = make_astate ~store ~memory ~pfs ~types ~preds () in
+            Some (id, astate)
+        | [] -> None
+      in
+      let+ id = cur_report_id in
+      let astate = (get_cmd id).state in
+      let store = State.get_store astate |> Store.bindings in
+      let memory = State.get_heap astate in
+      let pfs = State.get_pfs astate in
+      let types = State.get_typ_env astate in
+      let preds = State.get_preds astate in
+      (id, make_astate ~store ~memory ~pfs ~types ~preds ())
   end
 
   include Make (Impl)

@@ -11,7 +11,10 @@ struct
 
   let add_variables = MonadicSMemory.Lift.add_variables
 
-  let get_variables _ ~store ~memory ?pfs ?types ?preds _ =
+  let get_variables
+      _
+      Gillian.Debugger.Utils.{ store; memory; pfs; types; preds }
+      _ =
     let open Debugger_utils.Variable in
     let variables = Hashtbl.create 0 in
     (* New scope ids must be higher than last top level scope id to prevent
