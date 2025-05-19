@@ -1188,7 +1188,7 @@ module Make (State : SState.S) :
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
-    SMatcher.try_recovering astate tactic
+    SMatcher.try_recovering astate tactic |> Result.map fst
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix

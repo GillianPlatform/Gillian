@@ -88,22 +88,8 @@ functor
         let data = build_assertion_data ~pp_asrt ~prev_substs id content in
         let next_ids = L.Log_queryer.get_next_report_ids id in
         let result =
-          let () =
-            if List.is_empty next_ids then
-              Fmt.failwith "Match_map.build_seg: assertion %a has no next!"
-                L.Report_id.pp id
-          in
-          List.fold_left
-            (fun result next_id ->
-              let content, type_ =
-                L.Log_queryer.get_report next_id |> Option.get
-              in
-              let result' =
-                build_map ~pp_asrt ~prev_substs:data.substitutions ~nodes
-                  next_id type_ content
-              in
-              if result = Success then Success else result')
-            Failure next_ids
+          build_nexts ~prev_substs:data.substitutions ~pp_asrt ~nodes next_ids
+            id
         in
         let () = Hashtbl.replace nodes id (Assertion (data, next_ids)) in
         result
@@ -119,10 +105,34 @@ functor
         in
         let () = Hashtbl.replace nodes id (MatchResult (id, result)) in
         result
+      else if type_ = Content_type.match_recovery then
+        let MatchRecoveryReport.{ tactic; _ } =
+          content |> Yojson.Safe.from_string |> MatchRecoveryReport.of_yojson
+          |> Result.get_ok
+        in
+        let next_ids = L.Log_queryer.get_next_report_ids id in
+        let result = build_nexts ~prev_substs ~pp_asrt ~nodes next_ids id in
+        let () = Hashtbl.replace nodes id (RecoveryTactic (tactic, next_ids)) in
+        result
       else
         Fmt.failwith
           "Match_map.build_seg: report %a has invalid type (%s) for match map!"
           L.Report_id.pp id type_
+
+    and build_nexts ?prev_substs ~pp_asrt ~nodes next_ids id =
+      let () =
+        if List.is_empty next_ids then
+          Fmt.failwith "Match_map.build_nexts: node %a has no next!"
+            L.Report_id.pp id
+      in
+      List.fold_left
+        (fun result next_id ->
+          let content, type_ = L.Log_queryer.get_report next_id |> Option.get in
+          let result' =
+            build_map ~pp_asrt ?prev_substs ~nodes next_id type_ content
+          in
+          if result = Success then Success else result')
+        Failure next_ids
 
     let f ?(pp_asrt = Asrt.pp_atom) match_id =
       let kind =

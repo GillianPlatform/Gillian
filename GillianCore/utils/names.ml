@@ -24,13 +24,6 @@ let lvar_prefix_bi = "#lvar_bi_"
 
 (** {2 Name testers} *)
 
-let is_pvar_name (name : string) : bool =
-  try
-    name.[0] <> '#'
-    && name.[0] <> '$'
-    && (String.length name < 6 || String.sub name 0 6 <> lvar_prefix)
-  with _ -> false
-
 let is_aloc_name (name : string) : bool =
   String.starts_with ~prefix:aloc_prefix name
 
@@ -44,6 +37,9 @@ let is_spec_var_name (name : string) : bool =
 
 let is_lloc_name (name : string) : bool =
   String.starts_with ~prefix:lloc_prefix name
+
+let is_pvar_name (name : string) : bool =
+  (not (is_lvar_name name)) && not (is_lloc_name name)
 
 (** {2 Name builders} *)
 
