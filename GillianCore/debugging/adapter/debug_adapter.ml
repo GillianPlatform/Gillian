@@ -65,29 +65,27 @@ functor
         fst (Lwt.task ())
       with Exit -> Lwt.return_unit
 
-    let start_async in_ out =
-      try%lwt
-        Utils.Prelude.disable_stdout ();
-        Config.debug := true;
-        let rpc = Debug_rpc.create ~in_ ~out () in
-        DL.setup rpc;
-        Printexc.record_backtrace true;
-        let cancel = ref (fun () -> ()) in
-        Lwt.async (fun () ->
-            let%lwt () = run_debugger rpc in
-            !cancel ();
-            Lwt.return_unit);
-        let loop = Debug_rpc.start rpc in
-        let () = cancel := fun () -> Lwt.cancel loop in
-        let%lwt () = try%lwt loop with Lwt.Canceled -> Lwt.return_unit in
-        Lwt.return ()
-      with Failure e as f ->
-        DL.to_file e;
-        Lwt.pause ();%lwt
-        raise f
-
     let start () =
-      (* Looks like VSCode sends a SIGTERM when debugging stops, so whatever. *)
-      Usage_logs.Debug.with_session @@ fun () ->
-      Lwt_main.run (start_async Lwt_io.stdin Lwt_io.stdout)
+      Lwt_main.run
+      @@ try%lwt
+           Utils.Prelude.disable_stdout ();
+           Config.debug := true;
+           let rpc =
+             let in_, out = Lwt_io.(stdin, stdout) in
+             Debug_rpc.create ~in_ ~out ()
+           in
+           DL.setup rpc;
+           Printexc.record_backtrace true;
+           Lwt.async (fun () ->
+               let%lwt () = run_debugger rpc in
+               !cancel_debugger ();
+               Lwt.return_unit);
+           let loop = Debug_rpc.start rpc in
+           let () = cancel_debugger := fun () -> Lwt.cancel loop in
+           let%lwt () = try%lwt loop with Lwt.Canceled -> Lwt.return_unit in
+           Lwt.return ()
+         with Failure e as f ->
+           DL.to_file e;
+           Lwt.pause ();%lwt
+           raise f
   end

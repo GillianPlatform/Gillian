@@ -150,5 +150,24 @@ let merge ?(merge_ok : 'a -> 'b -> 'c = fun x _ -> x) e1 e2 =
 (* Execution should continue if ok or analysis failure (to get the rest of the results).
    Other errors should halt immediately. *)
 let should_continue = function
-  | Ok _ | Error (AnalysisFailures _) -> true
   | Error (InternalError _ | OperationError _ | CompilationError _) -> false
+  | Error (AnalysisFailures fs)
+    when List.exists (fun f -> f.is_preprocessing) fs -> false
+  | Ok _ | Error (AnalysisFailures _) -> true
+
+let to_usage_log =
+  let open Usage_logs.Event in
+  function
+  | Ok _ -> Lsp.Success
+  | Error (AnalysisFailures fs) ->
+      let fs =
+        fs
+        |> List.map @@ fun { msg; loc; is_preprocessing; in_target } ->
+           let loc = Option.map Location.to_small loc in
+           Lsp.make_analysis_failure ?loc ~is_preprocessing ?in_target msg
+      in
+      Analysis_failures fs
+  | Error (CompilationError { msg; loc; _ }) ->
+      let loc = Option.map Location.to_small loc in
+      Compilation_error { msg; loc }
+  | Error (OperationError msg | InternalError { msg; _ }) -> Other_error msg

@@ -43,6 +43,8 @@ let proc_name_of_id s =
     Some proc_name
   else None
 
+let cancel_debugger = ref (fun () -> ())
+
 (** Describes an exception *)
 type exception_info = { id : string; description : string option }
 

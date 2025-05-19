@@ -64,7 +64,10 @@ class lsp_server (f : string -> unit Gillian_result.t) =
       let path = DocumentUri.to_path uri in
       let () = Hashtbl.replace Config.file_content_overrides path contents in
       let result = f path in
-      let () = Utils.Usage_logs.Lsp.log path result in
+      let () =
+        let result = Gillian_result.to_usage_log result in
+        Utils.Usage_logs.Lsp.log path result
+      in
       let diags = result_to_diagnostics ~path result in
       let () = Config.reset_config () in
       notify_back#send_diagnostic diags
