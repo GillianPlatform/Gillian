@@ -579,7 +579,7 @@ let rec compile_stmt_list
     ?loop_body_of
     stmtl =
   (* create generator that works in the context of this function *)
-  let compile_expr = compile_expr ~fname in
+  let compile_expr = compile_expr ~is_loop_prefix ~fname in
   let compile_lcmd = compile_lcmd ~fname in
   let compile_list = compile_stmt_list ~fname ?loop_body_of in
   let gen_str = Generators.gen_str fname in
