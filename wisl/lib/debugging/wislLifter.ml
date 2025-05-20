@@ -443,16 +443,6 @@ struct
           let++ prev = get_prev () in
           init_partial ~prev
 
-    let failwith ~exec_data ?partial ~partials msg =
-      DL.failwith
-        (fun () ->
-          [
-            ("exec_data", exec_data_to_yojson exec_data);
-            ("partial_data", opt_to_yojson partial_data_to_yojson partial);
-            ("partials_state", to_yojson partials);
-          ])
-        ("WislLifter.PartialCmds.handle: " ^ msg)
-
     let handle
         ~(partials : t)
         ~tl_ast
@@ -461,16 +451,11 @@ struct
         ~is_loop_func
         ~proc_name
         ~prev_id
-        exec_data =
-      let partial =
-        find_or_init ~partials ~get_prev prev_id
-        |> Result_utils.or_else (fun e -> failwith ~exec_data ~partials e)
-      in
+        (exec_data : exec_data) =
+      let** partial = find_or_init ~partials ~get_prev prev_id in
       Hashtbl.replace partials exec_data.id partial;
-      let result =
+      let** result =
         update ~tl_ast ~prog ~prev_id ~is_loop_func ~proc_name exec_data partial
-        |> Result_utils.or_else (fun e ->
-               failwith ~exec_data ~partial ~partials e)
       in
       let () =
         match result with
@@ -479,7 +464,7 @@ struct
             |> Ext_list.iter (fun (id, _) -> Hashtbl.remove_all partials id)
         | _ -> ()
       in
-      result
+      Ok result
   end
 
   type t = {
@@ -816,7 +801,7 @@ struct
         Partial_cmds.handle ~partials ~tl_ast ~prog ~get_prev ~is_loop_func
           ~proc_name ~prev_id exec_data
       with
-      | Finished finished ->
+      | Ok (Finished finished) ->
           DL.log (fun m ->
               m
                 ~json:
@@ -827,7 +812,21 @@ struct
                 "Finishing WISL command");
           let cmd = insert_new_cmd ~state finished in
           Either.Right cmd
-      | StepAgain (id, case) -> Either.Left (id, case)
+      | Ok (StepAgain (id, case)) -> Either.Left (id, case)
+      | Error msg ->
+          DL.failwith
+            (fun () ->
+              let prev_id =
+                match prev_id with
+                | Some id -> L.Report_id.to_yojson id
+                | None -> `Null
+              in
+              [
+                ("state", to_yojson state);
+                ("exec_data", exec_data_to_yojson exec_data);
+                ("prev_id", prev_id);
+              ])
+            ("Error while handling command: " ^ msg)
   end
 
   let init_or_handle = Init_or_handle.f
@@ -1023,15 +1022,12 @@ struct
         | Some (id, case) -> find_next state id case
         | None -> Either.left id)
 
-  let request_next state id case =
-    let rec aux id case =
-      let path = path_of_id id state in
-      let exec_data = Effect.perform (Step (Some id, case, path)) in
-      match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
-      | Either.Left (id, case) -> aux id case
-      | Either.Right map -> map.data.id
-    in
-    aux id case
+  let rec request_next state id case =
+    let path = path_of_id id state in
+    let exec_data = Effect.perform (Step (Some id, case, path)) in
+    match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
+    | Either.Left (id, case) -> request_next state id case
+    | Either.Right map -> map.data.id
 
   let step state id case =
     let () =
