@@ -140,7 +140,7 @@ module Make
           Config.Verification.set_lemmas_to_verify lemmas_to_verify
     in
     let r = verify files already_compiled outfile_opt no_unfold incremental in
-    let () = if stats then Statistics.print_statistics () in
+    let () = if stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 

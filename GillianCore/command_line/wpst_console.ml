@@ -245,7 +245,7 @@ module Make
       Gillian_result.try_ @@ fun () ->
       process_files files already_compiled outfile_opt incremental
     in
-    let () = if stats then Statistics.print_statistics () in
+    let () = if stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 
