@@ -149,7 +149,7 @@ struct
       process_files files already_compiled outfile_opt should_emit_specs
         incremental
     in
-    let () = if !Config.stats then Statistics.print_statistics () in
+    let () = if !Config.stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 

@@ -1146,7 +1146,7 @@ struct
     let terminate state =
       L.Report_state.(activate global_state);
       Verification.postprocess_files state.debug_state.source_files;
-      if !Config.stats then Statistics.print_statistics ();
+      if !Config.stats then L.Statistics.print_statistics ();
       Usage_logs.Debug.stop ()
 
     let get_frames state =
