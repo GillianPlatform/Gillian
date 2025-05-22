@@ -59,9 +59,10 @@
 %token <CodeLoc.t> NOT HEAD TAIL REV LEN SUB
 
 (* Logic Binary *)
-%token WAND           /* -*   */
-%token ARROW          /* ->   */
-%token BLOCK_ARROW    /* -b-> */
+%token WAND           /* -*    */
+%token ARROW          /* ->    */
+%token BLOCK_ARROW    /* -b->  */
+%token <CodeLoc.t> FREED          /* freed */
 
 (* Logic *)
 %token <CodeLoc.t> EMP LSTNIL
@@ -545,6 +546,11 @@ logic_assertion:
       let bare_assert = WLAssert.LBlockPointsTo (le1, le2) in
       let lstart = WLExpr.get_loc le1 in
       let lend = get_lend le2 in
+      let loc = CodeLoc.merge lstart lend in
+      WLAssert.make bare_assert loc }
+  | lstart = FREED; le = logic_expression
+    { let bare_assert = WLAssert.LFreed le in
+      let lend = WLExpr.get_loc le in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
   | lstart = LBRACE; formula = logic_expression; lend = RBRACE;

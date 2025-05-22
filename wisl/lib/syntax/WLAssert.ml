@@ -8,6 +8,7 @@ type tt =
   | LPred of string * WLExpr.t list
   | LPointsTo of WLExpr.t * WLExpr.t list
   | LBlockPointsTo of WLExpr.t * WLExpr.t list
+  | LFreed of WLExpr.t
   | LType of WLExpr.t * WType.t
   | LPure of WLExpr.t
 
@@ -39,6 +40,7 @@ let rec get_vars_and_lvars asrt =
       double_union (WLExpr.get_vars_and_lvars el) (from_wlexpr_list lel)
   | LBlockPointsTo (el, lel) ->
       double_union (WLExpr.get_vars_and_lvars el) (from_wlexpr_list lel)
+  | LFreed el -> WLExpr.get_vars_and_lvars el
   | LPure lf -> WLExpr.get_vars_and_lvars lf
   | LWand { lhs = _, largs; rhs = _, rargs } ->
       double_union (from_wlexpr_list largs) (from_wlexpr_list rargs)
@@ -75,6 +77,7 @@ let rec pp fmt asser =
       Fmt.pf fmt "@[(%a) -> %a@]" WLExpr.pp le1 pp_params le2
   | LBlockPointsTo (le1, le2) ->
       Fmt.pf fmt "@[(%a) -b-> %a@]" WLExpr.pp le1 pp_params le2
+  | LFreed le -> Fmt.pf fmt "@[freed (%a)@]" WLExpr.pp le
   | LPure f -> Fmt.pf fmt "@[(%a)@]" WLExpr.pp f
   | LType (el, ty) -> Fmt.pf fmt "@[%a : %a@]" WLExpr.pp el WType.pp ty
 
@@ -94,7 +97,8 @@ let rec substitution (subst : (string, WLExpr.tt) Hashtbl.t) (a : t) : t =
           { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
     | LPointsTo (e1, le) -> LPointsTo (fe e1, List.map fe le)
     | LBlockPointsTo (e1, le) -> LBlockPointsTo (fe e1, List.map fe le)
-    | LPure frm -> LPure (WLExpr.substitution subst frm)
-    | LType (el, ty) -> LType (WLExpr.substitution subst el, ty)
+    | LFreed e -> LFreed (fe e)
+    | LPure frm -> LPure (fe frm)
+    | LType (el, ty) -> LType (fe el, ty)
   in
   { wlaid; wlaloc; wlanode }

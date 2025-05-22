@@ -123,16 +123,14 @@ let rec infer_single_assert_step asser known =
   | WLAssert.LWand { lhs = _, largs; rhs = _, rargs } ->
       List.fold_left infer_logic_expr known largs |> fun acc ->
       List.fold_left infer_logic_expr acc rargs
-  | WLAssert.LPointsTo (le1, le2) ->
+  | WLAssert.LPointsTo (le1, le2) | WLAssert.LBlockPointsTo (le1, le2) ->
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
       needs_to_be le1 WList inferred
-  | WLAssert.LBlockPointsTo (le1, le2) ->
-      let inferred =
-        List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
-      in
-      needs_to_be le1 WList inferred
+  | WLAssert.LFreed le ->
+      let inferred = infer_logic_expr known le in
+      needs_to_be le WList inferred
   | WLAssert.LPure f -> infer_logic_expr known f
   | WLAssert.LType (le, ty) -> needs_to_be le ty known
 

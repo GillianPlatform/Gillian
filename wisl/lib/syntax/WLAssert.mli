@@ -6,6 +6,7 @@ type tt =
   | LPointsTo of WLExpr.t * WLExpr.t list
       (** x -> a, b <=> (x -> a) * (x+1 -> b) *)
   | LBlockPointsTo of WLExpr.t * WLExpr.t list
+  | LFreed of WLExpr.t
   | LType of WLExpr.t * WType.t
   | LPure of WLExpr.t
 

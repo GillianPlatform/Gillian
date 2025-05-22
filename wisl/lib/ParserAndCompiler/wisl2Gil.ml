@@ -240,6 +240,21 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     let open Expr.Infix in
     e + k_e
   in
+  let compile_freed (le : WLExpr.t) : string list * Asrt.t =
+    let exs, la, e = compile_lexpr le in
+    let loc = gen_str sgvar in
+    let offset = gen_str sgvar in
+    let expr_offset = Expr.LVar offset in
+    let la =
+      Asrt.Types
+        [ (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.IntType) ]
+      :: Asrt.Pure (BinOp (e, Equal, Expr.EList [ Expr.LVar loc; expr_offset ]))
+      :: la
+    in
+    let freed = Constr.freed ~loc:e in
+    (loc :: exs, freed :: la)
+  in
+
   (* compiles le1 -> lle, returns the assertion AND the list of existential variables generated *)
   let rec compile_pointsto
       ?(start = true)
@@ -322,6 +337,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       (exs1 @ exs2, cla1 @ cla2)
   | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
   | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
+  | LFreed le -> compile_freed le
   | LPred (pr, lel) ->
       let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
       let exs = List.concat exsl in

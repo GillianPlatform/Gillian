@@ -65,7 +65,8 @@ rule read =
   (* logical binary stuff *)
   | "-*"     { WAND }
   | "->"     { ARROW }
-  | "-b>"   { BLOCK_ARROW }
+  | "-b>"    { BLOCK_ARROW }
+  | "freed"   { FREED (curr lexbuf) }
   | "/\\"    { AND }
   | "\\/"    { OR }
   (* punctuation *)
