@@ -75,6 +75,28 @@ type err_ =
   | MPInvariant of Asrt.t * Asrt.t list
 [@@deriving show]
 
+let pp_err_ fmt = function
+  | MPSpec (name, asrts) ->
+      Fmt.pf fmt "MP failed for spec %s:@\n@[%a@]" name
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPPred (name, asrts) ->
+      Fmt.pf fmt "MP failed for predicate %s:@\n@[%a@]" name
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPLemma (name, asrts) ->
+      Fmt.pf fmt "MP failed for lemma %s:@\n@[%a@]" name
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPAssert (asrt, asrts) ->
+      Fmt.pf fmt "MP failed for assertion %a:@\n@[%a@]" Asrt.pp asrt
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPInvariant (asrt, asrts) ->
+      Fmt.pf fmt "MP failed for invariant %a:@\n@[%a@]" Asrt.pp asrt
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+
 type err = err_ Location.located
 
 let pp_err fmt (e, _) = pp_err_ fmt e

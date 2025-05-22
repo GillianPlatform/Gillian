@@ -763,9 +763,10 @@ struct
     let ipreds = MP.init_preds prog.preds in
     match ipreds with
     | Error (e, loc) ->
-        Fmt.pr "Creation of matching plans for predicates failed with:\n%a\n@?"
-          MP.pp_err_ e;
-        let msg = "Creation of matching plans for predicates failed." in
+        let msg =
+          Fmt.str "Creation of matching plans for predicates failed:@\n %a@\n@?"
+            MP.pp_err_ e
+        in
         raise
           (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg)
     | Ok preds ->
