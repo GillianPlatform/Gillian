@@ -241,7 +241,7 @@ struct
           | Nexts ids -> (ids, make_basic_next ids, None)
           | Result r ->
               let highlight =
-                if r then None else Some Map_node_options.Highlight.Error
+                Some Map_node_options.Highlight.(if r then Success else Error)
               in
               ([], Map_node_next.Final, highlight)
         in
@@ -407,9 +407,11 @@ struct
         in
         let next = get_node_next node in
         let highlight =
-          match node.data.errors with
-          | [] -> None
-          | _ -> Some Map_node_options.Highlight.Error
+          let open Map_node_options.Highlight in
+          match (node.data.errors, next) with
+          | _ :: _, _ -> Some Error
+          | [], Final -> Some Success
+          | [], _ -> None
         in
         let options =
           Map_node_options.Basic
