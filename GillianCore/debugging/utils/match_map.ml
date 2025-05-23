@@ -83,56 +83,53 @@ functor
       in
       { id; fold; assertion; substitutions }
 
-    let rec build_map ~pp_asrt ?(prev_substs = []) ~nodes id type_ content =
-      if type_ = Content_type.assertion then
-        let data = build_assertion_data ~pp_asrt ~prev_substs id content in
-        let next_ids = L.Log_queryer.get_next_report_ids id in
-        let result =
-          build_nexts ~prev_substs:data.substitutions ~pp_asrt ~nodes next_ids
-            id
-        in
-        let () = Hashtbl.replace nodes id (Assertion (data, next_ids)) in
-        result
-      else if type_ = Content_type.match_result then
-        let result_report =
-          content |> Yojson.Safe.from_string |> MatchResultReport.of_yojson
-          |> Result.get_ok
-        in
-        let result =
-          match result_report with
-          | Success _ -> Success
-          | Failure _ -> Failure
-        in
-        let () = Hashtbl.replace nodes id (MatchResult (id, result)) in
-        result
-      else if type_ = Content_type.match_recovery then
-        let MatchRecoveryReport.{ tactic; _ } =
-          content |> Yojson.Safe.from_string |> MatchRecoveryReport.of_yojson
-          |> Result.get_ok
-        in
-        let next_ids = L.Log_queryer.get_next_report_ids id in
-        let result = build_nexts ~prev_substs ~pp_asrt ~nodes next_ids id in
-        let () = Hashtbl.replace nodes id (RecoveryTactic (tactic, next_ids)) in
-        result
-      else
-        Fmt.failwith
-          "Match_map.build_seg: report %a has invalid type (%s) for match map!"
-          L.Report_id.pp id type_
-
-    and build_nexts ?prev_substs ~pp_asrt ~nodes next_ids id =
-      let () =
-        if List.is_empty next_ids then
-          Fmt.failwith "Match_map.build_nexts: node %a has no next!"
-            L.Report_id.pp id
-      in
-      List.fold_left
-        (fun result next_id ->
-          let content, type_ = L.Log_queryer.get_report next_id |> Option.get in
-          let result' =
-            build_map ~pp_asrt ?prev_substs ~nodes next_id type_ content
+    let get_next id : ((L.Report_id.t * string * string) list, bool) Either.t =
+      match L.Log_queryer.get_next_reports id with
+      | [] -> failwith "TODO"
+      | [ (_, type_, content) ] when type_ = Content_type.match_result ->
+          let report = of_yojson_string MatchResultReport.of_yojson content in
+          let result =
+            match report with
+            | Success _ -> true
+            | Failure _ -> false
           in
-          if result = Success then Success else result')
-        Failure next_ids
+          Either.Right result
+      | next_ids -> Either.Left next_ids
+
+    let rec build_map ~pp_asrt ?(prev_substs = []) ~nodes id type_ content =
+      let step, prev_substs =
+        if type_ = Content_type.assertion then
+          let data = build_assertion_data ~pp_asrt ~prev_substs id content in
+          (Assertion data, data.substitutions)
+        else if type_ = Content_type.match_recovery then
+          let report =
+            content |> Yojson.Safe.from_string |> MatchRecoveryReport.of_yojson
+            |> Result.get_ok
+          in
+          (RecoveryTactic report.tactic, prev_substs)
+        else
+          Fmt.failwith
+            "Match_map.build_map: report %a has invalid type (%s) for match \
+             map!"
+            L.Report_id.pp id type_
+      in
+      let next, result =
+        match get_next id with
+        | Either.Left nexts ->
+            let result, ids =
+              List.fold_left
+                (fun (r, acc) (id, type_, content) ->
+                  let r' =
+                    build_map ~pp_asrt ~prev_substs ~nodes id type_ content
+                  in
+                  (r || r', id :: acc))
+                (true, []) nexts
+            in
+            (Nexts ids, result)
+        | Either.Right result -> (Result result, result)
+      in
+      let () = Hashtbl.replace nodes id (step, next) in
+      result
 
     let f ?(pp_asrt = Asrt.pp_atom) match_id =
       let kind =
@@ -144,11 +141,11 @@ functor
       let nodes = Hashtbl.create 1 in
       let roots, result =
         List.fold_left
-          (fun (roots, result) (id, type_, content) ->
-            let result' = build_map ~pp_asrt ~nodes id type_ content in
-            let result = if result = Success then Success else result' in
-            (id :: roots, result))
-          ([], Failure) roots
+          (fun (roots, r) (id, type_, content) ->
+            let r' = build_map ~pp_asrt ~nodes id type_ content in
+            (id :: roots, r || r'))
+          ([], false) roots
       in
+      let result = if result then Success else Failure in
       { kind; roots; nodes; result }
   end

@@ -32,11 +32,15 @@ module Types = struct
   }
   [@@deriving yojson]
 
-  type node =
-    | Assertion of assertion_data * Logging.Report_id.t list
-    | MatchResult of Logging.Report_id.t * match_result
-    | RecoveryTactic of Matcher.recovery_tactic * Logging.Report_id.t list
+  type next = Nexts of Logging.Report_id.t list | Result of bool
   [@@deriving yojson]
+
+  type step =
+    | Assertion of assertion_data
+    | RecoveryTactic of Matcher.recovery_tactic
+  [@@deriving yojson]
+
+  type node = step * next [@@deriving yojson]
 
   type t = {
     kind : kind;
