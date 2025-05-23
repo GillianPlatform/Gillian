@@ -234,84 +234,63 @@ struct
         Map_node.make ~id ~next ~options () |> add_node state
 
       let convert_match_node proc_state state (map : Match_map.t) node_id =
-        let node = Hashtbl.find map.nodes node_id in
+        let step, next = Hashtbl.find map.nodes node_id in
         let id = show_id node_id in
-        match node with
-        | Assertion (data, nexts) ->
-            let next = make_basic_next nexts in
-            let submaps, folds, extras =
-              match data.fold with
-              | None -> ([], [], None)
-              | Some matching ->
-                  let id = show_id matching.id in
-                  let badge =
-                    let tag =
-                      match matching.result with
-                      | Success -> Some "success"
-                      | Failure -> Some "fail"
+        let next_ids, next, highlight =
+          match next with
+          | Nexts ids -> (ids, make_basic_next ids, None)
+          | Result r ->
+              let highlight =
+                if r then None else Some Map_node_options.Highlight.Error
+              in
+              ([], Map_node_next.Final, highlight)
+        in
+        let display, selectable, extras, submaps, folds =
+          match step with
+          | Assertion data ->
+              let display = data.assertion in
+              let submaps, folds, extras =
+                match data.fold with
+                | None -> ([], [], None)
+                | Some matching ->
+                    let id = show_id matching.id in
+                    let badge =
+                      let tag =
+                        match matching.result with
+                        | Success -> Some "success"
+                        | Failure -> Some "fail"
+                      in
+                      Map_node_extra.Badge { text = "Fold"; tag }
                     in
-                    Map_node_extra.Badge { text = "Fold"; tag }
-                  in
-                  ([ id ], [ matching ], Some [ badge ])
-            in
-            let options =
-              Map_node_options.Basic
-                {
-                  display = data.assertion;
-                  selectable = Some true;
-                  extras;
-                  highlight = None;
-                }
-            in
-            let () =
-              Map_node.make ~id ~submaps ~next ~options () |> add_node state
-            in
-            (nexts, folds)
-        | RecoveryTactic (tactic, nexts) ->
-            let kind, pname, args =
-              match tactic with
-              | Try_fold (p, args) -> ("Fold", p, args)
-              | Try_unfold (p, args) -> ("Unfold", p, args)
-            in
-            let next = make_basic_next nexts in
-            let options =
+                    ([ id ], [ matching ], Some [ badge ])
+              in
+              (display, Some true, extras, submaps, folds)
+          | RecoveryTactic tactic ->
+              let kind, pname, args =
+                match tactic with
+                | Try_fold (p, args) -> ("Fold", p, args)
+                | Try_unfold (p, args) -> ("Unfold", p, args)
+              in
               let pp_exprs =
                 Fmt.(
                   list ~sep:(any ", ") (Lifter.pp_expr proc_state.lifter_state))
               in
               let display = Fmt.str "%s %s(%a)" kind pname pp_exprs args in
-              let badge =
-                Map_node_extra.Badge { text = "Recovery tactic"; tag = None }
+              let extras =
+                let badge =
+                  Map_node_extra.Badge { text = "Recovery tactic"; tag = None }
+                in
+                Some [ badge ]
               in
-              Map_node_options.Basic
-                {
-                  display;
-                  selectable = Some false;
-                  extras = Some [ badge ];
-                  highlight = None;
-                }
-            in
-            let () = Map_node.make ~id ~next ~options () |> add_node state in
-            (nexts, [])
-        | MatchResult (_, result) ->
-            let highlight =
-              match result with
-              | Success -> None
-              | Failure -> Some Map_node_options.Highlight.Error
-            in
-            let options =
-              Map_node_options.Basic
-                {
-                  display = Match_map.show_match_result result;
-                  selectable = Some false;
-                  extras = Some [];
-                  highlight;
-                }
-            in
-            let () =
-              Map_node.make ~id ~next:Final ~options () |> add_node state
-            in
-            ([], [])
+              (display, Some false, extras, [], [])
+        in
+        let options =
+          Map_node_options.Basic { display; selectable; extras; highlight }
+        in
+        let () =
+          Map_node.make ~id ~submaps ~next ~options () |> add_node state
+        in
+        (next_ids, folds)
 
       let convert_match_map' proc_state state (matching : Match_map.matching) =
         let map = get_match_map matching.id state.debug_state proc_state in
@@ -516,7 +495,7 @@ struct
                    let* node = Hashtbl.find_opt match_.nodes assertion_id in
                    let* substs =
                      match node with
-                     | Match_map.Assertion (data, _) -> Some data.substitutions
+                     | Match_map.Assertion data, _ -> Some data.substitutions
                      | _ -> None
                    in
                    let substs' =
