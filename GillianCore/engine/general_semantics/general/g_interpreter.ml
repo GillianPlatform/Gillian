@@ -71,6 +71,7 @@ struct
       prev_cmd_report_id : Logging.Report_id.t option;
       branch_case : branch_case option;
       branch_path : branch_path;
+      laction_fuel : int;
       loc : Location.t option;
     }
     [@@deriving yojson]
@@ -126,6 +127,7 @@ struct
         ?loc
         ?prev_cmd_report_id
         ?branch_case
+        ?(laction_fuel = 10)
         () =
       (* TODO this needs some optimising; big concrete tests like Test262 use
          way too much memory due to long branch paths.
@@ -144,6 +146,7 @@ struct
           loc;
           prev_cmd_report_id;
           branch_case;
+          laction_fuel;
         }
 
     let get_prev_cmd_id = function
@@ -672,6 +675,7 @@ struct
       loop_ids:string list ->
       branch_count:int ->
       ?branch_case:branch_case ->
+      ?laction_fuel:int ->
       unit ->
       CConf.t
 
@@ -693,6 +697,7 @@ struct
       branch_path : branch_path;
       last_known_loc : Location.t option;
       prev_cmd_report_id : L.Report_id.t option;
+      laction_fuel : int;
     }
 
     module Do_eval = struct
@@ -1022,6 +1027,7 @@ struct
           make_confcont;
           eval_expr;
           prev_cmd_report_id;
+          laction_fuel;
           _;
         } =
           state
@@ -1102,7 +1108,8 @@ struct
                   |> Recovery_tactic.merge tactic_from_params
                 in
                 let recovery_states : (State.t list, string) result =
-                  State.try_recovering state recovery_vals
+                  if laction_fuel <= 0 then Error "out of fuel"
+                  else State.try_recovering state recovery_vals
                 in
                 match recovery_states with
                 | Ok recovery_states ->
@@ -1119,21 +1126,15 @@ struct
                         make_confcont ~state ~callstack:cs
                           ~invariant_frames:iframes ~prev_idx:prev
                           ~loop_ids:prev_loop_ids ~next_idx:i
-                          ~branch_count:b_counter ?branch_case ())
+                          ~branch_count:b_counter ?branch_case
+                          ~laction_fuel:(laction_fuel - 1) ())
                       recovery_states
                 | Error msg ->
-                    L.verbose (fun m -> m "Couldn't recover because: %s" msg);
-                    let pp_err ft (a, errs) =
-                      Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                        (Fmt.Dump.list State.pp_err)
-                        errs
-                    in
-                    Fmt.pr "%a\n@?" (Fmt.styled `Red pp_err) (a, errs);
                     L.normal ~title:"failure" ~severity:Error (fun m ->
                         m "Action call failed with:@.%a"
                           (Fmt.Dump.list State.pp_err)
                           errs);
-
+                    L.verbose (fun m -> m "Couldn't recover because: %s" msg);
                     [
                       ConfErr
                         (* (errs, state) *)
@@ -1664,7 +1665,8 @@ struct
         (last_known_loc : Location.t option ref)
         (report_id_ref : L.Report_id.t option ref)
         (branch_path : branch_path)
-        (branch_case : branch_case option) : CConf.t list =
+        (branch_case : branch_case option)
+        laction_fuel : CConf.t list =
       let _, (annot, _) = get_cmd prog cs i in
 
       (* The full list of loop ids is the concatenation
@@ -1680,6 +1682,7 @@ struct
       let eval_in_state state =
         eval_cmd_after_frame_handling prog state cs iframes prev prev_loop_ids i
           b_counter last_known_loc report_id_ref branch_path branch_case
+          laction_fuel
       in
       match loop_action with
       | Nothing -> eval_in_state state
@@ -1721,7 +1724,8 @@ struct
         (last_known_loc : Location.t option ref)
         (report_id_ref : L.Report_id.t option ref)
         (branch_path : branch_path)
-        (branch_case : branch_case option) : CConf.t list =
+        (branch_case : branch_case option)
+        (laction_fuel : int) : CConf.t list =
       let store = State.get_store state in
       let eval_expr = make_eval_expr state in
       let proc_name, annot_cmd = get_cmd prog cs i in
@@ -1780,6 +1784,7 @@ struct
           branch_path;
           last_known_loc = !last_known_loc;
           prev_cmd_report_id;
+          laction_fuel;
         }
       in
 
@@ -1803,7 +1808,8 @@ struct
       (last_known_loc : Location.t option)
       (report_id_ref : L.Report_id.t option ref)
       (branch_path : branch_path)
-      (branch_case : branch_case option) : CConf.t list =
+      (branch_case : branch_case option)
+      laction_fuel : CConf.t list =
     let states =
       match get_cmd prog cs i with
       | _, (_, LAction _) -> simplify state
@@ -1814,7 +1820,7 @@ struct
         let last_known_loc = ref last_known_loc in
         try
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
-            last_known_loc report_id_ref branch_path branch_case
+            last_known_loc report_id_ref branch_path branch_case laction_fuel
         with
         | Interpreter_error (errors, error_state) ->
             [
@@ -2136,6 +2142,7 @@ struct
           branch_path;
           branch_case;
           loc;
+          laction_fuel;
           _;
         } =
           cconf
@@ -2143,7 +2150,7 @@ struct
         L.set_previous prev_cmd_report_id;
         let next_confs =
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
-            b_counter loc parent_id_ref branch_path branch_case
+            b_counter loc parent_id_ref branch_path branch_case laction_fuel
         in
         continue_or_pause ~new_confs:true next_confs
           (fun ?selector () -> f (next_confs @ rest_confs) selector results)
