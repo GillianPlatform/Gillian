@@ -1308,7 +1308,7 @@ struct
     module Scopes = struct
       open Variable
 
-      let pvars = { id = 1; name = "Program variables" }
+      let pvars = { id = 1; name = "Program store" }
       let heap = { id = 2; name = "Heap" }
       let preds = { id = 3; name = "Predicates" }
       let pfs = { id = 4; name = "Pure formulae" }
@@ -1448,6 +1448,7 @@ struct
       |> List.map (fun (name, value) ->
              let value =
                if is_ptr ~store ~pfs name value then "Pointer"
+               else if value = Type.ObjectType then "Block identifier"
                else Type.str value
              in
              Variable.{ name; value; type_ = None; var_ref = 0 })
