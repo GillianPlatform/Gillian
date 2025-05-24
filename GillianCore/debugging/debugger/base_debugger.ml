@@ -50,6 +50,9 @@ struct
         [@default []]
     lifter_state : Lifter.t;
     report_state : L.Report_state.t;
+    mutable has_errors : bool; [@default false]
+    unfinished_nodes : L.Report_id.t Hashset.t; [@default Hashset.empty ()]
+    submap_procs : string Hashset.t; [@default Hashset.empty ()]
     ext : 'ext;
   }
   [@@deriving make]
@@ -424,6 +427,27 @@ struct
         in
         Map_node.make ~id ~aliases ~submaps ~next ~options () |> add_node state
 
+      let has_unfinished_case = List.exists (fun (_, (next, _)) -> next = None)
+
+      let update_status id (node : Exec_map.Packaged.node) proc_state =
+        let is_node_finished =
+          match node.next with
+          | None -> true
+          | Some (Single (Some _, _)) -> true
+          | Some (Branch cases) when not (has_unfinished_case cases) -> true
+          | _ -> false
+        in
+        let () =
+          Hashset.(if is_node_finished then remove else add)
+            proc_state.unfinished_nodes id
+        in
+        let () =
+          match node.data.submap with
+          | Proc s -> Hashset.add proc_state.submap_procs s
+          | _ -> ()
+        in
+        proc_state.has_errors <- proc_state.has_errors || node.data.errors <> []
+
       let add_changed_node id node proc_state state =
         let () =
           if not proc_state.root_created then
@@ -431,7 +455,9 @@ struct
             proc_state.root_created <- true
         in
         match node with
-        | Some node -> convert_node proc_state state node
+        | Some node ->
+            let () = update_status id node proc_state in
+            convert_node proc_state state node
         | None -> Hashtbl.remove_all state.debug_state.all_nodes (show_id id)
 
       let get_all_nodes state =
@@ -483,37 +509,67 @@ struct
         Map_update_event_body.Current_steps.make ~primary:(Some p)
           ~secondary:(Some s) ()
 
-      let get_map_ext state : Yojson.Safe.t =
-        let proc_substs =
-          state.procs |> Hashtbl.to_seq
-          |> Seq.map (fun (proc_name, proc) ->
-                 let+ substs =
-                   let* assertion_id, match_id =
-                     List_utils.hd_opt proc.selected_match_steps
-                   in
-                   let* match_ =
-                     Hashtbl.find_opt state.debug_state.matches match_id
-                   in
-                   let* node = Hashtbl.find_opt match_.nodes assertion_id in
-                   let* substs =
-                     match node with
-                     | Match_map.Assertion data, _ -> Some data.substitutions
-                     | _ -> None
-                   in
-                   let substs' =
-                     substs
-                     |> List.map @@ fun Match_map.{ assert_id; subst = a, b } ->
-                        `List
-                          [ `String (show_id assert_id); `String a; `String b ]
-                   in
-                   Some substs'
+      let get_substs state =
+        state.procs |> Hashtbl.to_seq
+        |> Seq.map (fun (proc_name, proc) ->
+               let+ substs =
+                 let* assertion_id, match_id =
+                   List_utils.hd_opt proc.selected_match_steps
                  in
-                 (show_proc_id proc_name, `List substs))
-          |> Seq.filter_map (fun x -> x)
-          |> List.of_seq
+                 let* match_ =
+                   Hashtbl.find_opt state.debug_state.matches match_id
+                 in
+                 let* node = Hashtbl.find_opt match_.nodes assertion_id in
+                 let* substs =
+                   match node with
+                   | Match_map.Assertion data, _ -> Some data.substitutions
+                   | _ -> None
+                 in
+                 let substs' =
+                   substs
+                   |> List.map @@ fun Match_map.{ assert_id; subst = a, b } ->
+                      `List
+                        [ `String (show_id assert_id); `String a; `String b ]
+                 in
+                 Some substs'
+               in
+               (show_proc_id proc_name, `List substs))
+        |> Seq.filter_map (fun x -> x)
+        |> List.of_seq
+
+      let get_status state =
+        let rec aux acc proc_name =
+          let acc = SS.add proc_name acc in
+          match Hashtbl.find_opt state.procs proc_name with
+          | None -> (false, false, acc)
+          | Some proc_state ->
+              let finished = Hashset.length proc_state.unfinished_nodes = 0 in
+              let has_errors = proc_state.has_errors in
+              let subprocs = proc_state.submap_procs |> Hashset.to_seq in
+              Seq.fold_left
+                (fun (finished, has_errors, acc) proc_name ->
+                  if SS.mem proc_name acc then (finished, has_errors, acc)
+                  else
+                    let finished', has_errors', acc = aux acc proc_name in
+                    let finished = finished && finished' in
+                    let has_errors = has_errors || has_errors' in
+                    (finished, has_errors, acc))
+                (finished, has_errors, acc)
+                subprocs
         in
-        let substs = `Assoc proc_substs in
-        `Assoc [ ("substs", substs) ]
+        let finished, has_errors, _ =
+          aux SS.empty state.debug_state.main_proc_name
+        in
+        (finished, has_errors)
+
+      let get_map_ext state : Yojson.Safe.t =
+        let substs = [ ("substs", `Assoc (get_substs state)) ] in
+        let status =
+          let finished, has_errors = get_status state in
+          let status = `List [ `Bool finished; `Bool has_errors ] in
+          [ ("status", status) ]
+        in
+        `Assoc (substs @ status)
 
       let get_map_update state =
         let nodes = get_changed_nodes ~clear:true state in
