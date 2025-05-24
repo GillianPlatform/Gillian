@@ -1,8 +1,6 @@
-SSFT 2025
-=========
+SSFT 2025 - Installation instructions
+=====================================
 
-Installation
-------------
 
 Before you start, please install the following:
 
@@ -30,7 +28,7 @@ Once that's done, follow these steps:
 
    .. image:: /_static/img/ssft/reopen_in_container.png
 
-   * If you cannot find the popup, open the Command Palette (F1 or Ctrl+Shift+P by default) and select *"Dev Containers: Open Folder in Container..."* and select the :code:`gillian-lab` folder.
+   * If you cannot find the popup, open the Command Palette (:code:`F1` or :code:`Ctrl+Shift+P` by default) and select *"Dev Containers: Open Folder in Container..."* and select the :code:`gillian-lab` folder.
 
      .. image:: /_static/img/ssft/open_folder_in_container.png
 
