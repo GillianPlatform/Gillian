@@ -126,3 +126,4 @@ let reset_config () =
 
 let usage_logs = ref false
 let usage_logs_file = ref "./gillian_usage_log.jsonl"
+let usage_logs_git_ref = ref "HEAD"

@@ -52,8 +52,3 @@ let merge ?(check_source = true) a b =
   { loc_start; loc_end; loc_source = a.loc_source }
 
 type 'a located = 'a * t option
-
-let to_small { loc_start; loc_end; _ } =
-  let { pos_line = start_line; pos_column = start_col } = loc_start in
-  let { pos_line = end_line; pos_column = end_col } = loc_end in
-  Usage_logs.{ start_line; start_col; end_line; end_col }

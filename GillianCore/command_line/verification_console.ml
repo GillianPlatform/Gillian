@@ -52,6 +52,10 @@ module Make
     let doc = "Write usage logs" in
     Arg.(value & flag & info [ "usage-logs" ] ~doc)
 
+  let usage_logs_git_ref =
+    let doc = "Git ref against which files are compared for usage logs" in
+    Arg.(value & opt string "HEAD" & info [ "usage-logs-ref" ] ~doc)
+
   let parse_eprog files already_compiled =
     if not already_compiled then
       let+ progs = PC.parse_and_compile_files files in
@@ -177,18 +181,21 @@ module Make
       in
       Cmd.info cmd_name ~doc ~man
 
-    let start_debug_adapter procs_only manual usage_logs () =
+    let start_debug_adapter procs_only manual usage_logs usage_logs_git_ref () =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
       let () =
         if procs_only then Config.Verification.(things_to_verify := ProcsOnly)
       in
       Config.manual_proof := manual;
       Config.usage_logs := usage_logs;
+      Config.usage_logs_git_ref := usage_logs_git_ref;
       Debug_adapter.start ()
 
     let debug_verify_t =
       Common_args.use
-        Term.(const start_debug_adapter $ procs_only $ manual $ usage_logs)
+        Term.(
+          const start_debug_adapter $ procs_only $ manual $ usage_logs
+          $ usage_logs_git_ref)
 
     let debug_verify_cmd =
       Console.Debug (Cmd.v debug_verify_info debug_verify_t)
@@ -207,19 +214,23 @@ module Make
       in
       Cmd.info cmd_name ~doc ~man
 
-    let start_language_server procs_only manual usage_logs () =
+    let start_language_server procs_only manual usage_logs usage_logs_git_ref ()
+        =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
       let () =
         if procs_only then Config.Verification.(things_to_verify := ProcsOnly)
       in
       Config.manual_proof := manual;
       Config.usage_logs := usage_logs;
+      Config.usage_logs_git_ref := usage_logs_git_ref;
       let analyse file = verify [ file ] false None false false in
       Lsp_server.run analyse
 
     let lsp_verify_t =
       Common_args.use
-        Term.(const start_language_server $ procs_only $ manual $ usage_logs)
+        Term.(
+          const start_language_server
+          $ procs_only $ manual $ usage_logs $ usage_logs_git_ref)
 
     let lsp_verify_cmd = Console.Lsp (Cmd.v debug_verify_info lsp_verify_t)
   end

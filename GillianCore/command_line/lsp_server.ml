@@ -1,8 +1,6 @@
 open Linol_lwt
 open Linol.Lsp.Types
 
-type buffer_state = { path : string; content : string }
-
 let default_range =
   let start = Position.create ~line:0 ~character:0 in
   let end_ = Position.create ~line:0 ~character:1 in
@@ -49,7 +47,9 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     inherit Jsonrpc2.server
 
     (* one env per document *)
-    val buffers : (DocumentUri.t, buffer_state) Hashtbl.t = Hashtbl.create 4
+    val buffers : (DocumentUri.t, unit Gillian_result.t) Hashtbl.t =
+      Hashtbl.create 4
+
     method spawn_query_handler f = spawn f
 
     (* We define here a helper method that will:
@@ -60,16 +60,15 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     method private _on_doc
         ~(notify_back : Jsonrpc2.notify_back)
         (uri : DocumentUri.t)
-        (contents : string) =
+        (content : string) =
       let path = DocumentUri.to_path uri in
-      let () = Hashtbl.replace Config.file_content_overrides path contents in
+      let () = Hashtbl.replace Config.file_content_overrides path content in
       let result = f path in
-      let () =
-        let result = Gillian_result.to_usage_log result in
-        Utils.Usage_logs.Lsp.log path result
-      in
+      let old_result = Hashtbl.find_opt buffers uri in
+      let () = Usage_logs.Lsp.log path ?old_result ~content result in
       let diags = result_to_diagnostics ~path result in
       let () = Config.reset_config () in
+      Hashtbl.replace buffers uri result;
       notify_back#send_diagnostic diags
 
     (* We now override the [on_notify_doc_did_open] method that will be called
