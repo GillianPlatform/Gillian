@@ -25,7 +25,9 @@ This lecture covers:
 * Specification and verification of sequential programs for mutating data structures
 * Tools inspired by separation logic, based on compositional symbolic execution
 
-*Slides coming soon...*
+`Main slides </_static/docs/cse-ssft25-lecture1.pdf>`_
+
+`WISL slides </_static/docs/cse-ssft25-wisl.pdf>`_
 
 Lab Session 1: An introduction to Gillian
 -----------------------------------------
