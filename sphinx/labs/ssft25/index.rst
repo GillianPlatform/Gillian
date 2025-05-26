@@ -10,44 +10,66 @@ Welcome to the Gillian lab at SSFT 2025!
 
 This lab take the Separation Logic and Compositional Symbolic Execution theory you've seen in the lectures, and recontextualise it with a semi-automatic verification tool built with Gillian.
 
-Installation
-------------
+.. admonition:: **Installation instructions**
 
-See :doc:`here <install>` for installation instructions.
+   See :doc:`here <install>` for installation instructions.
 
-We recommend you follow these ahead of time, as installing the Gillian container can take a while.
+   We recommend you follow these ahead of time, as installing the Gillian container can take a while.
 
-General notes
--------------
-* If you get a :code:`SIGPIPE` or :code:`"Broken pipe"` error, try making a small change to your code and trying again.
-* If Gillian seems stuck or unresponsive, try opening the Command Palette with (:code:`F1` or :code:`Ctrl+Shift+P` by default) and running the *"Reload window"* command 
+Lecture 1: Compositional Software Verification
+----------------------------------------------
 
-Session 1
----------
-This session focuses on introductory exercises to familiarise yourself with Gillian and its Compositional Symbolic Execution -based verification.
+This lecture covers:
 
-These exercises consist of singly-linked-list algorithms that aim to demonstrate:
+* Separation logic
+* Specification and verification of sequential programs for mutating data structures
+* Tools inspired by separation logic, based on compositional symbolic execution
+
+*Slides coming soon...*
+
+Lab Session 1: An introduction to Gillian
+-----------------------------------------
+
+These exercises are in the ``lab1`` directory of the lab repository. They include list algorithms to demonstrate:
 
 * Folding and unfolding predicates
-* Compositinally calling functions
 * Applying proof tactics and lemmas
+* Calling functions compositionally
 * Loop invariants
-* Strengthening specifications
 
-These exercises are in the :code:`lab1` directory of the lab repository.
+If you have time, check out exercises A-D from the ``lab2`` directory for some examples with different data structures.
 
-If you have time left over, try your hand at exercises A-D from :code:`lab2`.
+Lecture 2: Compositional Symbolic Execution
+-------------------------------------------
 
+This lecture covers:
 
-Session 2
----------
-The second session will apply what you've learned in session 1 to some more complicated exercises.
+* Theoretical foundations - Compositional Symbolic Execution (CSE) and bi-abduction
+   * CSE for a simple C-like state
+   * State-parametric CSE
+   * Functional compositionality
+* State combinators for CSE 
 
-This includes:
+*Slides coming soon...*
 
-* Verifying algorithms on different data structures, including sets, doubly-linked lists, and binary search trees
-* Writing a complex predicate for a well-bracketed property
-* Verifying algorithms ported from the real-world `Collections-C <https://github.com/srdja/Collections-C>`_ library.
-* A harder verification for a loop invariant
+Lab session 2: Further experience with Gillian
+----------------------------------------------
 
-These exercises are in the :code:`lab2` directory of the lab repository.
+These exercises are in the ``lab1`` directory of the lab repository. They include:
+
+* Some fun, harder examples of data-structure algorithms
+* List algorithms ported from the real-world `Collections-C library <https://github.com/srdja/Collections-C>`_
+* A much harder iterative list algorithm
+
+Feel free to tackle these in any order, and refer back to the Lab 1 exercises if you need a refresher.
+
+Misc. lab notes
+---------------
+* The language server highlights compilation errors (and other unexpect problems) in red, and verification falures in blue.
+* The debugger supports breakpoints! This can be handy when restarting the debugger after making changes to your code; assign breakpoints to the relevant lines and click the *Continue* button |continue_button|.
+* If you get a :code:`SIGPIPE` or :code:`"Broken pipe"` error, try making a small change to your code and trying again.
+   * *Note from Nat: I have \*absolutely no idea\* why this happens. Even with a repro, it disappears if I try to track it down 🙃*
+* If Gillian seems stuck or unresponsive, try opening the Command Palette with (:code:`F1` or :code:`Ctrl+Shift+P` by default) and running the *"Reload window"* command.
+
+.. |continue_button| image:: /_static/img/ssft/continue_button.png
+   :height: 1.2em
