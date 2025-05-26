@@ -1631,11 +1631,6 @@ module Make (State : SState.S) :
               L.normal (fun m -> m "Match. Recovery tactic failed: %s" msg);
               Res_list.just_errors errs
           | Ok (sp, tactic) -> (
-              let recovery_report_id =
-                let num_results = List.length sp in
-                let astate = AstateRec.from astate in
-                MatchRecoveryReport.(log { astate; num_results; tactic })
-              in
               let open Syntaxes.List in
               let* astate = sp in
               match unfold_concrete_preds astate with
@@ -1647,6 +1642,11 @@ module Make (State : SState.S) :
               | Some (_, astate) ->
                   (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
                   let subst'' = SVal.SESubst.copy subst_i in
+                  let recovery_report_id =
+                    let num_results = List.length sp in
+                    let astate = AstateRec.from astate in
+                    MatchRecoveryReport.(log { astate; num_results; tactic })
+                  in
                   let new_ret =
                     match_mp ?prev_id:recovery_report_id
                       ([ (astate, subst'', mp) ], [])

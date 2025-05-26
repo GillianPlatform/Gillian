@@ -85,7 +85,11 @@ functor
 
     let get_next id : ((L.Report_id.t * string * string) list, bool) Either.t =
       match L.Log_queryer.get_next_reports id with
-      | [] -> failwith "TODO"
+      | [] ->
+          let msg =
+            Fmt.str "Match_map: couldn't find nexts of %a" L.Report_id.pp id
+          in
+          raise (Gillian_result.Exc.internal_error msg)
       | [ (_, type_, content) ] when type_ = Content_type.match_result ->
           let report = of_yojson_string MatchResultReport.of_yojson content in
           let result =
