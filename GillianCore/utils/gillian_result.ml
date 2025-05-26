@@ -39,8 +39,9 @@ module Error = struct
     AnalysisFailures
       [ make_analysis_failure ?is_preprocessing ?in_target ?loc msg ]
 
-  let pp fmt = function
-    | AnalysisFailures es ->
+  let pp' ?(brief = false) fmt e =
+    match (brief, e) with
+    | false, AnalysisFailures es ->
         let msgs =
           es
           |> List.mapi @@ fun i ({ msg; loc; _ } : analysis_failure) ->
@@ -49,13 +50,22 @@ module Error = struct
         Fmt.pf fmt "Analysis failures!\n%a\n"
           (Fmt.list ~sep:(Fmt.any "\n") Fmt.string)
           msgs
-    | CompilationError { msg; loc; _ } ->
+    | true, AnalysisFailures es ->
+        let len = List.length es in
+        Fmt.pf fmt "%d analysis failure%s!" len (if len > 1 then "s" else "")
+    | false, CompilationError { msg; loc; _ } ->
         Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc
           msg
-    | OperationError o -> Fmt.pf fmt "%s" o
-    | InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
+    | true, CompilationError { msg; _ } ->
+        Fmt.pf fmt "Error during compilation.\n%s" msg
+    | _, OperationError o -> Fmt.pf fmt "%s" o
+    | _, InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
 
-  let show = Fmt.to_to_string pp
+  let show' ?brief = Fmt.to_to_string (pp' ?brief)
+  let pp = pp' ~brief:false
+  let show = show' ~brief:false
+  let pp_brief = pp' ~brief:true
+  let show_brief = show' ~brief:true
 
   let to_error_code = function
     | AnalysisFailures _ -> 1
@@ -80,6 +90,11 @@ module Exc = struct
     }
 
   exception Gillian_error of Error.t
+
+  let () =
+    Printexc.register_printer @@ function
+    | Gillian_error e -> Some (Error.show_brief e)
+    | _ -> None
 
   let internal_error ?(additional_data : (string * Yojson.Safe.t) list = []) msg
       : exn =

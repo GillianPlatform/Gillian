@@ -104,8 +104,8 @@ let setup rpc =
 let dump_dbg : (unit -> Yojson.Safe.t) option ref = ref None
 let set_debug_state_dumper f = dump_dbg := Some f
 
-let set_rpc_command_handler rpc ?name module_ f =
-  let f x =
+let try' ~name f x =
+  let err_json backtrace =
     let name_json =
       match name with
       | Some name -> [ ("dap_cmd", `String name) ]
@@ -116,38 +116,37 @@ let set_rpc_command_handler rpc ?name module_ f =
       | Some dump_dbg -> [ ("debug_state", dump_dbg ()) ]
       | None -> []
     in
-    let err_json backtrace =
-      name_json @ dbg_json @ [ ("backtrace", `String backtrace) ]
-    in
-    let%lwt () =
-      match name with
-      | Some name -> log_async ~v:true (fun m -> m "%s request received" name)
-      | None -> Lwt.return_unit
-    in
-
-    try%lwt f x with
-    | FailureJson (e, json) ->
-        let backtrace = Printexc.get_backtrace () in
-        let err_json = err_json backtrace in
-        let json = err_json @ json in
-        log_async (fun m -> m ~json "[Error] %s" e);%lwt
-        raise (Failure e)
-    | (Failure e | Invalid_argument e) as err ->
-        let backtrace = Printexc.get_backtrace () in
-        let err_json = err_json backtrace in
-        log_async (fun m -> m ~json:err_json "[Error] %s" e);%lwt
-        raise err
-    | Not_found ->
-        let backtrace = Printexc.get_backtrace () in
-        let err_json = err_json backtrace in
-        log_async (fun m -> m ~json:err_json "[Error] Not found");%lwt
-        raise Not_found
-    | Effect.Unhandled _ as e ->
-        let backtrace = Printexc.get_backtrace () in
-        let err_json = err_json backtrace in
-        let s = Printexc.to_string e in
-        log_async (fun m ->
-            m ~json:err_json "[Error] Unhandled exception\n%s" s);%lwt
-        raise e
+    name_json @ dbg_json @ [ ("backtrace", `String backtrace) ]
   in
+  let%lwt () =
+    match name with
+    | Some name -> log_async ~v:true (fun m -> m "%s request received" name)
+    | None -> Lwt.return_unit
+  in
+  try%lwt f x with
+  | FailureJson (e, json) ->
+      let backtrace = Printexc.get_backtrace () in
+      let err_json = err_json backtrace in
+      let json = err_json @ json in
+      log_async (fun m -> m ~json "[Error] %s" e);%lwt
+      raise (Failure e)
+  | (Failure e | Invalid_argument e) as err ->
+      let backtrace = Printexc.get_backtrace () in
+      let err_json = err_json backtrace in
+      log_async (fun m -> m ~json:err_json "[Error] %s" e);%lwt
+      raise err
+  | Not_found ->
+      let backtrace = Printexc.get_backtrace () in
+      let err_json = err_json backtrace in
+      log_async (fun m -> m ~json:err_json "[Error] Not found");%lwt
+      raise Not_found
+  | Effect.Unhandled _ as e ->
+      let backtrace = Printexc.get_backtrace () in
+      let err_json = err_json backtrace in
+      let s = Printexc.to_string e in
+      log_async (fun m -> m ~json:err_json "[Error] Unhandled exception\n%s" s);%lwt
+      raise e
+
+let set_rpc_command_handler rpc ?name ?(catchall = true) module_ f =
+  let f x = if catchall then try' ~name f x else f x in
   Debug_rpc.set_command_handler rpc module_ f
