@@ -14,7 +14,7 @@ Once that's done, follow these steps:
 
    .. code-block:: bash
 
-        git clone https://github.com/GillianPlatform/gillian-lab.git  --depth 1 --branch SSFT25
+        git clone https://github.com/GillianPlatform/gillian-lab.git --branch SSFT25
 
 #. If necessary, select *Yes, I trust the authors*.
 
