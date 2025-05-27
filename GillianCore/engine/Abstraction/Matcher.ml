@@ -1632,6 +1632,21 @@ module Make (State : SState.S) :
               Res_list.just_errors errs
           | Ok (sp, tactic) -> (
               let open Syntaxes.List in
+              let recovery_report_id =
+                let id = ref None in
+                fun () ->
+                  match !id with
+                  | Some id -> id
+                  | None ->
+                      let num_results = List.length sp in
+                      let astate = AstateRec.from astate in
+                      let id' =
+                        MatchRecoveryReport.(
+                          log { astate; num_results; tactic })
+                      in
+                      let () = id := Some id' in
+                      id'
+              in
               let* astate = sp in
               match unfold_concrete_preds astate with
               | None ->
@@ -1642,17 +1657,11 @@ module Make (State : SState.S) :
               | Some (_, astate) ->
                   (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
                   let subst'' = SVal.SESubst.copy subst_i in
-                  let recovery_report_id =
-                    let num_results = List.length sp in
-                    let astate = AstateRec.from astate in
-                    MatchRecoveryReport.(log { astate; num_results; tactic })
-                  in
+                  let prev_id = recovery_report_id () in
                   let new_ret =
-                    match_mp ?prev_id:recovery_report_id
-                      ([ (astate, subst'', mp) ], [])
+                    match_mp ?prev_id ([ (astate, subst'', mp) ], [])
                   in
-                  handle_ret ?prev_id:recovery_report_id ~fuel:(fuel - 1)
-                    new_ret))
+                  handle_ret ?prev_id ~fuel:(fuel - 1) new_ret))
       | Error errors ->
           L.verbose (fun fmt -> fmt "Matcher.match: Failure");
           Res_list.just_errors errors
