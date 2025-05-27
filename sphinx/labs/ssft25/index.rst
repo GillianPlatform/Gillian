@@ -71,7 +71,7 @@ Misc. lab notes
 * The debugger supports breakpoints! This can be handy when restarting the debugger after making changes to your code; assign breakpoints to the relevant lines and click the *Continue* button |continue_button|.
 * If you get a :code:`SIGPIPE` or :code:`"Broken pipe"` error, try making a small change to your code and trying again.
    * *Note from Nat: I have \*absolutely no idea\* why this happens. Even with a repro, it disappears if I try to track it down 🙃*
-* If Gillian seems stuck or unresponsive, try opening the Command Palette with (:code:`F1` or :code:`Ctrl+Shift+P` by default) and running the *"Reload window"* command.
+* If Gillian seems stuck or unresponsive, or if the WISL language server fails to start, try opening the Command Palette with (:code:`F1` or :code:`Ctrl+Shift+P` by default) and running the *"Reload window"* command.
 
 .. |continue_button| image:: /_static/img/ssft/continue_button.png
    :height: 1.2em

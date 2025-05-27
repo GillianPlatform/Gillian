@@ -15,10 +15,6 @@ Once that's done, follow these steps:
    .. code-block:: bash
 
         git clone https://github.com/GillianPlatform/gillian-lab.git  --depth 1 --branch SSFT25
-  
-   .. warning::
-
-      This tag may not yet be present; if so, it will become available nearer to the lab date.
 
 #. If necessary, select *Yes, I trust the authors*.
 
