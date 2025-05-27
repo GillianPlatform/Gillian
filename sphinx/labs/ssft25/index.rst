@@ -61,7 +61,7 @@ These exercises are in the ``lab1`` directory of the lab repository. They includ
 
 * Some fun, harder examples of data-structure algorithms
 * List algorithms ported from the real-world `Collections-C library <https://github.com/srdja/Collections-C>`_
-* A much harder iterative list algorithm
+* Some harder iterative list algorithms
 
 Feel free to tackle these in any order, and refer back to the Lab 1 exercises if you need a refresher.
 
