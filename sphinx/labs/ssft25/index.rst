@@ -52,8 +52,6 @@ This lecture covers:
    * Functional compositionality
 * State combinators for CSE 
 
-*Slides coming soon...*
-
 Lab session 2: Further experience with Gillian
 ----------------------------------------------
 
@@ -64,6 +62,8 @@ These exercises are in the ``lab1`` directory of the lab repository. They includ
 * Some harder iterative list algorithms
 
 Feel free to tackle these in any order, and refer back to the Lab 1 exercises if you need a refresher.
+
+At the end of the lab session, we'd hugely appreciate it if you could fill out `this survey <https://imperial.eu.qualtrics.com/jfe/form/SV_egkAr0HhPTVi4l0>`_ to help us evaluate Gillian's user experience.
 
 Misc. lab notes
 ---------------
