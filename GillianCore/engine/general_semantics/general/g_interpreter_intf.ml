@@ -49,6 +49,7 @@ module type S = sig
       prev_cmd_report_id : Logging.Report_id.t option;
       branch_case : Branch_case.t option;
       branch_path : Branch_case.path;
+      laction_fuel : int;
       loc : Location.t option;
     }
 

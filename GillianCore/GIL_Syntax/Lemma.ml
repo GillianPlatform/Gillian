@@ -19,6 +19,7 @@ type t = TypeDef__.lemma = {
   lemma_variant : Expr.t option;
   (* The paramater to treat as the variant. Will trigger termination checks *)
   lemma_existentials : string list;
+  lemma_location : Location.t option;
 }
 
 let init_tbl () : (string, t) Hashtbl.t = Hashtbl.create Config.small_tbl_size
@@ -53,7 +54,10 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
   let map_asrts (pred, loc) =
     match Pred.extend_asrt_pred_types preds pred with
     | Ok pred -> (pred, loc)
-    | Error msg -> raise (Gillian_result.Exc.verification_failure ?loc msg)
+    | Error msg ->
+        raise
+          (Gillian_result.Exc.analysis_failure ~in_target:lemma.lemma_name ?loc
+             msg)
   in
   let pt_spec { lemma_hyp; lemma_concs; lemma_spec_variant } =
     {

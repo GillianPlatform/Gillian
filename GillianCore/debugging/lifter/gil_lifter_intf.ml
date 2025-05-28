@@ -21,6 +21,9 @@ module type S = sig
   val path_of_id : Logging.Report_id.t -> t -> Branch_case.path
   val should_skip_cmd : cmd_report Lifter.executed_cmd_data -> t -> bool
   val cases_at_id : Logging.Report_id.t -> t -> Branch_case.t list
+  val get_type_env_vars : Type_env.t -> Variable.t list
+  val get_pred_vars : Preds.t -> Variable.t list
+  val get_pure_formulae_vars : PFS.t -> Variable.t list
 end
 
 module type Make = functor

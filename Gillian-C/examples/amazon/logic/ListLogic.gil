@@ -12,7 +12,7 @@ lemma DestructList(lst)
 
 (* First projection of a list of pairs *)
 pure pred FirstProj(+lst : List, fProj : List) : (lst == {{  }}) *
-  (fProj == {{  }}), (lst == l+ ({{ {{ #fst, _lvar_js_7 }} }}, #rest)) *
+  (fProj == {{  }}), (lst == l+ ({{ {{ #fst, #lvar_js_7 }} }}, #rest)) *
   FirstProj(#rest, #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
   
 

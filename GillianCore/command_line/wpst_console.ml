@@ -216,9 +216,8 @@ module Make
     in
     Printf.printf "Compilation time: %fs\n" (Sys.time () -. t);
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
-    match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed"
-    | Ok prog' -> run prog' init_data incremental source_files_opt
+    let prog' = MP.init_prog prog in
+    run prog' init_data incremental source_files_opt
 
   let wpst
       files
@@ -246,7 +245,7 @@ module Make
       Gillian_result.try_ @@ fun () ->
       process_files files already_compiled outfile_opt incremental
     in
-    let () = if stats then Statistics.print_statistics () in
+    let () = if stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 
@@ -286,7 +285,7 @@ module Make
 
     let start_debug_adapter () =
       Config.current_exec_mode := Utils.Exec_mode.Symbolic;
-      Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
+      Debug_adapter.start ()
 
     let debug_wpst_t = Common_args.use Term.(const start_debug_adapter)
     let debug_wpst_cmd = Console.Debug (Cmd.v debug_wpst_info debug_wpst_t)

@@ -1,6 +1,5 @@
 open Gillian.Symbolic
 open Gil_syntax
-open Gillian.Debugger.Utils
 
 type t [@@deriving yojson]
 
@@ -57,11 +56,4 @@ val substitution_in_place :
   list
 
 val assertions : t -> Gillian.Gil_syntax.Asrt.t
-
-val add_debugger_variables :
-  store:(string * Gillian.Gil_syntax.Expr.t) list ->
-  memory:t ->
-  is_gil_file:bool ->
-  get_new_scope_id:(unit -> int) ->
-  Variable.ts ->
-  Variable.scope list
+val to_seq : t -> (string * (SFVL.t * int option) option) Seq.t
