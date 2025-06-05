@@ -779,6 +779,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
               verbose (fun m ->
                   m "Successfully created MP of specification of %s"
                     spec.spec_name));
+            L.tmi (fun m -> m "%a" pp mp);
             Hashtbl.replace u_specs spec.spec_name { data = spec; mp })
       specs;
     Ok u_specs

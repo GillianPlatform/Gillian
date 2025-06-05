@@ -83,22 +83,37 @@ functor
       in
       { id; fold; assertion; substitutions }
 
-    let get_next id : ((L.Report_id.t * string * string) list, bool) Either.t =
-      match L.Log_queryer.get_next_reports id with
-      | [] ->
+    let get_next id : (L.Report_id.t * string * string) list * bool option =
+      let nexts = L.Log_queryer.get_next_reports id in
+      let () =
+        if List.is_empty nexts then
           let msg =
             Fmt.str "Match_map: couldn't find nexts of %a" L.Report_id.pp id
           in
           raise (Gillian_result.Exc.internal_error msg)
-      | [ (_, type_, content) ] when type_ = Content_type.match_result ->
-          let report = of_yojson_string MatchResultReport.of_yojson content in
-          let result =
-            match report with
-            | Success _ -> true
-            | Failure _ -> false
-          in
-          Either.Right result
-      | next_ids -> Either.Left next_ids
+      in
+      let nexts, result =
+        List.fold_left
+          (fun (nexts, result) ((_, type_, content) as r) ->
+            if type_ = Content_type.match_result then
+              let report =
+                of_yojson_string MatchResultReport.of_yojson content
+              in
+              let result' =
+                match report with
+                | Success _ -> true
+                | Failure _ -> false
+              in
+              let result =
+                match result with
+                | Some result -> Some (result || result')
+                | None -> Some result'
+              in
+              (nexts, result)
+            else (r :: nexts, result))
+          ([], None) nexts
+      in
+      (List.rev nexts, result)
 
     let rec build_map ~pp_asrt ?(prev_substs = []) ~nodes id type_ content =
       let step, prev_substs =
@@ -117,22 +132,16 @@ functor
              map!"
             L.Report_id.pp id type_
       in
-      let next, result =
-        match get_next id with
-        | Either.Left nexts ->
-            let result, ids =
-              List.fold_left
-                (fun (r, acc) (id, type_, content) ->
-                  let r' =
-                    build_map ~pp_asrt ~prev_substs ~nodes id type_ content
-                  in
-                  (r || r', id :: acc))
-                (true, []) nexts
-            in
-            (Nexts ids, result)
-        | Either.Right result -> (Result result, result)
+      let nexts, this_result = get_next id in
+      let result, next_ids =
+        List.fold_left
+          (fun (r, acc) (id, type_, content) ->
+            let r' = build_map ~pp_asrt ~prev_substs ~nodes id type_ content in
+            (r || r', id :: acc))
+          (Option.value ~default:false this_result, [])
+          nexts
       in
-      let () = Hashtbl.replace nodes id (step, next) in
+      let () = Hashtbl.replace nodes id (step, this_result, next_ids) in
       result
 
     let f ?(pp_asrt = Asrt.pp_atom) match_id =

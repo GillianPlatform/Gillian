@@ -237,16 +237,13 @@ struct
         Map_node.make ~id ~next ~options () |> add_node state
 
       let convert_match_node proc_state state (map : Match_map.t) node_id =
-        let step, next = Hashtbl.find map.nodes node_id in
+        let step, this_result, next_ids = Hashtbl.find map.nodes node_id in
         let id = show_id node_id in
-        let next_ids, next, highlight =
-          match next with
-          | Nexts ids -> (ids, make_basic_next ids, None)
-          | Result r ->
-              let highlight =
-                Some Map_node_options.Highlight.(if r then Success else Error)
-              in
-              ([], Map_node_next.Final, highlight)
+        let next = make_basic_next next_ids in
+        let highlight =
+          this_result
+          |> Option.map @@ fun r ->
+             Map_node_options.Highlight.(if r then Success else Error)
         in
         let display, selectable, extras, submaps, folds =
           match step with
@@ -522,7 +519,7 @@ struct
                  let* node = Hashtbl.find_opt match_.nodes assertion_id in
                  let* substs =
                    match node with
-                   | Match_map.Assertion data, _ -> Some data.substitutions
+                   | Match_map.Assertion data, _, _ -> Some data.substitutions
                    | _ -> None
                  in
                  let substs' =
