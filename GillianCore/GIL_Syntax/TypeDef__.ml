@@ -237,6 +237,7 @@ and lemma = {
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
   lemma_existentials : string list;
+  lemma_location : location option;
 }
 
 and single_spec = {
@@ -255,6 +256,7 @@ and spec = {
   spec_normalised : bool;
   spec_incomplete : bool;
   spec_to_verify : bool;
+  spec_location : location option;
 }
 
 and bispec = {

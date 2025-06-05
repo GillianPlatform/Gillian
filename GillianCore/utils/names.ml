@@ -8,41 +8,38 @@ let return_variable = "ret"
 (** {2 Prefixes} *)
 
 (** Literal location prefix  *)
-let lloc_prefix = "$l"
+let lloc_prefix = "$loc_"
 
 (** Program variable prefix  *)
 let pvar_prefix = "_pvar_"
 
 (** Abstract location prefix  *)
-let aloc_prefix = "_$l_"
+let aloc_prefix = "#loc_"
 
 (** Logical variable prefix  *)
-let lvar_prefix = "_lvar_"
+let lvar_prefix = "#lvar_"
 
 (** Logical variable prefix  *)
-let lvar_prefix_bi = "_lvar_bi_"
+let lvar_prefix_bi = "#lvar_bi_"
 
 (** {2 Name testers} *)
 
-let is_pvar_name (name : string) : bool =
-  try
-    name.[0] <> '#'
-    && name.[0] <> '$'
-    && (String.length name < 6 || String.sub name 0 6 <> lvar_prefix)
-  with _ -> false
-
 let is_aloc_name (name : string) : bool =
-  try String.sub name 0 4 = aloc_prefix with _ -> false
+  String.starts_with ~prefix:aloc_prefix name
 
-let is_lvar_name (name : string) : bool =
-  try String.sub name 0 1 = "#" || String.sub name 0 6 = lvar_prefix
-  with _ -> false
+let is_internal_lvar_name (name : string) : bool =
+  is_aloc_name name || String.starts_with ~prefix:lvar_prefix name
+
+let is_lvar_name (name : string) : bool = String.starts_with ~prefix:"#" name
 
 let is_spec_var_name (name : string) : bool =
-  try String.sub name 0 1 = "#" with _ -> false
+  is_lvar_name name && not (is_internal_lvar_name name)
 
 let is_lloc_name (name : string) : bool =
-  try String.sub name 0 2 = lloc_prefix with _ -> false
+  String.starts_with ~prefix:lloc_prefix name
+
+let is_pvar_name (name : string) : bool =
+  (not (is_lvar_name name)) && not (is_lloc_name name)
 
 (** {2 Name builders} *)
 

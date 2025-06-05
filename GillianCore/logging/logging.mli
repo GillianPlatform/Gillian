@@ -215,3 +215,9 @@ module Parent : sig
 end
 
 val dummy_pp : Format.formatter -> 'a -> unit
+
+module Statistics : sig
+  val exec_cmds : int ref
+  val update_statistics : string -> float -> unit
+  val print_statistics : unit -> unit
+end

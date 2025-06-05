@@ -26,11 +26,7 @@ struct
 
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
-      let prog =
-        match MP.init_prog debug_state.prog with
-        | Error _ -> failwith "Creation of matching plans failed"
-        | Ok prog -> prog
-      in
+      let prog = MP.init_prog debug_state.prog in
       Verification.SAInterpreter.init_evaluate_proc
         (fun x -> x)
         prog proc_name []
@@ -43,6 +39,17 @@ struct
       let get_match_map _ _ =
         failwith "Can't get matching in symbolic debugging!"
     end
+
+    let get_astate _ proc_state =
+      let { cur_report_id; _ } = proc_state in
+      cur_report_id
+      |> Option.map @@ fun id ->
+         let astate = (get_cmd id).state in
+         let store = State.get_store astate |> Store.bindings in
+         let memory = State.get_heap astate in
+         let pfs = State.get_pfs astate in
+         let types = State.get_typ_env astate in
+         (id, make_astate ~store ~memory ~pfs ~types ())
   end
 
   include Make (Impl)

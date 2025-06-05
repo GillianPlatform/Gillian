@@ -26,18 +26,16 @@ module Make (State : SState.S) = struct
 
   let lift_error st : State.err_t -> err_t = function
     | StateErr.EMem e -> StateErr.EMem (st, e)
-    | StateErr.EType (v, t, t') -> StateErr.EType (v, t, t')
     | StateErr.EPure f -> StateErr.EPure f
     | StateErr.EVar v -> StateErr.EVar v
-    | StateErr.EAsrt (v, f, a) -> StateErr.EAsrt (v, f, a)
+    | StateErr.EAsrt (v, f) -> StateErr.EAsrt (v, f)
     | StateErr.EOther s -> StateErr.EOther s
 
   let unlift_error : err_t -> State.err_t = function
     | StateErr.EMem (_, e) -> StateErr.EMem e
-    | StateErr.EType (v, t, t') -> StateErr.EType (v, t, t')
     | StateErr.EPure f -> StateErr.EPure f
     | StateErr.EVar v -> StateErr.EVar v
-    | StateErr.EAsrt (v, f, a) -> StateErr.EAsrt (v, f, a)
+    | StateErr.EAsrt (v, f) -> StateErr.EAsrt (v, f)
     | StateErr.EOther s -> StateErr.EOther s
 
   let lift_errors st = List.map (lift_error st)

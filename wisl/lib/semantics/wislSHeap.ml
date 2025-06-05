@@ -3,7 +3,6 @@ open Gillian.Symbolic
 open Gillian.Gil_syntax
 module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
-open Gillian.Debugger.Utils
 
 type err =
   | MissingResource of (WislLActions.ga * string * Expr.t option)
@@ -325,99 +324,12 @@ let pp fmt heap =
       Block.pp ~loc:l ft b )
     heap
 
-let get_store_vars store is_gil_file =
-  List.filter_map
-    (fun (var, (value : Gil_syntax.Expr.t)) ->
-      if (not is_gil_file) && Str.string_match (Str.regexp "gvar") var 0 then
-        None
-      else
-        let match_offset lst loc loc_pp =
-          match lst with
-          | [ Expr.Lit (Int offset) ] ->
-              Fmt.str "-> (%a, %d)" (Fmt.hbox loc_pp) loc (Z.to_int offset)
-          | [ offset ] ->
-              Fmt.str "-> (%a, %a)" (Fmt.hbox loc_pp) loc (Fmt.hbox Expr.pp)
-                offset
-          | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
-        in
-        let value =
-          match value with
-          | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
-            -> match_offset rest loc Fmt.string
-          | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
-        in
-        Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
-    store
-  |> List.sort Stdlib.compare
-
-let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
-    Variable.t list =
-  let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
-  let compare_offsets (v, _) (w, _) =
-    try
-      let open Expr.Infix in
-      let difference = v - w in
-      match difference with
-      | Expr.Lit (Int f) ->
-          if Z.lt f Z.zero then -1 else if Z.gt f Z.zero then 1 else 0
-      | _ -> 0
-    with _ -> (* Do not sort the offsets if an exception has occurred *)
-              0
-  in
-  let cell_vars l : Variable.t list =
-    List.sort compare_offsets l
-    |> List.map (fun (offset, value) : Variable.t ->
-           (* Display offset as a number to match the printing of WISL pointers *)
-           let offset_str =
-             match offset with
-             | Expr.Lit (Int o) -> Z.to_string o
-             | other -> vstr other
-           in
-           Variable.create_leaf offset_str (vstr value) ())
-  in
-  smemory |> Hashtbl.to_seq
-  |> Seq.map (fun (loc, blocks) ->
-         match blocks with
-         | Block.Freed -> Variable.create_leaf loc "freed" ()
-         | Allocated { data; bound } ->
-             let bound =
-               match bound with
-               | None -> "none"
-               | Some bound -> string_of_int bound
-             in
-             let bound = Variable.create_leaf "bound" bound () in
-             let cells_id = get_new_scope_id () in
-             let () =
-               Hashtbl.replace variables cells_id
-                 (cell_vars (SFVL.to_list data))
-             in
-             let cells = Variable.create_node "cells" cells_id () in
-             let loc_id = get_new_scope_id () in
-             let () = Hashtbl.replace variables loc_id [ bound; cells ] in
-             Variable.create_node loc loc_id ~value:"allocated" ())
-  |> List.of_seq
-
-let add_debugger_variables
-    ~store
-    ~memory
-    ~is_gil_file
-    ~get_new_scope_id
-    variables =
-  let store_id = get_new_scope_id () in
-  let memory_id = get_new_scope_id () in
-  let scopes : Variable.scope list =
-    [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
-  in
-  let store_vars = get_store_vars store is_gil_file in
-  let memory_vars = add_memory_vars memory get_new_scope_id variables in
-  let vars = [ store_vars; memory_vars ] in
-  let () =
-    List.iter2
-      (fun (scope : Variable.scope) vars ->
-        Hashtbl.replace variables scope.id vars)
-      scopes vars
-  in
-  scopes
+let to_seq heap =
+  Hashtbl.to_seq heap
+  |> Seq.map (fun (loc, block) ->
+         match block with
+         | Block.Freed -> (loc, None)
+         | Allocated { data; bound } -> (loc, Some (data, bound)))
 
 let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
 

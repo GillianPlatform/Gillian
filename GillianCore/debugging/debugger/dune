@@ -13,6 +13,7 @@
   logging
   parserAndCompiler
   utils
+  usage_logs
   debugger_log
   debugger_utils
   debugger_lifter)

@@ -31,7 +31,8 @@ let ( let** ) o f = Result.bind o f
 
 module Make
     (SMemory : Gillian.Symbolic.Memory_S)
-    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
+    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
+             with type Lifter.memory = SMemory.t)
     (Verification : Engine.Verifier.S with type annot = C2_annot.t) =
 struct
   open Exec_map
@@ -498,16 +499,6 @@ struct
           let++ prev = get_prev () in
           init_partial ~prev
 
-    let failwith ~exec_data ?partial ~partials msg =
-      DL.failwith
-        (fun () ->
-          [
-            ("exec_data", exec_data_to_yojson exec_data);
-            ("partial_data", opt_to_yojson partial_data_to_yojson partial);
-            ("partials_state", to_yojson partials);
-          ])
-        ("C2_lifter.PartialCmds.handle: " ^ msg)
-
     let handle ~prog ~(partials : t) ~get_prev ~prev_id exec_data =
       DL.log (fun m ->
           let report = exec_data.cmd_report in
@@ -517,16 +508,9 @@ struct
           m
             ~json:[ ("exec_data", exec_data); ("annot", annot) ]
             "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
-      let partial =
-        find_or_init ~partials ~get_prev prev_id
-        |> Result_utils.or_else (fun e -> failwith ~exec_data ~partials e)
-      in
+      let** partial = find_or_init ~partials ~get_prev prev_id in
       Hashtbl.replace partials exec_data.id partial;
-      let result =
-        update ~prog ~prev_id exec_data partial
-        |> Result_utils.or_else (fun e ->
-               failwith ~exec_data ~partial ~partials e)
-      in
+      let** result = update ~prog ~prev_id exec_data partial in
       let () =
         match result with
         | Finished f ->
@@ -538,7 +522,7 @@ struct
             |> Ext_list.iter (fun (id, _) -> Hashtbl.remove_all partials id)
         | _ -> ()
       in
-      result
+      Ok result
   end
 
   type t = {
@@ -860,10 +844,24 @@ struct
             Partial_cmds.handle ~prog ~get_prev ~partials ~prev_id exec_data
           in
           match partial_result with
-          | Finished finished ->
+          | Ok (Finished finished) ->
               let cmd = insert_new_cmd ~state finished in
               Either.Right cmd
-          | StepAgain (id, case) -> Either.Left (id, case))
+          | Ok (StepAgain (id, case)) -> Either.Left (id, case)
+          | Error msg ->
+              DL.failwith
+                (fun () ->
+                  let prev_id =
+                    match prev_id with
+                    | Some id -> L.Report_id.to_yojson id
+                    | None -> `Null
+                  in
+                  [
+                    ("state", to_yojson state);
+                    ("exec_data", exec_data_to_yojson exec_data);
+                    ("prev_id", prev_id);
+                  ])
+                ("Error while handling command: " ^ msg))
   end
 
   let init_or_handle = Init_or_handle.f
@@ -885,6 +883,37 @@ struct
     { id = "unknown"; description = Some "Error lifting not supported yet!" }
 
   let add_variables = Memory_model.MonadicSMemory.Lift.add_variables
+
+  let get_variables _ { store; memory; pfs; types; preds } _ =
+    let open Gil_lifter in
+    let open Variable in
+    let variables = Hashtbl.create 0 in
+    (* New scope ids must be higher than last top level scope id to prevent
+        duplicate scope ids *)
+    let scope_id = ref (List.length top_level_scopes) in
+    let get_new_scope_id () =
+      let () = scope_id := !scope_id + 1 in
+      !scope_id
+    in
+    let lifted_scopes =
+      let lifted_scopes =
+        add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
+          variables
+      in
+      let pure_formulae_vars =
+        Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
+      in
+      let type_env_vars = Option.fold ~some:get_type_env_vars ~none:[] types in
+      let pred_vars = Option.fold ~some:get_pred_vars preds ~none:[] in
+      let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
+      let () =
+        List.iter2
+          (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
+          top_level_scopes vars_list
+      in
+      lifted_scopes
+    in
+    (lifted_scopes, variables)
 
   let select_case nexts =
     let result =
@@ -945,15 +974,12 @@ struct
         | Some (id, case) -> find_next state id case
         | None -> Either.left id)
 
-  let request_next state id case =
-    let rec aux id case =
-      let path = path_of_id id state in
-      let exec_data = Effect.perform (Step (Some id, case, path)) in
-      match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
-      | Either.Left (id, case) -> aux id case
-      | Either.Right map -> map.data.id
-    in
-    aux id case
+  let rec request_next state id case =
+    let path = path_of_id id state in
+    let exec_data = Effect.perform (Step (Some id, case, path)) in
+    match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
+    | Either.Left (id, case) -> request_next state id case
+    | Either.Right map -> map.data.id
 
   let step state id case =
     let () =
@@ -1160,4 +1186,7 @@ struct
     let () = Kconfig.harness := Some entrypoint in
     C2ParserAndCompiler.parse_and_compile_files files
     |> Result.map (fun r -> (r, Constants.CBMC_names.start))
+
+  let pp_expr _ = Gil_syntax.Expr.pp
+  let pp_asrt _ = Gil_syntax.Asrt.pp_atom
 end

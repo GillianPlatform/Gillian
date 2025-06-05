@@ -39,13 +39,15 @@ type 'annot prog = {
 
 type preds_tbl_t = (string, pred) Hashtbl.t
 
-type err =
+type err_ =
   | MPSpec of string * Asrt.t list
   | MPPred of string * Asrt.t list
   | MPLemma of string * Asrt.t list
   | MPAssert of Asrt.t * Asrt.t list
   | MPInvariant of Asrt.t * Asrt.t list
 [@@deriving show]
+
+type err = err_ Location.located [@@deriving show]
 
 module KB = Expr.Set
 
@@ -72,9 +74,7 @@ val init :
   (t, Asrt.t list) result
 
 val init_prog :
-  ?preds_tbl:(string, pred) Hashtbl.t ->
-  ('a, int) Prog.t ->
-  ('a prog, err) result
+  ?preds_tbl:(string, pred) Hashtbl.t -> ('a, int) Prog.t -> 'a prog
 
 val init_preds :
   (string, Pred.t) Hashtbl.t -> ((string, pred) Hashtbl.t, err) result

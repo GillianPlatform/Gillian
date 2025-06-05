@@ -10,6 +10,9 @@ module type S = sig
        and type heap_t = heap_t
        and type m_err_t = m_err
 
+  module SState :
+    SState.S with type t = SPState.state_t and type heap_t = heap_t
+
   module SAInterpreter :
     G_interpreter.S
       with type vt = SVal.M.t
@@ -20,7 +23,7 @@ module type S = sig
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SMatcher : Matcher.S
+  module SMatcher : Matcher.S with type state_t = SPState.state_t
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -59,6 +62,7 @@ module Make
                  and type store_t = SStore.t)
     (SPState : PState.S
                  with type state_t = SState.t
+                  and type heap_t = SState.heap_t
                   and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) :
@@ -67,4 +71,5 @@ module Make
      and type m_err = SPState.m_err_t
      and type state = SPState.t
      and module SPState = SPState
+     and module SState = SState
      and type annot = PC.Annot.t
