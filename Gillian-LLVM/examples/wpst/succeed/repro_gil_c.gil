@@ -1,0 +1,31 @@
+proc main() {
+    x := fresh_svar();
+    assume((x == 0i));
+    goto [ x = 1i ] true_case false_case;
+    true_case:
+        y := fresh_svar();
+        assume_type(y, Bitvector(32i));
+        z := {{ "int-32", y}};
+        tyy := typeOf y;
+        assert((tyy == Bitvector(32i)));
+        goto end;
+    false_case:
+        y := fresh_svar();
+        assume_type(y, Num);
+        tyy := typeOf y;
+        assert((tyy == Num));
+        assume((y == 1.0));
+        z := {{ "float", y}};
+
+
+    end:
+        ptr_l := [alloc](0i, 4i);
+        ptr := l-nth(ptr_l, 0i);
+        a := [store]("i-32", ptr, 0i, z);
+        b := [load]("i-32", ptr, 0i);
+        end_val := l-nth(b, 0i);
+        value := l-nth(end_val, 1i);
+        assert((true));
+        ret := end_val;
+        return
+};

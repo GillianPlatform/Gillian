@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - uses: ocaml/setup-ocaml@v2
+      - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.2.0+options"
       - name: Installing Python prerequisites
@@ -38,7 +38,7 @@ jobs:
         id: restore-cache
         uses: actions/cache@v3
         env:
-            cache-name: cache-ocaml
+          cache-name: cache-ocaml
         with:
           path: _opam
           key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
@@ -47,10 +47,15 @@ jobs:
 
       - name: Install dependencies
         run: make init-ci
+      - name: Install ubuntu dependencies
+        run: sudo apt-get install libgmp-dev pkg-config libsqlite3-dev python3 z3 -y
+        if: runner.os == 'Linux'
       - name: Build Gillian
         run: opam exec -- dune build @all
       - name: Basic tests
         run: opam exec -- dune test
+      - name: Gillian-LLVM Tests
+        run: opam exec -- dune exec gillian-llvm  -- bulk-wpst Gillian-LLVM/examples/wpst
       - name: Wisl checks
         run: "opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh"
       - name: Format checking
@@ -69,12 +74,12 @@ jobs:
       - name: Building docs
         run: make docs
         if: runner.os == 'Linux'
-      - name: Sending docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ runner.os }}-docs
-          path: _docs
-        if: runner.os == 'Linux'
+      # - name: Sending docs artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ${{ runner.os }}-docs
+      #     path: _docs
+      #   if: runner.os == 'Linux'
       - name: Setting dependency cache
         run: opam clean
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -265,7 +270,7 @@ jobs:
   #   if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
   #   strategy:
   #     matrix:
-  #       operating-system: [macos-latest]
+  #       operating-system: [ubuntu-latest]
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
@@ -284,14 +289,159 @@ jobs:
   #     - name: Download release
   #       uses: actions/download-artifact@v4
   #       with:
-  #        name: ${{ runner.os }}-opam
-  #        path: opam
+  #         name: ${{ runner.os }}-opam
+  #         path: opam
+  #     - name: Extract release
+  #       run: |
+  #         tar xzf opam/opam.tar.gz
+  #         rm opam -rf
+  #     - name: init env
+  #       run: "Gillian-JS/scripts/setup_environment.sh"
+  #       working-directory: "Gillian"
+  #     - name: Test JaVerT
+  #       run: "./testJaVerT.sh"
+  #       working-directory: "Gillian/Gillian-JS/environment/"
+  #     # - name: Test Amazon
+  #     #   run: "make"
+  #     #   working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
+
+  # kanillian_c_tests:
+  #   strategy:
+  #     matrix:
+  #       operating-system: [ubuntu-latest]
+  #   runs-on: ${{ matrix.operating-system }}
+  #   needs: build
+  #   steps:
+  #     - name: Setup Z3
+  #       id: z3
+  #       uses: cda-tum/setup-z3@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - uses: ocaml/setup-ocaml@v2
+  #       with:
+  #         ocaml-compiler: "ocaml-variants.5.2.0+options"
+  #     - name: install CBMC
+  #       run: sudo apt install cbmc -y
+  #     - name: Checkout project
+  #       uses: actions/checkout@v3
+  #       with:
+  #         path: Gillian
+  #     - name: Download release
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: ${{ runner.os }}-opam
+  #         path: opam
   #     - name: Extract release
   #       run: |
   #         tar xzf opam/opam.tar.gz
   #         rm -rf opam
-  #     - name: Symbolic Testing Buckets.js
-  #       run: "opam exec -- gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
+  #     - name: init env
+  #       run: "kanillian/scripts/setup_environment.sh"
+  #       working-directory: "Gillian"
+  #     - name: Test All
+  #       run: "opam exec -- bash ./testAll.sh"
+  #       working-directory: "Gillian/kanillian/environment/"
+
+  # test262:
+  #   if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
+  #   strategy:
+  #     matrix:
+  #       operating-system: [ubuntu-latest]
+  #   runs-on: ${{ matrix.operating-system }}
+  #   needs: build
+  #   steps:
+  #     - name: Setup Z3
+  #       id: z3
+  #       uses: cda-tum/setup-z3@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - uses: ocaml/setup-ocaml@v2
+  #       with:
+  #         ocaml-compiler: "ocaml-variants.5.2.0+options"
+  #     - name: Checkout project
+  #       uses: actions/checkout@v3
+  #       with:
+  #         repository: GillianPlatform/javert-test262
+  #         path: test262
+  #         ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
+  #     - name: Download release
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: ${{ runner.os }}-opam
+  #         path: opam
+  #     - name: Extract release
+  #       run: |
+  #         tar xzf opam/opam.tar.gz
+  #         rm -rf opam
+  #     - name: Test262
+  #       run: "opam exec -- gillian-js test262 test262/test --ci"
+
+  # collections-c:
+  #   if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
+  #   strategy:
+  #     matrix:
+  #       operating-system: [ubuntu-latest]
+  #   runs-on: ${{ matrix.operating-system }}
+  #   needs: build
+  #   steps:
+  #     - name: Setup Z3
+  #       id: z3
+  #       uses: cda-tum/setup-z3@v1
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - uses: ocaml/setup-ocaml@v2
+  #       with:
+  #         ocaml-compiler: "ocaml-variants.5.2.0+options"
+  #     - name: checkout project
+  #       uses: actions/checkout@v3
+  #       with:
+  #         repository: GillianPlatform/collections-c-for-gillian
+  #         path: collections-c
+  #         ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
+  #     - name: Download release
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: ${{ runner.os }}-opam
+  #         path: opam
+  #     - name: Extract release
+  #       run: |
+  #         tar xzf opam/opam.tar.gz
+  #         rm -rf opam
+  #     - name: Symbolic Testing Collections-C
+  #       run: "opam exec -- bash ./scripts/gillian-compcert/runTests.sh"
+  #       working-directory: collections-c
+
+  # # test-Buckets:
+  # #   if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
+  # #   strategy:
+  # #     matrix:
+  # #       operating-system: [macos-latest]
+  # #   runs-on: ${{ matrix.operating-system }}
+  # #   needs: build
+  # #   steps:
+  # #     - name: Setup Z3
+  # #       id: z3
+  # #       uses: cda-tum/setup-z3@v1
+  # #       env:
+  # #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # #     - uses: ocaml/setup-ocaml@v2
+  # #       with:
+  # #         ocaml-compiler: "ocaml-variants.5.2.0+options"
+  # #     - name: Checkout project
+  # #       uses: actions/checkout@v3
+  # #       with:
+  # #         path: Gillian
+  # #     - name: Download release
+  # #       uses: actions/download-artifact@v4
+  # #       with:
+  # #        name: ${{ runner.os }}-opam
+  # #        path: opam
+  # #     - name: Extract release
+  # #       run: |
+  # #         tar xzf opam/opam.tar.gz
+  # #         rm -rf opam
+  # #     - name: Symbolic Testing Buckets.js
+  # #       run: "opam exec -- gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
   build-docker:
     runs-on: ubuntu-latest
@@ -306,7 +456,7 @@ jobs:
         id: restore-cache
         uses: actions/cache@v3
         env:
-            cache-name: cache-ocaml
+          cache-name: cache-ocaml
         with:
           path: .docker_opam_cache
           key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
@@ -329,28 +479,28 @@ jobs:
           docker cp deps:/home/opam/.opam/5.2 ./.docker_opam_cache
           docker rm deps
 
-  deploy-docs:
-    if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    needs: [build]
-    strategy:
-      fail-fast: false
-      matrix:
-        operating-system: [ubuntu-latest]
-    steps:
-      - name: Download built docs
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ runner.os }}-docs
-          path: docs
-      - name: Deploy docs
-        run: |
-          git config --global user.email "<>"
-          git config --global user.name "GitHub Actions"
-          git clone https://${{ secrets.DOCS_USER }}:${{ secrets.DOCS_TOKEN }}@github.com/GillianPlatform/GillianPlatform.github.io.git docs-repo --branch master
-          cd docs-repo
-          rm * -rf
-          cp -r ../docs/* .
-          git add -A
-          git commit --allow-empty -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
-          git push --force
+  # deploy-docs:
+  #   if: github.ref == 'refs/heads/master'
+  #   runs-on: ubuntu-latest
+  #   needs: [build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       operating-system: [ubuntu-latest]
+  #   steps:
+  #     - name: Download built docs
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: ${{ runner.os }}-docs
+  #         path: docs
+  #     - name: Deploy docs
+  #       run: |
+  #         git config --global user.email "<>"
+  #         git config --global user.name "GitHub Actions"
+  #         git clone https://${{ secrets.DOCS_USER }}:${{ secrets.DOCS_TOKEN }}@github.com/GillianPlatform/GillianPlatform.github.io.git docs-repo --branch master
+  #         cd docs-repo
+  #         rm * -rf
+  #         cp -r ../docs/* .
+  #         git add -A
+  #         git commit --allow-empty -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
+  #         git push --force

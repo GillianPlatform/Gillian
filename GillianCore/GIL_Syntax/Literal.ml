@@ -14,6 +14,7 @@ type t = TypeDef__.literal =
   | Loc of string  (** GIL object locations *)
   | Type of Type.t  (** GIL types ({!type:Type.t}) *)
   | LList of t list  (** Lists of GIL literals *)
+  | LBitvector of (Z.t * int)
   | Nono
 [@@deriving ord]
 
@@ -27,6 +28,7 @@ let rec equal la lb =
   | String sl, String sr | Loc sl, Loc sr -> String.equal sl sr
   | Type tl, Type tr -> Type.equal tl tr
   | LList ll, LList lr -> List.for_all2 equal ll lr
+  | LBitvector (vl, wl), LBitvector (vr, wr) -> Z.equal vl vr && Int.equal wl wr
   | _ -> false
 
 let to_yojson = TypeDef__.literal_to_yojson
@@ -47,6 +49,7 @@ let rec pp fmt x =
   | Loc loc -> Fmt.string fmt loc
   | Type t -> Fmt.string fmt (Type.str t)
   | LList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
+  | LBitvector (v, w) -> Fmt.pf fmt "0x%sv%d" (Z.format "%x" v) w
 
 (** Typing *)
 let type_of (x : t) : Type.t =
@@ -62,6 +65,7 @@ let type_of (x : t) : Type.t =
   | Loc _ -> ObjectType
   | Type _ -> TypeType
   | LList _ -> ListType
+  | LBitvector (_, w) -> BvType w
   | Nono -> NoneType
 
 let evaluate_constant (c : Constant.t) : t =

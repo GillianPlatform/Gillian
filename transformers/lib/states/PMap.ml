@@ -184,7 +184,9 @@ struct
     let open Delayed.Syntax in
     let* idx_opt = I.validate_index idx in
     match idx_opt with
-    | None -> DR.error (InvalidIndexValue idx)
+    | None ->
+        Logging.tmi (fun m -> m "Invalid index value %a in get" Expr.pp idx);
+        DR.error (InvalidIndexValue idx)
     | Some idx' -> (
         let* res = I.get h idx' in
         match (res, d) with
@@ -219,11 +221,16 @@ struct
     match (action, args) with
     | SubAction _, [] -> failwith "Missing index for sub-action"
     | SubAction action, idx :: args ->
+        Logging.tmi (fun m ->
+            m "Executing action in Make %s with args %a and idx %a"
+              (S.action_to_str action) (Fmt.list Expr.pp) args Expr.pp idx);
         let** s, idx', ss = get s idx in
         let* () = Delayed.return ~learned:[ Expr.Infix.(idx == idx') ] () in
         let+ r = S.execute_action action ss args in
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
+        Logging.verbose (fun fmt ->
+            fmt "AFTER EXECUTING ACTION WITH: %a" S.pp ss');
         let s' = set ~idx ~idx' ss' s in
         (s', idx' :: v)
     | Alloc, args ->
@@ -475,10 +482,15 @@ struct
     match (action, args) with
     | SubAction _, [] -> failwith "Missing index for sub-action"
     | SubAction action, idx :: args ->
+        Logging.tmi (fun m ->
+            m "Executing action %s with args %a and idx %a"
+              (S.action_to_str action) (Fmt.list Expr.pp) args Expr.pp idx);
         let** s, idx', ss = get s idx in
         let+ r = S.execute_action action ss args in
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
+        Logging.verbose (fun fmt ->
+            fmt "AFTER EXECUTING ACTION WITH: %a" S.pp ss');
         let s' = set ~idx ~idx' ss' s in
         (s', idx' :: v)
     | Alloc, args ->

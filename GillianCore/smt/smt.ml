@@ -15,7 +15,8 @@ let z3_config =
     ("timeout", "30000");
   ]
 
-let solver = new_solver z3
+let _debug_z3 = { z3 with log = printf_log }
+let solver = new_solver _debug_z3
 let cmd s = ack_command solver s
 let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
 
@@ -24,6 +25,7 @@ exception SMT_unknown
 let pp_sexp = Sexplib.Sexp.pp_hum
 let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
+let defined_bv_variants : int list ref = ref []
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -141,7 +143,7 @@ let declare_recognizer ~name ~constructor ~typ =
     t_bool
     (list [ atom "_"; atom "is"; atom constructor ] <| atom "x")
 
-let mk_datatype name type_params (variants : (module Variant.S) list) =
+let create_datatype name type_params (variants : (module Variant.S) list) =
   let constructors, recognizer_defs =
     variants
     |> List.map (fun v ->
@@ -155,6 +157,10 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
     |> List.split
   in
   let decl = declare_datatype name type_params constructors in
+  (decl, recognizer_defs)
+
+let mk_datatype name type_params (variants : (module Variant.S) list) =
+  let decl, recognizer_defs = create_datatype name type_params variants in
   let () = init_decls := recognizer_defs @ (decl :: !init_decls) in
   atom name
 
@@ -177,6 +183,7 @@ module Type_operations = struct
   module List = (val nul "ListType" : Nullary)
   module Type = (val nul "TypeType" : Nullary)
   module Set = (val nul "SetType" : Nullary)
+  module Bv = (val un "BvType" "bvWidth" t_int : Unary)
 
   let t_gil_type =
     mk_datatype "GIL_Type" []
@@ -193,10 +200,47 @@ module Type_operations = struct
         (module List : Variant.S);
         (module Type : Variant.S);
         (module Set : Variant.S);
+        (module Bv : Variant.S);
       ]
 end
 
 let t_gil_type = Type_operations.t_gil_type
+
+module BvLiteral = struct
+  let lit_name = "GIL_BVLiteral"
+  let t_lit_name = atom lit_name
+  let name (width : int) = Printf.sprintf "Bv_%d" width
+  let accessor (width : int) = Printf.sprintf "bv_under_value_%d" width
+
+  let make_mod (width : int) =
+    Variant.un (name width) (accessor width) (t_bits width)
+
+  let get_mods _ =
+    let needed_widths = !defined_bv_variants |> List.sort_uniq Int.compare in
+    L.verbose (fun m ->
+        m "BV variants: %a" (Fmt.list ~sep:Fmt.sp Fmt.int) needed_widths);
+    List.map
+      (fun x ->
+        let module S = (val make_mod x) in
+        (x, (module S : Variant.Unary)))
+      needed_widths
+
+  let make_lit_recognizers _ : (int * string) list =
+    let mods = get_mods () in
+    List.map (fun (x, (module S : Variant.Unary)) -> (x, S.recognizer)) mods
+
+  let decl_data_type _ =
+    let mods = get_mods () in
+    let mods_with_nop_constructor =
+      let module M = (val Variant.nul "BVNoop") in
+      (module M : Variant.S)
+      :: List.map
+           (fun (x, (module S : Variant.Unary)) -> (module S : Variant.S))
+           mods
+    in
+
+    create_datatype lit_name [] mods_with_nop_constructor
+end
 
 module Lit_operations = struct
   open Variant
@@ -204,6 +248,8 @@ module Lit_operations = struct
   let gil_literal_name = "GIL_Literal"
   let t_gil_literal = atom gil_literal_name
 
+  module L = List
+  module T = Type
   module Undefined = (val nul "Undefined" : Nullary)
   module Null = (val nul "Null" : Nullary)
   module Empty = (val nul "Empty" : Nullary)
@@ -214,7 +260,15 @@ module Lit_operations = struct
   module Loc = (val un "Loc" "locValue" t_int : Unary)
   module Type = (val un "Type" "tValue" t_gil_type : Unary)
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
+  module Bv = (val un "Bv" "bv_value" BvLiteral.t_lit_name : Unary)
   module None = (val nul "None" : Nullary)
+
+  let bv_recognizer_name w = Printf.sprintf "GIL_BVRecognizer_%d" w
+  let recog_bv w arg = atom (bv_recognizer_name w) <| arg
+
+  let bv_guards _ =
+    let mods = BvLiteral.get_mods () in
+    L.map (fun (x, (module S : Variant.Unary)) -> (recog_bv x, T.BvType x)) mods
 
   let _ =
     mk_datatype gil_literal_name []
@@ -230,7 +284,25 @@ module Lit_operations = struct
         (module Type : Variant.S);
         (module List : Variant.S);
         (module None : Variant.S);
+        (module Bv : Variant.S);
       ]
+
+  let declare_bv_recognizers _ =
+    let mods = BvLiteral.get_mods () in
+    L.map
+      (fun (x, (module S : Variant.Unary)) ->
+        let name_of_candidate = "x" in
+        let candidate = atom name_of_candidate in
+        define_fun (bv_recognizer_name x)
+          [ (name_of_candidate, atom gil_literal_name) ]
+          t_bool
+          (list
+             [
+               atom "and";
+               Bv.recognize candidate;
+               S.recognize (Bv.access candidate);
+             ]))
+      mods
 end
 
 let t_gil_literal = Lit_operations.t_gil_literal
@@ -303,6 +375,9 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
+    | BvType w ->
+        defined_bv_variants := w :: !defined_bv_variants;
+        Type_operations.Bv.construct (nat_k w)
   with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
@@ -322,6 +397,7 @@ module Encoding = struct
     | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
     | SetType -> t_gil_literal_set
     | TypeType -> t_gil_type
+    | BvType width -> t_bits width
 
   type t = {
     consts : (string * sexp) Hashset.t; [@default Hashset.empty ()]
@@ -347,7 +423,12 @@ module Encoding = struct
   let null_encoding = make ~kind:Simple_wrapped Lit_operations.Null.construct
   let empty_encoding = make ~kind:Simple_wrapped Lit_operations.Empty.construct
   let none_encoding = make ~kind:Simple_wrapped Lit_operations.None.construct
-  let native typ = make ~kind:(Native typ)
+
+  let native typ =
+    (match typ with
+    | Type.BvType width -> defined_bv_variants := width :: !defined_bv_variants
+    | _ -> ());
+    make ~kind:(Native typ)
 
   let make_const ?extra_asrts ~typ kind const =
     let const = sanitize_identifier const in
@@ -401,6 +482,9 @@ module Encoding = struct
           | TypeType -> Type.construct
           | BooleanType -> Bool.construct
           | ListType -> List.construct
+          | BvType w ->
+              let module M = (val BvLiteral.make_mod w) in
+              fun x -> Bv.construct (M.construct x)
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
               Fmt.failwith "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
@@ -419,6 +503,14 @@ module Encoding = struct
   let get_bool = get_native ~accessor:Lit_operations.Bool.access
   let get_list = get_native ~accessor:Lit_operations.List.access
 
+  let get_bv (width : int) (e : t) : sexp =
+    get_native
+      ~accessor:(fun x ->
+        let m = BvLiteral.make_mod width in
+        let module M = (val m : Variant.Unary) in
+        Lit_operations.Bv.access x |> M.access)
+      e
+
   let get_set { kind; expr; _ } =
     match kind with
     | Native SetType -> expr
@@ -430,7 +522,7 @@ end
 
 let typeof_simple e =
   let open Type in
-  let guards =
+  let guards_non_bv =
     Lit_operations.
       [
         (Null.recognize, NullType);
@@ -446,6 +538,8 @@ let typeof_simple e =
         (List.recognize, ListType);
       ]
   in
+  let guards_bv = Lit_operations.bv_guards () in
+  let guards = guards_non_bv @ guards_bv in
   List.fold_left
     (fun acc (guard, typ) -> ite (guard e) (encode_type typ) acc)
     (encode_type UndefinedType)
@@ -509,6 +603,7 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
     | Num n -> real_k (Q.of_float n) >- NumberType
     | String s -> encode_string s >- StringType
     | Loc l -> encode_string l >- ObjectType
+    | LBitvector (v, w) -> bv_k w v >- BvType w
     | Type t -> encode_type t >- TypeType
     | LList lits ->
         let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
@@ -721,6 +816,53 @@ let encode_quantified_expr
   let expr = mk_quant quantified_vars encoded_assertion in
   native ~consts ~extra_asrts BooleanType expr
 
+let encode_bvop
+    (op : BVOps.t)
+    (literals : int list)
+    (bvs : sexp list)
+    (width : int option) : Encoding.t =
+  let unop_encode (f : sexp -> sexp) = f (List.hd bvs) in
+  let binop_encode (f : sexp -> sexp -> sexp) =
+    f (List.hd bvs) (List.nth bvs 1)
+  in
+  let sexpr =
+    match op with
+    | BVOps.BVNeg -> unop_encode bv_neg
+    | BVOps.BVNot -> unop_encode bv_not
+    | BVOps.BVPlus -> binop_encode bv_add
+    | BVOps.BVAnd -> binop_encode bv_and
+    | BVOps.BVOr -> binop_encode bv_or
+    | BVOps.BVMul -> binop_encode bv_mul
+    | BVOps.BVUDiv -> binop_encode bv_udiv
+    | BVOps.BVUrem -> binop_encode bv_urem
+    | BVOps.BVShl -> binop_encode bv_shl
+    | BVOps.BVLShr -> binop_encode bv_lshr
+    | BVConcat -> binop_encode bv_concat
+    | BVXor -> binop_encode bv_xor
+    | BVSrem -> binop_encode bv_srem
+    | BVSub -> binop_encode bv_sub
+    | BVSdiv -> binop_encode bv_sdiv
+    | BVAshr -> binop_encode bv_ashr
+    | BVSmod -> binop_encode bv_smod
+    | BVZeroExtend -> bv_zero_extend (List.hd literals) (List.hd bvs)
+    | BVSignExtend -> bv_sign_extend (List.hd literals) (List.hd bvs)
+    | BVExtract ->
+        bv_extract (List.hd literals) (List.nth literals 1) (List.hd bvs)
+    | BVOps.BVUlt -> binop_encode bv_ult
+    | BVOps.BVUleq -> binop_encode bv_uleq
+    | BVOps.BVSlt -> binop_encode bv_slt
+    | BVOps.BVSleq -> binop_encode bv_sleq
+    | BVOps.BVNegO -> bv_nego (List.hd bvs)
+    | BVOps.BVUMulO -> binop_encode bv_umulo
+    | BVOps.BVSMulO -> binop_encode bv_smulo
+    | BVOps.BVUAddO -> binop_encode bv_uaddo
+    | BVOps.BVSAddO -> binop_encode bv_saddo
+  in
+  Encoding.native
+    (Option.map (fun w -> Gil_syntax.Type.BvType w) width
+    |> Option.value ~default:Gil_syntax.Type.BooleanType)
+    sexpr
+
 let rec encode_logical_expression
     ~(gamma : typenv)
     ~(llen_lvars : SS.t)
@@ -744,6 +886,12 @@ let rec encode_logical_expression
   | PVar _ -> failwith "HORROR: Program variable in pure formula"
   | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
+  | BVExprIntrinsic (op, es, width) ->
+      let extracted_bvs, extracted_lits = Expr.partition_bvargs es in
+      let widths = List.map (fun (_, w) -> w) extracted_bvs in
+      let>-- les = List.map (fun (e, _) -> f e) extracted_bvs in
+      List.combine les widths |> List.map (fun (encoded, w) -> get_bv w encoded)
+      |> fun encodings -> encode_bvop op extracted_lits encodings width
   | NOp (SetUnion, les) ->
       let>-- les = List.map f les in
       les |> List.map get_set |> set_union' Z3 >- SetType
@@ -923,6 +1071,25 @@ let reset_solver () =
   let () = cmd (push 1) in
   ()
 
+let perform_decls _ =
+  let bv_decl, bv_recogs = BvLiteral.decl_data_type () in
+  let bv_refined_recogs = Lit_operations.declare_bv_recognizers () in
+  let () =
+    L.verbose (fun m -> m "Performing decls %a" Sexplib.Sexp.pp_hum bv_decl)
+  in
+  let () =
+    L.verbose (fun m ->
+        m "Performing recogs %a"
+          (Fmt.list ~sep:Fmt.sp Sexplib.Sexp.pp_hum)
+          bv_recogs)
+  in
+  let decls = List.rev !init_decls in
+  (bv_decl :: bv_recogs) @ decls @ bv_refined_recogs
+  |> List.iter (fun decl ->
+         L.verbose (fun m ->
+             m "Performing decl %s" (Sexplib.Sexp.to_string decl));
+         cmd decl)
+
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () =
     L.verbose (fun m ->
@@ -932,7 +1099,8 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   in
   let () = reset_solver () in
   let encoded_assertions = encode_assertions fs gamma in
-  let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
+  let () = perform_decls () in
+  let () = if true then Dump.dump fs gamma encoded_assertions in
   let () = List.iter cmd !builtin_funcs in
   let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");
@@ -1011,6 +1179,7 @@ let lift_model
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
   let () = reset_solver () in
+  perform_decls ();
   let model_eval = (model_eval' solver model).eval [] in
 
   let get_val x =
@@ -1067,7 +1236,4 @@ let lift_model
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
 
-let () =
-  let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
-  cmd (push 1)
+let () = cmd (push 1)

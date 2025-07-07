@@ -22,6 +22,7 @@
         "List",      GIL_Parser.LISTTYPELIT;
         "Type",      GIL_Parser.TYPETYPELIT;
         "Set",       GIL_Parser.SETTYPELIT;
+        "Bitvector", GIL_Parser.BVTYPELIT;
 
         (* Literals *)
         "undefined", GIL_Parser.UNDEFINED;
@@ -133,6 +134,7 @@
         "normal",       GIL_Parser.NORMAL;
         "error",        GIL_Parser.ERROR;
         "fail",         GIL_Parser.FAIL;
+        "bug",          GIL_Parser.BUG;
         "trusted",      GIL_Parser.TRUSTED;
 
         (* Procedure definition keywords *)
@@ -145,11 +147,13 @@
 }
 
 let digit = ['0'-'9']
+let hexdigit = ['0'-'9''a'-'f''A'-'F']
 let letter = ['a'-'z''A'-'Z']
 let identifier = letter(letter|digit|'_')*
 
 let float = '-'? digit+ ('.' digit*)?
 let int = '-'? digit+ 'i'
+let bv = "0x" hexdigit+ 'v' digit+
 
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
@@ -171,6 +175,36 @@ rule read = parse
   | "{{"                 { GIL_Parser.LSTOPEN   }
   | "}}"                 { GIL_Parser.LSTCLOSE  }
 
+  (* Bv intrinsics *)
+  | "concat" { GIL_Parser.BVCONCAT }
+  | "extract" { GIL_Parser.BVEXTRACT }
+  | "bvnot" { GIL_Parser.BVNOT }
+  | "bvand" { GIL_Parser.BVAND }
+  | "bvor" { GIL_Parser.BVOR }
+  | "bvneg" { GIL_Parser.BVNEG }
+  | "bvadd" { GIL_Parser.BVADD }
+  | "bvmul" { GIL_Parser.BVMUL }
+  | "bvudiv" { GIL_Parser.BVUDIV }
+  | "bvurem" { GIL_Parser.BVUREM }
+  | "bvnego" { GIL_Parser.BVNEGO }
+  | "bvuaddo" { GIL_Parser.BVUADDO }
+  | "bvsaddo" { GIL_Parser.BVSADDO }
+  | "bvumulo" { GIL_Parser.BVUMULO }
+  | "bvsmulo" { GIL_Parser.BVSMULO }
+  | "bvshl" { GIL_Parser.BVSHL }
+  | "bvlshr" { GIL_Parser.BVLSHR }
+  | "bvxor" {GIL_Parser.BVXOR }
+  | "bvsrem" { GIL_Parser.BVSREM }
+  | "bvsub" { GIL_Parser.BVSUB }
+  | "bvult" { GIL_Parser.BVULT }
+  | "bvuleq" { GIL_Parser.BVULEQ }
+  | "bvslt" { GIL_Parser.BVSLT }
+  | "bvsleq" { GIL_Parser.BVSLEQ }
+  | "bvsext" { GIL_Parser.BVSIGNEXTEND }
+  | "bvzext" { GIL_Parser.BVZEROEXTEND }
+  | "bvsdiv" { GIL_Parser.BVSDIV }
+  | "bvsmod" { GIL_Parser.BVSMOD }
+  | "bvashr" { GIL_Parser.BVASHR }
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
   | "$$max_float"        { GIL_Parser.MAX_FLOAT     }
@@ -281,6 +315,11 @@ rule read = parse
                            let s_n = String.sub s 0 ((String.length s) - 1) in
                            let n = Z.of_string s_n in
                            GIL_Parser.INTEGER n }
+  | bv                   { let s = Lexing.lexeme lexbuf in
+                           let l = String.split_on_char 'v' s in
+                           let n = Z.of_string (List.nth l 0) in
+                           let w = int_of_string (List.nth l 1) in
+                           GIL_Parser.BITVECTOR (n, w) }
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                            GIL_Parser.FLOAT n }
   | '"'                  { read_string (Buffer.create 32) lexbuf }

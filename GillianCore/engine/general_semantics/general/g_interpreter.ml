@@ -857,11 +857,11 @@ struct
                       | Error x -> Right (Exec_err.EState x))
                     ret
                 in
-                let b_counter, has_branched =
-                  match successes with
-                  | [] -> (b_counter, false)
-                  | _ -> (b_counter + 1, true)
+
+                let b_counter =
+                  Int.max 0 (List.length successes - 1) + b_counter
                 in
+                let has_branched = List.length successes > 1 in
                 let spec_name = spec.data.spec_name in
                 let success_confs =
                   successes
@@ -931,7 +931,10 @@ struct
           let args = build_args v_args params in
 
           let is_internal_proc proc_name =
-            (Prog.get_proc_exn prog.prog proc_name).proc_internal
+            Prog.get_proc prog.prog proc_name
+            |> Option.map (fun x ->
+                   let open Proc in
+                   x.proc_internal)
           in
 
           let symb_exec_proc =
@@ -959,7 +962,7 @@ struct
               (* In bi-abduction, reached max depth of recursive calls *)
               | _, _, true -> []
               (* In bi-abduction, recursive call *)
-              | true, false, _ -> symb_exec_proc ()
+              | true, Some false, _ -> symb_exec_proc ()
               (* TODO: When JS internals work
                  | true, false, false
                    when List.length
@@ -2053,6 +2056,12 @@ struct
                      if Hashtbl.mem prog.specs pid then Some conf else None)
                    on_hold
                in
+               let () =
+                 L.(
+                   verbose (fun m ->
+                       m "Resuming size of: %d total size of: %d"
+                         (List.length hold_confs) (List.length on_hold)))
+               in
                continue_or_pause hold_confs (fun ?selector () ->
                    eval_step ret_fun false prog results [] hold_confs selector
                      []))
@@ -2226,7 +2235,9 @@ struct
             }
           in
           debug_log conf rest_confs;
-
+          L.(
+            verbose (fun m ->
+                m "Evaluating a conf with holds %d" (List.length on_hold)));
           match conf with
           | None -> Handle_conf.none eval_step_state
           | Some (ConfCont ({ branch_count; _ } as c))

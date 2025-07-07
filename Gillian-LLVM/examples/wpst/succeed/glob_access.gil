@@ -1,0 +1,8 @@
+
+proc main() {
+    x := $l_sym;
+    r := [setZeros](x,0i,4i, "Freeable");
+    nr := [load]("i-32", x, 0i);
+    ret := l-nth(nr,0i);
+    return
+};

@@ -42,4 +42,4 @@ module ByFolder (P : sig
   val max_depth : int
   val cmd_name : string
   val exec_mode : Exec_mode.t
-end) : S
+end) : S with type category = string

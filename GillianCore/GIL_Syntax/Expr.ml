@@ -1,22 +1,25 @@
 open Names
 
-(** GIL Expressions *)
+(* TypeDef__.expr = *)
 type t = TypeDef__.expr =
-  | Lit of Literal.t  (** GIL literals           *)
-  | PVar of string  (** GIL program variables  *)
-  | LVar of LVar.t  (** GIL logical variables  *)
+  | Lit of Literal.t  (** GIL literals *)
+  | PVar of string  (** GIL program variables *)
+  | LVar of LVar.t  (** GIL logical variables *)
   | ALoc of string  (** GIL abstract locations *)
-  | UnOp of UnOp.t * t  (** Unary operators         *)
-  | BinOp of t * BinOp.t * t  (** Binary operators        *)
+  | BVExprIntrinsic of BVOps.t * bv_arg list * int option
+  | UnOp of UnOp.t * t  (** Unary operators *)
+  | BinOp of t * BinOp.t * t  (** Binary operators *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
-  | NOp of NOp.t * t list  (** n-ary operators         *)
-  | EList of t list  (** Lists of expressions    *)
-  | ESet of t list  (** Sets of expressions     *)
+  | NOp of NOp.t * t list  (** n-ary operators *)
+  | EList of t list  (** Lists of expressions *)
+  | ESet of t list  (** Sets of expressions *)
   | Exists of (string * Type.t option) list * t
       (** Existential quantification. *)
   | ForAll of (string * Type.t option) list * t
       (** Universal quantification. *)
-[@@deriving eq, ord]
+
+and bv_arg = TypeDef__.bv_arg = Literal of int | BvExpr of (t * int)
+[@@deriving eq, ord, yojson]
 
 let to_yojson = TypeDef__.expr_to_yojson
 let of_yojson = TypeDef__.expr_of_yojson
@@ -30,10 +33,82 @@ let int n = lit (Int (Z.of_int n))
 let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let bv_z (z : Z.t) (w : int) = lit (LBitvector (z, w))
+let zero_bv (w : int) = bv_z Z.zero w
 let false_ = Lit (Bool false)
 let true_ = Lit (Bool true)
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
+
+let extract_bv_width (e : t) =
+  match e with
+  | Lit (LBitvector (_, w)) -> w
+  | BVExprIntrinsic (_, _, Some w) -> w
+  | _ -> failwith "unrecoginized bitvector expression"
+
+let concat_single (little : t) (big : t) : t =
+  let little_size = extract_bv_width little in
+  let big_size = extract_bv_width big in
+  let nwidth = Int.add little_size big_size in
+  BVExprIntrinsic
+    ( BVOps.BVConcat,
+      [ BvExpr (big, big_size); BvExpr (little, little_size) ],
+      Some nwidth )
+
+let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
+  List.fold_right f (List.tl list) (List.hd list)
+
+let bv_concat (lst : t List.t) =
+  reduce (fun elem sum -> concat_single elem sum) lst
+
+let bv_extract (low_index : int) (high_index : int) (e : t) : t =
+  let src_width = extract_bv_width e in
+  let nsize = high_index - low_index + 1 in
+  BVExprIntrinsic
+    ( BVOps.BVExtract,
+      [ Literal high_index; Literal low_index; BvExpr (e, src_width) ],
+      Some nsize )
+
+let bv_ugt a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic (BVOps.BVUlt, [ BvExpr (b, width); BvExpr (a, width) ], None)
+
+let bv_plus a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVPlus, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_urem a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVUrem, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_mul a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVMul, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_sub a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVSub, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_width a = extract_bv_width a
+
+let bv_ule a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic (BVOps.BVUleq, [ BvExpr (a, width); BvExpr (b, width) ], None)
+
+let bv_ult a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic (BVOps.BVUlt, [ BvExpr (a, width); BvExpr (b, width) ], None)
+
+let bv_extract_between_sz (src : int) (dst : int) (e : t) : t =
+  let src_width = extract_bv_width e in
+  assert (src = src_width);
+  if dst > src then
+    failwith "We are reading outside of a symbolic value... unsound"
+  else bv_extract 0 dst e
 
 let num_to_int = function
   | Lit (Num n) -> int (int_of_float n)
@@ -42,6 +117,10 @@ let num_to_int = function
 let int_to_num = function
   | Lit (Int n) -> num (Z.to_float n)
   | e -> UnOp (IntToNum, e)
+
+let int_to_bv ~width (n : int) : t =
+  let z = Z.of_int n in
+  Lit (Literal.LBitvector (z, width))
 
 let typeof x =
   match x with
@@ -339,6 +418,32 @@ module Map = Map.Make (MyExpr)
 
 (** Optional map over expressions *)
 
+let rec sequence_opt (l : 'a option list) : 'a list option =
+  match l with
+  | [] -> Some []
+  | h :: tl -> (
+      match h with
+      | Some x -> Option.map (fun lst -> x :: lst) (sequence_opt tl)
+      | None -> None)
+
+let partition_bvargs (lst : bv_arg list) : (t * int) list * int list =
+  List.partition_map
+    (function
+      | BvExpr (e, w) -> Left (e, w)
+      | Literal i -> Right i)
+    lst
+
+let map_bv_arg_exprs (f : t -> t) (lst : bv_arg list) : bv_arg list =
+  List.map
+    (function
+      | BvExpr (e, w) -> BvExpr (f e, w)
+      | Literal i -> Literal i)
+    lst
+
+let exprs_from_bvargs (lst : bv_arg list) : t list =
+  let es, _ = partition_bvargs lst in
+  List.map (fun (e, _) -> e) es
+
 let rec map_opt
     (f_before : t -> t option * bool)
     (f_after : (t -> t) option)
@@ -358,6 +463,14 @@ let rec map_opt
         match mapped_expr with
         | Lit _ | LVar _ | ALoc _ | PVar _ -> Some mapped_expr
         | UnOp (op, e) -> Option.map (fun e -> UnOp (op, e)) (map_e e)
+        | BVExprIntrinsic (op, es, w) ->
+            let map_bv_arg = function
+              | Literal w -> Some (Literal w)
+              | BvExpr (e, w) -> map_e e |> Option.map (fun x -> BvExpr (x, w))
+            in
+
+            List.map map_bv_arg es |> sequence_opt
+            |> Option.map (fun args -> BVExprIntrinsic (op, args, w))
         | BinOp (e1, op, e2) -> (
             match (map_e e1, map_e e2) with
             | Some e1', Some e2' -> Some (BinOp (e1', op, e2'))
@@ -390,6 +503,12 @@ let rec pp fmt e =
   match e with
   | Lit l -> Literal.pp fmt l
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
+  | BVExprIntrinsic (op, es, w) ->
+      Fmt.pf fmt "%s(%a : %a)" (BVOps.str op)
+        (Fmt.list ~sep:Fmt.comma pp_bv_arg)
+        es
+        (Fmt.option ~none:Fmt.nop (fun pf i -> Fmt.pf pf "%di" i))
+        w
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->
@@ -414,6 +533,11 @@ let rec pp fmt e =
       Fmt.pf fmt "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
+
+and pp_bv_arg fmt (arg : bv_arg) =
+  match arg with
+  | Literal w -> Fmt.pf fmt "%di" w
+  | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %di)" pp e w
 
 let rec full_pp fmt e =
   match e with
@@ -472,6 +596,13 @@ let rec is_concrete (le : t) : bool =
   match le with
   | Lit _ | PVar _ -> true
   | LVar _ | ALoc _ | Exists _ | ForAll _ -> false
+  | BVExprIntrinsic (_, es, _) ->
+      loop
+        (List.filter_map
+           (function
+             | Literal _ -> None
+             | BvExpr (e, _) -> Some e)
+           es)
   | UnOp (_, e) -> f e
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
@@ -497,7 +628,8 @@ let rec from_lit_list (lit : Literal.t) : t =
   | LList lst -> EList (List.map f lst)
   | _ -> Lit lit
 
-(** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList lst)  *)
+(** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList
+    lst) *)
 let lists (le : t) : t list =
   Visitors.Collectors.list_collector#visit_expr () le
 

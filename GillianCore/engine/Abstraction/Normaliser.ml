@@ -116,6 +116,8 @@ module Make (SPState : PState.S) = struct
               SStore.put store pvar (LVar new_lvar);
               SESubst.put subst (PVar pvar) (LVar new_lvar);
               LVar new_lvar)
+      | BVExprIntrinsic (op, es, width) ->
+          BVExprIntrinsic (op, Expr.map_bv_arg_exprs f es, width)
       | BinOp (le1, bop, le2) -> (
           let nle1 = f le1 in
           let nle2 = f le2 in
@@ -173,7 +175,8 @@ module Make (SPState : PState.S) = struct
                         (Exceptions.Impossible
                            "normalise_lexpr: program variable in normalised \
                             expression")
-                  | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
+                  | BinOp (_, _, _) | UnOp (_, _) | BVExprIntrinsic (_, _, _) ->
+                      UnOp (TypeOf, nle1)
                   | Exists _ | ForAll _ -> Lit (Type BooleanType)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
                   | NOp (_, _) | ESet _ -> Lit (Type SetType))

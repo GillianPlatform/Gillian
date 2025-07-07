@@ -1,0 +1,15 @@
+(library
+ (name gillian_llvm_lib)
+ (libraries
+  gillian
+  gillian.parserAndCompiler
+  llvm_memory_model
+  llvm_runtime_gen
+  yojson
+  irep_lib
+  dune-site
+  gillian.alcotest-runner))
+
+(generate_sites_module
+ (module runtime_sites)
+ (sites gillian-llvm))

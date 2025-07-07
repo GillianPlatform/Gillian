@@ -21,6 +21,39 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LISTTYPELIT
 %token TYPETYPELIT
 %token SETTYPELIT
+%token BVTYPELIT
+
+(* BV intrinsics *)
+%token BVCONCAT
+%token BVEXTRACT
+%token BVNOT
+%token BVAND
+%token BVOR
+%token BVNEG
+%token BVADD
+%token BVMUL
+%token BVUDIV
+%token BVUREM
+%token BVNEGO
+%token BVUADDO
+%token BVSADDO
+%token BVUMULO
+%token BVSMULO
+%token BVSHL
+%token BVLSHR
+%token BVULT
+%token BVXOR
+%token BVSREM
+%token BVSUB
+%token BVULEQ
+%token BVSLT
+%token BVSLEQ
+%token BVSIGNEXTEND
+%token BVZEROEXTEND
+%token BVSDIV
+%token BVSMOD
+%token BVASHR
+
 (* Constants *)
 %token MIN_FLOAT
 %token MAX_FLOAT
@@ -36,6 +69,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token FALSE
 %token <float> FLOAT
 %token <Z.t> INTEGER
+%token <Z.t * int> BITVECTOR
 %token NAN
 %token INFINITY
 %token <string> STRING
@@ -197,6 +231,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token VARIANT
 %token NORMAL
 %token ERROR
+%token BUG
 %token FAIL
 %token TRUSTED
 (* Procedure definition keywords *)
@@ -348,6 +383,43 @@ pred_head_target:
 (********* Expressions *********)
 (*******************************)
 
+
+gbvpred: 
+| BVULT { BVOps.BVUlt }
+| BVULEQ { BVOps.BVUleq }
+| BVSLT { BVOps.BVSlt }
+| BVSLEQ { BVOps.BVSleq }
+| BVUMULO { BVOps.BVUMulO }
+| BVSMULO { BVOps.BVSMulO }
+| BVNEGO { BVOps.BVNegO }
+| BVUADDO { BVOps.BVUAddO }
+| BVSADDO { BVOps.BVSAddO }
+
+gbvintrinsic:
+| BVCONCAT { BVOps.BVConcat }
+| BVEXTRACT { BVOps.BVExtract }
+| BVNOT { BVOps.BVNot }
+| BVAND { BVOps.BVAnd }
+| BVOR { BVOps.BVOr }
+| BVNEG { BVOps.BVNeg }
+| BVADD { BVOps.BVPlus }
+| BVMUL { BVOps.BVMul } 
+| BVUDIV { BVOps.BVUDiv }
+| BVUREM { BVOps.BVUrem }
+| BVSHL { BVOps.BVShl }
+| BVLSHR { BVOps.BVLShr }
+| BVXOR { BVOps.BVXor }
+| BVSREM { BVOps.BVSrem }
+| BVSUB { BVOps.BVSub }
+| BVSIGNEXTEND { BVOps.BVSignExtend }
+| BVZEROEXTEND { BVOps.BVZeroExtend }
+| BVSDIV { BVOps.BVSdiv }
+| BVSMOD { BVOps.BVSmod }
+| BVASHR { BVOps.BVAshr }
+
+bv_arg_target:
+  | BVTYPELIT LBRACE e=expr_target COMMA width=INTEGER RBRACE { Expr.BvExpr(e,Z.to_int width) }
+  | n = INTEGER { Expr.Literal(Z.to_int n) }
 atomic_expr_target:
 (* literal *)
   | lit=lit_target { Expr.Lit lit }
@@ -396,6 +468,10 @@ atomic_expr_target:
     { Expr.Exists (vars, e) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
     { Expr.ForAll (vars, e) }
+  |itname=gbvpred; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON ; RBRACE
+    { Expr.BVExprIntrinsic(itname, es, None) }
+  | itname=gbvintrinsic; LBRACE; es=separated_list(COMMA, bv_arg_target); COLON; width=INTEGER ; RBRACE
+      { Expr.BVExprIntrinsic(itname, es, Some (Z.to_int width)) }
 ;
 
 unary_expr:
@@ -527,7 +603,7 @@ implication_expr:
     { Expr.BinOp (e1, Impl, e2) }
 
 expr_target:
-    implication_expr { $1 }
+    | implication_expr { $1 }
 ;
 
 top_level_expr_target:
@@ -675,6 +751,7 @@ gcmd_with_annot:
       let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
+
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)
@@ -763,6 +840,7 @@ g_mult_spec_line:
 g_spec_kind:
   | NORMAL { Flag.Normal }
   | ERROR { Flag.Error }
+  | BUG { Flag.Bug }
 
 g_sspec_target:
 (* {trusted} [spec_name: #bla, #ble, #bli] [[ .... ]] [[ .... ]] flag *)
@@ -1149,6 +1227,7 @@ lit_target:
   | FALSE                     { Literal.Bool false }
   | FLOAT                     { Literal.Num $1 }
   | n = INTEGER               { Literal.Int n }
+  | t = BITVECTOR             { Literal.LBitvector t }
   | NAN                       { Literal.Num nan }
   | INFINITY                  { Literal.Num infinity }
   | STRING                    { Literal.String $1 }
@@ -1225,4 +1304,5 @@ type_target:
   | LISTTYPELIT  { Type.ListType }
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
+  | BVTYPELIT LBRACE width=INTEGER RBRACE {Type.BvType(Z.to_int width)}
 ;

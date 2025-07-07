@@ -1,9 +1,7 @@
 open SVal
 module L = Logging
 
-(** ****************
-  * SATISFIABILITY *
-  * **************** **)
+(** **************** * SATISFIABILITY * * **************** **)
 
 let get_axioms (fs : Expr.Set.t) (_ : Type_env.t) : Expr.Set.t =
   Expr.Set.fold
@@ -25,13 +23,33 @@ let simplify_pfs_and_gamma
     ?relevant_info
     (fs : Expr.t list)
     (gamma : Type_env.t) : Expr.Set.t * Type_env.t * SESubst.t =
+  let pp_relevant_info fmt (relevant_info : SS.t * SS.t * SS.t) =
+    let pp_ss fmt (vlu : SS.t) =
+      (Fmt.list ~sep:Fmt.comma Fmt.string) fmt (SS.to_list vlu)
+    in
+    let comb fmt (p, l, o) =
+      Fmt.pf fmt "(%a, %a, %a)" pp_ss p pp_ss l pp_ss o
+    in
+    comb fmt relevant_info
+  in
+  Logging.tmi (fun m ->
+      m "fs in simplify_pfs_and_gamma: %a pfs: %a relevant_info: %a"
+        (Fmt.list ~sep:Fmt.comma Expr.pp)
+        fs
+        (Fmt.list ~sep:Fmt.comma Expr.pp)
+        (Expr.Set.elements (PFS.to_set (PFS.of_list fs)))
+        (Fmt.option pp_relevant_info)
+        relevant_info);
   let pfs, gamma =
     match (relevant_info, !Config.under_approximation) with
     | Some relevant_info, false ->
+        Logging.tmi (fun m ->
+            m "filtering with relevant_info: %a" pp_relevant_info relevant_info);
         ( PFS.filter_with_info relevant_info (PFS.of_list fs),
           Type_env.filter_with_info relevant_info gamma )
     | _ -> (PFS.of_list fs, Type_env.copy gamma)
   in
+  Logging.tmi (fun m -> m "pfs: %a" PFS.pp pfs);
   let subst, _ = Simplifications.simplify_pfs_and_gamma ~matching pfs gamma in
   let fs_lst = PFS.to_list pfs in
   let fs_set = Expr.Set.of_list fs_lst in
@@ -81,10 +99,13 @@ let check_satisfiability
     (fs : Expr.t list)
     (gamma : Type_env.t) : bool =
   (* let t = if time = "" then 0. else Sys.time () in *)
+  Logging.tmi (fun m -> m "fs: %a" (Fmt.list ~sep:Fmt.comma Expr.pp) fs);
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ?relevant_info ~matching fs gamma in
   let axioms = get_axioms fs gamma in
   let fs = Expr.Set.union fs axioms in
+  Logging.tmi (fun m ->
+      m "fs: %a" (Fmt.list ~sep:Fmt.comma Expr.pp) (Expr.Set.elements fs));
   if Expr.Set.is_empty fs then true
   else if Expr.Set.mem Expr.false_ fs then false
   else
@@ -102,16 +123,17 @@ let sat ~matching ~pfs ~gamma formula : bool =
           fmt "Discharged sat before SMT @[%a -> %b@]" Expr.pp formula b);
       b
   | _ ->
-      let relevant_info =
+      (*let relevant_info =
         (Expr.pvars formula', Expr.lvars formula', Expr.locs formula')
-      in
-      check_satisfiability ~matching ~relevant_info
+      in*)
+      (* TODO(Ian): you cant just remove relevant info like this what if the 
+        formula is just false concretely? This assuems that reduction is fully normalizing
+      is that a requirement?*)
+      check_satisfiability ~matching (* ~relevant_info *)
         (formula' :: PFS.to_list pfs)
         gamma
 
-(** ************
-  * ENTAILMENT *
-  * ************ **)
+(** ************ * ENTAILMENT * * ************ **)
 
 let check_entailment
     ?(matching = false)

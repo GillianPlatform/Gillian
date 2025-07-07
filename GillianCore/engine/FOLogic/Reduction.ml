@@ -88,6 +88,8 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
         | _, Lit (Num _) -> raise (exn "LstNth with float")
         | le, n -> BinOp (le, LstNth, n))
     | BinOp (le1, op, le2) -> BinOp (f le1, op, f le2)
+    | BVExprIntrinsic (op, es, width) ->
+        BVExprIntrinsic (op, Expr.map_bv_arg_exprs f es, width)
     (* Unary Operators **)
     | UnOp (Car, lst) -> (
         match f lst with
@@ -884,6 +886,8 @@ and reduce_lexpr_loop
               Base cases
        ------------------------- *)
     | Lit _ | PVar _ | ALoc _ -> le
+    | BVExprIntrinsic (op, es, width) ->
+        BVExprIntrinsic (op, Expr.map_bv_arg_exprs f es, width)
     (* -------------------------
                  LVar
        ------------------------- *)

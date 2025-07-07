@@ -251,3 +251,9 @@ let[@tail_mod_cons] rec assoc_replace k v = function
   | [] -> [ (k, v) ]
   | (k', _) :: r when k = k' -> (k, v) :: r
   | x :: r -> x :: assoc_replace k v r
+
+let rec zip (l1 : 'a list) (l2 : 'b list) : ('a * 'b) list =
+  match (l1, l2) with
+  | h1 :: t1, h2 :: t2 -> (h1, h2) :: zip t1 t2
+  | [], _ -> []
+  | _, [] -> []

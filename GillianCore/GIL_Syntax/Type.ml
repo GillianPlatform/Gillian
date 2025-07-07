@@ -1,20 +1,19 @@
-(**
-	GIL Types
-*)
+(** GIL Types *)
 
 type t = TypeDef__.typ =
-  | UndefinedType  (** Type of Undefined      *)
-  | NullType  (** Type of Null           *)
-  | EmptyType  (** Type of Empty          *)
+  | UndefinedType  (** Type of Undefined *)
+  | NullType  (** Type of Null *)
+  | EmptyType  (** Type of Empty *)
   | NoneType  (** Type of logical values *)
-  | BooleanType  (** Type of booleans       *)
+  | BooleanType  (** Type of booleans *)
   | IntType  (** Type of integers *)
-  | NumberType  (** Type of floats         *)
-  | StringType  (** Type of strings        *)
-  | ObjectType  (** Type of objects        *)
-  | ListType  (** Type of lists          *)
-  | TypeType  (** Type of types          *)
-  | SetType  (** Type of sets           *)
+  | NumberType  (** Type of floats *)
+  | StringType  (** Type of strings *)
+  | ObjectType  (** Type of objects *)
+  | ListType  (** Type of lists *)
+  | TypeType  (** Type of types *)
+  | SetType  (** Type of sets *)
+  | BvType of int
 [@@deriving yojson, eq, ord, show]
 
 (** Print *)
@@ -32,6 +31,7 @@ let str (x : t) =
   | ListType -> "List"
   | TypeType -> "Type"
   | SetType -> "Set"
+  | BvType w -> "Bitvector(" ^ Int.to_string w ^ "i)"
 
 module Set = Set.Make (struct
   type nonrec t = t

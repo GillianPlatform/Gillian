@@ -1,0 +1,16 @@
+
+@nopath
+proc getchar() {
+  ctr_26: skip;
+          ctr_25 := fresh_svar();
+          assume_type (ctr_25, Bitvector(32i));
+          ctr_27 := {{ "int-32", ctr_25 }};
+          ret := ctr_27;
+          return
+};
+
+proc main() {
+    x := "getchar"();
+    assert (l-nth(x, 1i) == 0x0v32);
+    return
+};

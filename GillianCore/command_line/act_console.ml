@@ -74,6 +74,15 @@ struct
           Proc.(proc.proc_name, proc.proc_aliases, proc.proc_calls) :: acc)
         prog.procs []
     in
+    L.verbose (fun m ->
+        m "%a"
+          (Fmt.list ~sep:(Fmt.any ",") (fun fm (pname, aliases, calls) ->
+               Fmt.pf fm "(%s, %a, %a)" pname
+                 (Fmt.list ~sep:(Fmt.any ";") Fmt.string)
+                 aliases
+                 (Fmt.list ~sep:(Fmt.any ";") Fmt.string)
+                 calls))
+          fcalls);
     let call_graph = Call_graph.make () in
     let fnames = Hashtbl.create (List.length fcalls * 2) in
     fcalls
