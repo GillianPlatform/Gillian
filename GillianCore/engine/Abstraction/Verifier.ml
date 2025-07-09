@@ -121,7 +121,7 @@ struct
 
   let testify
       ~(init_data : SPState.init_data)
-      (func_or_lemma_name : string)
+      (_func_or_lemma_name : string) (* TODO: unused now? *)
       (preds : (string, MP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
@@ -129,7 +129,6 @@ struct
       (id : int)
       (pre : Asrt.t located)
       (posts : Asrt.t located list)
-      (variant : Expr.t option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) :
@@ -287,14 +286,6 @@ struct
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
-          let variants = Hashtbl.create 1 in
-          let () = Hashtbl.add variants func_or_lemma_name variant in
-          let normalised_assertions =
-            List.map
-              (fun (state, subst) ->
-                (SPState.set_variants state (Hashtbl.copy variants), subst))
-              normalised_assertions
-          in
           let result =
             List.mapi test_of_normalised_state normalised_assertions
           in
@@ -319,7 +310,7 @@ struct
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
       testify ~init_data spec_name preds pred_ins name params id sspec.ss_pre
-        sspec.ss_posts sspec.ss_variant (Some sspec.ss_flag)
+        sspec.ss_posts (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -392,11 +383,10 @@ struct
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
-        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
+        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant = _ } ->
           let to_verify = Option.is_some lemma.lemma_proof in
           testify ~init_data lemma.lemma_name preds pred_ins lemma.lemma_name
-            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant None
-            None to_verify)
+            lemma.lemma_params 0 lemma_hyp lemma_concs None None to_verify)
         lemma.lemma_specs
     in
     let tests, specs =

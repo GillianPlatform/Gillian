@@ -35,7 +35,6 @@ end = struct
   type m_err_t = CMemory.err_t [@@deriving yojson, show]
   type err_t = (m_err_t, vt) StateErr.t [@@deriving show]
   type init_data = CMemory.init_data
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
 

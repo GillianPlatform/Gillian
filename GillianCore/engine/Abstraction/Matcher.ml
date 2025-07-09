@@ -10,14 +10,12 @@ type match_kind =
 module type S = sig
   type err_t
   type state_t
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type t = {
     state : state_t;
     preds : Preds.t;
     wands : Wands.t;
     pred_defs : MP.preds_tbl_t;
-    variants : variants_t;
   }
 
   type post_res = (Flag.t * Asrt.t list) option
@@ -25,12 +23,7 @@ module type S = sig
 
   module Logging : sig
     module AstateRec : sig
-      type t = {
-        state : state_t;
-        preds : Preds.t;
-        wands : Wands.t;
-        variants : variants_t;
-      }
+      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
       [@@deriving yojson]
     end
 
@@ -147,7 +140,6 @@ module Make (State : SState.S) :
 
   type state_t = State.t [@@deriving yojson]
   type abs_t = string * Expr.t list
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type err_t = State.err_t [@@deriving yojson, show]
 
   type t = {
@@ -155,7 +147,6 @@ module Make (State : SState.S) :
     preds : Preds.t;
     wands : Wands.t;
     pred_defs : MP.preds_tbl_t;
-    variants : variants_t;
   }
 
   type post_res = (Flag.t * Asrt.t list) option
@@ -170,42 +161,28 @@ module Make (State : SState.S) :
   type internal_mp_u_res = (t * SVal.SESubst.t * post_res, err_t) List_res.t
 
   module Logging = struct
-    let pp_variants : (string * Expr.t option) Fmt.t =
-      Fmt.pair ~sep:Fmt.comma Fmt.string (Fmt.option Expr.pp)
-
     let pp_astate fmt astate =
-      let { state; preds; wands; variants; _ } = astate in
-      Fmt.pf fmt "%a@\nPREDS:@\n%a@\nWANDS:@\n%a@\nVARIANTS:@\n%a@\n" State.pp
-        state Preds.pp preds Wands.pp wands
-        (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
-        variants
+      let { state; preds; wands; _ } = astate in
+      Fmt.pf fmt "%a@\nPREDS:@\n%a@\nWANDS:@\n%a@\n" State.pp state Preds.pp
+        preds Wands.pp wands
 
     let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate
         =
-      let { state; preds; wands; variants; _ } = astate in
-      Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\nWANDS:@\n%a@\nVARIANTS:@\n%a@\n"
+      let { state; preds; wands; _ } = astate in
+      Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\nWANDS:@\n%a@\n"
         (State.pp_by_need pvars lvars locs)
         state Preds.pp preds Wands.pp wands
-        (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
-        variants
 
     module AstateRec = struct
       type t' = t
 
-      type t = {
-        state : state_t;
-        preds : Preds.t;
-        wands : Wands.t;
-        variants : variants_t;
-      }
+      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
       [@@deriving yojson]
 
-      let from ({ state; preds; wands; variants; _ } : t') =
-        { state; preds; variants; wands }
+      let from ({ state; preds; wands; _ } : t') = { state; preds; wands }
 
-      let pp_custom pp_astate fmt { state; preds; variants; wands } =
-        pp_astate fmt
-          { state; preds; variants; wands; pred_defs = Hashtbl.create 0 }
+      let pp_custom pp_astate fmt { state; preds; wands } =
+        pp_astate fmt { state; preds; wands; pred_defs = Hashtbl.create 0 }
 
       let pp = pp_custom pp_astate
     end
@@ -293,7 +270,7 @@ module Make (State : SState.S) :
   open Logging
 
   let clear_resource (astate : t) =
-    let { state; preds; wands = _; pred_defs; variants } = astate in
+    let { state; preds; wands = _; pred_defs } = astate in
     let state = State.clear_resource state in
     let preds_list = Preds.to_list preds in
     List.iter
@@ -305,7 +282,7 @@ module Make (State : SState.S) :
           in
           ())
       preds_list;
-    { state; preds; wands = Wands.init []; pred_defs; variants }
+    { state; preds; wands = Wands.init []; pred_defs }
 
   type cons_pure_result = Success of state_t | Abort of Expr.t | Vanish
 
@@ -325,7 +302,7 @@ module Make (State : SState.S) :
 
   let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
       SVal.SESubst.t * t list =
-    let { state; preds; wands; pred_defs; variants } = astate in
+    let { state; preds; wands; pred_defs } = astate in
     let subst, states =
       State.simplify ~save ~kill_new_lvars:false ~matching state
     in
@@ -343,7 +320,6 @@ module Make (State : SState.S) :
                 preds = Preds.copy preds;
                 pred_defs;
                 wands = Wands.copy wands;
-                variants = Hashtbl.copy variants;
               })
             states )
 
@@ -353,7 +329,6 @@ module Make (State : SState.S) :
       preds = Preds.copy astate.preds;
       wands = Wands.copy astate.wands;
       pred_defs = astate.pred_defs;
-      variants = Hashtbl.copy astate.variants;
     }
 
   let subst_in_expr_opt (astate : t) (subst : SVal.SESubst.t) (e : Expr.t) :
@@ -538,7 +513,7 @@ module Make (State : SState.S) :
       (subst : SVal.SESubst.t)
       (a : Asrt.atom) : (t, err_t) Res_list.t =
     let open Res_list.Syntax in
-    let { state; preds; pred_defs; variants; wands } = astate in
+    let { state; preds; pred_defs; wands } = astate in
     let other_state_err msg = [ Error (StateErr.EOther msg) ] in
 
     L.verbose (fun m ->
@@ -568,7 +543,6 @@ module Make (State : SState.S) :
                    preds = Preds.copy preds;
                    wands = Wands.copy wands;
                    pred_defs;
-                   variants = Hashtbl.copy variants;
                  })
     | Types les -> (
         L.verbose (fun fmt -> fmt "Types assertion.");
@@ -583,12 +557,12 @@ module Make (State : SState.S) :
         match state' with
         | None ->
             other_state_err "Produce Simple Assertion: Cannot produce types"
-        | Some _ -> [ Ok { state; preds; wands; pred_defs; variants } ])
+        | Some _ -> [ Ok { state; preds; wands; pred_defs } ])
     | Pred (pname, les) ->
         L.verbose (fun fmt -> fmt "Predicate assertion.");
         let vs = List.map (subst_in_expr subst) les in
         let pred_def = Hashtbl.find pred_defs pname in
-        let++ { state; preds; wands; pred_defs; variants } =
+        let++ { state; preds; wands; pred_defs } =
           match pred_def.pred.pred_facts with
           | [] -> Res_list.return astate
           | facts ->
@@ -609,17 +583,14 @@ module Make (State : SState.S) :
                   facts params les
               in
               let facts = Asrt.Pure (Expr.conjunct facts) in
-              produce_assertion
-                { state; preds; wands; pred_defs; variants }
-                subst facts
+              produce_assertion { state; preds; wands; pred_defs } subst facts
         in
         let pure = pred_def.pred.pred_pure in
         let preds = Preds.copy preds in
         let wands = Wands.copy wands in
         let state = State.copy state in
-        let variants = Hashtbl.copy variants in
         Preds.extend ~pure preds (pname, vs);
-        { state; preds; wands; pred_defs; variants }
+        { state; preds; wands; pred_defs }
     | Wand { lhs = lname, largs; rhs = rname, rargs } ->
         if !Config.under_approximation then
           L.fail "Wand assertions are not supported in under-approximation mode";
@@ -635,8 +606,7 @@ module Make (State : SState.S) :
             let v_le = subst_in_expr subst le in
             let opt_res =
               Option.map
-                (fun state ->
-                  [ Ok { state; preds; wands; pred_defs; variants } ])
+                (fun state -> [ Ok { state; preds; wands; pred_defs } ])
                 (State.assume_a ~matching:true
                    ~production:!Config.delay_entailment state
                    [ BinOp (v_x, Equal, v_le) ])
@@ -680,8 +650,7 @@ module Make (State : SState.S) :
             in
             other_state_err msg
         | Some state' ->
-            Res_list.return
-              { state = state'; preds; wands; pred_defs; variants })
+            Res_list.return { state = state'; preds; wands; pred_defs })
 
   and produce_asrt_list (astate : t) (subst : SVal.SESubst.t) (sas : Asrt.t) :
       (t, err_t) Res_list.t =
@@ -691,7 +660,7 @@ module Make (State : SState.S) :
       SVal.SESubst.iter subst (fun v value ->
           SVal.SESubst.put subst v (State.simplify_val astate.state value))
     in
-    let** { state; preds; wands; pred_defs; variants } =
+    let** { state; preds; wands; pred_defs } =
       List.fold_left
         (fun intermediate_states asrt ->
           let** intermediate_state = intermediate_states in
@@ -722,7 +691,7 @@ module Make (State : SState.S) :
     L.verbose (fun fmt -> fmt "Concluded final check");
     match admissible with
     | None -> other_state_err "final state non admissible"
-    | Some state -> Res_list.return { state; preds; pred_defs; wands; variants }
+    | Some state -> Res_list.return { state; preds; pred_defs; wands }
 
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
       (t, err_t) Res_list.t =
@@ -802,7 +771,7 @@ module Make (State : SState.S) :
     let params = List.map (fun (x, _) -> Expr.PVar x) pred.pred.pred_params in
 
     let open Res_list.Syntax in
-    let** { state; preds; wands; pred_defs; variants } =
+    let** { state; preds; wands; pred_defs } =
       match pred.pred.pred_guard with
       | None -> Res_list.return astate
       | Some _ ->
@@ -854,7 +823,7 @@ module Make (State : SState.S) :
                 (List.length (first_def :: rest_defs))
                 SVal.SESubst.pp subst_i);
           let state' = State.add_spec_vars state new_spec_vars in
-          let astate = { state = state'; preds; wands; pred_defs; variants } in
+          let astate = { state = state'; preds; wands; pred_defs } in
           let rest_results =
             let* def = rest_defs in
             produce (copy_astate astate) (SVal.SESubst.copy subst_i) def
@@ -1016,7 +985,7 @@ module Make (State : SState.S) :
           Fmt.(list ~sep:comma (Dump.option Expr.pp))
           vs);
 
-    let { state; preds; wands; pred_defs; variants } = astate in
+    let { state; preds; wands; pred_defs } = astate in
     let pred = MP.get_pred_def pred_defs pname in
     let pred_def = pred.pred in
     let pred_pure = pred_def.pred_pure in
@@ -1047,7 +1016,7 @@ module Make (State : SState.S) :
             match match_ins_outs_lists state subst step vs les_outs with
             | Success new_state ->
                 Res_list.return
-                  ({ state = new_state; wands; preds; pred_defs; variants }, vs)
+                  ({ state = new_state; wands; preds; pred_defs }, vs)
             | Abort fail_pf ->
                 let error =
                   StateErr.EAsrt ([], UnOp (Not, fail_pf), [ [ Pure fail_pf ] ])
@@ -1162,7 +1131,7 @@ module Make (State : SState.S) :
       (step : MP.step) : (t, err_t) Res_list.t * L.Report_id.t option =
     let open Syntaxes.Option in
     (* Auxiliary function for actions and predicates, with indexed outs *)
-    let { state; wands; preds; pred_defs; variants } = astate in
+    let { state; wands; preds; pred_defs } = astate in
 
     let assertion_loggable =
       let+ () = if L.Mode.enabled () then Some () else None in
@@ -1245,7 +1214,7 @@ module Make (State : SState.S) :
                 with
                 | Success state''' ->
                     Res_list.return
-                      { state = state'''; preds; wands; pred_defs; variants }
+                      { state = state'''; preds; wands; pred_defs }
                 | Abort fail_pf ->
                     let error =
                       StateErr.EAsrt
@@ -1353,7 +1322,7 @@ module Make (State : SState.S) :
                   match cons_pure state to_asrt with
                   | Success new_state ->
                       Res_list.return
-                        { state = new_state; preds; wands; pred_defs; variants }
+                        { state = new_state; preds; wands; pred_defs }
                   | Vanish -> Res_list.vanish
                   | Abort _ ->
                       let vs = State.unfolding_vals state [ pf ] in
@@ -1388,7 +1357,7 @@ module Make (State : SState.S) :
                     | None -> Res_list.vanish
                     | Some state' ->
                         Res_list.return
-                          { state = state'; wands; preds; pred_defs; variants }
+                          { state = state'; wands; preds; pred_defs }
                   else
                     let les, _ = List.split les in
                     let les =
