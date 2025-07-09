@@ -10,14 +10,7 @@ type match_kind =
 module type S = sig
   type err_t
   type state_t
-
-  type t = {
-    state : state_t;
-    preds : Preds.t;
-    wands : Wands.t;
-    pred_defs : MP.preds_tbl_t;
-  }
-
+  type t = state_t Pred_state.t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * SVal.SESubst.t * MP.t) list * err_t list
 

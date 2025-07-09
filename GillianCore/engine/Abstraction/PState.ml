@@ -45,14 +45,7 @@ module Make (State : SState.S) :
   module SMatcher = Matcher.Make (State)
 
   type init_data = State.init_data
-
-  type t = SMatcher.t = {
-    state : State.t;
-    preds : Preds.t;
-    wands : Wands.t;
-    pred_defs : MP.preds_tbl_t;
-  }
-
+  type t = State.t Pred_state.t
   type vt = Expr.t [@@deriving yojson, show]
   type st = SVal.SESubst.t
   type store_t = SStore.t
@@ -75,32 +68,29 @@ module Make (State : SState.S) :
   type action_ret = (t * vt list, err_t) Res_list.t
 
   let init_with_pred_table pred_defs init_data =
-    {
-      state = State.init init_data;
-      preds = Preds.init [];
-      wands = Wands.init [];
-      pred_defs;
-    }
+    Pred_state.
+      {
+        state = State.init init_data;
+        preds = Preds.init [];
+        wands = Wands.init [];
+        pred_defs;
+      }
 
   let init init_data =
     let empty_pred_defs : MP.preds_tbl_t = MP.init_pred_defs () in
-    {
-      state = State.init init_data;
-      preds = Preds.init [];
-      wands = Wands.init [];
-      pred_defs = empty_pred_defs;
-    }
+    Pred_state.
+      {
+        state = State.init init_data;
+        preds = Preds.init [];
+        wands = Wands.init [];
+        pred_defs = empty_pred_defs;
+      }
 
-  let get_init_data astate = State.get_init_data astate.state
-  let sure_is_nonempty t = State.sure_is_nonempty t.state
+  let get_init_data astate = State.get_init_data astate.Pred_state.state
+  let sure_is_nonempty t = State.sure_is_nonempty t.Pred_state.state
 
   let copy_with_state (astate : t) (state : state_t) =
-    {
-      state;
-      preds = Preds.copy astate.preds;
-      wands = Wands.copy astate.wands;
-      pred_defs = astate.pred_defs;
-    }
+    Pred_state.copy_with_state astate state
 
   let make_p
       ~(preds : MP.preds_tbl_t)
@@ -143,7 +133,7 @@ module Make (State : SState.S) :
 
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
-  let set_wands astate wands = { astate with wands }
+  let set_wands astate wands = Pred_state.{ astate with wands }
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in
@@ -193,7 +183,7 @@ module Make (State : SState.S) :
     State.get_type astate.state v
 
   let copy (astate : t) : t =
-    let { state; preds; wands; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands; pred_defs } = astate in
     {
       state = State.copy state;
       preds = Preds.copy preds;
@@ -204,17 +194,10 @@ module Make (State : SState.S) :
   let simplify_val (astate : t) (v : Expr.t) : Expr.t =
     State.simplify_val astate.state v
 
-  let pp fmt (astate : t) : unit =
-    let { state; preds; wands; _ } = astate in
-    Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n@[<v 2>WANDS:@\n%a@]@\n"
-      State.pp state Preds.pp preds Wands.pp wands
+  let pp fmt (astate : t) : unit = Pred_state.pp State.pp fmt astate
 
   let pp_by_need pvars lvars locs fmt astate : unit =
-    let { state; preds; wands; _ } = astate in
-    (* TODO: Pred printing by need *)
-    Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n@[<v 2>WANDS:@\n%a@]@\n"
-      (State.pp_by_need pvars lvars locs)
-      state Preds.pp preds Wands.pp wands
+    Pred_state.pp State.(pp_by_need pvars lvars locs) fmt astate
 
   let add_spec_vars (astate : t) (vs : Var.Set.t) : t =
     let state = State.add_spec_vars astate.state vs in
@@ -223,13 +206,13 @@ module Make (State : SState.S) :
   let get_spec_vars (astate : t) : Var.Set.t = State.get_spec_vars astate.state
 
   let get_lvars (astate : t) : Var.Set.t =
-    let { state; preds; wands; _ } = astate in
+    let Pred_state.{ state; preds; wands; _ } = astate in
     State.get_lvars state
     |> SS.union (Preds.get_lvars preds)
     |> SS.union (Wands.get_lvars wands)
 
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
-    let { state; preds; wands; _ } = astate in
+    let Pred_state.{ state; preds; wands; _ } = astate in
     let s_asrts = State.to_assertions ?to_keep state in
     let p_asrts = Preds.to_assertions preds in
     let w_asrts = Wands.to_assertions wands in
@@ -237,12 +220,18 @@ module Make (State : SState.S) :
 
   let substitution_in_place ?(subst_all = false) (subst : st) (astate : t) :
       t list =
-    let { state; preds; wands; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands; pred_defs } = astate in
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
     List.map
       (fun state ->
-        { state; preds = Preds.copy preds; wands = Wands.copy wands; pred_defs })
+        Pred_state.
+          {
+            state;
+            preds = Preds.copy preds;
+            wands = Wands.copy wands;
+            pred_defs;
+          })
       (State.substitution_in_place ~subst_all subst state)
 
   let update_store (state : t) (x : string option) (v : Expr.t) : t =
@@ -345,7 +334,7 @@ module Make (State : SState.S) :
     SVal.SESubst.init subst_lst
 
   let clear_resource (astate : t) =
-    let { state; preds; wands = _; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands = _; pred_defs } = astate in
     let state = State.clear_resource state in
     let preds_list = Preds.to_list preds in
     List.iter
@@ -357,12 +346,12 @@ module Make (State : SState.S) :
           in
           ())
       preds_list;
-    { state; preds; wands = Wands.init []; pred_defs }
+    Pred_state.{ state; preds; wands = Wands.init []; pred_defs }
 
   let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
       failwith "Binding of pure variables in *-assert.";
-    let store = State.get_store astate.state in
+    let store = State.get_store astate.Pred_state.state in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
     let pvars_diff = SS.diff pvars_a pvars_store in
@@ -501,7 +490,7 @@ module Make (State : SState.S) :
         Res_list.error_with (StateErr.EPure fail_pfs)
 
   let produce astate a =
-    let store = State.get_store astate.state in
+    let store = State.get_store astate.Pred_state.state in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
     let pvars_diff = SS.diff pvars_a pvars_store in
@@ -1103,25 +1092,31 @@ module Make (State : SState.S) :
 
   let consume_core_pred core_pred astate in_args =
     let open Syntaxes.List in
-    let+ result = State.consume_core_pred core_pred astate.state in_args in
+    let+ result =
+      State.consume_core_pred core_pred astate.Pred_state.state in_args
+    in
     match result with
     | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
     | Error err -> Error err
 
   let produce_core_pred core_pred astate args =
     let open Syntaxes.List in
-    let+ state = State.produce_core_pred core_pred astate.state args in
+    let+ state =
+      State.produce_core_pred core_pred astate.Pred_state.state args
+    in
     copy_with_state astate state
 
   let split_core_pred_further astate core_pred ins err =
-    State.split_core_pred_further astate.state core_pred ins err
+    State.split_core_pred_further astate.Pred_state.state core_pred ins err
 
   let mem_constraints (astate : t) : Expr.t list =
     State.mem_constraints astate.state
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
   let pp_err = State.pp_err
-  let get_recovery_tactic astate vs = State.get_recovery_tactic astate.state vs
+
+  let get_recovery_tactic astate vs =
+    State.get_recovery_tactic astate.Pred_state.state vs
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
@@ -1134,39 +1129,13 @@ module Make (State : SState.S) :
     L.verbose (fun m -> m "AState: get_fixes");
     State.get_fixes errs
 
-  let get_equal_values astate = State.get_equal_values astate.state
-  let get_heap astate = State.get_heap astate.state
-  let get_typ_env astate = State.get_typ_env astate.state
-  let get_pfs astate = State.get_pfs astate.state
+  let get_equal_values astate = State.get_equal_values astate.Pred_state.state
+  let get_heap astate = State.get_heap astate.Pred_state.state
+  let get_typ_env astate = State.get_typ_env astate.Pred_state.state
+  let get_pfs astate = State.get_pfs astate.Pred_state.state
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
-    (* TODO: Deserialize other components of pstate *)
-    let open Syntaxes.Result in
-    let rec aux = function
-      | Some state, Some preds, Some wands, [] ->
-          Ok { state; preds; pred_defs = MP.init_pred_defs (); wands }
-      | None, preds, wands, ("state", state_yojson) :: rest ->
-          let* state = State.of_yojson state_yojson in
-          aux (Some state, preds, wands, rest)
-      | state, None, wands, ("preds", preds_yojson) :: rest ->
-          let* preds = Preds.of_yojson preds_yojson in
-          aux (state, Some preds, wands, rest)
-      | state, preds, None, ("wands", wands_yojson) :: rest ->
-          let* wands = Wands.of_yojson wands_yojson in
-          aux (state, preds, Some wands, rest)
-      | _ -> Error "Cannot parse yojson into PState"
-    in
-    match yojson with
-    | `Assoc sections -> aux (None, None, None, sections)
-    | _ -> Error "Cannot parse yojson into PState"
+    Pred_state.of_yojson State.of_yojson yojson
 
-  let to_yojson pstate =
-    (* TODO: Serialize other components of pstate *)
-    let { state; preds; wands; _ } = pstate in
-    `Assoc
-      [
-        ("state", State.to_yojson state);
-        ("preds", Preds.to_yojson preds);
-        ("wands", Wands.to_yojson wands);
-      ]
+  let to_yojson pstate = Pred_state.to_yojson State.to_yojson pstate
 end
