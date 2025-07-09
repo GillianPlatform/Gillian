@@ -36,7 +36,6 @@ val consume_pred :
   abs_t option
 
 val find : t -> (abs_t -> bool) -> abs_t option
-val get_all : maintain:bool -> (abs_t -> bool) -> t -> abs_t list
 val substitution_in_place : SVal.SESubst.t -> t -> unit
 
 (** Turns a predicate set into a list of assertions *)

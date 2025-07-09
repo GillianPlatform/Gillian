@@ -68,16 +68,6 @@ let strategic_choice ~consume preds (f : 'a -> int) =
     if consume then preds := new_list;
     Some value
 
-let pop_all preds f =
-  let rec vals_and_remove passed acc = function
-    | [] -> (List.rev passed, acc)
-    | a :: r when f a -> vals_and_remove passed (a :: acc) r
-    | a :: r -> vals_and_remove (a :: passed) acc r
-  in
-  let new_list, values = vals_and_remove [] [] !preds in
-  preds := new_list;
-  values
-
 (** Removes the first occurrence of a pa with name --p_name-- and returns it *)
 let remove_by_name (preds : t) (pname : string) : abs_t option =
   pop preds (fun (n, _) -> String.equal n pname)
@@ -113,8 +103,6 @@ let find (preds : t) (sel : abs_t -> bool) : abs_t option =
 
 let filter (preds : t) (sel : abs_t -> bool) : abs_t list =
   List.filter sel !preds
-
-let get_all ~maintain f p = if maintain then filter p f else pop_all p f
 
 (** TODO: EFICIENCY ISSUE!!! *)
 let consume_pred

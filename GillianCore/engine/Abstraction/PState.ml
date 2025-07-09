@@ -30,9 +30,6 @@ module type S = sig
   val set_wands : t -> Wands.t -> t
 
   val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
-  val add_pred_defs : MP.preds_tbl_t -> t -> t
-  val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
-  val set_pred : t -> abs_t -> unit
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end
 
@@ -1079,9 +1076,6 @@ module Make (State : SState.S) :
   let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
     State.unfolding_vals astate.state fs
 
-  let add_pred_defs (pred_defs : MP.preds_tbl_t) (astate : t) : t =
-    { astate with pred_defs }
-
   let fresh_loc ?(loc : vt option) (astate : t) : vt =
     State.fresh_loc ?loc astate.state
 
@@ -1095,16 +1089,6 @@ module Make (State : SState.S) :
 
   let produce_posts (astate : t) (subst : st) (asrts : Asrt.t list) : t list =
     SMatcher.produce_posts astate subst asrts
-
-  let get_all_preds ?(keep : bool option) (sel : abs_t -> bool) (astate : t) :
-      abs_t list =
-    Preds.get_all ~maintain:(Option.value ~default:true keep) sel astate.preds
-
-  let set_pred (astate : t) (pred : abs_t) : unit =
-    let { preds; pred_defs; _ } = astate in
-    let pred_name, _ = pred in
-    let pure = (Hashtbl.find pred_defs pred_name).pred.pred_pure in
-    Preds.extend ~pure preds pred
 
   let update_subst (astate : t) (subst : st) : unit =
     State.update_subst astate.state subst
