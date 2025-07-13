@@ -32,10 +32,14 @@ module Types = struct
   }
   [@@deriving yojson]
 
-  type node =
-    | Assertion of assertion_data * Logging.Report_id.t list
-    | MatchResult of Logging.Report_id.t * match_result
+  type next = Logging.Report_id.t list [@@deriving yojson]
+
+  type step =
+    | Assertion of assertion_data
+    | RecoveryTactic of Matcher.recovery_tactic
   [@@deriving yojson]
+
+  type node = step * bool option * next [@@deriving yojson]
 
   type t = {
     kind : kind;
@@ -50,7 +54,7 @@ include Types
 
 module type Build = sig
   (** Given the ID of a matching, build the representative matching map *)
-  val f : Logging.Report_id.t -> t
+  val f : ?pp_asrt:Asrt.atom Fmt.t -> Logging.Report_id.t -> t
 end
 
 module type Make_builder = functor (Verification : Verifier.S) -> Build

@@ -866,10 +866,14 @@ let rec reduce_binop_inttonum_const
 and reduce_lexpr_loop
     ?(matching = false)
     ?(reduce_lvars = false)
+    ?(fuel = 20)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (le : Expr.t) =
-  let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
+  let f =
+    if fuel <= 0 then Fun.id
+    else reduce_lexpr_loop ~matching ~reduce_lvars ~fuel:(fuel - 1) pfs gamma
+  in
 
   (* L.verbose (fun fmt -> fmt "Reducing Expr: %a" Expr.pp le); *)
   let rec find_lstsub_inn (lst : Expr.t) (start : Expr.t) =
@@ -1177,12 +1181,11 @@ and reduce_lexpr_loop
             let eqs = get_equal_expressions pfs le in
             let first =
               List.find_map
-                (fun e ->
-                  match e with
-                  | Expr.EList les
+                (function
+                  | Expr.EList les as e
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
                       Some e
-                  | Lit (LList les)
+                  | Lit (LList les) as e
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
                       Some e
                   | NOp (LstCat, (EList les as e) :: _)

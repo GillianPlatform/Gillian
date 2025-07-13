@@ -97,13 +97,14 @@ module type S = sig
   val memory_error_to_exception_info :
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
 
-  val add_variables :
-    store:(string * Expr.t) list ->
-    memory:memory ->
-    is_gil_file:bool ->
-    get_new_scope_id:(unit -> int) ->
-    Variable.ts ->
-    Variable.scope list
+  val pp_expr : t -> Expr.t Fmt.t
+  val pp_asrt : t -> Asrt.atom Fmt.t
+
+  val get_variables :
+    t ->
+    memory astate ->
+    Logging.Report_id.t ->
+    Variable.scope list * Variable.ts
 
   (* A proxy for ParserAndCompiler.parse_and_compile_files; this allows specifying an entrypoint function,
      and can receive a new entrypoint function to substitute it with.

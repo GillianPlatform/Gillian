@@ -153,7 +153,7 @@ let int = '-'? digit+ 'i'
 
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
-let lvar2 = "_lvar_" (letter|digit|'_')*
+let lvar2 = "#lvar_" (letter|digit|'_')*
 let normalised_lvar = "##NORMALISED_LVAR" (letter|digit|'_'|'$')*
 let loc = "$l" (letter|digit|'_')*
 let aloc = "_$l_" (letter|digit|'_')*

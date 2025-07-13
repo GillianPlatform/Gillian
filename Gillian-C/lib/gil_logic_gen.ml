@@ -23,7 +23,7 @@ let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "opt_rec_struct_" ^ struct_name
 
 let fresh_lvar ?(fname = "") () =
-  let pre = "_lvar_i_" in
+  let pre = Utils.Names.lvar_prefix ^ "i_" in
   Generators.gen_str ~fname pre
 
 let rec split3_expr_comp = function
@@ -773,6 +773,7 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_variant = None;
       lemma_specs;
       lemma_proof;
+      lemma_location = None;
     }
 
 let trans_spec ~ann ?(only_spec = false) cl_spec =
@@ -786,6 +787,7 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
+        spec_location = None;
       }
   in
   let _ =
@@ -908,7 +910,7 @@ let generate_bispec clight_prog fname ident f =
   let true_params = List.map true_name params in
   let clight_fun = get_clight_fun clight_prog ident in
   let cligh_params = clight_fun.Clight.fn_params in
-  let mk_lvar x = Expr.LVar ("" ^ x) in
+  let mk_lvar x = Expr.LVar (Utils.Names.lvar_prefix ^ x) in
   let lvars = List.map mk_lvar true_params in
   let equalities =
     List.map

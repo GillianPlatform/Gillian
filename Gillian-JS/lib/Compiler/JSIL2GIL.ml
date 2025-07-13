@@ -135,6 +135,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_normalised = spec.normalised;
     spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
+    spec_location = None;
   }
 
 (* TODO: Bring in OX *)
@@ -158,6 +159,7 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = Option.map jsil2gil_expr lemma.variant;
     lemma_existentials = lemma.existentials;
+    lemma_location = None;
   }
 
 let jsil2gil_pred (pred : Pred.t) : GPred.t =

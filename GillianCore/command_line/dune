@@ -6,6 +6,7 @@
   fmt.tty
   gil_syntax
   utils
+  usage_logs
   engine
   bulk
   logging

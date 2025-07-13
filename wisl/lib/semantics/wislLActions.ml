@@ -46,10 +46,15 @@ let str_ga = function
   | Freed -> "freed"
 
 let ga_from_str = function
-  | "cell" -> Cell
-  | "bound" -> Bound
-  | "freed" -> Freed
-  | ga -> failwith ("Unknown general assertion for wisl : " ^ ga)
+  | "cell" -> Some Cell
+  | "bound" -> Some Bound
+  | "freed" -> Some Freed
+  | _ -> None
+
+let ga_from_str_exn ga =
+  match ga_from_str ga with
+  | Some ga -> ga
+  | None -> failwith ("Unknown general assertion for wisl : " ^ ga)
 
 let ga_to_setter = function
   | Cell -> SetCell
@@ -66,7 +71,7 @@ let ga_to_deleter = function
   | Bound -> RemBound
   | Freed -> RemFreed
 
-let ga_to_action_str action str = ga_from_str str |> action |> str_ac
+let ga_to_action_str action str = ga_from_str_exn str |> action |> str_ac
 let ga_to_setter_str = ga_to_action_str ga_to_setter
 let ga_to_getter_str = ga_to_action_str ga_to_getter
 let ga_to_deleter_str = ga_to_action_str ga_to_deleter
@@ -74,5 +79,5 @@ let ga_to_yojson x = `String (str_ga x)
 
 let ga_of_yojson x =
   match x with
-  | `String s -> Ok (ga_from_str s)
+  | `String s -> Ok (ga_from_str_exn s)
   | _ -> Error "Invalid json representing wisl core predicate"

@@ -7,7 +7,8 @@ end
 module type Make = functor
   (SMemory : SMemory.S)
   (PC : ParserAndCompiler.S)
-  (TLLifter : functor (Gil : Gil_lifter_with_state)
+  (TLLifter : functor
+     (Gil : Gil_lifter_with_state with type Lifter.memory = SMemory.t)
      (V : Verifier.S with type annot = PC.Annot.t) ->
      Lifter.S
        with type memory = SMemory.t
