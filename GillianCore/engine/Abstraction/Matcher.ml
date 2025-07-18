@@ -1483,7 +1483,6 @@ module Make (State : SState.S) :
                 L.fail "ERROR: IMPOSSIBLE! MATCHING ERRORS IN UX MODE!!!!"
             | false, [], [] ->
                 L.fail "OX MATCHING VANISHED??? MEDOOOOOOOO!!!!!!!!!"
-            | false, _ :: _ :: _, [] -> L.fail "DEATH. OX MATCHING BRANCHED"
             | true, [], _ ->
                 (* Vanished in UX *)
                 match_mp' (rest_search_states, errs_so_far)
@@ -1503,6 +1502,28 @@ module Make (State : SState.S) :
                 match_mp'
                   ( ((state, subst, rest_mp), assertion_id) :: rest_search_states,
                     errs_so_far )
+            | false, states, [] -> (
+                L.verbose (fun m ->
+                    m "Consumer yielded >1 branches in OX mode: %d branches!!!"
+                      (List.length states));
+                (* We have obtained several branches. So there is a disjunction in the PFS.
+                   All branches need to successfuly unify against this *)
+                let all_next : internal_mp_u_res =
+                  List.concat_map
+                    (fun state ->
+                      let state = copy_astate state in
+                      let subst = SVal.SESubst.copy subst in
+                      Res_list.of_list_res
+                      @@ match_mp'
+                           ( [ ((state, subst, rest_mp), assertion_id) ],
+                             errs_so_far ))
+                    states
+                  |> Res_list.to_list_res
+                in
+                match all_next with
+                | Ok res -> Ok res
+                | Error errs ->
+                    match_mp' (rest_search_states, errs @ errs_so_far))
             | true, first :: rem, [] ->
                 let rem =
                   List.map
