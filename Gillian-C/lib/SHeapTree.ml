@@ -1145,8 +1145,7 @@ let is_empty t =
   match t with
   | Freed -> false
   | Tree { bounds; root } ->
-      Option.is_none bounds
-      && Option.fold ~none:true ~some:(fun root -> Tree.is_empty root) root
+      Option.is_none bounds && Option.fold ~none:true ~some:Tree.is_empty root
 
 let freed = Freed
 
