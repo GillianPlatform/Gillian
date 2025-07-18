@@ -1,4 +1,5 @@
 (library
  (name wSyntax)
+ (public_name wisl.syntax)
  (libraries wUtils)
  (flags :standard -open WUtils))
