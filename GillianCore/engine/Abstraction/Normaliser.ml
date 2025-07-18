@@ -452,7 +452,7 @@ module Make (SPState : PState.S) = struct
 
       L.verbose (fun m -> m "About to simplify.");
       let _ =
-        Simplifications.simplify_pfs_and_gamma pfs gamma ~matching:true
+        Simplifications.simplify_pfs_and_gamma pfs gamma
           ~save_spec_vars:(SS.empty, true)
       in
       L.verbose (fun m -> m "Done simplifying.");
@@ -689,7 +689,7 @@ module Make (SPState : PState.S) = struct
     let fos = generate_overlapping_constraints c_asrts' in
     List.iter (fun fo -> PFS.extend new_pfs fo) fos;
     let subst', _ =
-      Simplifications.simplify_pfs_and_gamma new_pfs gamma ~matching:true
+      Simplifications.simplify_pfs_and_gamma new_pfs gamma
         ~save_spec_vars:(SS.empty, true)
     in
     let subst = compose_substs subst subst' in
@@ -904,7 +904,7 @@ module Make (SPState : PState.S) = struct
               gamma
           then (
             (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
-            let _, states = SPState.simplify ~matching:true astate in
+            let _, states = SPState.simplify astate in
             let+ state = states in
             L.verbose (fun m ->
                 m "AFTER NORMALISATION: %d states: @\n%a" (List.length states)

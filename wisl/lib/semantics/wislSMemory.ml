@@ -147,7 +147,7 @@ let dispose heap pfs gamma loc_expr =
       | Error e -> Error [ e ])
   | None -> Error [ InvalidLocation loc_expr ]
 
-let execute_action ?matching:_ name heap pfs gamma args =
+let execute_action name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
   match action with
   | GetCell -> (
