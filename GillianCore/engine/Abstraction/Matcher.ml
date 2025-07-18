@@ -683,7 +683,9 @@ module Make (State : SState.S) :
     in
     L.verbose (fun fmt -> fmt "Concluded final check");
     match admissible with
-    | None -> other_state_err "final state non admissible"
+    | None ->
+        L.normal (fun fmt -> fmt "final state non admissible");
+        Res_list.vanish
     | Some state -> Res_list.return { state; preds; pred_defs; wands }
 
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
@@ -1723,15 +1725,14 @@ module Make (State : SState.S) :
           L.verbose (fun m -> m "No fold recovery tactic");
           Error "None"
     in
-    let- unfold_error =
-      (* This matches the legacy behaviour *)
-      let unfold_values = Option.value ~default:[] tactic.try_unfold in
-      match unfold_with_vals ~auto_level:`High astate unfold_values with
-      | None -> Error "Automatic unfold failed"
-      | Some next_states ->
-          Ok (List.map (fun (_, astate) -> astate) next_states)
-    in
-    Fmt.error "try_fold: %s\ntry_unfold: %s" fold_error unfold_error
+    (* This matches the legacy behaviour *)
+    let unfold_values = Option.value ~default:[] tactic.try_unfold in
+    match unfold_with_vals ~auto_level:`High astate unfold_values with
+    | None ->
+        L.normal (fun fmt ->
+            fmt "Automatic unfold failed / fold error: %s" fold_error);
+        Ok []
+    | Some next_states -> Ok (List.map (fun (_, astate) -> astate) next_states)
 
   let rec rec_unfold
       ?(fuel = 10)
