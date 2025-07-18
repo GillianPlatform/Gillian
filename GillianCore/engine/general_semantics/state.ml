@@ -47,12 +47,7 @@ module type S = sig
 
   (** Assume assertion *)
   val assume_a :
-    ?matching:bool ->
-    ?production:bool ->
-    ?time:string ->
-    t ->
-    Expr.t list ->
-    t option
+    ?production:bool -> ?time:string -> t -> Expr.t list -> t option
 
   (** Assume type *)
   val assume_t : t -> vt -> Type.t -> t option
@@ -71,8 +66,7 @@ module type S = sig
   val get_type : t -> vt -> Type.t option
 
   (** State simplification *)
-  val simplify :
-    ?save:bool -> ?kill_new_lvars:bool -> ?matching:bool -> t -> st * t list
+  val simplify : ?save:bool -> ?kill_new_lvars:bool -> t -> st * t list
 
   (** Value simplification *)
   val simplify_val : t -> vt -> vt

@@ -1,6 +1,4 @@
-type t = { pfs : PFS.t; gamma : Type_env.t; matching : bool }
+type t = { pfs : PFS.t; gamma : Type_env.t }
 
-let make ~matching ~pfs ~gamma () = { pfs; matching; gamma }
-
-let copy t =
-  { pfs = PFS.copy t.pfs; gamma = Type_env.copy t.gamma; matching = t.matching }
+let make ~pfs ~gamma () = { pfs; gamma }
+let copy t = { pfs = PFS.copy t.pfs; gamma = Type_env.copy t.gamma }

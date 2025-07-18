@@ -71,14 +71,10 @@ module Make (State : SState.S) = struct
         in
         { procs; state = first_state; af_state } :: rest
 
-  let assume_a
-      ?(matching = false)
-      ?(production = false)
-      ?time:_
-      (bi_state : t)
-      (fs : Expr.t list) : t option =
+  let assume_a ?(production = false) ?time:_ (bi_state : t) (fs : Expr.t list) :
+      t option =
     let { state; _ } = bi_state in
-    match State.assume_a ~matching ~production state fs with
+    match State.assume_a ~production state fs with
     | Some state -> Some { bi_state with state }
     | None -> None
 
@@ -107,7 +103,6 @@ module Make (State : SState.S) = struct
   let simplify
       ?(save = false)
       ?(kill_new_lvars : bool option)
-      ?matching:_
       ({ procs; state; af_state } : t) : SVal.SESubst.t * t list =
     let kill_new_lvars = Option.value ~default:true kill_new_lvars in
     let subst, states = State.simplify ~save ~kill_new_lvars state in
@@ -201,8 +196,7 @@ module Make (State : SState.S) = struct
         let this_state = State.add_spec_vars this_state lvars in
         match a with
         | Asrt.Emp -> [ this_state ]
-        | Pure f ->
-            State.assume_a ~matching:true this_state [ f ] |> Option.to_list
+        | Pure f -> State.assume_a this_state [ f ] |> Option.to_list
         | Types types ->
             types
             |> List.fold_left
@@ -410,7 +404,7 @@ module Make (State : SState.S) = struct
     let v_ret : Expr.t = Option.value ~default:(Lit Undefined) v_ret in
     let final_state' : State.t = update_store final_state' (Some x) v_ret in
     (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
-    let _ = State.simplify ~matching:true final_state' in
+    let _ = State.simplify final_state' in
     let bi_state : t = { procs; state = final_state'; af_state = af_state' } in
 
     L.(

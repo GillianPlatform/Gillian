@@ -823,7 +823,6 @@ let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : Cint.t list =
   List.rev found_lengths
 
 let rec reduce_binop_inttonum_const
-    matching
     reduce_lvars
     pfs
     gamma
@@ -831,7 +830,7 @@ let rec reduce_binop_inttonum_const
     (r : Expr.t)
     (op : BinOp.t) : Expr.t option =
   let open Utils.Syntaxes.Option in
-  let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
+  let f = reduce_lexpr_loop ~reduce_lvars pfs gamma in
   match (l, r) with
   | Lit (Num x), UnOp (IntToNum, e) | UnOp (IntToNum, e), Lit (Num x) ->
       let* () = if snd (modf x) = 0.0 then Some () else None in
@@ -1529,8 +1528,6 @@ and reduce_lexpr_loop
     | BinOp (UnOp (ToStringOp, e1), Equal, UnOp (ToStringOp, e2)) ->
         BinOp (e1, Equal, e2)
     (* BinOps: Equalities (locations) *)
-    (* This line is the central mechanism to "matching": *)
-    | BinOp (ALoc x, Equal, ALoc y) when not matching -> Lit (Bool (x = y))
     | BinOp (ALoc _, Equal, Lit (Loc _)) | BinOp (Lit (Loc _), Equal, ALoc _) ->
         Expr.false_
     (* BinOps: Equalities (lists) *)
@@ -1808,8 +1805,7 @@ and reduce_lexpr_loop
               let pfs_with_left = PFS.copy pfs in
               PFS.extend pfs_with_left left;
               let right =
-                reduce_lexpr_loop ~matching ~reduce_lvars pfs_with_left gamma
-                  right
+                reduce_lexpr_loop ~reduce_lvars pfs_with_left gamma right
               in
               BinOp (left, Impl, right))
     (* BinOps: List indexing *)
@@ -1944,8 +1940,7 @@ and reduce_lexpr_loop
           | _ -> None
         in
         let- () =
-          reduce_binop_inttonum_const matching reduce_lvars pfs gamma flel fler
-            op
+          reduce_binop_inttonum_const reduce_lvars pfs gamma flel fler op
         in
         match op with
         | Equal when Expr.equal flel fler -> Expr.true_
@@ -2218,13 +2213,12 @@ and reduce_lexpr_loop
     f result)
 
 and reduce_lexpr
-    ?(matching = false)
     ?(reduce_lvars = false)
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (le : Expr.t) =
   (* let t = Sys.time () in *)
-  let result = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma le in
+  let result = reduce_lexpr_loop ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
   Logging.normal (fun f ->
       f "reduce_lexpr: @[%a -> %a@]" Expr.pp le Expr.pp result);
@@ -2763,12 +2757,9 @@ let reduce_types (a : Asrt.t) : Asrt.t =
   with PFSFalse -> [ Asrt.Pure (Lit (Bool false)) ]
 
 (* Reduction of assertions *)
-let reduce_assertion_loop
-    (matching : bool)
-    (pfs : PFS.t)
-    (gamma : Type_env.t)
-    (a : Asrt.t) : Asrt.t =
-  let fe = reduce_lexpr_loop ~matching pfs gamma in
+let reduce_assertion_loop (pfs : PFS.t) (gamma : Type_env.t) (a : Asrt.t) :
+    Asrt.t =
+  let fe = reduce_lexpr_loop pfs gamma in
   let f : Asrt.atom -> Asrt.t = function
     (* Empty heap *)
     | Asrt.Emp -> []
@@ -2785,7 +2776,7 @@ let reduce_assertion_loop
     | Pred (name, les) -> [ Pred (name, List.map fe les) ]
     (* Pure assertions *)
     | Pure (Lit (Bool true)) -> []
-    | Pure f -> [ Pure (reduce_lexpr ~matching ~pfs ~gamma f) ]
+    | Pure f -> [ Pure (reduce_lexpr ~pfs ~gamma f) ]
     (* Types *)
     | Types lvt -> (
         try
@@ -2881,7 +2872,6 @@ let clean_double_equalities (a : Asrt.t) : Asrt.t =
   pures @ non_pures
 
 let reduce_assertion
-    ?(matching = false)
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (a : Asrt.t) : Asrt.t =
@@ -2889,7 +2879,7 @@ let reduce_assertion
   let a = clean_double_equalities a in
 
   let rec loop (a : Asrt.t) =
-    let a' = reduce_assertion_loop matching pfs gamma a in
+    let a' = reduce_assertion_loop pfs gamma a in
     let equalities = extract_lvar_equalities a' in
     let a' =
       List.fold_left
@@ -2904,7 +2894,7 @@ let reduce_assertion
           | _ -> a)
         a' equalities
     in
-    let a' = reduce_assertion_loop matching pfs gamma a' in
+    let a' = reduce_assertion_loop pfs gamma a' in
     if a' <> a && not (a' == a) then loop a' else a'
   in
 

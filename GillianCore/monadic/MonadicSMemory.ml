@@ -96,7 +96,7 @@ module Lift (MSM : S) :
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Expr.Set.t * (string * Type.t) list) list =
     let process = substitution_in_place subst mem in
-    let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
+    let curr_pc = Pc.make ~pfs ~gamma () in
     match Delayed.resolve ~curr_pc process with
     | [] -> failwith "substitution killed every branch, that cannot happen"
     | leeloo_dallas_multibranch ->

@@ -21,7 +21,6 @@ let get_axioms (fs : Expr.Set.t) (_ : Type_env.t) : Expr.Set.t =
     fs Expr.Set.empty
 
 let simplify_pfs_and_gamma
-    ?(matching = false)
     ?relevant_info
     (fs : Expr.t list)
     (gamma : Type_env.t) : Expr.Set.t * Type_env.t * SESubst.t =
@@ -32,7 +31,7 @@ let simplify_pfs_and_gamma
           Type_env.filter_with_info relevant_info gamma )
     | _ -> (PFS.of_list fs, Type_env.copy gamma)
   in
-  let subst, _ = Simplifications.simplify_pfs_and_gamma ~matching pfs gamma in
+  let subst, _ = Simplifications.simplify_pfs_and_gamma pfs gamma in
   let fs_lst = PFS.to_list pfs in
   let fs_set = Expr.Set.of_list fs_lst in
   (fs_set, gamma, subst)
@@ -75,14 +74,13 @@ let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
         None)
 
 let check_satisfiability
-    ?(matching = false)
     ?time:_
     ?relevant_info
     (fs : Expr.t list)
     (gamma : Type_env.t) : bool =
   (* let t = if time = "" then 0. else Sys.time () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
-  let fs, gamma, _ = simplify_pfs_and_gamma ?relevant_info ~matching fs gamma in
+  let fs, gamma, _ = simplify_pfs_and_gamma ?relevant_info fs gamma in
   let axioms = get_axioms fs gamma in
   let fs = Expr.Set.union fs axioms in
   if Expr.Set.is_empty fs then true
@@ -94,8 +92,8 @@ let check_satisfiability
          (Sys.time () -. t); *)
     result
 
-let sat ~matching ~pfs ~gamma formula : bool =
-  let formula' = Reduction.reduce_lexpr ~matching ~pfs ~gamma formula in
+let sat ~pfs ~gamma formula : bool =
+  let formula' = Reduction.reduce_lexpr ~pfs ~gamma formula in
   match formula' with
   | Lit (Bool b) ->
       Logging.verbose (fun fmt ->
@@ -105,16 +103,13 @@ let sat ~matching ~pfs ~gamma formula : bool =
       let relevant_info =
         (Expr.pvars formula', Expr.lvars formula', Expr.locs formula')
       in
-      check_satisfiability ~matching ~relevant_info
-        (formula' :: PFS.to_list pfs)
-        gamma
+      check_satisfiability ~relevant_info (formula' :: PFS.to_list pfs) gamma
 
 (** ************
   * ENTAILMENT *
   * ************ **)
 
 let check_entailment
-    ?(matching = false)
     (existentials : SS.t)
     (left_fs : PFS.t)
     (right_fs : Expr.t list)
@@ -142,8 +137,7 @@ let check_entailment
   let left_lvars = PFS.lvars left_fs in
   let right_lvars = PFS.lvars right_fs in
   let existentials =
-    Simplifications.simplify_implication ~matching existentials left_fs right_fs
-      gamma
+    Simplifications.simplify_implication existentials left_fs right_fs gamma
   in
   Type_env.filter_vars_in_place gamma (SS.union left_lvars right_lvars);
 

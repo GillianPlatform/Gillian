@@ -188,7 +188,7 @@ module Make (SMemory : SMemory.S) :
       =
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
-    let pc = Gpc.make ~matching:false ~pfs ~gamma () in
+    let pc = Gpc.make ~pfs ~gamma () in
     let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
     match value with
     | Ok (new_heap, vs) ->
@@ -202,7 +202,7 @@ module Make (SMemory : SMemory.S) :
   let consume_core_pred core_pred state in_args =
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
-    let pc = Gpc.make ~matching:true ~pfs ~gamma () in
+    let pc = Gpc.make ~pfs ~gamma () in
     let+ Gbranch.{ value; pc } = SMemory.consume core_pred heap pc in_args in
     match value with
     | Ok (new_heap, vs) ->
@@ -222,8 +222,7 @@ module Make (SMemory : SMemory.S) :
   let produce_core_pred core_pred state args =
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
-    (* matching false is suspicious here *)
-    let pc = Gpc.make ~matching:false ~pfs ~gamma () in
+    let pc = Gpc.make ~pfs ~gamma () in
     let+ Gbranch.{ value = new_heap; pc } =
       SMemory.produce core_pred heap pc args
     in
@@ -282,12 +281,8 @@ module Make (SMemory : SMemory.S) :
           PFS.extend pfs red;
           [ state ])
 
-  let assume_a
-      ?(matching = false)
-      ?(production = false)
-      ?(time = "")
-      (state : t)
-      (ps : Expr.t list) : t option =
+  let assume_a ?(production = false) ?(time = "") (state : t) (ps : Expr.t list)
+      : t option =
     let { pfs; gamma; _ } = state in
     try
       let ps = List.map (Reduction.reduce_lexpr ~pfs ~gamma) ps in
@@ -296,7 +291,6 @@ module Make (SMemory : SMemory.S) :
           production
           || FOSolver.check_satisfiability
                ~time:("SState: assume_a: " ^ time)
-               ~matching
                (ps @ PFS.to_list pfs)
                gamma
         then (
@@ -351,11 +345,8 @@ module Make (SMemory : SMemory.S) :
     let t, _ = Typing.type_lexpr gamma le in
     t
 
-  let simplify
-      ?(save = false)
-      ?(kill_new_lvars = true)
-      ?(matching = false)
-      (state : t) : st * t list =
+  let simplify ?(save = false) ?(kill_new_lvars = true) (state : t) :
+      st * t list =
     let { heap; store; pfs; gamma; spec_vars } = state in
     let save_spec_vars =
       if save then (SS.empty, true) else (spec_vars, false)
@@ -368,7 +359,7 @@ module Make (SMemory : SMemory.S) :
            -----------------------------------"
           pp state);
     let subst, _ =
-      Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma ~matching
+      Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma
         ~save_spec_vars
     in
     let subst =
