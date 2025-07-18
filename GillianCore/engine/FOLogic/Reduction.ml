@@ -2220,8 +2220,9 @@ and reduce_lexpr
   (* let t = Sys.time () in *)
   let result = reduce_lexpr_loop ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
-  Logging.normal (fun f ->
-      f "reduce_lexpr: @[%a -> %a@]" Expr.pp le Expr.pp result);
+  if not @@ Expr.equal le result then
+    Logging.normal (fun f ->
+        f "reduce_lexpr: @[%a -> %a@]" Expr.pp le Expr.pp result);
   result
 
 and simplify_num_arithmetic_lexpr
