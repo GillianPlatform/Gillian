@@ -401,7 +401,9 @@ module Make (SMemory : SMemory.S) :
 
       let states =
         match memories with
-        | [] -> failwith "Impossible: memory substitution returned []"
+        | [] ->
+            L.normal (fun m -> m "Memory substitution vanished");
+            []
         | [ (mem, lpfs, lgamma) ] ->
             let () = Expr.Set.iter (PFS.extend pfs) lpfs in
             let () =

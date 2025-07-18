@@ -306,7 +306,7 @@ module Make (State : SState.S) :
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
     match states with
-    | [] -> failwith "Impossible: state substitution returned []"
+    | [] -> (subst, [])
     | [ state ] -> (subst, [ { astate with state } ])
     | states ->
         ( subst,

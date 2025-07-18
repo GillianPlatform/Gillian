@@ -632,7 +632,7 @@ module Tree = struct
     in
     Delayed.return { node = new_node; span; children = Some (left, right) }
 
-  let remove_node x = Ok (make ~node:(NotOwned Totally) ~span:x.span ())
+  let remove_node x = DR.ok (make ~node:(NotOwned Totally) ~span:x.span ())
 
   let sval_leaf ~low ~perm ~value ~chunk =
     let node = Node.encode ~perm ~chunk value in
@@ -772,9 +772,8 @@ module Tree = struct
         Range.is_equal range t.span
       then (
         log_string "Range does equal span, replacing.";
-        match replace_node t with
-        | Ok new_tree -> DR.ok (t, new_tree)
-        | Error err -> DR.error err)
+        let++ new_tree = replace_node t in
+        (t, new_tree))
       else
         match t.children with
         | Some (left, right) ->
@@ -785,7 +784,7 @@ module Tree = struct
             then
               let l, h = range in
               let upper_range = (mid, h) in
-              let dont_replace_node = Result.ok in
+              let dont_replace_node = DR.ok in
               if%sat
                 (* High-range already good *)
                 Range.is_equal upper_range right.span
@@ -859,7 +858,7 @@ module Tree = struct
 
   let prod_node (t : t) range node : (t, err) DR.t =
     let open DR.Syntax in
-    let replace_node _ = Ok (make ~node ~span:range ()) in
+    let replace_node _ = DR.ok (make ~node ~span:range ()) in
     let rebuild_parent = of_children in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
     t
@@ -885,7 +884,7 @@ module Tree = struct
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
-    let replace_node _ = Ok (sarr_leaf ~low ~chunk ~array ~size ~perm) in
+    let replace_node _ = DR.ok (sarr_leaf ~low ~chunk ~array ~size ~perm) in
     let rebuild_parent = of_children in
     let range = Range.of_low_chunk_and_size low chunk size in
     let** _, t = frame_range t ~replace_node ~rebuild_parent range in
@@ -910,7 +909,7 @@ module Tree = struct
       (sval : SVal.t)
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
-    let replace_node _ = Ok (sval_leaf ~low ~chunk ~value:sval ~perm) in
+    let replace_node _ = DR.ok (sval_leaf ~low ~chunk ~value:sval ~perm) in
     let rebuild_parent = of_children in
     let range = Range.of_low_and_chunk low chunk in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
@@ -923,17 +922,17 @@ module Tree = struct
     let replace_node node =
       match node.node with
       | Node.NotOwned Totally ->
-          Error (MissingResource (Fixable { is_store = false; low; chunk }))
+          DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
       | Node.NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
                 "SHeapTree Load Error: Memory Partially Not Owned (Currently \
                  Unsupported)");
-          Error (MissingResource Unfixable)
+          DR.error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
-          if min_perm >=% Readable then Ok node
+          if min_perm >=% Readable then DR.ok node
           else
-            Error
+            DR.error
               (InsufficientPermission { required = Readable; actual = min_perm })
     in
     let rebuild_parent = with_children in
@@ -949,18 +948,18 @@ module Tree = struct
     let replace_node node =
       match node.node with
       | NotOwned Totally ->
-          Error (MissingResource (Fixable { is_store = true; low; chunk }))
+          DR.error (MissingResource (Fixable { is_store = true; low; chunk }))
       | NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
                 "SHeapTree Store Error: Memory Partially Not Owned (Currently \
                  Unsupported)");
-          Error (MissingResource Unfixable)
+          DR.error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Writable then
-            Ok (sval_leaf ~low ~chunk ~value:sval ~perm:min_perm)
+            DR.ok (sval_leaf ~low ~chunk ~value:sval ~perm:min_perm)
           else
-            Error
+            DR.error
               (InsufficientPermission { required = Writable; actual = min_perm })
     in
     let rebuild_parent = of_children in
@@ -1009,16 +1008,16 @@ module Tree = struct
     let replace_node node =
       match node.node with
       | NotOwned Totally ->
-          Error (MissingResource Unfixable) (* No chunk available to fix *)
+          DR.error (MissingResource Unfixable) (* No chunk available to fix *)
       | NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
                 "SHeapTree Drop Permission Error: Memory Partially Not Owned \
                  (Currently Unsupported)");
-          Error (MissingResource Unfixable)
-      | MemVal { min_perm = Freeable; _ } -> Ok (rec_set_perm node)
+          DR.error (MissingResource Unfixable)
+      | MemVal { min_perm = Freeable; _ } -> DR.ok (rec_set_perm node)
       | MemVal { min_perm; _ } ->
-          Error
+          DR.error
             (InsufficientPermission { required = Freeable; actual = min_perm })
     in
     let rebuild_parent = update_parent_perm in
@@ -1460,8 +1459,7 @@ let move dst_tree dst_ofs src_tree src_ofs size =
         | None -> DR.error (MissingResource Unfixable)
         | Some src_root ->
             let** framed, _ =
-              Tree.frame_range src_root
-                ~replace_node:(fun x -> Ok x)
+              Tree.frame_range src_root ~replace_node:DR.ok
                 ~rebuild_parent:(fun t ~left:_ ~right:_ -> Delayed.return t)
                 src_range
             in
@@ -1478,8 +1476,8 @@ let move dst_tree dst_ofs src_tree src_ofs size =
                     Tree.frame_range dst_root
                       ~replace_node:(fun current ->
                         match current.node with
-                        | NotOwned _ -> Error (MissingResource Unfixable)
-                        | _ -> Ok (Tree.realign framed dst_ofs))
+                        | NotOwned _ -> DR.error (MissingResource Unfixable)
+                        | _ -> DR.ok (Tree.realign framed dst_ofs))
                       ~rebuild_parent:Tree.of_children dst_range
                   in
                   DR.of_result (with_root dst_tree new_dst_root)
@@ -1548,7 +1546,11 @@ let merge ~old_tree ~new_tree =
                 List.fold_left
                   (fun acc (tree_node : Tree.t) ->
                     let** acc = acc in
-                    let replace_node _ = Ok tree_node in
+                    let replace_node (t : Tree.t) =
+                      match t.node with
+                      | MemVal _ -> DR.vanish ()
+                      | _ -> DR.ok tree_node
+                    in
                     let rebuild_parent = Tree.of_children in
                     let++ _, tree =
                       Tree.frame_range acc ~replace_node ~rebuild_parent
