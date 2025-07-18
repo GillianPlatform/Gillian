@@ -1730,9 +1730,7 @@ module Make (State : SState.S) :
     let unfold_values = Option.value ~default:[] tactic.try_unfold in
     match unfold_with_vals ~auto_level:`High astate unfold_values with
     | None ->
-        L.normal (fun fmt ->
-            fmt "Automatic unfold failed / fold error: %s" fold_error);
-        Ok []
+        Fmt.error "try_fold: %s\ntry_unfold: Automatic unfold failed" fold_error
     | Some next_states -> Ok (List.map (fun (_, astate) -> astate) next_states)
 
   let rec rec_unfold
