@@ -41,17 +41,16 @@ let iter f sfvl = Expr.Map.iter f sfvl
 let partition f sfvl = Expr.Map.partition f sfvl
 let remove = Expr.Map.remove
 
-let union =
-  Expr.Map.union (fun k fvl fvr ->
-      L.(
-        verbose (fun m ->
-            m
-              "WARNING: SFVL.union: merging with field in both lists (%s: %s \
-               and %s), choosing left."
-              ((Fmt.to_to_string Expr.pp) k)
-              ((Fmt.to_to_string Expr.pp) fvl)
-              ((Fmt.to_to_string Expr.pp) fvr)));
-      Some fvl)
+let union l r =
+  let ok = ref true in
+  let st =
+    Expr.Map.union
+      (fun _ _ _ ->
+        ok := false;
+        None)
+      l r
+  in
+  (st, !ok)
 
 let to_list fv_list = fold (fun f v ac -> (f, v) :: ac) fv_list []
 
@@ -70,10 +69,8 @@ let add_with_test
     (ofs : field_name)
     (new_val : field_value)
     (sfvl : t) =
-  let actual_ofs =
-    Option.value ~default:ofs
-      (Option.map fst (get_first (equality_test ofs) sfvl))
-  in
+  let matching_ofs = Option.map fst (get_first (equality_test ofs) sfvl) in
+  let actual_ofs = Option.value ~default:ofs matching_ofs in
   add actual_ofs new_val sfvl
 
 (** Returns the logical variables occuring in --sfvl-- *)

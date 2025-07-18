@@ -84,6 +84,10 @@ let init () = Hashtbl.create 1
 
 let copy heap = Hashtbl.copy heap
 
+let update heap loc block =
+  if Block.is_empty block then Hashtbl.remove heap loc
+  else Hashtbl.replace heap loc block
+
 (****** Types and functions for logging when blocks have been freed ********)
 
 type set_freed_info = { loc : string } [@@deriving yojson]
@@ -192,7 +196,7 @@ let rem_cell heap loc offset =
   | Some Block.Freed -> Error (UseAfterFree loc)
   | Some (Allocated { bound; data }) ->
       let data = SFVL.remove offset data in
-      let () = Hashtbl.replace heap loc (Allocated { bound; data }) in
+      let () = update heap loc (Allocated { bound; data }) in
       Ok ()
 
 let get_bound heap loc =
@@ -219,7 +223,7 @@ let rem_bound heap loc =
   | Some (Allocated { bound = None; _ }) ->
       Error (MissingResource (Bound, loc, None))
   | Some (Allocated { data; _ }) ->
-      let () = Hashtbl.replace heap loc (Allocated { data; bound = None }) in
+      let () = update heap loc (Allocated { data; bound = None }) in
       Ok ()
 
 let get_freed heap loc =
@@ -240,29 +244,31 @@ let rem_freed heap loc =
 
 (***** Some things specific to symbolic heaps ********)
 
-let merge_loc (heap : t) new_loc old_loc : unit =
+(** tries merging two locations -- returns false is the merging failed as they overlapped,
+    meaning substitution must vanish! *)
+let merge_loc ~new_loc ~old_loc (heap : t) : bool =
   let old_block, new_block =
     (Hashtbl.find_opt heap old_loc, Hashtbl.find_opt heap new_loc)
   in
   match (old_block, new_block) with
-  | Some Block.Freed, Some Block.Freed -> Hashtbl.remove heap old_loc
-  | None, Some Block.Freed -> ()
-  | Some Block.Freed, None ->
-      Hashtbl.replace heap new_loc Block.Freed;
-      Hashtbl.remove heap old_loc
-  | _, _ -> (
-      let old_block = Option.value ~default:Block.empty old_block in
-      let new_block = Option.value ~default:Block.empty new_block in
-      match (old_block, new_block) with
-      | _, Freed | Freed, _ -> failwith "merging non-freed and freed block"
-      | ( Allocated { data = old_data; bound = old_bound },
-          Allocated { data = new_data; bound = new_bound } ) ->
-          let data = SFVL.union new_data old_data in
-          let bound =
-            if Option.is_some new_bound then new_bound else old_bound
-          in
-          let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
-          Hashtbl.remove heap old_loc)
+  | None, _ -> true
+  | Some block, None ->
+      Hashtbl.replace heap new_loc block;
+      Hashtbl.remove heap old_loc;
+      true
+  | Some (Allocated _ | Freed), Some Freed -> false
+  | Some Freed, Some (Allocated _) -> false
+  | ( Some (Allocated { data = data_l; bound = bound_l }),
+      Some (Allocated { data = data_r; bound = bound_r }) ) ->
+      let data, ok = SFVL.union data_l data_r in
+      let bound, ok =
+        match (bound_l, bound_r) with
+        | Some _, Some _ -> (None, false)
+        | None, b | b, None -> (b, ok)
+      in
+      let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
+      Hashtbl.remove heap old_loc;
+      ok
 
 let substitution_in_place subst heap :
     (t * Expr.Set.t * (string * Type.t) list) list =
@@ -280,24 +286,28 @@ let substitution_in_place subst heap :
         | ALoc _ -> true
         | _ -> false)
   in
-  Subst.iter aloc_subst (fun aloc new_loc ->
-      let aloc =
-        match aloc with
-        | ALoc loc -> loc
-        | _ -> raise (Failure "Impossible by construction")
-      in
-      let new_loc_str =
-        match new_loc with
-        | Expr.Lit (Literal.Loc loc) -> loc
-        | Expr.ALoc loc -> loc
-        | _ ->
-            raise
-              (Failure
-                 (Printf.sprintf "Heap substitution fail for loc: %s"
-                    ((WPrettyUtils.to_str Expr.pp) new_loc)))
-      in
-      merge_loc heap new_loc_str aloc);
-  [ (heap, Expr.Set.empty, []) ]
+  let subst_ok =
+    Subst.fold aloc_subst
+      (fun aloc new_loc acc ->
+        let old_loc =
+          match aloc with
+          | ALoc loc -> loc
+          | _ -> raise (Failure "Impossible by construction")
+        in
+        let new_loc =
+          match new_loc with
+          | Expr.Lit (Literal.Loc loc) -> loc
+          | Expr.ALoc loc -> loc
+          | _ ->
+              raise
+                (Failure
+                   (Printf.sprintf "Heap substitution fail for loc: %s"
+                      ((WPrettyUtils.to_str Expr.pp) new_loc)))
+        in
+        acc && merge_loc heap ~new_loc ~old_loc)
+      true
+  in
+  if subst_ok then [ (heap, Expr.Set.empty, []) ] else []
 
 let assertions heap =
   Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
