@@ -1244,16 +1244,9 @@ module Make (State : SState.S) :
                   consume_pred ~no_auto_fold astate pname vs
                     ~fold_outs_info:(subst, step, les_outs)
                 in
-                let () =
-                  match consume_pred_res with
-                  | [] ->
-                      let msg = "CONSUME_PRED VANISHED! MEDOOOOOO!!!!!" in
-                      L.verbose ~severity:Warning (fun m -> m "%s" msg);
-                      if not !Config.under_approximation then
-                        Fmt.failwith "%s\n@?" msg
-                      else ()
-                  | _ -> ()
-                in
+                if List.is_empty consume_pred_res then
+                  L.verbose ~severity:Warning (fun m ->
+                      m "Consume_pred vanished!");
                 let++ astate', _ = consume_pred_res in
                 astate'
           | Wand { lhs; rhs } ->
@@ -1471,18 +1464,11 @@ module Make (State : SState.S) :
             let res_list, assertion_id =
               match_assertion_safely astate subst step
             in
-            let successes, errors =
-              res_list
-              |> List.partition_map (function
-                   | Ok x -> Left x
-                   | Error x -> Right x)
-            in
+            let successes, errors = Res_list.split res_list in
             match (!Config.under_approximation, successes, errors) with
             (* We start by handling the crash cases that should never happen *)
             | true, _, _ :: _ ->
                 L.fail "ERROR: IMPOSSIBLE! MATCHING ERRORS IN UX MODE!!!!"
-            | false, [], [] ->
-                L.fail "OX MATCHING VANISHED??? MEDOOOOOOOO!!!!!!!!!"
             | true, [], _ ->
                 (* Vanished in UX *)
                 match_mp' (rest_search_states, errs_so_far)
@@ -1502,6 +1488,10 @@ module Make (State : SState.S) :
                 match_mp'
                   ( ((state, subst, rest_mp), assertion_id) :: rest_search_states,
                     errs_so_far )
+            | false, [], [] ->
+                L.verbose (fun m ->
+                    m "Consumer yielded 0 branches in OX mode!!!");
+                match_mp' (rest_search_states, errs_so_far)
             | false, states, [] -> (
                 L.verbose (fun m ->
                     m "Consumer yielded >1 branches in OX mode: %d branches!!!"
@@ -1633,16 +1623,6 @@ module Make (State : SState.S) :
     in
     let subst = SVal.SESubst.init (additional_bindings @ param_bindings) in
     let match_result = match_ ~in_matching state subst pred.def_mp match_kind in
-    let () =
-      match match_result with
-      | [] ->
-          Fmt.(
-            failwith "@[<h>HORROR: fold vanished for %s(%a) with bindings: %a@]"
-              pred_name (Dump.list Expr.pp) args
-              (Dump.list @@ Dump.pair Expr.pp Expr.pp)
-              additional_bindings)
-      | _ -> ()
-    in
     let open Res_list.Syntax in
     let** astate', subst', _ = match_result in
     let { preds = preds'; _ } = astate' in
