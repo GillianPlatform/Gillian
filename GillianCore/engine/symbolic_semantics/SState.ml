@@ -52,7 +52,6 @@ module Make (SMemory : SMemory.S) :
   }
   [@@deriving yojson]
 
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = SMemory.init_data
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list

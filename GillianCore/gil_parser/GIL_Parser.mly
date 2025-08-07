@@ -995,7 +995,9 @@ g_pred_target:
 
 variant_target:
   VARIANT LBRACE; variant = expr_target; RBRACE
-  { variant }
+  {
+    Printf.eprintf "Warning: variants are not currently being used by Gillian, no termination is checked.\n";
+    variant }
 
 
 lemma_head_target:

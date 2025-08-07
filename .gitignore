@@ -103,3 +103,6 @@ _docs/sphinx
 
 # Memtraces
 *.ctf
+
+# Nix / direnv
+.direnv

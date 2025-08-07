@@ -53,7 +53,9 @@
   (visitors
    (>= 2.3))
   (yojson
-   (>= 1.7.0))
+   (and
+    (>= 1.7.0)
+    (< 3.0)))
   (zarith
    (>= 1.12))
   (odoc :with-doc)))
@@ -109,7 +111,8 @@
  (name transformers)
  (sites
   (share runtime))
- (synopsis "Gillian instantiation using state model transformers, à la Iris")
+ (synopsis
+  "Gillian instantiation using state model transformers, à la Iris")
  (depends
   (gillian
    (= :version))

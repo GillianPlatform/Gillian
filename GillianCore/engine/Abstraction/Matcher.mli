@@ -15,14 +15,12 @@ type recovery_tactic =
 module type S = sig
   type err_t
   type state_t
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type t = {
     state : state_t;
     preds : Preds.t;
     wands : Wands.t;
     pred_defs : MP.preds_tbl_t;
-    variants : variants_t;
   }
 
   type post_res = (Flag.t * Asrt.t list) option
@@ -30,12 +28,7 @@ module type S = sig
 
   module Logging : sig
     module AstateRec : sig
-      type t = {
-        state : state_t;
-        preds : Preds.t;
-        wands : Wands.t;
-        variants : variants_t;
-      }
+      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
       [@@deriving yojson]
     end
 

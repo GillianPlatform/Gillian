@@ -13,7 +13,6 @@ module Make (State : SState.S) = struct
   type store_t = SStore.t
   type m_err_t = t * State.m_err_t [@@deriving yojson]
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson]
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = State.init_data
 
   exception Internal_State_Error of err_t list * t

@@ -28,7 +28,6 @@ module type S = sig
   exception Internal_State_Error of err_t list * t
 
   type action_ret = (t * vt list, err_t) Res_list.t
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data
 
   val execute_action : string -> t -> vt list -> action_ret

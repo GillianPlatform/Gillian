@@ -388,7 +388,10 @@ lemma:
           } }
 
 variant_def:
-  | VARIANT; COLON; e = logic_expression { e }
+  | VARIANT; COLON; e = logic_expression {
+    Printf.eprintf "Warning: variants are not currently being used by Gillian, no termination is checked.\n";
+    e
+  }
 
 with_variant_def:
   | WITH; variant = variant_def { variant }
