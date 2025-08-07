@@ -125,7 +125,7 @@ struct
 
   let testify
       ~(init_data : SPState.init_data)
-      (_func_or_lemma_name : string) (* TODO: unused now? *)
+      (func_or_lemma_name : string)
       (preds : (string, MP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
