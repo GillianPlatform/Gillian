@@ -749,7 +749,8 @@ g_spec_target:
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
     let spec_incomplete = Option.is_some incomplete in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
+    let spec_location = Some (get_loc $startpos $endpos) in
+    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify; spec_location } in
     spec
   }
 ;
@@ -1028,6 +1029,7 @@ g_lemma_target:
         lemmas_with_no_paths := SS.add lemma_name !lemmas_with_no_paths
     in
     let lemma_existentials = Option.value ~default:[] lemma_existentials in
+    let lemma_location = Some (get_loc $startpos $endpos) in
     let spec = Lemma.{
       lemma_hyp;
       lemma_concs;
@@ -1043,6 +1045,7 @@ g_lemma_target:
         lemma_variant;
         lemma_proof;
         lemma_existentials;
+        lemma_location;
       }
   }
 ;
@@ -1138,7 +1141,7 @@ type_env_pair_target:
 logic_variable_target:
   v = LVAR
   {
-    let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
+    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
     Expr.LVar v_imported }
 ;

@@ -405,7 +405,7 @@ nop_target:
 expr_target:
   | lit=lit_target { Expr.Lit lit }
   | v = LVAR {
-    let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
+    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
     Expr.LVar v_imported
   }
   | ALOC { Expr.ALoc $1 }
@@ -478,7 +478,7 @@ program_variable_target:
 logic_variable_target:
   v = LVAR
   {
-    let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
+    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
     Expr.LVar v_imported }
 

@@ -8,6 +8,8 @@ module type S = sig
   type state_t
   type abs_t = string * vt list
 
+  module SMatcher : Matcher.S with type state_t = state_t
+
   val make_p :
     preds:MP.preds_tbl_t ->
     init_data:init_data ->
@@ -267,15 +269,13 @@ module Make (State : SState.S) :
     let new_store =
       try SStore.init (List.combine params args)
       with Invalid_argument _ ->
-        let message =
-          Fmt.str
-            "Running spec of %s which takes %i parameters with the following \
-             %i arguments : %a"
-            name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
-            args
-        in
-        raise (Invalid_argument message)
+        Fmt.failwith
+          "Running spec of %s which takes %i parameters with the following %i \
+           arguments : %a"
+          name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
+          args
     in
+
     let astate' = set_store astate new_store in
     let existential_bindings = Option.value ~default:[] existential_bindings in
     let existential_bindings =
@@ -410,7 +410,8 @@ module Make (State : SState.S) :
       L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate));
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -588,7 +589,8 @@ module Make (State : SState.S) :
     else ();
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -910,7 +912,8 @@ module Make (State : SState.S) :
                 m "State after substitution:@\n@[%a@]\n" pp astate));
           let mp =
             match mp with
-            | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+            | Error asrts ->
+                raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
             | Ok mp -> mp
           in
           let bindings =
@@ -1135,7 +1138,7 @@ module Make (State : SState.S) :
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
-    SMatcher.try_recovering astate tactic
+    SMatcher.try_recovering astate tactic |> Result.map fst
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix

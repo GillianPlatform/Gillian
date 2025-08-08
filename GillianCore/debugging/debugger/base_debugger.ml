@@ -28,6 +28,7 @@ struct
   module Annot = PC.Annot
   module Content_type = L.Logging_constants.Content_type
   module State = Verification.SPState
+  module Store = Store
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
   type tl_ast = PC.tl_ast
@@ -38,9 +39,9 @@ struct
     mutable cur_report_id : L.Report_id.t option;
     (* TODO: The below fields only depend on the
             cur_report_id and could be refactored to use this *)
-    mutable top_level_scopes : Variable.scope list;
     mutable frames : frame list;
-    mutable variables : Variable.ts; [@default Hashtbl.create 0]
+    mutable variables : (Variable.scope list * Variable.ts) option;
+        [@default None]
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable proc_name : string;
@@ -49,6 +50,9 @@ struct
         [@default []]
     lifter_state : Lifter.t;
     report_state : L.Report_state.t;
+    mutable has_errors : bool; [@default false]
+    unfinished_nodes : L.Report_id.t Hashset.t; [@default Hashset.empty ()]
+    submap_procs : string Hashset.t; [@default Hashset.empty ()]
     ext : 'ext;
   }
   [@@deriving make]
@@ -77,6 +81,17 @@ struct
     procs : (string, 'proc_state) Hashtbl.t;
     debug_state : 'debug_state;
   }
+
+  let get_cmd id =
+    match L.Log_queryer.get_report id with
+    | None -> Fmt.failwith "get_cmd: couldn't find report %a" L.Report_id.pp id
+    | Some (content, type_) ->
+        if type_ <> Content_type.cmd then
+          Fmt.failwith "get_cmd: report %a has unexpected type %s"
+            L.Report_id.pp id type_
+        else
+          let open Verification.SAInterpreter.Logging in
+          content |> of_yojson_string ConfigReport.of_yojson
 
   module type Debugger_impl = sig
     type proc_state_ext
@@ -108,8 +123,16 @@ struct
         Match_map.matching list
 
       val get_match_map :
-        L.Report_id.t -> debug_state_ext base_debug_state -> Match_map.t
+        L.Report_id.t ->
+        debug_state_ext base_debug_state ->
+        proc_state_ext base_proc_state ->
+        Match_map.t
     end
+
+    val get_astate :
+      debug_state_ext base_debug_state ->
+      proc_state_ext base_proc_state ->
+      (L.Report_id.t * State.heap_t astate) option
   end
 
   module Make (Debugger_impl : Debugger_impl) = struct
@@ -134,7 +157,7 @@ struct
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       (List_utils.last cmd.callstack |> Option.get).pid
 
-    let get_proc_state ?cmd_id ?(activate_report_state = true) state =
+    let get_proc_state ?cmd_id ?(activate_report_state = true) (state : t) =
       let { debug_state; procs } = state in
       let proc_name =
         match cmd_id with
@@ -206,80 +229,109 @@ struct
           Map_node_options.Root
             {
               title = "Match";
-              subtitle = show_match_kind matching;
-              zoomable = true;
-              extras = [];
+              subtitle = Some (show_match_kind matching);
+              zoomable = Some true;
+              extras = None;
             }
         in
         Map_node.make ~id ~next ~options () |> add_node state
 
-      let convert_match_node state (map : Match_map.t) node_id =
-        let node = Hashtbl.find map.nodes node_id in
+      let convert_match_node proc_state state (map : Match_map.t) node_id =
+        let step, this_result, next_ids = Hashtbl.find map.nodes node_id in
         let id = show_id node_id in
-        match node with
-        | Assertion (data, nexts) ->
-            let next = make_basic_next nexts in
-            let options =
-              Map_node_options.Basic
-                { display = data.assertion; selectable = true; extras = [] }
-            in
-            let submaps, folds =
-              match data.fold with
-              | None -> ([], [])
-              | Some matching ->
-                  let id = show_id matching.id in
-                  ([ id ], [ matching ])
-            in
-            let () =
-              Map_node.make ~id ~submaps ~next ~options () |> add_node state
-            in
-            (nexts, folds)
-        | MatchResult (_, result) ->
-            let options =
-              Map_node_options.Basic
-                {
-                  display = Match_map.show_match_result result;
-                  selectable = false;
-                  extras = [];
-                }
-            in
-            let () =
-              Map_node.make ~id ~next:Final ~options () |> add_node state
-            in
-            ([], [])
+        let next = make_basic_next next_ids in
+        let highlight =
+          this_result
+          |> Option.map @@ fun r ->
+             Map_node_options.Highlight.(if r then Success else Error)
+        in
+        let display, selectable, extras, submaps, folds =
+          match step with
+          | Assertion data ->
+              let display = data.assertion in
+              let submaps, folds, extras =
+                match data.fold with
+                | None -> ([], [], None)
+                | Some matching ->
+                    let id = show_id matching.id in
+                    let badge =
+                      let tag =
+                        match matching.result with
+                        | Success -> Some "success"
+                        | Failure -> Some "fail"
+                      in
+                      Map_node_extra.Badge { text = "Fold"; tag }
+                    in
+                    ([ id ], [ matching ], Some [ badge ])
+              in
+              (display, Some true, extras, submaps, folds)
+          | RecoveryTactic tactic ->
+              let kind, pname, args =
+                match tactic with
+                | Try_fold (p, args) -> ("Fold", p, args)
+                | Try_unfold (p, args) -> ("Unfold", p, args)
+              in
+              let pp_exprs =
+                Fmt.(
+                  list ~sep:(any ", ") (Lifter.pp_expr proc_state.lifter_state))
+              in
+              let display = Fmt.str "%s %s(%a)" kind pname pp_exprs args in
+              let extras =
+                let badge =
+                  Map_node_extra.Badge { text = "Recovery tactic"; tag = None }
+                in
+                Some [ badge ]
+              in
+              (display, Some false, extras, [], [])
+        in
+        let options =
+          Map_node_options.Basic { display; selectable; extras; highlight }
+        in
+        let () =
+          Map_node.make ~id ~submaps ~next ~options () |> add_node state
+        in
+        (next_ids, folds)
 
-      let convert_match_map' state (matching : Match_map.matching) =
-        let map = get_match_map matching.id state.debug_state in
+      let convert_match_map' proc_state state (matching : Match_map.matching) =
+        let map = get_match_map matching.id state.debug_state proc_state in
         let () = Hashtbl.add state.debug_state.matches matching.id map in
         let () = convert_match_root state matching map in
         let rec aux other_matches = function
           | [] -> other_matches
           | node_id :: rest ->
-              let nexts, folds = convert_match_node state map node_id in
+              let nexts, folds =
+                convert_match_node proc_state state map node_id
+              in
               aux (folds @ other_matches) (nexts @ rest)
         in
         aux [] map.roots
 
-      let rec convert_match_maps state = function
+      let rec convert_match_maps proc_state state = function
         | [] -> ()
         | matching :: rest ->
-            let folds = convert_match_map' state matching in
-            convert_match_maps state (folds @ rest)
+            let folds = convert_match_map' proc_state state matching in
+            convert_match_maps proc_state state (folds @ rest)
 
       let get_node_extras (node : Exec_map.Packaged.node) =
         let open Map_node_extra in
-        match node.data.matches with
-        | [] -> []
-        | matches ->
-            let tag =
-              if
-                List.for_all
-                  (fun (m : Match_map.matching) -> m.result = Success)
-                  matches
-              then "success"
-              else "fail"
-            in
-            [ Badge { text = "Match"; tag } ]
+        let badges =
+          match node.data.matches with
+          | [] -> []
+          | matches ->
+              let tag =
+                if
+                  List.for_all
+                    (fun (m : Match_map.matching) -> m.result = Success)
+                    matches
+                then Some "success"
+                else Some "fail"
+              in
+              [ Badge { text = "Match"; tag } ]
+        in
+        let tooltips =
+          node.data.errors |> List.map (fun err -> Tooltip { text = err })
+        in
+        Some (badges @ tooltips)
 
       let get_node_next (node : Exec_map.Packaged.node) =
         let open Map_node_next in
@@ -314,11 +366,11 @@ struct
         let options =
           let title, subtitle =
             match proc.proc_display_name with
-            | Some ts -> ts
-            | None -> (proc_name, "")
+            | Some (t, s) -> (t, Some s)
+            | None -> (proc_name, None)
           in
           Map_node_options.Root
-            { title; subtitle; zoomable = true; extras = [] }
+            { title; subtitle; zoomable = Some true; extras = None }
         in
         let () =
           if not proc.proc_hidden then
@@ -326,10 +378,10 @@ struct
         in
         Map_node.make ~id ~next ~options () |> add_node state
 
-      let convert_node (node : Exec_map.Packaged.node) state =
+      let convert_node proc_state state (node : Exec_map.Packaged.node) =
         let id = show_id node.data.id in
         let aliases = node.data.all_ids |> List.map show_id in
-        let () = convert_match_maps state node.data.matches in
+        let () = convert_match_maps proc_state state node.data.matches in
         let submaps =
           let matches =
             node.data.matches
@@ -354,15 +406,44 @@ struct
           submaps @ matches
         in
         let next = get_node_next node in
+        let highlight =
+          let open Map_node_options.Highlight in
+          match (node.data.errors, next) with
+          | _ :: _, _ -> Some Error
+          | [], Final -> Some Success
+          | [], _ -> None
+        in
         let options =
           Map_node_options.Basic
             {
               display = node.data.display;
-              selectable = true;
+              selectable = Some true;
               extras = get_node_extras node;
+              highlight;
             }
         in
         Map_node.make ~id ~aliases ~submaps ~next ~options () |> add_node state
+
+      let has_unfinished_case = List.exists (fun (_, (next, _)) -> next = None)
+
+      let update_status id (node : Exec_map.Packaged.node) proc_state =
+        let is_node_finished =
+          match node.next with
+          | None -> true
+          | Some (Single (Some _, _)) -> true
+          | Some (Branch cases) when not (has_unfinished_case cases) -> true
+          | _ -> false
+        in
+        let () =
+          Hashset.(if is_node_finished then remove else add)
+            proc_state.unfinished_nodes id
+        in
+        let () =
+          match node.data.submap with
+          | Proc s -> Hashset.add proc_state.submap_procs s
+          | _ -> ()
+        in
+        proc_state.has_errors <- proc_state.has_errors || node.data.errors <> []
 
       let add_changed_node id node proc_state state =
         let () =
@@ -371,7 +452,9 @@ struct
             proc_state.root_created <- true
         in
         match node with
-        | Some node -> convert_node node state
+        | Some node ->
+            let () = update_status id node proc_state in
+            convert_node proc_state state node
         | None -> Hashtbl.remove_all state.debug_state.all_nodes (show_id id)
 
       let get_all_nodes state =
@@ -423,37 +506,67 @@ struct
         Map_update_event_body.Current_steps.make ~primary:(Some p)
           ~secondary:(Some s) ()
 
-      let get_map_ext state : Yojson.Safe.t =
-        let proc_substs =
-          state.procs |> Hashtbl.to_seq
-          |> Seq.map (fun (proc_name, proc) ->
-                 let+ substs =
-                   let* assertion_id, match_id =
-                     List_utils.hd_opt proc.selected_match_steps
-                   in
-                   let* match_ =
-                     Hashtbl.find_opt state.debug_state.matches match_id
-                   in
-                   let* node = Hashtbl.find_opt match_.nodes assertion_id in
-                   let* substs =
-                     match node with
-                     | Match_map.Assertion (data, _) -> Some data.substitutions
-                     | _ -> None
-                   in
-                   let substs' =
-                     substs
-                     |> List.map @@ fun Match_map.{ assert_id; subst = a, b } ->
-                        `List
-                          [ `String (show_id assert_id); `String a; `String b ]
-                   in
-                   Some substs'
+      let get_substs state =
+        state.procs |> Hashtbl.to_seq
+        |> Seq.map (fun (proc_name, proc) ->
+               let+ substs =
+                 let* assertion_id, match_id =
+                   List_utils.hd_opt proc.selected_match_steps
                  in
-                 (proc_name, `List substs))
-          |> Seq.filter_map (fun x -> x)
-          |> List.of_seq
+                 let* match_ =
+                   Hashtbl.find_opt state.debug_state.matches match_id
+                 in
+                 let* node = Hashtbl.find_opt match_.nodes assertion_id in
+                 let* substs =
+                   match node with
+                   | Match_map.Assertion data, _, _ -> Some data.substitutions
+                   | _ -> None
+                 in
+                 let substs' =
+                   substs
+                   |> List.map @@ fun Match_map.{ assert_id; subst = a, b } ->
+                      `List
+                        [ `String (show_id assert_id); `String a; `String b ]
+                 in
+                 Some substs'
+               in
+               (show_proc_id proc_name, `List substs))
+        |> Seq.filter_map (fun x -> x)
+        |> List.of_seq
+
+      let get_status state =
+        let rec aux acc proc_name =
+          let acc = SS.add proc_name acc in
+          match Hashtbl.find_opt state.procs proc_name with
+          | None -> (false, false, acc)
+          | Some proc_state ->
+              let finished = Hashset.length proc_state.unfinished_nodes = 0 in
+              let has_errors = proc_state.has_errors in
+              let subprocs = proc_state.submap_procs |> Hashset.to_seq in
+              Seq.fold_left
+                (fun (finished, has_errors, acc) proc_name ->
+                  if SS.mem proc_name acc then (finished, has_errors, acc)
+                  else
+                    let finished', has_errors', acc = aux acc proc_name in
+                    let finished = finished && finished' in
+                    let has_errors = has_errors || has_errors' in
+                    (finished, has_errors, acc))
+                (finished, has_errors, acc)
+                subprocs
         in
-        let substs = `Assoc proc_substs in
-        `Assoc [ ("substs", substs) ]
+        let finished, has_errors, _ =
+          aux SS.empty state.debug_state.main_proc_name
+        in
+        (finished, has_errors)
+
+      let get_map_ext state : Yojson.Safe.t =
+        let substs = [ ("substs", `Assoc (get_substs state)) ] in
+        let status =
+          let finished, has_errors = get_status state in
+          let status = `List [ `Bool finished; `Bool has_errors ] in
+          [ ("status", status) ]
+        in
+        `Assoc (substs @ status)
 
       let get_map_update state =
         let nodes = get_changed_nodes ~clear:true state in
@@ -525,42 +638,7 @@ struct
       let get_match_map id { debug_state; _ } = get_match_map id debug_state
     end
 
-    let top_level_scopes : Variable.scope list =
-      let top_level_scope_names =
-        (* [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ] *)
-        [ "Pure Formulae"; "Typing Environment"; "Predicates" ]
-      in
-      List.mapi
-        (fun i name -> Variable.{ name; id = i + 1 })
-        top_level_scope_names
-
     let is_gil_file file_name = Filename.check_suffix file_name "gil"
-
-    let get_pure_formulae_vars (state : state_t) : Variable.t list =
-      let open Variable in
-      State.get_pfs state |> PFS.to_list
-      |> List.map (fun formula ->
-             let value = Fmt.to_to_string (Fmt.hbox Expr.pp) formula in
-             { name = ""; value; type_ = None; var_ref = 0 })
-      |> List.sort (fun v w -> Stdlib.compare v.value w.value)
-
-    let get_type_env_vars (state : state_t) : Variable.t list =
-      let open Variable in
-      let typ_env = State.get_typ_env state in
-      Type_env.to_list typ_env
-      |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
-      |> List.map (fun (name, value) ->
-             let value = Type.str value in
-             { name; value; type_ = None; var_ref = 0 })
-      |> List.sort (fun v w -> Stdlib.compare v.name w.name)
-
-    let get_pred_vars (state : state_t) : Variable.t list =
-      let open Variable in
-      State.get_preds state |> Preds.to_list
-      |> List.map (fun pred ->
-             let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
-             { name = ""; value; type_ = None; var_ref = 0 })
-      |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
     module Process_files = struct
       let get_progs_or_fail = function
@@ -674,24 +752,6 @@ struct
           frame :: call_stack_to_frames rest se.call_index prog
 
     module Update_proc_state = struct
-      let get_cmd id =
-        match L.Log_queryer.get_report id with
-        | None ->
-            Fmt.failwith
-              "Unable to find report id '%a'. Check the logging level is set \
-               correctly"
-              L.Report_id.pp id
-        | Some (content, type_) ->
-            if type_ <> Content_type.cmd then
-              Fmt.failwith
-                "Debugger: don't know how to handle report of type '%s'!" type_
-            else
-              let () =
-                DL.show_report ~v:true id
-                  ("Debugger.update...: Got report type " ^ type_)
-              in
-              content |> of_yojson_string Logging.ConfigReport.of_yojson
-
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
         | [] -> None
@@ -703,54 +763,13 @@ struct
                 let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
                 Some (cmd, annot))
 
-      let create_variables (state : state_t option) (is_gil_file : bool) :
-          Variable.scope list * Variable.ts =
-        let variables = Hashtbl.create 0 in
-        (* New scope ids must be higher than last top level scope id to prevent
-           duplicate scope ids *)
-        let scope_id = ref (List.length top_level_scopes) in
-        let get_new_scope_id () =
-          let () = scope_id := !scope_id + 1 in
-          !scope_id
-        in
-        let lifted_scopes =
-          match state with
-          | None -> []
-          | Some state ->
-              let store = State.get_store state |> Store.bindings in
-              let memory = State.get_heap state in
-              let lifted_scopes =
-                Lifter.add_variables ~store ~memory ~is_gil_file
-                  ~get_new_scope_id variables
-              in
-              let pure_formulae_vars = get_pure_formulae_vars state in
-              let type_env_vars = get_type_env_vars state in
-              let pred_vars = get_pred_vars state in
-              let vars_list =
-                [ pure_formulae_vars; type_env_vars; pred_vars ]
-              in
-              let () =
-                List.iter2
-                  (fun (scope : Variable.scope) vars ->
-                    Hashtbl.replace variables scope.id vars)
-                  top_level_scopes vars_list
-              in
-              lifted_scopes
-        in
-        (lifted_scopes, variables)
-
       let f report_id cfg state =
         let cmd = get_cmd report_id in
         state.cur_report_id <- Some report_id;
         state.selected_match_steps <- [];
         state.frames <-
           call_stack_to_frames cmd.callstack cmd.proc_line cfg.prog;
-        let lifted_scopes, variables =
-          create_variables (Some cmd.state) (is_gil_file cfg.source_file)
-        in
-        state.variables <- variables;
-        state.top_level_scopes <-
-          List.concat [ lifted_scopes; top_level_scopes ];
+        state.variables <- None;
         (* TODO: fix *)
         (* let () = dbg.errors <- cmd_result.errors in *)
         state.cur_cmd <- get_cur_cmd cmd cfg
@@ -764,12 +783,6 @@ struct
         state |> update_proc_state id cfg;
         Ok ()
       with Failure msg -> Gillian_result.internal_error msg
-
-    let jump_to_id id (state : t) =
-      let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
-      let** proc_state = get_proc_state ~cmd_id state in
-      let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
-      proc_state.selected_match_steps <- matches
 
     let handle_stop debug_state proc_state ?(is_end = false) id id' =
       let id =
@@ -790,12 +803,24 @@ struct
       | Exec_res.RSucc _ -> []
       | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
 
+    let errors_of_matches matches =
+      matches
+      |> List.filter_map (fun (m : Match_map.matching) ->
+             match m.result with
+             | Success -> None
+             | Failure -> (
+                 match m.kind with
+                 | Postcondition _ -> Some "Couldn't satisfy postcondition"
+                 | FunctionCall f ->
+                     Some (Fmt.str "Couldn't satisfy precondition of %s" f)
+                 | _ -> None))
+
     let build_final_cmd_data content result prev_id branch_path debug_state =
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       let exec_data =
         let proc_name = (List.hd cmd.callstack).pid in
-        let errors = show_result_errors result in
         let matches = match_final_cmd prev_id ~proc_name result debug_state in
+        let errors = show_result_errors result @ errors_of_matches matches in
         let next_kind = Exec_map.Zero in
         Lift.make_executed_cmd_data next_kind prev_id cmd ~matches ~errors
           branch_path
@@ -919,8 +944,10 @@ struct
               let report =
                 of_yojson_string Logging.ConfigReport.of_yojson content
               in
+              let errors = errors_of_matches matches in
               let exec_data =
-                Lift.make_executed_cmd_data cmd_kind id report ~matches path
+                Lift.make_executed_cmd_data cmd_kind id report ~matches ~errors
+                  path
               in
               (exec_data, cont_func)
           | EoB ->
@@ -969,39 +996,69 @@ struct
                           Inspect.add_changed_node id node proc_state state
                         in
                         continue k ())
-                | _ ->
-                    let s = Printexc.to_string (Effect.Unhandled eff) in
-                    Fmt.failwith "HORROR: effect leak!\n%s" s);
+                | _ -> None);
           }
 
-      let lifter_call lifter_func proc_state state =
+      let lifter_call ?interaction lifter_func proc_state state =
         let stop_id, stop_reason =
           with_lifter_effects lifter_func proc_state state
         in
         let++ () = jump_state_to_id stop_id state.debug_state proc_state in
+        let () =
+          interaction
+          |> Option.iter @@ fun kind ->
+             let breakpoint = stop_reason = Breakpoint in
+             Usage_logs.Debug.log_interaction (Dap_step { kind; breakpoint })
+        in
         stop_reason
 
-      let lifter_call_with_id state lifter_func =
+      let lifter_call_with_id ?interaction state lifter_func =
         let proc_state = get_proc_state_exn state in
         let { cur_report_id; lifter_state; _ } = proc_state in
         let id = Option.get cur_report_id in
         let f () = lifter_func lifter_state id in
-        lifter_call f proc_state state |> Result.get_ok
+        lifter_call ?interaction f proc_state state |> Result.get_ok
 
-      let over state = lifter_call_with_id state Lifter.step_over
-      let in_ state = lifter_call_with_id state Lifter.step_in
-      let out state = lifter_call_with_id state Lifter.step_out
+      let step_over state =
+        lifter_call_with_id ~interaction:Step_over state Lifter.step_over
 
-      let branch case id state =
+      let step_in state =
+        lifter_call_with_id ~interaction:Step_in state Lifter.step_in
+
+      let step_out state =
+        lifter_call_with_id ~interaction:Step_out state Lifter.step_out
+
+      let step_specific case id state =
         let proc_state = get_proc_state_exn ~cmd_id:id state in
         let { lifter_state; _ } = proc_state in
         let f () = Lifter.step_branch lifter_state id case in
-        lifter_call f proc_state state
+        let stop_reason = lifter_call f proc_state state in
+        let () =
+          let has_case = Option.is_some case in
+          Usage_logs.Debug.log_interaction (Step_specific { has_case })
+        in
+        stop_reason
 
-      let back state = lifter_call_with_id state Lifter.step_back
-      let continue state = lifter_call_with_id state Lifter.continue
-      let continue_back state = lifter_call_with_id state Lifter.continue_back
+      let step_back state =
+        lifter_call_with_id ~interaction:Step_back state Lifter.step_back
+
+      let continue state =
+        lifter_call_with_id ~interaction:Continue state Lifter.continue
+
+      let continue_back state =
+        lifter_call_with_id ~interaction:Continue_back state
+          Lifter.continue_back
+
+      let jump id (state : t) =
+        let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
+        let** proc_state = get_proc_state ~cmd_id state in
+        let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
+        let () = proc_state.selected_match_steps <- matches in
+        Usage_logs.Debug.log_interaction
+          (Jump { is_match = not (List.is_empty matches) })
     end
+
+    include Step
 
     module Launch_proc = struct
       open Gillian_result
@@ -1044,8 +1101,8 @@ struct
                in
                let proc_state =
                  let make ext =
-                   make_base_proc_state ~proc_name ~cont_func ~top_level_scopes
-                     ~lifter_state ~report_state ~ext ()
+                   make_base_proc_state ~proc_name ~cont_func ~lifter_state
+                     ~report_state ~ext ()
                  in
                  let ext = Debugger_impl.init_proc debug_state (make ()) in
                  make ext
@@ -1092,11 +1149,14 @@ struct
 
       let make_state debug_state = { debug_state; procs = Hashtbl.create 0 }
 
-      let f file_name proc_name : t Gillian_result.t =
+      let f filename proc_name : t Gillian_result.t =
         Fmt_tty.setup_std_outputs ();
         PC.initialize !Config.current_exec_mode;
         Config.stats := false;
-        let** debug_state, entrypoint = build_debug_state file_name proc_name in
+        let** debug_state, entrypoint = build_debug_state filename proc_name in
+        let () =
+          Usage_logs.Debug.start ~filename ~proc:debug_state.main_proc_name
+        in
         let proc_name = debug_state.main_proc_name in
         let state = make_state debug_state in
         let++ main_proc_state, _ = launch_proc proc_name ~entrypoint state in
@@ -1107,15 +1167,6 @@ struct
     end
 
     let launch = Launch.f
-    let step_in = Step.in_
-    let step ?(reverse = false) = if reverse then Step.back else Step.over
-    let step_specific = Step.branch
-    let step_out = Step.out
-
-    let run ?(reverse = false) ?(launch = false) =
-      ignore launch;
-      (* TODO *)
-      if reverse then Step.continue_back else Step.continue
 
     let start_proc proc_name state =
       let { debug_state; procs } = state in
@@ -1129,18 +1180,29 @@ struct
     let terminate state =
       L.Report_state.(activate global_state);
       Verification.postprocess_files state.debug_state.source_files;
-      if !Config.stats then Statistics.print_statistics ()
+      if !Config.stats then L.Statistics.print_statistics ();
+      Usage_logs.Debug.stop ()
 
     let get_frames state =
       let { frames; _ } = get_proc_state_exn state in
       frames
 
-    let get_scopes state =
-      let { top_level_scopes; _ } = get_proc_state_exn state in
-      top_level_scopes
+    let get_scopes_and_variables state =
+      let ({ variables; lifter_state; _ } as proc_state) =
+        get_proc_state_exn state
+      in
+      let- () = variables in
+      match get_astate state.debug_state proc_state with
+      | None -> ([], Hashtbl.create 0)
+      | Some (id, astate) ->
+          let vs = Lifter.get_variables lifter_state astate id in
+          proc_state.variables <- Some vs;
+          vs
+
+    let get_scopes state = fst (get_scopes_and_variables state)
 
     let get_variables (var_ref : int) (state : t) : Variable.t list =
-      let { variables; _ } = get_proc_state_exn state in
+      let variables = snd (get_scopes_and_variables state) in
       match Hashtbl.find_opt variables var_ref with
       | None -> []
       | Some vars -> vars

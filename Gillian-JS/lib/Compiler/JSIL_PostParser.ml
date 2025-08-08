@@ -11,7 +11,7 @@ let counter = ref 0
 let pvar_counter = ref 0
 
 let fresh_bi_lvar () =
-  let v = "#bi_var_" ^ string_of_int !counter in
+  let v = Utils.Names.lvar_prefix_bi ^ string_of_int !counter in
   counter := !counter + 1;
   v
 

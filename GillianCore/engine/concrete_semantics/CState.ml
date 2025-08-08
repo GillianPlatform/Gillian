@@ -181,10 +181,6 @@ end = struct
   let pp_err fmt (err : err_t) : unit =
     match err with
     | EMem m_err -> CMemory.pp_err fmt m_err
-    | EType (v, t1, t2) ->
-        Fmt.pf fmt "EType(%a, %a, %s)" CVal.M.pp v
-          (Fmt.option ~none:(Fmt.any "None") (Fmt.of_to_string Type.str))
-          t1 (Type.str t2)
     | _ ->
         raise
           (Exceptions.Unsupported
