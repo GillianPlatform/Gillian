@@ -53,6 +53,11 @@ let of_list_res (lr : ('a, 'b) List_res.t) =
   | Ok x -> just_oks x
   | Error y -> just_errors y
 
+let to_list_res (rl : ('a, 'b) t) : ('a, 'b) List_res.t =
+  match split rl with
+  | oks, [] -> Ok oks
+  | _, errs -> Error errs
+
 module Syntax = struct
   let ( let** ) = bind
   let ( let++ ) x f = map f x

@@ -94,6 +94,10 @@ module Mem = struct
     | Some t -> Delayed.return t
     | None -> Delayed.return SHeapTree.empty
 
+  let update_loc loc tree map =
+    if SHeapTree.is_empty tree then SMap.remove loc map
+    else SMap.add loc tree map
+
   (***** Implementation of local actions *****)
 
   let alloc (map : t) low high : t * string =
@@ -161,7 +165,7 @@ module Mem = struct
     let++ sval, perm, new_tree =
       map_lift_err loc_name (SHeapTree.cons_single tree ofs chunk)
     in
-    (SMap.add loc_name new_tree map, sval, perm)
+    (update_loc loc_name new_tree map, sval, perm)
 
   let prod_single map loc ofs chunk sval perm =
     let open DR.Syntax in
@@ -183,7 +187,7 @@ module Mem = struct
       let++ sarr, perm, new_tree =
         map_lift_err loc_name (SHeapTree.cons_array tree ofs size chunk)
       in
-      (SMap.add loc_name new_tree map, sarr, perm)
+      (update_loc loc_name new_tree map, sarr, perm)
 
   let prod_array map loc ofs size chunk array perm =
     let open DR.Syntax in
@@ -221,7 +225,7 @@ module Mem = struct
       let++ new_tree, perm =
         map_lift_err loc_name (sheap_consumer tree low high)
       in
-      (SMap.add loc_name new_tree map, perm)
+      (update_loc loc_name new_tree map, perm)
 
   let prod_simple ~sheap_producer map loc low high perm =
     let open DR.Syntax in
@@ -252,7 +256,7 @@ module Mem = struct
     let++ bounds, new_tree =
       SHeapTree.cons_bounds tree |> DR.of_result |> map_lift_err loc_name
     in
-    (SMap.add loc_name new_tree map, bounds)
+    (update_loc loc_name new_tree map, bounds)
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in

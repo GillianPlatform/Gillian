@@ -165,7 +165,7 @@ module Make (Annot : Annot.S) = struct
       let rec find fname paths =
         match paths with
         | [] ->
-            Fmt.failwith "Cannot resolve \"%s\", looked in %a and ." fname
+            Fmt.failwith "Cannot resolve \"%s\", looked in %a." fname
               Fmt.(list ~sep:(any ", ") string)
               runtime_paths
         | path :: rest ->

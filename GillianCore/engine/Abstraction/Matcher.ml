@@ -325,7 +325,7 @@ module Make (State : SState.S) :
 
   let cons_pure (state : state_t) (f : Expr.t) : cons_pure_result =
     if !Config.under_approximation then
-      match State.assume_a ~matching:true state [ f ] with
+      match State.assume_a state [ f ] with
       | Some state -> Success state
       | None -> Vanish
     else if State.assert_a state [ f ] then Success state
@@ -337,16 +337,13 @@ module Make (State : SState.S) :
     let state' = State.set_store astate.state store in
     { astate with state = state' }
 
-  let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
-      SVal.SESubst.t * t list =
+  let simplify_astate ?(save = false) (astate : t) : SVal.SESubst.t * t list =
     let { state; preds; wands; pred_defs } = astate in
-    let subst, states =
-      State.simplify ~save ~kill_new_lvars:false ~matching state
-    in
+    let subst, states = State.simplify ~save ~kill_new_lvars:false state in
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
     match states with
-    | [] -> failwith "Impossible: state substitution returned []"
+    | [] -> (subst, [])
     | [ state ] -> (subst, [ { astate with state } ])
     | states ->
         ( subst,
@@ -644,8 +641,7 @@ module Make (State : SState.S) :
             let opt_res =
               Option.map
                 (fun state -> [ Ok { state; preds; wands; pred_defs } ])
-                (State.assume_a ~matching:true
-                   ~production:!Config.delay_entailment state
+                (State.assume_a ~production:!Config.delay_entailment state
                    [ BinOp (v_x, Equal, v_le) ])
             in
             Option.value
@@ -677,8 +673,7 @@ module Make (State : SState.S) :
                   m "About to assume %a in state:\n%a" Formula.pp f' pp_state state); *)
         (* FIXME: Understand why this causes a bug in Gillian-C *)
         match
-          State.assume_a ~matching:true ~production:!Config.delay_entailment
-            state [ f' ]
+          State.assume_a ~production:!Config.delay_entailment state [ f' ]
         with
         | None ->
             let msg =
@@ -704,7 +699,7 @@ module Make (State : SState.S) :
           try produce_assertion intermediate_state subst asrt
           with e ->
             let admissible =
-              State.assume_a ~time:"Produce: final check" ~matching:true
+              State.assume_a ~time:"Produce: final check"
                 intermediate_state.state [ Expr.true_ ]
             in
             if !Config.delay_entailment && Option.is_none admissible then (
@@ -720,14 +715,14 @@ module Make (State : SState.S) :
     in
     let admissible =
       L.verbose (fun fmt -> fmt "Produce: final check");
-      try
-        State.assume_a ~time:"Produce: final check" ~matching:true state
-          [ Expr.true_ ]
+      try State.assume_a ~time:"Produce: final check" state [ Expr.true_ ]
       with _ -> None
     in
     L.verbose (fun fmt -> fmt "Concluded final check");
     match admissible with
-    | None -> other_state_err "final state non admissible"
+    | None ->
+        L.normal (fun fmt -> fmt "final state non admissible");
+        Res_list.vanish
     | Some state -> Res_list.return { state; preds; pred_defs; wands }
 
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
@@ -875,7 +870,7 @@ module Make (State : SState.S) :
               L.verbose (fun m -> m "Warning: %a" pp_err_t err);
               Res_list.vanish
           | Ok state ->
-              let subst, states = simplify_astate ~matching:true state in
+              let subst, states = simplify_astate state in
               let+ state = states in
               Ok (subst, state))
     in
@@ -1079,8 +1074,7 @@ module Make (State : SState.S) :
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let** folded =
-          fold ~in_matching:true ~state:astate ~match_kind:(Fold pname) pred
-            vs_ins
+          fold ~state:astate ~match_kind:(Fold pname) pred vs_ins
         in
         (* Supposedly, we don't need a guard to make sure we're not looping indefinitely:
            if the fold worked, then consume_pred should not take this branch on the next try.
@@ -1122,7 +1116,7 @@ module Make (State : SState.S) :
              (fun (u, e) ->
                let se = SVal.SESubst.subst_in_expr pvar_subst ~partial:true e in
                (* let se = SVal.SESubst.subst_in_expr subst ~partial:true se in *)
-               (u, try Reduction.reduce_lexpr ~matching:true se with _ -> se))
+               (u, try Reduction.reduce_lexpr se with _ -> se))
              outs)
       with _ -> None
     in
@@ -1287,16 +1281,9 @@ module Make (State : SState.S) :
                   consume_pred ~no_auto_fold astate pname vs
                     ~fold_outs_info:(subst, step, les_outs)
                 in
-                let () =
-                  match consume_pred_res with
-                  | [] ->
-                      let msg = "CONSUME_PRED VANISHED! MEDOOOOOO!!!!!" in
-                      L.verbose ~severity:Warning (fun m -> m "%s" msg);
-                      if not !Config.under_approximation then
-                        Fmt.failwith "%s\n@?" msg
-                      else ()
-                  | _ -> ()
-                in
+                if List.is_empty consume_pred_res then
+                  L.verbose ~severity:Warning (fun m ->
+                      m "Consume_pred vanished!");
                 let++ astate', _ = consume_pred_res in
                 astate'
           | Wand { lhs; rhs } ->
@@ -1352,9 +1339,7 @@ module Make (State : SState.S) :
                   let discharges_pf =
                     List.fold_left Expr.Infix.( && ) Expr.true_ discharges
                   in
-                  let discharges_pf =
-                    Reduction.reduce_lexpr ~matching:true discharges_pf
-                  in
+                  let discharges_pf = Reduction.reduce_lexpr discharges_pf in
                   let to_asrt = Expr.Infix.( && ) pf discharges_pf in
                   match cons_pure state to_asrt with
                   | Success new_state ->
@@ -1388,7 +1373,7 @@ module Make (State : SState.S) :
               | _ ->
                   if !Config.under_approximation then
                     (* In under-approx we try to assume the types hold*)
-                    match State.assume_a ~matching:true state corrections with
+                    match State.assume_a state corrections with
                     | None -> Res_list.vanish
                     | Some state' ->
                         Res_list.return
@@ -1510,19 +1495,11 @@ module Make (State : SState.S) :
             let res_list, assertion_id =
               match_assertion_safely astate subst step
             in
-            let successes, errors =
-              res_list
-              |> List.partition_map (function
-                   | Ok x -> Left x
-                   | Error x -> Right x)
-            in
+            let successes, errors = Res_list.split res_list in
             match (!Config.under_approximation, successes, errors) with
             (* We start by handling the crash cases that should never happen *)
             | true, _, _ :: _ ->
                 L.fail "ERROR: IMPOSSIBLE! MATCHING ERRORS IN UX MODE!!!!"
-            | false, [], [] ->
-                L.fail "OX MATCHING VANISHED??? MEDOOOOOOOO!!!!!!!!!"
-            | false, _ :: _ :: _, [] -> L.fail "DEATH. OX MATCHING BRANCHED"
             | true, [], _ ->
                 (* Vanished in UX *)
                 match_mp' (rest_search_states, errs_so_far)
@@ -1543,6 +1520,32 @@ module Make (State : SState.S) :
                 match_mp'
                   ( ((state, subst, rest_mp), assertion_id) :: rest_search_states,
                     errs_so_far )
+            | false, [], [] ->
+                L.verbose (fun m ->
+                    m "Consumer yielded 0 branches in OX mode!!!");
+                match_mp' (rest_search_states, errs_so_far)
+            | false, states, [] -> (
+                L.verbose (fun m ->
+                    m "Consumer yielded >1 branches in OX mode: %d branches!!!"
+                      (List.length states));
+                (* We have obtained several branches. So there is a disjunction in the PFS.
+                   All branches need to successfuly unify against this *)
+                let all_next : internal_mp_u_res =
+                  List.concat_map
+                    (fun state ->
+                      let state = copy_astate state in
+                      let subst = SVal.SESubst.copy subst in
+                      Res_list.of_list_res
+                      @@ match_mp'
+                           ( [ ((state, subst, rest_mp), assertion_id) ],
+                             errs_so_far ))
+                    states
+                  |> Res_list.to_list_res
+                in
+                match all_next with
+                | Ok res -> Ok res
+                | Error errs ->
+                    match_mp' (rest_search_states, errs @ errs_so_far))
             | true, first :: rem, [] ->
                 let rem =
                   List.map
@@ -1669,16 +1672,6 @@ module Make (State : SState.S) :
     in
     let subst = SVal.SESubst.init (additional_bindings @ param_bindings) in
     let match_result = match_ ~in_matching state subst pred.def_mp match_kind in
-    let () =
-      match match_result with
-      | [] ->
-          Fmt.(
-            failwith "@[<h>HORROR: fold vanished for %s(%a) with bindings: %a@]"
-              pred_name (Dump.list Expr.pp) args
-              (Dump.list @@ Dump.pair Expr.pp Expr.pp)
-              additional_bindings)
-      | _ -> ()
-    in
     let open Res_list.Syntax in
     let** astate', subst', _ = match_result in
     let { preds = preds'; _ } = astate' in
@@ -1783,16 +1776,14 @@ module Make (State : SState.S) :
           L.verbose (fun m -> m "No fold recovery tactic");
           Error "None"
     in
-    let- unfold_error =
-      (* This matches the legacy behaviour *)
-      let unfold_values = Option.value ~default:[] tactic.try_unfold in
-      match unfold_with_vals' ~auto_level:`High astate unfold_values with
-      | None -> Error "Automatic unfold failed"
-      | Some (pname, next_states) ->
-          let sp = List.map (fun (_, astate) -> astate) next_states in
-          Ok (sp, Try_unfold (pname, unfold_values))
-    in
-    Fmt.error "try_fold: %s\ntry_unfold: %s" fold_error unfold_error
+    (* This matches the legacy behaviour *)
+    let unfold_values = Option.value ~default:[] tactic.try_unfold in
+    match unfold_with_vals' ~auto_level:`High astate unfold_values with
+    | None ->
+        Fmt.error "try_fold: %s\ntry_unfold: Automatic unfold failed" fold_error
+    | Some (pname, next_states) ->
+        let sp = List.map snd next_states in
+        Ok (sp, Try_unfold (pname, unfold_values))
 
   let unfold_with_vals
       ~(auto_level : [ `High | `Low ])
@@ -1866,7 +1857,7 @@ module Make (State : SState.S) :
       match produced with
       | Error _ -> []
       | Ok state ->
-          let _, simplified = simplify_astate ~matching:true state in
+          let _, simplified = simplify_astate state in
           simplified
 
     let match_assertion astate subst step =
@@ -2047,7 +2038,7 @@ module Make (State : SState.S) :
       let outs =
         let+ u, e = outs in
         let se = SVal.SESubst.subst_in_expr pvar_subst ~partial:true e in
-        let se = try Reduction.reduce_lexpr ~matching:true se with _ -> se in
+        let se = try Reduction.reduce_lexpr se with _ -> se in
         (u, se)
       in
       List.iter (fun (u, v) -> SVal.SESubst.put subst u v) outs;
