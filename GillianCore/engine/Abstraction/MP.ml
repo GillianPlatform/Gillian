@@ -67,13 +67,40 @@ let kb_pp = Fmt.(braces (iter ~sep:comma KB.iter Expr.full_pp))
 
 type preds_tbl_t = (string, pred) Hashtbl.t
 
-type err =
+type err_ =
   | MPSpec of string * Asrt.t list
   | MPPred of string * Asrt.t list
   | MPLemma of string * Asrt.t list
   | MPAssert of Asrt.t * Asrt.t list
   | MPInvariant of Asrt.t * Asrt.t list
 [@@deriving show]
+
+let pp_err_ fmt = function
+  | MPSpec (name, asrts) ->
+      Fmt.pf fmt "MP failed for spec %s:@\n@[%a@]" name
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPPred (name, asrts) ->
+      Fmt.pf fmt "MP failed for predicate %s:@\n@[%a@]" name
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPLemma (name, asrts) ->
+      Fmt.pf fmt "MP failed for lemma %s:@\n@[%a@]" name
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPAssert (asrt, asrts) ->
+      Fmt.pf fmt "MP failed for assertion %a:@\n@[%a@]" Asrt.pp asrt
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+  | MPInvariant (asrt, asrts) ->
+      Fmt.pf fmt "MP failed for invariant %a:@\n@[%a@]" Asrt.pp asrt
+        Fmt.(list ~sep:(any ", ") Asrt.pp)
+        asrts
+
+type err = err_ Location.located
+
+let pp_err fmt (e, _) = pp_err_ fmt e
+let show_err (e, _) = show_err_ e
 
 exception MPError of err
 
@@ -743,7 +770,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
         let mp = init ~use_params:true KB.empty params preds sspecs in
         match mp with
         | Error err ->
-            raise (MPError (MPSpec (spec.spec_name, err)))
+            raise (MPError (MPSpec (spec.spec_name, err), spec.spec_location))
             (* let msg = Printf.sprintf "Specification of %s cannot be turned into MP. %s"
                  spec.name (Spec.str spec) in
                L.fail msg *)
@@ -752,6 +779,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
               verbose (fun m ->
                   m "Successfully created MP of specification of %s"
                     spec.spec_name));
+            L.tmi (fun m -> m "%a" pp mp);
             Hashtbl.replace u_specs spec.spec_name { data = spec; mp })
       specs;
     Ok u_specs
@@ -778,7 +806,8 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
         let mp = init ~use_params:true KB.empty params preds sspecs in
         match mp with
         | Error err ->
-            raise (MPError (MPLemma (lemma.lemma_name, err)))
+            raise
+              (MPError (MPLemma (lemma.lemma_name, err), lemma.lemma_location))
             (* let msg = Printf.sprintf "Lemma %s cannot be turned into MP" lemma.name in
                L.fail msg *)
         | Ok mp ->
@@ -825,7 +854,8 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         in
         let create_or_raise defs =
           match init known_params KB.empty pred_ins defs with
-          | Error err -> raise (MPError (MPPred (pred.pred_name, err)))
+          | Error err ->
+              raise (MPError (MPPred (pred.pred_name, err), pred.pred_loc))
           (* let msg = Printf.sprintf "Predicate definition of %s cannot be turned into MP" pred.name in
              L.fail msg *)
           | Ok mp -> mp
@@ -849,32 +879,42 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
     Ok u_preds
   with MPError e -> Error e
 
-let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, err) result =
-  let open Syntaxes.Result in
-  let all_specs : Spec.t list = Prog.get_specs prog in
-  let lemmas : Lemma.t list = Prog.get_lemmas prog in
-  let* preds =
-    match preds_tbl with
-    | Some preds_tbl -> Ok preds_tbl
-    | None -> init_preds prog.preds
+let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : 'a prog =
+  let res =
+    let open Syntaxes.Result in
+    let all_specs : Spec.t list = Prog.get_specs prog in
+    let lemmas : Lemma.t list = Prog.get_lemmas prog in
+    let* preds =
+      match preds_tbl with
+      | Some preds_tbl -> Ok preds_tbl
+      | None -> init_preds prog.preds
+    in
+    let pred_ins =
+      Hashtbl.fold
+        (fun name (pred : pred) pred_ins ->
+          Hashtbl.add pred_ins name pred.pred.pred_ins;
+          pred_ins)
+        preds
+        (Hashtbl.create Config.medium_tbl_size)
+    in
+    let* lemmas =
+      L.verbose (fun fmt -> fmt "Calculating MPs for lemmas");
+      init_lemmas pred_ins lemmas
+    in
+    let+ specs = init_specs pred_ins all_specs in
+    let coverage : (string * int, int) Hashtbl.t =
+      Hashtbl.create Config.big_tbl_size
+    in
+    { prog; specs; preds; lemmas; coverage }
   in
-  let pred_ins =
-    Hashtbl.fold
-      (fun name (pred : pred) pred_ins ->
-        Hashtbl.add pred_ins name pred.pred.pred_ins;
-        pred_ins)
-      preds
-      (Hashtbl.create Config.medium_tbl_size)
-  in
-  let* lemmas =
-    L.verbose (fun fmt -> fmt "Calculating MPs for lemmas");
-    init_lemmas pred_ins lemmas
-  in
-  let+ specs = init_specs pred_ins all_specs in
-  let coverage : (string * int, int) Hashtbl.t =
-    Hashtbl.create Config.big_tbl_size
-  in
-  { prog; specs; preds; lemmas; coverage }
+  match res with
+  | Ok res -> res
+  | Error (e, loc) ->
+      let msg =
+        Fmt.str "Creation of matching plans failed:@\n %a@\n@?" pp_err_ e
+      in
+      raise
+        (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg)
 
 let get_pred_def (pred_defs : preds_tbl_t) (name : string) : pred =
   match Hashtbl.find_opt pred_defs name with

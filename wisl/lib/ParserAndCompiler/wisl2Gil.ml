@@ -510,12 +510,18 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
     let rec_call =
       WStmt.make (FunCall (loopretvar, loop_fname, pvars, None)) while_loc
     in
+    let loop_vanish_hack =
+      if not !WConfig.loop_hack then []
+      else
+        let false_ = WExpr.make (Val (Bool false)) while_loc in
+        [ WStmt.make (Assume false_) while_loc ]
+    in
     let allvars = WExpr.make (WExpr.List pvars) while_loc in
     let ret_not_rec = WStmt.make (VarAssign (loopretvar, allvars)) while_loc in
     let body =
-      [
-        WStmt.make (If (guard, wcmds @ [ rec_call ], [ ret_not_rec ])) while_loc;
-      ]
+      let then_ = wcmds @ [ rec_call ] @ loop_vanish_hack in
+      let else_ = [ ret_not_rec ] in
+      [ WStmt.make (If (guard, then_, else_)) while_loc ]
     in
     let loop_body_of =
       match loop_body_of with
@@ -579,7 +585,7 @@ let rec compile_stmt_list
     ?loop_body_of
     stmtl =
   (* create generator that works in the context of this function *)
-  let compile_expr = compile_expr ~fname in
+  let compile_expr = compile_expr ~is_loop_prefix ~fname in
   let compile_lcmd = compile_lcmd ~fname in
   let compile_list = compile_stmt_list ~fname ?loop_body_of in
   let gen_str = Generators.gen_str fname in
@@ -870,7 +876,7 @@ let rec compile_stmt_list
 
 let compile_spec
     ?(fname = "main")
-    WSpec.{ pre; post; variant; fparams; existentials; _ } =
+    WSpec.{ pre; post; variant; fparams; existentials; sploc; _ } =
   let comp_pre =
     let _, comp_pre = compile_lassert ~fname pre in
     let loc = WLAssert.get_loc pre |> CodeLoc.to_location in
@@ -901,7 +907,8 @@ let compile_spec
         Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
           true
   in
-  Spec.init fname fparams [ single_spec ] false false true
+  let location = CodeLoc.to_location sploc in
+  Spec.init fname fparams [ single_spec ] false false true (Some location)
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
@@ -1056,6 +1063,7 @@ let compile_lemma
         lemma_variant;
         lemma_hypothesis;
         lemma_conclusion;
+        lemma_loc;
         _;
       } =
   let compile_lcmd = compile_lcmd ~fname:lemma_name in
@@ -1092,6 +1100,7 @@ let compile_lemma
     (post, Some loc)
   in
   let lemma_existentials = [] in
+  let lemma_location = Some (CodeLoc.to_location lemma_loc) in
   (* TODO: What about existentials for lemma in WISL ? *)
   Lemma.
     {
@@ -1110,6 +1119,7 @@ let compile_lemma
           };
         ];
       lemma_existentials;
+      lemma_location;
     }
 
 let compile ~filepath WProg.{ context; predicates; lemmas } =

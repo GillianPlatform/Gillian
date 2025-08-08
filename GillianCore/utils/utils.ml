@@ -127,6 +127,7 @@ end
 (**/**)
 
 module Preprocessing_utils = Preprocessing_utils
-module Statistics = Statistics
+
+type _ Effect.t += Sys_error_during_logging : (string * string) -> unit Effect.t
 
 (**/**)

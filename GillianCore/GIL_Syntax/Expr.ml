@@ -382,39 +382,41 @@ let rec map_opt
       Option.map f_after mapped_expr
 
 (** Printer *)
-let rec pp fmt e =
+let pp_custom ~pp ft =
   let pp_var_with_type fmt (x, t_opt) =
     Fmt.pf fmt "%s%a" x
       (Fmt.option (fun fm t -> Fmt.pf fm " : %s" (Type.str t)))
       t_opt
   in
-  match e with
-  | Lit l -> Literal.pp fmt l
-  | PVar v | LVar v | ALoc v -> Fmt.string fmt v
+  function
+  | Lit l -> Literal.pp ft l
+  | PVar v | LVar v | ALoc v -> Fmt.string ft v
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->
-          Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
-      | Equal -> Fmt.pf fmt "@[(%a %s %a)@]" pp e1 (BinOp.str op) pp e2
-      | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
-  | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
+          Fmt.pf ft "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
+      | Equal -> Fmt.pf ft "@[(%a %s %a)@]" pp e1 (BinOp.str op) pp e2
+      | _ -> Fmt.pf ft "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
+  | LstSub (e1, e2, e3) -> Fmt.pf ft "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
-  | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
-  | EList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
+  | UnOp (op, e) -> Fmt.pf ft "(%s %a)" (UnOp.str op) pp e
+  | EList ll -> Fmt.pf ft "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
   (* -{ e1, e2, ... }- *)
-  | ESet ll -> Fmt.pf fmt "-{ %a }-" (Fmt.list ~sep:Fmt.comma pp) ll
+  | ESet ll -> Fmt.pf ft "-{ %a }-" (Fmt.list ~sep:Fmt.comma pp) ll
   | NOp (op, le) ->
-      Fmt.pf fmt "%s %a" (NOp.str op)
+      Fmt.pf ft "%s %a" (NOp.str op)
         (Fmt.parens (Fmt.list ~sep:Fmt.comma pp))
         le
   | Exists (bt, e) ->
-      Fmt.pf fmt "(exists %a . %a)"
+      Fmt.pf ft "(exists %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
   | ForAll (bt, e) ->
-      Fmt.pf fmt "(forall %a . %a)"
+      Fmt.pf ft "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
+
+let rec pp ft t = pp_custom ~pp ft t
 
 let rec full_pp fmt e =
   match e with

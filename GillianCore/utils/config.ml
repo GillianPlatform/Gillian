@@ -97,6 +97,7 @@ module Verification = struct
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
   let things_to_verify = ref All
+  let things_to_exclude = ref Containers.SS.empty
 
   let set_procs_to_verify = function
     | [] -> ()
@@ -122,3 +123,7 @@ let reset_config () =
       reset_config_f := None;
       f ()
   | None -> ()
+
+let usage_logs = ref false
+let usage_logs_file = ref "./gillian_usage_log.jsonl"
+let usage_logs_git_ref = ref "HEAD"

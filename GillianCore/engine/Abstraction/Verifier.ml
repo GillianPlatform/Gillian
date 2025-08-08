@@ -14,6 +14,9 @@ module type S = sig
        and type heap_t = heap_t
        and type m_err_t = m_err
 
+  module SState :
+    SState.S with type t = SPState.state_t and type heap_t = heap_t
+
   module SAInterpreter :
     G_interpreter.S
       with type vt = Expr.t
@@ -24,7 +27,7 @@ module type S = sig
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SMatcher : Matcher.S
+  module SMatcher : Matcher.S with type state_t = SPState.state_t
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -69,6 +72,7 @@ module Make
 struct
   module L = Logging
   module SSubst = SVal.SESubst
+  module SState = SState
   module SPState = SPState
 
   module SAInterpreter =
@@ -82,7 +86,7 @@ struct
   type m_err = SPState.m_err_t
   type annot = PC.Annot.t
 
-  module SMatcher = Matcher.Make (SState)
+  module SMatcher = SPState.SMatcher
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
@@ -121,7 +125,7 @@ struct
 
   let testify
       ~(init_data : SPState.init_data)
-      (_func_or_lemma_name : string) (* TODO: unused now? *)
+      (func_or_lemma_name : string)
       (preds : (string, MP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
@@ -227,8 +231,7 @@ struct
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_mp with
         | Error _ ->
-            let open Gillian_result in
-            let err =
+            let exc =
               let msg =
                 Fmt.str
                   "Failed to create matching plan for post-condition of %s" name
@@ -242,9 +245,10 @@ struct
                     | None, None -> None)
                   None posts
               in
-              Error.AnalysisFailures [ { msg; loc } ]
+              Gillian_result.Exc.analysis_failure ?loc ~is_preprocessing:true
+                msg
             in
-            raise (Exc.Gillian_error err)
+            raise exc
         | Ok post_mp ->
             let pre' = SPState.to_assertions ss_pre in
             let ss_pre =
@@ -278,6 +282,7 @@ struct
             in
             (Some test, Some ((pre', snd pre), posts))
     in
+    Gillian_result.with_target func_or_lemma_name @@ fun () ->
     try
       (* Step 1 - normalise the precondition *)
       match
@@ -295,8 +300,10 @@ struct
         Fmt.str "Preprocessing %s failed during normalisation\n%s" name msg
       in
       let loc = snd pre in
-      let error = Gillian_result.Error.(AnalysisFailures [ { msg; loc } ]) in
-      raise (Gillian_result.Exc.Gillian_error error)
+      let exc =
+        Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg
+      in
+      raise exc
 
   let testify_sspec
       ~init_data
@@ -485,9 +492,9 @@ struct
           errors
           |> List.map @@ fun e ->
              let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
-             Gillian_result.Error.{ msg; loc }
+             Gillian_result.Error.make_analysis_failure ?loc msg
         in
-        Gillian_result.analysis_failures errors
+        Error (Gillian_result.Error.AnalysisFailures errors)
     | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } ->
         if Some fl <> test.flag then (
           let msg =
@@ -499,7 +506,8 @@ struct
                 (Fmt.Dump.pair Fmt.int Fmt.int)
                 test.id msg);
           Fmt.pr "f @?";
-          Gillian_result.analysis_failures [ { msg; loc } ])
+          let e = Gillian_result.Error.make_analysis_failures ?loc msg in
+          Error e)
         else
           let parent_id =
             match parent_id with
@@ -528,7 +536,7 @@ struct
             let () = Fmt.pr "s @?" in
             Ok ()
           else
-            let msg = "Failed to match against postcondition" in
+            let msg = "Couldn't satisfy postcondition" in
             let () =
               L.normal (fun m ->
                   m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
@@ -536,7 +544,10 @@ struct
                     test.id msg)
             in
             let () = Fmt.pr "f @?" in
-            Gillian_result.analysis_failures [ { msg; loc = test.post_loc } ]
+            let e =
+              Gillian_result.Error.make_analysis_failures ?loc:test.post_loc msg
+            in
+            Error e
 
   let analyse_proc_results
       (test : t)
@@ -581,19 +592,20 @@ struct
            in
            None
          else
-           let msg = "Failed to match against postcondition" in
+           let msg = "Couldn't satisfy postcondition" in
            let () =
              L.normal (fun m ->
                  m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
                    (Fmt.Dump.pair Fmt.int Fmt.int)
                    test.id msg)
            in
-           Some Gillian_result.Error.{ msg; loc = test.post_loc }
+           Some
+             (Gillian_result.Error.make_analysis_failure ?loc:test.post_loc msg)
     in
     let result =
       match errors with
       | [] -> Ok ()
-      | _ -> Gillian_result.analysis_failures errors
+      | _ -> Error (Gillian_result.Error.AnalysisFailures errors)
     in
     print_success_or_failure (Result.is_ok result);
     result
@@ -611,6 +623,7 @@ struct
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
   let verify (prog : annot MP.prog) (test : t) : unit Gillian_result.t =
+    Gillian_result.with_target test.name @@ fun () ->
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -649,10 +662,10 @@ struct
                   errors
                   |> List.map @@ fun e ->
                      let msg = Fmt.str "%a" SPState.pp_err e in
-                     Gillian_result.Error.{ msg; loc = None }
+                     Gillian_result.Error.make_analysis_failure msg
                 in
                 print_success_or_failure false;
-                Gillian_result.analysis_failures errors))
+                Error (Gillian_result.Error.AnalysisFailures errors)))
 
   let pred_extracting_visitor =
     object
@@ -739,11 +752,14 @@ struct
       (lnames_to_verify : SS.t) : annot MP.prog * t list * t list =
     let ipreds = MP.init_preds prog.preds in
     match ipreds with
-    | Error e ->
-        Fmt.pr "Creation of matching plans for predicates failed with:\n%a\n@?"
-          MP.pp_err e;
-        Fmt.failwith "Creation of matching plans for predicates failed."
-    | Ok preds -> (
+    | Error (e, loc) ->
+        let msg =
+          Fmt.str "Creation of matching plans for predicates failed:@\n %a@\n@?"
+            MP.pp_err_ e
+        in
+        raise
+          (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg)
+    | Ok preds ->
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
@@ -820,22 +836,14 @@ struct
 
         (* STEP 4: Create matching plans for specs and predicates *)
         (* Printf.printf "Creating matching plans: %f\n" (cur_time -. start_time); *)
-        match MP.init_prog ~preds_tbl:preds prog with
-        | Error e ->
-            Fmt.failwith "Creation of matching plans failed:@\n %a@\n@?"
-              MP.pp_err e
-        | Ok prog' ->
-            (* STEP 5: Determine static dependencies and add to call graph *)
-            List.iter
-              (fun test -> record_proc_dependencies test.name prog')
-              tests;
-            List.iter
-              (fun test -> record_lemma_dependencies test.name prog')
-              tests';
-            Hashtbl.iter
-              (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
-              prog'.preds;
-            (prog', tests', tests))
+        let prog' = MP.init_prog ~preds_tbl:preds prog in
+        (* STEP 5: Determine static dependencies and add to call graph *)
+        List.iter (fun test -> record_proc_dependencies test.name prog') tests;
+        List.iter (fun test -> record_lemma_dependencies test.name prog') tests';
+        Hashtbl.iter
+          (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
+          prog'.preds;
+        (prog', tests', tests)
 
   let verify_procs
       ~(init_data : SPState.init_data)
@@ -873,15 +881,19 @@ struct
     result
 
   let select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify =
-    match !Config.Verification.things_to_verify with
-    | All -> (procs_to_verify, lemmas_to_verify)
-    | ProcsOnly -> (procs_to_verify, SS.empty)
-    | LemmasOnly -> (SS.empty, lemmas_to_verify)
-    | Specific ->
-        ( SS.inter procs_to_verify
-            (SS.of_list !Config.Verification.procs_to_verify),
-          SS.inter lemmas_to_verify
-            (SS.of_list !Config.Verification.lemmas_to_verify) )
+    let module C = Config.Verification in
+    let ps, ls =
+      match !C.things_to_verify with
+      | All -> (procs_to_verify, lemmas_to_verify)
+      | ProcsOnly -> (procs_to_verify, SS.empty)
+      | LemmasOnly -> (SS.empty, lemmas_to_verify)
+      | Specific ->
+          ( SS.inter procs_to_verify (SS.of_list !C.procs_to_verify),
+            SS.inter lemmas_to_verify (SS.of_list !C.lemmas_to_verify) )
+    in
+    let ps = SS.diff ps !C.things_to_exclude in
+    let ls = SS.diff ls !C.things_to_exclude in
+    (ps, ls)
 
   let verify_up_to_procs
       ?(proc_name : string option)

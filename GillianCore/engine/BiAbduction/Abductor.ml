@@ -145,6 +145,7 @@ module Make
               spec_normalised = true;
               spec_incomplete = true;
               spec_to_verify = false;
+              spec_location = None;
             }
         in
         L.verbose (fun m ->

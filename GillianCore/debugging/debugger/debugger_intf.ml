@@ -9,9 +9,10 @@ module type S = sig
   end
 
   val launch : string -> string option -> t Gillian_result.t
-  val jump_to_id : Logging.Report_id.t -> t -> unit Gillian_result.t
+  val jump : Logging.Report_id.t -> t -> unit Gillian_result.t
   val step_in : t -> stop_reason
-  val step : ?reverse:bool -> t -> stop_reason
+  val step_over : t -> stop_reason
+  val step_back : t -> stop_reason
 
   val step_specific :
     Exec_map.Packaged.branch_case option ->
@@ -20,7 +21,8 @@ module type S = sig
     stop_reason Gillian_result.t
 
   val step_out : t -> stop_reason
-  val run : ?reverse:bool -> ?launch:bool -> t -> stop_reason
+  val continue : t -> stop_reason
+  val continue_back : t -> stop_reason
   val start_proc : string -> t -> stop_reason Gillian_result.t
   val terminate : t -> unit
   val get_frames : t -> frame list

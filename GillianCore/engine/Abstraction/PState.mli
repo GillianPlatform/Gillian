@@ -8,6 +8,8 @@ module type S = sig
   type state_t
   type abs_t = string * vt list
 
+  module SMatcher : Matcher.S with type state_t = state_t
+
   val make_p :
     preds:MP.preds_tbl_t ->
     init_data:init_data ->

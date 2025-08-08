@@ -41,7 +41,9 @@ let rec auto_unfold
                     instead of %i"
                    name (List.length args) (List.length params)
                in
-               raise (Gillian_result.Exc.verification_failure ?loc msg)
+               raise
+                 (Gillian_result.Exc.analysis_failure ~is_preprocessing:true
+                    ?loc msg)
            in
            let subst = SVal.SSubst.init combined in
            let defs = List.map (fun (_, def) -> def) pred.pred_definitions in
@@ -491,7 +493,8 @@ let explicit_param_types
         | Ok pred -> pred
         | Error msg ->
             raise
-              (Gillian_result.Exc.verification_failure ?loc:pred.pred_loc msg)
+              (Gillian_result.Exc.analysis_failure ~is_preprocessing:true
+                 ?loc:pred.pred_loc msg)
       in
       (* Join the new predicate definition with all previous for the same predicate (if any) *)
       try
