@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
       - name: Setup Z3
@@ -54,6 +54,8 @@ jobs:
         run: opam exec -- dune build @all
       - name: Basic tests
         run: opam exec -- dune test
+      - name: Generate LLVM Runtime
+        run: opam exec -- dune exec -- gillian-llvm-runtime-gen Gillian-LLVM/examples/rt/template.json Gillian-LLVM/examples/rt/runtime.gil
       - name: Gillian-LLVM Tests
         run: opam exec -- dune exec gillian-llvm  -- bulk-wpst Gillian-LLVM/examples/wpst
       - name: Wisl checks

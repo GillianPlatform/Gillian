@@ -1,0 +1,181 @@
+
+import "Gillian-LLVM/examples/rt/runtime.gil";
+proc main() {
+  v_t := {{"int-1",0x1v1}};
+  v_f := {{"int-1",0x0v1}};
+
+  v_1 := {{"float",1.5}};
+  v_2 := {{"float",-2.3}};
+  v_3 := {{"float",nan}};
+
+  (* Test false *)
+  r_1 := "fcmp_false_32_32_1"(v_1, v_2);
+  assert((r_1 == v_f));
+  r_2 := "fcmp_false_32_32_1"(v_2, v_1);
+  assert((r_2 == v_f));
+  r_3 := "fcmp_false_32_32_1"(v_1, v_1);
+  assert((r_3 == v_f));
+  r_4 := "fcmp_false_32_32_1"(v_1, v_3);
+  assert((r_4 == v_f));
+  
+  (* Test OEQ *)
+  r_5 := "fcmp_oeq_32_32_1"(v_1, v_2);
+  assert((r_5 == v_f));
+  r_6 := "fcmp_oeq_32_32_1"(v_2, v_1);
+  assert((r_6 == v_f));
+  r_7 := "fcmp_oeq_32_32_1"(v_1, v_1);
+  assert((r_7 == v_t));
+  r_8 := "fcmp_oeq_32_32_1"(v_1, v_3);
+  assert((r_8 == v_f));
+
+  (* Test OGT *)
+  r_9 := "fcmp_ogt_32_32_1"(v_1, v_2);
+  assert((r_9 == v_t));
+  r_10 := "fcmp_ogt_32_32_1"(v_2, v_1);
+  assert((r_10 == v_f));
+  r_11 := "fcmp_ogt_32_32_1"(v_1, v_1);
+  assert((r_11 == v_f));
+  r_12 := "fcmp_ogt_32_32_1"(v_1, v_3);
+  assert((r_12 == v_f));
+
+  (* Test OGE *)
+  r_13 := "fcmp_oge_32_32_1"(v_1, v_2);
+  assert((r_13 == v_t));
+  r_14 := "fcmp_oge_32_32_1"(v_2, v_1);
+  assert((r_14 == v_f));
+  r_15 := "fcmp_oge_32_32_1"(v_1, v_1);
+  assert((r_15 == v_t));
+  r_16 := "fcmp_oge_32_32_1"(v_1, v_3);
+  assert((r_16 == v_f));
+
+  (* Test OLT *)
+  r_17 := "fcmp_olt_32_32_1"(v_1, v_2);
+  assert((r_17 == v_f));
+  r_18 := "fcmp_olt_32_32_1"(v_2, v_1);
+  assert((r_18 == v_t));
+  r_19 := "fcmp_olt_32_32_1"(v_1, v_1);
+  assert((r_19 == v_f));
+  r_20 := "fcmp_olt_32_32_1"(v_1, v_3);
+  assert((r_20 == v_f));
+
+  (* Test OLE *)
+  r_21 := "fcmp_ole_32_32_1"(v_1, v_2);
+  assert((r_21 == v_f));
+  r_22 := "fcmp_ole_32_32_1"(v_2, v_1);
+  assert((r_22 == v_t));
+  r_23 := "fcmp_ole_32_32_1"(v_1, v_1);
+  assert((r_23 == v_t));
+  r_24 := "fcmp_ole_32_32_1"(v_1, v_3);
+  assert((r_24 == v_f));
+
+  (* Test ONE *)
+  r_25 := "fcmp_one_32_32_1"(v_1, v_2);
+  assert((r_25 == v_t));
+  r_26 := "fcmp_one_32_32_1"(v_2, v_1);
+  assert((r_26 == v_t));
+  r_27 := "fcmp_one_32_32_1"(v_1, v_1);
+  assert((r_27 == v_f));
+  r_28 := "fcmp_one_32_32_1"(v_1, v_3);
+  assert((r_28 == v_f));
+
+  (* Test ORD *)
+  r_29 := "fcmp_ord_32_32_1"(v_1, v_2);
+  assert((r_29 == v_t));
+  r_30 := "fcmp_ord_32_32_1"(v_2, v_1);
+  assert((r_30 == v_t));
+  r_31 := "fcmp_ord_32_32_1"(v_1, v_1);
+  assert((r_31 == v_t));
+  r_32 := "fcmp_ord_32_32_1"(v_1, v_3);
+  assert((r_32 == v_f));
+  r_33 := "fcmp_ord_32_32_1"(v_3, v_1);
+  assert((r_33 == v_f));
+  r_34 := "fcmp_ord_32_32_1"(v_3, v_3);
+  assert((r_34 == v_f));
+
+  (* Test UEQ *)
+  r_35 := "fcmp_ueq_32_32_1"(v_1, v_2);
+  assert((r_35 == v_f));
+  r_36 := "fcmp_ueq_32_32_1"(v_2, v_1);
+  assert((r_36 == v_f));
+  r_37 := "fcmp_ueq_32_32_1"(v_1, v_1);
+  assert((r_37 == v_t));
+  r_38 := "fcmp_ueq_32_32_1"(v_1, v_3);
+  assert((r_38 == v_t));
+
+  (* Test UGT *)
+  r_39 := "fcmp_ugt_32_32_1"(v_1, v_2);
+  assert((r_39 == v_t));
+  r_40 := "fcmp_ugt_32_32_1"(v_2, v_1);
+  assert((r_40 == v_f));
+  r_41 := "fcmp_ugt_32_32_1"(v_1, v_1);
+  assert((r_41 == v_f));
+  r_42 := "fcmp_ugt_32_32_1"(v_1, v_3);
+  assert((r_42 == v_t));
+
+  (* Test UGE *)
+  r_43 := "fcmp_uge_32_32_1"(v_1, v_2);
+  assert((r_43 == v_t));
+  r_44 := "fcmp_uge_32_32_1"(v_2, v_1);
+  assert((r_44 == v_f));
+  r_45 := "fcmp_uge_32_32_1"(v_1, v_1);
+  assert((r_45 == v_t));
+  r_46 := "fcmp_uge_32_32_1"(v_1, v_3);
+  assert((r_46 == v_t));
+
+  (* Test ULT *)
+  r_47 := "fcmp_ult_32_32_1"(v_1, v_2);
+  assert((r_47 == v_f));
+  r_48 := "fcmp_ult_32_32_1"(v_2, v_1);
+  assert((r_48 == v_t));
+  r_49 := "fcmp_ult_32_32_1"(v_1, v_1);
+  assert((r_49 == v_f));
+  r_50 := "fcmp_ult_32_32_1"(v_1, v_3);
+  assert((r_50 == v_t));
+
+  (* Test ULE *)
+  r_51 := "fcmp_ule_32_32_1"(v_1, v_2);
+  assert((r_51 == v_f));
+  r_52 := "fcmp_ule_32_32_1"(v_2, v_1);
+  assert((r_52 == v_t));
+  r_53 := "fcmp_ule_32_32_1"(v_1, v_1);
+  assert((r_53 == v_t));
+  r_54 := "fcmp_ule_32_32_1"(v_1, v_3);
+  assert((r_54 == v_t));
+
+  (* Test UNE *)
+  r_55 := "fcmp_une_32_32_1"(v_1, v_2);
+  assert((r_55 == v_t));
+  r_56 := "fcmp_une_32_32_1"(v_2, v_1);
+  assert((r_56 == v_t));
+  r_57 := "fcmp_une_32_32_1"(v_1, v_1);
+  assert((r_57 == v_f));
+  r_58 := "fcmp_une_32_32_1"(v_1, v_3);
+  assert((r_58 == v_t));
+
+  (* Test UNO *)
+  r_59 := "fcmp_uno_32_32_1"(v_1, v_2);
+  assert((r_59 == v_f));
+  r_60 := "fcmp_uno_32_32_1"(v_2, v_1);
+  assert((r_60 == v_f));
+  r_61 := "fcmp_uno_32_32_1"(v_1, v_1);
+  assert((r_61 == v_f));
+  r_62 := "fcmp_uno_32_32_1"(v_1, v_3);
+  assert((r_62 == v_t));
+  r_63 := "fcmp_uno_32_32_1"(v_3, v_1);
+  assert((r_63 == v_t));
+  r_64 := "fcmp_uno_32_32_1"(v_3, v_3);
+  assert((r_64 == v_t));
+
+  (* Test true *)
+  r_65 := "fcmp_true_32_32_1"(v_1, v_2);
+  assert((r_65 == v_t));
+  r_66 := "fcmp_true_32_32_1"(v_2, v_1);
+  assert((r_66 == v_t));
+  r_67 := "fcmp_true_32_32_1"(v_1, v_1);
+  assert((r_67 == v_t));
+  r_68 := "fcmp_true_32_32_1"(v_1, v_3);
+  assert((r_68 == v_t));
+
+  ret := {{}};
+  return
+};

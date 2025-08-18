@@ -394,7 +394,7 @@ let cmp_patterns
     in
     return ()
   in
-  let case_statement_for_int (regular_val1 : Expr.t) (regular_val2 : Expr.t) =
+  let case_statement_for_num (regular_val1 : Expr.t) (regular_val2 : Expr.t) =
     let int_val1 = Expr.list_nth regular_val1 1 in
     let int_val2 = Expr.list_nth regular_val2 1 in
     let* _ = add_return_of_bool_value (op [ int_val1; int_val2 ] shape) in
@@ -420,11 +420,35 @@ let cmp_patterns
             LLVMRuntimeTypes.Int (List.hd shape.args);
             LLVMRuntimeTypes.Int (List.nth shape.args 1);
           ];
-        case_stat = case_statement_for_int expr1 expr2;
+        case_stat = case_statement_for_num expr1 expr2;
       };
     ]
   in
-  let patterns = int_patterns @ ptr_patterns in
+  let float_patterns =
+    [
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.F32; LLVMRuntimeTypes.F32 ];
+        case_stat = case_statement_for_num expr1 expr2;
+      };
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.F64; LLVMRuntimeTypes.F64 ];
+        case_stat = case_statement_for_num expr1 expr2;
+      };
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.F32; LLVMRuntimeTypes.F64 ];
+        case_stat = case_statement_for_num expr1 expr2;
+      };
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.F64; LLVMRuntimeTypes.F32 ];
+        case_stat = case_statement_for_num expr1 expr2;
+      };
+    ]
+  in
+  let patterns = int_patterns @ ptr_patterns @ float_patterns in
   let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
   let* _ = type_dispatch patterns default_statement in
   return ()
@@ -519,6 +543,11 @@ module OpFunctions = struct
   let bv_op_pred ?(literals : int list option) (op : BVOps.t) inputs shape =
     bv_op_function_custom_res ?literals op inputs shape None
 
+  let fp_op_pred (op : BinOp.t) (inputs : Expr.t list) (shape : bv_op_shape) :
+      Expr.t =
+    let open Gil_syntax in
+    Expr.BinOp (List.hd inputs, op, List.hd (List.tl inputs))
+
   let bv_check_function
       ?(literals : int list option)
       (op : BVOps.t)
@@ -533,6 +562,7 @@ module OpFunctions = struct
   let mul_op_function = bv_op_function BVOps.BVMul
   let sdiv_op_function = bv_op_function BVOps.BVSdiv
   let shl_op_function = bv_op_function BVOps.BVShl
+  let lshr_op_function = bv_op_function BVOps.BVLShr
   let srem_op_function = bv_op_function BVSrem
   let mul_op_nuw = bv_check_function BVOps.BVUMulO
   let mul_op_nsw = bv_check_function BVOps.BVSMulO
@@ -562,6 +592,63 @@ module OpFunctions = struct
   let icmp_slt = bv_op_pred BVOps.BVSlt
   let icmp_sle = bv_op_pred BVOps.BVSleq
 
+  (* fcmp helpers *)
+  let unordered_function
+      (inputs : Expr.t list)
+      (shape : bv_op_shape) =
+    let lhs_nan = Expr.UnOp (UnOp.M_isNaN, List.hd inputs) in
+    let rhs_nan = Expr.UnOp (UnOp.M_isNaN, List.hd (List.tl inputs)) in
+    let unordered = Expr.BinOp (lhs_nan, BinOp.Or, rhs_nan) in
+    unordered
+
+  let ordered_function
+      (inputs : Expr.t list)
+      (shape : bv_op_shape) =
+    let ordered = Expr.UnOp (UnOp.Not, unordered_function inputs shape) in
+    ordered
+
+  let ordered_and_function
+      (f : Expr.t list -> bv_op_shape -> Expr.t)
+      (inputs : Expr.t list)
+      (shape : bv_op_shape) =
+    let orig_res = f inputs shape in
+    let ordered = ordered_function inputs shape in
+    let ordered_res = Expr.BinOp (ordered, BinOp.And, orig_res) in
+    ordered_res
+
+  let unordered_or_function
+      (f : Expr.t list -> bv_op_shape -> Expr.t)
+      (inputs : Expr.t list)
+      (shape : bv_op_shape) =
+    let orig_res = f inputs shape in
+    let unordered = unordered_function inputs shape in
+    let unordered_res = Expr.BinOp (unordered, BinOp.Or, orig_res) in
+    unordered_res
+
+  (* fcmp functions *)
+  let fcmp_false (inputs : Expr.t list) (shape : bv_op_shape) =
+    let open Gil_syntax in
+    Expr.Lit (Literal.Bool false)
+  let fcmp_oeq = ordered_and_function icmp_eq
+  let fcmp_ogt =
+    ordered_and_function (negated_function (fp_op_pred BinOp.FLessThanEqual))
+  let fcmp_oge = ordered_and_function (negated_function (fp_op_pred BinOp.FLessThan))
+  let fcmp_olt = ordered_and_function (fp_op_pred BinOp.FLessThan)
+  let fcmp_ole = ordered_and_function (fp_op_pred BinOp.FLessThanEqual)
+  let fcmp_one = ordered_and_function (negated_function icmp_eq)
+  let fcmp_ord = ordered_function
+  let fcmp_uno = unordered_function
+  let fcmp_ueq = unordered_or_function icmp_eq
+  let fcmp_ugt =
+    unordered_or_function (negated_function (fp_op_pred BinOp.FLessThanEqual))
+  let fcmp_uge = unordered_or_function (negated_function (fp_op_pred BinOp.FLessThan))
+  let fcmp_ult = unordered_or_function (fp_op_pred BinOp.FLessThan)
+  let fcmp_ule = unordered_or_function (fp_op_pred BinOp.FLessThanEqual)
+  let fcmp_une = unordered_or_function (negated_function icmp_eq)
+  let fcmp_true (inputs : Expr.t list) (shape : bv_op_shape) =
+    let open Gil_syntax in
+    Expr.Lit (Literal.Bool true)
+  
   let unop_function
       ?(compute_lits : (input:int -> output:int -> int list) option)
       (op : BVOps.t)
@@ -1172,6 +1259,14 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
                []);
       };
       {
+        name = "bvlshr";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_integer_op ~op:OpFunctions.lshr_op_function)
+               []);
+      };
+      {
         name = "bvor";
         generator =
           ValueOp
@@ -1325,6 +1420,134 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
           ValueOp
             (flag_template_function
                (template_from_pattern_cmp ~op:OpFunctions.icmp_sle)
+               []);
+      };
+      {
+        name = "fcmp_false";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_false)
+               []);
+      };
+      {
+        name = "fcmp_oeq";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_oeq)
+               []);
+      };
+      {
+        name = "fcmp_ogt";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ogt)
+               []);
+      };
+      {
+        name = "fcmp_oge";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_oge)
+               []);
+      };
+      {
+        name = "fcmp_olt";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_olt)
+               []);
+      };
+      {
+        name = "fcmp_ole";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ole)
+               []);
+      };
+      {
+        name = "fcmp_one";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_one)
+               []);
+      };
+      {
+        name = "fcmp_ord";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ord)
+               []);
+      };
+      {
+        name = "fcmp_uno";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_uno)
+               []);
+      };
+      {
+        name = "fcmp_ueq";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ueq)
+               []);
+      };
+      {
+        name = "fcmp_ugt";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ugt)
+               []);
+      };
+      {
+        name = "fcmp_uge";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_uge)
+               []);
+      };
+      {
+        name = "fcmp_ult";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ult)
+               []);
+      };
+      {
+        name = "fcmp_ule";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_ule)
+               []);
+      };
+      {
+        name = "fcmp_une";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_une)
+               []);
+      };
+      {
+        name = "fcmp_true";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_cmp ~op:OpFunctions.fcmp_true)
                []);
       };
     ]
