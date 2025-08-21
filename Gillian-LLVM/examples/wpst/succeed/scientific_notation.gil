@@ -1,0 +1,35 @@
+
+import "Gillian-LLVM/examples/rt/runtime.gil";
+proc main() {
+  v_t := {{"int-1",0x1v1}};
+
+  v_1 := {{"float",1.5e9}};
+  v_2 := {{"float",-2.3e+09}};
+  v_3 := {{"float",4.8e3}};
+  v_4 := {{"float",52.7E-8}};
+  v_5 := {{"float",-23.0E+8}};
+
+  r_1 := "fcmp_ogt_32_32_1"(v_1, v_2);
+  assert((r_1 == v_t));
+  r_2 := "fcmp_ogt_32_32_1"(v_1, v_3);
+  assert((r_2 == v_t));
+  r_3 := "fcmp_ogt_32_32_1"(v_1, v_4);
+  assert((r_3 == v_t));
+  r_4 := "fcmp_ogt_32_32_1"(v_1, v_5);
+  assert((r_4 == v_t));
+  r_5 := "fcmp_olt_32_32_1"(v_2, v_3);
+  assert((r_5 == v_t));
+  r_6 := "fcmp_olt_32_32_1"(v_2, v_4);
+  assert((r_6 == v_t));
+  r_7 := "fcmp_oeq_32_32_1"(v_2, v_5);
+  assert((r_7 == v_t));
+  r_8 := "fcmp_ogt_32_32_1"(v_3, v_4);
+  assert((r_8 == v_t));
+  r_9 := "fcmp_ogt_32_32_1"(v_3, v_5);
+  assert((r_9 == v_t));
+  r_10 := "fcmp_ogt_32_32_1"(v_4, v_5);
+  assert((r_10 == v_t));
+
+  ret := {{}};
+  return
+};
