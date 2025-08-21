@@ -355,7 +355,13 @@ module SVArray = struct
   let byte_array_of_sval (sval : SVal.t) : t Delayed.t =
     let open Delayed.Syntax in
     let+ result = SVal.to_raw_bytes_se sval in
-    { chunk = sval.chunk; values = Expr.EList result }
+    (* At this point we know that the chunk is: *)
+    (* IntegerChunk | IntegerOrPtrChunk *)
+    (* Unconditionally decompose into an IntegerChunk of width 8, matching the *)
+    (* array element type *)
+    let result_expr = Expr.EList result in
+    let chunk = Chunk.IntegerChunk 8 in
+    { chunk; values = result_expr }
 
   let decode_sval_into ~chunk (sval : SVal.t) =
     let open Delayed.Syntax in
