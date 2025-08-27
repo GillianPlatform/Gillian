@@ -256,6 +256,7 @@ module Node = struct
     let open Delayed.Syntax in
     let a, size_left = left in
     let b, size_right = right in
+    Logging.tmi (fun m -> m "MERGING NODES OF LHS@,%a@,RHS@,%a" pp a pp b);
     match (a, b) with
     | NotOwned Totally, NotOwned Totally -> ret (NotOwned Totally)
     | NotOwned _, _ | _, NotOwned _ -> ret (NotOwned Partially)
@@ -272,6 +273,10 @@ module Node = struct
         let array arr = ret (mk (Array arr)) in
         let lazy_value = ret (mk LazyValue) in
         let zeros = ret (mk Zeros) in
+
+        Logging.tmi (fun m ->
+            m "vala, valb LHS@,%a@,RHS@,%a" Yojson.Safe.pp
+              (mem_val_to_yojson vala) Yojson.Safe.pp (mem_val_to_yojson valb));
         match (vala, valb) with
         | Zeros, Zeros -> zeros
         | Poisoned Totally, Poisoned Totally -> ret (mk (Poisoned Totally))
@@ -402,7 +407,7 @@ module Node = struct
             | Some arr -> array arr
             | None -> lazy_value))
 
-  let decode ~low ~chunk t =
+  let decode ~low ~chunk ?children t =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match t with
@@ -419,7 +424,13 @@ module Node = struct
         let+ sval = SVArr.decode_as_sval ~chunk arr in
         Ok (sval, exact_perm)
     | MemVal { mem_val = LazyValue; exact_perm; _ } ->
-        failwith "unimplmented: decoding lazy value"
+        let left, right =
+          match children with
+          | Some (left, right) -> (left, right)
+          | _ -> failwith "decoding lazy value without access to children"
+        in
+        Logging.tmi (fun m -> m "decode %a %a" pp left pp right);
+        failwith "fallthrough"
 
   let decode_array ~size ~chunk t =
     let open Delayed.Syntax in
@@ -661,10 +672,10 @@ module Tree = struct
         Logging.tmi (fun m -> m "EXTEND_IF_NEEDED: left can be less than span");
         failwith "left can be less than span"
         (*;
-        let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
-        let children = (new_left_tree, t) in
-        Delayed.return
-          (make ~node:(NotOwned Partially) ~span:(rl, sh) ~children ()))*))
+          let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
+          let children = (new_left_tree, t) in
+          Delayed.return
+            (make ~node:(NotOwned Partially) ~span:(rl, sh) ~children ()))*))
       else Delayed.return t
     in
     let sl, _ = t_with_left.span in
@@ -938,7 +949,12 @@ module Tree = struct
     in
     let rebuild_parent = with_children in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
-    let++ sval, _ = Node.decode ~low ~chunk framed.node in
+    let children =
+      match framed.children with
+      | Some (l, r) -> Some (l.node, r.node)
+      | None -> None
+    in
+    let++ sval, _ = Node.decode ~low ~chunk ?children framed.node in
     (sval, tree)
 
   let store (t : t) (low : Expr.t) (chunk : Chunk.t) (sval : SVal.t) :

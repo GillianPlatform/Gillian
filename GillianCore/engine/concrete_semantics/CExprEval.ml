@@ -1,4 +1,5 @@
 open Arith_utils
+open BVOps
 module CStore = Store.Make (CVal.M)
 
 (* Expression Evaluation *)
@@ -312,6 +313,71 @@ and evaluate_lstsub (store : CStore.t) (e1 : Expr.t) (e2 : Expr.t) (e3 : Expr.t)
   in
   LList sub_list
 
+and map_bvbinop width =
+  let bv f l r = Literal.LBitvector (f l r, width)
+  and bool f l r = Literal.Bool (f l r) in
+  function
+  | BVPlus -> bv Z.add
+  | BVUleq -> bool Z.leq
+  | BVUlt -> bool Z.lt
+  | _ as op ->
+      raise
+        (Exceptions.Unsupported
+           (Printf.sprintf "Unimplemented concrete BVOp %s" (BVOps.str op)))
+
+and map_bvunop width =
+  let _bv f x = Literal.LBitvector (f x, width)
+  and _bool f x = Literal.Bool (f x) in
+  function
+  | _ as op ->
+      raise
+        (Exceptions.Unsupported
+           (Printf.sprintf "Unimplemented concrete BVOp %s" (BVOps.str op)))
+
+and evaluate_bvop
+    (store : CStore.t)
+    (op : BVOps.t)
+    (es : Expr.bv_arg list)
+    width : CVal.M.t =
+  let _eval = evaluate_expr store
+  and bv_lit = function
+    | Expr.Literal i ->
+        failwith "unhandled Literal in position expecting BvExpr, API misuse?"
+        (* Literal.LBitvector (i, 32) *)
+    | Expr.BvExpr (e, w) ->
+        Logging.tmi (fun m -> m "evaluated BvExpr: %a" Expr.pp e);
+        (evaluate_expr store e, w)
+  in
+  match (op, es) with
+  | _, [ lhs; rhs ] -> (
+      let lhs, lw = bv_lit lhs and rhs, rw = bv_lit rhs in
+      assert (lw = rw);
+      let f = map_bvbinop lw op in
+      match (lhs, rhs) with
+      | LBitvector (lhs, lw), LBitvector (rhs, rw) ->
+          Logging.tmi (fun m ->
+              m "lhs=%a, rhs=%a" Z.pp_print lhs Z.pp_print rhs);
+          assert (lw = rw);
+          f lhs rhs
+      | _ -> failwith "Unhandled non-bitvector literal in evaluate_bvop")
+  | _, [ e ] -> (
+      let e, w = bv_lit e in
+      let f = map_bvunop w op in
+      match e with
+      | LBitvector (e, w) -> f e
+      | _ -> failwith "Unhandled non-bitvector literal in evaluate_binop")
+  | BVExtract, [ Expr.Literal hi; Expr.Literal lo; (Expr.BvExpr _ as e) ] -> (
+      let e, w = bv_lit e in
+      match e with
+      | LBitvector (e, w) -> Literal.LBitvector (Z.extract e hi lo, w)
+      | _ as v ->
+          Logging.tmi (fun m -> m "bvextract: %a" Literal.pp v);
+          failwith "Unimplemented bvextract")
+  | _ ->
+      let op_name = BVOps.str op in
+      failwith
+        (Printf.sprintf "Unhandled number of BV op arguments for %s" op_name)
+
 and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
   try
     let ee = evaluate_expr store in
@@ -325,10 +391,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
         | Some v -> v)
-    | BVExprIntrinsic (_, _, _) ->
-        raise
-          (Failure
-             "Bitvector intrinsics currently unsupported in concrete semantics")
+    | BVExprIntrinsic (op, es, width) -> evaluate_bvop store op es width
     | BinOp (e1, bop, e2) -> evaluate_binop store bop e1 e2
     | UnOp (unop, e) -> evaluate_unop unop (ee e)
     | NOp (nop, le) -> evaluate_nop nop (List.map ee le)
