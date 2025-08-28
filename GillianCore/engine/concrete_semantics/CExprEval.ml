@@ -318,6 +318,7 @@ and map_bvbinop width =
   and bool f l r = Literal.Bool (f l r) in
   function
   | BVPlus -> bv Z.add
+  | BVSub -> bv Z.sub
   | BVUleq -> bool Z.leq
   | BVUlt -> bool Z.lt
   | _ as op ->
@@ -344,9 +345,7 @@ and evaluate_bvop
     | Expr.Literal i ->
         failwith "unhandled Literal in position expecting BvExpr, API misuse?"
         (* Literal.LBitvector (i, 32) *)
-    | Expr.BvExpr (e, w) ->
-        Logging.tmi (fun m -> m "evaluated BvExpr: %a" Expr.pp e);
-        (evaluate_expr store e, w)
+    | Expr.BvExpr (e, w) -> evaluate_expr store e, w
   in
   match (op, es) with
   | _, [ lhs; rhs ] -> (
@@ -355,8 +354,6 @@ and evaluate_bvop
       let f = map_bvbinop lw op in
       match (lhs, rhs) with
       | LBitvector (lhs, lw), LBitvector (rhs, rw) ->
-          Logging.tmi (fun m ->
-              m "lhs=%a, rhs=%a" Z.pp_print lhs Z.pp_print rhs);
           assert (lw = rw);
           f lhs rhs
       | _ -> failwith "Unhandled non-bitvector literal in evaluate_bvop")
@@ -370,6 +367,8 @@ and evaluate_bvop
       let e, w = bv_lit e in
       match e with
       | LBitvector (e, w) -> Literal.LBitvector (Z.extract e hi lo, w)
+      | LList [ty; LBitvector (e, w)] ->
+         Literal.LList [ty; Literal.LBitvector (Z.extract e hi lo, w)]
       | _ as v ->
           Logging.tmi (fun m -> m "bvextract: %a" Literal.pp v);
           failwith "Unimplemented bvextract")

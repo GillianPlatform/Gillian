@@ -473,6 +473,7 @@ module SVArray = struct
           let bts =
             List.init ln (fun i ->
                 let elem = Expr.list_nth arr.values i in
+                Logging.tmi (fun m -> m "decode_as_sval expr=%a" Expr.pp elem);
                 elem)
           in
           let built = Expr.bv_concat bts in
@@ -491,7 +492,16 @@ module SVArray = struct
     else failwith "unimplemented: decoding an array as another one"
 
   let array_sub ~arr ~start ~size : t =
-    { arr with values = Expr.list_sub ~lst:arr.values ~start ~size }
+    let e = Expr.list_sub ~lst:arr.values ~start ~size in
+    let values =
+      try
+        Engine.Reduction.reduce_lexpr e
+      with
+        _ as err ->
+        Logging.tmi (fun m -> m "Attempted to simplify array expression but: %s" (Printexc.to_string err));
+        raise err
+    in
+    { arr with values }
 
   let split_at_offset ~at arr : t * t =
     let size_right =

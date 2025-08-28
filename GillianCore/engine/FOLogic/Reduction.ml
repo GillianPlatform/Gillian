@@ -886,8 +886,7 @@ and reduce_lexpr_loop
               Base cases
        ------------------------- *)
     | Lit _ | PVar _ | ALoc _ -> le
-    (*
-    | BVExprIntrinsic (op, args, width) as e -> (
+    (* | BVExprIntrinsic (op, args, width) -> (
         let args = Expr.map_bv_arg_exprs f args
         and reduced =
           try
@@ -904,7 +903,6 @@ and reduce_lexpr_loop
               None
           | e -> raise e
         in
-        Logging.tmi (fun m -> m "Reduce BVExprIntrinsic: %a" Expr.pp e);
         match reduced with
         | None -> BVExprIntrinsic (op, args, width)
         | Some x -> x) *)
