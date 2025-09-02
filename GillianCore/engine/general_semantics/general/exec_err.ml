@@ -9,6 +9,8 @@ type ('value, 'state_err) t =
   | EFailReached of { fail_code : string; fail_params : 'value list }
 [@@deriving yojson]
 
+let estates errs = List.map (fun x -> EState x) errs
+
 let pp pp_val pp_state_err ft err =
   let open Fmt in
   match err with
