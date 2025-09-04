@@ -151,7 +151,7 @@ let hexdigit = ['0'-'9''a'-'f''A'-'F']
 let letter = ['a'-'z''A'-'Z']
 let identifier = letter(letter|digit|'_')*
 
-let float = '-'? digit+ ('.' digit*)?
+let float = '-'? digit+ ('.' digit*)? (('e'|'E') ('+'|'-')? digit+)?
 let int = '-'? digit+ 'i'
 let bv = "0x" hexdigit+ 'v' digit+
 

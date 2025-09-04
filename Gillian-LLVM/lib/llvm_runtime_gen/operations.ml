@@ -453,6 +453,110 @@ let cmp_patterns
   let* _ = type_dispatch patterns default_statement in
   return ()
 
+let fp_patterns
+    ~(pointer_width : int)
+    (expr1 : Expr.t)
+    (expr2 : Expr.t)
+    (op : bv_op_function)
+    (shape : bv_op_shape)
+    (flag_checks : bv_op_function list option) =
+  let open Codegenerator in
+  let open TypePatterns in
+  let open Gil_syntax.Expr.Infix in
+  let case_statement_for_float (regular_val0 : Expr.t) (regular_val1 : Expr.t) =
+    let float_valx = Expr.list_nth regular_val0 1 in
+    let float_valy = Expr.list_nth regular_val1 1 in
+    let* _ =
+      add_return_of_value
+        (Expr.EList
+           [ Expr.list_nth regular_val0 0; op [ float_valx; float_valy ] shape ])
+    in
+    return ()
+  in
+  let patterns =
+    [
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.F32; LLVMRuntimeTypes.F32 ];
+        case_stat = case_statement_for_float expr1 expr2;
+      };
+      {
+        exprs = [ expr1; expr2 ];
+        types_ = [ LLVMRuntimeTypes.F64; LLVMRuntimeTypes.F64 ];
+        case_stat = case_statement_for_float expr1 expr2;
+      };
+    ]
+  in
+  let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
+  let* _ = type_dispatch patterns default_statement in
+  return ()
+
+let fp_patterns_unary
+    ~(pointer_width : int)
+    (expr : Expr.t)
+    (op : bv_op_function)
+    (shape : bv_op_shape)
+    (flag_checks : bv_op_function list option) =
+  let open Codegenerator in
+  let open TypePatterns in
+  let open Gil_syntax.Expr.Infix in
+  let case_statement_for_float (regular_val : Expr.t) =
+    let float_val = Expr.list_nth regular_val 1 in
+    let* _ =
+      add_return_of_value
+        (Expr.EList
+           [ Expr.list_nth regular_val 0; op [ float_val ] shape ])
+    in
+    return ()
+  in
+  let patterns =
+    [
+      {
+        exprs = [ expr ];
+        types_ = [ LLVMRuntimeTypes.F32 ];
+        case_stat = case_statement_for_float expr;
+      };
+      {
+        exprs = [ expr ];
+        types_ = [ LLVMRuntimeTypes.F64 ];
+        case_stat = case_statement_for_float expr;
+      };
+    ]
+  in
+  let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
+  let* _ = type_dispatch patterns default_statement in
+  return ()
+
+let fp_ext_patterns
+    ~(pointer_width : int)
+    (expr : Expr.t)
+    (shape : bv_op_shape)
+    (flag_checks : bv_op_function list option) =
+  let open Codegenerator in
+  let open TypePatterns in
+  let open Gil_syntax.Expr.Infix in
+  let case_statement_for_f32_to_f64 (regular_val : Expr.t) =
+    let float_val = Expr.list_nth regular_val 1 in
+    let* _ =
+      add_return_of_value
+        (Expr.EList
+           [ Expr.string "double"; float_val ])
+    in
+    return ()
+  in
+  let patterns =
+    [
+      {
+        exprs = [ expr ];
+        types_ = [ LLVMRuntimeTypes.F32 ];
+        case_stat = case_statement_for_f32_to_f64 expr;
+      };
+    ]
+  in
+  let default_statement = add_cmd (fail_cmd "No_type_pattern_matched" []) in
+  let* _ = type_dispatch patterns default_statement in
+  return ()
+
 let pattern_function
     (expr1 : Expr.t)
     (expr2 : Expr.t)
@@ -547,6 +651,11 @@ module OpFunctions = struct
       Expr.t =
     let open Gil_syntax in
     Expr.BinOp (List.hd inputs, op, List.hd (List.tl inputs))
+
+  let fp_unop_pred (op : UnOp.t) (inputs : Expr.t list) (shape : bv_op_shape) :
+      Expr.t =
+    let open Gil_syntax in
+    Expr.UnOp (op, List.hd inputs)
 
   let bv_check_function
       ?(literals : int list option)
@@ -693,6 +802,11 @@ module OpFunctions = struct
     | [ x; y ] ->
         bv_op_function BVOps.BVPlus [ neg_function [ y ] first_shape; x ] shape
     | _ -> failwith "Invalid number of arguments"
+
+  let fp_sub_function = fp_op_pred BinOp.FMinus
+  let fp_mul_function = fp_op_pred BinOp.FTimes
+  let fp_div_function = fp_op_pred BinOp.FDiv
+  let fp_abs_function = fp_unop_pred UnOp.M_abs
 end
 
 let template_from_pattern_unary
@@ -730,6 +844,35 @@ let template_from_pattern_cmp
     (shape : bv_op_shape) =
   op_function name 2 (function
     | [ x; y ] -> cmp_patterns ~pointer_width x y op shape
+    | _ -> failwith "Invalid number of arguments")
+
+let template_from_pattern_fp
+    ~(op : bv_op_function)
+    ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
+    (name : string)
+    (shape : bv_op_shape) =
+  op_function name 2 (function
+    | [ x; y ] -> fp_patterns ~pointer_width x y op shape flag_checks
+    | _ -> failwith "Invalid number of arguments")
+  
+let template_from_pattern_fp_unary
+    ~(op : bv_op_function)
+    ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
+    (name : string)
+    (shape : bv_op_shape) =
+  op_function name 1 (function
+    | [ x ] -> fp_patterns_unary ~pointer_width x op shape flag_checks
+    | _ -> failwith "Invalid number of arguments")
+
+let template_from_pattern_fp_ext
+    ~(pointer_width : int)
+    ~(flag_checks : bv_op_function list option)
+    (name : string)
+    (shape : bv_op_shape) =
+  op_function name 1 (function
+    | [ x ] -> fp_ext_patterns ~pointer_width x shape flag_checks
     | _ -> failwith "Invalid number of arguments")
 
 let template_from_integer_op
@@ -1340,6 +1483,46 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
           ValueOp
             (flag_template_function
                (template_from_pattern_unary ~op:OpFunctions.sext_function)
+               []);
+      };
+      {
+        name = "fpsub";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_fp ~op:OpFunctions.fp_sub_function)
+               []);
+      };
+      {
+        name = "fpmul";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_fp ~op:OpFunctions.fp_mul_function)
+               []);
+      };
+      {
+        name = "fpdiv";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_fp ~op:OpFunctions.fp_div_function)
+               []);
+      };
+      {
+        name = "fpabs";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_fp_unary ~op:OpFunctions.fp_abs_function)
+               []);
+      };
+      {
+        name = "fpext";
+        generator =
+          ValueOp
+            (flag_template_function
+               (template_from_pattern_fp_ext)
                []);
       };
       {

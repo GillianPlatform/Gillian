@@ -1,0 +1,68 @@
+
+import "Gillian-LLVM/examples/rt/runtime.gil";
+proc main() {
+  f_1 := {{"float",1.5}};
+  f_2 := {{"float",-2.3}};
+  f_3 := {{"float",3.8}};
+  f_4 := {{"float",-3.8}};
+  f_5 := {{"float",2.5}};
+  f_6 := {{"float",3.0}};
+  f_7 := {{"float",7.5}};
+  f_8 := {{"float",4.8}};
+  f_9 := {{"float",2.0}};
+  f_10 := {{"float",2.4}};
+
+  d_1 := {{"double",1.5}};
+  d_2 := {{"double",-2.3}};
+  d_3 := {{"double",3.8}};
+  d_4 := {{"double",-3.8}};
+  d_5 := {{"double",2.5}};
+  d_6 := {{"double",3.0}};
+  d_7 := {{"double",7.5}};
+  d_8 := {{"double",4.8}};
+  d_9 := {{"double",2.0}};
+  d_10 := {{"double",2.4}};
+
+  (* Test sub *)
+  r_1 := "fpsub_32_32_32"(f_1, f_2);
+  assert((r_1 == f_3));
+  r_2 := "fpsub_32_32_32"(f_2, f_1);
+  assert((r_2 == f_4));
+  r_3 := "fpsub_64_64_64"(d_1, d_2);
+  assert((r_3 == d_3));
+  r_4 := "fpsub_64_64_64"(d_2, d_1);
+  assert((r_4 == d_4));
+  
+  (* Test mul *)
+  r_5 := "fpmul_32_32_32"(f_5, f_6);
+  assert((r_5 == f_7));
+  r_6 := "fpmul_32_32_32"(f_6, f_5);
+  assert((r_6 == f_7));
+  r_7 := "fpmul_64_64_64"(d_5, d_6);
+  assert((r_7 == d_7));
+  r_8 := "fpmul_64_64_64"(d_6, d_5);
+  assert((r_8 == d_7));
+
+  (* Test div *)
+  r_9 := "fpdiv_32_32_32"(f_8, f_9);
+  assert((r_9 == f_10));
+  r_10 := "fpdiv_64_64_64"(d_8, d_9);
+  assert((r_10 == d_10));
+
+  (* Test abs *)
+  r_11 := "fpabs_32_32"(f_1);
+  assert((r_11 == f_1));
+  r_12 := "fpabs_32_32"(f_4);
+  assert((r_12 == f_3));
+  r_13 := "fpabs_64_64"(d_1);
+  assert((r_13 == d_1));
+  r_14 := "fpabs_64_64"(d_4);
+  assert((r_14 == d_3));
+
+  (* Test ext *)
+  r_15 := "fpext_32_64"(f_1);
+  assert((r_15 == d_1));
+
+  ret := {{}};
+  return
+};
