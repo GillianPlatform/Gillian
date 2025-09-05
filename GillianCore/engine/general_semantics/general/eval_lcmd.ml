@@ -1,8 +1,13 @@
 module L = Logging
+open Choice
+open Choice.Syntax
 
 module Make (Impl : Impl.S) = struct
   open Impl
   open Res_list.Syntax
+
+  type res = (int, (state * bool, state_err) result) Choice.t
+  type ctx = { state : state; prog : annot MP.prog; did_branch : bool }
 
   let eval_expr state expr =
     match eval_expr' state expr with
@@ -85,10 +90,10 @@ module Make (Impl : Impl.S) = struct
     in
     left_states @ right_states
 
-  let rec eval_macro name args prog state =
+  let rec eval_macro name args (ctx : ctx) =
     let macro =
       let open MP in
-      match Macro.get prog.prog.macros name with
+      match Macro.get ctx.prog.prog.macros name with
       | Some macro -> macro
       | None ->
           L.verbose (fun m ->
@@ -110,14 +115,14 @@ module Make (Impl : Impl.S) = struct
       macro.macro_definition
       |> List.map (SVal.SSubst.substitute_lcmd subst ~partial:true)
     in
-    eval_lcmds lcmds prog state
+    eval_lcmds' lcmds ctx
 
   and eval_if e lcmds_t lcmds_e prog state =
     let** ve = eval_expr state e in
     let e = Val.to_expr ve in
     match e with
-    | Expr.Lit (Bool true) -> eval_lcmds lcmds_t prog state
-    | Expr.Lit (Bool false) -> eval_lcmds lcmds_e prog state
+    | Expr.Lit (Bool true) -> eval_lcmds' lcmds_t prog state
+    | Expr.Lit (Bool false) -> eval_lcmds' lcmds_e prog state
     | _ ->
         if not (Expr.is_boolean_expr e) then
           Fmt.failwith
@@ -127,24 +132,26 @@ module Make (Impl : Impl.S) = struct
         let state' = State.copy state in
         let then_states =
           match State.assume_a state [ e ] with
-          | Some state -> eval_lcmds lcmds_t prog state
+          | Some state -> eval_lcmds' lcmds_t prog state
           | None -> Res_list.vanish
         in
         let else_states =
           match State.assume_a state' [ ne ] with
-          | Some state -> eval_lcmds lcmds_e prog state
+          | Some state -> eval_lcmds' lcmds_e prog state
           | None -> Res_list.vanish
         in
         then_states @ else_states
 
-  and eval_lcmds lcmds prog state : (state, state_err) Res_list.t =
+  and eval_lcmds' lcmds prog state : res =
     match lcmds with
-    | [] -> Res_list.return state
-    | lcmd :: lcmds ->
-        let** state = eval_lcmd lcmd prog state in
-        eval_lcmds lcmds prog state
+    | [] -> return (Ok state)
+    | lcmd :: lcmds -> (
+        let&* res = eval_lcmd' lcmd prog state in
+        match res with
+        | Ok state -> eval_lcmds' lcmds prog state
+        | Error err -> return (Error err))
 
-  and eval_lcmd (lcmd : LCmd.t) prog state : (state, state_err) Res_list.t =
+  and eval_lcmd' (lcmd : LCmd.t) prog state : res =
     match lcmd with
     | AssumeType (e, t) -> eval_assume_type e t state
     | Assume f -> eval_assume f state

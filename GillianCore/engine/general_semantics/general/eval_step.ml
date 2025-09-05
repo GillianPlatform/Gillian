@@ -1,4 +1,6 @@
 module L = Logging
+open Choice
+open Choice.Syntax
 
 module Make (Impl : Impl.S) = struct
   open Impl
@@ -52,13 +54,14 @@ module Make (Impl : Impl.S) = struct
 
   let simplify_state state =
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
+    |> Choice.Indexed.make_const
 
   let handle_loop_action loop_action invariant_frames state =
     match loop_action with
-    | Nothing -> [ state ]
+    | Nothing -> return state
     | FrameOff id ->
         L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id);
-        [ state ]
+        return state
     | Malformed -> L.fail "Malformed loop identifiers"
     | FrameOn ids ->
         L.verbose (fun fmt -> fmt "INFO: Going to frame on %a" pp_str_list ids);
@@ -77,7 +80,7 @@ module Make (Impl : Impl.S) = struct
               fmt
                 "WARNING: FRAMING ON AFTER EXITING LOOP BRANCHED INTO %i STATES"
                 n);
-        states
+        Choice.Indexed.make_const states
 
   let is_internal (cs : Call_stack.t) (prog : annot MP.prog) =
     let pid = (List.hd cs).pid in
@@ -119,19 +122,18 @@ module Make (Impl : Impl.S) = struct
     MP.update_coverage prog pid ix;
     let ctxs =
       (* TODO: branch cases for this? *)
-      let open Syntaxes.List in
-      let* state = simplify_state state in
-      let+ state = handle_loop_action loop_action invariant_frames state in
+      let&* state = simplify_state state in
+      let&+ state = handle_loop_action loop_action invariant_frames state in
       let conf = { conf with state } in
       { conf; prog; loop_ids; loop_action; pid; cmd; annot; last_known_loc }
     in
     ctxs
 
-  let evaluate_step (prog : annot MP.prog) (cont : step_cont) : step list =
-    cont |> prepare_step_ctx prog
-    |> List.concat_map @@ fun ctx ->
-       try eval_cmd ctx
-       with Failure msg ->
-         let loc = !(ctx.last_known_loc) in
-         raise (Gillian_result.Exc.analysis_failure ?loc msg)
+  let evaluate_step (prog : annot MP.prog) (cont : step_cont) :
+      (int, step) Choice.t =
+    let&* ctx = prepare_step_ctx prog cont in
+    try eval_cmd ctx
+    with Failure msg ->
+      let loc = !(ctx.last_known_loc) in
+      raise (Gillian_result.Exc.analysis_failure ?loc msg)
 end

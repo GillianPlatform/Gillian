@@ -161,7 +161,7 @@ module Make' (M : Modules) = struct
     eval_expr' state expr
     |> Result.map_error @@ fun (errors, state) ->
        let errors = List.map (fun x -> Exec_err.EState x) errors in
-       [ make_err ~state ~errors ctx ]
+       make_err ~state ~errors ctx
 
   let eval_exprs ?state ctx exprs =
     List_utils.map_results (eval_expr ?state ctx) exprs
