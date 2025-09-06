@@ -4,6 +4,7 @@ let pp_str_list = Fmt.(brackets (list ~sep:comma string))
 
 module Make (Impl : Impl.S) = struct
   open Impl
+  open Choice
   module Eval_lcmd = Eval_lcmd.Make (Impl)
   module Eval_proc_call = Eval_proc_call.Make (Impl)
 
@@ -41,9 +42,9 @@ module Make (Impl : Impl.S) = struct
 
   let eval_assignment x e ctx =
     let state = ctx.conf.state in
-    let@* v = eval_expr ctx e in
+    let&** v = eval_expr ctx e in
     let state = update_store state x v in
-    [ make_cont ~state ctx ]
+    return (make_cont ~state ctx)
 
   (* Try recovering from an LAction failure *)
   let try_recovering_laction v_es errors ctx =
@@ -78,9 +79,9 @@ module Make (Impl : Impl.S) = struct
     (* TODO: AnnotatedAction log? *)
     let open Syntaxes.Result in
     let { state; callstack; laction_fuel; _ } : step_cont = ctx.conf in
-    let@* v_es = eval_exprs ctx es in
+    let&** v_es = eval_exprs ctx es in
     let oks, errors = State.execute_action a state v_es |> Res_list.split in
-    let@* ok_states =
+    let&** ok_states =
       oks
       |> List_utils.map_results @@ fun (state, vs) ->
          let e' = Expr.EList (List.map Val.to_expr vs) in
@@ -112,56 +113,56 @@ module Make (Impl : Impl.S) = struct
          let callstack = get_callstack () in
          make_cont ~state ~callstack ~did_branch ~laction_fuel ctx
     in
-    cont_steps @ error_steps
+    choose_const (cont_steps @ error_steps)
 
   let eval_logic (lcmd : LCmd.t) ctx =
     let { prog; loop_ids; loop_action; _ } = ctx in
     let { state; callstack; prev_loop_ids; invariant_frames; _ } = ctx.conf in
     match lcmd with
-    | SL SymbExec -> [ make_cont ~symb_exec_next:true ctx ]
+    | SL SymbExec -> return (make_cont ~symb_exec_next:true ctx)
     (* Invariant being revisited *)
     | SL (Invariant (a, binders)) when loop_ids = prev_loop_ids ->
         (* TODO: is ignoring the result of match_invariant and vanishing the right thing to do? *)
         let _ = State.match_invariant prog true state a binders in
-        []
-    | SL (Invariant (a, binders)) -> (
+        vanish
+    | SL (Invariant (a, binders)) ->
         assert (loop_action = FrameOff (List.hd loop_ids));
-        State.match_invariant prog false state a binders
-        |> List.map @@ function
-           | Ok (frame, state) ->
-               let invariant_frames =
-                 (List.hd loop_ids, frame) :: invariant_frames
-               in
-               make_cont ~state ~invariant_frames ctx
-           | Error err ->
-               let errors = [ Exec_err.EState err ] in
-               make_err ~errors ctx)
-    | _ ->
-        let all_results = Eval_lcmd.eval_lcmd lcmd prog state in
-        let successes, errors = Res_list.split all_results in
+        let oks, errs =
+          State.match_invariant prog false state a binders |> Res_list.split
+        in
+        let did_branch = List.length oks > 1 in
         let get_callstack = callstack_copier callstack in
-        let success_steps =
-          let did_branch = List.length successes > 1 in
-          successes
-          |> List.map @@ fun state ->
+        let ok_steps =
+          oks
+          |> List.map @@ fun (frame, state) ->
+             let invariant_frames =
+               (List.hd loop_ids, frame) :: invariant_frames
+             in
              let callstack = get_callstack () in
-             make_cont ~state ~callstack ~did_branch ctx
+             make_cont ~state ~callstack ~did_branch ~invariant_frames ctx
         in
-        let error_steps =
-          match errors with
-          | [] -> []
-          | _ ->
-              let errors = Exec_err.estates errors in
-              let callstack = get_callstack () in
-              [ make_err ~errors ~callstack ctx ]
+        let err_steps =
+          errs
+          |> List.map @@ fun err ->
+             let callstack = get_callstack () in
+             let errors = [ Exec_err.EState err ] in
+             make_err ~errors ~callstack ctx
         in
-        success_steps @ error_steps
+        choose_const (ok_steps @ err_steps)
+    | _ -> (
+        let&+ r = Eval_lcmd.eval_lcmd lcmd prog state in
+        let callstack = Call_stack.copy callstack in
+        match r with
+        | Ok (state, did_branch) -> make_cont ~state ~callstack ~did_branch ctx
+        | Error errors ->
+            let errors = Exec_err.estates errors in
+            make_err ~errors ~callstack ctx)
 
   let eval_guarded_goto e t_ix f_ix ctx =
     let { state; callstack; _ } : step_cont = ctx.conf in
-    let@* vt = eval_expr ctx e in
+    let&** vt = eval_expr ctx e in
     let lvt = Val.to_literal vt in
-    let@* vf =
+    let&** vf =
       match lvt with
       | Some (Bool true) -> Ok vfalse
       | Some (Bool false) -> Ok vtrue
@@ -198,19 +199,17 @@ module Make (Impl : Impl.S) = struct
             let state' = State.copy state in
             (State.assume state vt, State.assume state' vf)
     in
-    let ts = ts |> List.map @@ fun s -> (s, t_ix) in
-    let fs = fs |> List.map @@ fun s -> (s, f_ix) in
+    let get_callstack = callstack_copier callstack in
+    let ts = ts |> List.map @@ fun s -> (s, t_ix, get_callstack ()) in
+    let fs = fs |> List.map @@ fun s -> (s, f_ix, get_callstack ()) in
     let states = ts @ fs in
     let did_branch = t_sat && f_sat && List.length states > 1 in
-    let get_callstack = callstack_copier callstack in
-    states
-    |> List.map @@ fun (state, ix) ->
-       let callstack = get_callstack () in
-       make_cont ~state ~callstack ~ix ~did_branch ctx
+    let&+ state, ix, callstack = choose_const states in
+    make_cont ~state ~callstack ~ix ~did_branch ctx
 
   let eval_phi_assignment lxarr ctx =
     let j = get_predecessor ctx in
-    let@* state =
+    let&** state =
       let open Syntaxes.Result in
       List.fold_left
         (fun state (x, x_arr) ->
@@ -220,11 +219,11 @@ module Make (Impl : Impl.S) = struct
           update_store state x v)
         (Ok ctx.conf.state) lxarr
     in
-    [ make_cont ~state ctx ]
+    return (make_cont ~state ctx)
 
   let eval_call x e args j subst ctx =
-    let@* pid = eval_expr ctx e in
-    let@* v_args = eval_exprs ctx args in
+    let&** pid = eval_expr ctx e in
+    let&** v_args = eval_exprs ctx args in
     eval_proc_call x pid v_args j subst ctx
 
   let eval_ecall x pid args j ctx =
@@ -236,15 +235,15 @@ module Make (Impl : Impl.S) = struct
       | Lit (String pid) -> pid
       | _ -> failwith "Procedure identifier not a program variable"
     in
-    let@* v_args = eval_exprs ctx args in
-    let open Syntaxes.List in
-    let+ state, callstack, prev_ix, ix =
+    let&** v_args = eval_exprs ctx args in
+    let&+ state, callstack, prev_ix, ix =
       External.execute prog.prog state callstack ix x pid v_args j
+      |> choose_const
     in
     make_cont ~state ~callstack ~ix ~prev_ix ctx
 
   let eval_apply x pid_args j ctx =
-    let@* v_pid_args = eval_expr ctx pid_args in
+    let&** v_pid_args = eval_expr ctx pid_args in
     match Val.to_list v_pid_args with
     | Some v_pid_args_list ->
         let pid = List.hd v_pid_args_list in
@@ -257,7 +256,7 @@ module Make (Impl : Impl.S) = struct
     let { state; callstack; _ } : step_cont = ctx.conf in
     let args = callstack |> Call_stack.get_cur_args |> Val.from_list in
     let state = update_store state x args in
-    [ make_cont ~state ctx ]
+    return (make_cont ~state ctx)
 
   let eval_return ?(is_error = false) ctx =
     let loop_ids = ctx.loop_ids in
@@ -286,7 +285,7 @@ module Make (Impl : Impl.S) = struct
             let () = Fmt.pr "n @?" in
             Flag.Error
         in
-        [ make_finish ~flag ~ret_val ctx ]
+        return (make_finish ~flag ~ret_val ctx)
     | {
      store = Some old_store;
      loop_ids = start_loop_ids;
@@ -305,30 +304,30 @@ module Make (Impl : Impl.S) = struct
         let to_frame_on =
           loop_ids_to_frame_on_at_the_end loop_ids start_loop_ids
         in
-        let open Syntaxes.List in
-        let+ state =
+        let&+ state =
           (* Framing on should never fail *)
           if Exec_mode.is_verification_exec !Config.current_exec_mode then
             State.frame_on state invariant_frames to_frame_on
             |> List.filter_map Result.to_option
-          else [ state ]
+            |> choose_const
+          else return state
         in
         let state = State.set_store state old_store in
         let state = update_store state x ret_val in
         make_cont ~state ~callstack ~loop_ids:start_loop_ids ~ix ~prev_ix ctx
 
   let eval_fail fail_code fail_params ctx =
-    let@* fail_params = eval_exprs ctx fail_params in
+    let&** fail_params = eval_exprs ctx fail_params in
     let errors = [ Exec_err.EFailReached { fail_code; fail_params } ] in
-    [ make_err ~errors ctx ]
+    return (make_err ~errors ctx)
 
-  let eval_cmd (ctx : step_ctx) : step list =
+  let eval_cmd (ctx : step_ctx) : step Seq.t =
     match ctx.cmd with
-    | Skip -> [ make_cont ctx ]
+    | Skip -> return (make_cont ctx)
     | Assignment (x, e) -> eval_assignment x e ctx
     | LAction (x, a, es) -> eval_laction x a es ctx
     | Logic lcmd -> eval_logic lcmd ctx
-    | Goto ix -> [ make_cont ~ix ctx ]
+    | Goto ix -> return (make_cont ~ix ctx)
     | GuardedGoto (e, j, k) -> eval_guarded_goto e j k ctx
     | PhiAssignment lxarr -> eval_phi_assignment lxarr ctx
     | Call (x, e, args, j, subst) -> eval_call x e args j subst ctx

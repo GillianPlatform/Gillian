@@ -25,6 +25,7 @@ module Make' (M : Modules) = struct
   module Annot = PC.Annot
   module Call_stack = Call_stack.Make (Val) (Store)
   module External = M.External (Val) (ESubst) (Store) (State) (Call_stack)
+  module Choice = Choice.Dummy
 
   type value = Val.t [@@deriving yojson, show]
   type subst = ESubst.t
@@ -161,7 +162,7 @@ module Make' (M : Modules) = struct
     eval_expr' state expr
     |> Result.map_error @@ fun (errors, state) ->
        let errors = List.map (fun x -> Exec_err.EState x) errors in
-       [ make_err ~state ~errors ctx ]
+       make_err ~state ~errors ctx
 
   let eval_exprs ?state ctx exprs =
     List_utils.map_results (eval_expr ?state ctx) exprs
@@ -186,6 +187,16 @@ module Make' (M : Modules) = struct
     match r with
     | Ok v -> f v
     | Error e -> e
+
+  let return = Seq.return
+  let vanish = Seq.empty
+  let ( let&* ) s f = Seq.concat_map f s
+  let ( let&+ ) s f = Seq.map f s
+
+  let ( let&** ) r f =
+    match r with
+    | Ok v -> f v
+    | Error e -> return e
 end
 
 module type S = sig

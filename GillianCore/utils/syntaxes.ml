@@ -61,3 +61,8 @@ module List = struct
   let ( let+ ) x f = List.map f x
   let ( let* ) x f = List.concat_map f x
 end
+
+module Seq = struct
+  let ( let+ ) x f = Seq.map f x
+  let ( let* ) x f = Seq.concat_map f x
+end

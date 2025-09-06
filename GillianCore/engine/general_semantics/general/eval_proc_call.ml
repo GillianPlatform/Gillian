@@ -2,13 +2,14 @@ module L = Logging
 
 module Make (Impl : Impl.S) = struct
   open Impl
+  open Choice
 
   let get_pid pid ctx =
     match Val.to_literal pid with
     | Some (String pid) -> Ok pid
     | Some _ ->
         let errors = [ Exec_err.EProc pid ] in
-        Error [ make_err ~errors ctx ]
+        Error (make_err ~errors ctx)
     | None -> failwith "Procedure Call Error - unlifting procedure ID failed"
 
   let get_spec_and_params pid ctx =
@@ -22,7 +23,7 @@ module Make (Impl : Impl.S) = struct
       | None, Some spec -> Ok (Spec.get_params spec.data)
       | _ ->
           let errors = [ Exec_err.EProc (Val.from_literal (String pid)) ] in
-          Error [ make_err ~errors ctx ]
+          Error (make_err ~errors ctx)
     in
     (spec, params)
 
@@ -95,7 +96,7 @@ module Make (Impl : Impl.S) = struct
           ^ spec.data.spec_name
         in
         let errors = [ Exec_err.EState (StateErr.EOther msg) ] in
-        Error [ make_err ~errors ctx ]
+        Error (make_err ~errors ctx)
     | _ -> Ok (Spec_applied (spec, res))
 
   let get_eval_method spec caller x pid args subst ctx =
@@ -121,7 +122,7 @@ module Make (Impl : Impl.S) = struct
         ~loop_ids ~ret_var:x ~call_index:ix ~continue_index:(ix + 1)
         ?error_index:j ()
     in
-    [ make_cont ~state ~callstack ~ix:0 ~prev_ix:(-1) ~symb_exec_next ctx ]
+    return (make_cont ~state ~callstack ~ix:0 ~prev_ix:(-1) ~symb_exec_next ctx)
 
   let use_applied_spec (spec : MP.spec) res pid j ctx =
     let { callstack; ix; _ } : step_cont = ctx.conf in
@@ -133,7 +134,7 @@ module Make (Impl : Impl.S) = struct
     in
     let did_branch = List.length successes > 1 in
     let get_callstack = callstack_copier callstack in
-    let@* success_steps =
+    let&** success_steps =
       successes
       |> List_utils.map_results @@ fun (state, flag) ->
          let open Syntaxes.Result in
@@ -149,7 +150,7 @@ module Make (Impl : Impl.S) = struct
                  Fmt.str "Error: tried to use bug spec '%s'" spec.data.spec_name
                in
                let errors = [ Exec_err.EState (StateErr.EOther msg) ] in
-               Error [ make_err ~state ~errors ctx ]
+               Error (make_err ~state ~errors ctx)
          in
          let callstack = get_callstack () in
          make_cont ~state ~callstack ~ix ~did_branch ctx
@@ -161,7 +162,7 @@ module Make (Impl : Impl.S) = struct
           let callstack = get_callstack () in
           [ make_err ~errors ~callstack ctx ]
     in
-    success_steps @ error_steps
+    choose_const (success_steps @ error_steps)
 
   (** Evaluate a call to a proc
     @param x Variable in which the return value is stored
@@ -170,20 +171,20 @@ module Make (Impl : Impl.S) = struct
     @param j Step index in the caller proc to go to if the callee proc terminates with an error (e.g. for try/catch)
     @param subst Substitutions
     @param ctx The executing context *)
-  let eval_proc_call x pid v_args j subst ctx =
+  let eval_proc_call x pid v_args j subst ctx : step Seq.t =
     let { callstack; _ } : step_cont = ctx.conf in
-    let@* pid = get_pid pid ctx in
-    let@* spec, params = get_spec_and_params pid ctx in
+    let&** pid = get_pid pid ctx in
+    let&** spec, params = get_spec_and_params pid ctx in
     let caller = Call_stack.get_cur_proc_id callstack in
     let () = Call_graph.add_proc_call call_graph caller pid in
     let args = build_args v_args params in
 
-    let@* eval_method = get_eval_method spec caller x pid args subst ctx in
+    let&** eval_method = get_eval_method spec caller x pid args subst ctx in
     match eval_method with
     | Exec -> exec_proc_body x pid v_args j params args ctx
     | Exec_explicit ->
         exec_proc_body ~symb_exec_next:false x pid v_args j params args ctx
     | Spec_applied (spec, res) -> use_applied_spec spec res pid j ctx
-    | Suspend -> [ Step_susp (pid, ctx.conf) ]
-    | Vanish -> []
+    | Suspend -> return (Step_susp (pid, ctx.conf))
+    | Vanish -> vanish
 end

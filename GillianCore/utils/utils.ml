@@ -16,6 +16,12 @@ module Call_graph = struct
   include Call_graph
 end
 
+(** @canonical Gillian.Utils.Choice *)
+module Choice = struct
+  (** @inline *)
+  include Choice
+end
+
 (** @canonical Gillian.Utils.Compare *)
 module Compare = struct
   (** @inline *)
