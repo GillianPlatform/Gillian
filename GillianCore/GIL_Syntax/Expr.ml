@@ -33,6 +33,7 @@ let int n = lit (Int (Z.of_int n))
 let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let bv n w = lit (LBitvector (Z.of_int n, w))
 let bv_z (z : Z.t) (w : int) = lit (LBitvector (z, w))
 let zero_bv (w : int) = bv_z Z.zero w
 let false_ = Lit (Bool false)
@@ -44,7 +45,7 @@ let extract_bv_width (e : t) =
   match e with
   | Lit (LBitvector (_, w)) -> w
   | BVExprIntrinsic (_, _, Some w) -> w
-  | _ -> failwith "unrecoginized bitvector expression"
+  | _ -> failwith "extract_bv_width: unrecognized bitvector expression"
 
 let concat_single (little : t) (big : t) : t =
   let little_size = extract_bv_width little in
@@ -59,7 +60,10 @@ let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
   List.fold_right f (List.tl list) (List.hd list)
 
 let bv_concat (lst : t List.t) =
-  reduce (fun elem sum -> concat_single elem sum) lst
+  (* HACK(tnytown): BvExpr requires a size here but we can't concretize *)
+  let exprs = List.map (fun e -> BvExpr (e, 0)) lst in
+  BVExprIntrinsic (BVOps.BVConcat, exprs, None)
+(* reduce (fun elem sum -> concat_single elem sum) lst *)
 
 let bv_extract (low_index : int) (high_index : int) (e : t) : t =
   let src_width = extract_bv_width e in
@@ -87,6 +91,11 @@ let bv_mul a b =
   let width = extract_bv_width a in
   BVExprIntrinsic
     (BVOps.BVMul, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_udiv a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVUDiv, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_sub a b =
   let width = extract_bv_width a in

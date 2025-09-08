@@ -473,9 +473,16 @@ module SVArray = struct
           let bts =
             List.init ln (fun i ->
                 let elem = Expr.list_nth arr.values i in
-                Logging.tmi (fun m -> m "decode_as_sval expr=%a" Expr.pp elem);
+                (*let elem' = try
+                  Engine.Reduction.reduce_lexpr elem
+                with
+                  _ as err ->
+                  Logging.tmi (fun m -> m "Attempted to simplify decode_as_sval elem but: %s" (Printexc.to_string err));
+                  elem
+                in*)
+                Logging.tmi (fun m -> m "decode_as_sval i=%d expr=@,%a" i Expr.pp elem);
                 elem)
-          in
+          in 
           let built = Expr.bv_concat bts in
           Delayed.return SVal.{ chunk; value = built }
     | Float { bit_width = size_from }, Float { bit_width = size_to } ->
@@ -491,7 +498,7 @@ module SVArray = struct
     if Chunk.equal chunk arr.chunk then Delayed.return arr
     else failwith "unimplemented: decoding an array as another one"
 
-  let array_sub ~arr ~start ~size : t =
+  let array_sub ~arr ~start ~size : t = 
     let e = Expr.list_sub ~lst:arr.values ~start ~size in
     let values =
       try
@@ -499,26 +506,29 @@ module SVArray = struct
       with
         _ as err ->
         Logging.tmi (fun m -> m "Attempted to simplify array expression but: %s" (Printexc.to_string err));
-        raise err
+        e
     in
     { arr with values }
 
   let split_at_offset ~at arr : t * t =
-    let size_right =
-      let open Expr.Infix in
-      Expr.list_length arr.values - at
+    let len_bv = match Expr.list_length arr.values with
+      | Expr.Lit (Literal.Int x) -> Expr.Lit (LBitvector (x, 64))
+      | _ -> failwith "unexpected value in list length"
     in
-    ( array_sub ~arr ~start:Expr.zero_i ~size:at,
+    let size_right =
+      Expr.bv_sub len_bv at
+    in
+    ( array_sub ~arr ~start:(Expr.zero_bv 64) ~size:at,
       array_sub ~arr ~start:at ~size:size_right )
 
   let split_at_byte ~at arr : (t * t) Delayed.t =
-    let chunk_size = Expr.int (Chunk.size arr.chunk) in
+    let chunk_size = Expr.bv_z (Z.of_int (Chunk.size arr.chunk)) 64 in
     let can_keep_chunk =
       let open Expr.Infix in
-      Expr.imod at chunk_size == Expr.zero_i
+      Expr.imod at chunk_size == (Expr.zero_bv 64)
     in
     if%ent can_keep_chunk then
-      Delayed.return (split_at_offset ~at:Expr.Infix.(at / chunk_size) arr)
+      Delayed.return (split_at_offset ~at:(Expr.bv_udiv at chunk_size) arr)
     else failwith "Unhandled: split_at_byte that doesn't preserve chunk"
 
   (* let split_array_in ~size ~amount arr =

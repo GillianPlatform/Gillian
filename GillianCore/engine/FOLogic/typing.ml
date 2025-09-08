@@ -192,12 +192,19 @@ module Infer_types_to_gamma = struct
             (fun w -> ([ BvType w; BvType w ], no_lits_constraint, BvType w))
             width
       | BVConcat -> (
-          let x1 = List.nth_opt es 0 in
-          let x2 = List.nth_opt es 1 in
-          match (x1, x2) with
-          | Some (Expr.BvExpr (_, w1)), Some (Expr.BvExpr (_, w2)) ->
+          let xs =
+            try
               Some
-                ([ BvType w1; BvType w2 ], no_lits_constraint, BvType (w1 + w2))
+                (List.fold_left_map
+                   (fun acc x ->
+                     match x with
+                     | Expr.BvExpr (_, w) -> (acc + w, BvType w)
+                     | _ -> failwith "untyped")
+                   0 es)
+            with _ -> None
+          in
+          match xs with
+          | Some (w, xs) -> Some (xs, no_lits_constraint, BvType w)
           | _ -> None)
       | BVExtract -> (
           let x1 = List.nth_opt es 0 in
@@ -402,14 +409,19 @@ module Type_lexpr = struct
         (Some tt, true))
       ~none:def_neg outcome
 
+  (* Is e typable as bitvector or int? *)
+  let infer_bvorint gamma e =
+    let is_ty t =
+      let _, ok = infer_type gamma e t in
+      ok
+    in
+    (None, is_ty IntType || is_ty (BvType 32) || is_ty (BvType 64))
+
   (* List-nth is typable with constraints *)
   let type_lstnth gamma e1 e2 =
     let infer_type = infer_type gamma in
     let _, success = infer_type e1 ListType in
-    if not success then def_neg
-    else
-      let _, success = infer_type e2 IntType in
-      if not success then def_neg else (None, true)
+    if not success then def_neg else infer_bvorint gamma e2
 
   (* String-nth is typable with constraints *)
   let type_strnth gamma e1 e2 =
@@ -607,8 +619,8 @@ module Type_lexpr = struct
     let _, ite3 = f le3 in
     if ite1 && ite2 && ite3 then
       let _, success1 = infer_type le1 ListType in
-      let _, success2 = infer_type le2 IntType in
-      let _, success3 = infer_type le3 IntType in
+      let _, success2 = infer_bvorint gamma le2 in
+      let _, success3 = infer_bvorint gamma le3 in
       if success1 && success2 && success3 then (Some Type.ListType, true)
       else def_neg
     else def_neg

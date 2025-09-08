@@ -321,6 +321,7 @@ module Expr : sig
   val bv_extract : int -> int -> t -> t
   val bv_plus : t -> t -> t
   val bv_mul : t -> t -> t
+  val bv_udiv : t -> t -> t
   val bv_sub : t -> t -> t
   val bv_ule : t -> t -> t
   val bv_ult : t -> t -> t

@@ -135,21 +135,23 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     (* Uninteresting cases **)
     | EList lst -> EList (List.map f lst)
     | ESet lst -> ESet (List.map f lst)
-    | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
+    (* | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3) *)
     | Exists (bt, le) -> Exists (bt, f le)
     | ForAll (bt, le) -> ForAll (bt, f le)
-    (*
-    | LstSub(le1, le2, le3) ->
-      (match f le1, f le2, f le3 with
-      | EList lst, Lit (Num _start), Lit (Num _end) ->
-          (try EList (Array.to_list (Array.sub (Array.of_list lst) (int_of_float _start) (int_of_float _end)))
-            with _ -> raise (ReductionException (LstSub(le1, le2, le3), "Invalid List Expression")))
-      | Lit (LList lst), Lit (Num _start), Lit (Num _end) ->
-          (try Lit (LList (Array.to_list (Array.sub (Array.of_list lst) (int_of_float _start) (int_of_float _end))))
-            with _ -> raise (ReductionException (LstSub(le1, le2, le3), "Invalid List Expression")))
-      | le1, le2, le3 -> LstSub(le1, le2, le3)
-      )
-    *)
+    | LstSub (le1, le2, le3) as expr -> (
+        let reduce lst pos len =
+          try
+            Array.to_list
+              (Array.sub (Array.of_list lst) (Z.to_int pos) (Z.to_int len))
+          with _ ->
+            raise (ReductionException (expr, "Invalid List Expression"))
+        in
+        match (f le1, f le2, f le3) with
+        | EList lst, Lit (LBitvector (pos, _)), Lit (LBitvector (len, _)) ->
+            EList (reduce lst pos len)
+        | Lit (LList lst), Lit (LBitvector (pos, _)), Lit (LBitvector (len, _))
+          -> Lit (LList (reduce lst pos len))
+        | le1, le2, le3 -> LstSub (le1, le2, le3))
   in
 
   result
@@ -1914,7 +1916,7 @@ and reduce_lexpr_loop
         let fidx = f idx in
         match fidx with
         (* Index is a non-negative integer *)
-        | Lit (Int n) when Z.leq Z.zero n ->
+        | (Lit (Int n) | Lit (LBitvector (n, _))) when Z.leq Z.zero n ->
             if lexpr_is_list gamma fle then
               Option.value
                 ~default:(Expr.BinOp (fle, LstNth, fidx))
