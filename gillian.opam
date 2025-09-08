@@ -44,5 +44,5 @@ build: [
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
 pin-depends: [
-  "simple_smt.~dev" "git+https://github.com/trail-of-forks/simple-smt-ocaml#8327fce05f8389ac9e3150d4e69a29b7fe6cc899"
+  "simple_smt.~dev" "git+https://github.com/trail-of-forks/simple-smt-ocaml#6c844de9e54ad3696c98721681e6d9018d0a46ff"
 ]
