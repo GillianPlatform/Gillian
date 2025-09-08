@@ -44,8 +44,8 @@ module Codegenerator : S with type label = string = struct
   type state = { curr_block : block; blocks : block list }
   type 'a t = state -> 'a * state
 
-  let set_state s = fun state -> ((), s)
-  let get_state = fun state -> (state, state)
+  let set_state s state = ((), s)
+  let get_state state = (state, state)
   let ctr = ref 0
 
   let fresh_sym () =
@@ -233,7 +233,7 @@ let op_bv_scheme
     (check_ops : bv_op_function list option)
     (shape : bv_op_shape) : unit Codegenerator.t =
   let open Codegenerator in
-  let generalized_op = fun inputs shape -> return (op inputs shape) in
+  let generalized_op inputs shape = return (op inputs shape) in
   generalized_op_bv_scheme inputs generalized_op check_ops shape
 
 let op_function
@@ -841,17 +841,13 @@ module OpFunctions = struct
   let icmp_sle = bv_op_pred BVOps.BVSleq
 
   (* fcmp helpers *)
-  let unordered_function
-      (inputs : Expr.t list)
-      (shape : bv_op_shape) =
+  let unordered_function (inputs : Expr.t list) (shape : bv_op_shape) =
     let lhs_nan = Expr.UnOp (UnOp.M_isNaN, List.hd inputs) in
     let rhs_nan = Expr.UnOp (UnOp.M_isNaN, List.hd (List.tl inputs)) in
     let unordered = Expr.BinOp (lhs_nan, BinOp.Or, rhs_nan) in
     unordered
 
-  let ordered_function
-      (inputs : Expr.t list)
-      (shape : bv_op_shape) =
+  let ordered_function (inputs : Expr.t list) (shape : bv_op_shape) =
     let ordered = Expr.UnOp (UnOp.Not, unordered_function inputs shape) in
     ordered
 
@@ -877,26 +873,36 @@ module OpFunctions = struct
   let fcmp_false (inputs : Expr.t list) (shape : bv_op_shape) =
     let open Gil_syntax in
     Expr.Lit (Literal.Bool false)
+
   let fcmp_oeq = ordered_and_function icmp_eq
+
   let fcmp_ogt =
     ordered_and_function (negated_function (fp_op_pred BinOp.FLessThanEqual))
-  let fcmp_oge = ordered_and_function (negated_function (fp_op_pred BinOp.FLessThan))
+
+  let fcmp_oge =
+    ordered_and_function (negated_function (fp_op_pred BinOp.FLessThan))
+
   let fcmp_olt = ordered_and_function (fp_op_pred BinOp.FLessThan)
   let fcmp_ole = ordered_and_function (fp_op_pred BinOp.FLessThanEqual)
   let fcmp_one = ordered_and_function (negated_function icmp_eq)
   let fcmp_ord = ordered_function
   let fcmp_uno = unordered_function
   let fcmp_ueq = unordered_or_function icmp_eq
+
   let fcmp_ugt =
     unordered_or_function (negated_function (fp_op_pred BinOp.FLessThanEqual))
-  let fcmp_uge = unordered_or_function (negated_function (fp_op_pred BinOp.FLessThan))
+
+  let fcmp_uge =
+    unordered_or_function (negated_function (fp_op_pred BinOp.FLessThan))
+
   let fcmp_ult = unordered_or_function (fp_op_pred BinOp.FLessThan)
   let fcmp_ule = unordered_or_function (fp_op_pred BinOp.FLessThanEqual)
   let fcmp_une = unordered_or_function (negated_function icmp_eq)
+
   let fcmp_true (inputs : Expr.t list) (shape : bv_op_shape) =
     let open Gil_syntax in
     Expr.Lit (Literal.Bool true)
-  
+
   let unop_function
       ?(compute_lits : (input:int -> output:int -> int list) option)
       (op : BVOps.t)

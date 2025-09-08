@@ -87,7 +87,8 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
 end
 
 module CLI =
-  Gillian.Command_line.Make (Init_data) (States.Cmemory.Make(Init_data)) (SMemory)
+  Gillian.Command_line.Make (Init_data) (States.Cmemory.Make (Init_data))
+    (SMemory)
     (DummyParserAndCompiler)
     (LLVM.ExternalSemantics)
     (struct
