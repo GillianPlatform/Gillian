@@ -395,7 +395,7 @@ and evaluate_bvop
         List.fold_left
           (fun acc x ->
             match bv_lit x with
-            | LBitvector (v, w), _ ->
+            | (LBitvector (v, w) | LList [ String _; LBitvector (v, w) ]), _ ->
                 Logging.tmi (fun m -> m "+= %d" (Z.to_int v));
                 (v, w)
             | (_ as l), _ ->
