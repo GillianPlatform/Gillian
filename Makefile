@@ -13,8 +13,11 @@ build:
 fmt:
 	$(OPAM_EXEC) dune fmt
 
-deps:
+opam:
 	$(OPAM_EXEC) dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam transformers.opam
+
+deps:
+	make opam
 	opam install . -y --deps-only
 
 switch:
@@ -70,4 +73,4 @@ sphinx:
 sphinx-watch:
 	sphinx-autobuild sphinx _docs/sphinx/
 
-.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs odoc sphinx githooks switch
+.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs odoc sphinx githooks switch deps opam
