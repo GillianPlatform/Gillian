@@ -326,6 +326,23 @@
             ]
         },
         {
+            "name": "bvadd",
+            "output_name": "bvadd_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
             "name": "fpsub",
             "output_name": "fpsub_32_32_32",
             "spec": [
@@ -464,6 +481,512 @@
                     "flags": [],
                     "shape": {
                         "args": [32],
+                        "width_of_result": 64
+                    }
+                }
+            ]
+        },
+        {
+            "name": "sitofp",
+            "output_name": "sitofp",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "uitofp",
+            "output_name": "uitofp",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "fptosi",
+            "output_name": "fptosi",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "fptoui",
+            "output_name": "fptoui",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "select",
+            "output_name": "select_1_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [1, 32, 32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "usubsat",
+            "output_name": "usubsat_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [32, 32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_ult",
+            "output_name": "icmp_ult_64_64_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [64, 64],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvumin",
+            "output_name": "bvumin_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [32, 32],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvumin",
+            "output_name": "bvumin_64_64_64",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [64, 64],
+                        "width_of_result": 64
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvtrunc",
+            "output_name": "bvtrunc_8_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [8],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvtrunc",
+            "output_name": "bvtrunc_64_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [64],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_eq",
+            "output_name": "icmp_eq_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_ne",
+            "output_name": "icmp_ne_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_ugt",
+            "output_name": "icmp_ugt_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_uge",
+            "output_name": "icmp_uge_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_ult",
+            "output_name": "icmp_ult_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_ule",
+            "output_name": "icmp_ule_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_sgt",
+            "output_name": "icmp_sgt_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_sge",
+            "output_name": "icmp_sge_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_slt",
+            "output_name": "icmp_slt_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "icmp_sle",
+            "output_name": "icmp_sle_32_32_1",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [
+                            32,
+                            32
+                        ],
+                        "width_of_result": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvabs",
+            "output_name": "bvabs_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvmul",
+            "output_name": "bvmul_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvand",
+            "output_name": "bvand_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvor",
+            "output_name": "bvor_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvxor",
+            "output_name": "bvxor_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvshl",
+            "output_name": "bvshl_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvlshr",
+            "output_name": "bvlshr_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvsdiv",
+            "output_name": "bvsdiv_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvsrem",
+            "output_name": "bvsrem_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvadd",
+            "output_name": "bvadd_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvsub",
+            "output_name": "bvsub_32_32_32",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32, 32 ],
+                        "width_of_result": 32
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvzext",
+            "output_name": "bvzext_32_64",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32 ],
+                        "width_of_result": 64
+                    }
+                }
+            ]
+        },
+        {
+            "name": "bvsext",
+            "output_name": "bvsext_32_64",
+            "spec": [
+                "ValueSpec",
+                {
+                    "flags": [],
+                    "shape": {
+                        "args": [ 32 ],
                         "width_of_result": 64
                     }
                 }

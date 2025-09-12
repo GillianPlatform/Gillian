@@ -170,7 +170,7 @@ module Infer_types_to_gamma = struct
       | BVNegO ->
           type_bv_pred (fun w ->
               ([ BvType w ], no_lits_constraint, Type.BooleanType))
-      | BVNot | BVNeg ->
+      | BVNot | BVNeg | BVToInt | IntToBV ->
           Option.map
             (fun w -> ([ BvType w ], no_lits_constraint, BvType w))
             width
@@ -554,7 +554,7 @@ module Type_lexpr = struct
     let arity =
       BVOps.(
         match op with
-        | BVNeg | BVNegO | BVNot -> 1
+        | BVNeg | BVNegO | BVNot | BVToInt | IntToBV -> 1
         | BVShl
         | BVLShr
         | BVUrem

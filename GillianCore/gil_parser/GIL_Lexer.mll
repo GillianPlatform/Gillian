@@ -177,7 +177,7 @@ rule read = parse
 
   (* Bv intrinsics *)
   | "concat" { GIL_Parser.BVCONCAT }
-  | "extract" { GIL_Parser.BVEXTRACT }
+  | "bvextract" { GIL_Parser.BVEXTRACT }
   | "bvnot" { GIL_Parser.BVNOT }
   | "bvand" { GIL_Parser.BVAND }
   | "bvor" { GIL_Parser.BVOR }
@@ -205,6 +205,8 @@ rule read = parse
   | "bvsdiv" { GIL_Parser.BVSDIV }
   | "bvsmod" { GIL_Parser.BVSMOD }
   | "bvashr" { GIL_Parser.BVASHR }
+  | "bvtoint" { GIL_Parser.BVTOINT }
+  | "inttobv" { GIL_Parser.INTTOBV }
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
   | "$$max_float"        { GIL_Parser.MAX_FLOAT     }

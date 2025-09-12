@@ -28,6 +28,8 @@ type t = TypeDef__.bvop =
   | BVNegO
   | BVUAddO
   | BVSAddO
+  | BVToInt
+  | IntToBV
 [@@deriving eq, ord]
 
 let str (x : t) =
@@ -61,6 +63,8 @@ let str (x : t) =
   | BVNegO -> "bvnego"
   | BVUAddO -> "bvuaddo"
   | BVSAddO -> "bvsaddo"
+  | BVToInt -> "bvtoint"
+  | IntToBV -> "inttobv"
 
 let to_yojson = TypeDef__.bvop_to_yojson
 let of_yojson = TypeDef__.bvop_of_yojson

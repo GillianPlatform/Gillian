@@ -208,6 +208,8 @@ module BVOps : sig
     | BVNegO
     | BVUAddO
     | BVSAddO
+    | BVToInt
+    | IntToBV
   [@@deriving yojson, eq]
 
   (** Printer *)

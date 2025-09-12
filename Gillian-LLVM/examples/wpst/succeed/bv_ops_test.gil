@@ -1,0 +1,170 @@
+
+import "Gillian-LLVM/examples/rt/runtime.gil";
+proc main() {
+  v_f := {{"int-1",0x0v1}};
+  v_t := {{"int-1",0x1v1}};
+
+  v_1 := {{"int-32",0x5v32}};
+  v_2 := {{"int-32",0x80000000v32}};
+  v_3 := {{"int-64",0x5v64}};
+  v_4 := {{"int-64",0x8000000000000000v64}};
+  v_5 := {{"int-64", 0x1234567890ABCDEFv64}};
+  v_6 := {{"int-32", 0x90ABCDEFv32}};
+  v_7 := {{"int-8", 0x3v8}};
+  v_8 := {{"int-8", 0x2v8}};
+  v_9 := {{"int-32",0x6v32}};
+  v_10 := {{"int-32",0x1v32}};
+  v_11 := {{"int-32",0x0v32}};
+  v_12 := {{"int-32",0x7FFFFFFBv32}};
+  v_13 := {{"int-32",0x4v32}};
+  v_14 := {{"int-32",0x1Ev32}};
+  v_15 := {{"int-32",0x7v32}};
+  v_16 := {{"int-32",0x3v32}};
+  v_17 := {{"int-32",0x8v32}};
+  v_18 := {{"int-32",0x2v32}};
+  v_19 := {{"int-32",0x40000000v32}};
+  v_20 := {{"int-32",0xFFFFFFFAv32}}; (* -6 *)
+  v_21 := {{"int-32",0xFFFFFFFEv32}}; (* -2 *)
+  v_22 := {{"int-32",0xFFFFFFFDv32}}; (* -3 *)
+  v_23 := {{"int-32",0xFFFFFFFFv32}}; (* -1 *)
+  v_24 := {{"int-64",0x80000000v64}};
+  v_25 := {{"int-64",0xFFFFFFFF80000000v64}};
+  v_26 := {{"int-32",0xFFFFFFFBv32}}; (* -5 *)
+
+  (* Test umin *)
+  r_0 := "bvumin_32_32_32"(v_1, v_2);
+  assert((r_0 == v_1));
+  r_1 := "bvumin_32_32_32"(v_2, v_1);
+  assert((r_1 == v_1));
+  r_2 := "bvumin_64_64_64"(v_3, v_4);
+  assert((r_2 == v_3));
+  r_3 := "bvumin_64_64_64"(v_4, v_3);
+  assert((r_3 == v_3));
+  r_4 := "bvumin_32_32_32"(v_1, v_9);
+  assert((r_4 == v_1));
+  r_5 := "bvumin_32_32_32"(v_9, v_1);
+  assert((r_5 == v_1));
+
+  (* Test trunc *)
+  (* r_6 := "bvtrunc_64_32"(v_5);
+  assert((r_6 == v_6));
+  r_7 := "bvtrunc_8_2"(v_7);
+  assert((r_7 == v_t));
+  r_8 := "bvtrunc_8_2"(v_8);
+  assert((r_8 == v_f)); *)
+
+  (* Test select *)
+  r_9 := "select_1_32_32_32"(v_t, v_1, v_9);
+  assert((r_9 == v_1));
+  r_10 := "select_1_32_32_32"(v_t, v_9, v_1);
+  assert((r_10 == v_9));
+  r_11 := "select_1_32_32_32"(v_f, v_1, v_9);
+  assert((r_11 == v_9));
+  r_12 := "select_1_32_32_32"(v_f, v_9, v_1);
+  assert((r_12 == v_1));
+
+  (* Test usubsat *)
+  r_13 := "usubsat_32_32_32"(v_9, v_1);
+  assert((r_13 == v_10));
+  r_14 := "usubsat_32_32_32"(v_1, v_9);
+  assert((r_14 == v_11));
+  r_15 := "usubsat_32_32_32"(v_2, v_1);
+  assert((r_15 == v_12));
+  r_16 := "usubsat_32_32_32"(v_1, v_2);
+  assert((r_16 == v_11));
+
+  (* Test abs *)
+  r_17 := "bvabs_32_32"(v_1);
+  assert((r_17 == v_1));
+  r_18 := "bvabs_32_32"(v_26);
+  assert((r_18 == v_1));
+
+  (* Test mul *)
+  (* r_19 := "bvmul_32_32_32"(v_1, v_9);
+  assert((r_19 == v_14));
+  r_20 := "bvmul_32_32_32"(v_9, v_1);
+  assert((r_20 == v_14)); *)
+
+  (* Test and *)
+  r_21 := "bvand_32_32_32"(v_10, v_13);
+  assert((r_21 == v_11));
+  r_22 := "bvand_32_32_32"(v_13, v_10);
+  assert((r_22 == v_11));
+  r_23 := "bvand_32_32_32"(v_1, v_13);
+  assert((r_23 == v_13));
+  r_24 := "bvand_32_32_32"(v_13, v_1);
+  assert((r_24 == v_13));
+
+  (* Test or *)
+  r_25 := "bvor_32_32_32"(v_9, v_1);
+  assert((r_25 == v_15));
+  r_26 := "bvor_32_32_32"(v_1, v_9);
+  assert((r_26 == v_15));
+
+  (* Test xor *)
+  r_27 := "bvxor_32_32_32"(v_9, v_1);
+  assert((r_27 == v_16));
+  r_28 := "bvxor_32_32_32"(v_1, v_9);
+  assert((r_28 == v_16));
+
+  (* Test shl *)
+  (* r_29 := "bvshl_32_32_32"(v_10, v_16);
+  assert((r_29 == v_17));
+  r_30 := "bvshl_32_32_32"(v_2, v_10);
+  assert((r_30 == v_11)); *)
+
+  (* Test lshr *)
+  (* r_31 := "bvlshr_32_32_32"(v_1, v_18);
+  assert((r_31 == v_10));
+  r_32 := "bvlshr_32_32_32"(v_2, v_10);
+  assert((r_32 == v_19)); *)
+
+  (* Test sdiv *)
+  (* r_33 := "bvsdiv_32_32_32"(v_9, v_16);
+  assert((r_33 == v_18));
+  r_34 := "bvsdiv_32_32_32"(v_20, v_16);
+  assert((r_34 == v_21)); *)
+
+  (* Test srem *)
+  (* r_35 := "bvsrem_32_32_32"(v_9, v_16);
+  assert((r_35 == v_11));
+  r_36 := "bvsrem_32_32_32"(v_15, v_16);
+  assert((r_36 == v_10));
+  r_37 := "bvsrem_32_32_32"(v_26, v_16);
+  assert((r_37 == v_21)); *)
+
+  (* Test add *)
+  r_38 := "bvadd_32_32_32"(v_16, v_18);
+  assert((r_38 == v_1));
+  r_39 := "bvadd_32_32_32"(v_18, v_16);
+  assert((r_39 == v_1));
+  r_40 := "bvadd_32_32_32"(v_21, v_22);
+  assert((r_40 == v_26));
+  r_41 := "bvadd_32_32_32"(v_22, v_21);
+  assert((r_40 == v_26));
+
+  (* Test sub *)
+  r_42 := "bvsub_32_32_32"(v_16, v_18);
+  assert((r_42 == v_10));
+  r_43 := "bvsub_32_32_32"(v_18, v_16);
+  assert((r_43 == v_23));
+  r_44 := "bvsub_32_32_32"(v_21, v_22);
+  assert((r_44 == v_10));
+  r_45 := "bvsub_32_32_32"(v_22, v_21);
+  assert((r_45 == v_23));
+
+  (* Test zext *)
+  (* r_46 := "bvzext_32_64"(v_1);
+  assert((r_46 == v_3));
+  r_47 := "bvzext_32_64"(v_2);
+  assert((r_47 == v_24)); *)
+
+  (* Test sext *)
+  (* r_48 := "bvsext_32_64"(v_1);
+  assert((r_48 == v_3));
+  r_49 := "bvsext_32_64"(v_2);
+  assert((r_49 == v_25)); *)
+
+  ret := {{}};
+  return
+};

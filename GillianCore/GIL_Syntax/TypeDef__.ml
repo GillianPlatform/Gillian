@@ -162,6 +162,8 @@ and bvop =
   | BVNegO
   | BVUAddO
   | BVSAddO
+  | BVToInt
+  | IntToBV
 
 and bv_arg = Literal of int | BvExpr of (expr * int)
 
