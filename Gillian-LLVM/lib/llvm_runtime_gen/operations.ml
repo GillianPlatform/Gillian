@@ -1802,11 +1802,8 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
         generator =
           ValueOp
             (flag_template_function
-               (template_from_integer_op ~op:OpFunctions.mul_op_function)
-               [
-                 (NoSignedWrap, OpFunctions.mul_op_nsw);
-                 (NoUnsignedWrap, OpFunctions.mul_op_nuw);
-               ]);
+               (template_from_integer_op ~op:OpFunctions.sdiv_op_function)
+               []);
       };
       {
         name = "bvsrem";
