@@ -972,31 +972,17 @@ struct
         let open Lift in
         let open Lifter in
         let open Effect.Deep in
-        try_with f ()
-          {
-            effc =
-              (fun (type a) (eff : a Effect.t) ->
-                match eff with
-                | Step (id, case, path) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        let step_result =
-                          handle_step_effect id case path proc_state state
-                        in
-                        continue k step_result)
-                | IsBreakpoint (file, lines) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        is_breakpoint ~file ~lines proc_state |> continue k)
-                | Node_updated (id, node) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        let () =
-                          Inspect.add_changed_node id node proc_state state
-                        in
-                        continue k ())
-                | _ -> None);
-          }
+        try f () with
+        | effect Step (id, case, path), k ->
+            let step_result =
+              handle_step_effect id case path proc_state state
+            in
+            continue k step_result
+        | effect IsBreakpoint (file, lines), k ->
+            is_breakpoint ~file ~lines proc_state |> continue k
+        | effect Node_updated (id, node), k ->
+            let () = Inspect.add_changed_node id node proc_state state in
+            continue k ()
 
       let lifter_call ?interaction lifter_func proc_state state =
         let stop_id, stop_reason =
