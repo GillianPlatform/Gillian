@@ -2528,7 +2528,8 @@ let rec translate_expr tr_ctx e :
                      (None,           cmd_goto_test_empty);  (*        goto [ x_r1 = empty ] next3 next4                                       *)
                      (Some next3,     cmd_ret_undefined);    (* next3: x_r2 := undefined                                                       *)
                      (Some next4,     cmd_phi_final)         (* next4: x_r3 := PHI(x_r1, x_r2)                                                 *)
-                   ] *)))
+                   ] *)
+              ))
       in
       let errs =
         errs_ef @ errs_xf_val @ errs_args @ [ var_te; var_te ]
@@ -6147,7 +6148,8 @@ and translate_statement tr_ctx e =
 
       let cmds =
         cmds (*  cmds                            *) @ cmd_gv_x
-        @ (*  x_v := i__getValue (x) with err *)
+        @
+        (*  x_v := i__getValue (x) with err *)
         cmd_goto
       in
 

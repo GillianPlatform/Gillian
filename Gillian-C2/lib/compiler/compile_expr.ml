@@ -135,15 +135,14 @@ type access =
   | InMemoryFunction of { ptr : Expr.t; symbol : string option }
   | InMemoryScalar of { ptr : Expr.t; loaded : Expr.t option }
   | InMemoryComposit of { ptr : Expr.t; type_ : GType.t }
-      (** For copy, we just need the size, not the type.
-          However, in the future, we might copy fields
-          one-by-one to preserve the correct semantics of C *)
+      (** For copy, we just need the size, not the type. However, in the future,
+          we might copy fields one-by-one to preserve the correct semantics of C
+      *)
   | Direct of string
   | ListMember of { list : string; index : int; total_size : int }
-      (** When a value is represented as a list in the store,
-          one can access or override one of the members by.
-          For now this only used for overflow result.
-          However, we could also model fat pointers like this. *)
+      (** When a value is represented as a list in the store, one can access or
+          override one of the members by. For now this only used for overflow
+          result. However, we could also model fat pointers like this. *)
   | DirectFunction of string
   | ZST
 [@@deriving show { with_path = false }]
@@ -1004,7 +1003,8 @@ and compile_assign_val ~ctx ~annot ~lhs ~(rhs : Val_repr.t) =
         Error.code_error
           (Fmt.str
              "Invalid assignement, wrong mix of ByCopy and Direct assignments.\n\
-              %a = %a." pp_access access Val_repr.pp rhs)
+              %a = %a."
+             pp_access access Val_repr.pp rhs)
   in
   pre @ write
 
@@ -1018,8 +1018,8 @@ and compile_assign ~ctx ~annot ~lhs ~rhs =
           Fmt.str
             "%s\n\
              Originally: %a = %a\n\n\
-            \              Left type is %a and right type is %a" msg GExpr.pp
-            lhs Val_repr.pp v GType.pp lhs.type_ GType.pp rhs.type_
+            \              Left type is %a and right type is %a"
+            msg GExpr.pp lhs Val_repr.pp v GType.pp lhs.type_ GType.pp rhs.type_
         in
         throw msg
   in
@@ -1621,7 +1621,8 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
                 Error.code_error
                   (Fmt.str
                      "Wrong mix of access and value kind for function call:\n\
-                      %a = %a" pp_access access Val_repr.pp v)
+                      %a = %a"
+                     pp_access access Val_repr.pp v)
           in
           pre1 @ pre2 @ write |> void)
   | Switch { control; cases; default } ->

@@ -2,8 +2,9 @@ open Cgil_lib
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 
 module Gil_to_c_lifter
-    (Verification : Gillian.Abstraction.Verifier.S
-                      with type annot = CParserAndCompiler.Annot.t) =
+    (Verification :
+      Gillian.Abstraction.Verifier.S
+        with type annot = CParserAndCompiler.Annot.t) =
 struct
   include
     Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (CParserAndCompiler)

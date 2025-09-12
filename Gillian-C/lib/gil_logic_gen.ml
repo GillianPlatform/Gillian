@@ -141,7 +141,7 @@ let assert_of_member cenv members id typ =
         List.init arg_number (fun k ->
             Expr.LVar ("i__" ^ field_name ^ "_" ^ string_of_int k))
       in
-      let list_is_components = pvmember #== (Expr.list args_without_ins) in
+      let list_is_components = pvmember#==(Expr.list args_without_ins) in
       let ofs = Expr.Infix.(pvofs + fo) in
       let args = pvloc :: ofs :: args_without_ins in
       let pred_call = Asrt.Pred (pred_name, args) in
@@ -341,8 +341,8 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
       let ptr = Expr.EList [ Lit (Loc loc); Expr.zero_i ] in
       ([], [], ptr)
 
-(** Returns assertions that are necessary to define the expression,
-      the created variable for binding when necessary, and the used expression *)
+(** Returns assertions that are necessary to define the expression, the created
+    variable for binding when necessary, and the used expression *)
 let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
   match e with
   | CExpr.SExpr se -> ([], [], trans_simpl_expr se)

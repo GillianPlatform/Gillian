@@ -1,8 +1,9 @@
 (** @canonical Gillian.Debugger.Utils
 
-  Miscellaneous types and functions for debugger-related purposes *)
+    Miscellaneous types and functions for debugger-related purposes *)
 
-(** Converts a GIL location (column number starts from 0) to a VSCode location (column number starts from 1) *)
+(** Converts a GIL location (column number starts from 0) to a VSCode location
+    (column number starts from 1) *)
 let location_to_display_location
     ({ loc_start; loc_end; loc_source } : Location.t) : Location.t =
   let loc_start = { loc_start with pos_column = loc_start.pos_column + 1 } in
@@ -13,7 +14,8 @@ let location_to_display_location
 type stop_reason =
   | Step  (** The step has been completed *)
   | ReachedStart
-      (** The start of the program has been reached (when executing backwards) *)
+      (** The start of the program has been reached (when executing backwards)
+      *)
   | ReachedEnd  (** The end of the program has been reached *)
   | Breakpoint  (** A breakpoint has been reached *)
   | ExecutionError  (** An error in execution has occurred *)

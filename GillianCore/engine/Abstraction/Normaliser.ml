@@ -84,13 +84,11 @@ module Make (SPState : PState.S) = struct
     let a' = concretize_list_accesses a new_lists in
     make_new_list_as a' new_lists
 
-  (**
-  le -> non - normalised logical expression
-  subst -> table mapping variable and logical variable
-  gamma -> table mapping logical variables + variables to types
+  (** le -> non - normalised logical expression subst -> table mapping variable
+      and logical variable gamma -> table mapping logical variables + variables
+      to types
 
-  the store is assumed to contain all the program variables in le
-*)
+      the store is assumed to contain all the program variables in le *)
   let rec normalise_lexpr
       ?(no_types = false)
       ?(store = SStore.init [])
@@ -484,7 +482,7 @@ module Make (SPState : PState.S) = struct
     L.verbose (fun m -> m "Finished normalising pure assertions.");
     result
 
-  (** Separate an assertion into:  core_asrts, pure, typing and predicates *)
+  (** Separate an assertion into: core_asrts, pure, typing and predicates *)
   let separate_assertion (a : Asrt.t) :
       (string * Expr.t list * Expr.t list) list
       * Expr.t list
@@ -765,7 +763,8 @@ module Make (SPState : PState.S) = struct
            let open Syntaxes.List in
            let* current_state = current_states in
            SPState.produce current_state subst [ Asrt.CorePred (a, ins, outs) ]
-           |> (* If some production fails, we ignore *)
+           |>
+           (* If some production fails, we ignore *)
            List.filter_map (function
              | Ok x -> Some x
              | Error msg ->
@@ -851,9 +850,9 @@ module Make (SPState : PState.S) = struct
     L.verbose (fun m -> m "Here are the pfs: %a" PFS.pp (PFS.of_list pfs));
 
     (* Step 3 -- Normalise type assertions and pure assertions
-       * 3.1 - type assertions -> initialises gamma
-       * 3.2 - pure assertions -> initialises store and pfs
-    *)
+     * 3.1 - type assertions -> initialises gamma
+     * 3.2 - pure assertions -> initialises store and pfs
+     *)
     let success = normalise_types store gamma subst types in
     if not success then (
       L.verbose (fun m ->

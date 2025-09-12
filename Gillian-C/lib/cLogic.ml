@@ -244,7 +244,8 @@ module CLCmd = struct
         recursive : bool;
       }  (** Unfolding of a specific predicate *)
     | Unfold_all of string
-        (** Recursively unfold all predicates with the given name (with a fuel). *)
+        (** Recursively unfold all predicates with the given name (with a fuel).
+        *)
     | Fold of string * CExpr.t list  (** Fold a predicate *)
     | Apply of string * CExpr.t list  (** Apply a lemma *)
     | Assert of CAssert.t * string list
@@ -254,7 +255,8 @@ module CLCmd = struct
     | Invariant of { assertion : CAssert.t; bindings : string list }
         (** Loop invariant *)
     | SymbExec
-        (** Ignore the next function specification and symbolically execute instead *)
+        (** Ignore the next function specification and symbolically execute
+            instead *)
 
   let rec pp fmt lcmd =
     let pp_unfold_bindings ft b =

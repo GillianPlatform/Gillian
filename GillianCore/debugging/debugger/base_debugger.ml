@@ -9,18 +9,17 @@ let ( let++ ) f o = Result.map o f
 module Premake
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Verification : Verifier.S
-                      with type SPState.init_data = ID.t
-                       and type annot = PC.Annot.t)
-    (Lifter : Lift.S
-                with type memory = Verification.SAInterpreter.heap_t
-                 and type memory_error = Verification.SPState.m_err_t
-                 and type tl_ast = PC.tl_ast
-                 and type cmd_report =
-                  Verification.SAInterpreter.Logging.ConfigReport.t
-                 and type annot = PC.Annot.t
-                 and type init_data = PC.init_data
-                 and type pc_err = PC.err) =
+    (Verification :
+      Verifier.S with type SPState.init_data = ID.t and type annot = PC.Annot.t)
+    (Lifter :
+      Lift.S
+        with type memory = Verification.SAInterpreter.heap_t
+         and type memory_error = Verification.SPState.m_err_t
+         and type tl_ast = PC.tl_ast
+         and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
+         and type annot = PC.Annot.t
+         and type init_data = PC.init_data
+         and type pc_err = PC.err) =
 struct
   open Verification.SAInterpreter
   module Gil_parsing = Gil_parsing.Make (PC.Annot)

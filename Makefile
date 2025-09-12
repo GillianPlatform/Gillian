@@ -1,6 +1,6 @@
-OCAML_VARIANT=ocaml-variants.5.2.0+options
+OCAML_VARIANT=ocaml-variants.5.3.0+options
 DEV_PACKAGES=ocaml-lsp-server,feather,fileutils
-BUILD_PACKAGES=ocamlformat.0.26.2,odoc
+BUILD_PACKAGES=ocamlformat.0.27.0,odoc
 ifeq ($(NO_OPAM_EXEC),)
 	OPAM_EXEC = opam exec --
 else

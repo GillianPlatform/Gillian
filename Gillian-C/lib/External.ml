@@ -6,10 +6,11 @@ module M
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
+    (State :
+      State.S
+        with type vt = Val.t
+         and type st = ESubst.t
+         and type store_t = Store.t)
     (Call_stack : Call_stack.S with type vt = Val.t and type store_t = Store.t) =
 struct
   let execute_printf _prog state cs i x v_args _j =
@@ -22,18 +23,16 @@ struct
     in
     [ (end_state, cs, i, i + 1) ]
 
-  (**
-  General External Procedure Treatment
-  @param prog GIL program
-  @param state Current state
-  @param cs Current call stack
-  @param i Current index
-  @param x Variable that stores the result
-  @param pid Procedure identifier
-  @param v_args Parameters
-  @param j Optional error index
-  @return Resulting configuration
-*)
+  (** General External Procedure Treatment
+      @param prog GIL program
+      @param state Current state
+      @param cs Current call stack
+      @param i Current index
+      @param x Variable that stores the result
+      @param pid Procedure identifier
+      @param v_args Parameters
+      @param j Optional error index
+      @return Resulting configuration *)
   let execute
       (prog : ('a, int) Prog.t)
       (state : State.t)

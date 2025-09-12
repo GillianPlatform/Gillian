@@ -1,6 +1,6 @@
 (** Configuration for the framework
 
-  This mostly consists of modifiable flags and hardcoded values *)
+    This mostly consists of modifiable flags and hardcoded values *)
 
 (** {2 Global config} *)
 
@@ -35,7 +35,7 @@ let medium_tbl_size = 0
 let big_tbl_size = 0
 
 (** {2 Bi-abduction config}
-  These values seem to never be modified *)
+    These values seem to never be modified *)
 
 let specs_to_stdout = ref false
 
@@ -71,8 +71,8 @@ let dump_smt = ref false
 
 (** {2 Bulk testing} *)
 
-(** If activated, at the end of bulk execution or bulk wpst, and only with the Rely runner,
-    a list of all failures will be printed in [stdout] *)
+(** If activated, at the end of bulk execution or bulk wpst, and only with the
+    Rely runner, a list of all failures will be printed in [stdout] *)
 let bulk_print_all_failures = ref true
 
 (** {2 Runtime settings} *)
@@ -112,9 +112,10 @@ module Verification = struct
         things_to_verify := Specific
 end
 
-(** {2 Resetting} 
-    With the addition of in-file config statements, we want to be able to "reset" the config
-    when analysis is run multiple times in one "instance", i.e. the LSP. *)
+(** {2 Resetting}
+    With the addition of in-file config statements, we want to be able to
+    "reset" the config when analysis is run multiple times in one "instance",
+    i.e. the LSP. *)
 let reset_config_f = ref None
 
 let reset_config () =

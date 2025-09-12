@@ -1,18 +1,18 @@
 open Syntaxes.Result
 
 type t = TypeDef__.pred = {
-  pred_name : string;  (** Name of the predicate  *)
+  pred_name : string;  (** Name of the predicate *)
   pred_source_path : string option;
   pred_loc : Location.t option;
   pred_internal : bool;
-  pred_num_params : int;  (** Number of parameters   *)
-  pred_params : (string * Type.t option) list;  (** Actual parameters      *)
-  pred_ins : int list;  (** Ins                    *)
+  pred_num_params : int;  (** Number of parameters *)
+  pred_params : (string * Type.t option) list;  (** Actual parameters *)
+  pred_ins : int list;  (** Ins *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
-      (** Predicate definitions  *)
+      (** Predicate definitions *)
   pred_facts : Expr.t list;  (** Facts that hold for every definition *)
   pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
-  pred_pure : bool;  (** Is the predicate pure  *)
+  pred_pure : bool;  (** Is the predicate pure *)
   pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
   pred_normalised : bool;  (** If the predicate has been previously normalised *)
@@ -144,8 +144,8 @@ let pp fmt pred =
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =
     (* Step 1 - Extract all the program variables used in the definition
-       * -----------------------------------------------------------------------------------
-    *)
+     * -----------------------------------------------------------------------------------
+     *)
     let all_pred_pvars : string list =
       List.concat
         (List.map
@@ -154,8 +154,8 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
     in
 
     (* Step 2 - Check all predicates
-       * -----------------------------------------------------------------------------------
-    *)
+     * -----------------------------------------------------------------------------------
+     *)
     let string_of_params =
       List.map (fun (pvar, _) -> pvar) predicate.pred_params
     in
@@ -213,10 +213,8 @@ let extend_asrt_pred_types (preds : (string, t) Hashtbl.t) (a : Asrt.t) :
   in
   Result.map List.concat (List_utils.map_results f a)
 
-(**
-   GIL Predicates can have non-pvar parameters - to say that a given parameter
-   always has a certain value...
-  *)
+(** GIL Predicates can have non-pvar parameters - to say that a given parameter
+    always has a certain value... *)
 let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) :
     (t, string) result =
   let new_asrts =

@@ -287,7 +287,8 @@ module Make (Annot : Annot.S) = struct
     in
     let procs, predecessors =
       Hashtbl.fold
-        (fun (_ : string) (proc : (annot, string) Proc.t) (procs, predecessors) ->
+        (fun (_ : string) (proc : (annot, string) Proc.t) (procs, predecessors)
+           ->
           let proc, new_predecessors = proc_of_ext_proc proc in
           (proc :: procs, new_predecessors @ predecessors))
         ext_program.procs ([], [])

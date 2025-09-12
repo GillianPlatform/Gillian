@@ -1,6 +1,7 @@
-version=0.26.2
+version=0.27.0
 assignment-operator=end-line
 break-cases=fit-or-vertical
 break-fun-decl=fit-or-vertical
 break-fun-sig=fit-or-vertical
 doc-comments=before
+ocaml-version = 5.3

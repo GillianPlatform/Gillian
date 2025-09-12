@@ -1,6 +1,6 @@
 (** @canonical Gillian.Symbolic.Pure_context
 
-GIL pure formulae *)
+    GIL pure formulae *)
 
 (** @canonical Gillian.Symbolic.Pure_context.t *)
 type t [@@deriving yojson]
@@ -19,7 +19,8 @@ val of_list : Expr.t list -> t
 
 val to_set : t -> Expr.Set.t
 
-(** [mem pfs f] return true iff the formula [f] is part of the pure formulae [pfs] *)
+(** [mem pfs f] return true iff the formula [f] is part of the pure formulae
+    [pfs] *)
 val mem : t -> Expr.t -> bool
 
 (** [extend pfs f] extends the pure formulae [pfs] with the formula [f] *)
@@ -44,7 +45,8 @@ val length : t -> int
 (** [copy pfs] Returns a copy of the pure formulae [pfs] *)
 val copy : t -> t
 
-(** [merge_into_left pfsl pfsr] merges the pure formulae [pfsr] with the pure formulae [pfsl] *)
+(** [merge_into_left pfsl pfsr] merges the pure formulae [pfsr] with the pure
+    formulae [pfsl] *)
 val merge_into_left : t -> t -> unit
 
 (** [set pfs fs] sets the pure formulae [pfs] to [fs] *)
@@ -53,16 +55,20 @@ val set : t -> Expr.t list -> unit
 (** [iter f pfs] iterates over the pure formulae [pfs] using the function [f] *)
 val iter : (Expr.t -> unit) -> t -> unit
 
-(** [fold_left f ac pfs] folds over the pure formulae [pfs] using the function [f] and initial accumulator [ac] *)
+(** [fold_left f ac pfs] folds over the pure formulae [pfs] using the function
+    [f] and initial accumulator [ac] *)
 val fold_left : ('a -> Expr.t -> 'a) -> 'a -> t -> 'a
 
 (** [map_inplace f pfs] is like a map operation, but performing in place *)
 val map_inplace : (Expr.t -> Expr.t) -> t -> unit
 
-(** [substitution subst pfs] substitutes the substutition subst in the pure formulae [pfs] in-place *)
+(** [substitution subst pfs] substitutes the substutition subst in the pure
+    formulae [pfs] in-place *)
 val substitution : SVal.SESubst.t -> t -> unit
 
-(** [subst_expr_for_expr e_to_subst e_subst pfs] substitutes the expression [e_to_subst] with the expression [e_subst] in the pure formulae [pfs] in-place *)
+(** [subst_expr_for_expr e_to_subst e_subst pfs] substitutes the expression
+    [e_to_subst] with the expression [e_subst] in the pure formulae [pfs]
+    in-place *)
 val subst_expr_for_expr : Expr.t -> Expr.t -> t -> unit
 
 (** [lvars pfs] returns the set containing all the lvars occurring in [pfs] *)
@@ -70,22 +76,26 @@ val lvars : t -> Containers.SS.t
 
 (** Returns the set containing all the alocs occurring in --pfs-- *)
 val alocs : t -> Containers.SS.t
-(** [alocs pfs] returns the set containing all the abstract locations occurring in [pfs] *)
+(** [alocs pfs] returns the set containing all the abstract locations occurring
+    in [pfs] *)
 
-(** [clocs pfs] returns the set containing all the concrete locations occurring in [pfs] *)
+(** [clocs pfs] returns the set containing all the concrete locations occurring
+    in [pfs] *)
 val clocs : t -> Containers.SS.t
 
 (** [pp fmt pfs] prints the pure formulae [pfs] *)
 val pp : Format.formatter -> t -> unit
 
-(** [pp pvars lvars locs fmt pfs] prints the pure formulae [pfs] relevnt to [pvars], [lvars] and [locs] *)
+(** [pp pvars lvars locs fmt pfs] prints the pure formulae [pfs] relevnt to
+    [pvars], [lvars] and [locs] *)
 val pp_by_need :
   Containers.SS.t * Containers.SS.t * Containers.SS.t ->
   Format.formatter ->
   t ->
   unit
 
-(** [filter_with_info pvars lvars locs pfs] returns only the pfs relevant to [pvars], [lvars], and [locs]*)
+(** [filter_with_info pvars lvars locs pfs] returns only the pfs relevant to
+    [pvars], [lvars], and [locs]*)
 val filter_with_info :
   Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t
 
@@ -113,6 +123,6 @@ val filter : (Expr.t -> bool) -> t -> unit
 val filter_map : (Expr.t -> Expr.t option) -> t -> unit
 val exists : (Expr.t -> bool) -> t -> bool
 
-(** Gets the nths formula. There are very few good use cases for this function, and uses should generaly use iterators instead.
-    O(n) *)
+(** Gets the nths formula. There are very few good use cases for this function,
+    and uses should generaly use iterators instead. O(n) *)
 val get_nth : int -> t -> Expr.t option

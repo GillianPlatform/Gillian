@@ -52,7 +52,8 @@ let pp fmt f =
          %a;@,\
          @[<h 0>return@ %a@]@]@\n\
          }@\n\
-         @[{ %a }@]" WLAssert.pp (WSpec.get_pre spec) f.name
+         @[{ %a }@]"
+        WLAssert.pp (WSpec.get_pre spec) f.name
         (WPrettyUtils.pp_list Format.pp_print_string)
         f.params pp_list_stmt f.body WExpr.pp f.return_expr WLAssert.pp
         (WSpec.get_post spec)

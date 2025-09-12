@@ -6,9 +6,8 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (CState : CState.S with type init_data = ID.t)
-    (C_interpreter : G_interpreter.S
-                       with type annot = PC.Annot.t
-                        and type state_t = CState.t)
+    (C_interpreter :
+      G_interpreter.S with type annot = PC.Annot.t and type state_t = CState.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)

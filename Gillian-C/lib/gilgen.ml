@@ -861,9 +861,9 @@ let set_global_var symbol v =
       None )
 
 (* Second part of the return tuple is:
-   * false if it should be a function call
-   * true if it should be an external call
-*)
+ * false if it should be a function call
+ * true if it should be an external call
+ *)
 let intern_impl_of_extern_function ext_f =
   let open AST in
   match ext_f with

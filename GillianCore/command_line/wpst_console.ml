@@ -8,10 +8,11 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (SState : SState.S with type init_data = ID.t)
-    (S_interpreter : G_interpreter.S
-                       with type annot = PC.Annot.t
-                        and type state_t = SState.t
-                        and type state_err_t = SState.err_t)
+    (S_interpreter :
+      G_interpreter.S
+        with type annot = PC.Annot.t
+         and type state_t = SState.t
+         and type state_err_t = SState.err_t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t)
     (Debug_adapter : Debug_adapter.S) : Console.S = struct
   module Common_args = Common_args.Make (PC)
