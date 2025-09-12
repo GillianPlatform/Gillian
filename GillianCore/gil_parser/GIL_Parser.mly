@@ -53,6 +53,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token BVSDIV
 %token BVSMOD
 %token BVASHR
+%token BVTOINT
+%token INTTOBV
 
 (* Constants *)
 %token MIN_FLOAT
@@ -416,6 +418,8 @@ gbvintrinsic:
 | BVSDIV { BVOps.BVSdiv }
 | BVSMOD { BVOps.BVSmod }
 | BVASHR { BVOps.BVAshr }
+| BVTOINT { BVOps.BVToInt }
+| INTTOBV { BVOps.IntToBV }
 
 bv_arg_target:
   | BVTYPELIT LBRACE e=expr_target COMMA width=INTEGER RBRACE { Expr.BvExpr(e,Z.to_int width) }

@@ -857,6 +857,8 @@ let encode_bvop
     | BVOps.BVSMulO -> binop_encode bv_smulo
     | BVOps.BVUAddO -> binop_encode bv_uaddo
     | BVOps.BVSAddO -> binop_encode bv_saddo
+    | BVOps.BVToInt -> unop_encode bv_to_int
+    | BVOps.IntToBV -> int_to_bv (List.hd literals) (List.hd bvs)
   in
   Encoding.native
     (Option.map (fun w -> Gil_syntax.Type.BvType w) width

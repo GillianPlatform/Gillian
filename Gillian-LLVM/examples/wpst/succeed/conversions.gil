@@ -1,0 +1,51 @@
+import "Gillian-LLVM/examples/rt/runtime.gil";
+proc main() {
+  v_1 := {{"float",1.5}};
+  v_2 := {{"float",-2.3}};
+  v_3 := {{"float",3.0}};
+  v_4 := {{"int-32",0x1v32}};
+  v_5 := {{"int-32",0xFFFFFFFEv32}};
+  v_6 := {{"int-32",0x3v32}};
+  v_7 := {{"float",1.0}};
+  v_8 := {{"float",-2.0}};
+  v_9 := {{"float",3.0}};
+  v_10 := {{"float",4294967294.0}};
+  v_11 := {{"int-32",0x0v32}};
+  
+  (* Test fptosi *)
+  r_1 := "fptosi"(v_1);
+  assert((r_1 == v_4));
+  r_2 := "fptosi"(v_2);
+  assert((r_2 == v_5));
+  r_3 := "fptosi"(v_3);
+  assert((r_3 == v_6));
+
+  (* Test fptoui *)
+  r_4 := "fptoui"(v_1);
+  assert((r_4 == v_4));
+  r_5 := "fptoui"(v_2);
+  assert((r_5 == v_11));
+  r_6 := "fptoui"(v_3);
+  assert((r_6 == v_6));
+
+  (* Test uitofp *)
+  r_7 := "uitofp"(v_4);
+  assert((r_7 == v_7));
+  r_8 := "uitofp"(v_5);
+  assert((r_8 == v_10));
+  r_9 := "uitofp"(v_6);
+  assert((r_9 == v_9));
+
+  (* Test sitofp *)
+  r_10 := "sitofp"(v_4);
+  assert((r_10 == v_7));
+  r_11 := "sitofp"(v_5);
+  assert((r_11 == v_8));
+  r_12 := "sitofp"(v_6);
+  assert((r_12 == v_9));
+
+  assert((v_1 == v_2));
+
+  ret := {{}};
+  return
+};

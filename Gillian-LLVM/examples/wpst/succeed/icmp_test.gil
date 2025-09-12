@@ -1,0 +1,125 @@
+
+import "Gillian-LLVM/examples/rt/runtime.gil";
+proc main() {
+  v_t := {{"int-1",0x1v1}};
+  v_f := {{"int-1",0x0v1}};
+
+  v_1 := {{"int-32",0x1v32}};
+  v_2 := {{"int-32",0xFFFFFFFEv32}};
+  v_3 := {{"int-32",0x3v32}};
+  
+  (* Test EQ *)
+  r_1 := "icmp_eq_32_32_1"(v_1, v_2);
+  assert((r_1 == v_f));
+  r_2 := "icmp_eq_32_32_1"(v_2, v_1);
+  assert((r_2 == v_f));
+  r_3 := "icmp_eq_32_32_1"(v_1, v_1);
+  assert((r_3 == v_t));
+
+  (* Test NE *)
+  r_4 := "icmp_ne_32_32_1"(v_1, v_2);
+  assert((r_4 == v_t));
+  r_5 := "icmp_ne_32_32_1"(v_2, v_1);
+  assert((r_5 == v_t));
+  r_6 := "icmp_ne_32_32_1"(v_1, v_1);
+  assert((r_6 == v_f));
+
+  (* Test UGT *)
+  r_7 := "icmp_ugt_32_32_1"(v_1, v_2);
+  assert((r_7 == v_f));
+  r_8 := "icmp_ugt_32_32_1"(v_2, v_1);
+  assert((r_8 == v_t));
+  r_9 := "icmp_ugt_32_32_1"(v_1, v_1);
+  assert((r_9 == v_f));
+  r_10 := "icmp_ugt_32_32_1"(v_1, v_3);
+  assert((r_10 == v_f));
+  r_11 := "icmp_ugt_32_32_1"(v_3, v_1);
+  assert((r_11 == v_t));
+
+  (* Test UGE *)
+  r_12 := "icmp_uge_32_32_1"(v_1, v_2);
+  assert((r_12 == v_f));
+  r_13 := "icmp_uge_32_32_1"(v_2, v_1);
+  assert((r_13 == v_t));
+  r_14 := "icmp_uge_32_32_1"(v_1, v_1);
+  assert((r_14 == v_t));
+  r_15 := "icmp_uge_32_32_1"(v_1, v_3);
+  assert((r_15 == v_f));
+  r_16 := "icmp_uge_32_32_1"(v_3, v_1);
+  assert((r_16 == v_t));
+
+  (* Test ULT *)
+  r_17 := "icmp_ult_32_32_1"(v_1, v_2);
+  assert((r_17 == v_t));
+  r_18 := "icmp_ult_32_32_1"(v_2, v_1);
+  assert((r_18 == v_f));
+  r_19 := "icmp_ult_32_32_1"(v_1, v_1);
+  assert((r_19 == v_f));
+  r_20 := "icmp_ult_32_32_1"(v_1, v_3);
+  assert((r_20 == v_t));
+  r_21 := "icmp_ult_32_32_1"(v_3, v_1);
+  assert((r_21 == v_f));
+
+  (* Test ULE *)
+  r_22 := "icmp_ule_32_32_1"(v_1, v_2);
+  assert((r_22 == v_t));
+  r_23 := "icmp_ule_32_32_1"(v_2, v_1);
+  assert((r_23 == v_f));
+  r_24 := "icmp_ule_32_32_1"(v_1, v_1);
+  assert((r_24 == v_t));
+  r_25 := "icmp_ule_32_32_1"(v_1, v_3);
+  assert((r_25 == v_t));
+  r_26 := "icmp_ule_32_32_1"(v_3, v_1);
+  assert((r_26 == v_f));
+
+  (* Test SGT *)
+  r_27 := "icmp_sgt_32_32_1"(v_1, v_2);
+  assert((r_27 == v_t));
+  r_28 := "icmp_sgt_32_32_1"(v_2, v_1);
+  assert((r_28 == v_f));
+  r_29 := "icmp_sgt_32_32_1"(v_1, v_1);
+  assert((r_29 == v_f));
+  r_30 := "icmp_sgt_32_32_1"(v_1, v_3);
+  assert((r_30 == v_f));
+  r_31 := "icmp_sgt_32_32_1"(v_3, v_1);
+  assert((r_31 == v_t));
+
+  (* Test SGE *)
+  r_32 := "icmp_sge_32_32_1"(v_1, v_2);
+  assert((r_32 == v_t));
+  r_33 := "icmp_sge_32_32_1"(v_2, v_1);
+  assert((r_33 == v_f));
+  r_34 := "icmp_sge_32_32_1"(v_1, v_1);
+  assert((r_34 == v_t));
+  r_35 := "icmp_sge_32_32_1"(v_1, v_3);
+  assert((r_35 == v_f));
+  r_36 := "icmp_sge_32_32_1"(v_3, v_1);
+  assert((r_36 == v_t));
+
+  (* Test SLT *)
+  r_37 := "icmp_slt_32_32_1"(v_1, v_2);
+  assert((r_37 == v_f));
+  r_38 := "icmp_slt_32_32_1"(v_2, v_1);
+  assert((r_38 == v_t));
+  r_39 := "icmp_slt_32_32_1"(v_1, v_1);
+  assert((r_39 == v_f));
+  r_40 := "icmp_slt_32_32_1"(v_1, v_3);
+  assert((r_40 == v_t));
+  r_41 := "icmp_slt_32_32_1"(v_3, v_1);
+  assert((r_41 == v_f));
+
+  (* Test SLE *)
+  r_42 := "icmp_sle_32_32_1"(v_1, v_2);
+  assert((r_42 == v_f));
+  r_43 := "icmp_sle_32_32_1"(v_2, v_1);
+  assert((r_43 == v_t));
+  r_44 := "icmp_sle_32_32_1"(v_1, v_1);
+  assert((r_44 == v_t));
+  r_45 := "icmp_sle_32_32_1"(v_1, v_3);
+  assert((r_45 == v_t));
+  r_46 := "icmp_sle_32_32_1"(v_3, v_1);
+  assert((r_46 == v_f));
+
+  ret := {{}};
+  return
+};
