@@ -6,17 +6,17 @@ module type S = sig
   type init_data
 
   (** Type of GIL values *)
-  type vt = SVal.M.t
+  type vt := SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SESubst.t
+  type st := SVal.SESubst.t
 
   type err_t [@@deriving show, yojson]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]
 
-  type action_ret = (t * vt list, err_t) result
+  type action_ret := (t * vt list, err_t) result
 
   (** Initialisation *)
   val init : init_data -> t

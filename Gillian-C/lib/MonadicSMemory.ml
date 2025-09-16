@@ -33,9 +33,6 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
       Logging.verbose (fun fmt -> fmt "Resolved %a as %s" Expr.pp lvar_loc l);
       Delayed.return l
 
-type vt = Values.t
-type st = Subst.t
-
 (* let ga = LActions.ga *)
 
 type err_t =
@@ -379,8 +376,6 @@ let to_yojson t =
 
 let of_yojson m =
   Result.map (fun mem -> { genv = Global_env.empty; mem }) (Mem.of_yojson m)
-
-type action_ret = (t * vt list, err_t) result
 
 let make_branch ~heap ?(rets = []) () = (heap, rets)
 
