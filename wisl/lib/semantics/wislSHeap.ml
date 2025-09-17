@@ -223,7 +223,7 @@ let rem_bound heap loc =
   | None -> error (MissingResource (Cell, loc, None))
   | Some (Allocated { bound = None; _ }) ->
       error (MissingResource (Bound, loc, None))
-  | Some (Allocated { data; _ }) ->
+  | Some (Allocated { bound = Some _; data }) ->
       let () = update heap loc (Allocated { data; bound = None }) in
       ok ()
 
