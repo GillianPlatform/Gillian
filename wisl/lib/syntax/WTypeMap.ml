@@ -11,11 +11,10 @@ type t = WType.t TypeMap.t
 let type_of_variable (var : string) (type_context : t) : WType.t option =
   TypeMap.find_opt (WLExpr.PVar var) type_context
 
-let of_val v =
-  let open WVal in
-  match v with
+let of_val : WVal.t -> WType.t = function
   | Bool _ -> WBool
   | Int _ -> WInt
+  | Float _ -> WFloat
   | Str _ -> WString
   | Null -> WNull
   | VList _ -> WList
@@ -30,19 +29,18 @@ let of_unop u =
   | WUnOp.TAIL -> (WList, WList)
 
 (** returns (x, y, z) when binop takes types x and y and returns type z *)
-let of_binop b =
-  match b with
-  | WBinOp.EQUAL -> (WAny, WAny, WBool)
-  | WBinOp.LESSTHAN
-  | WBinOp.GREATERTHAN
-  | WBinOp.LESSEQUAL
-  | WBinOp.GREATEREQUAL -> (WInt, WInt, WBool)
-  | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WInt, WInt, WInt)
-  | WBinOp.AND | WBinOp.OR -> (WBool, WBool, WBool)
-  | WBinOp.LSTCONS -> (WAny, WList, WList)
-  | WBinOp.LSTCAT -> (WList, WList, WList)
-  | WBinOp.LSTNTH -> (WList, WInt, WAny)
-  | WBinOp.PLUS | WBinOp.MINUS -> (WAny, WAny, WAny)
+let of_binop : WBinOp.t -> WType.t * WType.t * WType.t = function
+  | EQUAL -> (WAny, WAny, WBool)
+  | LESSTHAN | GREATERTHAN | LESSEQUAL | GREATEREQUAL -> (WInt, WInt, WBool)
+  | FLESSTHAN | FGREATERTHAN | FLESSEQUAL | FGREATEREQUAL ->
+      (WFloat, WFloat, WBool)
+  | TIMES | DIV | MOD -> (WInt, WInt, WInt)
+  | FPLUS | FMINUS | FTIMES | FDIV | FMOD -> (WFloat, WFloat, WFloat)
+  | AND | OR -> (WBool, WBool, WBool)
+  | LSTCONS -> (WAny, WList, WList)
+  | LSTCAT -> (WList, WList, WList)
+  | LSTNTH -> (WList, WInt, WAny)
+  | PLUS | MINUS -> (WAny, WAny, WAny)
 
 (* TODO: improve this, because we can add Ints AND Pointers *)
 
@@ -124,13 +122,23 @@ let rec infer_single_assert_step asser known =
       List.fold_left infer_logic_expr known largs |> fun acc ->
       List.fold_left infer_logic_expr acc rargs
   | WLAssert.LPointsTo (le1, le2) ->
+      let le_perm = List.filter_map fst le2 in
+      let le2 = List.map snd le2 in
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
+      let inferred =
+        List.fold_left (fun acc p -> needs_to_be p WFloat acc) inferred le_perm
+      in
       needs_to_be le1 WList inferred
   | WLAssert.LBlockPointsTo (le1, le2) ->
+      let le_perm = List.filter_map fst le2 in
+      let le2 = List.map snd le2 in
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
+      in
+      let inferred =
+        List.fold_left (fun acc p -> needs_to_be p WFloat acc) inferred le_perm
       in
       needs_to_be le1 WList inferred
   | WLAssert.LPure f -> infer_logic_expr known f

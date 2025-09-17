@@ -4,11 +4,20 @@ type t =
   | GREATERTHAN
   | LESSEQUAL
   | GREATEREQUAL
+  | FLESSTHAN
+  | FGREATERTHAN
+  | FLESSEQUAL
+  | FGREATEREQUAL
   | PLUS
   | MINUS
   | TIMES
   | DIV
   | MOD
+  | FPLUS
+  | FMINUS
+  | FTIMES
+  | FDIV
+  | FMOD
   | AND
   | OR
   (* Lists are only for the logic *)

@@ -6,10 +6,15 @@ type tt =
   | Dispose of WExpr.t  (** free(e) *)
   | Lookup of string * WExpr.t  (** x := [e] *)
   | Update of WExpr.t * WExpr.t  (** [e] := [e] *)
-  | FunCall of string * string * WExpr.t list * (string * string list) option
+  | FunCall of
+      string
+      * string
+      * WExpr.t list
+      * (string * (string * WLExpr.t) list) option
       (** x := f(e1, ..., en), last bit should be ignored *)
   | While of WExpr.t * t list  (** while (e) \{ s \} *)
   | If of WExpr.t * t list * t list  (** if (e) \{ s \} else \{ s \} *)
+  | Par of t list
   | Logic of WLCmd.t  (** logic command *)
   | Assert of WExpr.t  (** non-SL assertion *)
   | Assume of WExpr.t  (** non-SL assumption *)

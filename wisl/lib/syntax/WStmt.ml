@@ -8,10 +8,15 @@ type tt =
   | Dispose of WExpr.t
   | Lookup of string * WExpr.t (* x := [e] *)
   | Update of WExpr.t * WExpr.t (* [e] := [e] *)
-  | FunCall of string * string * WExpr.t list * (string * string list) option
+  | FunCall of
+      string
+      * string
+      * WExpr.t list
+      * (string * (string * WLExpr.t) list) option
     (* The last bit is only for internal use *)
   | While of WExpr.t * t list
   | If of WExpr.t * t list * t list
+  | Par of t list
   | Logic of WLCmd.t
   | Assert of WExpr.t
   | Assume of WExpr.t
@@ -51,6 +56,7 @@ and pp fmt stmt =
       Format.fprintf fmt
         "@[@[<v 2>if(%a) {@\n%a@]@\n@[<v 2>} else {@\n%a@]@\n}@]" WExpr.pp e
         pp_list s1 pp_list s2
+  | Par s -> Format.fprintf fmt "@[@[<v 2>par {@\n%a@]@\n}@]" pp_list s
   | Logic lcmd -> Format.fprintf fmt "@[[[ %a ]]@]" WLCmd.pp lcmd
   | Assert e -> Format.fprintf fmt "@[assert %a@]" WExpr.pp e
   | Assume e -> Format.fprintf fmt "@[assume %a@]" WExpr.pp e
@@ -85,6 +91,7 @@ let functions_called_by_list sl =
     | { snode = While (_, slp); _ } :: r -> aux (aux already slp @ already) r
     | { snode = If (_, slp1, slp2); _ } :: r ->
         aux (aux already slp1 @ aux already slp2 @ already) r
+    | { snode = Par s; _ } :: r -> aux (aux already s @ already) r
     | _l :: r -> aux already r
   in
   aux [] sl
@@ -107,6 +114,7 @@ let rec get_by_id id stmt =
     | While (e, sl) -> expr_getter e |>> (list_visitor, sl)
     | If (e, sl1, sl2) ->
         expr_getter e |>> (list_visitor, sl1) |>> (list_visitor, sl2)
+    | Par s -> list_visitor s
     | Logic lcmd -> lcmd_getter lcmd
     | Fresh _ | New _ | Skip -> `None
   in

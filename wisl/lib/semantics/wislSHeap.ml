@@ -42,13 +42,13 @@ module Block = struct
     | Allocated { data; bound } ->
         let data_asrts =
           SFVL.assertions_with_constructor
-            ~constr:(fun loc offset value -> Constr.cell ~loc ~offset ~value)
+            ~constr:(fun loc offset value -> Constr.cell ~loc ~offset ~value ())
             eloc data
         in
         let bound_asrt =
           match bound with
           | None -> []
-          | Some bound -> [ Constr.bound ~loc:eloc ~bound ]
+          | Some bound -> [ Constr.bound ~loc:eloc ~bound () ]
         in
         bound_asrt @ data_asrts
 

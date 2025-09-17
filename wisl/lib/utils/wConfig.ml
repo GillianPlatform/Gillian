@@ -3,3 +3,4 @@ let current_uri = ref "test.wisl"
 let debug_mode = ref false
 let import_env_var = "WISL_RUNTIME_PATH"
 let loop_hack = ref false
+let fractional_permissions = ref false
