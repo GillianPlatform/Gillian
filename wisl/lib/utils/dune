@@ -1,5 +1,6 @@
 (library
  (name wUtils)
+ (public_name wisl.utils)
  (libraries yojson str gillian)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson)))

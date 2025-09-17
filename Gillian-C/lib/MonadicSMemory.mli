@@ -4,7 +4,7 @@ module Lift : sig
   open Gillian.Debugger.Utils
 
   val add_variables :
-    store:(string * vt) list ->
+    store:(string * Gillian.Symbolic.Values.t) list ->
     memory:t ->
     is_gil_file:'a ->
     get_new_scope_id:(unit -> int) ->

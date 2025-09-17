@@ -1,7 +1,5 @@
 open Gillian.Debugger
-
-module SMemory =
-  Gillian.Symbolic.Legacy_s_memory.Modernize (WSemantics.WislSMemory)
+module SMemory = Gillian.Monadic.MonadicSMemory.Lift (WSemantics.WislSMemory)
 
 module Lifter =
   Lifter.Gil_fallback_lifter.Make (SMemory) (WParserAndCompiler)
