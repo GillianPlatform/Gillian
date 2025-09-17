@@ -3,14 +3,14 @@ open Gillian.Gil_syntax
 
 (** {b JSIL logic assertions}. *)
 type t =
-  | Emp  (** Empty heap             *)
+  | Emp  (** Empty heap *)
   | Star of t * t  (** Separating conjunction *)
-  | PointsTo of Expr.t * Expr.t * Expr.t  (** Heap cell assertion    *)
-  | MetaData of Expr.t * Expr.t  (** MetaData               *)
-  | Pred of string * Expr.t list  (** Predicates             *)
-  | EmptyFields of Expr.t * Expr.t  (** emptyFields assertion  *)
-  | Pure of Expr.t  (** Pure formula           *)
-  | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
+  | PointsTo of Expr.t * Expr.t * Expr.t  (** Heap cell assertion *)
+  | MetaData of Expr.t * Expr.t  (** MetaData *)
+  | Pred of string * Expr.t list  (** Predicates *)
+  | EmptyFields of Expr.t * Expr.t  (** emptyFields assertion *)
+  | Pure of Expr.t  (** Pure formula *)
+  | Types of (Expr.t * Type.t) list  (** Typing assertion *)
 
 let compare x y =
   let cmp = Stdlib.compare in

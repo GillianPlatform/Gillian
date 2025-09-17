@@ -10,7 +10,8 @@ type t = {
   exec : Gillian.Utils.Exec_mode.t list;
 }
 
-(** All imports, should not be used as such, imports should be selected using the [import] function *)
+(** All imports, should not be used as such, imports should be selected using
+    the [import] function *)
 let all_imports =
   [
     { file = "archi32_constants.gil"; arch = a32; exec = all_exec };

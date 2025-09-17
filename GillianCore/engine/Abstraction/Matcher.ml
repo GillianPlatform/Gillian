@@ -736,7 +736,8 @@ module Make (State : SState.S) :
         m
           "@[-----------------@\n\
            -----------------@\n\
-           Produce assertion: @[%a@]@]" Asrt.pp a);
+           Produce assertion: @[%a@]@]"
+          Asrt.pp a);
     let sas = MP.simplify_asrts a in
     produce_asrt_list astate subst sas
 
@@ -778,9 +779,8 @@ module Make (State : SState.S) :
   (** [extend_subts_with_bindings unfold_info pred state subst] takes:
       - A state
       - A substitution
-      - A list of pairs of lvar names
-      And extends the substitution with the pairs
-      [(#y, eval_expr #x)] for each pair [(x, y)] *)
+      - A list of pairs of lvar names And extends the substitution with the
+        pairs [(#y, eval_expr #x)] for each pair [(x, y)] *)
   let extend_subst_with_bindings
       (state : State.t)
       (subst : SVal.SESubst.t)
@@ -1009,10 +1009,9 @@ module Make (State : SState.S) :
             m "Could not find any match for the required wand!!!");
         Res_list.error_with (StateErr.EPure Expr.false_)
 
-  (** Consumes a predicate from the state.
-      If the predicate is not "verbatim" in our set of preds,
-      and it is not abstract and we are not in manual mode,
-      we attempt to fold it. *)
+  (** Consumes a predicate from the state. If the predicate is not "verbatim" in
+      our set of preds, and it is not abstract and we are not in manual mode, we
+      attempt to fold it. *)
   and consume_pred
       ?(in_matching = false)
       ?(fold_outs_info : (SVal.SESubst.t * MP.step * Expr.t list) option)
@@ -1420,7 +1419,8 @@ module Make (State : SState.S) :
         L.verbose (fun m ->
             m
               "WARNING: UNCAUGHT EXCEPTION IN MATCH ASSERTION: %s@\n\
-               Here's the backtrace: %s" (Printexc.to_string err)
+               Here's the backtrace: %s"
+              (Printexc.to_string err)
               (Printexc.get_backtrace ()))
       in
       let res_list =

@@ -25,7 +25,7 @@ let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
 (* Reduction of assertions *)
 
 (*************************************)
-(** Symbolic state simplification   **)
+(** Symbolic state simplification **)
 
 (*************************************)
 
@@ -297,14 +297,12 @@ let _resolve_set_existentials
     (rpfs, !exists, gamma))
   else (rpfs, !exists, gamma)
 
-(**
-  Pure entailment: simplify pure formulae and typing environment
+(** Pure entailment: simplify pure formulae and typing environment
 
-  @param pfs Pure formulae (modified destructively)
-  @param gamma Typing environment (modified destructively)
-  @param vars_to_save Logical variables that cannot be deleted
-  @return Substitution from logical variables to logical expressions
-*)
+    @param pfs Pure formulae (modified destructively)
+    @param gamma Typing environment (modified destructively)
+    @param vars_to_save Logical variables that cannot be deleted
+    @return Substitution from logical variables to logical expressions *)
 let simplify_pfs_and_gamma
     ?(matching = false)
     ?(kill_new_lvars : bool option)
@@ -471,7 +469,7 @@ let simplify_pfs_and_gamma
                 extend_with pf;
                 vars_to_kill := SS.union !vars_to_kill new_vars;
                 `Replace whole)
-        (*  *)
+        (* *)
         | BinOp (UnOp (LstLen, x), Equal, BinOp (Lit (Int n), IPlus, LVar z))
           when Z.geq n Z.zero ->
             let new_lvars =
@@ -841,8 +839,8 @@ let simplify_pfs_and_gamma
       in
 
       (*****************************************
-        ********* THIS IS THE BEGINNING *********
-        *****************************************)
+       ********* THIS IS THE BEGINNING *********
+       *****************************************)
       PFS.sort lpfs;
       let old_pfs = ref (PFS.init ()) in
       let iteration_count = ref 0 in

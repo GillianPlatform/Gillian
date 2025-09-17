@@ -22,7 +22,7 @@ module Mode : sig
   (** Sets the logging mode *)
   val set_mode : t -> unit
 
-  (** Pretty print function for logging mode type  *)
+  (** Pretty print function for logging mode type *)
   val pp : Format.formatter -> t -> unit
 end
 
@@ -62,8 +62,8 @@ module Log_queryer : sig
   (** Gets the ID of the report that precedes the given ID *)
   val get_previous_report_id : Report_id.t -> Report_id.t option
 
-  (** Gets the ID, content and type (in that order) of all reports
-    that directly succeed the given ID *)
+  (** Gets the ID, content and type (in that order) of all reports that directly
+      succeed the given ID *)
   val get_next_reports : Report_id.t -> (Report_id.t * string * string) list
 
   (** As with {!get_next_reports}, but only gives IDs *)
@@ -72,27 +72,33 @@ module Log_queryer : sig
   (** Gets the ID of the "first" report that succeeds the given ID *)
   val get_next_report_id : Report_id.t -> Report_id.t option
 
-  (** Gets the annotation corresponding to the previous set-freed action
-     for a given location in the current phase, if it exists *)
+  (** Gets the annotation corresponding to the previous set-freed action for a
+      given location in the current phase, if it exists *)
   val get_previously_freed_annot : string -> string option
 
-  (** Gets the ID, type, and content (in that order) of any children of the given ID
+  (** Gets the ID, type, and content (in that order) of any children of the
+      given ID
 
-    If [roots_only] is true, only gets children with no previous; defaults to [false] *)
+      If [roots_only] is true, only gets children with no previous; defaults to
+      [false] *)
   val get_children_of :
     ?roots_only:bool -> Report_id.t -> (Report_id.t * string * string) list
 
-  (** Gets the ID and content of any children of the given ID with type ["cmd_result"] *)
+  (** Gets the ID and content of any children of the given ID with type
+      ["cmd_result"] *)
   val get_cmd_results : Report_id.t -> (Report_id.t * string) list
 
-  (** Gets the ID and content of a child, with type ["match"], of the given ID (if it exists) *)
+  (** Gets the ID and content of a child, with type ["match"], of the given ID
+      (if it exists) *)
   val get_match_for : Report_id.t -> (Report_id.t * string) option
 
-  (** Returns the ID and content of all children of the given ID with type ["match_result"] *)
+  (** Returns the ID and content of all children of the given ID with type
+      ["match_result"] *)
   val get_match_results : Report_id.t -> (Report_id.t * string) list
 
-  (** Given an ID for an assertion, traverses parents until a command is encountered.
-  Returns the command ID, and a list of pairs of assertion ID and respective match ID  *)
+  (** Given an ID for an assertion, traverses parents until a command is
+      encountered. Returns the command ID, and a list of pairs of assertion ID
+      and respective match ID *)
   val resolve_command_and_matches :
     Report_id.t -> Report_id.t * (Report_id.t * Report_id.t) list
 end
@@ -190,8 +196,8 @@ module Phase : sig
       [Verbose] *)
   val with_verbose : ?title:string -> ?severity:Severity.t -> (unit -> 'a) -> 'a
 
-  (** Runs the specified function within a phase with logging level set to
-      [TMI] *)
+  (** Runs the specified function within a phase with logging level set to [TMI]
+  *)
   val with_tmi : ?title:string -> ?severity:Severity.t -> (unit -> 'a) -> 'a
 end
 

@@ -1,17 +1,27 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -euo pipefail
+code=0
+dune_checks=1
 
-if command -v opam >/dev/null 2>&1; then
+if [ -n "$NO_OPAM_EXEC" ]; then
+  opam=""
+else
+  if command -v opam >/dev/null 2>&1; then
+    opam="opam exec --"
+  else
+    dune_checks=0
+    echo >&2 "[ERR] Failed precommit validation: opam isn't available"
+    code=1
+  fi
+fi
+
+if [ -n "$dune_checks" ]; then
   echo "[INFO] Running source code formatting"
-  opam exec -- dune fmt
+  $opam dune fmt
 
   echo "[INFO] Running build"
-  opam exec -- dune build
-  exit 0
-else
-  echo >&2 "[ERR] Failed precommit validation: opam isn't available"
-  exit 1
+  $opam dune build
 fi
 
 if command -v make >/dev/null 2>&1; then
@@ -19,10 +29,13 @@ if command -v make >/dev/null 2>&1; then
   make -n > /dev/null
 else
   echo >&2 "[ERR] Failed makefile check: make isn't installed"
+  code=1
 fi
 
 # Code that checks if any file of the form *.opam has active diffs and exits with 1 if there is one
 if git diff --name-only | grep -qE '\.opam$'; then
   echo >&2 "[ERR] Failed precommit validation: opam files have active diffs, probably triggered by the build steps"
-  exit 1
+  code=1
 fi
+
+exit $code

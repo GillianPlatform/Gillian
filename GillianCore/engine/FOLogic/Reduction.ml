@@ -857,11 +857,9 @@ let rec reduce_binop_inttonum_const
       Expr.BinOp (l, op, r)
   | _ -> None
 
-(**
-  Reduction of logical expressions
-  - gamma is used for:
-  - pfs  are used for: Car, Cdr, SetDiff
-*)
+(** Reduction of logical expressions
+    - gamma is used for:
+    - pfs are used for: Car, Cdr, SetDiff *)
 (* TODO: can this whole mess be removed since we did sth similar with formulae? *)
 and reduce_lexpr_loop
     ?(matching = false)
@@ -1644,10 +1642,12 @@ and reduce_lexpr_loop
         BinOp (e2, FLessThanEqual, e1)
     | BinOp (Lit (Bool false), Equal, BinOp (e1, FLessThanEqual, e2)) ->
         BinOp (e2, FLessThan, e1)
-    | BinOp (* x + (-y) = 0f <=> x = y *)
+    | BinOp
+        (* x + (-y) = 0f <=> x = y *)
         (BinOp (LVar x, FPlus, UnOp (FUnaryMinus, LVar y)), Equal, Lit (Num 0.))
       -> BinOp (LVar x, Equal, LVar y)
-    | BinOp (* x + (-y) = 0i <=> x = y *)
+    | BinOp
+        (* x + (-y) = 0i <=> x = y *)
         (BinOp (LVar x, IPlus, UnOp (IUnaryMinus, LVar y)), Equal, Lit (Int z))
       when Z.equal z Z.zero -> BinOp (LVar x, Equal, LVar y)
     | BinOp (BinOp (Lit (Num x), FPlus, LVar y), Equal, LVar z)
@@ -2278,8 +2278,9 @@ and simplify_int_arithmetic_lexpr
 
 (** Checks if an int expression is greater than zero.
 
-    @returns [Some true] if definitely > 0, [Some false] if definitely < 0,
-      and [None] if both outcomes are satisfiable. *)
+    @return
+      [Some true] if definitely > 0, [Some false] if definitely < 0, and [None]
+      if both outcomes are satisfiable. *)
 and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
     bool option =
   (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)

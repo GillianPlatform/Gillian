@@ -1,6 +1,6 @@
-OCAML_VARIANT=ocaml-variants.5.2.0+options
-DEV_PACKAGES=ocaml-lsp-server,feather,fileutils
-BUILD_PACKAGES=ocamlformat.0.26.2,odoc
+OCAML_VARIANT=ocaml-variants.5.3.0+options
+DEV_PACKAGES=ocaml-lsp-server
+BUILD_PACKAGES=ocamlformat.0.27.0,odoc
 ifeq ($(NO_OPAM_EXEC),)
 	OPAM_EXEC = opam exec --
 else
@@ -13,13 +13,22 @@ build:
 fmt:
 	$(OPAM_EXEC) dune fmt
 
-deps:
+opam:
 	$(OPAM_EXEC) dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam transformers.opam
+
+deps:
+	make opam
 	opam install . -y --deps-only
 
-init-dev:
+switch:
 	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only
-	$(OPAM_EXEC) ./githooks/install.ml
+
+githooks:
+	./githooks/install
+
+init-dev:
+	make switch
+	make githooks
 
 init-ci:
 	opam install . -y --deps-only
@@ -64,4 +73,4 @@ sphinx:
 sphinx-watch:
 	sphinx-autobuild sphinx _docs/sphinx/
 
-.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs odoc sphinx
+.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs odoc sphinx githooks switch deps opam

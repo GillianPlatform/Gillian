@@ -1,20 +1,18 @@
-(**
-	GIL Types
-*)
+(** GIL Types *)
 
 type t = TypeDef__.typ =
-  | UndefinedType  (** Type of Undefined      *)
-  | NullType  (** Type of Null           *)
-  | EmptyType  (** Type of Empty          *)
+  | UndefinedType  (** Type of Undefined *)
+  | NullType  (** Type of Null *)
+  | EmptyType  (** Type of Empty *)
   | NoneType  (** Type of logical values *)
-  | BooleanType  (** Type of booleans       *)
+  | BooleanType  (** Type of booleans *)
   | IntType  (** Type of integers *)
-  | NumberType  (** Type of floats         *)
-  | StringType  (** Type of strings        *)
-  | ObjectType  (** Type of objects        *)
-  | ListType  (** Type of lists          *)
-  | TypeType  (** Type of types          *)
-  | SetType  (** Type of sets           *)
+  | NumberType  (** Type of floats *)
+  | StringType  (** Type of strings *)
+  | ObjectType  (** Type of objects *)
+  | ListType  (** Type of lists *)
+  | TypeType  (** Type of types *)
+  | SetType  (** Type of sets *)
 [@@deriving yojson, eq, ord, show]
 
 (** Print *)

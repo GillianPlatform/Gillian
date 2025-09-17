@@ -29,8 +29,9 @@ let ( let++ ) f o = Result.map o f
 let ( let** ) o f = Result.bind o f
 
 module Make
-    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
-             with type Lifter.memory = WislSMemory.t)
+    (Gil :
+      Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
+        with type Lifter.memory = WislSMemory.t)
     (Verification : Engine.Verifier.S with type annot = Annot.t) =
 struct
   open Exec_map
@@ -743,9 +744,9 @@ struct
   let insert_new_cmd = Insert_new_cmd.f
 
   module Init_or_handle = struct
-    (** Loop body functions have some boilerplate we want to ignore.
-        This would normally be [Hidden], but we want to only consider
-        the true case of the function *)
+    (** Loop body functions have some boilerplate we want to ignore. This would
+        normally be [Hidden], but we want to only consider the true case of the
+        function *)
     let handle_loop_prefix exec_data =
       let { cmd_report; id; _ } = exec_data in
       let annot = CmdReport.(cmd_report.annot) in
@@ -1349,8 +1350,9 @@ struct
           | Expr.Lit (Int f) ->
               if Z.lt f Z.zero then -1 else if Z.gt f Z.zero then 1 else 0
           | _ -> 0
-        with _ -> (* Do not sort the offsets if an exception has occurred *)
-                  0
+        with _ ->
+          (* Do not sort the offsets if an exception has occurred *)
+          0
       in
       let cell_vars l : Variable.t list =
         List.sort compare_offsets l

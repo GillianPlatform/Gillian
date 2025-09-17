@@ -15,9 +15,7 @@ module GCmd = Gil.Cmd
 module Expr = Gil.Expr
 module Annot = Gil.Annot
 
-(**
- *  Fresh identifiers
- *)
+(** * Fresh identifiers *)
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
   let r () = counter := 0 in

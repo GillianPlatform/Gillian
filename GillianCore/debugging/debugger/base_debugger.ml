@@ -9,18 +9,17 @@ let ( let++ ) f o = Result.map o f
 module Premake
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Verification : Verifier.S
-                      with type SPState.init_data = ID.t
-                       and type annot = PC.Annot.t)
-    (Lifter : Lift.S
-                with type memory = Verification.SAInterpreter.heap_t
-                 and type memory_error = Verification.SPState.m_err_t
-                 and type tl_ast = PC.tl_ast
-                 and type cmd_report =
-                  Verification.SAInterpreter.Logging.ConfigReport.t
-                 and type annot = PC.Annot.t
-                 and type init_data = PC.init_data
-                 and type pc_err = PC.err) =
+    (Verification :
+      Verifier.S with type SPState.init_data = ID.t and type annot = PC.Annot.t)
+    (Lifter :
+      Lift.S
+        with type memory = Verification.SAInterpreter.heap_t
+         and type memory_error = Verification.SPState.m_err_t
+         and type tl_ast = PC.tl_ast
+         and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
+         and type annot = PC.Annot.t
+         and type init_data = PC.init_data
+         and type pc_err = PC.err) =
 struct
   open Verification.SAInterpreter
   module Gil_parsing = Gil_parsing.Make (PC.Annot)
@@ -973,31 +972,17 @@ struct
         let open Lift in
         let open Lifter in
         let open Effect.Deep in
-        try_with f ()
-          {
-            effc =
-              (fun (type a) (eff : a Effect.t) ->
-                match eff with
-                | Step (id, case, path) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        let step_result =
-                          handle_step_effect id case path proc_state state
-                        in
-                        continue k step_result)
-                | IsBreakpoint (file, lines) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        is_breakpoint ~file ~lines proc_state |> continue k)
-                | Node_updated (id, node) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        let () =
-                          Inspect.add_changed_node id node proc_state state
-                        in
-                        continue k ())
-                | _ -> None);
-          }
+        try f () with
+        | effect Step (id, case, path), k ->
+            let step_result =
+              handle_step_effect id case path proc_state state
+            in
+            continue k step_result
+        | effect IsBreakpoint (file, lines), k ->
+            is_breakpoint ~file ~lines proc_state |> continue k
+        | effect Node_updated (id, node), k ->
+            let () = Inspect.add_changed_node id node proc_state state in
+            continue k ()
 
       let lifter_call ?interaction lifter_func proc_state state =
         let stop_id, stop_reason =

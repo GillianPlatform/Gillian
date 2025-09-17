@@ -57,7 +57,8 @@ class lsp_server (f : string -> unit Gillian_result.t) =
         - store the state resulting from the processing
         - return the diagnostics from the new state
     *)
-    method private _on_doc
+    method
+        private _on_doc
         ~(notify_back : Jsonrpc2.notify_back)
         (uri : DocumentUri.t)
         (content : string) =

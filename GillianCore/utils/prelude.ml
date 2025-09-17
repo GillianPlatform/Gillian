@@ -1,6 +1,6 @@
 (** @canonical Gillian.Utils.Prelude
-  
-  Most-used helper functions, [Stdlib] extensions *)
+
+    Most-used helper functions, [Stdlib] extensions *)
 
 (** [Option] pretty-printer *)
 let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
@@ -12,11 +12,11 @@ let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
 let of_yojson_string of_yojson s =
   s |> Yojson.Safe.from_string |> of_yojson |> Result.get_ok
 
-(** Extension of Hashtbl with functions to serialize to and deserialize
-  from yojson, along with some other helpers
-  
-  A Hashtbl is a represented as a list of key-value pairs,
-  where a key-value pair is list of two elements*)
+(** Extension of Hashtbl with functions to serialize to and deserialize from
+    yojson, along with some other helpers
+
+    A Hashtbl is a represented as a list of key-value pairs, where a key-value
+    pair is list of two elements*)
 module Hashtbl = struct
   include Hashtbl
 
@@ -104,9 +104,9 @@ module Hashtbl = struct
 end
 
 (** Extension of Map with functions to serialize to and deserialize from yojson
-  
-  A Map is a represented as a list of key-value pairs, where a
-  key-value pair is list of two elements *)
+
+    A Map is a represented as a list of key-value pairs, where a key-value pair
+    is list of two elements *)
 module Map = struct
   module type OrderedType = sig
     type t [@@deriving yojson]
@@ -192,9 +192,10 @@ module Hashset = struct
   let to_seq (h : 'a t) : 'a Seq.t = Hashtbl.to_seq_keys h
 end
 
-(** Extension of Stack with functions to serialize to and deserialize from yojson
-  
-  A Stack is a last-in-first-out collection of elements *)
+(** Extension of Stack with functions to serialize to and deserialize from
+    yojson
+
+    A Stack is a last-in-first-out collection of elements *)
 module Stack = struct
   include Stack
 

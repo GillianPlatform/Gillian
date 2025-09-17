@@ -6,7 +6,8 @@ module Types = struct
     error : 'err;  (** The memory error that needs to be lifted *)
     command : (int Cmd.t * 'annot) option;  (** The command where it happened *)
     tl_ast : 'ast option;
-        (** If the program was compiled from the target language, we keep the tl ast around *)
+        (** If the program was compiled from the target language, we keep the tl
+            ast around *)
   }
 
   type 'cmd_report executed_cmd_data = {
@@ -52,9 +53,9 @@ module type S = sig
         -> cmd_report executed_cmd_data Effect.t
 
   (** Given a proc name, a tl_ast, and the data from the first executed GIL
-    command, initialise the lifter's state and handle the first command.
+      command, initialise the lifter's state and handle the first command.
 
-    Returns [None] if lifting is unsupported (i.e. if [tl_ast] is [None]). *)
+      Returns [None] if lifting is unsupported (i.e. if [tl_ast] is [None]). *)
   val init :
     proc_name:string ->
     all_procs:string list ->

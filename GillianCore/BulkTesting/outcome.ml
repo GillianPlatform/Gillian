@@ -1,4 +1,5 @@
-(** This is stupid, outcome is actually the interpreter. Doesn't really make sense, this should be changed. *)
+(** This is stupid, outcome is actually the interpreter. Doesn't really make
+    sense, this should be changed. *)
 module type S = sig
   module Val : Val.S
   module ESubst : ESubst.S with type vt = Val.t and type t = Val.et

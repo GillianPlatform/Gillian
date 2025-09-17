@@ -151,8 +151,8 @@ class ['a] iter =
       self#visit_stmt_body ~ctx stmt.body
   end
 
-(** Same as list.map, but takes a reference and marks it as true
-   if any element was changed *)
+(** Same as list.map, but takes a reference and marks it as true if any element
+    was changed *)
 let map_mark_changed ~changed f l =
   List.map
     (fun x ->

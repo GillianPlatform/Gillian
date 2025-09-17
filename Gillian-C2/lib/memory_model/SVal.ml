@@ -254,7 +254,8 @@ module SVArray = struct
 
   let singleton SVal.{ chunk; value } = { chunk; values = Expr.EList [ value ] }
 
-  (** This assumes chunks are properly respected outside of the call of this function *)
+  (** This assumes chunks are properly respected outside of the call of this
+      function *)
   let cons_same_chunk (el : SVal.t) (arr : t) =
     concat_same_chunk (singleton el) arr
 
