@@ -39,7 +39,9 @@ let get fn sfvl = Option.map (fun fv -> fv) (Expr.Map.find_opt fn sfvl)
 let is_empty sfvl = sfvl = empty
 let iter f sfvl = Expr.Map.iter f sfvl
 let partition f sfvl = Expr.Map.partition f sfvl
-let remove = Expr.Map.remove
+
+let remove v sfvl =
+  if Expr.Map.mem v sfvl then (Expr.Map.remove v sfvl, true) else (sfvl, false)
 
 let union l r =
   let ok = ref true in

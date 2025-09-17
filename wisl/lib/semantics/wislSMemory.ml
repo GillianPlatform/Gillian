@@ -115,9 +115,44 @@ let execute_action ~action_name heap (args : vt list) =
         (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
         args
 
-let ga_to_setter = WislLActions.ga_to_setter_str
-let ga_to_getter = WislLActions.ga_to_getter_str
-let ga_to_deleter = WislLActions.ga_to_deleter_str
+let consume ~core_pred heap args =
+  (* let core_pred = WislLActions.ga_from_str core_pred in *)
+  let getter = WislLActions.ga_to_getter_str core_pred in
+  let deleter = WislLActions.ga_to_deleter_str core_pred in
+  let** heap', vs = execute_action ~action_name:getter heap args in
+  let vs_ins, vs_outs = List_utils.split_at vs (List.length args) in
+  let++ heap'', _ = execute_action ~action_name:deleter heap' vs_ins in
+  (heap'', vs_outs)
+
+let produce ~core_pred heap args =
+  (* let core_pred = WislLActions.ga_from_str core_pred in *)
+  let setter = WislLActions.ga_to_setter_str core_pred in
+  let deleter = WislLActions.ga_to_deleter_str core_pred in
+  let del_args =
+    match (WislLActions.ga_from_str_exn core_pred, args) with
+    | Cell, loc :: ofs :: _ -> [ loc; ofs ]
+    | (Bound | Freed), loc :: _ -> [ loc ]
+    | _ -> failwith "Invalid arguments for produce"
+  in
+  let* del_res = execute_action ~action_name:deleter heap del_args in
+  (* HACK: rather than properly implementing produce/consume, we reuse existing mechanisms;
+     all core predicates of WISL's memory are exclusively owned, meaning they can't be produced
+     "on top" of each other. Thus, to make sure we're not over-writing something, we try deleting
+     first:
+     - if the delete succeeds, then something was there and the production must vanish.
+     - if the delete fails, nothing is there and we can go forward with it! *)
+  let* () =
+    match del_res with
+    | Error _ -> Delayed.return ()
+    | Ok _ -> vanish ()
+  in
+  let* set_res = execute_action ~action_name:setter heap args in
+  match set_res with
+  | Error _ ->
+      (* It's ok for failing producers to vanish, no unsoundness *)
+      Delayed.vanish ()
+  | Ok (heap', _) -> Delayed.return heap'
+
 let copy = WislSHeap.copy
 let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 
@@ -178,22 +213,4 @@ let can_fix = function
 
 let get_failing_constraint _ = Expr.true_
 let sure_is_nonempty t = not (WislSHeap.is_empty t)
-
-let consume ~core_pred heap args =
-  let getter = ga_to_getter core_pred in
-  let deleter = ga_to_deleter core_pred in
-  let** heap', vs = execute_action ~action_name:getter heap args in
-  let vs_ins, vs_outs = List_utils.split_at vs (List.length args) in
-  let++ heap'', _ = execute_action ~action_name:deleter heap' vs_ins in
-  (heap'', vs_outs)
-
-let produce ~core_pred heap args =
-  let setter = ga_to_setter core_pred in
-  let* set_res = execute_action ~action_name:setter heap args in
-  match set_res with
-  | Error _ ->
-      (* It's ok for failing producers to vanish, no unsoundness *)
-      Delayed.vanish ()
-  | Ok (heap', _) -> Delayed.return heap'
-
 let split_further _ _ _ _ = None

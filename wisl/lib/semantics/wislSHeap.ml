@@ -196,9 +196,11 @@ let rem_cell heap loc offset =
   | None -> error (MissingResource (Cell, loc, Some offset))
   | Some Block.Freed -> error (UseAfterFree loc)
   | Some (Allocated { bound; data }) ->
-      let data = SFVL.remove offset data in
-      let () = update heap loc (Allocated { bound; data }) in
-      ok ()
+      let data, removed = SFVL.remove offset data in
+      if not removed then error (MissingResource (Cell, loc, Some offset))
+      else
+        let () = update heap loc (Allocated { bound; data }) in
+        ok ()
 
 let get_bound heap loc =
   match Hashtbl.find_opt heap loc with
