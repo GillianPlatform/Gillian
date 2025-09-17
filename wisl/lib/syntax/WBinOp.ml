@@ -4,11 +4,20 @@ type t =
   | GREATERTHAN
   | LESSEQUAL
   | GREATEREQUAL
+  | FLESSTHAN
+  | FGREATERTHAN
+  | FLESSEQUAL
+  | FGREATEREQUAL
   | PLUS
   | MINUS
   | TIMES
   | DIV
   | MOD
+  | FPLUS
+  | FMINUS
+  | FTIMES
+  | FDIV
+  | FMOD
   | AND
   | OR
   (* Lists are only for the logic *)
@@ -27,11 +36,20 @@ let pp fmt b =
   | GREATERTHAN -> s ">"
   | LESSEQUAL -> s "<="
   | GREATEREQUAL -> s ">="
+  | FLESSTHAN -> s "f<"
+  | FGREATERTHAN -> s "f>"
+  | FLESSEQUAL -> s "f<="
+  | FGREATEREQUAL -> s "f>="
   | PLUS -> s "+"
   | MINUS -> s "-"
   | TIMES -> s "*"
   | DIV -> s "/"
   | MOD -> s "%"
+  | FPLUS -> s "f+"
+  | FMINUS -> s "f-"
+  | FTIMES -> s "f*"
+  | FDIV -> s "f/"
+  | FMOD -> s "f%"
   | AND -> s "&&"
   | OR -> s "||"
   | LSTCAT -> s "@"

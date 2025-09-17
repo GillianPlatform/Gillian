@@ -3,9 +3,9 @@ type tt =
   | LStar of t * t
   | LWand of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
   | LPred of string * WLExpr.t list
-  | LPointsTo of WLExpr.t * WLExpr.t list
+  | LPointsTo of WLExpr.t * (WLExpr.t option * WLExpr.t) list
       (** x -> a, b <=> (x -> a) * (x+1 -> b) *)
-  | LBlockPointsTo of WLExpr.t * WLExpr.t list
+  | LBlockPointsTo of WLExpr.t * (WLExpr.t option * WLExpr.t) list
   | LType of WLExpr.t * WType.t
   | LPure of WLExpr.t
 

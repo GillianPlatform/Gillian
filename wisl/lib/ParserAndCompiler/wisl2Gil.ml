@@ -26,6 +26,7 @@ let compile_type t =
     | WString -> Some Type.StringType
     | WPtr -> Some Type.ObjectType
     | WInt -> Some Type.IntType
+    | WFloat -> Some Type.NumberType
     | WSet -> Some Type.SetType
     | WAny -> None)
 
@@ -35,11 +36,18 @@ let compile_binop b =
     | EQUAL -> BinOp.Equal
     | LESSTHAN -> BinOp.ILessThan
     | LESSEQUAL -> BinOp.ILessThanEqual
+    | FLESSTHAN -> BinOp.FLessThan
+    | FLESSEQUAL -> BinOp.FLessThanEqual
     | PLUS -> BinOp.IPlus
     | MINUS -> BinOp.IMinus
     | TIMES -> BinOp.ITimes
     | DIV -> BinOp.IDiv
     | MOD -> BinOp.IMod
+    | FPLUS -> BinOp.FPlus
+    | FMINUS -> BinOp.FMinus
+    | FTIMES -> BinOp.FTimes
+    | FDIV -> BinOp.FDiv
+    | FMOD -> BinOp.FMod
     | AND -> BinOp.And
     | OR -> BinOp.Or
     | LSTNTH -> BinOp.LstNth
@@ -63,6 +71,7 @@ let rec compile_val v =
   | Bool b -> Literal.Bool b
   | Null -> Literal.Null
   | Int n -> Literal.Int (Z.of_int n)
+  | Float x -> Literal.Num x
   | Str s -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
@@ -229,6 +238,11 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         in
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
 
+let compile_lexpr_perm ?fname lexpr =
+  match lexpr with
+  | Some lexpr -> compile_lexpr ?fname lexpr
+  | None -> ([], [], Expr.num 1.0)
+
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lassert = compile_lassert ~fname in
@@ -247,7 +261,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       ?(ptr_opt = None)
       ?(curr = 0)
       (le1 : WLExpr.t)
-      (lle : WLExpr.t list) : string list * Asrt.t =
+      (lle : (WLExpr.t option * WLExpr.t) list) : string list * Asrt.t =
     let compile_pointsto = compile_pointsto ~start:false in
     let exs1, la1, (loc, offset), expr_offset =
       match ptr_opt with
@@ -277,17 +291,19 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
               @
               match expr_offset with
               | Lit (Int _) -> []
-              | _ -> [ (expr_offset, Type.IntType) ])
-            :: Asrt.Pure
-                 (BinOp (e1, Equal, Expr.EList [ Expr.LVar loc; expr_offset ]))
+              | _ -> [ (expr_offset, IntType) ])
+            :: Asrt.Pure (BinOp (e1, Equal, EList [ LVar loc; expr_offset ]))
             :: la1,
             (loc, offset),
             expr_offset )
     in
     let eloc, eoffs = (Expr.LVar loc, gil_add expr_offset curr) in
-    let cell = WislLActions.(str_ga Cell) in
     let bound =
-      if start && block then [ Constr.bound ~loc:eloc ~bound:(List.length lle) ]
+      if start && block then
+        [
+          Constr.bound ~loc:eloc ~bound:(List.length lle)
+            ~permission:(Expr.num 1.0) ();
+        ]
       else []
     in
     match lle with
@@ -297,21 +313,23 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
              "In LPointsTo assertions, a location should always point to at \
               least one value\n\
               It is not the case in : %a" WLAssert.pp asser)
-    | [ le ] ->
+    | [ (perm, le) ] ->
         let exs2, la2, e2 = compile_lexpr le in
-        ( exs1 @ exs2,
-          Asrt.CorePred (cell, [ eloc; eoffs ], [ e2 ]) :: (bound @ la1 @ la2)
-        )
-    | le :: r ->
+        let exs3, la3, e3 = compile_lexpr_perm perm in
+        ( exs1 @ exs2 @ exs3,
+          Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3 ()
+          :: (bound @ la1 @ la2 @ la3) )
+    | (perm, le) :: r ->
         let exs2, la2, e2 = compile_lexpr le in
-        let exs3, la3 =
+        let exs3, la3, e3 = compile_lexpr_perm perm in
+        let exs4, la4 =
           compile_pointsto ~block
             ~ptr_opt:(Some (loc, offset))
             le1 r ~curr:(curr + 1)
         in
-        ( exs1 @ exs2 @ exs3,
-          Asrt.CorePred (cell, [ eloc; eoffs ], [ e2 ])
-          :: (bound @ la1 @ la2 @ la3) )
+        ( exs1 @ exs2 @ exs3 @ exs4,
+          Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3 ()
+          :: (bound @ la4 @ la1 @ la2 @ la3) )
   in
   let open WLAssert in
   match get asser with
@@ -605,6 +623,34 @@ let rec compile_stmt_list
   let dispose = WislLActions.str_ac WislLActions.Dispose in
   let getcell = WislLActions.str_ac WislLActions.GetCell in
   let alloc = WislLActions.str_ac WislLActions.Alloc in
+  let create_func_call x fn el to_bind =
+    let expr_fn = gil_expr_of_str fn in
+    let cmdles, params = List.split (List.map compile_expr el) in
+    let bindings =
+      match to_bind with
+      | Some (spec_name, lvars) ->
+          let lvar_names = List.map fst lvars in
+          let compiled_lexprs =
+            List.map (fun (_, expr) -> compile_lexpr expr) lvars
+          in
+          let lvar_vals =
+            List.map
+              (fun tuple ->
+                match tuple with
+                | [], [], vals -> vals
+                | _ ->
+                    failwith
+                      "Something went wrong when compiling lexpr for a \
+                       function call. The exprs passed might not have been \
+                       lvars.")
+              compiled_lexprs
+          in
+          let lvars = List.combine lvar_names lvar_vals in
+          Some (spec_name, lvars)
+      | None -> None
+    in
+    (x, expr_fn, params, bindings, cmdles)
+  in
   let open WStmt in
   match stmtl with
   | [] -> ([], [])
@@ -784,15 +830,32 @@ let rec compile_stmt_list
   (* x := new(k) =>
           x := [alloc](k); // this is already a pointer
   *)
+  (* Parallel composition *)
+  | { snode = Par funcs; sid; sloc } :: rest ->
+      let lambda f =
+        match f with
+        | { snode = FunCall (x, fn, el, to_bind); _ } ->
+            let var_name, fct_name, args, bindings, cmdles =
+              create_func_call x fn el to_bind
+            in
+            (Cmd.Call (var_name, fct_name, args,  None, bindings ), cmdles)
+        | _ ->
+            failwith
+              "Parallel composition called with a node different from FunCall!"
+      in
+      let zipped = List.map lambda funcs in
+      let fcs = List.map (fun (f, _) -> f) zipped in
+      let cmdles = List.concat_map snd zipped in
+      let cmd = List.hd fcs in
+      let annot =
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
+      let comp_rest, new_functions = compile_list rest in
+      (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* Function call *)
   | { snode = FunCall (x, fn, el, to_bind); sid; sloc } :: rest ->
-      let expr_fn = gil_expr_of_str fn in
-      let cmdles, params = List.split (List.map compile_expr el) in
-      let bindings =
-        match to_bind with
-        | Some (spec_name, lvars) ->
-            Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
-        | None -> None
+      let x, expr_fn, params, bindings, cmdles =
+        create_func_call x fn el to_bind
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
       let annot =

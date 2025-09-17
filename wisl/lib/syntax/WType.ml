@@ -6,6 +6,7 @@ type t =
   | WString
   | WPtr
   | WInt
+  | WFloat
   | WAny
   | WSet
 
@@ -34,12 +35,14 @@ let pp fmt t =
   | WString -> s "String"
   | WPtr -> s "Pointer"
   | WInt -> s "Int"
+  | WFloat -> s "Float"
   | WAny -> s "Any"
   | WSet -> s "Set"
 
-let to_gil = function
-  | WList -> Gil_syntax.Type.ListType
-  | WInt -> Gil_syntax.Type.IntType
-  | WString -> Gil_syntax.Type.StringType
-  | WBool -> Gil_syntax.Type.BooleanType
+let to_gil : t -> Gil_syntax.Type.t = function
+  | WList -> ListType
+  | WInt -> IntType
+  | WString -> StringType
+  | WBool -> BooleanType
+  | WFloat -> NumberType
   | t -> Fmt.failwith "Can't convert type '%a' to GIL!" pp t
