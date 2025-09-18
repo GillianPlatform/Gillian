@@ -1,7 +1,6 @@
 (library
  (name wSemantics)
  (public_name wisl.semantics)
- (libraries wSyntax wUtils gillian fmt gillian.ppx_sat.runtime)
+ (libraries gillian)
  (preprocess
-  (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
- (flags :standard -open WUtils -open Utils.Prelude))
+  (pps ppx_deriving.std ppx_deriving_yojson)))

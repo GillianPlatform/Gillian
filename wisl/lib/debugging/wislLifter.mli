@@ -1,4 +1,4 @@
-open WSemantics
+open WStateEx
 open Gillian.Debugger
 
 module Make
@@ -6,7 +6,7 @@ module Make
              with type Lifter.memory = WislSMemory.t)
     (V : Engine.Verifier.S with type annot = WParserAndCompiler.Annot.t) :
   Lifter.S
-    with type memory_error = WSemantics.WislSHeap.err
+    with type memory_error = WislSHeap.err
      and type tl_ast = WParserAndCompiler.tl_ast
      and type memory = WislSMemory.t
      and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
