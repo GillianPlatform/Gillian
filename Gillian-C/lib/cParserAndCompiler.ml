@@ -273,10 +273,12 @@ let optimise_calls_in_proc proc genv =
       method! visit_cmd _ cmd =
         match cmd with
         | Call
-            ( x,
-              Lit (String fname),
-              [ EList [ Lit (Loc l); Lit (Int z) ] ],
-              None,
+            ( {
+                var_name = x;
+                fun_name = Lit (String fname);
+                args = [ EList [ Lit (Loc l); Lit (Int z) ] ];
+                bindings = None;
+              },
               None )
           when fname = Internal_Functions.get_function_name && Z.(equal z zero)
           -> (
@@ -456,8 +458,8 @@ let parse_and_compile_files paths =
     List.sort_uniq
       (fun a b ->
         match (a, b) with
-        | ( Cmd.Call (_, _, Lit (Loc a) :: _, _, _),
-            Cmd.Call (_, _, Lit (Loc b) :: _, _, _) ) -> String.compare a b
+        | ( Cmd.Call ({ args = Lit (Loc a) :: _; _ }, _),
+            Cmd.Call ({ args = Lit (Loc b) :: _; _ }, _) ) -> String.compare a b
         | _ -> failwith "Wrong init cmd")
       (init_cmds @ genv_init_cmds)
   in

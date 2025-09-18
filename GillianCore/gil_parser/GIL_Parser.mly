@@ -698,7 +698,7 @@ gcmd_target:
   | v=VAR; DEFEQ; e=expr_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
     {
-      Cmd.Call (v, e, es, oi, subst)
+      Cmd.Call ({ var_name = v; fun_name = e; args = es; bindings = subst }, oi)
     }
 (* x := e(e1, ..., en) with j *)
   | v=VAR; DEFEQ; EXTERN; pname=VAR;

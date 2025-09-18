@@ -40,9 +40,7 @@ let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
   in
   let target = Expr.string target in
   let glob_set_fun = Expr.string Constants.Internal_functions.glob_set_fun in
-  let call =
-    b @@ Cmd.Call ("u", glob_set_fun, [ symbol; target ], None, None)
-  in
+  let call = b @@ Cmd.call "u" glob_set_fun [ symbol; target ] in
   Seq.return call
 
 (* This is to be used without a current body.
@@ -66,7 +64,7 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
     let loc = Expr.PVar loc in
     let store_zeros_cmd =
       let store_zeros = Constants.Internal_functions.store_zeros in
-      b @@ Cmd.Call ("u", Lit (String store_zeros), [ loc; size ], None, None)
+      b @@ Cmd.call "u" (Lit (String store_zeros)) [ loc; size ]
     in
 
     let store_value_cmds =
@@ -115,7 +113,7 @@ let set_global_env_proc (ctx : Ctx.t) =
   let constructor_calls =
     Seq.map
       (fun c ->
-        let cmd = Cmd.Call ("u", Expr.string c, [], None, None) in
+        let cmd = Cmd.call "u" (Expr.string c) [] in
         Body_item.make cmd)
       (Hashset.to_seq ctx.prog.constrs)
   in
