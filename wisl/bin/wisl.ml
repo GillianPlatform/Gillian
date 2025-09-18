@@ -1,5 +1,5 @@
 open Gillian.Debugger
-module SMemory = Gillian.Monadic.MonadicSMemory.Lift (WSemantics.WislSMemory)
+module SMemory = Gillian.Monadic.MonadicSMemory.Lift (WStateEx.WislSMemory)
 
 module Lifter =
   Lifter.Gil_fallback_lifter.Make (SMemory) (WParserAndCompiler)
@@ -8,7 +8,7 @@ module Lifter =
 module CLI =
   Gillian.Command_line.Make
     (Gillian.General.Init_data.Dummy)
-    (WSemantics.WislCMemory)
+    (WStateConcrete.WislCMemory)
     (SMemory)
     (WParserAndCompiler)
     (Gillian.General.External.Dummy (WParserAndCompiler.Annot))

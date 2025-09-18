@@ -1,4 +1,5 @@
 open WSemantics
+open WStateEx
 open WSyntax
 open Gil_syntax
 module L = Logging

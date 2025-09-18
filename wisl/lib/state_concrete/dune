@@ -1,0 +1,7 @@
+(library
+ (name wStateConcrete)
+ (public_name wisl.state_concrete)
+ (libraries wSyntax wUtils wSemantics gillian fmt gillian.ppx_sat.runtime)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
+ (flags :standard -open WUtils -open Utils.Prelude -open WSemantics))
