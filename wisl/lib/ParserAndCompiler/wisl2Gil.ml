@@ -130,8 +130,7 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       let cmdl1, comp_expr1 = compile_expr e1 in
       let cmdl2, comp_expr2 = compile_expr e2 in
       let call_i_plus =
-        Cmd.Call
-          (call_var, internal_func, [ comp_expr1; comp_expr2 ], None, None)
+        Cmd.call call_var internal_func [ comp_expr1; comp_expr2 ]
       in
       ( cmdl1 @ cmdl2
         @ [
@@ -300,10 +299,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     let eloc, eoffs = (Expr.LVar loc, gil_add expr_offset curr) in
     let bound =
       if start && block then
-        [
-          Constr.bound ~loc:eloc ~bound:(List.length lle)
-            ~permission:(Expr.num 1.0);
-        ]
+        [ Constr.bound ~loc:eloc ~bound:(List.length lle) () ]
       else []
     in
     match lle with
@@ -317,7 +313,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let exs2, la2, e2 = compile_lexpr le in
         let exs3, la3, e3 = compile_lexpr_perm perm in
         ( exs1 @ exs2 @ exs3,
-          Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3
+          Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3 ()
           :: (bound @ la1 @ la2 @ la3) )
     | (perm, le) :: r ->
         let exs2, la2, e2 = compile_lexpr le in
@@ -328,7 +324,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             le1 r ~curr:(curr + 1)
         in
         ( exs1 @ exs2 @ exs3 @ exs4,
-          Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3
+          Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3 ()
           :: (bound @ la4 @ la1 @ la2 @ la3) )
   in
   let open WLAssert in
@@ -560,12 +556,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
   in
   let retv = gen_str gvar in
   let call_cmd =
-    Cmd.Call
-      ( retv,
-        Lit (String loop_fname),
-        List.map (fun x -> Expr.PVar x) vars,
-        None,
-        None )
+    Cmd.call retv (Lit (String loop_fname))
+      (List.map (fun x -> Expr.PVar x) vars)
   in
   let reassign_vars =
     List.mapi
@@ -649,7 +641,7 @@ let rec compile_stmt_list
           Some (spec_name, lvars)
       | None -> None
     in
-    (x, expr_fn, params, bindings, cmdles)
+    (Cmd.{ var_name = x; fun_name = expr_fn; args = params; bindings }, cmdles)
   in
   let open WStmt in
   match stmtl with
@@ -835,10 +827,7 @@ let rec compile_stmt_list
       let lambda f =
         match f with
         | { snode = FunCall (x, fn, el, to_bind); _ } ->
-            let var_name, fct_name, args, bindings, cmdles =
-              create_func_call x fn el to_bind
-            in
-            (Cmd.{ var_name; fct_name; args; err_lab = None; bindings }, cmdles)
+            create_func_call x fn el to_bind
         | _ ->
             failwith
               "Parallel composition called with a node different from FunCall!"
@@ -854,10 +843,8 @@ let rec compile_stmt_list
       (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* Function call *)
   | { snode = FunCall (x, fn, el, to_bind); sid; sloc } :: rest ->
-      let x, expr_fn, params, bindings, cmdles =
-        create_func_call x fn el to_bind
-      in
-      let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
+      let call, cmdles = create_func_call x fn el to_bind in
+      let cmd = Cmd.Call (call, None) in
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
           ~nest_kind:(FunCall fn) ()

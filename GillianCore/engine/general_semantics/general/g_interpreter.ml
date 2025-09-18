@@ -823,24 +823,24 @@ struct
           ]
 
         let exec_with_spec spec x j args pid subst symb_exec_proc eval_state =
-          let {
-            annot;
-            state;
-            i;
-            b_counter;
-            cs;
-            branch_path;
-            prev_cmd_report_id;
-            _;
-          } =
-            eval_state
-          in
-          let process_ret = process_ret pid j eval_state in
           match !symb_exec_next with
           | true ->
               symb_exec_next := false;
               symb_exec_proc ()
           | false ->
+              let {
+                annot;
+                state;
+                i;
+                b_counter;
+                cs;
+                branch_path;
+                prev_cmd_report_id;
+                _;
+              } =
+                eval_state
+              in
+              let process_ret = process_ret pid j eval_state in
               let subst = eval_subst_list state subst in
               L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
               (* print_to_all ("\tStarting run spec: " ^ pid); *)
@@ -997,9 +997,12 @@ struct
                         < !Config.bi_no_spec_depth -> symb_exec_proc () *)
               | _ -> spec_exec_proc ())
           | false -> spec_exec_proc ()
+
+        let par_f _fcs _eval_state = failwith "TODO: parallel function calls"
       end
 
       let eval_proc_call = Eval_proc_call.f
+      let eval_par_proc_call = Eval_proc_call.par_f
 
       let split_results results =
         let oks, errs =
@@ -1380,13 +1383,24 @@ struct
         ]
 
       (* Function call *)
-      let eval_call x e args j subst eval_state =
+      let eval_call (fcall : Cmd.function_call) j eval_state =
         let { eval_expr; _ } = eval_state in
         DL.log ~v:true (fun m -> m "Call");
-        let pid = eval_expr e in
-        let v_args = List.map eval_expr args in
-        let result = eval_proc_call x pid v_args j subst eval_state in
-        result
+        let pid = eval_expr fcall.fun_name in
+        let v_args = List.map eval_expr fcall.args in
+        eval_proc_call fcall.var_name pid v_args j fcall.bindings eval_state
+
+      (* Parallel function call *)
+      let eval_par_call (fcs : Cmd.function_call list) eval_state =
+        let { eval_expr; _ } = eval_state in
+        let eval_fc (fc : Cmd.function_call) =
+          DL.log (fun m -> m "Call");
+          let pid = eval_expr fc.fun_name in
+          let v_args = List.map eval_expr fc.args in
+          (fc.var_name, pid, v_args, fc.bindings)
+        in
+        let fcs = List.map eval_fc fcs in
+        eval_par_proc_call fcs eval_state
 
       (* External function call *)
       let eval_ecall x (pid : Expr.t) args j eval_state =
@@ -1619,8 +1633,9 @@ struct
             ]
         | GuardedGoto (e, j, k) -> eval_guarded_goto e j k eval_state
         | PhiAssignment lxarr -> eval_phi_assignment lxarr eval_state
-        | Call (x, e, args, j, subst) -> eval_call x e args j subst eval_state
+        | Call (fcall, err) -> eval_call fcall err eval_state
         | ECall (x, pid, args, j) -> eval_ecall x pid args j eval_state
+        | Par fcals -> eval_par_call fcals eval_state
         | Apply (x, pid_args, j) -> eval_apply x pid_args j eval_state
         (* Arguments *)
         | Arguments x ->

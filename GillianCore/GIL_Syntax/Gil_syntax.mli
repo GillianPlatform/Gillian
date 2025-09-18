@@ -566,6 +566,13 @@ module Cmd : sig
   (** Optional bindings for procedure calls *)
   type logic_bindings_t = string * (string * Expr.t) list
 
+  type function_call = {
+    var_name : string;
+    fun_name : Expr.t;
+    args : Expr.t list;
+    bindings : logic_bindings_t option;
+  }
+
   type 'label t =
     | Skip  (** Skip *)
     | Assignment of string * Expr.t  (** Variable Assignment *)
@@ -573,9 +580,8 @@ module Cmd : sig
     | Logic of LCmd.t  (** Logic commands *)
     | Goto of 'label  (** Unconditional goto *)
     | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
-    | Call of
-        string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
-        (** Procedure call *)
+    | Call of function_call * 'label option  (** Procedure call *)
+    | Par of function_call list  (** Parallel composition *)
     | ECall of string * Expr.t * Expr.t list * 'label option
         (** External Procedure call *)
     | Apply of string * Expr.t * 'label option
@@ -607,6 +613,14 @@ module Cmd : sig
 
   (** Location collector *)
   val locs : 'a t -> Containers.SS.t
+
+  val call :
+    ?bindings:logic_bindings_t ->
+    ?error:'label ->
+    string ->
+    Expr.t ->
+    Expr.t list ->
+    'label t
 end
 
 (** @canonical Gillian.Gil_syntax.Pred *)
@@ -1153,14 +1167,7 @@ module Visitors : sig
          ; visit_Branch : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_Bug : 'c -> Flag.t -> Flag.t
          ; visit_Call :
-             'c ->
-             'f Cmd.t ->
-             string ->
-             Expr.t ->
-             Expr.t list ->
-             'f option ->
-             (string * (string * Expr.t) list) option ->
-             'f Cmd.t
+             'c -> 'f Cmd.t -> Cmd.function_call -> 'f option -> 'f Cmd.t
          ; visit_Car : 'c -> UnOp.t -> UnOp.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
          ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
@@ -1192,6 +1199,7 @@ module Visitors : sig
          ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
          ; visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
+         ; visit_function_call : 'c -> Cmd.function_call -> Cmd.function_call
          ; visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
          ; visit_Fold :
              'c ->
@@ -1282,6 +1290,7 @@ module Visitors : sig
          ; visit_NumberType : 'c -> Type.t -> Type.t
          ; visit_ObjectType : 'c -> Type.t -> Type.t
          ; visit_Or : 'c -> BinOp.t -> BinOp.t
+         ; visit_Par : 'c -> 'f Cmd.t -> Cmd.function_call list -> 'f Cmd.t
          ; visit_PVar : 'c -> Expr.t -> string -> Expr.t
          ; visit_PhiAssignment :
              'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
@@ -1409,14 +1418,7 @@ module Visitors : sig
     method visit_Bug : 'c -> Flag.t -> Flag.t
 
     method visit_Call :
-      'c ->
-      'f Cmd.t ->
-      string ->
-      Expr.t ->
-      Expr.t list ->
-      'f option ->
-      (string * (string * Expr.t) list) option ->
-      'f Cmd.t
+      'c -> 'f Cmd.t -> Cmd.function_call -> 'f option -> 'f Cmd.t
 
     method visit_Car : 'c -> UnOp.t -> UnOp.t
     method visit_Cdr : 'c -> UnOp.t -> UnOp.t
@@ -1445,6 +1447,7 @@ module Visitors : sig
     method visit_FPlus : 'c -> BinOp.t -> BinOp.t
     method visit_FTimes : 'c -> BinOp.t -> BinOp.t
     method visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
+    method visit_function_call : 'c -> Cmd.function_call -> Cmd.function_call
     method visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
 
     method visit_Fold :
@@ -1541,6 +1544,7 @@ module Visitors : sig
     method visit_NumberType : 'c -> Type.t -> Type.t
     method visit_ObjectType : 'c -> Type.t -> Type.t
     method visit_Or : 'c -> BinOp.t -> BinOp.t
+    method visit_Par : 'c -> 'f Cmd.t -> Cmd.function_call list -> 'f Cmd.t
     method visit_PVar : 'c -> Expr.t -> string -> Expr.t
 
     method visit_PhiAssignment :
@@ -1702,14 +1706,7 @@ module Visitors : sig
          ; visit_BooleanType : 'c -> 'f
          ; visit_Branch : 'c -> Expr.t -> 'f
          ; visit_Bug : 'c -> 'f
-         ; visit_Call :
-             'c ->
-             string ->
-             Expr.t ->
-             Expr.t list ->
-             'g option ->
-             (string * (string * Expr.t) list) option ->
-             'f
+         ; visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
          ; visit_Car : 'c -> 'f
          ; visit_Cdr : 'c -> 'f
          ; visit_Constant : 'c -> Constant.t -> 'f
@@ -1734,6 +1731,7 @@ module Visitors : sig
              (string * (string * Expr.t) list) option ->
              'f
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_function_call : 'c -> Cmd.function_call -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
@@ -1803,6 +1801,7 @@ module Visitors : sig
          ; visit_NumberType : 'c -> 'f
          ; visit_ObjectType : 'c -> 'f
          ; visit_Or : 'c -> 'f
+         ; visit_Par : 'c -> Cmd.function_call list -> 'f
          ; visit_PVar : 'c -> string -> 'f
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
          ; visit_Pi : 'c -> 'f
@@ -1921,16 +1920,7 @@ module Visitors : sig
     method visit_BooleanType : 'c -> 'f
     method visit_Branch : 'c -> Expr.t -> 'f
     method visit_Bug : 'c -> 'f
-
-    method visit_Call :
-      'c ->
-      string ->
-      Expr.t ->
-      Expr.t list ->
-      'g option ->
-      (string * (string * Expr.t) list) option ->
-      'f
-
+    method visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
     method visit_Car : 'c -> 'f
     method visit_Cdr : 'c -> 'f
     method visit_Constant : 'c -> Constant.t -> 'f
@@ -1959,6 +1949,7 @@ module Visitors : sig
       'f
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_function_call : 'c -> Cmd.function_call -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
@@ -2028,6 +2019,7 @@ module Visitors : sig
     method visit_NumberType : 'c -> 'f
     method visit_ObjectType : 'c -> 'f
     method visit_Or : 'c -> 'f
+    method visit_Par : 'c -> Cmd.function_call list -> 'f
     method visit_PVar : 'c -> string -> 'f
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
@@ -2146,14 +2138,7 @@ module Visitors : sig
          ; visit_BooleanType : 'c -> unit
          ; visit_Branch : 'c -> Expr.t -> unit
          ; visit_Bug : 'c -> unit
-         ; visit_Call :
-             'c ->
-             string ->
-             Expr.t ->
-             Expr.t list ->
-             'f option ->
-             Cmd.logic_bindings_t option ->
-             unit
+         ; visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
          ; visit_Car : 'c -> unit
          ; visit_Cdr : 'c -> unit
          ; visit_Constant : 'c -> Constant.t -> unit
@@ -2176,6 +2161,7 @@ module Visitors : sig
          ; visit_FPlus : 'c -> unit
          ; visit_FTimes : 'c -> unit
          ; visit_FUnaryMinus : 'c -> unit
+         ; visit_function_call : 'c -> Cmd.function_call -> unit
          ; visit_Fail : 'c -> string -> Expr.t list -> unit
          ; visit_Fold :
              'c ->
@@ -2254,6 +2240,7 @@ module Visitors : sig
          ; visit_NumberType : 'c -> unit
          ; visit_ObjectType : 'c -> unit
          ; visit_Or : 'c -> unit
+         ; visit_Par : 'c -> Cmd.function_call list -> unit
          ; visit_PVar : 'c -> string -> unit
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
@@ -2364,16 +2351,7 @@ module Visitors : sig
     method visit_BooleanType : 'c -> unit
     method visit_Branch : 'c -> Expr.t -> unit
     method visit_Bug : 'c -> unit
-
-    method visit_Call :
-      'c ->
-      string ->
-      Expr.t ->
-      Expr.t list ->
-      'f option ->
-      (string * (string * Expr.t) list) option ->
-      unit
-
+    method visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
     method visit_Car : 'c -> unit
     method visit_Cdr : 'c -> unit
     method visit_Constant : 'c -> Constant.t -> unit
@@ -2398,6 +2376,7 @@ module Visitors : sig
     method visit_FPlus : 'c -> unit
     method visit_FTimes : 'c -> unit
     method visit_FUnaryMinus : 'c -> unit
+    method visit_function_call : 'c -> Cmd.function_call -> unit
     method visit_Fail : 'c -> string -> Expr.t list -> unit
 
     method visit_Fold :
@@ -2480,6 +2459,7 @@ module Visitors : sig
     method visit_NumberType : 'c -> unit
     method visit_ObjectType : 'c -> unit
     method visit_Or : 'c -> unit
+    method visit_Par : 'c -> Cmd.function_call list -> unit
     method visit_PVar : 'c -> string -> unit
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit

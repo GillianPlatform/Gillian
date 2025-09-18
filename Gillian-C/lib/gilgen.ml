@@ -62,11 +62,8 @@ let internal_proc_of_unop uop =
 
 let trans_binop_expr ~fname binop te1 te2 =
   let call func =
-    let gvar = Generators.gen_str ~fname Prefix.gvar in
-    ( [
-        Cmd.Call (gvar, Expr.Lit (Literal.String func), [ te1; te2 ], None, None);
-      ],
-      Expr.PVar gvar )
+    let var_name = Generators.gen_str ~fname Prefix.gvar in
+    ([ Cmd.call var_name (Lit (String func)) [ te1; te2 ] ], Expr.PVar var_name)
   in
   let open Cminor in
   match binop with
@@ -273,15 +270,13 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
 
       let chunk = to_gil_chunk clight_prog fname fid compcert_chunk expp in
 
-      let cmd =
-        Cmd.Call (gvar, loadv, [ expr_of_chunk chunk; e ], None, None)
-      in
+      let cmd = Cmd.call gvar loadv [ expr_of_chunk chunk; e ] in
       (cl @ [ cmd ], Expr.PVar gvar)
   | Eunop (uop, e) ->
       let cl, e = trans_expr e in
       let gvar = gen_str Prefix.gvar in
       let ip = internal_proc_of_unop uop in
-      let call = Cmd.Call (gvar, Lit (Literal.String ip), [ e ], None, None) in
+      let call = Cmd.call gvar (Lit (String ip)) [ e ] in
       (cl @ [ call ], PVar gvar)
   | Ebinop (binop, e1, e2) ->
       let leading_e1, te1 = trans_expr e1 in
@@ -335,8 +330,7 @@ let make_free_cmd fname var_list =
   (* If there's nothing to free, we just don't create the command *)
   match make_blocks var_list with
   | [] -> None
-  | blocks ->
-      Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
+  | blocks -> Some (Cmd.call gvar freelist [ EList blocks ])
 
 let make_symb_gen ~fname ~ctx assigned_id type_string =
   let gen_str = Generators.gen_str ~fname Prefix.gvar in
@@ -425,7 +419,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
         Expr.Lit (Literal.String Internal_Functions.bool_of_val)
       in
       let texb = gen_str Prefix.gvar in
-      let bov = Cmd.Call (texb, bool_of_val, [ texp ], None, None) in
+      let bov = Cmd.call texb bool_of_val [ texp ] in
       let a_bov = (annot_ctx context, None, bov) in
       let guard = Cmd.GuardedGoto (PVar texb, then_lab, else_lab) in
       let goto_end = Cmd.Goto endif_lab in
@@ -515,9 +509,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let annot_v_eval = add_annots ~ctx:context v_eval_cmds in
       let storev = Expr.Lit (Literal.String Internal_Functions.storev) in
       let gvar = gen_str Prefix.gvar in
-      let cmd =
-        Cmd.Call (gvar, storev, [ chunk_expr; eaddr; ev ], None, None)
-      in
+      let cmd = Cmd.call gvar storev [ chunk_expr; eaddr; ev ] in
       let cmds =
         annot_addr_eval @ annot_v_eval @ [ (annot_ctx context, None, cmd) ]
       in
@@ -571,12 +563,8 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let s_get_function_name =
         Expr.Lit (Literal.String Internal_Functions.get_function_name)
       in
-      let get_fname =
-        Cmd.Call (fname_var, s_get_function_name, [ fn_expr ], None, None)
-      in
-      let call_cmd =
-        Cmd.Call (leftvar, Expr.PVar fname_var, trans_params, None, None)
-      in
+      let get_fname = Cmd.call fname_var s_get_function_name [ fn_expr ] in
+      let call_cmd = Cmd.call leftvar (PVar fname_var) trans_params in
       let cmds =
         add_annots ~ctx:context leading_fn
         @ add_annots ~ctx:context leading_params
@@ -739,12 +727,9 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let cmds_src, src = trans_expr src in
       let temp = gen_str Prefix.gvar in
       let call =
-        Cmd.Call
-          ( temp,
-            Expr.string Internal_Functions.ef_memcpy,
-            [ Expr.int_z sz; Expr.int_z al; dst; src ],
-            None,
-            None )
+        Cmd.call temp
+          (Expr.string Internal_Functions.ef_memcpy)
+          [ Expr.int_z sz; Expr.int_z al; dst; src ]
       in
       (add_annots ~ctx:context (cmds_dst @ cmds_src @ [ call ]), [])
   | Sbuiltin (_optid, _exf, _params) as s ->
@@ -803,7 +788,7 @@ let trans_function
       let expr_fn =
         Expr.Lit (Literal.String CConstants.Internal_Functions.initialize_genv)
       in
-      [ (empty_annot, None, Cmd.Call (gvar, expr_fn, [], None, None)) ]
+      [ (empty_annot, None, Cmd.call gvar expr_fn []) ]
     else []
   in
   let body, callees = trans_stmt ~clight_prog ~fname ~fid ~context fn_body in
@@ -853,12 +838,7 @@ let set_global_var symbol v =
   in
   let id_list_expr = Expr.Lit (Literal.LList init_data_list) in
   let setvar = CConstants.Internal_Functions.glob_set_var in
-  Cmd.Call
-    ( "u",
-      Lit (String setvar),
-      [ loc; sz; id_list_expr; perm_string ],
-      None,
-      None )
+  Cmd.call "u" (Lit (String setvar)) [ loc; sz; id_list_expr; perm_string ]
 
 (* Second part of the return tuple is:
    * false if it should be a function call
