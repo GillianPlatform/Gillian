@@ -103,9 +103,7 @@ let load_scalar ~ctx ?var (e : Expr.t) (t : GType.t) : string Cs.with_cmds =
         | None -> Ctx.fresh_v ctx
       in
       let loadv = Constants.Internal_functions.loadv in
-      let load_cmd =
-        Cmd.Call (var, Lit (String loadv), [ chunk; e ], None, None)
-      in
+      let load_cmd = Cmd.call var (Lit (String loadv)) [ chunk; e ] in
       (var, [ load_cmd ])
 
 let store_scalar ~ctx ?var (p : Expr.t) (v : Expr.t) (t : GType.t) :
@@ -121,9 +119,7 @@ let store_scalar ~ctx ?var (p : Expr.t) (v : Expr.t) (t : GType.t) :
         | None -> Ctx.fresh_v ctx
       in
       let storev = Constants.Internal_functions.storev in
-      let store_cmd =
-        Cmd.Call (var, Lit (String storev), [ chunk; p; v ], None, None)
-      in
+      let store_cmd = Cmd.call var (Lit (String storev)) [ chunk; p; v ] in
       store_cmd
 
 let memcpy ~ctx ~(type_ : GType.t) ~(dst : Expr.t) ~(src : Expr.t) =
@@ -131,12 +127,7 @@ let memcpy ~ctx ~(type_ : GType.t) ~(dst : Expr.t) ~(src : Expr.t) =
   let size = Ctx.size_of ctx type_ in
   let memcpy = Constants.Internal_functions.ef_memcpy in
   (* TODO: emit a signal that alignment check is not performed correctly *)
-  Cmd.Call
-    ( temp,
-      Lit (String memcpy),
-      [ Expr.int size; Expr.zero_i; dst; src ],
-      None,
-      None )
+  Cmd.call temp (Lit (String memcpy)) [ Expr.int size; Expr.zero_i; dst; src ]
 
 let poison ~ctx ~(dst : Expr.t) byte_width =
   let temp = Ctx.fresh_v ctx in
@@ -195,6 +186,6 @@ let object_size ~ctx ~ptr_ty ptr : Expr.t Cs.with_cmds =
   | Pointer _ ->
       let temp = Ctx.fresh_v ctx in
       let fct = Constants.Unop_functions.object_size in
-      let call = Cmd.Call (temp, Lit (String fct), [ ptr ], None, None) in
+      let call = Cmd.call temp (Lit (String fct)) [ ptr ] in
       Cs.return ~app:[ call ] (Expr.PVar temp)
   | _ -> Error.unexpected "ObjectSize of something that is not a pointer"

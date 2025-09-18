@@ -389,9 +389,7 @@ let compile_binop
         compute e1 e2 b
     | Proc internal_function ->
         let gvar = Ctx.fresh_v ctx in
-        let call =
-          Cmd.Call (gvar, Lit (String internal_function), [ e1; e2 ], None, None)
-        in
+        let call = Cmd.call gvar (Lit (String internal_function)) [ e1; e2 ] in
         Cs.return ~app:[ call ] (Expr.PVar gvar)
     | GilBinop b -> Cs.return (Expr.BinOp (e1, b, e2))
     | App f -> Cs.return (f e1 e2)
@@ -655,9 +653,7 @@ let compile_cast ~(ctx : Ctx.t) ~(from : GType.t) ~(into : GType.t) e :
       let function_name = Expr.Lit (String function_name) in
       let e = Val_repr.as_value ~msg:"TypeCast operand" e in
       let temp = Ctx.fresh_v ctx in
-      let call =
-        Cmd.Call (temp, function_name, e :: additional_params, None, None)
-      in
+      let call = Cmd.call temp function_name (e :: additional_params) in
       Cs.return ~app:[ call ] (Val_repr.ByValue (PVar temp))
   | App f ->
       let e = Val_repr.as_value ~msg:"TypeCast operand" e in
@@ -848,9 +844,7 @@ and compile_call
           let bool_of_value =
             Expr.Lit (String Constants.Internal_functions.bool_of_val)
           in
-          let call =
-            Cmd.Call (temp, bool_of_value, [ to_assume ], None, None)
-          in
+          let call = Cmd.call temp bool_of_value [ to_assume ] in
           Cs.return ~app:[ b call ] (Expr.PVar temp)
         else Cs.return to_assume
       in
@@ -889,9 +883,7 @@ and compile_call
           let bool_of_value =
             Expr.Lit (String Constants.Internal_functions.bool_of_val)
           in
-          let call =
-            Cmd.Call (temp, bool_of_value, [ to_assert ], None, None)
-          in
+          let call = Cmd.call temp bool_of_value [ to_assert ] in
           Cs.return ~app:[ b call ] (Expr.PVar temp)
         else Cs.return to_assert
       in
@@ -946,7 +938,7 @@ and compile_call
          It's a trick of CompCert.*)
       if Ctx.representable_in_store ctx return_type then
         let ret_var = Ctx.fresh_v ctx in
-        let gil_call = Cmd.Call (ret_var, fname, args, None, None) in
+        let gil_call = Cmd.call ret_var fname args in
         by_value ~app:[ b ~nest_kind gil_call ] (Expr.PVar ret_var)
       else
         (* If the function returns by copy, we add first parameter
@@ -955,9 +947,7 @@ and compile_call
           Memory.alloc_temp ~ctx ~location return_type |> Cs.map_l b
         in
         let unused_temp = Ctx.fresh_v ctx in
-        let gil_call =
-          Cmd.Call (unused_temp, fname, temp_arg :: args, None, None)
-        in
+        let gil_call = Cmd.call unused_temp fname (temp_arg :: args) in
         by_copy ~app:[ b ~nest_kind gil_call ] temp_arg return_type
 
 and poison ~ctx ~annot (lhs : GExpr.t) =
@@ -1103,9 +1093,7 @@ and compile_symbol ~ctx ~b expr =
     | InMemoryFunction { ptr; symbol = None } ->
         let symbol = Ctx.fresh_v ctx in
         let get_name = Constants.Internal_functions.get_function_name in
-        let call =
-          Cmd.Call (symbol, Lit (String get_name), [ ptr ], None, None)
-        in
+        let call = Cmd.call symbol (Lit (String get_name)) [ ptr ] in
         Cs.return ~app:[ b call ] (Val_repr.Procedure (Expr.PVar symbol))
     | DirectFunction symbol ->
         Cs.return (Val_repr.Procedure (Lit (String symbol)))

@@ -72,8 +72,8 @@ struct
   let get_fun_call_name exec_data =
     let cmd = CmdReport.(exec_data.cmd_report.cmd) in
     match cmd with
-    | Cmd.Call (_, name_expr, _, _, _) -> (
-        match name_expr with
+    | Cmd.Call ({ fun_name; _ }, _) -> (
+        match fun_name with
         | Expr.Lit (Literal.String name) -> Some name
         | _ ->
             failwith "get_fun_call_name: function name wasn't a literal expr!")

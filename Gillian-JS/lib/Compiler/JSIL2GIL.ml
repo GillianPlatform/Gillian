@@ -447,7 +447,17 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
   | LGoto j -> [ (lab, GCmd.Goto j) ]
   | LGuardedGoto (e, j, k) -> [ (lab, GCmd.GuardedGoto (fe e, j, k)) ]
   | LCall (x, e, es, j, subst) ->
-      [ (lab, GCmd.Call (x, fe e, List.map fe es, j, subst)) ]
+      [
+        ( lab,
+          GCmd.Call
+            ( {
+                var_name = x;
+                fun_name = fe e;
+                args = List.map fe es;
+                bindings = subst;
+              },
+              j ) );
+      ]
   | LECall (x, e, es, j) -> [ (lab, GCmd.ECall (x, fe e, List.map fe es, j)) ]
   | LApply (x, e, j) -> [ (lab, GCmd.Apply (x, fe e, j)) ]
   | LArguments x -> [ (lab, GCmd.Arguments x) ]
