@@ -122,7 +122,7 @@ let execute_action ~action_name heap args =
   | Dispose, [ loc ] -> dispose heap loc
   | _ ->
       Fmt.failwith
-        "Invalid action call for WISL, for '%s' with parameters : [ %a ]"
+        "Invalid action call for WISL-frac, for '%s' with parameters : [ %a ]"
         (WislLActions.str_ac action)
         (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Expr.pp)
         args
@@ -142,8 +142,9 @@ let produce ~core_pred heap args =
   let deleter = WislLActions.ga_to_deleter_str core_pred in
   let del_args =
     match (WislLActions.ga_from_str_exn core_pred, args) with
-    | Cell, loc :: ofs :: _ -> [ loc; ofs ]
-    | (Bound | Freed), loc :: _ -> [ loc ]
+    | Cell, loc :: ofs :: perm :: _ -> [ loc; ofs; perm ]
+    | Bound, loc :: perm :: _ -> [ loc; perm ]
+    | Freed, loc :: _ -> [ loc ]
     | _ -> failwith "Invalid arguments for produce"
   in
   let* del_res = execute_action ~action_name:deleter heap del_args in

@@ -58,7 +58,7 @@ let union =
       let { permission = rperm; _ } = fvr in
       Some { value; permission = Expr.Infix.(lperm +. rperm) })
 
-let to_list fv_list = fold (fun f v ac -> (f, v) :: ac) fv_list []
+let to_list (fv_list : t) = fold (fun f v ac -> (f, v) :: ac) fv_list []
 
 let of_list l =
   let add_several l fvl = List.fold_left (fun ac (a, b) -> add a b ac) fvl l in

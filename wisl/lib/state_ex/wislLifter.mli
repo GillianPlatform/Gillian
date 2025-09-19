@@ -1,4 +1,3 @@
-open WStateEx
 open Gillian.Debugger
 
 module Make

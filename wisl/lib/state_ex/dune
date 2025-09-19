@@ -1,7 +1,14 @@
 (library
  (name wStateEx)
  (public_name wisl.state_ex)
- (libraries wSyntax wUtils wSemantics gillian fmt gillian.ppx_sat.runtime)
+ (libraries
+  wSyntax
+  wUtils
+  wSemantics
+  wParserAndCompiler
+  gillian
+  fmt
+  gillian.ppx_sat.runtime)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
  (flags :standard -open WUtils -open Utils.Prelude -open WSemantics))

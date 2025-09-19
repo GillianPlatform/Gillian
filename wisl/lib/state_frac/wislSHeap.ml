@@ -428,6 +428,15 @@ let alocs heap : SS.t =
         | false -> SS.empty))
     heap SS.empty
 
+let to_seq (heap : t) =
+  Hashtbl.to_seq heap
+  |> Seq.map (fun (loc, block) ->
+         match block with
+         | Block.Freed -> (loc, None)
+         | Allocated { data; bound } ->
+             let bound = Option.map fst bound in
+             (loc, Some (data, bound)))
+
 (***** small things useful for printing ******)
 
 let pp fmt heap =
