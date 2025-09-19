@@ -1,17 +1,15 @@
-open Gillian.Symbolic
-open Gillian.Gil_syntax
 open Gillian.Utils
+open Gillian.Gil_syntax
 open Gillian.Monadic
 open Delayed.Syntax
-open Delayed_result
 open Delayed_result.Syntax
+open Delayed_result
 module Recovery_tactic = Gillian.General.Recovery_tactic
 module Logging = Gillian.Logging
 module SFVL = SFVL
 module SS = Gillian.Utils.Containers.SS
 
 type init_data = unit
-type vt = Values.t
 type err_t = WislSHeap.err [@@deriving yojson, show]
 type t = WislSHeap.t [@@deriving yojson]
 
@@ -35,37 +33,47 @@ let resolve_loc_or_alloc loc =
       let al = ALoc.alloc () in
       Delayed.return ~learned:[ BinOp (ALoc al, Equal, loc) ] al
 
-let get_cell heap (loc : vt) (offset : vt) =
-  let** loc = resolve_loc loc in
-  let++ loc, ofs, value = WislSHeap.get_cell heap loc offset in
-  let loc = Expr.loc_from_loc_name loc in
-  (heap, [ loc; ofs; value ])
-
-let set_cell heap (loc : vt) (offset : vt) (value : vt) =
+let store heap loc offset value =
   let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.set_cell heap loc offset value in
+  let++ () = WislSHeap.store heap loc offset value in
   (heap, [])
 
-let rem_cell heap (loc : vt) (offset : vt) =
+let load heap loc offset =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_cell heap loc offset in
+  let++ value = WislSHeap.load heap loc offset in
+  (heap, [ value ])
+
+let get_cell heap loc offset permission =
+  let** loc = resolve_loc loc in
+  let++ loc, ofs, value = WislSHeap.get_cell heap loc offset permission in
+  let loc = Expr.loc_from_loc_name loc in
+  (heap, [ loc; ofs; permission; value ])
+
+let set_cell heap loc offset value permission =
+  let* loc = resolve_loc_or_alloc loc in
+  let++ () = WislSHeap.set_cell heap loc offset value permission in
   (heap, [])
 
-let get_bound heap loc =
+let rem_cell heap loc offset permission =
   let** loc = resolve_loc loc in
-  let++ b = WislSHeap.get_bound heap loc in
+  let++ () = WislSHeap.rem_cell heap loc offset permission in
+  (heap, [])
+
+let get_bound heap loc permission =
+  let** loc = resolve_loc loc in
+  let++ b, perm = WislSHeap.get_bound heap loc permission in
   let b = Expr.int b in
   let loc = Expr.loc_from_loc_name loc in
-  (heap, [ loc; b ])
+  (heap, [ loc; perm; b ])
 
-let set_bound heap (loc : vt) (bound : int) =
+let set_bound heap loc (bound : int) permission =
   let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.set_bound heap loc bound in
+  let++ () = WislSHeap.set_bound heap loc bound permission in
   (heap, [])
 
-let rem_bound heap loc =
+let rem_bound heap loc permission =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_bound heap loc in
+  let++ () = WislSHeap.rem_bound heap loc permission in
   (heap, [])
 
 let get_freed heap loc =
@@ -74,7 +82,7 @@ let get_freed heap loc =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc ])
 
-let set_freed heap (loc : vt) =
+let set_freed heap loc =
   let* loc = resolve_loc_or_alloc loc in
   let+ () = WislSHeap.set_freed heap loc in
   Ok (heap, [])
@@ -86,33 +94,37 @@ let rem_freed heap loc =
 
 let alloc heap (size : int) =
   let loc = WislSHeap.alloc heap size in
-  ok (heap, [ Expr.Lit (Loc loc); Lit (Int Z.zero) ])
+  ok (heap, [ Expr.ALoc loc; Expr.Lit (Int Z.zero) ])
 
 let dispose heap loc =
   let** loc = resolve_loc loc in
   let++ () = WislSHeap.dispose heap loc in
   (heap, [])
 
-let execute_action ~action_name heap (args : vt list) =
+let execute_action ~action_name heap args =
   let action = WislLActions.ac_from_str action_name in
   match (action, args) with
-  | (Load | GetCell), [ loc; ofs ] -> get_cell heap loc ofs
-  | (Store | SetCell), [ loc; ofs; value ] -> set_cell heap loc ofs value
-  | RemCell, [ loc; ofs ] -> rem_cell heap loc ofs
-  | GetBound, [ loc ] -> get_bound heap loc
-  | SetBound, [ loc; Lit (Int b) ] -> set_bound heap loc (Z.to_int b)
-  | RemBound, [ loc ] -> rem_bound heap loc
+  | Store, [ loc; ofs; value ] -> store heap loc ofs value
+  | Load, [ loc; ofs ] -> load heap loc ofs
+  | GetCell, [ loc; ofs; permission ] -> get_cell heap loc ofs permission
+  | SetCell, [ loc; ofs; permission; value ] ->
+      set_cell heap loc ofs value permission
+  | RemCell, [ loc; ofs; permission ] -> rem_cell heap loc ofs permission
+  | GetBound, [ loc; permission ] -> get_bound heap loc permission
+  | SetBound, [ loc; permission; Expr.Lit (Int b) ] ->
+      set_bound heap loc (Z.to_int b) permission
+  | RemBound, [ loc; permission ] -> rem_bound heap loc permission
   | GetFreed, [ loc ] -> get_freed heap loc
   | SetFreed, [ loc ] -> set_freed heap loc
   | RemFreed, [ loc ] -> rem_freed heap loc
-  | Alloc, [ Lit (Int size) ] when Z.geq size Z.one ->
+  | Alloc, [ Expr.Lit (Literal.Int size) ] when Z.geq size Z.one ->
       alloc heap (Z.to_int size)
   | Dispose, [ loc ] -> dispose heap loc
   | _ ->
       Fmt.failwith
         "Invalid action call for WISL, for '%s' with parameters : [ %a ]"
         (WislLActions.str_ac action)
-        (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+        (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Expr.pp)
         args
 
 let consume ~core_pred heap args =
@@ -163,31 +175,22 @@ let pp_by_need _ fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
 
 let pp_err fmt t =
-  match t with
-  | WislSHeap.MissingResource _ -> Fmt.pf fmt "Missing Resource"
-  | DoubleFree _ -> Fmt.pf fmt "Double Free"
-  | UseAfterFree _ -> Fmt.pf fmt "Use After Free"
-  | MemoryLeak -> Fmt.pf fmt "Memory Leak"
-  | OutOfBounds _ -> Fmt.pf fmt "Out Of Bounds"
-  | InvalidLocation loc ->
-      Fmt.pf fmt "Invalid Location: '%a' cannot be resolved as a location"
-        Expr.pp loc
-
-let get_recovery_tactic _ e =
-  match e with
-  | WislSHeap.MissingResource (_, loc, ofs) ->
-      let loc = Expr.loc_from_loc_name loc in
-      let ofs = Option.to_list ofs in
-      Recovery_tactic.try_unfold (loc :: ofs)
-  | _ -> Recovery_tactic.none
+  Fmt.string fmt
+    (match t with
+    | WislSHeap.MissingResource _ -> "Missing Resource"
+    | DoubleFree _ -> "Double Free"
+    | UseAfterFree _ -> "Use After Free"
+    | MemoryLeak -> "Memory Leak"
+    | OutOfBounds _ -> "Out Of Bounds"
+    | InvalidLocation _ -> "Invalid Location")
 
 let substitution_in_place = WislSHeap.substitution_in_place
 
 let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
   WislSHeap.clean_up keep mem
 
-let lvars heap = WislSHeap.lvars heap
-let alocs heap = WislSHeap.alocs heap
+let lvars = WislSHeap.lvars
+let alocs = WislSHeap.alocs
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
@@ -207,10 +210,19 @@ let get_fixes (err : err_t) =
       [ [ Asrt.Pure (BinOp (new_expr, Equal, loc)) ] ]
   | _ -> []
 
+let get_recovery_tactic _ e =
+  match e with
+  | WislSHeap.MissingResource (_, loc, ofs) ->
+      let loc = Expr.loc_from_loc_name loc in
+      let ofs = Option.to_list ofs in
+      Recovery_tactic.try_unfold (loc :: ofs)
+  | _ -> Recovery_tactic.none
+
+let add_debugger_variables = WislSHeap.add_debugger_variables
+let sure_is_nonempty = Fun.negate WislSHeap.is_empty
+let split_further _ _ _ _ = None
+let get_failing_constraint _ = Expr.true_
+
 let can_fix = function
   | WislSHeap.InvalidLocation _ | MissingResource _ -> true
   | _ -> false
-
-let get_failing_constraint _ = Expr.true_
-let sure_is_nonempty t = not (WislSHeap.is_empty t)
-let split_further _ _ _ _ = None

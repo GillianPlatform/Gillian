@@ -1,4 +1,6 @@
 type ac =
+  | Store
+  | Load
   | SetCell
   | GetCell
   | RemCell
@@ -14,6 +16,8 @@ type ac =
 type ga = Cell | Bound | Freed [@@deriving yojson, show]
 
 let str_ac = function
+  | Store -> "store"
+  | Load -> "load"
   | SetCell -> "setcell"
   | GetCell -> "getcell"
   | RemCell -> "remcell"
@@ -27,6 +31,8 @@ let str_ac = function
   | RemBound -> "rembound"
 
 let ac_from_str = function
+  | "store" -> Store
+  | "load" -> Load
   | "setcell" -> SetCell
   | "getcell" -> GetCell
   | "remcell" -> RemCell
