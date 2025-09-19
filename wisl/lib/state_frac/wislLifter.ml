@@ -1,5 +1,5 @@
+open Gillian
 open WSemantics
-open WStateEx
 open WSyntax
 open Gil_syntax
 module L = Logging
@@ -1379,9 +1379,13 @@ struct
                  in
                  let bound = Variable.create_leaf "bound" bound () in
                  let cells_id = new_var_ref () in
+                 let cells =
+                   SFVL.to_list data
+                   |> List.map (fun ((k, v) : Expr.t * SFVL.field_value) ->
+                          (k, v.value))
+                 in
                  let () =
-                   Hashtbl.replace variables cells_id
-                     (cell_vars (SFVL.to_list data))
+                   Hashtbl.replace variables cells_id (cell_vars cells)
                  in
                  let cells = Variable.create_node "cells" cells_id () in
                  let loc_id = new_var_ref () in

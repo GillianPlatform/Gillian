@@ -44,6 +44,7 @@ val lvars : t -> SS.t
 val alocs : t -> SS.t
 val substitution_in_place : Gillian.Symbolic.Subst.t -> t -> t Delayed.t
 val assertions : t -> Asrt.atom list
+val to_seq : t -> (string * (SFVL.t * int option) option) Seq.t
 
 val add_debugger_variables :
   store:(string * Expr.t) list ->

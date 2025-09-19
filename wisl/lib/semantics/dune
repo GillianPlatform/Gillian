@@ -1,6 +1,6 @@
 (library
  (name wSemantics)
  (public_name wisl.semantics)
- (libraries gillian)
+ (libraries gillian wUtils)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson)))

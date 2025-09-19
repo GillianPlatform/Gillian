@@ -1,9 +1,9 @@
 open Gillian.Debugger
-module SMemory = Gillian.Monadic.MonadicSMemory.Lift (WStateEx.WislSMemory)
+module SMemory = Gillian.Monadic.MonadicSMemory.Lift (WStateFrac.WislSMemory)
 
 module Lifter =
   Lifter.Gil_fallback_lifter.Make (SMemory) (WParserAndCompiler)
-    (WStateEx.WislLifter.Make)
+    (WStateFrac.WislLifter.Make)
 
 module CLI =
   Gillian.Command_line.Make
@@ -15,4 +15,6 @@ module CLI =
     (Gillian.Bulk.Runner.DummyRunners)
     (Lifter)
 
-let () = CLI.main ()
+let () =
+  WUtils.WConfig.fractional_permissions := true;
+  CLI.main ()
