@@ -1,4 +1,6 @@
 type ac =
+  | Store
+  | Load
   | SetCell
   | GetCell
   | RemCell
