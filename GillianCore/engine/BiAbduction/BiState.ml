@@ -324,10 +324,10 @@ module Make (State : SState.S) = struct
 
   let run_spec
       (spec : MP.spec)
-      (bi_state : t)
       (x : string)
       (args : Expr.t list)
-      (_ : (string * (string * Expr.t) list) option) : (t * Flag.t) list =
+      (_ : (string * (string * Expr.t) list) option)
+      (bi_state : t) : (t * Flag.t) list =
     (* let start_time = time() in *)
     L.(
       verbose (fun m ->
@@ -418,11 +418,14 @@ module Make (State : SState.S) = struct
 
   let run_spec
       (spec : MP.spec)
-      (bi_state : t)
       (x : string)
       (args : Expr.t list)
-      (_ : (string * (string * Expr.t) list) option) =
-    Res_list.just_oks (run_spec spec bi_state x args None)
+      (_ : (string * (string * Expr.t) list) option)
+      (bi_state : t) =
+    Res_list.just_oks (run_spec spec x args None bi_state)
+
+  let run_par_spec _ _ =
+    failwith "ERROR: run_par_spec called for non-abstract execution"
 
   let produce_posts (_ : t) (_ : SVal.SESubst.t) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from bi_state.")

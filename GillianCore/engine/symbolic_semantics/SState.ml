@@ -518,11 +518,14 @@ module Make (SMemory : SMemory.S) :
 
   let run_spec
       (_ : MP.spec)
-      (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) =
+      (_ : (string * (string * vt) list) option)
+      (_ : t) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
+
+  let run_par_spec _ _ =
+    failwith "ERROR: run_par_spec called for non-abstract execution"
 
   let unfolding_vals (_ : t) (fs : Expr.t list) : vt list =
     let map to_str to_expr =

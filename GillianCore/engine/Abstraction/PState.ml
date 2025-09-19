@@ -255,16 +255,18 @@ module Make (State : SState.S) :
 
   (* FIXME: This needs to change -> we need to return a matching ret type, so we can
       compose with bi-abduction at the spec level *)
-  let run_spec_aux
-      ?(existential_bindings : (string * vt) list option)
+  let rec run_spec_aux
+      ?(more_specs = [])
+      ?(existential_bindings : (string * vt) list = [])
       (name : string)
       (params : string list)
       (mp : MP.t)
-      (astate : t)
       (x : string option)
-      (args : vt list) : (t * Flag.t, SMatcher.err_t) Res_list.t =
+      (args : vt list)
+      (astate : t) : (t * Flag.t, SMatcher.err_t) Res_list.t =
     L.verbose (fun m ->
-        m "INSIDE RUN spec of %s with the following MP:@\n%a@\n" name MP.pp mp);
+        m "INSIDE RUN spec of %s (%d more) with the following MP:@\n%a@\n" name
+          (List.length more_specs) MP.pp mp);
     let old_store = get_store astate in
     let new_store =
       try SStore.init (List.combine params args)
@@ -277,7 +279,6 @@ module Make (State : SState.S) :
     in
 
     let astate' = set_store astate new_store in
-    let existential_bindings = Option.value ~default:[] existential_bindings in
     let existential_bindings =
       List.map (fun (x, v) -> (Expr.LVar x, v)) existential_bindings
     in
@@ -299,16 +300,22 @@ module Make (State : SState.S) :
           m "WARNING: Failed to match against the precondition of procedure %s"
             name);
     let** frame_state, subst, posts = res in
+
+    let** frame_state, _ =
+      match more_specs with
+      | [] -> Res_list.return (frame_state, Flag.Normal)
+      | (name, params, mp, x, args, existential_bindings) :: more_specs ->
+          let frame_state = set_store frame_state (SStore.copy old_store) in
+          run_spec_aux ~more_specs ?existential_bindings name params mp x args
+            frame_state
+    in
+
     let fl, posts =
       match posts with
-      | Some (fl, posts) -> (fl, posts)
-      | None ->
-          let msg =
-            Printf.sprintf
-              "SYNTAX ERROR: Spec of %s does not have a postcondition" name
-          in
-          L.fail msg
+      | Some p -> p
+      | None -> Fmt.kstr L.fail "Spec of %s has no postcondition" name
     in
+
     (* OK FOR DELAY ENTAILMENT *)
     let* final_state = SMatcher.produce_posts frame_state subst posts in
     let final_store = get_store final_state in
@@ -1031,7 +1038,7 @@ module Make (State : SState.S) :
           in
           let** astate, _ =
             run_spec_aux ~existential_bindings lname lemma.data.lemma_params
-              lemma.mp astate None v_args
+              lemma.mp None v_args astate
           in
           let astate = add_spec_vars astate (Var.Set.of_list binders) in
           let _, astates = simplify astate in
@@ -1045,18 +1052,30 @@ module Make (State : SState.S) :
 
   let run_spec
       (spec : MP.spec)
-      (astate : t)
       (x : string)
       (args : vt list)
-      (subst : (string * (string * vt) list) option) :
-      (t * Flag.t, err_t) Res_list.t =
-    match subst with
-    | None ->
-        run_spec_aux spec.data.spec_name spec.data.spec_params spec.mp astate
-          (Some x) args
-    | Some (_, subst_lst) ->
-        run_spec_aux ~existential_bindings:subst_lst spec.data.spec_name
-          spec.data.spec_params spec.mp astate (Some x) args
+      (subst : (string * (string * vt) list) option)
+      (astate : t) : (t * Flag.t, err_t) Res_list.t =
+    run_spec_aux ?existential_bindings:(Option.map snd subst)
+      spec.data.spec_name spec.data.spec_params spec.mp (Some x) args astate
+
+  let run_par_spec specs astate =
+    let specs =
+      List.map
+        (fun ((spec, x, args, subst) :
+               MP.spec * string * vt list * (string * (string * vt) list) option) ->
+          ( spec.data.spec_name,
+            spec.data.spec_params,
+            spec.mp,
+            Some x,
+            args,
+            Option.map snd subst ))
+        specs
+    in
+    match specs with
+    | [] -> Res_list.return (astate, Flag.Normal)
+    | (a, b, c, d, e, f) :: more_specs ->
+        run_spec_aux ~more_specs ?existential_bindings:f a b c d e astate
 
   let matches
       (astate : t)
