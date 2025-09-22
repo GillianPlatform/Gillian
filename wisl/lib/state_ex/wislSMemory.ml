@@ -96,8 +96,16 @@ let dispose heap loc =
 let execute_action ~action_name heap (args : vt list) =
   let action = WislLActions.ac_from_str action_name in
   match (action, args) with
-  | (Load | GetCell), [ loc; ofs ] -> get_cell heap loc ofs
-  | (Store | SetCell), [ loc; ofs; value ] -> set_cell heap loc ofs value
+  | GetCell, [ loc; ofs ] -> get_cell heap loc ofs
+  | SetCell, [ loc; ofs; value ] -> set_cell heap loc ofs value
+  | Load, [ loc; ofs ] ->
+      (* load only returns the value *)
+      let++ st, res = get_cell heap loc ofs in
+      (st, [ List.nth res 2 ])
+  | Store, [ loc; ofs; value ] ->
+      (* and store returns nothing *)
+      let++ st, _ = set_cell heap loc ofs value in
+      (st, [])
   | RemCell, [ loc; ofs ] -> rem_cell heap loc ofs
   | GetBound, [ loc ] -> get_bound heap loc
   | SetBound, [ loc; Lit (Int b) ] -> set_bound heap loc (Z.to_int b)
