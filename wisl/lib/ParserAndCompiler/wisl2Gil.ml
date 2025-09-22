@@ -779,26 +779,18 @@ let rec compile_stmt_list
           x := v_get[2];
       *)
   (* Property Update *)
-  | { snode = Update (e1, e2); sid; sloc } :: rest ->
-      let get_annot, set_annot =
-        WAnnot.make_multi ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-          ()
+  | { snode = Update (e1, e2); sloc; _ } :: rest ->
+      let set_annot =
+        WAnnot.make_basic ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
-      let v_get = gen_str gvar in
-      let getcmd =
-        Cmd.LAction (v_get, load, [ nth comp_e1 0; nth comp_e1 1 ])
-      in
-      let e_v_get = Expr.PVar v_get in
       let v_set = gen_str gvar in
       let setcmd =
-        Cmd.LAction (v_set, store, [ nth e_v_get 0; nth e_v_get 1; comp_e2 ])
+        Cmd.LAction (v_set, store, [ nth comp_e1 0; nth comp_e1 1; comp_e2 ])
       in
       let comp_rest, new_functions = compile_list rest in
-      ( cmdle1 @ cmdle2
-        @ ((get_annot, None, getcmd) :: (set_annot, None, setcmd) :: comp_rest),
-        new_functions )
+      (cmdle1 @ cmdle2 @ ((set_annot, None, setcmd) :: comp_rest), new_functions)
   (* [e1] := e2 =>
           ce1 := Ce(e1);
           ce2 := Ce(e2);
