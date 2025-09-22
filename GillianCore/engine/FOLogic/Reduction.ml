@@ -281,16 +281,12 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
     =
   let f = get_nth_of_list pfs in
 
-  let err_msg = "get_nth_of_list: index out of bounds." in
-
   (* If we can compute the length of the list, then the index needs to be compatible *)
-  let olen = get_length_of_list lst in
-  let _ =
-    match olen with
-    | None -> ()
-    | Some len ->
-        if len <= idx then raise (ReductionException (Lit Nono, err_msg))
-  in
+  (get_length_of_list lst
+  |> Option.iter @@ fun len ->
+     if len <= idx then
+       let err_msg = Fmt.str "get_nth_of_list: index %d out of bounds." idx in
+       raise (ReductionException (lst, err_msg)));
 
   match lst with
   (* Nothing can be done for variables *)
