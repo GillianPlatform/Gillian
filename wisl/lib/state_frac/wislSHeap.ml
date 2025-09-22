@@ -271,9 +271,7 @@ let rem_cell heap loc offset out_perm =
   | Some Block.Freed -> error (UseAfterFree loc)
   | Some (Allocated { data; bound }) -> (
       match SFVL.get offset data with
-      | None ->
-          failwith
-            "Called rem_cell with an offset that is not in the data SFVL!"
+      | None -> error (MissingResource (Cell, loc, Some offset))
       | Some SFVL.{ value; permission } ->
           let data = SFVL.remove offset data in
           let new_perm = Expr.Infix.(permission -. out_perm) in

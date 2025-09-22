@@ -38,7 +38,7 @@ let field_names sfvl =
   result
 
 let fold f sfvl ac = Expr.Map.fold f sfvl ac
-let get fn sfvl = Option.map (fun fv -> fv) (Expr.Map.find_opt fn sfvl)
+let get fn sfvl = Expr.Map.find_opt fn sfvl
 let is_empty sfvl = sfvl = empty
 let iter f sfvl = Expr.Map.iter f sfvl
 let partition f sfvl = Expr.Map.partition f sfvl
