@@ -189,8 +189,8 @@ let access_cell heap loc ofs permission_check =
       check_sfvl ofs data none_case success_case
 
 let load heap loc ofs =
-  let++ _, _, v = access_cell heap loc ofs (fun _ -> Delayed.return None) in
-  v
+  let++ loc, ofs, v = access_cell heap loc ofs (fun _ -> Delayed.return None) in
+  (Expr.loc_from_loc_name loc, ofs, v)
 
 let get_cell heap loc ofs out_perm =
   let permission_check q =
@@ -233,7 +233,9 @@ let store heap loc_name ofs v =
       if%sat Expr.Infix.(permission <. full_perm) then
         let missing_permission = Expr.Infix.(full_perm -. permission) in
         error (MissingResource (Cell, loc_name, Some missing_permission))
-      else extend_block heap loc_name ofs v data bound permission
+      else
+        let++ () = extend_block heap loc_name ofs v data bound permission in
+        (Expr.loc_from_loc_name loc_name, ofs)
     in
     check_sfvl ofs data none_case some_case
   in

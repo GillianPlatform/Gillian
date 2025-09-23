@@ -35,13 +35,13 @@ let resolve_loc_or_alloc loc =
 
 let store heap loc offset value =
   let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.store heap loc offset value in
-  (heap, [])
+  let++ loc, ofs = WislSHeap.store heap loc offset value in
+  (heap, [ loc; ofs ])
 
 let load heap loc offset =
   let** loc = resolve_loc loc in
-  let++ value = WislSHeap.load heap loc offset in
-  (heap, [ value ])
+  let++ loc, ofs, value = WislSHeap.load heap loc offset in
+  (heap, [ loc; ofs; value ])
 
 let get_cell heap loc offset permission =
   let** loc = resolve_loc loc in
