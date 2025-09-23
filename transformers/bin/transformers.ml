@@ -25,10 +25,7 @@ module PatchedMem = MyMonadicSMemory.Make (MyMem) (Prebuilt.MyInitData)
 (* Gillian Instantiation *)
 (* For measuring performance, wrap this in PerfMeasurer.Make *)
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
-
-module Lifter
-    (Verifier : Gillian.Abstraction.Verifier.S with type annot = PC.Annot.t) =
-  Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (PC) (Verifier)
+module Lifter = Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (PC)
 
 module CLI =
   Gillian.Command_line.Make (InitData) (Cmemory.Make (InitData)) (SMemory) (PC)
