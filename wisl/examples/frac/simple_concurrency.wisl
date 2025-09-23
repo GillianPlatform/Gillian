@@ -7,7 +7,7 @@ predicate is_int(+x: Int) {
     emp
 }
 
-{ (x == #x) * (p == #p) * (#p f<= 1.0) * (#x -> (#p: #v)) }
+{ (x == #x) * (p == #p) * (#p f<= 1.0) * (#x -> (#p: #v)) * (#v: Int) }
 function read(x, p) {
     n := [x];
     if (n == 0) {
@@ -27,9 +27,9 @@ function write(x, v) {
 { (ret == 0) * (#x -> #v) }
 
 //should fail
-[spec incorrect_write: #p]
+[spec SHOULD_FAIL_incorrect_write: #p]
 { (x == #x) * (v == #v) * (#p f<= 1.0) * (#x -> (#p: #v))}
-function incorrect_write(x, v) {
+function SHOULD_FAIL_incorrect_write(x, v) {
     [x] := v;
     return 0
 }
@@ -85,7 +85,7 @@ function conc_reads_same_loc(x) {
 
 // should fail
 { emp }
-function conc_writes_same_loc() {
+function SHOULD_FAIL_conc_writes_same_loc() {
     x := new(1);
     par {
         u := write(x, 2);

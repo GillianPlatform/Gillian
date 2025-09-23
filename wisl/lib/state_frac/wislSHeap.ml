@@ -208,11 +208,10 @@ let overwrite_cell heap loc_name ofs block_missing in_bounds =
   | None -> block_missing ()
   | Some Block.Freed -> error (UseAfterFree loc_name)
   | Some (Allocated { data; bound = None }) -> in_bounds data None
-  | Some (Allocated { data; bound = Some (n, perm) }) ->
-      let expr_n = Expr.int n in
-      if%sat Expr.Infix.(expr_n <= ofs) then
+  | Some (Allocated { data; bound = Some (bound, perm) }) ->
+      if%sat Expr.Infix.(ofs >= Expr.int bound) then
         error (MissingResource (Bound, loc_name, Some ofs))
-      else in_bounds data (Some (n, perm))
+      else in_bounds data (Some (bound, perm))
 
 (* Helper function: Extends the block data with a new cell at offset ofs with the value v. *)
 let extend_block heap loc_name ofs value data bound permission =
@@ -250,16 +249,12 @@ let set_cell heap loc_name ofs v out_perm =
     ok ()
   in
   let in_bounds data bound =
-    let full_perm = Expr.num 1.0 in
     let none_case () = extend_block heap loc_name ofs v data bound out_perm in
-    let some_case _ value permission =
-      let eq = Expr.Infix.(value == v) in
+    let some_case ofs value permission =
       let new_perm = Expr.Infix.(permission +. out_perm) in
-      let fl = Expr.Infix.(new_perm <=. full_perm) in
-      let () =
-        Hashtbl.replace heap loc_name (Block.Allocated { data; bound })
-      in
-      ok ~learned:[ eq; fl ] ()
+      let data = SFVL.add ofs SFVL.{ value = v; permission = new_perm } data in
+      Hashtbl.replace heap loc_name (Block.Allocated { data; bound });
+      ok ~learned:[ Expr.Infix.(value == v && new_perm <=. Expr.num 1.0) ] ()
     in
     check_sfvl ofs data none_case some_case
   in
