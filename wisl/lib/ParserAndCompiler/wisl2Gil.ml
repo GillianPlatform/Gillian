@@ -702,7 +702,7 @@ let rec compile_stmt_list
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* Fresh s-var *)
   | { snode = Fresh v; sid; sloc } :: rest ->
-      let cmd = Cmd.Logic (FreshSVar v) in
+      let cmd = Cmd.Logic (LCmd.FreshSVar v) in
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
@@ -718,7 +718,9 @@ let rec compile_stmt_list
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
-          (BinOp (nth comp_e 1, Equal, Lit (Int Z.zero)), ctnlab, faillab)
+          ( Expr.BinOp (nth comp_e 1, BinOp.Equal, Expr.Lit (Literal.Int Z.zero)),
+            ctnlab,
+            faillab )
       in
       let g_var = gen_str gvar in
       let failcmd = Cmd.Fail ("InvalidBlockPointer", [ comp_e ]) in
@@ -748,7 +750,10 @@ let rec compile_stmt_list
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let checkptrcmd =
         Cmd.GuardedGoto
-          ( BinOp (UnOp (TypeOf, comp_e), Equal, Lit (Type ListType)),
+          ( Expr.BinOp
+              ( Expr.UnOp (UnOp.TypeOf, comp_e),
+                BinOp.Equal,
+                Expr.Lit (Literal.Type ListType) ),
             ctnlab,
             faillab )
       in
@@ -756,7 +761,7 @@ let rec compile_stmt_list
       let lookupcmd =
         Cmd.LAction (v_get, load, [ nth comp_e 0; nth comp_e 1 ])
       in
-      let getvalcmd = Cmd.Assignment (x, nth (PVar v_get) 0) in
+      let getvalcmd = Cmd.Assignment (x, nth (Expr.PVar v_get) 2) in
       let cmds =
         [
           (annot, None, checkptrcmd);
@@ -774,9 +779,9 @@ let rec compile_stmt_list
           x := v_get[2];
       *)
   (* Property Update *)
-  | { snode = Update (e1, e2); sid; sloc } :: rest ->
+  | { snode = Update (e1, e2); sloc; _ } :: rest ->
       let set_annot =
-        WAnnot.make ~origin_loc:(CodeLoc.to_location sloc) ~origin_id:sid ()
+        WAnnot.make_basic ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
