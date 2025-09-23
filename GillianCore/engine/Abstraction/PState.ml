@@ -295,20 +295,11 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let res = SMatcher.match_ astate' subst mp (FunctionCall name) in
-    if List.find_opt Result.is_error res |> Option.is_some then
+    if List.exists Result.is_error res then
       L.normal (fun m ->
           m "WARNING: Failed to match against the precondition of procedure %s"
             name);
     let** frame_state, subst, posts = res in
-
-    let** frame_state, _ =
-      match more_specs with
-      | [] -> Res_list.return (frame_state, Flag.Normal)
-      | (name, params, mp, x, args, existential_bindings) :: more_specs ->
-          let frame_state = set_store frame_state (SStore.copy old_store) in
-          run_spec_aux ~more_specs ?existential_bindings name params mp x args
-            frame_state
-    in
 
     let fl, posts =
       match posts with
@@ -316,13 +307,29 @@ module Make (State : SState.S) :
       | None -> Fmt.kstr L.fail "Spec of %s has no postcondition" name
     in
 
+    let** frame_state, frame_store =
+      match more_specs with
+      | [] -> Res_list.return (frame_state, old_store)
+      | (name, params, mp, x, args, existential_bindings) :: more_specs ->
+          let frame_state = set_store frame_state (SStore.copy old_store) in
+          let++ frame_state, _ =
+            run_spec_aux ~more_specs ?existential_bindings name params mp x args
+              frame_state
+          in
+          let frame_store = get_store frame_state in
+          let frame_state = set_store frame_state (SStore.copy new_store) in
+          (frame_state, frame_store)
+    in
+
     (* OK FOR DELAY ENTAILMENT *)
     let* final_state = SMatcher.produce_posts frame_state subst posts in
+
     let final_store = get_store final_state in
     let v_ret = SStore.get final_store Names.return_variable in
-    let final_state = set_store final_state (SStore.copy old_store) in
+    let final_state = set_store final_state (SStore.copy frame_store) in
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
+
     let _, final_states = simplify final_state in
     let+ final_state = final_states in
     match SMatcher.unfold_concrete_preds final_state with
