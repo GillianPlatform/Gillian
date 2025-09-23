@@ -225,7 +225,7 @@ struct
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
         let s' = set ~idx ~idx' ss' s in
-        (s', idx' :: v)
+        (s', v)
     | Alloc, args ->
         if I.mode = Dynamic then
           failwith "Alloc not allowed using dynamic indexing";
@@ -480,7 +480,7 @@ struct
         let ( let+^ ) = lifting_err idx idx' in
         let+^ ss', v = r in
         let s' = set ~idx ~idx' ss' s in
-        (s', idx' :: v)
+        (s', v)
     | Alloc, args ->
         let* idx = I.make_fresh () in
         let ss, v = S.instantiate args in

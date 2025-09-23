@@ -77,7 +77,7 @@ module Make (S : MyMonadicSMemory.S) :
         let** idx', ss = validate_index (b, n) idx in
         let+ r = S.execute_action a ss args in
         match r with
-        | Ok (ss', v) -> Ok ((ExpMap.add idx' ss' b, n), idx' :: v)
+        | Ok (ss', v) -> Ok ((ExpMap.add idx' ss' b, n), v)
         | Error e -> Error (SubError (idx', e)))
     | SubAction _, [] -> failwith "Missing index for sub-action"
 
