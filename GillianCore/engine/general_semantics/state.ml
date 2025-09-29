@@ -1,8 +1,8 @@
 (** @canonical Gillian.General.State
 
-  Interface for GIL General States.
+    Interface for GIL General States.
 
-  They are considered to be mutable. *)
+    They are considered to be mutable. *)
 
 (** @canonical Gillian.General.State.S *)
 module type S = sig
@@ -110,9 +110,10 @@ module type S = sig
 
   val evaluate_slcmd : 'a MP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
-  (** [match_invariant prog revisited state invariant binders] returns a list of pairs of states.
-      In each pair, the first element is the framed off state, and the second one is the invariant,
-      i.e. the state obtained by producing the invariant *)
+  (** [match_invariant prog revisited state invariant binders] returns a list of
+      pairs of states. In each pair, the first element is the framed off state,
+      and the second one is the invariant, i.e. the state obtained by producing
+      the invariant *)
   val match_invariant :
     'a MP.prog ->
     bool ->

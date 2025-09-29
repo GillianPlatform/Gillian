@@ -60,13 +60,15 @@ module type S = sig
 end
 
 module Make
-    (SState : SState.S
-                with type vt = SVal.M.t
-                 and type st = SVal.SESubst.t
-                 and type store_t = SStore.t)
-    (SPState : PState.S
-                 with type state_t = SState.t
-                  and type init_data = SState.init_data)
+    (SState :
+      SState.S
+        with type vt = SVal.M.t
+         and type st = SVal.SESubst.t
+         and type store_t = SStore.t)
+    (SPState :
+      PState.S
+        with type state_t = SState.t
+         and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) =
 struct

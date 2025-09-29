@@ -26,7 +26,8 @@ module type S = sig
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) Exec_err.t [@@deriving show, yojson]
 
-  (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
+  (** Type of configurations: state, call stack, previous index, previous loop
+      ids, current index, branching *)
   module CConf : sig
     type err = {
       callstack : Call_stack.t;
@@ -87,16 +88,18 @@ module type S = sig
   type conf_t = BConfErr of err_t list | BConfCont of state_t
 
   (** The result of execution
-      
-    In the symbolic case, this is the result of {i one branch} of execution *)
+
+      In the symbolic case, this is the result of {i one branch} of execution *)
   type result_t = (state_t, state_vt, err_t) Exec_res.t
 
   type conf_selector =
     | Path of Branch_case.path
     | IdCase of Logging.Report_id.t * Branch_case.t option
 
-  (** To support the step-by-step behaviour of the debugger, execution is split into thunks; each invocation executes one GIL command.
-    By supplying a branch path, or an ID and branch case, a particular branch of execution can be selected. *)
+  (** To support the step-by-step behaviour of the debugger, execution is split
+      into thunks; each invocation executes one GIL command. By supplying a
+      branch path, or an ID and branch case, a particular branch of execution
+      can be selected. *)
   type 'result cont_func_f =
     ?selector:conf_selector -> unit -> 'result cont_func
 
@@ -165,7 +168,8 @@ module type S = sig
     state_t ->
     'a cont_func
 
-  (** As with {! init_evaluate_proc}, but immediately executes the proc to completion *)
+  (** As with {! init_evaluate_proc}, but immediately executes the proc to
+      completion *)
   val evaluate_proc :
     (result_t -> 'a) ->
     annot MP.prog ->
@@ -189,10 +193,11 @@ module type Intf = sig
       (Val : Val.S)
       (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
       (Store : Store.S with type vt = Val.t)
-      (State : State.S
-                 with type vt = Val.t
-                  and type st = ESubst.t
-                  and type store_t = Store.t)
+      (State :
+        State.S
+          with type vt = Val.t
+           and type st = ESubst.t
+           and type store_t = Store.t)
       (PC : ParserAndCompiler.S)
       (External : External.T(PC.Annot).S) :
     S

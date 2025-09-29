@@ -1,6 +1,4 @@
-(**
-    Reporter which logs to a database
-*)
+(** Reporter which logs to a database *)
 
 let initialize () =
   Log_database.reset_db ();

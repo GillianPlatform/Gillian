@@ -6,9 +6,8 @@ module L = Logging
 module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Verification : Verifier.S
-                      with type annot = PC.Annot.t
-                       and type SPState.init_data = ID.t)
+    (Verification :
+      Verifier.S with type annot = PC.Annot.t and type SPState.init_data = ID.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t)
     (Debug_adapter : Debug_adapter.S) : Console.S = struct
   module Common_args = Common_args.Make (PC)

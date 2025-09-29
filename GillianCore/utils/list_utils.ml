@@ -1,19 +1,20 @@
 (** Helper functions for {!List}s *)
 
-(** Cross product of two lists, l1 and l2, combining its elements with function f
+(** Cross product of two lists, l1 and l2, combining its elements with function
+    f
 
-  If l1 is of size n and l2 of size m, the cross product is of size [n * m] *)
+    If l1 is of size n and l2 of size m, the cross product is of size [n * m] *)
 let cross_product (l1 : 'a list) (l2 : 'b list) (f : 'a -> 'b -> 'c) : 'c list =
   List.fold_left (fun result e1 -> result @ List.map (f e1) l2) [] l1
 
 (** Uses [Stdlib.compare] to produce a list with duplicate elements removed
 
-  The resulting list will also be sorted. *)
+    The resulting list will also be sorted. *)
 let remove_duplicates l = List.sort_uniq Stdlib.compare l
 
 (** Gives the intersection of two lists
-    
-  This uses the polymorphic [=] *)
+
+    This uses the polymorphic [=] *)
 let intersect (lst1 : 'a list) (lst2 : 'a list) : 'a list =
   let lst =
     cross_product lst1 lst2 (fun a b -> if a = b then Some a else None)
@@ -21,8 +22,8 @@ let intersect (lst1 : 'a list) (lst2 : 'a list) : 'a list =
   List.map Option.get (List.filter (fun x -> x <> None) lst)
 
 (** Gives the cross-product of a 2D list
-  
-  A 2D list of size [x * y] will give a product of size [x ^ y] *)
+
+    A 2D list of size [x * y] will give a product of size [x ^ y] *)
 let rec list_product l =
   let rec aux ~acc l1 l2 =
     match (l1, l2) with
@@ -40,7 +41,8 @@ let rec list_product l =
       let tail_product = list_product tl in
       aux ~acc:[] l1 tail_product
 
-(** The same as {!List.combine}, but allows the first list to be longer than the second *)
+(** The same as {!List.combine}, but allows the first list to be longer than the
+    second *)
 let right_combine (lst1 : 'a list) (lst2 : 'b list) : ('a * 'b) list =
   let rec loop lst1 lst2 comb_lst =
     match (lst1, lst2) with
@@ -64,7 +66,8 @@ let split_at (lst : 'a list) (len : int) : 'a list * 'a list =
   in
   f 0 [] lst
 
-(** Similar to {!List.filter_map}, but returns [None] if, for any element [x], [f x = None] *)
+(** Similar to {!List.filter_map}, but returns [None] if, for any element [x],
+    [f x = None] *)
 let rec flaky_map f =
   let ( let* ) = Option.bind in
   function
@@ -76,7 +79,7 @@ let rec flaky_map f =
 
 (** Returns a sublist using an offset and length
 
-  Returns [None] if the list is too short *)
+    Returns [None] if the list is too short *)
 let list_sub l ofs len =
   let rec aux l i acc =
     if i >= ofs + len then Some (List.rev acc)
@@ -94,8 +97,8 @@ let make n el =
   aux [] n
 
 (** Gives the index of an element in a list
-    
-  Uses polymorphic [=], and returns [None] if not found *)
+
+    Uses polymorphic [=], and returns [None] if not found *)
 let index_of element list =
   let rec aux cursor l =
     match l with
@@ -105,8 +108,8 @@ let index_of element list =
   in
   aux 0 list
 
-(** Returns [Left v] if [v] is the nth element of [lst] or [Right sz] if
-    the list is too short and is of size [sz]. Fails if provided a negative [n]. *)
+(** Returns [Left v] if [v] is the nth element of [lst] or [Right sz] if the
+    list is too short and is of size [sz]. Fails if provided a negative [n]. *)
 let nth_or_size list n =
   if n < 0 then Fmt.failwith "Invalid nth : %d" n;
   let rec aux sz list n =
@@ -117,8 +120,8 @@ let nth_or_size list n =
   aux 0 list n
 
 (** Tests if a list starts with another
-  
-  Uses polymorphic [=] *)
+
+    Uses polymorphic [=] *)
 let rec starts_with a b =
   match (a, b) with
   | _, [] -> true
@@ -126,12 +129,12 @@ let rec starts_with a b =
   | _, _ -> false
 
 (** Tests if a list ends with another
-  
-  Uses polymorphic [=] *)
+
+    Uses polymorphic [=] *)
 let ends_with a b = starts_with (List.rev a) (List.rev b)
 
-(** Returns the list without the first element that matches the predicate,
-  and the removed element if it exists *)
+(** Returns the list without the first element that matches the predicate, and
+    the removed element if it exists *)
 let pop_where f =
   let rec aux pre = function
     | [] -> (None, List.rev pre)
@@ -151,8 +154,8 @@ let pop_map f =
   aux []
 
 (** Splits a list into head and tail
-    
-  Returns [(None, [])] if the list is empty *)
+
+    Returns [(None, [])] if the list is empty *)
 let hd_tl = function
   | x :: xs -> (Some x, xs)
   | [] -> (None, [])
@@ -174,7 +177,8 @@ let cons_opt x xs =
   | None -> xs
   | Some x -> x :: xs
 
-(** Similar to {!flaky_map}, but with [Result]s, giving the first error if one exists *)
+(** Similar to {!flaky_map}, but with [Result]s, giving the first error if one
+    exists *)
 let map_results f l =
   let rec aux acc = function
     | [] -> Ok (List.rev acc)

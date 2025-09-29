@@ -4,7 +4,8 @@ module Gerror : sig
 end
 
 module Machine_model_parse : sig
-  (** Consumes the architecture data from the symtab, and returns the built machine_model. *)
+  (** Consumes the architecture data from the symtab, and returns the built
+      machine_model. *)
   val consume_from_symtab : Symtab.t -> Machine_model.t
 end
 

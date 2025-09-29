@@ -6,9 +6,8 @@ module L = Logging
 module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Abductor : Abductor.S
-                  with type init_data = ID.t
-                   and type annot = PC.Annot.t)
+    (Abductor :
+      Abductor.S with type init_data = ID.t and type annot = PC.Annot.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)

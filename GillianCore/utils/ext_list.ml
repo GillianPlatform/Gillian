@@ -155,19 +155,20 @@ let remove_duplicates ?(equal = ( = )) l =
   in
   outer l.first
 
-(** Filters-maps the list in place according to fmap.
-    For each element, if it is not filtered, the cond on the element is also checked.
-    If the condition is true, then the filtering stops and the function returns true.
-    If the condition is false, then the element is replaced.
-    If the condition is never met, the function returns false
+(** Filters-maps the list in place according to fmap. For each element, if it is
+    not filtered, the cond on the element is also checked. If the condition is
+    true, then the filtering stops and the function returns true. If the
+    condition is false, then the element is replaced. If the condition is never
+    met, the function returns false
 
     For example
-    [let f = (fun x ->
-      if x < 5 then `Filter else if x = 10 then `Stop else `Replace (x + 1))]
+    [let f = (fun x -> if x < 5 then `Filter else if x = 10 then `Stop else
+     `Replace (x + 1))]
 
-    [filter_map_stop_cond f \[ 1; 2; 6;7; 4 \]] will modify the list into [\[ 7; 8 \]] and return false
-    [filter_map_stop_cond f \[ 1; 2; 6; 7; 10; 8; 4 \]] will modify the list into [\[ 7; 8; 10; 8; 4 \]] and return true
-*)
+    [filter_map_stop_cond f [ 1; 2; 6;7; 4 ]] will modify the list into
+    [[ 7; 8 ]] and return false
+    [filter_map_stop_cond f [ 1; 2; 6; 7; 10; 8; 4 ]] will modify the list into
+    [[ 7; 8; 10; 8; 4 ]] and return true *)
 let filter_map_stop f l =
   let rec aux ~last_kept ~set_tail = function
     | Nil ->

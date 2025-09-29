@@ -515,9 +515,9 @@ module Encoding = struct
 
   let simply_wrapped = make ~kind:Simple_wrapped
 
-  (** Takes a value either natively encoded or simply wrapped
-    and returns a value simply wrapped.
-    Careful: do not use wrap with a a set, as they cannot be simply wrapped *)
+  (** Takes a value either natively encoded or simply wrapped and returns a
+      value simply wrapped. Careful: do not use wrap with a a set, as they
+      cannot be simply wrapped *)
   let simple_wrap { expr; kind; _ } =
     let open Lit_operations in
     match kind with

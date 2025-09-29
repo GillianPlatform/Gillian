@@ -29,13 +29,15 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Print Z3 version
+        run: z3 --version
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.2.0+options"
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: Installing Python prerequisites
         run: sudo pip install sphinx furo
       - name: Restore Cache
@@ -45,7 +47,7 @@ jobs:
           cache-name: cache-ocaml
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.2.0-${{ hashFiles('**.opam') }}
+          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
       - name: Install dependencies
         run: make init-ci
       - name: Install ubuntu dependencies
@@ -101,7 +103,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.2.0+options"
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -139,7 +141,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.2.0+options"
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -177,7 +179,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.2.0+options"
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: install CBMC
         run: |
           curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb
@@ -218,7 +220,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.2.0+options"
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
@@ -252,7 +254,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.2.0+options"
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: checkout project
         uses: actions/checkout@v3
         with:
@@ -287,7 +289,7 @@ jobs:
   #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   #     - uses: ocaml/setup-ocaml@v3
   #       with:
-  #         ocaml-compiler: "ocaml-variants.5.2.0+options"
+  #         ocaml-compiler: "ocaml-variants.5.3.0+options"
   #     - name: Checkout project
   #       uses: actions/checkout@v3
   #       with:
@@ -465,9 +467,9 @@ jobs:
           cache-name: cache-ocaml
         with:
           path: .docker_opam_cache
-          key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
+          key: docker-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            docker-${{ env.cache-name }}-ocaml-5.2.0
+            docker-${{ env.cache-name }}-ocaml-5.3.0
       - name: Build and export docker image
         uses: docker/build-push-action@v4
         with:
@@ -482,7 +484,7 @@ jobs:
         run: |
           rm -rf .docker_opam_cache
           docker run --name deps ${{ env.DOCKER_IMG_NAME }}:test bash -c "opam clean"
-          docker cp deps:/home/opam/.opam/5.2 ./.docker_opam_cache
+          docker cp deps:/home/opam/.opam/5.3 ./.docker_opam_cache
           docker rm deps
 
   push-docker:
@@ -503,9 +505,9 @@ jobs:
             cache-name: cache-ocaml
         with:
           path: .docker_opam_cache
-          key: docker-${{ env.cache-name }}-ocaml-5.2.0-${{ hashFiles('**/*.opam') }}
+          key: docker-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            docker-${{ env.cache-name }}-ocaml-5.2.0
+            docker-${{ env.cache-name }}-ocaml-5.3.0
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:

@@ -89,10 +89,10 @@ module type S = sig
   val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
   val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
 
-  (** [unfold state name args unfold_info] returns a
-      list of pairs (subst, state), resulting from unfolding
-      the predicate [name(..args..)] from the given state.
-      unfold_info contains information about how to bind new variables. *)
+  (** [unfold state name args unfold_info] returns a list of pairs (subst,
+      state), resulting from unfolding the predicate [name(..args..)] from the
+      given state. unfold_info contains information about how to bind new
+      variables. *)
   val unfold :
     ?additional_bindings:unfold_info_t ->
     t ->
@@ -109,9 +109,9 @@ module type S = sig
   val try_recovering :
     t -> Expr.t Recovery_tactic.t -> (t list * recovery_tactic, string) result
 
-  (** Tries to unfold the given predicate in the state.
-      If it manages, it returns the new set of states and corresponding
-      substitutions, otherwise, it returns None. *)
+  (** Tries to unfold the given predicate in the state. If it manages, it
+      returns the new set of states and corresponding substitutions, otherwise,
+      it returns None. *)
   val unfold_with_vals :
     auto_level:[ `High | `Low ] ->
     t ->
@@ -120,8 +120,8 @@ module type S = sig
 
   (** Unfolds 1 predicate for which all arguments are concrete.
       - If it finds one:
-        - if it succeeds to unfold, it returns Some (Some subst, new_state )
-        - if it fails to unfold it returns None
+      - if it succeeds to unfold, it returns Some (Some subst, new_state )
+      - if it fails to unfold it returns None
       - If it doesn't find one, it returns Some (None, input_state) *)
   val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
@@ -140,9 +140,8 @@ module type S = sig
     match_kind ->
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 
-  (** Folds a predicate in the state, consuming its definition and
-      producing the folded predicate.
-      If the predicate has a guard, the guard is produced. *)
+  (** Folds a predicate in the state, consuming its definition and producing the
+      folded predicate. If the predicate has a guard, the guard is produced. *)
   val fold :
     ?in_matching:bool ->
     ?additional_bindings:(Expr.t * Expr.t) list ->
@@ -152,10 +151,9 @@ module type S = sig
     Expr.t list ->
     (t, err_t) Res_list.t
 
-  (** Consumes a predicate from the state.
-      If the predicate is not "verbatim" in our set of preds,
-      and it is not abstract and we are not in manual mode,
-      we attempt to fold it. *)
+  (** Consumes a predicate from the state. If the predicate is not "verbatim" in
+      our set of preds, and it is not abstract and we are not in manual mode, we
+      attempt to fold it. *)
   val consume_pred :
     ?in_matching:bool ->
     ?fold_outs_info:SVal.SESubst.t * MP.step * Expr.t list ->

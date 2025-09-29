@@ -113,9 +113,9 @@ let rec get_by_id id stmt =
   let self_or_none = if get_id stmt = id then `WStmt stmt else `None in
   self_or_none |>> (aux, stmt)
 
-(** This function checks that the statement list has at least one concrete statement
-    and that every loop is preceded by an invariant
-    It returns true and an empty string if it is the case, false with a message otherwise *)
+(** This function checks that the statement list has at least one concrete
+    statement and that every loop is preceded by an invariant It returns true
+    and an empty string if it is the case, false with a message otherwise *)
 
 (* let check_consistency sl loc =
    let message_need_concrete = "This statement bloc contains only logic commands, it needs concrete statements." in

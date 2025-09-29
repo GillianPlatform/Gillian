@@ -1,8 +1,8 @@
 (** @canonical Gillian.General.Store
 
-  Interface for GIL Stores
+    Interface for GIL Stores
 
-  GIL stores are (mutable) mappings from GIL variables to GIL values. *)
+    GIL stores are (mutable) mappings from GIL variables to GIL values. *)
 
 (** @canonical Gillian.General.Store.S *)
 module type S = sig
@@ -33,7 +33,8 @@ module type S = sig
   (** Return value of a given variable or throw *)
   val get_unsafe : t -> Var.t -> vt
 
-  (** Store constructor, with a list of bindings of the form (variable, value) *)
+  (** Store constructor, with a list of bindings of the form (variable, value)
+  *)
   val init : (Var.t * vt) list -> t
 
   (** Store iterator *)

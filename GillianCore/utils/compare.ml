@@ -1,8 +1,8 @@
 (** @canonical Gillian.Utils.Compare
 
-  Convenience function for comparison
-    
-  Returns a variant that can easily be matched against *)
+    Convenience function for comparison
+
+    Returns a variant that can easily be matched against *)
 
 type comparison = Gt | Lt | Eq
 

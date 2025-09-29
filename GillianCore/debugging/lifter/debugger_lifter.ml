@@ -1,6 +1,6 @@
 (** @canonical Gillian.Debugger.Lifter
 
-  Interface for lifting execution of GIL commands to a target language *)
+    Interface for lifting execution of GIL commands to a target language *)
 
 include Lifter
 

@@ -1,6 +1,4 @@
-(**
-    Module which wraps a message format to allow it to be a loggable type
-*)
+(** Module which wraps a message format to allow it to be a loggable type *)
 
 type t = PP : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> t
 

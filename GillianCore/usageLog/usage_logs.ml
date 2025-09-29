@@ -152,15 +152,18 @@ module Event = struct
     type t = { filename : string; result : result; diff : string option }
     [@@deriving yojson, make]
 
-    let of_gillian_result = (* let open Gillian_result.Error in *)
+    let of_gillian_result =
+      (* let open Gillian_result.Error in *)
       function
       | Ok _ -> Success
       | Error (Gillian_result.Error.AnalysisFailures fs) ->
           let fs =
             fs
             |> List.map
-               @@ fun Gillian_result.Error.
-                        { msg; loc; is_preprocessing; in_target } ->
+               @@
+               fun Gillian_result.Error.
+                     { msg; loc; is_preprocessing; in_target }
+               ->
                let loc = Option.map shrink_loc loc in
                make_analysis_failure ?loc ~is_preprocessing ?in_target msg
           in

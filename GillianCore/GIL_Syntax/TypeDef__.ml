@@ -323,7 +323,7 @@ and ('annot, 'label) proc = {
 }
 [@@deriving
   visitors { variety = "reduce" },
-    visitors { variety = "endo" },
-    visitors { variety = "iter" },
-    yojson,
-    eq]
+  visitors { variety = "endo" },
+  visitors { variety = "iter" },
+  yojson,
+  eq]

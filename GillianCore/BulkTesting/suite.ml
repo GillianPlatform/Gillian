@@ -42,14 +42,14 @@ module ByFolder (P : sig
   val exec_mode : Exec_mode.t
 end) =
 struct
-  (** This defines a very simple way of handling tests.
-      There is no information associated to tests, and tests are simply
-      categorized by the folder they're in.
-      Depth of the categorizing folder is parametrisable *)
+  (** This defines a very simple way of handling tests. There is no information
+      associated to tests, and tests are simply categorized by the folder
+      they're in. Depth of the categorizing folder is parametrisable *)
 
-  (** This contains an extremely simple way of handling test information.
-        There is no info associated to tests, and the category is simply the name of the folder that contains the tests. 
-        Depth of the category is parametrisable. *)
+  (** This contains an extremely simple way of handling test information. There
+      is no info associated to tests, and the category is simply the name of the
+      folder that contains the tests. Depth of the category is parametrisable.
+  *)
 
   let common_root list_string =
     let common_root2 a b =

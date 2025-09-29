@@ -25,10 +25,12 @@ module Types = struct
     id : Logging.Report_id.t;
         (** The report ID of the assertion in the log database *)
     fold : matching option;
-        (** The ID of the fold matching and its result, if this assertion requires a fold *)
+        (** The ID of the fold matching and its result, if this assertion
+            requires a fold *)
     assertion : string;  (** The string representation of this assertion *)
     substitutions : substitution list;
-        (** A list of the substitutions learned from this assertion specifically *)
+        (** A list of the substitutions learned from this assertion specifically
+        *)
   }
   [@@deriving yojson]
 
@@ -66,7 +68,8 @@ module type Intf = sig
     include Types
   end
 
-  (** {!Build.f}: Given the ID of a matching, build the representative matching map *)
+  (** {!Build.f}: Given the ID of a matching, build the representative matching
+      map *)
   module type Build = Build
 
   (**/**)

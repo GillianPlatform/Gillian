@@ -47,33 +47,36 @@ module type PMapImpl = sig
 
   val mode : index_mode
 
-  (** Creates a new address, for allocating new state. Only used in static mode *)
+  (** Creates a new address, for allocating new state. Only used in static mode
+  *)
   val make_fresh : unit -> Expr.t Delayed.t
 
-  (** The arguments used when instantiating new state. Only used in dynamic mode *)
+  (** The arguments used when instantiating new state. Only used in dynamic mode
+  *)
   val default_instantiation : Expr.t list
 
   (* Note for the below two functions we use option Delayed rather than
      result Delayed, to avoid the headache of handling additional errors. *)
 
-  (** Validates the index, by returning possibly a new index (or that same index).
-      Returns None if the index is not valid. *)
+  (** Validates the index, by returning possibly a new index (or that same
+      index). Returns None if the index is not valid. *)
   val validate_index : Expr.t -> Expr.t option Delayed.t
 
-  (** Returns (symbolically) the state at the given index if it's found,
-      or None if no state is there, in which case an empty binding could be
-      created there instead. It's important this function doesn't return an empty
-      state (with MyMonadicSMemory.empty ()), but None, as the caller might need
-      to distinguish these situations (eg. checking a domain set).
+  (** Returns (symbolically) the state at the given index if it's found, or None
+      if no state is there, in which case an empty binding could be created
+      there instead. It's important this function doesn't return an empty state
+      (with MyMonadicSMemory.empty ()), but None, as the caller might need to
+      distinguish these situations (eg. checking a domain set).
 
-      This function should assume the index is valid (ie. it was returned by `validate_index`).
-      *)
+      This function should assume the index is valid (ie. it was returned by
+      `validate_index`). *)
   val get : t -> Expr.t -> (Expr.t * entry) option Delayed.t
 
   (** Updates the entry with the given state; `idx` represents the previous
-      index of the state, in case a new index was found for it. In other words, after
-      this operation the map must store nothing at `idx`, and the new state at `idx'`.
-      `idx` and `idx'` can be equal, in which case the state is just added/updated. *)
+      index of the state, in case a new index was found for it. In other words,
+      after this operation the map must store nothing at `idx`, and the new
+      state at `idx'`. `idx` and `idx'` can be equal, in which case the state is
+      just added/updated. *)
   val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
 
   val empty : t
@@ -568,26 +571,28 @@ struct
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 
-(**
-  Type for the domain of a PMap.
-  Allows configuring it to either have static or dynamic indexing:
-  - Static: indexes are created by the state model on allocation (eg. the heap in C)
-  - Dynamic: indexes are given by the user on allocation (eg. objects in JS)
+(** Type for the domain of a PMap. Allows configuring it to either have static
+    or dynamic indexing:
+    - Static: indexes are created by the state model on allocation (eg. the heap
+      in C)
+    - Dynamic: indexes are given by the user on allocation (eg. objects in JS)
 
-  The user must provide the index on allocation in dynamic mode, and mustn't provide it in static mode.
-  is_valid_index must always be implemented, while make_fresh is only needed in static mode.
-*)
+    The user must provide the index on allocation in dynamic mode, and mustn't
+    provide it in static mode. is_valid_index must always be implemented, while
+    make_fresh is only needed in static mode. *)
 module type PMapIndex = sig
   val mode : index_mode
 
-  (** If the given expression is a valid index for the map.
-      Returns a possibly simplified index, and None if it's not valid.  *)
+  (** If the given expression is a valid index for the map. Returns a possibly
+      simplified index, and None if it's not valid. *)
   val is_valid_index : Expr.t -> Expr.t option Delayed.t
 
-  (** Creates a new address, for allocating new state. Only used in static mode *)
+  (** Creates a new address, for allocating new state. Only used in static mode
+  *)
   val make_fresh : unit -> Expr.t Delayed.t
 
-  (** The arguments used when instantiating new state. Only used in dynamic mode *)
+  (** The arguments used when instantiating new state. Only used in dynamic mode
+  *)
   val default_instantiation : Expr.t list
 end
 
@@ -637,9 +642,10 @@ module IntegerIndex : PMapIndex = struct
 end
 
 (** "Base" implementation of an open PMap, with no particular optimisation.
-    Takes as modules the backing ExpMap used (%sat or %ent), and the PMapIndex used for
-    validating and generating indices. Because this PMap is *open*, it is only compatible
-    with static indexing, as dynamic indexing requires a domain set to be sound. *)
+    Takes as modules the backing ExpMap used (%sat or %ent), and the PMapIndex
+    used for validating and generating indices. Because this PMap is *open*, it
+    is only compatible with static indexing, as dynamic indexing requires a
+    domain set to be sound. *)
 module MakeBaseImpl
     (ExpMap : MyUtils.SymExprMap)
     (I : PMapIndex)
