@@ -8,10 +8,10 @@ let is_logic_only u =
 let pp fmt u =
   let s = Format.fprintf fmt "@[%s@]" in
   match u with
-  | NOT -> s "not"
-  | HEAD -> s "hd"
-  | TAIL -> s "tl"
-  | LEN -> s "len"
-  | REV -> s "rev"
+  | NOT -> s "!"
+  | HEAD -> s "hd@ "
+  | TAIL -> s "tl@ "
+  | LEN -> s "len@ "
+  | REV -> s "rev@ "
 
 let str = Format.asprintf "%a" pp

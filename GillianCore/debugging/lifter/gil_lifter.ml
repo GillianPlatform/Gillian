@@ -23,7 +23,7 @@ functor
     type cmd_data = {
       id : id;
       display : string;
-      matches : matching list;
+      matches : Match_map.matching list;
       errors : string list;
       submap : id submap;
       branch_path : branch_path;
@@ -62,6 +62,39 @@ functor
       let head = List.hd cs in
       head.pid
 
+    let package_node { data : cmd_data; next } =
+      let data =
+        Packaged.
+          {
+            id = data.id;
+            all_ids = [ data.id ];
+            display = data.display;
+            matches = data.matches;
+            errors = data.errors;
+            submap = data.submap;
+          }
+      in
+      let next =
+        match next with
+        | Some (Single (next, ())) -> Some (Single (next, ""))
+        | Some (Branch nexts) ->
+            let nexts =
+              List.map
+                (fun (case, (next, ())) ->
+                  let case, bdata = Packaged.package_gil_case case in
+                  (case, (next, bdata)))
+                nexts
+            in
+            Some (Branch nexts)
+        | None -> None
+      in
+      { data; next }
+
+    let insert_cmd map id node =
+      let () = Effect.perform (Node_updated (id, Some (package_node node))) in
+      let () = Hashtbl.replace map.entries id (Node node) in
+      ()
+
     let new_cmd
         ?(submap = NoSubmap)
         ~parent
@@ -97,7 +130,7 @@ functor
         | Zero -> None
       in
       let node = { data; next } in
-      Hashtbl.replace map.entries id (Node node);
+      let () = insert_cmd map id node in
       node
 
     let should_skip_cmd (exec_data : cmd_report executed_cmd_data) state : bool
@@ -155,47 +188,12 @@ functor
         | None -> failwith "can't insert to final cmd"
       in
       let prev' = { prev with next = Some new_next } in
-      let () = Hashtbl.replace map.entries prev.data.id (Node prev') in
+      let () = insert_cmd map prev.data.id prev' in
       new_cmd
 
     let handle_cmd prev_id branch_case exec_data state =
       let _ = consume_cmd prev_id branch_case exec_data state in
       ()
-
-    let package_node { data : cmd_data; next } =
-      let data =
-        Packaged.
-          {
-            id = data.id;
-            all_ids = [ data.id ];
-            display = data.display;
-            matches = data.matches;
-            errors = data.errors;
-            submap = data.submap;
-          }
-      in
-      let next =
-        match next with
-        | Some (Single (next, ())) -> Some (Single (next, ""))
-        | Some (Branch nexts) ->
-            let nexts =
-              List.map
-                (fun (case, (next, ())) ->
-                  let case, bdata = Packaged.package_gil_case case in
-                  (case, (next, bdata)))
-                nexts
-            in
-            Some (Branch nexts)
-        | None -> None
-      in
-      { data; next }
-
-    let package = Packaged.package Fun.id package_node
-    let get_gil_map state = package state.map
-    let get_lifted_map _ = None
-
-    let get_lifted_map_exn _ =
-      failwith "get_lifted_map not implemented for GIL lifter"
 
     let get_matches_at_id id state = (get_exn state.map id).data.matches
     let path_of_id id state = (get_exn state.map id).data.branch_path
@@ -241,6 +239,66 @@ functor
       let () = Hashtbl.replace variables store_id store_vars in
       let () = Hashtbl.replace variables memory_id memory_vars in
       scopes
+
+    module Variables = struct
+      open Variable
+
+      let get_type_env_vars (types : Type_env.t) : Variable.t list =
+        Type_env.to_list types
+        |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
+        |> List.map (fun (name, value) ->
+               let value = Type.str value in
+               { name; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+
+      let get_pred_vars (preds : Preds.t) : Variable.t list =
+        preds |> Preds.to_list
+        |> List.map (fun pred ->
+               let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
+               { name = ""; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+
+      let get_pure_formulae_vars (pfs : PFS.t) : Variable.t list =
+        pfs |> PFS.to_list
+        |> List.map (fun formula ->
+               let value = Fmt.to_to_string (Fmt.hbox Expr.pp) formula in
+               { name = ""; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+
+      let get_variables _ { store; memory; pfs; types; preds } _ =
+        let variables = Hashtbl.create 0 in
+        (* New scope ids must be higher than last top level scope id to prevent
+            duplicate scope ids *)
+        let scope_id = ref (List.length top_level_scopes) in
+        let get_new_scope_id () =
+          let () = scope_id := !scope_id + 1 in
+          !scope_id
+        in
+        let lifted_scopes =
+          let lifted_scopes =
+            add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
+              variables
+          in
+          let pure_formulae_vars =
+            Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
+          in
+          let type_env_vars =
+            Option.fold ~some:get_type_env_vars ~none:[] types
+          in
+          let pred_vars = Option.fold ~some:get_pred_vars preds ~none:[] in
+          let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
+          let () =
+            List.iter2
+              (fun (scope : scope) vars ->
+                Hashtbl.replace variables scope.id vars)
+              top_level_scopes vars_list
+          in
+          lifted_scopes
+        in
+        (lifted_scopes, variables)
+    end
+
+    include Variables
 
     let select_case nexts =
       let case, _ =
@@ -390,4 +448,7 @@ functor
 
     let parse_and_compile_files ~entrypoint files =
       PC.parse_and_compile_files files |> Result.map (fun r -> (r, entrypoint))
+
+    let pp_expr _ = Expr.pp
+    let pp_asrt _ = Asrt.pp_atom
   end

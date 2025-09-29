@@ -106,14 +106,6 @@ type stop_at =
   | BeforeNothing
       (** As with [EndOfPath], but if the path ends with [Nothing], step back to the previous command *)
 
-(** Data about a matching *)
-type matching = {
-  id : L.Report_id.t;
-  kind : Matcher.match_kind;
-  result : Match_map.match_result;
-}
-[@@deriving yojson]
-
 type 't submap =
   | NoSubmap
   | Submap of 't  (** Embed an [Exec_map] as a submap *)
@@ -238,13 +230,14 @@ module Packaged = struct
     id : L.Report_id.t;
     all_ids : L.Report_id.t list;
     display : string;
-    matches : matching list;
+    matches : Match_map.matching list;
     errors : string list;
     submap : id submap;
   }
   [@@deriving yojson]
 
   type branch_data = string [@@deriving yojson]
+  type nonrec node = (L.Report_id.t, branch_case, cmd_data, branch_data) node
 
   type t = (L.Report_id.t, branch_case, cmd_data, branch_data) map
   [@@deriving yojson]

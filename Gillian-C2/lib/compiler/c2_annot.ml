@@ -1,4 +1,4 @@
-module Location = Gillian.Gil_syntax.Location
+module Location = Gillian.Utils.Location
 
 type tl_ref = Stmt of int | Expr of int [@@deriving yojson, eq]
 type nest_kind = Fun_call of string [@@deriving yojson, eq]

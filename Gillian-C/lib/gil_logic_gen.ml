@@ -23,7 +23,7 @@ let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "opt_rec_struct_" ^ struct_name
 
 let fresh_lvar ?(fname = "") () =
-  let pre = "_lvar_i_" in
+  let pre = Utils.Names.lvar_prefix ^ "i_" in
   Generators.gen_str ~fname pre
 
 let rec split3_expr_comp = function
@@ -263,6 +263,7 @@ let gen_pred_of_struct cenv ann struct_name =
       {
         pred_name;
         pred_source_path = None;
+        pred_loc = None;
         pred_internal = true;
         pred_ins;
         pred_num_params;
@@ -659,6 +660,7 @@ let trans_abs_pred ~filepath cl_pred =
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc = None;
       pred_internal = false;
       pred_num_params;
       pred_params;
@@ -699,6 +701,7 @@ let trans_pred ~ann ~filepath cl_pred =
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc = None;
       pred_internal = false;
       pred_num_params;
       pred_params;
@@ -732,8 +735,8 @@ let trans_sspec ~ann fname sspecs =
   let make_post p = if !Config.allocated_functions then ta p else ta p in
   Spec.
     {
-      ss_pre = tap @ ta pre;
-      ss_posts = List.map make_post posts;
+      ss_pre = (tap @ ta pre, None);
+      ss_posts = List.map (fun post -> (make_post post, None)) posts;
       (* FIXME: bring in variant *)
       ss_variant = None;
       ss_flag = Flag.Normal;
@@ -745,10 +748,8 @@ let trans_lemma ~ann ~filepath lemma =
   let CLemma.{ name; params; hypothesis; conclusions; proof } = lemma in
   let trans_asrt = trans_asrt ~ann ~fname:name in
   let trans_lcmd = trans_lcmd ~ann ~fname:name in
-  let make_post p =
-    if !Config.allocated_functions then trans_asrt p else trans_asrt p
-  in
-  let lemma_hyp = trans_asrt hypothesis in
+  let make_post p = (trans_asrt p, None) in
+  let lemma_hyp = (trans_asrt hypothesis, None) in
   let lemma_concs = List.map make_post conclusions in
   let lemma_proof =
     Option.map
@@ -772,6 +773,7 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_variant = None;
       lemma_specs;
       lemma_proof;
+      lemma_location = None;
     }
 
 let trans_spec ~ann ?(only_spec = false) cl_spec =
@@ -785,6 +787,7 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
+        spec_location = None;
       }
   in
   let _ =
@@ -907,7 +910,7 @@ let generate_bispec clight_prog fname ident f =
   let true_params = List.map true_name params in
   let clight_fun = get_clight_fun clight_prog ident in
   let cligh_params = clight_fun.Clight.fn_params in
-  let mk_lvar x = Expr.LVar ("" ^ x) in
+  let mk_lvar x = Expr.LVar (Utils.Names.lvar_prefix ^ x) in
   let lvars = List.map mk_lvar true_params in
   let equalities =
     List.map
@@ -923,7 +926,7 @@ let generate_bispec clight_prog fname ident f =
     {
       bispec_name = fname;
       bispec_params = true_params;
-      bispec_pres = [ pre ];
+      bispec_pres = [ (pre, None) ];
       bispec_normalised = false;
     }
 

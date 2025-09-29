@@ -125,8 +125,8 @@ module Make
       let new_post = Asrt.subst_clocs subst_fun post in
       Spec.
         {
-          ss_pre = pre;
-          ss_posts = [ new_post ];
+          ss_pre = (pre, None);
+          ss_posts = [ (new_post, None) ];
           ss_variant = None;
           ss_flag = fl;
           ss_to_verify = false;
@@ -145,6 +145,7 @@ module Make
               spec_normalised = true;
               spec_incomplete = true;
               spec_to_verify = false;
+              spec_location = None;
             }
         in
         L.verbose (fun m ->
@@ -180,7 +181,7 @@ module Make
               })
             l
     in
-    List.concat_map make_test bi_spec.bispec_pres
+    List.concat_map (fun (pre, _) -> make_test pre) bi_spec.bispec_pres
 
   let run_test
       (ret_fun : result_t -> (Spec.t * Flag.t) option)

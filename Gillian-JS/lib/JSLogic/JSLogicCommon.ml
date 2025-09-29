@@ -93,9 +93,8 @@ let find_in_list (lst : string list) (x : string) =
   loop lst 0
 
 let list_overlap (lst_1 : string list) (lst_2 : string list) =
-  (* print_endline
-     (Printf.sprintf "List overlap:\n\t%s\n\t%s" (String.concat ", " lst_1)
-        (String.concat ", " lst_2)); *)
+  (* Format.printf "List overlap:\n\t%s\n\t%s" (String.concat ", " lst_1)
+     (String.concat ", " lst_2); *)
   let rec loop lst_1 lst_2 i =
     match (lst_1, lst_2) with
     | [], _ | _, [] -> i

@@ -8,6 +8,8 @@ module type S = sig
   type state_t
   type abs_t = string * vt list
 
+  module SMatcher : Matcher.S with type state_t = state_t
+
   val make_p :
     preds:MP.preds_tbl_t ->
     init_data:init_data ->
@@ -29,7 +31,6 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
-  val set_variants : t -> variants_t -> t
   val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
   val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
@@ -49,14 +50,12 @@ module Make (State : SState.S) :
   module SMatcher = Matcher.Make (State)
 
   type init_data = State.init_data
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type t = SMatcher.t = {
     state : State.t;
     preds : Preds.t;
     wands : Wands.t;
     pred_defs : MP.preds_tbl_t;
-    variants : variants_t;
   }
 
   type vt = Expr.t [@@deriving yojson, show]
@@ -81,24 +80,20 @@ module Make (State : SState.S) :
   type action_ret = (t * vt list, err_t) Res_list.t
 
   let init_with_pred_table pred_defs init_data =
-    let empty_variants : variants_t = Hashtbl.create 1 in
     {
       state = State.init init_data;
       preds = Preds.init [];
       wands = Wands.init [];
       pred_defs;
-      variants = empty_variants;
     }
 
   let init init_data =
     let empty_pred_defs : MP.preds_tbl_t = MP.init_pred_defs () in
-    let empty_variants : variants_t = Hashtbl.create 1 in
     {
       state = State.init init_data;
       preds = Preds.init [];
       wands = Wands.init [];
       pred_defs = empty_pred_defs;
-      variants = empty_variants;
     }
 
   let get_init_data astate = State.get_init_data astate.state
@@ -110,7 +105,6 @@ module Make (State : SState.S) :
       preds = Preds.copy astate.preds;
       wands = Wands.copy astate.wands;
       pred_defs = astate.pred_defs;
-      variants = Hashtbl.copy astate.variants;
     }
 
   let make_p
@@ -122,14 +116,7 @@ module Make (State : SState.S) :
       ~(spec_vars : SS.t)
       () : t =
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
-    let variants = Hashtbl.create 1 in
-    {
-      state;
-      preds = Preds.init [];
-      wands = Wands.init [];
-      pred_defs = preds;
-      variants;
-    }
+    { state; preds = Preds.init []; wands = Wands.init []; pred_defs = preds }
 
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
@@ -162,9 +149,6 @@ module Make (State : SState.S) :
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
   let set_wands astate wands = { astate with wands }
-
-  let set_variants (astate : t) (variants : variants_t) : t =
-    { astate with variants }
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in
@@ -214,34 +198,21 @@ module Make (State : SState.S) :
     State.get_type astate.state v
 
   let copy (astate : t) : t =
-    let { state; preds; wands; pred_defs; variants } = astate in
+    let { state; preds; wands; pred_defs } = astate in
     {
       state = State.copy state;
       preds = Preds.copy preds;
       wands = Wands.copy wands;
       pred_defs;
-      variants = Hashtbl.copy variants;
     }
 
   let simplify_val (astate : t) (v : Expr.t) : Expr.t =
     State.simplify_val astate.state v
 
-  let pp_variants : (string * Expr.t option) Fmt.t =
-    Fmt.pair ~sep:Fmt.comma Fmt.string (Fmt.option Expr.pp)
-
   let pp fmt (astate : t) : unit =
-    let { state; preds; wands; variants; _ } = astate in
-    Fmt.pf fmt
-      "%a@\n\
-       @[<v 2>PREDICATES:@\n\
-       %a@]@\n\
-       @[<v 2>WANDS:@\n\
-       %a@]@\n\
-       @[<v 2>VARIANTS:@\n\
-       %a@]@\n"
+    let { state; preds; wands; _ } = astate in
+    Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n@[<v 2>WANDS:@\n%a@]@\n"
       State.pp state Preds.pp preds Wands.pp wands
-      (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
-      variants
 
   let pp_by_need pvars lvars locs fmt astate : unit =
     let { state; preds; wands; _ } = astate in
@@ -271,28 +242,12 @@ module Make (State : SState.S) :
 
   let substitution_in_place ?(subst_all = false) (subst : st) (astate : t) :
       t list =
-    let { state; preds; wands; pred_defs; variants } = astate in
+    let { state; preds; wands; pred_defs } = astate in
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
-    let subst_variants = Hashtbl.create 1 in
-    let () =
-      Hashtbl.iter
-        (fun func variant ->
-          Hashtbl.add subst_variants func
-            (Option.map
-               (SVal.SESubst.subst_in_expr subst ~partial:true)
-               variant))
-        variants
-    in
     List.map
       (fun state ->
-        {
-          state;
-          preds = Preds.copy preds;
-          wands = Wands.copy wands;
-          variants = Hashtbl.copy subst_variants;
-          pred_defs;
-        })
+        { state; preds = Preds.copy preds; wands = Wands.copy wands; pred_defs })
       (State.substitution_in_place ~subst_all subst state)
 
   let update_store (state : t) (x : string option) (v : Expr.t) : t =
@@ -320,15 +275,13 @@ module Make (State : SState.S) :
     let new_store =
       try SStore.init (List.combine params args)
       with Invalid_argument _ ->
-        let message =
-          Fmt.str
-            "Running spec of %s which takes %i parameters with the following \
-             %i arguments : %a"
-            name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
-            args
-        in
-        raise (Invalid_argument message)
+        Fmt.failwith
+          "Running spec of %s which takes %i parameters with the following %i \
+           arguments : %a"
+          name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
+          args
     in
+
     let astate' = set_store astate new_store in
     let existential_bindings = Option.value ~default:[] existential_bindings in
     let existential_bindings =
@@ -346,7 +299,7 @@ module Make (State : SState.S) :
 
     let open Res_list.Syntax in
     let open Syntaxes.List in
-    let res = SMatcher.match_ astate' subst mp FunctionCall in
+    let res = SMatcher.match_ astate' subst mp (FunctionCall name) in
     if List.find_opt Result.is_error res |> Option.is_some then
       L.normal (fun m ->
           m "WARNING: Failed to match against the precondition of procedure %s"
@@ -371,10 +324,9 @@ module Make (State : SState.S) :
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
     let+ final_state = final_states in
-    let with_unfolded_concrete =
-      snd (Option.get (SMatcher.unfold_concrete_preds final_state))
-    in
-    Ok (with_unfolded_concrete, fl)
+    match SMatcher.unfold_concrete_preds final_state with
+    | Some (_, with_unfolded_concrete) -> Ok (with_unfolded_concrete, fl)
+    | None -> raise (Internal_State_Error ([], final_state))
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
@@ -396,7 +348,7 @@ module Make (State : SState.S) :
     SVal.SESubst.init subst_lst
 
   let clear_resource (astate : t) =
-    let { state; preds; wands = _; pred_defs; variants } = astate in
+    let { state; preds; wands = _; pred_defs } = astate in
     let state = State.clear_resource state in
     let preds_list = Preds.to_list preds in
     List.iter
@@ -408,7 +360,7 @@ module Make (State : SState.S) :
           in
           ())
       preds_list;
-    { state; preds; wands = Wands.init []; pred_defs; variants }
+    { state; preds; wands = Wands.init []; pred_defs }
 
   let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
@@ -464,7 +416,8 @@ module Make (State : SState.S) :
       L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate));
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -642,7 +595,8 @@ module Make (State : SState.S) :
     else ();
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -966,7 +920,8 @@ module Make (State : SState.S) :
                 m "State after substitution:@\n@[%a@]\n" pp astate));
           let mp =
             match mp with
-            | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+            | Error asrts ->
+                raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
             | Ok mp -> mp
           in
           let bindings =
@@ -1189,7 +1144,7 @@ module Make (State : SState.S) :
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
-    SMatcher.try_recovering astate tactic
+    SMatcher.try_recovering astate tactic |> Result.map fst
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
@@ -1207,34 +1162,30 @@ module Make (State : SState.S) :
     (* TODO: Deserialize other components of pstate *)
     let open Syntaxes.Result in
     let rec aux = function
-      | Some state, Some preds, Some variants, Some wands, [] ->
-          Ok { state; preds; pred_defs = MP.init_pred_defs (); variants; wands }
-      | None, preds, variants, wands, ("state", state_yojson) :: rest ->
+      | Some state, Some preds, Some wands, [] ->
+          Ok { state; preds; pred_defs = MP.init_pred_defs (); wands }
+      | None, preds, wands, ("state", state_yojson) :: rest ->
           let* state = State.of_yojson state_yojson in
-          aux (Some state, preds, variants, wands, rest)
-      | state, None, variants, wands, ("preds", preds_yojson) :: rest ->
+          aux (Some state, preds, wands, rest)
+      | state, None, wands, ("preds", preds_yojson) :: rest ->
           let* preds = Preds.of_yojson preds_yojson in
-          aux (state, Some preds, variants, wands, rest)
-      | state, preds, None, wands, ("variants", variants_yojson) :: rest ->
-          let* variants = variants_t_of_yojson variants_yojson in
-          aux (state, preds, Some variants, wands, rest)
-      | state, preds, variants, None, ("wands", variants_yojson) :: rest ->
-          let* wands = Wands.of_yojson variants_yojson in
-          aux (state, preds, variants, Some wands, rest)
+          aux (state, Some preds, wands, rest)
+      | state, preds, None, ("wands", wands_yojson) :: rest ->
+          let* wands = Wands.of_yojson wands_yojson in
+          aux (state, preds, Some wands, rest)
       | _ -> Error "Cannot parse yojson into PState"
     in
     match yojson with
-    | `Assoc sections -> aux (None, None, None, None, sections)
+    | `Assoc sections -> aux (None, None, None, sections)
     | _ -> Error "Cannot parse yojson into PState"
 
   let to_yojson pstate =
     (* TODO: Serialize other components of pstate *)
-    let { state; preds; wands; variants; _ } = pstate in
+    let { state; preds; wands; _ } = pstate in
     `Assoc
       [
         ("state", State.to_yojson state);
         ("preds", Preds.to_yojson preds);
         ("wands", Wands.to_yojson wands);
-        ("variants", variants_t_to_yojson variants);
       ]
 end

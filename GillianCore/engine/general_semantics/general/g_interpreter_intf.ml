@@ -35,6 +35,7 @@ module type S = sig
       errors : err_t list;
       branch_path : Branch_case.path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
 
     type cont = {
@@ -48,6 +49,8 @@ module type S = sig
       prev_cmd_report_id : Logging.Report_id.t option;
       branch_case : Branch_case.t option;
       branch_path : Branch_case.path;
+      laction_fuel : int;
+      loc : Location.t option;
     }
 
     (** Equal to conf_cont + the id of the required spec *)
@@ -57,6 +60,7 @@ module type S = sig
       final_state : state_t;
       branch_path : Branch_case.path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
 
     type susp = {
@@ -70,6 +74,7 @@ module type S = sig
       branch_count : int;
       branch_path : Branch_case.path;
       prev_cmd_report_id : Logging.Report_id.t option;
+      loc : Location.t option;
     }
 
     type t =

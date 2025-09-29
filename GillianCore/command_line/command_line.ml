@@ -42,7 +42,35 @@ struct
   module Verif_debugger =
     Debugger.Verification_debugger.Make (ID) (PC) (Verification) (Lifter)
 
-  let main () =
+  let split_cmds cmds =
+    let cmds, debug_cmds, lsp_cmds =
+      List.fold_left
+        Console.(
+          fun (acc_normal, acc_debug, acc_lsp) -> function
+            | Normal cmd -> (cmd :: acc_normal, acc_debug, acc_lsp)
+            | Debug cmd -> (acc_normal, cmd :: acc_debug, acc_lsp)
+            | Lsp cmd -> (acc_normal, acc_debug, cmd :: acc_lsp))
+        ([], [], []) cmds
+    in
+    let cmds =
+      match debug_cmds with
+      | [] -> cmds
+      | _ ->
+          let debug_info = Cmd.info "debug" ~doc:"Commands for debugger mode" in
+          Cmd.group debug_info debug_cmds :: cmds
+    in
+    let cmds =
+      match lsp_cmds with
+      | [] -> cmds
+      | _ ->
+          let lsp_info =
+            Cmd.info "lsp" ~doc:"Commands for language server mode"
+          in
+          Cmd.group lsp_info lsp_cmds :: cmds
+    in
+    cmds
+
+  let main' () =
     Memtrace.trace_if_requested ();
 
     let doc = "An analysis toolchain" in
@@ -53,28 +81,53 @@ struct
         `P "Analysis toolchain for a given language, based on Gillian";
       ]
     in
-    let info = Cmd.info (Filename.basename Sys.executable_name) ~doc ~man in
+    let info =
+      Cmd.info ~exits:Common_args.exit_code_info
+        (Filename.basename Sys.executable_name)
+        ~doc ~man
+    in
 
     let consoles : (module Console.S) list =
       [
         (module Compiler_console.Make (ID) (PC));
         (module C_interpreter_console.Make (ID) (PC) (CState) (C_interpreter)
                   (Gil_parsing));
-        (module S_interpreter_console.Make (ID) (PC) (SState) (S_interpreter)
-                  (Gil_parsing));
-        (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing));
-        (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
-        (module Debug_verification_console.Make
-                  (PC)
-                  (Debug_adapter.Make (Verif_debugger)));
-        (module Debug_wpst_console.Make
-                  (PC)
+        (module Wpst_console.Make (ID) (PC) (SState) (S_interpreter)
+                  (Gil_parsing)
                   (Debug_adapter.Make (Symb_debugger)));
+        (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing)
+                  (Debug_adapter.Make (Verif_debugger)));
+        (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
         (module Bulk_console.Make (PC) (Runners));
       ]
     in
     let cmds =
-      consoles |> List.concat_map (fun (module C : Console.S) -> C.cmds)
+      consoles
+      |> List.concat_map (fun (module C : Console.S) -> C.cmds)
+      |> split_cmds
     in
     exit (Cmd.eval (Cmd.group info cmds))
+
+  let main () =
+    let open Effect.Deep in
+    try_with main' ()
+      {
+        effc =
+          (fun (type a) (eff : a Effect.t) ->
+            match eff with
+            | Utils.Sys_error_during_logging (s, bt) ->
+                Some
+                  (fun (k : (a, _) continuation) ->
+                    let msg =
+                      Fmt.str "!! ERROR DURING LOGGING: %s !!\nBacktrace:\n%s" s
+                        bt
+                    in
+                    Logging.print_to_all msg;
+                    Debugger_log.log (fun m -> m "%s" msg);
+                    continue k ())
+            | _ ->
+                Some
+                  (fun (k : (a, _) continuation) ->
+                    discontinue k (Effect.Unhandled eff)));
+      }
 end

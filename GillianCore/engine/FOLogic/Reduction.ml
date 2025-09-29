@@ -870,10 +870,14 @@ let rec reduce_binop_inttonum_const
 and reduce_lexpr_loop
     ?(matching = false)
     ?(reduce_lvars = false)
+    ?(fuel = 20)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (le : Expr.t) =
-  let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
+  let f =
+    if fuel <= 0 then Fun.id
+    else reduce_lexpr_loop ~matching ~reduce_lvars ~fuel:(fuel - 1) pfs gamma
+  in
 
   (* L.verbose (fun fmt -> fmt "Reducing Expr: %a" Expr.pp le); *)
   let rec find_lstsub_inn (lst : Expr.t) (start : Expr.t) =
@@ -1279,12 +1283,11 @@ and reduce_lexpr_loop
             let eqs = get_equal_expressions pfs le in
             let first =
               List.find_map
-                (fun e ->
-                  match e with
-                  | Expr.EList les
+                (function
+                  | Expr.EList les as e
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
                       Some e
-                  | Lit (LList les)
+                  | Lit (LList les) as e
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
                       Some e
                   | NOp (LstCat, (EList les as e) :: _)
@@ -1494,6 +1497,7 @@ and reduce_lexpr_loop
             let les = List.map Expr.list_length les in
             List.fold_left Expr.Infix.( + ) (List.hd les) (List.tl les)
         | LstLen, LstSub (_, _, len) when lexpr_is_list gamma fle -> len
+        | LstLen, UnOp (LstRev, le) -> UnOp (LstLen, f le)
         | LstLen, _ when lexpr_is_list gamma fle -> def
         (* List operations: reverse *)
         | LstRev, EList le -> EList (List.rev le)
@@ -1643,6 +1647,9 @@ and reduce_lexpr_loop
         else
           List.map2 (fun x y -> Expr.Infix.( == ) x (Lit y)) le ll
           |> Expr.conjunct
+    (* Z3 edge case: A list can't contain itself *)
+    | BinOp (EList [ x ], Equal, y) when Expr.equal x y -> Expr.false_
+    | BinOp (x, Equal, EList [ y ]) when Expr.equal x y -> Expr.false_
     | BinOp (EList ll, Equal, EList lr) ->
         if List.length ll <> List.length lr then Expr.(false_)
         else if ll = [] then Expr.(true_)
@@ -2075,6 +2082,10 @@ and reduce_lexpr_loop
                          les -> Expr.false_
                 | _ -> def)
             (* Booleans *)
+            (* Need this case, otherwise we end up with lvars as assertions, which the matcher
+               doesn't enjoy much. *)
+            | Lit (Bool true), LVar _ | LVar _, Lit (Bool true) ->
+                BinOp (flel, Equal, fler)
             | Lit (Bool true), _ when t2 = Some Type.BooleanType -> fler
             | _, Lit (Bool true) when t1 = Some Type.BooleanType -> flel
             (* Nested equalities *)
@@ -2916,12 +2927,71 @@ let extract_lvar_equalities : Asrt.t -> (string * Expr.t) list =
       else None
   | _ -> None
 
+let clean_double_equalities (a : Asrt.t) : Asrt.t =
+  let pures = Asrt.pure_asrts a in
+  let true_vars =
+    pures
+    |> List.filter_map @@ function
+       | Expr.BinOp (LVar x, Equal, Lit (Bool true))
+       | BinOp (Lit (Bool true), Equal, LVar x) -> Some x
+       | _ -> None
+  in
+  let is_bool_binop = function
+    | BinOp.Equal
+    | ILessThan
+    | ILessThanEqual
+    | FLessThan
+    | FLessThanEqual
+    | StrLess
+    | And
+    | Or
+    | Impl
+    | SetMem
+    | SetSub -> true
+    | _ -> false
+  in
+  let pures', vars_to_remove =
+    List.fold_left
+      (fun (pures, to_remove) v ->
+        let found = ref false in
+        let pures' =
+          pures
+          |> List.map @@ function
+             | (Expr.BinOp (LVar x, Equal, (BinOp (_, b, _) as e)) as a)
+             | (Expr.BinOp ((BinOp (_, b, _) as e), Equal, LVar x) as a) ->
+                 if List.mem x true_vars && is_bool_binop b then (
+                   found := true;
+                   e)
+                 else a
+             | a -> a
+        in
+        if !found then (pures', v :: to_remove) else (pures', to_remove))
+      (pures, []) true_vars
+  in
+  let pures' =
+    pures'
+    |> List.filter @@ function
+       | Expr.BinOp (LVar x, Equal, Lit (Bool true))
+       | Expr.BinOp (Lit (Bool true), Equal, LVar x)
+         when List.mem x vars_to_remove -> false
+       | _ -> true
+  in
+  let non_pures =
+    a
+    |> List.filter @@ function
+       | Asrt.Pure _ -> false
+       | _ -> true
+  in
+  let pures = pures' |> List.map @@ fun x -> Asrt.Pure x in
+  pures @ non_pures
+
 let reduce_assertion
     ?(matching = false)
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (a : Asrt.t) : Asrt.t =
   let a = reduce_types a in
+  let a = clean_double_equalities a in
 
   let rec loop (a : Asrt.t) =
     let a' = reduce_assertion_loop matching pfs gamma a in

@@ -1,3 +1,8 @@
+(** @canonical Gillian.Command_line.ParserAndCompiler
+
+  This defines an interface that allows a user to indicate how to parse their own programming language,
+  preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
+
 type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   gil_progs : (string * ('annot, string) Prog.t) list;
   source_files : SourceFiles.t;
@@ -45,7 +50,7 @@ module type S = sig
       then compiles them to a single or a set of GIL programs. The returned GIL
       program(s) should be ready to be analysed. *)
   val parse_and_compile_files :
-    string list -> ((Annot.t, tl_ast, init_data) compiled_progs, err) result
+    string list -> (Annot.t, tl_ast, init_data) compiled_progs Gillian_result.t
 
   (** [other_imports] is an association list that maps extensions to a parser
       and compiler. For example, it is possible to import a JSIL file in a GIL
@@ -54,7 +59,7 @@ module type S = sig
       [parse_and_compile_jsil_file] is a function that takes a file path, parses
       the file as a JSIL program, and compiles this to a GIL program. *)
   val other_imports :
-    (string * (string -> ((Annot.t, string) Prog.t, err) result)) list
+    (string * (string -> (Annot.t, string) Prog.t Gillian_result.t)) list
 
   (** Contains the name of the environment variable which contains the path to where the runtime is stored. *)
   val default_import_paths : string list option
@@ -63,6 +68,8 @@ module type S = sig
   val initialize : Exec_mode.t -> unit
 end
 
+(** Dummy ParserAndCompiler that will simply always fail. This is used when someone wants to build a command line interface
+    to only reason about GIL. *)
 module Dummy :
   S with type init_data = unit and type Annot.t = Gil_syntax.Annot.Basic.t =
 struct

@@ -32,6 +32,7 @@ module Report_id : sig
 
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
+  val of_string_opt : string -> t option
 end
 
 module Reporter : sig
@@ -89,6 +90,11 @@ module Log_queryer : sig
 
   (** Returns the ID and content of all children of the given ID with type ["match_result"] *)
   val get_match_results : Report_id.t -> (Report_id.t * string) list
+
+  (** Given an ID for an assertion, traverses parents until a command is encountered.
+  Returns the command ID, and a list of pairs of assertion ID and respective match ID  *)
+  val resolve_command_and_matches :
+    Report_id.t -> Report_id.t * (Report_id.t * Report_id.t) list
 end
 
 module Report_state : sig
@@ -209,3 +215,9 @@ module Parent : sig
 end
 
 val dummy_pp : Format.formatter -> 'a -> unit
+
+module Statistics : sig
+  val exec_cmds : int ref
+  val update_statistics : string -> float -> unit
+  val print_statistics : unit -> unit
+end

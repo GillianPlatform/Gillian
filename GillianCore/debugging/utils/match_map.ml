@@ -41,7 +41,7 @@ functor
       in
       if aux id then Success else Failure
 
-    let build_assertion_data ~prev_substs id content =
+    let build_assertion_data ~pp_asrt ~prev_substs id content =
       let module Subst = SVal.SESubst in
       let asrt_report =
         content |> Yojson.Safe.from_string |> AssertionReport.of_yojson
@@ -49,7 +49,7 @@ functor
       in
       let assertion =
         let asrt, _ = asrt_report.step in
-        Fmt.str "%a" Asrt.pp_atom asrt
+        Fmt.str "%a" pp_asrt asrt
       in
       let substitutions =
         asrt_report.subst |> Subst.to_list_pp
@@ -74,69 +74,91 @@ functor
             "Match_map.build_seg: report %a (child of assertion %a) has type \
              %s (expected %s)!"
             L.Report_id.pp child_id L.Report_id.pp id type_ Content_type.match_;
-        (child_id, result_of_id child_id)
+        let p =
+          match asrt_report.step with
+          | Pred (p, _), _ -> p
+          | _ -> assertion
+        in
+        { id = child_id; kind = Fold p; result = result_of_id child_id }
       in
       { id; fold; assertion; substitutions }
 
-    let rec build_map ?(prev_substs = []) ~nodes id type_ content =
-      if type_ = Content_type.assertion then
-        let data = build_assertion_data ~prev_substs id content in
-        let next_ids = L.Log_queryer.get_next_report_ids id in
-        let result =
-          let () =
-            if List.is_empty next_ids then
-              Fmt.failwith "Match_map.build_seg: assertion %a has no next!"
-                L.Report_id.pp id
+    let get_next id : (L.Report_id.t * string * string) list * bool option =
+      let nexts = L.Log_queryer.get_next_reports id in
+      let () =
+        if List.is_empty nexts then
+          let msg =
+            Fmt.str "Match_map: couldn't find nexts of %a" L.Report_id.pp id
           in
-          List.fold_left
-            (fun result next_id ->
-              let content, type_ =
-                L.Log_queryer.get_report next_id |> Option.get
+          raise (Gillian_result.Exc.internal_error msg)
+      in
+      let nexts, result =
+        List.fold_left
+          (fun (nexts, result) ((_, type_, content) as r) ->
+            if type_ = Content_type.match_result then
+              let report =
+                of_yojson_string MatchResultReport.of_yojson content
               in
               let result' =
-                build_map ~prev_substs:data.substitutions ~nodes next_id type_
-                  content
+                match report with
+                | Success _ -> true
+                | Failure _ -> false
               in
-              if result = Success then Success else result')
-            Failure next_ids
-        in
-        let () = Hashtbl.replace nodes id (Assertion (data, next_ids)) in
-        result
-      else if type_ = Content_type.match_result then
-        let result_report =
-          content |> Yojson.Safe.from_string |> MatchResultReport.of_yojson
-          |> Result.get_ok
-        in
-        let result =
-          match result_report with
-          | Success _ -> Success
-          | Failure _ -> Failure
-        in
-        let () = Hashtbl.replace nodes id (MatchResult (id, result)) in
-        result
-      else
-        Fmt.failwith
-          "Match_map.build_seg: report %a has invalid type (%s) for match map!"
-          L.Report_id.pp id type_
+              let result =
+                match result with
+                | Some result -> Some (result || result')
+                | None -> Some result'
+              in
+              (nexts, result)
+            else (r :: nexts, result))
+          ([], None) nexts
+      in
+      (List.rev nexts, result)
 
-    let f match_id =
+    let rec build_map ~pp_asrt ?(prev_substs = []) ~nodes id type_ content =
+      let step, prev_substs =
+        if type_ = Content_type.assertion then
+          let data = build_assertion_data ~pp_asrt ~prev_substs id content in
+          (Assertion data, data.substitutions)
+        else if type_ = Content_type.match_recovery then
+          let report =
+            content |> Yojson.Safe.from_string |> MatchRecoveryReport.of_yojson
+            |> Result.get_ok
+          in
+          (RecoveryTactic report.tactic, prev_substs)
+        else
+          Fmt.failwith
+            "Match_map.build_map: report %a has invalid type (%s) for match \
+             map!"
+            L.Report_id.pp id type_
+      in
+      let nexts, this_result = get_next id in
+      let result, next_ids =
+        List.fold_left
+          (fun (r, acc) (id, type_, content) ->
+            let r' = build_map ~pp_asrt ~prev_substs ~nodes id type_ content in
+            (r || r', id :: acc))
+          (Option.value ~default:false this_result, [])
+          nexts
+      in
+      let () = Hashtbl.replace nodes id (step, this_result, next_ids) in
+      result
+
+    let f ?(pp_asrt = Asrt.pp_atom) match_id =
       let kind =
         let content, _ = L.Log_queryer.get_report match_id |> Option.get in
-        let match_report =
-          content |> Yojson.Safe.from_string |> MatchReport.of_yojson
-          |> Result.get_ok
-        in
-        match_report.match_kind
+        let report = of_yojson_string MatchReport.of_yojson content in
+        report.match_kind
       in
       let roots = L.Log_queryer.get_children_of ~roots_only:true match_id in
       let nodes = Hashtbl.create 1 in
       let roots, result =
         List.fold_left
-          (fun (roots, result) (id, type_, content) ->
-            let result' = build_map ~nodes id type_ content in
-            let result = if result = Success then Success else result' in
-            (id :: roots, result))
-          ([], Failure) roots
+          (fun (roots, r) (id, type_, content) ->
+            let r' = build_map ~pp_asrt ~nodes id type_ content in
+            (id :: roots, r || r'))
+          ([], false) roots
       in
+      let result = if result then Success else Failure in
       { kind; roots; nodes; result }
   end

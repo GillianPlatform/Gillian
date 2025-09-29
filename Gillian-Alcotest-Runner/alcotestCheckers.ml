@@ -3,7 +3,7 @@ module Make (Outcome : Bulk.Outcome.S) = struct
     fail_at_parsing : Outcome.t -> unit;
     fail_at_parsing_with :
       constraint_name:string ->
-      (Outcome.ParserAndCompiler.err -> bool) ->
+      (Utils.Gillian_result.Error.compilation_error -> bool) ->
       Outcome.t ->
       unit;
     finish_in_fail : Outcome.t -> unit;

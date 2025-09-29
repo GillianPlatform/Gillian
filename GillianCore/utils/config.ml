@@ -10,6 +10,7 @@ let results_dir, set_result_dir =
   let rd = ref ".gillian" in
   ((fun () -> !rd), fun r -> rd := r)
 
+let file_content_overrides : (string, string) Hashtbl.t = Hashtbl.create 0
 let entry_point = ref "main"
 let json_ui = ref false
 let ci = ref false
@@ -91,19 +92,38 @@ let set_runtime_paths, get_runtime_paths =
 
 (** @canonical Gillian.Utils.Config.Verification *)
 module Verification = struct
+  type things_to_verify = Specific | All | ProcsOnly | LemmasOnly
+
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
-  let verify_only_some_of_the_things = ref false
+  let things_to_verify = ref All
+  let things_to_exclude = ref Containers.SS.empty
 
   let set_procs_to_verify = function
     | [] -> ()
     | a ->
         procs_to_verify := a;
-        verify_only_some_of_the_things := true
+        things_to_verify := Specific
 
   let set_lemmas_to_verify = function
     | [] -> ()
     | a ->
         lemmas_to_verify := a;
-        verify_only_some_of_the_things := true
+        things_to_verify := Specific
 end
+
+(** {2 Resetting} 
+    With the addition of in-file config statements, we want to be able to "reset" the config
+    when analysis is run multiple times in one "instance", i.e. the LSP. *)
+let reset_config_f = ref None
+
+let reset_config () =
+  match !reset_config_f with
+  | Some f ->
+      reset_config_f := None;
+      f ()
+  | None -> ()
+
+let usage_logs = ref false
+let usage_logs_file = ref "./gillian_usage_log.jsonl"
+let usage_logs_git_ref = ref "HEAD"

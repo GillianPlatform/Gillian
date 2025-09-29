@@ -1,23 +1,26 @@
 type match_kind =
-  | Postcondition
-  | Fold
-  | FunctionCall
+  | Postcondition of string
+  | Fold of string
+  | FunctionCall of string
   | Invariant
   | LogicCommand
   | PredicateGuard
 [@@deriving yojson]
 
+type recovery_tactic =
+  | Try_fold of string * Expr.t list
+  | Try_unfold of string * Expr.t list
+[@@deriving yojson]
+
 module type S = sig
   type err_t
   type state_t
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type t = {
     state : state_t;
     preds : Preds.t;
     wands : Wands.t;
     pred_defs : MP.preds_tbl_t;
-    variants : variants_t;
   }
 
   type post_res = (Flag.t * Asrt.t list) option
@@ -25,12 +28,7 @@ module type S = sig
 
   module Logging : sig
     module AstateRec : sig
-      type t = {
-        state : state_t;
-        preds : Preds.t;
-        wands : Wands.t;
-        variants : variants_t;
-      }
+      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
       [@@deriving yojson]
     end
 
@@ -45,6 +43,15 @@ module type S = sig
         subst : SVal.SESubst.t;
         mp : MP.t;
         match_kind : match_kind;
+      }
+      [@@deriving yojson]
+    end
+
+    module MatchRecoveryReport : sig
+      type t = {
+        astate : AstateRec.t;
+        tactic : recovery_tactic;
+        num_results : int;
       }
       [@@deriving yojson]
     end
@@ -99,7 +106,8 @@ module type S = sig
   val unfold_all : t -> string -> (t, err_t) Res_list.t
 
   (** Tries recovering from an error using the provided recovery tactic. *)
-  val try_recovering : t -> Expr.t Recovery_tactic.t -> (t list, string) result
+  val try_recovering :
+    t -> Expr.t Recovery_tactic.t -> (t list * recovery_tactic, string) result
 
   (** Tries to unfold the given predicate in the state.
       If it manages, it returns the new set of states and corresponding

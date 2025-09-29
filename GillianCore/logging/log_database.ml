@@ -3,13 +3,52 @@ let db = ref None
 
 exception Error of string
 
-let error fmt = Format.kasprintf (fun err -> raise (Error err)) fmt
+module Stmts = struct
+  let prepare stmt =
+    let ref : Sqlite3.stmt option ref = ref None in
+    fun db -> Sqlite3.prepare_or_reset db ref stmt
+
+  let insert_report =
+    prepare "INSERT INTO report VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
+
+  let get_report = prepare "SELECT content, type FROM report WHERE id=?;"
+  let get_previous = prepare "SELECT previous FROM report WHERE id = ?;"
+
+  let get_next_reports =
+    prepare "SELECT id, type, content FROM report WHERE previous=?;"
+
+  let get_previously_freed_annot =
+    prepare
+      "SELECT json_extract(content, '$.annot') FROM report WHERE  type=? AND \
+       parent=(SELECT parent from report WHERE type=? AND \
+       json_extract(content, '$.loc')=? ORDER BY elapsed_time DESC LIMIT 1) \
+       ORDER BY elapsed_time DESC LIMIT 1;"
+
+  let get_children =
+    prepare "SELECT id, type, content FROM report WHERE parent=?;"
+
+  let get_root_children =
+    prepare
+      "SELECT id, type, content FROM report WHERE parent=? AND previous IS \
+       NULL;"
+
+  let get_parent_report =
+    prepare
+      "SELECT id, type, content FROM report WHERE id = (SELECT parent FROM \
+       report WHERE id = ?);"
+
+  let get_grandparent_report =
+    prepare
+      "SELECT id, type, content FROM report WHERE id = (SELECT parent FROM \
+       report WHERE id = (SELECT parent FROM report WHERE id = ?));"
+end
+
 let is_enabled () = Option.is_some !db
 
 let get_db () =
   match !db with
   | None ->
-      error
+      failwith
         "Unable to get database. Ensure that Log_database.create_db has been \
          called."
   | Some db -> db
@@ -18,12 +57,13 @@ let check_result_code db ~log rc =
   match (rc : Sqlite3.Rc.t) with
   | OK | DONE | ROW -> ()
   | _ as err ->
-      error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
+      Fmt.failwith "%s: %s (%s)" log (Sqlite3.Rc.to_string err)
+        (Sqlite3.errmsg db)
 
 let exec db ~log ~stmt =
   let rc = Sqlite3.exec db stmt in
   try check_result_code db ~log rc
-  with Error err -> error "exec: %s (%s)" err (Sqlite3.errmsg db)
+  with Error err -> Fmt.failwith "exec: %s (%s)" err (Sqlite3.errmsg db)
 
 let zero_or_one_row db ~log ~stmt =
   match Sqlite3.step stmt with
@@ -31,13 +71,15 @@ let zero_or_one_row db ~log ~stmt =
       let row = Sqlite3.row_data stmt in
       match Sqlite3.step stmt with
       | DONE -> Some row
-      | ROW -> error "%s: expected zero or one row, got more than one row" log
+      | ROW ->
+          Fmt.failwith "%s: expected zero or one row, got more than one row" log
       | err ->
-          error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
-      )
+          Fmt.failwith "%s: %s (%s)" log (Sqlite3.Rc.to_string err)
+            (Sqlite3.errmsg db))
   | DONE -> None
   | err ->
-      error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
+      Fmt.failwith "%s: %s (%s)" log (Sqlite3.Rc.to_string err)
+        (Sqlite3.errmsg db)
 
 let create_report_table db =
   exec db ~log:"creating report table"
@@ -60,7 +102,7 @@ let close_db () =
   | None -> ()
   | Some db ->
       if not (Sqlite3.db_close db) then
-        error "closing: %s (%s)"
+        Fmt.failwith "closing: %s (%s)"
           (Sqlite3.errcode db |> Sqlite3.Rc.to_string)
           (Sqlite3.errmsg db)
 
@@ -74,9 +116,7 @@ let store_report
     ~severity
     ~type_ =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db "INSERT INTO report VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
-  in
+  let stmt = Stmts.insert_report db in
   Sqlite3.bind stmt 1 id |> check_result_code db ~log:"store report bind id";
   Sqlite3.bind stmt 2 title
   |> check_result_code db ~log:"store report bind title";
@@ -93,13 +133,11 @@ let store_report
   Sqlite3.bind stmt 8 type_
   |> check_result_code db ~log:"store report bind type";
   Sqlite3.step stmt |> check_result_code db ~log:"step: store report";
-  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: store report"
+  ()
 
 let get_report id =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db "SELECT content, type FROM report WHERE id=?;"
-  in
+  let stmt = Stmts.get_report db in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get report bind id";
   let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
@@ -109,12 +147,11 @@ let get_report id =
         (Sqlite3.Data.to_string_exn row.(0), Sqlite3.Data.to_string_exn row.(1)))
       row
   in
-  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get report";
   report_fields
 
 let get_previous_report_id id =
   let db = get_db () in
-  let stmt = Sqlite3.prepare db "SELECT previous FROM report WHERE id = ?;" in
+  let stmt = Stmts.get_previous db in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get previous report bind id";
   let row = zero_or_one_row db ~log:"step: get previous report" ~stmt in
@@ -122,15 +159,11 @@ let get_previous_report_id id =
     Option.bind row (fun row ->
         Int64.of_string_opt @@ Sqlite3.Data.to_string_exn row.(0))
   in
-  Sqlite3.finalize stmt
-  |> check_result_code db ~log:"finalize: get previous report";
   prev_report_id
 
 let get_next_reports id =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db "SELECT id, type, content FROM report WHERE previous=?;"
-  in
+  let stmt = Stmts.get_next_reports db in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get nexts bind id";
   let rc, children =
@@ -148,13 +181,7 @@ let get_next_reports id =
 (* TODO: elapsed_time bad, change to use parent/child check *)
 let get_previously_freed_annot loc =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db
-      "SELECT json_extract(content, '$.annot') FROM report WHERE  type=? AND \
-       parent=(SELECT parent from report WHERE type=? AND \
-       json_extract(content, '$.loc')=? ORDER BY elapsed_time DESC LIMIT 1) \
-       ORDER BY elapsed_time DESC LIMIT 1;"
-  in
+  let stmt = Stmts.get_previously_freed_annot db in
   Sqlite3.bind stmt 1
     (Sqlite3.Data.TEXT Logging_constants.Content_type.annotated_action)
   |> check_result_code db ~log:"get previous freed annot bind annotated_action";
@@ -165,17 +192,13 @@ let get_previously_freed_annot loc =
   |> check_result_code db ~log:"get previous freed annot bind loc";
   let row = zero_or_one_row db ~log:"step: get previous freed annot" ~stmt in
   let annot = Option.map (fun row -> Sqlite3.Data.to_string_exn row.(0)) row in
-  Sqlite3.finalize stmt
-  |> check_result_code db ~log:"finalize: get previous freed annot";
   annot
 
 let get_children_of roots_only id =
   let db = get_db () in
-  let query =
-    Fmt.str "SELECT id, type, content FROM report WHERE parent=?%s;"
-      (if roots_only then " AND previous IS NULL" else "")
+  let stmt =
+    Stmts.(if roots_only then get_root_children else get_children) db
   in
-  let stmt = Sqlite3.prepare db query in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get children bind id";
   let rc, children =
@@ -189,3 +212,29 @@ let get_children_of roots_only id =
   in
   rc |> check_result_code db ~log:"fold: get children";
   children
+
+let get_report_from_stmt ~msg db stmt =
+  let row = zero_or_one_row db ~log:("step: " ^ msg) ~stmt in
+  let report =
+    row
+    |> Option.map (fun row ->
+           let id : Report_id.t = Sqlite3.Data.to_int64_exn row.(0) in
+           let type_ = Sqlite3.Data.to_string_exn row.(1) in
+           let content = Sqlite3.Data.to_string_exn row.(2) in
+           (id, type_, content))
+  in
+  report
+
+let get_parent_of id =
+  let db = get_db () in
+  let stmt = Stmts.get_parent_report db in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
+  |> check_result_code db ~log:"get parent bind id";
+  get_report_from_stmt ~msg:"get parent" db stmt
+
+let get_grandparent_of id =
+  let db = get_db () in
+  let stmt = Stmts.get_grandparent_report db in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
+  |> check_result_code db ~log:"get grandparent bind id";
+  get_report_from_stmt ~msg:"get grandparent" db stmt

@@ -653,7 +653,7 @@ let jsoffsetchar_to_jsoffsetline c_offset offset_list =
 
 let lift_flow_loc loc =
   let open JS_Parser.Loc in
-  let open Gil_syntax.Location in
+  let open Location in
   let lift_pos p =
     let { line = pos_line; column = pos_column } = p in
     { pos_line; pos_column }

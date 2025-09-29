@@ -3,26 +3,27 @@ module type S = sig
   type t
 
   module Inspect : sig
-    type debug_state_view [@@deriving yojson]
-
-    val get_debug_state : t -> debug_state_view
-    val get_match_map : Logging.Report_id.t -> t -> Match_map.t
+    val get_map_update : t -> Sedap_types.Map_update_event.Payload.t
+    val get_full_map : t -> Sedap_types.Map_update_event.Payload.t
+    val dump_state : t -> Yojson.Safe.t
   end
 
-  val launch : string -> string option -> (t, string) result
-  val jump_to_id : Logging.Report_id.t -> t -> (unit, string) result
+  val launch : string -> string option -> t Gillian_result.t
+  val jump : Logging.Report_id.t -> t -> unit Gillian_result.t
   val step_in : t -> stop_reason
-  val step : ?reverse:bool -> t -> stop_reason
+  val step_over : t -> stop_reason
+  val step_back : t -> stop_reason
 
   val step_specific :
     Exec_map.Packaged.branch_case option ->
     Logging.Report_id.t ->
     t ->
-    (stop_reason, string) result
+    stop_reason Gillian_result.t
 
   val step_out : t -> stop_reason
-  val run : ?reverse:bool -> ?launch:bool -> t -> stop_reason
-  val start_proc : string -> t -> (stop_reason, string) result
+  val continue : t -> stop_reason
+  val continue_back : t -> stop_reason
+  val start_proc : string -> t -> stop_reason Gillian_result.t
   val terminate : t -> unit
   val get_frames : t -> frame list
   val get_scopes : t -> Variable.scope list

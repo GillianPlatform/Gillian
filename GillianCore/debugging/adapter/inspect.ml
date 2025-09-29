@@ -1,4 +1,4 @@
-open Debug_protocol_ext
+open Protocol
 
 (**/**)
 
@@ -7,9 +7,7 @@ module DL = Debugger_log
 (**/**)
 
 module Make (Debugger : Debugger.S) = struct
-  open Custom_commands (Debugger)
-
-  let run dbg rpc =
+  let run { dbg; rpc; _ } =
     DL.set_rpc_command_handler rpc ~name:"Threads"
       (module Threads_command)
       (fun () ->
@@ -67,14 +65,10 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.return
           (Exception_info_command.Result.make ~exception_id ~description
              ~break_mode ()));
-    DL.set_rpc_command_handler rpc ~name:"Debugger state"
-      (module Debugger_state_command)
-      (fun _ -> Lwt.return (Debugger.Inspect.get_debug_state dbg));
-    DL.set_rpc_command_handler rpc ~name:"Matching"
-      (module Matching_command)
-      (fun { id } ->
-        let match_map = dbg |> Debugger.Inspect.get_match_map id in
-        let result = Matching_command.Result.make ~match_id:id ~match_map in
-        Lwt.return result);
+    DL.set_rpc_command_handler rpc ~name:"Get full map"
+      (module Get_full_map_command)
+      (fun _ ->
+        let full_map = Debugger.Inspect.get_full_map dbg in
+        Lwt.return full_map);
     Lwt.return ()
 end

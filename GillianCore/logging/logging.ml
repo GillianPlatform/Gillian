@@ -17,12 +17,13 @@ let file_reporter : Reporter.t = (module File_reporter)
 let database_reporter : Reporter.t = (module Database_reporter)
 let reporters = ref []
 
-let initialize (reporters_to_initialize : (module Reporter.S) list) =
-  reporters := reporters_to_initialize;
-  List.iter (fun reporter -> Reporter.initialize reporter) !reporters
-
 let wrap_up () =
   List.iter (fun reporter -> Reporter.wrap_up reporter) !reporters
+
+let initialize (reporters_to_initialize : (module Reporter.S) list) =
+  reporters := reporters_to_initialize;
+  List.iter (fun reporter -> Reporter.initialize reporter) !reporters;
+  at_exit wrap_up
 
 let log_on_all_reporters (report : Report.t) =
   List.iter (fun reporter -> Reporter.log reporter report) !reporters
@@ -68,7 +69,7 @@ end
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
-  print_endline str
+  Fmt.pr "%s\n" str
 
 (* Failure *)
 let fail msg =
@@ -85,19 +86,9 @@ module Parent = struct
   let with_id id f =
     match id with
     | None -> f ()
-    | Some id -> (
-        set id;
-        let result =
-          try Ok (f ())
-          with e ->
-            print_to_all
-              (Fmt.str "Original Backtrace:@\n%s" (Printexc.get_backtrace ()));
-            Error e
-        in
-        release (Some id);
-        match result with
-        | Ok ok -> ok
-        | Error e -> raise e)
+    | Some id ->
+        let () = set id in
+        Fun.protect ~finally:(fun () -> release (Some id)) f
 
   let with_specific ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
     let id =
@@ -147,3 +138,63 @@ end
 
 let dummy_pp fmt _ =
   Fmt.pf fmt "!!! YOU SHOULDN'T BE SEEING THIS PRETTY PRINT !!!"
+
+module Statistics = struct
+  (*************************
+   * Timing and Statistics *
+   *************************)
+
+  open Utils.Containers
+
+  let active () = !Utils.Config.stats || Mode.enabled ()
+  let exec_cmds = ref 0
+
+  (* Performance statistics *)
+  let statistics = Hashtbl.create 511
+
+  (* Update the value of the fname statistic in the table, or add it if not present *)
+  let update_statistics (fname : string) (time : float) =
+    if not (active ()) then ()
+    else if Hashtbl.mem statistics fname then
+      let stat = Hashtbl.find statistics fname in
+      Hashtbl.replace statistics fname (time :: stat)
+    else Hashtbl.add statistics fname [ time ]
+
+  let print_statistics () =
+    print_to_all "\n STATISTICS \n ========== \n";
+
+    let keys : SS.t =
+      SS.of_list (Hashtbl.fold (fun k _ ac -> k :: ac) statistics [])
+    in
+
+    print_to_all (Printf.sprintf "Executed commands: %d" !exec_cmds);
+
+    (* Process each item in statistics table *)
+    SS.iter
+      (fun f ->
+        let lt = Hashtbl.find statistics f in
+        (* Calculate average, min, max *)
+        let min = ref infinity in
+        let max = ref 0. in
+        let tot = ref 0. in
+        let avg = ref 0. in
+        let std = ref 0. in
+        let len = float_of_int (List.length lt) in
+        tot :=
+          List.fold_left
+            (fun ac t ->
+              if t < !min then min := t;
+              if t > !max then max := t;
+              ac +. t)
+            0. lt;
+        avg := !tot /. len;
+        std :=
+          (List.fold_left (fun ac t -> ac +. ((!avg -. t) ** 2.)) 0. lt /. len)
+          ** 0.5;
+        print_to_all (Printf.sprintf "\t%s" f);
+        print_to_all
+          (Printf.sprintf
+             "Tot: %f\tCll: %d\nMin: %f\tMax: %f\nAvg: %f\tStd: %f\n" !tot
+             (int_of_float len) !min !max !avg !std))
+      keys
+end

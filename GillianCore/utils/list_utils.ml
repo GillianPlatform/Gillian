@@ -257,3 +257,8 @@ let rec zip (l1 : 'a list) (l2 : 'b list) : ('a * 'b) list =
   | h1 :: t1, h2 :: t2 -> (h1, h2) :: zip t1 t2
   | [], _ -> []
   | _, [] -> []
+
+let[@tail_mod_cons] rec drop n = function
+  | [] -> []
+  | l when n = 0 -> l
+  | _ :: r -> drop (n - 1) r

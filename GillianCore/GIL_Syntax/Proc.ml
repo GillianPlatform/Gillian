@@ -14,6 +14,11 @@ type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_spec : Spec.t option;
   proc_aliases : string list;
   proc_calls : string list;
+  (* Debugger options *)
+  proc_display_name : (string * string) option;
+      (** A friendly name for the proc, when displayed in the debugger *)
+  proc_hidden : bool;
+      (** Whether the proc should be hidden at the "top level" in the debugger *)
 }
 [@@deriving yojson]
 
