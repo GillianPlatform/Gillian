@@ -103,13 +103,11 @@ module Make (State : SState.S) = struct
     { procs; state = State.copy state; af_state = State.copy af_state }
 
   let simplify
-      ?(save = false)
-      ?(kill_new_lvars : bool option)
+      ?save
+      ?kill_new_lvars
       ?matching:_
       ({ procs; state; af_state } : t) : SVal.SESubst.t * t list =
-    let kill_new_lvars = Option.value ~default:true kill_new_lvars in
-    let subst, states = State.simplify ~save ~kill_new_lvars state in
-
+    let subst, states = State.simplify ?save ?kill_new_lvars state in
     let states =
       List.concat_map
         (fun state ->
