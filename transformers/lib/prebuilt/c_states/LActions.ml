@@ -1,5 +1,5 @@
 type ac = DropPerm | GetCurPerm | WeakValidPointer | Store | Load
-type ga = Single | Array | Hole | Zeros | Bounds
+type ga = Single | Array | Hole | Zeros | Bounds [@@deriving yojson]
 
 let str_ac = function
   | DropPerm -> "dropperm"
