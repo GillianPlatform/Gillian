@@ -27,7 +27,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     List.map (fun (a, args, ret) -> (A1 a, args, ret)) (S1.list_actions ())
     @ List.map (fun (a, args, ret) -> (A2 a, args, ret)) (S2.list_actions ())
 
-  type pred = P1 of S1.pred | P2 of S2.pred
+  type pred = P1 of S1.pred | P2 of S2.pred [@@deriving yojson]
 
   let pred_from_str s =
     match IDer.get_ided s with

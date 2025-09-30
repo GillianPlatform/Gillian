@@ -38,7 +38,7 @@ module Make (S : MyMonadicSMemory.S) :
          (fun (a, arg, ret) -> (SubAction a, arg, ret))
          (S.list_actions ())
 
-  type pred = FreedPred | SubPred of S.pred
+  type pred = FreedPred | SubPred of S.pred [@@deriving yojson]
 
   let pred_from_str = function
     | "freed" -> Some FreedPred
