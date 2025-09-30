@@ -37,7 +37,7 @@ module Make (S : MyMonadicSMemory.S) :
       (fun (a, args, ret) -> (SubAction a, "offset" :: args, ret))
       (S.list_actions ())
 
-  type pred = Length | SubPred of S.pred
+  type pred = Length | SubPred of S.pred [@@deriving yojson]
 
   let pred_from_str = function
     | "length" -> Some Length

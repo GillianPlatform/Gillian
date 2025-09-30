@@ -156,7 +156,7 @@ struct
         (fun (a, args, ret) -> (SubAction a, "index" :: args, ret))
         (S.list_actions ())
 
-  type pred = DomainSet | SubPred of S.pred
+  type pred = DomainSet | SubPred of S.pred [@@deriving yojson]
 
   let pred_from_str = function
     | "domainset" -> Some DomainSet
@@ -444,7 +444,7 @@ struct
         (fun (a, args, ret) -> (SubAction a, "index" :: args, ret))
         (S.list_actions ())
 
-  type pred = S.pred
+  type pred = S.pred [@@deriving yojson]
 
   let pred_from_str = S.pred_from_str
   let pred_to_str = S.pred_to_str

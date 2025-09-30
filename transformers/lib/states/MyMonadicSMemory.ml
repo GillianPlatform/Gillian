@@ -14,7 +14,7 @@ module type S = sig
 
   (* Type of predicates and actions  *)
   type action
-  type pred
+  type pred [@@deriving yojson]
 
   val action_from_str : string -> action option
   val action_to_str : action -> string

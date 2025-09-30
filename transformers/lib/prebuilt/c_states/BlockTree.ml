@@ -1145,7 +1145,7 @@ module M = struct
   [@@deriving show, yojson]
 
   type action = ac
-  type pred = ga
+  type pred = ga [@@deriving yojson]
 
   let action_to_str = str_ac
   let action_from_str s = try Some (ac_from_str s) with _ -> None
