@@ -112,7 +112,9 @@ module Make (S : MyMonadicSMemory.S) :
     | Length, [ n' ] -> (
         match n with
         | Some _ -> Delayed.vanish ()
-        | None -> Delayed.return (b, Some n'))
+        | None ->
+            let+ () = Delayed.assume_types [ (n', Type.IntType) ] in
+            (b, Some n'))
     | Length, _ -> failwith "Invalid arguments for length produce"
 
   let compose s1 s2 =
@@ -228,15 +230,9 @@ module Make (S : MyMonadicSMemory.S) :
     | OutOfBounds _ -> false
 
   let get_fixes = function
-    | SubError (idx, e) ->
-        S.get_fixes e |> MyUtils.deep_map (MyAsrt.map_cp (lift_corepred idx))
+    | SubError (idx, e) -> S.get_fixes e |> MyUtils.deep_map (lift_corepred idx)
     | MissingLength ->
         let lvar = Expr.LVar (LVar.alloc ()) in
-        [
-          [
-            MyAsrt.CorePred (Length, [], [ lvar ]);
-            MyAsrt.Types [ (lvar, Type.IntType) ];
-          ];
-        ]
+        [ [ (Length, [], [ lvar ]) ] ]
     | _ -> failwith "Called get_fixes on unfixable error"
 end

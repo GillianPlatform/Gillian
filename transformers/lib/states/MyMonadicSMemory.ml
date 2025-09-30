@@ -66,7 +66,7 @@ module type S = sig
 
   (** Get the fixes for an error, as a list of fixes -- a fix is a list of core
       predicates to produce onto the state. *)
-  val get_fixes : err_t -> pred MyAsrt.t list list
+  val get_fixes : err_t -> pred Fix.t list
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding
       predicates *)
@@ -174,14 +174,11 @@ struct
     let mapping (p, ins, outs) = Asrt.CorePred (pred_to_str p, ins, outs) in
     List.map mapping core_preds @ formulas
 
-  let get_fixes e =
-    get_fixes e
-    |> MyUtils.deep_map @@ function
-       | MyAsrt.Emp -> Asrt.Emp
-       | MyAsrt.Pure f -> Asrt.Pure f
-       | MyAsrt.Types ts -> Asrt.Types ts
-       | MyAsrt.CorePred (p, ins, outs) ->
-           Asrt.CorePred (pred_to_str p, ins, outs)
+  let get_fixes (e : err_t) =
+    let fixes = get_fixes e in
+    MyUtils.deep_map
+      (fun (p, ins, outs) -> Asrt.CorePred (pred_to_str p, ins, outs))
+      fixes
 
   (* Override methods to keep implementations light *)
   let clear _ = empty ()
