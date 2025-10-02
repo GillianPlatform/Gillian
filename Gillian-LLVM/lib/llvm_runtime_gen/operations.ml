@@ -259,6 +259,8 @@ let op_function
       proc_spec = None;
       proc_aliases = [];
       proc_calls = [];
+      proc_display_name = None;
+      proc_hidden = false;
     }
   in
   p
@@ -323,14 +325,13 @@ let pattern_function_unary
   in
   let case_statement_for_int (regular_val : Expr.t) =
     let int_val = Expr.list_nth regular_val 1 in
-    let result_type = 
+    let result_type =
       match shape.width_of_result with
       | Some width -> Expr.string ("int-" ^ string_of_int width)
       | None -> failwith "Unary operations should have a result width"
     in
     let* _ =
-      add_return_of_value
-        (Expr.EList [ result_type; op [ int_val ] shape ])
+      add_return_of_value (Expr.EList [ result_type; op [ int_val ] shape ])
     in
     return ()
   in
@@ -509,8 +510,7 @@ let fp_patterns_unary
     let float_val = Expr.list_nth regular_val 1 in
     let* _ =
       add_return_of_value
-        (Expr.EList
-           [ Expr.list_nth regular_val 0; op [ float_val ] shape ])
+        (Expr.EList [ Expr.list_nth regular_val 0; op [ float_val ] shape ])
     in
     return ()
   in
@@ -543,9 +543,7 @@ let fp_ext_patterns
   let case_statement_for_f32_to_f64 (regular_val : Expr.t) =
     let float_val = Expr.list_nth regular_val 1 in
     let* _ =
-      add_return_of_value
-        (Expr.EList
-           [ Expr.string "double"; float_val ])
+      add_return_of_value (Expr.EList [ Expr.string "double"; float_val ])
     in
     return ()
   in
@@ -574,31 +572,27 @@ let conversion_patterns
   let case_statement_for_int_to_float (regular_val : Expr.t) =
     let int_val = Expr.list_nth regular_val 1 in
     let converted_val = op [ int_val ] shape in
-    let target_type = 
+    let target_type =
       match shape.width_of_result with
-      | Some 32 -> "float"   (* F32 *)
-      | Some 64 -> "double"  (* F64 *)
-      | _ -> "float"         (* Default to F32 if width not specified *)
+      | Some 32 -> "float" (* F32 *)
+      | Some 64 -> "double" (* F64 *)
+      | _ -> "float" (* Default to F32 if width not specified *)
     in
     let* _ =
       add_return_of_value
-        (Expr.EList
-           [ Expr.string target_type; converted_val ])
+        (Expr.EList [ Expr.string target_type; converted_val ])
     in
     return ()
   in
   let case_statement_for_float_to_int (regular_val : Expr.t) =
     let float_val = Expr.list_nth regular_val 1 in
     let converted_val = op [ float_val ] shape in
-    let target_type = 
+    let target_type =
       match shape.width_of_result with
       | Some width -> Expr.string ("int-" ^ string_of_int width)
       | None -> failwith "Unary operations should have a result width"
     in
-    let* _ =
-      add_return_of_value
-        (Expr.EList [ target_type; converted_val ])
-    in
+    let* _ = add_return_of_value (Expr.EList [ target_type; converted_val ]) in
     return ()
   in
   let patterns =
@@ -641,31 +635,27 @@ let conversion_patterns_generalized
   let case_statement_for_int_to_float (regular_val : Expr.t) =
     let int_val = Expr.list_nth regular_val 1 in
     let* converted_val = op [ int_val ] shape in
-    let target_type = 
+    let target_type =
       match shape.width_of_result with
-      | Some 32 -> "float"   (* F32 *)
-      | Some 64 -> "double"  (* F64 *)
-      | _ -> "float"         (* Default to F32 if width not specified *)
+      | Some 32 -> "float" (* F32 *)
+      | Some 64 -> "double" (* F64 *)
+      | _ -> "float" (* Default to F32 if width not specified *)
     in
     let* _ =
       add_return_of_value
-        (Expr.EList
-           [ Expr.string target_type; converted_val ])
+        (Expr.EList [ Expr.string target_type; converted_val ])
     in
     return ()
   in
   let case_statement_for_float_to_int (regular_val : Expr.t) =
     let float_val = Expr.list_nth regular_val 1 in
     let* converted_val = op [ float_val ] shape in
-    let target_type = 
+    let target_type =
       match shape.width_of_result with
       | Some width -> Expr.string ("int-" ^ string_of_int width)
       | None -> failwith "Unary operations should have a result width"
     in
-    let* _ =
-      add_return_of_value
-        (Expr.EList [ target_type; converted_val ])
-    in
+    let* _ = add_return_of_value (Expr.EList [ target_type; converted_val ]) in
     return ()
   in
   let patterns =
@@ -673,12 +663,16 @@ let conversion_patterns_generalized
       {
         exprs = [ expr ];
         types_ = [ LLVMRuntimeTypes.Int 32 ];
-        case_stat = case_statement_for_int_to_float (Expr.EList [ Expr.string "int"; expr ]);
+        case_stat =
+          case_statement_for_int_to_float
+            (Expr.EList [ Expr.string "int"; expr ]);
       };
       {
         exprs = [ expr ];
         types_ = [ LLVMRuntimeTypes.Int 64 ];
-        case_stat = case_statement_for_int_to_float (Expr.EList [ Expr.string "int"; expr ]);
+        case_stat =
+          case_statement_for_int_to_float
+            (Expr.EList [ Expr.string "int"; expr ]);
       };
       {
         exprs = [ expr ];
@@ -954,23 +948,29 @@ module OpFunctions = struct
         let bexpr =
           Expr.BVExprIntrinsic
             ( BVOps.BVSlt,
-              [ BvExpr (x, input_width); BvExpr (Expr.zero_bv input_width, input_width) ],
+              [
+                BvExpr (x, input_width);
+                BvExpr (Expr.zero_bv input_width, input_width);
+              ],
               None )
         in
         let twos_comp_bv_expr =
-          Expr.BVExprIntrinsic (BVOps.BVNeg, [ BvExpr (x, input_width) ], Some input_width)
+          Expr.BVExprIntrinsic
+            (BVOps.BVNeg, [ BvExpr (x, input_width) ], Some input_width)
         in
         let twos_comp_int_expr =
-          bv_op_function BVOps.BVToInt [twos_comp_bv_expr] { shape with args = [input_width] }
+          bv_op_function BVOps.BVToInt [ twos_comp_bv_expr ]
+            { shape with args = [ input_width ] }
         in
         let neg_int_expr =
-          Expr.BinOp (twos_comp_int_expr, BinOp.ITimes, Expr.Lit (Literal.Int (Z.of_int (-1))))
+          Expr.BinOp
+            ( twos_comp_int_expr,
+              BinOp.ITimes,
+              Expr.Lit (Literal.Int (Z.of_int (-1))) )
         in
-        let neg_expr = 
-          Expr.UnOp (UnOp.IntToNum, neg_int_expr)
-        in
+        let neg_expr = Expr.UnOp (UnOp.IntToNum, neg_int_expr) in
         let pos_expr =
-          Expr.UnOp (UnOp.IntToNum, bv_op_function BVOps.BVToInt [x] shape)
+          Expr.UnOp (UnOp.IntToNum, bv_op_function BVOps.BVToInt [ x ] shape)
         in
         let* _ =
           ite bexpr
@@ -998,9 +998,11 @@ module OpFunctions = struct
         let join_block = fresh_sym () in
         let expr = Expr.BinOp (x, BinOp.FLessThan, Expr.num 0.) in
         let neg_expr = Expr.zero_bv width in
-        let lits = Some [width] in
+        let lits = Some [ width ] in
         let pos_expr =
-          bv_op_function ?literals:lits BVOps.IntToBV [Expr.UnOp (UnOp.NumToInt, x)] shape
+          bv_op_function ?literals:lits BVOps.IntToBV
+            [ Expr.UnOp (UnOp.NumToInt, x) ]
+            shape
         in
         let* _ =
           ite expr
@@ -1022,8 +1024,10 @@ module OpFunctions = struct
     let open Gil_syntax in
     match shape.width_of_result with
     | Some width ->
-        let lits = Some [width] in
-        bv_op_function ?literals:lits BVOps.IntToBV [Expr.UnOp (UnOp.NumToInt, List.hd inputs)] shape
+        let lits = Some [ width ] in
+        bv_op_function ?literals:lits BVOps.IntToBV
+          [ Expr.UnOp (UnOp.NumToInt, List.hd inputs) ]
+          shape
     | None -> failwith "Fptosi function requires a result width"
 
   let sub_function_overflow
@@ -1095,7 +1099,7 @@ let template_from_pattern_fp
   op_function name 2 (function
     | [ x; y ] -> fp_patterns ~pointer_width x y op shape flag_checks
     | _ -> failwith "Invalid number of arguments")
-  
+
 let template_from_pattern_fp_unary
     ~(op : bv_op_function)
     ~(pointer_width : int)
@@ -1132,7 +1136,8 @@ let template_from_pattern_conversion_generalized
     (name : string)
     (shape : bv_op_shape) =
   op_function name 1 (function
-    | [ x ] -> conversion_patterns_generalized ~pointer_width x op shape flag_checks
+    | [ x ] ->
+        conversion_patterns_generalized ~pointer_width x op shape flag_checks
     | _ -> failwith "Invalid number of arguments")
 
 let template_from_integer_op
@@ -1588,9 +1593,7 @@ module UtilityOps = struct
         let join_block = fresh_sym () in
         let bexpr =
           Expr.BVExprIntrinsic
-            ( BVOps.BVUlt,
-              [ BvExpr (x, width); BvExpr (y, width) ],
-              None )
+            (BVOps.BVUlt, [ BvExpr (x, width); BvExpr (y, width) ], None)
         in
         let* _ =
           ite bexpr
@@ -1616,9 +1619,7 @@ module UtilityOps = struct
         let join_block = fresh_sym () in
         let bexpr =
           Expr.BVExprIntrinsic
-            ( BVOps.BVUlt,
-              [ BvExpr (Expr.zero_bv 1, 1); BvExpr (x, 1) ],
-              None )
+            (BVOps.BVUlt, [ BvExpr (Expr.zero_bv 1, 1); BvExpr (x, 1) ], None)
         in
         let* _ =
           ite bexpr
@@ -1646,13 +1647,12 @@ module UtilityOps = struct
         let join_block = fresh_sym () in
         let bexpr =
           Expr.BVExprIntrinsic
-            ( BVOps.BVUleq,
-              [ BvExpr (x, width); BvExpr (y, width) ],
-              None )
+            (BVOps.BVUleq, [ BvExpr (x, width); BvExpr (y, width) ], None)
         in
         let zero_expr = Expr.zero_bv width in
         let pos_expr =
-          Expr.BVExprIntrinsic (BVOps.BVSub, [ BvExpr (x, width); BvExpr (y, width) ], Some width)
+          Expr.BVExprIntrinsic
+            (BVOps.BVSub, [ BvExpr (x, width); BvExpr (y, width) ], Some width)
         in
         let* _ =
           ite bexpr
@@ -1882,8 +1882,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
         generator =
           ValueOp
             (flag_template_function
-               (template_from_pattern_conversion
-                  ~op:OpFunctions.uitofp_function)
+               (template_from_pattern_conversion ~op:OpFunctions.uitofp_function)
                []);
       };
       {
@@ -1891,8 +1890,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
         generator =
           ValueOp
             (flag_template_function
-               (template_from_pattern_conversion
-                  ~op:OpFunctions.fptosi_function)
+               (template_from_pattern_conversion ~op:OpFunctions.fptosi_function)
                []);
       };
       {
@@ -1939,10 +1937,7 @@ module LLVMTemplates : Monomorphizer.OpTemplates = struct
       {
         name = "fpext";
         generator =
-          ValueOp
-            (flag_template_function
-               (template_from_pattern_fp_ext)
-               []);
+          ValueOp (flag_template_function template_from_pattern_fp_ext []);
       };
       {
         name = "icmp_eq";

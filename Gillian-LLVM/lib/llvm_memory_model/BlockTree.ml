@@ -184,8 +184,9 @@ module M = struct
             fmt "Vanishing on compose error: %a" pp_err_t e);
         Delayed.vanish ()
 
-  (** For Freeable: if a state can be freed. Must only be true if no non-empty state can
-   be composed with the state. The Expr list is irrelevant; it's required because of Gillian-C. *)
+  (** For Freeable: if a state can be freed. Must only be true if no non-empty
+      state can be composed with the state. The Expr list is irrelevant; it's
+      required because of Gillian-C. *)
   let is_exclusively_owned tree e =
     let open Delayed.Syntax in
     match e with
@@ -200,9 +201,9 @@ module M = struct
   (** If this state is entirely made up of concrete expressions. *)
   let is_concrete = SHeapTree.is_concrete
 
-  (** Instantiates this state with a list of arguments. This is used by PMap, either in
-    static mode with the 'instantiate' action, or in dynamic mode when accessing
-    a missing index. *)
+  (** Instantiates this state with a list of arguments. This is used by PMap,
+      either in static mode with the 'instantiate' action, or in dynamic mode
+      when accessing a missing index. *)
   let instantiate = function
     | [ low; high ] ->
         let tree = SHeapTree.instantiate low high in
@@ -212,7 +213,8 @@ module M = struct
   (** The list of core predicates corresponding to the state. *)
   let assertions tree = SHeapTree.assertions tree
 
-  (** The list of assertions that aren't core predicates corresponding to the state. *)
+  (** The list of assertions that aren't core predicates corresponding to the
+      state. *)
   let assertions_others tree : Asrt.atom list = SHeapTree.assertions_others tree
 
   (** If the error can be fixed *)
@@ -221,8 +223,8 @@ module M = struct
     | MissingResource _ -> true
     | _ -> false
 
-  (** Get the fixes for an error, as a list of fixes -- a fix is a list of core predicates
-    to produce onto the state. *)
+  (** Get the fixes for an error, as a list of fixes -- a fix is a list of core
+      predicates to produce onto the state. *)
   let get_fixes e =
     Logging.tmi (fun m -> m "Getting fixes for %a" pp_err e);
     match e with
@@ -243,7 +245,8 @@ module M = struct
         List.map make_branch possible_fix_types
     | _ -> []
 
-  (** The recovery tactic to attempt to resolve an error, by eg. unfolding predicates *)
+  (** The recovery tactic to attempt to resolve an error, by eg. unfolding
+      predicates *)
   let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
 
   (** The set of logical variables in the state *)
@@ -252,8 +255,8 @@ module M = struct
   (** The set of abstract locations in the state *)
   let alocs tree = SHeapTree.alocs tree
 
-  (** Applies a substitution to the state. This can branch, eg. when attempting to resolve
-    equality of expressions. *)
+  (** Applies a substitution to the state. This can branch, eg. when attempting
+      to resolve equality of expressions. *)
   let substitution_in_place subst tree =
     let le_subst = Subst.subst_in_expr subst ~partial:true in
     let sval_subst = SVal.substitution ~le_subst in

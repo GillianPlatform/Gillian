@@ -876,7 +876,8 @@ module Spec : sig
     bool ->
     st
 
-  (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
+  (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify]
+      creates a full specification with the given values *)
   val init :
     string ->
     string list ->

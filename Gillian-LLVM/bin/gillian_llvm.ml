@@ -48,7 +48,7 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
 
   (** Gives a JSON representation of the lifter's state.
 
-  Used for debugging problems with the lifter.*)
+      Used for debugging problems with the lifter.*)
   let dump (_st : t) = raise (Failure "unsupported")
 
   let step_over (_ : t) (_ : Logging.Report_id.t) =
@@ -63,13 +63,13 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
 
   (** Gets the non-lifted execution map of GIL commands.
 
-  In most cases, it's recommended to use a {!Gil_fallback_lifter}, and just
-  defer this call to the GIL lifter. *)
+      In most cases, it's recommended to use a {!Gil_fallback_lifter}, and just
+      defer this call to the GIL lifter. *)
   let get_gil_map _ = raise (Failure "unsupported")
 
   (** Gets the lifted execution map.
 
-  Returns [None] if lifting is not supported. *)
+      Returns [None] if lifting is not supported. *)
   let get_lifted_map _ = raise (Failure "unsupported")
 
   (** Exception-raising version of {!get_lifted_map}. *)
@@ -84,6 +84,9 @@ module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
     raise (Failure "unsupported")
 
   let parse_and_compile_files ~entrypoint:_ fls = raise (Failure "unsupported")
+  let pp_expr _ = raise (Failure "unsupported")
+  let pp_asrt _ = raise (Failure "unsupported")
+  let get_variables _ _ _ = raise (Failure "unsupported")
 end
 
 module CLI =

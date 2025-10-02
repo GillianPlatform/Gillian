@@ -509,12 +509,16 @@ let pp_custom ~pp ft =
     Fmt.pf fmt "%s%a" x
       (Fmt.option (fun fm t -> Fmt.pf fm " : %s" (Type.str t)))
       t_opt
+  and pp_bv_arg fmt (arg : bv_arg) =
+    match arg with
+    | Literal w -> Fmt.pf fmt "%di" w
+    | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %di)" pp e w
   in
   function
   | Lit l -> Literal.pp ft l
   | PVar v | LVar v | ALoc v -> Fmt.string ft v
   | BVExprIntrinsic (op, es, w) ->
-      Fmt.pf fmt "%s(%a : %a)" (BVOps.str op)
+      Fmt.pf ft "%s(%a : %a)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp_bv_arg)
         es
         (Fmt.option ~none:Fmt.nop (fun pf i -> Fmt.pf pf "%di" i))
@@ -543,11 +547,6 @@ let pp_custom ~pp ft =
       Fmt.pf ft "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
-
-and pp_bv_arg fmt (arg : bv_arg) =
-  match arg with
-  | Literal w -> Fmt.pf fmt "%di" w
-  | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %di)" pp e w
 
 let rec pp ft t = pp_custom ~pp ft t
 

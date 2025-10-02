@@ -21,17 +21,23 @@ let pp_err _ _ =
      or test suites"
 
 let parse_and_compile_files files :
-    ( ( Gil_parser.annot,
-        init_data,
-        tl_ast )
-      Gillian.Command_line.ParserAndCompiler.compiled_progs,
-      unit )
-    result =
+    ( Gil_parser.annot,
+      init_data,
+      tl_ast )
+    Gillian.Command_line.ParserAndCompiler.compiled_progs
+    Utils.Gillian_result.t =
   let eprogs =
     List.map
       (fun fl ->
         let eprog = Gil_parser.parse_eprog_from_file fl in
-        (fl, eprog.labeled_prog))
+        match eprog with
+        | Ok parsing_result -> (fl, parsing_result.labeled_prog)
+        | Error e ->
+            let msg =
+              Format.asprintf "Failed to parse file %s:%@%a" fl
+                Utils.Gillian_result.Error.pp e
+            in
+            failwith msg)
       files
   in
   Ok

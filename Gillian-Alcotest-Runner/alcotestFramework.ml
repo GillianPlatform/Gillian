@@ -56,15 +56,15 @@ module Make (Outcome : Outcome.S) = struct
           "Expected the test to fail at execution \nBut the test %a"
           Outcome.pp_what_test_did actual
 
-  let finish_in_error_mode =
-    make_check_finish_in_mode ~flag:Flag.Error ~expected:None
-
   let finish_in_fail test =
     match test with
-    | Outcome.FinishedExec [ RFail _ ] -> ()
+    | Ok [ Engine.Exec_res.RFail _ ] -> ()
     | _ ->
         Alcotest.failf "Expected the test to end with fail \nBut the test %a"
           Outcome.pp_what_test_did test
+
+  let finish_in_error_mode =
+    make_check_finish_in_mode ~flag:Flag.Error ~expected:None
 
   let finish_in_error_mode_with branches ~constraint_name constr =
     make_check_finish_in_mode ~flag:Flag.Error

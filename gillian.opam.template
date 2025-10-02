@@ -1,4 +1,4 @@
 pin-depends: [
-  ["simple_smt.~dev" "git+https://github.com/trail-of-forks/simple-smt-ocaml#6c844de9e54ad3696c98721681e6d9018d0a46ff"]
+  ["simple_smt.~dev" "git+https://github.com/trail-of-forks/simple-smt-ocaml#c992e9ec8e7a68c46dd49632da38a411846e6bf4"]
   ["sedap.~dev" "git+https://github.com/GillianPlatform/ocaml-sedap#1255830f659a806639468d143ed0e4fa39becfa0"]
 ]

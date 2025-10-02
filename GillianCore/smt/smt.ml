@@ -15,11 +15,7 @@ let z3_config =
     ("timeout", "30000");
   ]
 
-let _debug_z3 = { z3 with log = printf_log }
-let solver = new_solver _debug_z3
-let cmd s = ack_command solver s
-let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
-let () = Sys.(set_signal sigpipe Signal_ignore)
+let _debug_z3_config = { z3 with log = printf_log }
 
 exception SMT_unknown
 
@@ -28,28 +24,30 @@ let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
 let defined_bv_variants : int list ref = ref []
 
-let solver =
+let solver : solver ref =
   ref
     {
       command = (fun _ -> failwith "Uninitialized solver");
       stop = (fun () -> failwith "Uninitialized solver");
       force_stop = (fun () -> failwith "Uninitialized solver");
-      config = z3;
+      config = _debug_z3_config;
       raw_command = (fun _ -> failwith "Uninitialized solver");
     }
 
 let cmd s = ack_command !solver s
+let () = Sys.(set_signal sigpipe Signal_ignore)
 
 let rec init_solver () =
-  let z3 = new_solver z3 in
+  let z3 = new_solver _debug_z3_config in
   let command = protected_command z3 in
   let () = solver := { z3 with command } in
   (* Config, initial decls *)
   let () =
     z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
   in
+  (* XX(tnytown): we can't declare decls here because GIL_BVLiteral hasn't been declared yet
   let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
+  let () = decls |> List.iter cmd in *)
   let () = cmd (push 1) in
   ()
 
@@ -887,7 +885,7 @@ let encode_bvop
     | BVOps.BVUrem -> binop_encode bv_urem
     | BVOps.BVShl -> binop_encode bv_shl
     | BVOps.BVLShr -> binop_encode bv_lshr
-    | BVConcat -> binop_encode bv_concat
+    | BVConcat -> bv_concat bvs
     | BVXor -> binop_encode bv_xor
     | BVSrem -> binop_encode bv_srem
     | BVSub -> binop_encode bv_sub
