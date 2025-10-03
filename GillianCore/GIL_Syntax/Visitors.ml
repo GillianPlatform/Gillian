@@ -28,7 +28,8 @@ module Utils = struct
       method private plus = ( @ )
     end
 
-  (** Same as list_monoid but uses [rev_append] as [plus]. Will break any order-conservation *)
+  (** Same as list_monoid but uses [rev_append] as [plus]. Will break any
+      order-conservation *)
   class non_ordered_list_monoid =
     object
       method private zero = []

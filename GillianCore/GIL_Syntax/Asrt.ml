@@ -1,11 +1,10 @@
 (** {b GIL logic assertions}. *)
 type atom = TypeDef__.assertion_atom =
-  | Emp  (** Empty heap             *)
-  | Pred of string * Expr.t list  (** Predicates             *)
-  | Pure of Expr.t  (** Pure formula           *)
-  | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
-  | CorePred of string * Expr.t list * Expr.t list
-      (** Core assertion         *)
+  | Emp  (** Empty heap *)
+  | Pred of string * Expr.t list  (** Predicates *)
+  | Pure of Expr.t  (** Pure formula *)
+  | Types of (Expr.t * Type.t) list  (** Typing assertion *)
+  | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
   | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
       (** Magic wand of the form [P(...) -* Q(...)] *)
 [@@deriving eq]

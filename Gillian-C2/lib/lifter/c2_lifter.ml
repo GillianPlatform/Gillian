@@ -31,8 +31,9 @@ let ( let** ) o f = Result.bind o f
 
 module Make
     (SMemory : Gillian.Symbolic.Memory_S)
-    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
-             with type Lifter.memory = SMemory.t)
+    (Gil :
+      Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
+        with type Lifter.memory = SMemory.t)
     (Verification : Engine.Verifier.S with type annot = C2_annot.t) =
 struct
   open Exec_map
@@ -95,9 +96,11 @@ struct
       prev : (id * Branch_case.t option * id list) option;
           (** Where to put the finished cmd in the map. *)
       all_ids : (id * (Branch_case.kind option * Branch_case.case)) Ext_list.t;
-          (** All the GIL cmd IDs that build into this one (and the relevant branch case info). *)
+          (** All the GIL cmd IDs that build into this one (and the relevant
+              branch case info). *)
       unexplored_paths : (id * Gil_branch_case.t option) Stack.t;
-          (** All the paths that haven't been explored yet; a stack means depth-first exploration. *)
+          (** All the paths that haven't been explored yet; a stack means
+              depth-first exploration. *)
       ends : partial_end Ext_list.t;
           (** All the end points; there may be multiple if the cmd branches. *)
       matches : Match_map.matching Ext_list.t;

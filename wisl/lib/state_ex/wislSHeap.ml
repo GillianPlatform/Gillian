@@ -249,8 +249,8 @@ let rem_freed heap loc =
 
 (***** Some things specific to symbolic heaps ********)
 
-(** tries merging two locations -- returns false is the merging failed as they overlapped,
-    meaning substitution must vanish! *)
+(** tries merging two locations -- returns false is the merging failed as they
+    overlapped, meaning substitution must vanish! *)
 let merge_loc ~new_loc ~old_loc (heap : t) : bool =
   let old_block, new_block =
     (Hashtbl.find_opt heap old_loc, Hashtbl.find_opt heap new_loc)

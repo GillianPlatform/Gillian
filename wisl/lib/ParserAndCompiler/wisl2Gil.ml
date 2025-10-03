@@ -308,7 +308,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           (Format.asprintf
              "In LPointsTo assertions, a location should always point to at \
               least one value\n\
-              It is not the case in : %a" WLAssert.pp asser)
+              It is not the case in : %a"
+             WLAssert.pp asser)
     | [ (perm, le) ] ->
         let exs2, la2, e2 = compile_lexpr le in
         let exs3, la3, e3 = compile_lexpr_perm perm in

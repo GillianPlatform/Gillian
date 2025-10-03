@@ -2,16 +2,16 @@ open Names
 
 (** GIL Expressions *)
 type t = TypeDef__.expr =
-  | Lit of Literal.t  (** GIL literals           *)
-  | PVar of string  (** GIL program variables  *)
-  | LVar of LVar.t  (** GIL logical variables  *)
+  | Lit of Literal.t  (** GIL literals *)
+  | PVar of string  (** GIL program variables *)
+  | LVar of LVar.t  (** GIL logical variables *)
   | ALoc of string  (** GIL abstract locations *)
-  | UnOp of UnOp.t * t  (** Unary operators         *)
-  | BinOp of t * BinOp.t * t  (** Binary operators        *)
+  | UnOp of UnOp.t * t  (** Unary operators *)
+  | BinOp of t * BinOp.t * t  (** Binary operators *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
-  | NOp of NOp.t * t list  (** n-ary operators         *)
-  | EList of t list  (** Lists of expressions    *)
-  | ESet of t list  (** Sets of expressions     *)
+  | NOp of NOp.t * t list  (** n-ary operators *)
+  | EList of t list  (** Lists of expressions *)
+  | ESet of t list  (** Sets of expressions *)
   | Exists of (string * Type.t option) list * t
       (** Existential quantification. *)
   | ForAll of (string * Type.t option) list * t
@@ -500,7 +500,8 @@ let rec from_lit_list (lit : Literal.t) : t =
   | LList lst -> EList (List.map f lst)
   | _ -> Lit lit
 
-(** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList lst)  *)
+(** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList
+    lst) *)
 let lists (le : t) : t list =
   Visitors.Collectors.list_collector#visit_expr () le
 

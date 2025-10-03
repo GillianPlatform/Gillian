@@ -7,19 +7,19 @@ let return_variable = "ret"
 
 (** {2 Prefixes} *)
 
-(** Literal location prefix  *)
+(** Literal location prefix *)
 let lloc_prefix = "$loc_"
 
-(** Program variable prefix  *)
+(** Program variable prefix *)
 let pvar_prefix = "_pvar_"
 
-(** Abstract location prefix  *)
+(** Abstract location prefix *)
 let aloc_prefix = "#loc_"
 
-(** Logical variable prefix  *)
+(** Logical variable prefix *)
 let lvar_prefix = "#lvar_"
 
-(** Logical variable prefix  *)
+(** Logical variable prefix *)
 let lvar_prefix_bi = "#lvar_bi_"
 
 (** {2 Name testers} *)

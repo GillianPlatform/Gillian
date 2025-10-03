@@ -478,8 +478,9 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
       | Expr.Lit (Int f) ->
           if Z.lt f Z.zero then -1 else if Z.gt f Z.zero then 1 else 0
       | _ -> 0
-    with _ -> (* Do not sort the offsets if an exception has occurred *)
-              0
+    with _ ->
+      (* Do not sort the offsets if an exception has occurred *)
+      0
   in
   let cell_vars l : Variable.t list =
     List.sort compare_offsets l

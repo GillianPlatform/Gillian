@@ -1,17 +1,16 @@
 open Containers
 module L = Logging
 
-(** The [outs] type represents a list of learned outs, together
-    with (optionally) the way of constructing them *)
+(** The [outs] type represents a list of learned outs, together with
+    (optionally) the way of constructing them *)
 type outs = (Expr.t * Expr.t) list [@@deriving yojson, eq]
 
 let outs_pp =
   Fmt.(
     list ~sep:(Fmt.any "; ") (parens (pair ~sep:(Fmt.any ", ") Expr.pp Expr.pp)))
 
-(** The [mp_step] type represents a matching plan step,
-    consisting of an assertion together with the possible
-    learned outs *)
+(** The [mp_step] type represents a matching plan step, consisting of an
+    assertion together with the possible learned outs *)
 type step = Asrt.atom * outs [@@deriving yojson, eq]
 
 let pp_step = Fmt.pair ~sep:(Fmt.any ", ") Asrt.pp_atom_full outs_pp
@@ -27,16 +26,18 @@ type post = Flag.t * Asrt.t list [@@deriving eq, yojson]
 let pp_post ft (flag, asrts) =
   Fmt.pf ft "%a: %a" Flag.pp flag Fmt.(list ~sep:comma Asrt.pp) asrts
 
-(** At a high level, a matching plan is a tree of assertions.
-     *)
+(** At a high level, a matching plan is a tree of assertions. *)
 type t =
   | Choice of t * t
   | ConsumeStep of step * t
   | LabelStep of label * t
-      (** Labels provide additional existentials to be bound manually by the user *)
+      (** Labels provide additional existentials to be bound manually by the
+          user *)
   | Finished of post option
-      (** The optional assertion corresponds to some post-condition that may be produced after successfuly matching.
-          For example, a matching plan corresponding to a set of specifications will contain leaves that are respectively anntated with the corresponding post. *)
+      (** The optional assertion corresponds to some post-condition that may be
+          produced after successfuly matching. For example, a matching plan
+          corresponding to a set of specifications will contain leaves that are
+          respectively anntated with the corresponding post. *)
 [@@deriving yojson]
 
 (* type t =
@@ -121,10 +122,9 @@ let minimise_matchables (kb : KB.t) : KB.t =
       | _ -> KB.add u ac)
     kb KB.empty
 
-(** [missing kb e] returns a list of matchables that are missing
-    in order for the expression [e] to be known under knowledge
-    base [kb]. The expression is required to have previously been
-    fully reduced. *)
+(** [missing kb e] returns a list of matchables that are missing in order for
+    the expression [e] to be known under knowledge base [kb]. The expression is
+    required to have previously been fully reduced. *)
 let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
   let f' = missing_expr in
   let f = missing_expr kb in
@@ -181,15 +181,14 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
         in
         f' kb' e
 
-(** [is_known kb e] returns true if the expression [e] is known
-    under knowledge base [kb], and false otherwise *)
+(** [is_known kb e] returns true if the expression [e] is known under knowledge
+    base [kb], and false otherwise *)
 let is_known_expr (kb : KB.t) (e : Expr.t) : bool =
   missing_expr kb e = [ KB.empty ]
 
-(** [learn kb e] tries to learn matchables in the expression [e]
-    not known in the knowledge base [kb]. It returns a list of
-    pairs, each of which contains the learned matchable and the
-    method of its construction. *)
+(** [learn kb e] tries to learn matchables in the expression [e] not known in
+    the knowledge base [kb]. It returns a list of pairs, each of which contains
+    the learned matchable and the method of its construction. *)
 let rec learn_expr
     ?(top_level = false)
     (kb : KB.t)
@@ -360,8 +359,8 @@ let simple_ins_expr_collector =
       | _ -> super#visit_expr exclude e
   end
 
-(** [simple_ins_expr e] returns the list of possible ins
-    for a given expression [e] *)
+(** [simple_ins_expr e] returns the list of possible ins for a given expression
+    [e] *)
 let simple_ins_expr (e : Expr.t) : KB.t list =
   let open Expr in
   let llens, others = simple_ins_expr_collector#visit_expr SS.empty e in
@@ -387,10 +386,9 @@ let outs_expr (kb : KB.t) (base_expr : Expr.t) (e : Expr.t) : outs =
   (* Otherwise, there may be scenarios in which not all ins are required *)
   | true -> learn_expr ~top_level:true kb base_expr e
 
-(** [ins_outs_expr kb e] returns the possible ins and outs of
-    the expression [e] given a knowledge base [kb]. The outs
-    are provided together with the way they are constructed
-    given the ins *)
+(** [ins_outs_expr kb e] returns the possible ins and outs of the expression [e]
+    given a knowledge base [kb]. The outs are provided together with the way
+    they are constructed given the ins *)
 let ins_outs_expr (kb : KB.t) (base_expr : Expr.t) (e : Expr.t) :
     (KB.t * outs) list =
   let ins = simple_ins_expr e in
@@ -426,8 +424,8 @@ let ins_and_outs_from_lists (kb : KB.t) (lei : Expr.t list) (leo : Expr.t list)
   | [] -> [ (KB.empty, []) ]
   | _ -> List.map (fun ins -> (ins, outs)) ins
 
-(** [simple_ins_formula pf] returns the list of possible ins
-    for a given formula [pf] *)
+(** [simple_ins_formula pf] returns the list of possible ins for a given formula
+    [pf] *)
 let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
   let f = simple_ins_formula kb in
   match pf with
@@ -469,8 +467,8 @@ let rec simple_ins_formula (kb : KB.t) (pf : Expr.t) : KB.t list =
       List.map minimise_matchables ins
   | Lit _ | PVar _ | LVar _ | ALoc _ | LstSub _ | NOp _ | EList _ | ESet _ -> []
 
-(** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
-    for a given formula [pf] under a given knowledge base [kb] *)
+(** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs for a
+    given formula [pf] under a given knowledge base [kb] *)
 let ins_outs_formula (kb : KB.t) (pf : Expr.t) : (KB.t * outs) list =
   let default_ins = simple_ins_formula kb pf in
   let default_result : (KB.t * outs) list =
@@ -515,8 +513,8 @@ let ins_outs_formula (kb : KB.t) (pf : Expr.t) : (KB.t * outs) list =
               Expr.pp pf))
   | _ -> default_result
 
-(** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs
-    for a given assertion [a] under a given knowledge base [kb] *)
+(** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs for a
+    given assertion [a] under a given knowledge base [kb] *)
 let ins_outs_assertion
     (pred_ins : (string, int list) Hashtbl.t)
     (kb : KB.t)
@@ -624,8 +622,9 @@ let of_step_list ?post ?label (steps : step list) : t =
 
 (** Adds a linear matching plan (without choices) to a possibly non-linear one.
     Will be under-optimised if a non-linear matching plan is passed on the lhs.
-    We try to preserve order in which the assertions are added, as to maintain priorities set by the user.
-    In the future, we could provide an option that automatically prioritizes the shortest MP on the left-hand side. *)
+    We try to preserve order in which the assertions are added, as to maintain
+    priorities set by the user. In the future, we could provide an option that
+    automatically prioritizes the shortest MP on the left-hand side. *)
 let rec add_linear_mp (current_mp : t) (mp_to_add : t) : t =
   let rec merge_into_left left right =
     match (left, right) with
@@ -654,8 +653,8 @@ let rec add_linear_mp (current_mp : t) (mp_to_add : t) : t =
   | Some x -> x
   | None -> Choice (current_mp, mp_to_add)
 
-(** This function builds a general (slightly optimised by selecting common roots) matching plan
-    once the step list for each case has been decided. *)
+(** This function builds a general (slightly optimised by selecting common
+    roots) matching plan once the step list for each case has been decided. *)
 let build_mp (cases : (step list * label option * post option) list) : t =
   let linear_mps =
     List.map (fun (steps, label, post) -> of_step_list ?label ?post steps) cases

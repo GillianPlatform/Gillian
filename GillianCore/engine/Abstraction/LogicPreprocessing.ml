@@ -7,7 +7,7 @@ let unfolded_preds : (string, Pred.t) Hashtbl.t = Hashtbl.create small_tbl_size
 (*
  *  Auto-Unfolding Non-recursive Predicates in Assertions
  * 	-----------------------------------------------------
- * *)
+ *)
 let rec auto_unfold
     ?(unfold_rec_predicates = false)
     ?loc

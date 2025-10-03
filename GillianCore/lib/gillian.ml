@@ -6,7 +6,8 @@ end
 
 (** The GIL parser
 
-  This is parametric over target languages, via the [Annot] module parameter. *)
+    This is parametric over target languages, via the [Annot] module parameter.
+*)
 module Gil_parsing = struct
   (** @inline *)
   include Gil_parsing
@@ -73,8 +74,8 @@ module Logging = struct
   (** Module specifying functions required for a type to be loggable *)
   module Loggable = Loggable
 
-  (** Module for querying the reports stored by the database reporter.
-    Queries will return None if the Log_queryer is not enabled. *)
+  (** Module for querying the reports stored by the database reporter. Queries
+      will return None if the Log_queryer is not enabled. *)
   module Log_queryer = Log_queryer
 
   (** Logs a message at the [Normal] logging level given a message format *)
@@ -89,10 +90,10 @@ module Logging = struct
   (** Writes the string and then raises a failure. *)
   let fail = fail
 
-  (** Logs a type given a {!Loggable.t} and its content
-    type (which should be one of the predefined strings in
-    {!module-Logging_constants.module-Content_type}). Returns the logged report id if it has
-    been logged. *)
+  (** Logs a type given a {!Loggable.t} and its content type (which should be
+      one of the predefined strings in
+      {!module-Logging_constants.module-Content_type}). Returns the logged
+      report id if it has been logged. *)
   module Specific = Specific
 
   (** Functions for managing phases *)
@@ -103,8 +104,8 @@ module Logging = struct
 
   (** A dummy pretty-printer
 
-    Use this when you need a pretty printer,
-    but don't expect it to actually be seen anywhere *)
+      Use this when you need a pretty printer, but don't expect it to actually
+      be seen anywhere *)
   let dummy_pp = dummy_pp
 
   (** Prints a message to all available reporters, and stdout if applicable. *)

@@ -1,6 +1,6 @@
 (**************************************************************)
 (**************************************************************)
-(** GIL Commmands                                           **)
+(** GIL Commmands **)
 
 (**************************************************************)
 (**************************************************************)
@@ -18,23 +18,23 @@ type function_call = TypeDef__.function_call = {
 [@@deriving yojson]
 
 type 'label t = 'label TypeDef__.cmd =
-  | Skip  (** Skip                *)
-  | Assignment of string * Expr.t  (** Assignment          *)
-  | LAction of string * string * Expr.t list  (** Local Actions       *)
+  | Skip  (** Skip *)
+  | Assignment of string * Expr.t  (** Assignment *)
+  | LAction of string * string * Expr.t list  (** Local Actions *)
   | Logic of LCmd.t  (** GIL Logic commands *)
-  | Goto of 'label  (** Unconditional goto  *)
-  | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto    *)
+  | Goto of 'label  (** Unconditional goto *)
+  | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
   | Call of function_call * 'label option  (** Procedure call *)
   | Par of function_call list  (** Parallel calls *)
   | ECall of string * Expr.t * Expr.t list * 'label option
-      (** External Procedure call           *)
+      (** External Procedure call *)
   | Apply of string * Expr.t * 'label option
-      (** Application-style procedure call  *)
+      (** Application-style procedure call *)
   | Arguments of string  (** Arguments of the current function *)
-  | PhiAssignment of (string * Expr.t list) list  (** PHI assignment      *)
-  | ReturnNormal  (** Normal return       *)
-  | ReturnError  (** Error return        *)
-  | Fail of string * Expr.t list  (** Failure             *)
+  | PhiAssignment of (string * Expr.t list) list  (** PHI assignment *)
+  | ReturnNormal  (** Normal return *)
+  | ReturnError  (** Error return *)
+  | Fail of string * Expr.t list  (** Failure *)
 [@@deriving yojson]
 
 let equal = TypeDef__.equal_cmd

@@ -27,7 +27,8 @@ module Error = struct
     | AnalysisFailures of analysis_failure list
     | CompilationError of compilation_error
     | OperationError of string
-        (** Handled failure unrelated to analysis, e.g. unable to read input file *)
+        (** Handled failure unrelated to analysis, e.g. unable to read input
+            file *)
     | InternalError of internal_error  (** Something went very wrong! *)
   [@@deriving yojson]
 
@@ -145,9 +146,10 @@ let try_ f =
       let msg = "Internal error!\n" ^ Printexc.to_string e in
       internal_error ~backtrace msg
 
-(** "Merges" two results by selecting the error with highest precedence.
-  If both results are AnalysisFailures, they are properly merged.
-  If both results are Ok, takes the result of merge_ok, which takes the {b first} value by default *)
+(** "Merges" two results by selecting the error with highest precedence. If both
+    results are AnalysisFailures, they are properly merged. If both results are
+    Ok, takes the result of merge_ok, which takes the {b first} value by default
+*)
 let merge ?(merge_ok : 'a -> 'b -> 'c = fun x _ -> x) e1 e2 =
   match (e1, e2) with
   | Error (InternalError e), _ | _, Error (InternalError e) ->

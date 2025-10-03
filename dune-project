@@ -29,7 +29,7 @@
   "A parametric compositional symbolic execution for Correctness and Incorrectness")
  (depends
   (ocaml
-   (>= 5.1.0))
+   (>= 5.3.0))
   (alcotest
    (= 1.0.1))
   (cmdliner

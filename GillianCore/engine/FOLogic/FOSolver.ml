@@ -1,9 +1,7 @@
 open SVal
 module L = Logging
 
-(** ****************
-  * SATISFIABILITY *
-  * **************** **)
+(** **************** * SATISFIABILITY * * **************** **)
 
 let get_axioms (fs : Expr.Set.t) (_ : Type_env.t) : Expr.Set.t =
   Expr.Set.fold
@@ -109,9 +107,7 @@ let sat ~matching ~pfs ~gamma formula : bool =
         (formula' :: PFS.to_list pfs)
         gamma
 
-(** ************
-  * ENTAILMENT *
-  * ************ **)
+(** ************ * ENTAILMENT * * ************ **)
 
 let check_entailment
     ?(matching = false)

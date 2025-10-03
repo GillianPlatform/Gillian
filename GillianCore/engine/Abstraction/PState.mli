@@ -1,7 +1,4 @@
-(**
-    Interface for GIL General States.
-    They are considered to be mutable.
-*)
+(** Interface for GIL General States. They are considered to be mutable. *)
 module type S = sig
   include SState.S
 

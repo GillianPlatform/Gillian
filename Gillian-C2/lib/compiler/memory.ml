@@ -44,8 +44,8 @@ let ptr_offset ~ctx ~ty p e =
   let sty = Expr.int (Ctx.size_of ctx ty) in
   ptr_add_e p (Expr.Infix.( * ) e sty)
 
-(** Allocates the memory with the right size, and
-   returns a location expression, addressing the block *)
+(** Allocates the memory with the right size, and returns a location expression,
+    addressing the block *)
 let alloc ~loc_var ~size : Expr.t * string Cmd.t =
   if size == 0 then Fmt.failwith "OK ALLOCATING SOMETHING OF SIZE ZERO!";
   let alloc = Interface.(str_ac (AMem Alloc)) in
@@ -53,9 +53,8 @@ let alloc ~loc_var ~size : Expr.t * string Cmd.t =
   let loc = Expr.list_nth (PVar loc_var) 0 in
   (loc, cmd)
 
-(** Allocates the memory with the right size, and
-   returns a pointer expression pointing to the
-   beginning of the allocated block. *)
+(** Allocates the memory with the right size, and returns a pointer expression
+    pointing to the beginning of the allocated block. *)
 let alloc_ptr ~ctx ty : Expr.t * string Cmd.t =
   let size = Ctx.size_of ctx ty in
   let loc, cmd = alloc ~loc_var:(Ctx.fresh_v ctx) ~size in
@@ -85,12 +84,10 @@ let dealloc_local ~ctx ~cmd_kind (l : Ctx.Local.t) : Body_item.t =
   let loc = Body_item.compile_location l.location in
   Body_item.make ~loc ~cmd_kind cmd
 
-(** Loads a value into the given variable.
-    If no variable is given, one is created.
-    In any case, the variable containing the value, as well as
-    the load command is returned.
-    If a variable is given, the returned variable
-    is always equal to it *)
+(** Loads a value into the given variable. If no variable is given, one is
+    created. In any case, the variable containing the value, as well as the load
+    command is returned. If a variable is given, the returned variable is always
+    equal to it *)
 let load_scalar ~ctx ?var (e : Expr.t) (t : GType.t) : string Cs.with_cmds =
   match chunk_for_type ~ctx t with
   | None ->

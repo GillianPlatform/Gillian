@@ -1,14 +1,12 @@
-(** [check_satisfiability_with_model pfs gamma]
-    checks whether or not the pure formulae [pfs] are satisfiable
-    under the typing environment [gamma]. If this is the case,
-    the function returns the appropriate logical environment. *)
+(** [check_satisfiability_with_model pfs gamma] checks whether or not the pure
+    formulae [pfs] are satisfiable under the typing environment [gamma]. If this
+    is the case, the function returns the appropriate logical environment. *)
 val check_satisfiability_with_model :
   Gil_syntax.Expr.t list -> Type_env.t -> SVal.SESubst.t option
 
-(** [check_satisfiability ?matching pfs gamma]
-    checks whether or not the pure formulae [pfs] are satisfiable
-    under the typing environment [gamma]. The [matching] flag should
-    not be used by Gillian instantiation developers. *)
+(** [check_satisfiability ?matching pfs gamma] checks whether or not the pure
+    formulae [pfs] are satisfiable under the typing environment [gamma]. The
+    [matching] flag should not be used by Gillian instantiation developers. *)
 val check_satisfiability :
   ?matching:bool ->
   ?time:string ->
@@ -17,13 +15,14 @@ val check_satisfiability :
   Type_env.t ->
   bool
 
-(** A different API for [check_satisfiability] better adapted for usage in memory models *)
+(** A different API for [check_satisfiability] better adapted for usage in
+    memory models *)
 val sat :
   matching:bool -> pfs:PFS.t -> gamma:Type_env.t -> Gil_syntax.Expr.t -> bool
 
-(** [check_entailment existentials lpfs rpfs gamma] checks whether or not
-    the entailment << ∃ [existentials]. [lpfs] => [rpfs] >> holds
-    under the typing environment [gamma]. *)
+(** [check_entailment existentials lpfs rpfs gamma] checks whether or not the
+    entailment << ∃ [existentials]. [lpfs] => [rpfs] >> holds under the typing
+    environment [gamma]. *)
 val check_entailment :
   ?matching:bool ->
   Utils.Containers.SS.t ->
@@ -32,8 +31,8 @@ val check_entailment :
   Type_env.t ->
   bool
 
-(** [is_equal e1 e2 pfs gamma] checks whether or not
-    << pfs, gamma |- e1 = e2 >>. *)
+(** [is_equal e1 e2 pfs gamma] checks whether or not << pfs, gamma |- e1 = e2
+    >>. *)
 val is_equal :
   ?matching:bool ->
   pfs:PFS.t ->
@@ -42,8 +41,8 @@ val is_equal :
   Gil_syntax.Expr.t ->
   bool
 
-(** [is_different e1 e2 pfs gamma] checks whether or not
-    << pfs, gamma |- e1 <> e2 >>. *)
+(** [is_different e1 e2 pfs gamma] checks whether or not << pfs, gamma |- e1 <>
+    e2 >>. *)
 val is_different :
   pfs:PFS.t ->
   gamma:Type_env.t ->

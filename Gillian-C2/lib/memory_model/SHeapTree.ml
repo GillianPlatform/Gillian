@@ -54,8 +54,9 @@ type 'a or_error = ('a, err) Result.t
 type 'a d_or_error = ('a, err) DR.t
 
 module PathTaken = struct
-  (** Going through a tree can become quite expensive.
-      Remover is always called right after the getter, so we take note of the last path taken and on remove we just go for it directly.  *)
+  (** Going through a tree can become quite expensive. Remover is always called
+      right after the getter, so we take note of the last path taken and on
+      remove we just go for it directly. *)
 
   type t = Left | Right | Here [@@deriving yojson]
 end

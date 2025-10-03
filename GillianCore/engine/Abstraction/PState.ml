@@ -1,7 +1,4 @@
-(**
-    Interface for GIL Predicate States.
-    They are considered to be mutable.
-*)
+(** Interface for GIL Predicate States. They are considered to be mutable. *)
 module type S = sig
   include SState.S
 
@@ -747,7 +744,8 @@ module Make (State : SState.S) :
           let msg =
             Fmt.str
               "MATCH INVARIANT FAILURE: %a\n\
-               unable to produce variable bindings: %a." Asrt.pp a pp_err_t e
+               unable to produce variable bindings: %a."
+              Asrt.pp a pp_err_t e
           in
           L.print_to_all msg;
           Res_list.error_with e
@@ -783,15 +781,13 @@ module Make (State : SState.S) :
         List.map Result.ok states)
       (Res_list.return astate) frames
 
-  (**
-    Evaluation of logic commands
+  (** Evaluation of logic commands
 
-    @param prog GIL program
-    @param lcmd Logic command to be evaluated
-    @param state Current state
-    @param preds Current predicate set
-    @return List of states/predicate sets resulting from the evaluation
-  *)
+      @param prog GIL program
+      @param lcmd Logic command to be evaluated
+      @param state Current state
+      @param preds Current predicate set
+      @return List of states/predicate sets resulting from the evaluation *)
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (astate : t) :
       (t, err_t) Res_list.t =
     let eval_expr e =
@@ -1077,7 +1073,8 @@ module Make (State : SState.S) :
     let specs =
       List.map
         (fun ((spec, x, args, subst) :
-               MP.spec * string * vt list * (string * (string * vt) list) option) ->
+               MP.spec * string * vt list * (string * (string * vt) list) option)
+           ->
           ( spec.data.spec_name,
             spec.data.spec_params,
             spec.mp,

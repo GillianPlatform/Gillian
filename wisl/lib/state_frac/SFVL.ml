@@ -24,7 +24,7 @@ let fv_pp fmt { value; permission } =
   Fmt.pf fmt "%a [%a]" Expr.pp value Expr.pp permission
 
 (*************************************)
-(** Field Value List Functions      **)
+(** Field Value List Functions **)
 
 (*************************************)
 

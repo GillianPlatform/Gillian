@@ -2,8 +2,9 @@ let makeFormater format pp fmt e = Fmt.pf fmt "%s" (format (Fmt.str "%a" pp e))
 
 type branches = ExactlyOne | AllOfThem | AtLeastOne
 
-(** Builds a message explaining the reason of failure when the `AllOfThem` is used.
-    In this case, it explained every case that didn't match the expected patternd *)
+(** Builds a message explaining the reason of failure when the `AllOfThem` is
+    used. In this case, it explained every case that didn't match the expected
+    patternd *)
 let build_message_all ?(fmtexp = fun x -> x) flag const_opt lst_fail_msg =
   let pp_one fmt m = Fmt.pf fmt "- One of them %s" m in
   Fmt.str "Expected %s%s\nBut : @[<v 2>%a@]"
@@ -34,16 +35,16 @@ let oneResInMode
         let failure_message =
           Fmt.str
             "successfully finished in %a mode\n\
-             but didn't validate the constraint: %a" (pp_exp Flag.pp) flag
-            (pp_rcv Fmt.string) cn
+             but didn't validate the constraint: %a"
+            (pp_exp Flag.pp) flag (pp_rcv Fmt.string) cn
         in
         (false, failure_message)
   | RSucc { flag; _ }, _ ->
       let failure_message =
         Fmt.str
           "successfully finished in %a mode\n\
-           But was expected to finish successfully in %a mode" (pp_rcv Flag.pp)
-          fl (pp_exp Flag.pp) flag
+           But was expected to finish successfully in %a mode"
+          (pp_rcv Flag.pp) fl (pp_exp Flag.pp) flag
       in
       (false, failure_message)
   | _ ->

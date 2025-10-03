@@ -1,7 +1,6 @@
-(** This is a much simplified version of CBMC's locations.
-    Gillian only handles this, so there's not much more we can do.
-    Maybe there is a way to extract a better gillian location from
-    CBMC locs, but it's not worth it right now. *)
+(** This is a much simplified version of CBMC's locations. Gillian only handles
+    this, so there's not much more we can do. Maybe there is a way to extract a
+    better gillian location from CBMC locs, but it's not worth it right now. *)
 type t = {
   origin_id : int;
   source : string option;

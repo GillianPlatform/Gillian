@@ -12,10 +12,11 @@ module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
+    (State :
+      State.S
+        with type vt = Val.t
+         and type st = ESubst.t
+         and type store_t = Store.t)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) =
 struct
@@ -47,7 +48,8 @@ struct
   type err_t = (Val.t, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
-  (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
+  (** Type of configurations: state, call stack, previous index, previous loop
+      ids, current index, branching *)
   module CConf = struct
     type err = {
       callstack : Call_stack.t;
@@ -473,15 +475,13 @@ struct
    * Main Functions *
    * ************** *)
 
-  (**
-    Evaluation of logic commands
+  (** Evaluation of logic commands
 
-    @param prog GIL program
-    @param lcmd Logic command to be evaluated
-    @param state Current state
-    @param preds Current predicate set
-    @return List of states/predicate sets resulting from the evaluation
-  *)
+      @param prog GIL program
+      @param lcmd Logic command to be evaluated
+      @param state Current state
+      @param preds Current predicate set
+      @return List of states/predicate sets resulting from the evaluation *)
   module Evaluate_lcmd = struct
     let eval_assumetype e t state eval_expr =
       let v_x = eval_expr e in
@@ -653,17 +653,15 @@ struct
   let evaluate_lcmd = Evaluate_lcmd.eval_lcmd
   let evaluate_lcmds = Evaluate_lcmd.eval_lcmds
 
-  (**
-  Evaluation of commands
+  (** Evaluation of commands
 
-  @param prog GIL program
-  @param state Current state
-  @param preds Current predicate set
-  @param cs Current call stack
-  @param prev Previous index
-  @param i Current index
-  @return List of configurations resulting from the evaluation
-*)
+      @param prog GIL program
+      @param state Current state
+      @param preds Current predicate set
+      @param cs Current call stack
+      @param prev Previous index
+      @param i Current index
+      @return List of configurations resulting from the evaluation *)
 
   module Evaluate_cmd = struct
     type make_confcont =
@@ -2297,12 +2295,11 @@ struct
 
   let evaluate_cmd_step = Evaluate_cmd_step.eval_step
 
-  (**
-  Evaluates commands iteratively
+  (** Evaluates commands iteratively
 
-  @param init_func The initial continuation function which evaluates the first
-                   step of the program
-*)
+      @param init_func
+        The initial continuation function which evaluates the first step of the
+        program *)
   let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
     match init_func with
     | Finished results -> results

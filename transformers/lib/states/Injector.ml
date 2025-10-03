@@ -12,19 +12,24 @@ type 'a injection_hook = string -> 'a -> 'a Delayed.t
 module type Injection = sig
   type t
 
-  (** Called with the predicate's name and ins + outs before its production into the state. Replaces ins+outs *)
+  (** Called with the predicate's name and ins + outs before its production into
+      the state. Replaces ins+outs *)
   val pre_produce : (t * Expr.t list) injection_hook
 
-  (** Called with the predicate's name and ins before its consumption from the state. Replaces ins *)
+  (** Called with the predicate's name and ins before its consumption from the
+      state. Replaces ins *)
   val pre_consume : (t * Expr.t list) injection_hook
 
-  (** Called with the predicate's name and outs after its consumption from the state. Replaces outs *)
+  (** Called with the predicate's name and outs after its consumption from the
+      state. Replaces outs *)
   val post_consume : (t * Expr.t list) injection_hook
 
-  (** Called with the action's name and args before its execution. Replaces args *)
+  (** Called with the action's name and args before its execution. Replaces args
+  *)
   val pre_execute_action : (t * Expr.t list) injection_hook
 
-  (** Called with the action's name and returns after its execution. Replaces returns *)
+  (** Called with the action's name and returns after its execution. Replaces
+      returns *)
   val post_execute_action : (t * Expr.t list * Expr.t list) injection_hook
 
   (** Called after instantiation of the state *)

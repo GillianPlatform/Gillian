@@ -12,8 +12,8 @@ module Make (Outcome : Outcome.S) = struct
         let failure_message =
           Fmt.str
             "Expected test to fail at parsing time with %s\n\
-             but it failed at parsing time with constraint: %a" pa.msg
-            Fmt.string cname
+             but it failed at parsing time with constraint: %a"
+            pa.msg Fmt.string cname
         in
         Alcotest.(check bool) failure_message true (constr pa)
     | other, _ ->
@@ -41,7 +41,8 @@ module Make (Outcome : Outcome.S) = struct
     | other ->
         Alcotest.failf
           "Expected test to finish successfully in normal mode\n\
-           But test actually %a" Outcome.pp_what_test_did other
+           But test actually %a"
+          Outcome.pp_what_test_did other
 
   let fail_at_parsing = make_check_fail_at_parsing ~expected:None
 

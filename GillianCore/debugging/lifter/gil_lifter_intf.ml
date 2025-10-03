@@ -1,8 +1,9 @@
 module type S = sig
   include Lifter.S
 
-  (** A version of [init] that allows manually supplying exec_data instead of triggering
-      the Step effect - this is used when Gil is not the primary lifter. *)
+  (** A version of [init] that allows manually supplying exec_data instead of
+      triggering the Step effect - this is used when Gil is not the primary
+      lifter. *)
   val init_manual :
     string ->
     string list ->
