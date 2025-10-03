@@ -1,5 +1,6 @@
 include Gil_fallback_lifter_intf
 open Lifter
+open Effect.Deep
 
 module Make : Make =
 functor
@@ -61,40 +62,19 @@ functor
         | None -> Gil_lifter.handle_cmd (Option.get id) case exec_data state.gil
 
       let ignore_node_updated f x =
-        let open Effect.Deep in
-        try_with f x
-          {
-            effc =
-              (fun (type b) (eff : b Effect.t) ->
-                match eff with
-                | Node_updated _ ->
-                    Some (fun (k : (b, _) continuation) -> continue k ())
-                | _ -> None);
-          }
+        try f x with effect Node_updated _, k -> continue k ()
 
       let intercept_effect f state () =
-        let open Effect.Deep in
-        try_with f ()
-          {
-            effc =
-              (fun (type a) (eff : a Effect.t) ->
-                match eff with
-                | TLLifter.Step ((id, case, _) as s) ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        let exec_data = Effect.perform (Step s) in
-                        let () =
-                          ignore_node_updated delegate_to_gil
-                            (id, case, exec_data, state)
-                        in
-                        Effect.Deep.continue k exec_data)
-                | Gil_lifter.Step s ->
-                    Some
-                      (fun (k : (a, _) continuation) ->
-                        let exec_data = Effect.perform (Step s) in
-                        Effect.Deep.continue k exec_data)
-                | _ -> None);
-          }
+        try f () with
+        | effect TLLifter.Step ((id, case, _) as s), k ->
+            let exec_data = Effect.perform (Step s) in
+            let () =
+              ignore_node_updated delegate_to_gil (id, case, exec_data, state)
+            in
+            continue k exec_data
+        | effect Gil_lifter.Step s, k ->
+            let exec_data = Effect.perform (Step s) in
+            continue k exec_data
 
       let defer tl_f gil_f state =
         let f =

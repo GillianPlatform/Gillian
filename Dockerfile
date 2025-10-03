@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile:1.7-labs
 
-FROM ocaml/opam:debian-ocaml-5.2 AS build
+FROM ocaml/opam:debian-ocaml-5.3 AS build
 LABEL maintainer "Nat Karmios"
 ARG DEBIAN_FRONTEND=noninteractive
 RUN sudo apt-get update
