@@ -121,9 +121,14 @@ module Make (State : SState.S) :
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
 
-  let simplify ?(save = false) ?(kill_new_lvars : bool option) (astate : t) :
-      SVal.SESubst.t * t list =
-    let subst, states = State.simplify ~save ?kill_new_lvars astate.state in
+  let simplify
+      ?(save = false)
+      ?(kill_new_lvars : bool option)
+      ?(matching = false)
+      (astate : t) : SVal.SESubst.t * t list =
+    let subst, states =
+      State.simplify ~save ?kill_new_lvars ~matching astate.state
+    in
     Preds.substitution_in_place subst astate.preds;
     Wands.substitution_in_place subst astate.wands;
     match states with
@@ -164,11 +169,12 @@ module Make (State : SState.S) :
             astates)
 
   let assume_a
+      ?(matching = false)
       ?(production = false)
       ?(time = "")
       (astate : t)
       (fs : Expr.t list) : t option =
-    match State.assume_a ~production ~time astate.state fs with
+    match State.assume_a ~matching ~production ~time astate.state fs with
     | Some state -> Some { astate with state }
     | None -> None
 
@@ -329,8 +335,7 @@ module Make (State : SState.S) :
     let final_state = set_store final_state (SStore.copy frame_store) in
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
-
-    let _, final_states = simplify final_state in
+    let _, final_states = simplify ~matching:true final_state in
     let+ final_state = final_states in
     match SMatcher.unfold_concrete_preds final_state with
     | Some (_, with_unfolded_concrete) -> Ok (with_unfolded_concrete, fl)
@@ -849,7 +854,9 @@ module Make (State : SState.S) :
             let** _, state =
               SMatcher.unfold ?additional_bindings astate pname vs
             in
-            let _, states = simplify ~kill_new_lvars:true state in
+            let _, states =
+              simplify ~kill_new_lvars:true ~matching:true state
+            in
             Res_list.just_oks states)
       | Package { lhs; rhs } ->
           let++ astate =
@@ -1048,7 +1055,7 @@ module Make (State : SState.S) :
               lemma.mp None v_args astate
           in
           let astate = add_spec_vars astate (Var.Set.of_list binders) in
-          let _, astates = simplify astate in
+          let _, astates = simplify ~matching:true astate in
           Res_list.just_oks astates
       | Invariant _ ->
           raise

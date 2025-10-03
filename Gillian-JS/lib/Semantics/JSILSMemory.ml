@@ -516,6 +516,7 @@ module M = struct
     Ok [ (heap, [], [], []) ]
 
   let execute_action
+      ?matching:_
       (action : string)
       (heap : t)
       (pfs : PFS.t)

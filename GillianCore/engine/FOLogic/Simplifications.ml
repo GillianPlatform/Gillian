@@ -7,6 +7,7 @@ type simpl_key_type = {
   gamma_list : (Var.t * Type.t) list;
   pfs_list : Expr.t list;
   existentials : SS.t;
+  matching : bool;
   save_spec_vars : (SS.t * bool) option; (* rpfs_lvars  : CCommon.SS.t *)
 }
 
@@ -28,18 +29,19 @@ let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
 
 (*************************************)
 
-let reduce_pfs_in_place _ gamma (pfs : PFS.t) =
-  PFS.map_inplace (Reduction.reduce_lexpr ~gamma ~pfs) pfs
+let reduce_pfs_in_place ?(matching = false) _ gamma (pfs : PFS.t) =
+  PFS.map_inplace (Reduction.reduce_lexpr ~matching ~gamma ~pfs) pfs
 
-let sanitise_pfs store gamma pfs =
+let sanitise_pfs ?(matching = false) store gamma pfs =
   let old_pfs = ref (PFS.init ()) in
   while not (PFS.equal !old_pfs pfs) do
     old_pfs := PFS.copy pfs;
-    reduce_pfs_in_place store gamma pfs
+    reduce_pfs_in_place ~matching store gamma pfs
   done;
   PFS.remove_duplicates pfs
 
-let sanitise_pfs_no_store = sanitise_pfs (Hashtbl.create 1)
+let sanitise_pfs_no_store ?(matching = false) =
+  sanitise_pfs ~matching (Hashtbl.create 1)
 
 (* *********** *)
 (*   CLEANUP   *)
@@ -304,6 +306,7 @@ let _resolve_set_existentials
   @return Substitution from logical variables to logical expressions
 *)
 let simplify_pfs_and_gamma
+    ?(matching = false)
     ?(kill_new_lvars : bool option)
     ?(save_spec_vars : (SS.t * bool) option)
     ?(existentials : SS.t option)
@@ -322,6 +325,7 @@ let simplify_pfs_and_gamma
       gamma_list = Type_env.to_list gamma;
       pfs_list = PFS.to_list lpfs;
       existentials = !existentials;
+      matching;
       save_spec_vars (* rpfs_lvars = (PFS.lvars rpfs) *);
     }
   in
@@ -342,6 +346,8 @@ let simplify_pfs_and_gamma
       (SESubst.copy subst, simpl_existentials)
   | false ->
       L.verbose (fun m -> m "PFS/Gamma simplification:");
+      L.verbose (fun m ->
+          m "With matching: %s" (if matching then "Yes" else "No"));
       L.verbose (fun m -> m "PFS:@\n@[%a@]\n" PFS.pp lpfs);
       L.verbose (fun m -> m "Gamma:@\n@[%a@]\n" Type_env.pp gamma);
 
@@ -384,7 +390,7 @@ let simplify_pfs_and_gamma
         (* Reduce current assertion *)
         let rec_call = filter_mapper_formula pfs in
         let extend_with = PFS.extend pfs in
-        let whole = Reduction.reduce_lexpr ~gamma ~pfs pf in
+        let whole = Reduction.reduce_lexpr ~matching ~gamma ~pfs pf in
         match whole with
         (* These we must not encounter here *)
         | ForAll (bt, _) ->
@@ -440,7 +446,7 @@ let simplify_pfs_and_gamma
             rec_call (BinOp (le, Equal, EList []))
         | BinOp (UnOp (LstLen, le), Equal, Lit (Int len))
         | BinOp (Lit (Int len), Equal, UnOp (LstLen, le))
-          when Z.leq len (Z.of_int 100) ->
+          when (not matching) && Z.leq len (Z.of_int 100) ->
             let len = Z.to_int len in
             if len >= 0 then (
               let le_vars = List.init len (fun _ -> LVar.alloc ()) in
@@ -546,7 +552,7 @@ let simplify_pfs_and_gamma
                     (* SESubst.put result aloc (Lit (Loc lloc));
                        let temp_subst = SESubst.init [ aloc, Lit (Loc lloc) ] in
                          PFS.substitution_in_place temp_subst lpfs *)
-                | ALoc alocl, ALoc alocr ->
+                | ALoc alocl, ALoc alocr when matching ->
                     L.verbose (fun fmt ->
                         fmt "Two equal alocs: %s and %s" alocl alocr);
                     SESubst.put result (ALoc alocr) (ALoc alocl);
@@ -558,6 +564,11 @@ let simplify_pfs_and_gamma
                       SESubst.subst_in_expr ~partial:true temp_subst whole
                     in
                     rec_call substituted
+                | ALoc alocl, ALoc alocr when not matching ->
+                    if alocl = alocr then `Filter
+                    else
+                      stop_explain
+                        "Two different abstract locations are never equal"
                 (* Equal variables - what happens if they are numbers? *)
                 | LVar v1, LVar v2 when v1 = v2 -> `Filter
                 (* Variable and something else *)
@@ -870,7 +881,7 @@ let simplify_pfs_and_gamma
                   then PFS.extend lpfs (BinOp (LVar v, Equal, le))
               | _ -> ());
 
-          sanitise_pfs_no_store gamma lpfs;
+          sanitise_pfs_no_store ~matching gamma lpfs;
 
           let current_lvars = SS.union (PFS.lvars lpfs) (PFS.lvars rpfs) in
           Type_env.iter gamma (fun v _ ->
@@ -938,6 +949,7 @@ let simplify_pfs_and_gamma
       (result, !existentials)
 
 let simplify_implication
+    ~matching
     (exists : SS.t)
     (lpfs : PFS.t)
     (rpfs : PFS.t)
@@ -958,7 +970,7 @@ let simplify_implication
       | _ -> ())
     (PFS.to_list lpfs);
   let subst, exists =
-    simplify_pfs_and_gamma lpfs gamma ~rpfs ~existentials:exists
+    simplify_pfs_and_gamma ~matching lpfs gamma ~rpfs ~existentials:exists
   in
   PFS.substitution subst rpfs;
 
@@ -966,7 +978,7 @@ let simplify_implication
   PFS.map_inplace (Reduction.reduce_lexpr ~gamma ~pfs:lpfs) rpfs;
   L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 
-  sanitise_pfs_no_store gamma rpfs;
+  sanitise_pfs_no_store ~matching gamma rpfs;
   clean_up_stuff lpfs rpfs;
 
   L.(

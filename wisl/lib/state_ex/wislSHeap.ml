@@ -159,10 +159,10 @@ let get_cell heap loc ofs =
         match SFVL.get ofs data with
         | Some v -> ok (loc, ofs, v)
         | None -> (
-            let* { pfs; gamma } = Delayed.leak_pc_copy () in
+            let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
             match
               SFVL.get_first
-                (fun name -> Solver.is_equal ~pfs ~gamma name ofs)
+                (fun name -> Solver.is_equal ~pfs ~gamma ~matching name ofs)
                 data
             with
             | Some (o, v) -> ok (loc, o, v)
@@ -185,8 +185,8 @@ let set_cell heap loc_name ofs v =
             let open Expr.Infix in
             if%sat n <= ofs then error (UseAfterFree loc_name) else ok ()
       in
-      let* { pfs; gamma } = Delayed.leak_pc_copy () in
-      let equality_test = Solver.is_equal ~pfs ~gamma in
+      let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
+      let equality_test = Solver.is_equal ~matching ~pfs ~gamma in
       let data = SFVL.add_with_test ~equality_test ofs v data in
       let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
       ok ()

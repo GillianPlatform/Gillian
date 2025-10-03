@@ -69,7 +69,8 @@ end = struct
     | Bool false -> []
     | _ -> raise (Failure "assume. illegal argument to assume")
 
-  let assume_a ?production:_ ?time:_ (state : t) (ps : Expr.t list) : t option =
+  let assume_a ?matching:_ ?production:_ ?time:_ (state : t) (ps : Expr.t list)
+      : t option =
     let bs : CVal.M.t list = List.map (eval_expr state) ps in
     if List.for_all (( = ) (Bool true)) bs then Some state else None
 
@@ -111,7 +112,7 @@ end = struct
   let equals _ v1 v2 = v1 = v2
   let get_type _ v = Some (Literal.type_of v)
 
-  let simplify ?save:_ ?kill_new_lvars:_ (state : t) : st * t list =
+  let simplify ?save:_ ?kill_new_lvars:_ ?matching:_ (state : t) : st * t list =
     (CVal.CESubst.init [], [ state ])
 
   let simplify_val _ v = v

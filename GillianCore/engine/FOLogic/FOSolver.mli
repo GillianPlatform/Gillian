@@ -5,10 +5,12 @@
 val check_satisfiability_with_model :
   Gil_syntax.Expr.t list -> Type_env.t -> SVal.SESubst.t option
 
-(** [check_satisfiability pfs gamma]
+(** [check_satisfiability ?matching pfs gamma]
     checks whether or not the pure formulae [pfs] are satisfiable
-    under the typing environment [gamma]. *)
+    under the typing environment [gamma]. The [matching] flag should
+    not be used by Gillian instantiation developers. *)
 val check_satisfiability :
+  ?matching:bool ->
   ?time:string ->
   ?relevant_info:Containers.SS.t * Containers.SS.t * Containers.SS.t ->
   Gil_syntax.Expr.t list ->
@@ -16,17 +18,24 @@ val check_satisfiability :
   bool
 
 (** A different API for [check_satisfiability] better adapted for usage in memory models *)
-val sat : pfs:PFS.t -> gamma:Type_env.t -> Gil_syntax.Expr.t -> bool
+val sat :
+  matching:bool -> pfs:PFS.t -> gamma:Type_env.t -> Gil_syntax.Expr.t -> bool
 
 (** [check_entailment existentials lpfs rpfs gamma] checks whether or not
     the entailment << ∃ [existentials]. [lpfs] => [rpfs] >> holds
     under the typing environment [gamma]. *)
 val check_entailment :
-  Utils.Containers.SS.t -> PFS.t -> Gil_syntax.Expr.t list -> Type_env.t -> bool
+  ?matching:bool ->
+  Utils.Containers.SS.t ->
+  PFS.t ->
+  Gil_syntax.Expr.t list ->
+  Type_env.t ->
+  bool
 
 (** [is_equal e1 e2 pfs gamma] checks whether or not
     << pfs, gamma |- e1 = e2 >>. *)
 val is_equal :
+  ?matching:bool ->
   pfs:PFS.t ->
   gamma:Type_env.t ->
   Gil_syntax.Expr.t ->

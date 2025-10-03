@@ -8,20 +8,24 @@ type t = {
   gamma : Type_env.t;
   learned : Expr.Set.t;
   learned_types : (string * Type.t) list;
+  matching : bool;
 }
 
-let copy { pfs; gamma; learned; learned_types } =
+let copy { pfs; gamma; learned; learned_types; matching } =
   {
     pfs = Pure_context.copy pfs;
     gamma = Type_env.copy gamma;
     learned;
     learned_types;
+    matching;
   }
 
-let make ~pfs ~gamma ?(learned = []) ?(learned_types = []) () =
-  { pfs; gamma; learned = Expr.Set.of_list learned; learned_types }
+let make ~pfs ~gamma ~matching ?(learned = []) ?(learned_types = []) () =
+  { pfs; gamma; learned = Expr.Set.of_list learned; learned_types; matching }
 
-let init () = make ~pfs:(Pure_context.init ()) ~gamma:(Type_env.init ()) ()
+let init ?(matching = false) () =
+  make ~pfs:(Pure_context.init ()) ~gamma:(Type_env.init ()) ~matching ()
+
 let empty = init ()
 
 let pfs_to_pfs_and_gamma pfs =
@@ -58,7 +62,9 @@ let extend pc fs =
   let fs =
     List.filter_map
       (fun f ->
-        match Engine.Reduction.reduce_lexpr ~pfs ~gamma f with
+        match
+          Engine.Reduction.reduce_lexpr ~matching:pc.matching ~pfs ~gamma f
+        with
         | Expr.Lit (Bool true) -> None
         | f -> Some f)
       fs
@@ -101,13 +107,13 @@ let diff pca pcb =
   (Expr.Set.diff pca.learned pcb.learned, Expr.Set.diff pcb.learned pca.learned)
 
 let of_gpc (gpc : Engine.Gpc.t) =
-  let Engine.Gpc.{ pfs; gamma } = gpc in
-  make ~pfs ~gamma ()
+  let Engine.Gpc.{ pfs; gamma; matching } = gpc in
+  make ~pfs ~gamma ~matching ()
 
 let to_gpc (pc : t) =
-  let { pfs; gamma; learned; learned_types } = pc in
+  let { pfs; gamma; matching; learned; learned_types } = pc in
   let pfs = Pure_context.copy pfs in
   let gamma = Type_env.copy gamma in
   Expr.Set.iter (Pure_context.extend pfs) learned;
   List.iter (fun (x, y) -> Type_env.update gamma x y) learned_types;
-  Engine.Gpc.{ pfs; gamma }
+  Engine.Gpc.{ pfs; gamma; matching }

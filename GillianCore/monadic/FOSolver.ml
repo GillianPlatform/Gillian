@@ -27,15 +27,19 @@ let sat ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
 
   Logging.tmi (fun m -> m "WITH PFS : %a" PFS.pp pfs);
-  FOSolver.sat ~pfs ~gamma formula
+  FOSolver.sat ~matching:pc.matching ~pfs ~gamma formula
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
   try
-    let f = Engine.Reduction.reduce_lexpr ~gamma ~pfs formula in
+    let f =
+      Engine.Reduction.reduce_lexpr ~matching:pc.matching ~gamma ~pfs formula
+    in
     match f with
     | Lit (Bool b) -> b
-    | _ -> FOSolver.check_entailment Utils.Containers.SS.empty pfs [ f ] gamma
+    | _ ->
+        FOSolver.check_entailment ~matching:pc.matching
+          Utils.Containers.SS.empty pfs [ f ] gamma
   with Engine.Reduction.ReductionException (e, msg) ->
     Logging.verbose (fun m ->
         m
@@ -47,7 +51,7 @@ let check_entailment ~(pc : Pc.t) formula =
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
   comp ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc) e1 e2
 
-let is_equal = of_comp_fun FOSolver.is_equal
+let is_equal = of_comp_fun (FOSolver.is_equal ?matching:None)
 let is_different = of_comp_fun FOSolver.is_different
 let num_is_less_or_equal = of_comp_fun FOSolver.num_is_less_or_equal
 
@@ -56,8 +60,8 @@ let resolve_loc_name ~pc loc =
     ~gamma:(build_full_gamma pc) loc
 
 let reduce_expr ~pc expr =
-  Reduction.reduce_lexpr ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc)
-    expr
+  Reduction.reduce_lexpr ~matching:pc.Pc.matching ~pfs:(build_full_pfs pc)
+    ~gamma:(build_full_gamma pc) expr
 
 let resolve_type ~(pc : Pc.t) expr =
   (* TODO: I don't know what that how parameter means.

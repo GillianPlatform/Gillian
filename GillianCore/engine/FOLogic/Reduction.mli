@@ -20,10 +20,11 @@ val understand_lstcat :
   Expr.t list ->
   (Expr.t * Containers.SS.t) option
 
-(** [reduce_lexpr ?reduce_lvars ?pfs ?gamma e] reduces the
+(** [reduce_lexpr ?matching ?reduce_lvars ?pfs ?gamma e] reduces the
     expression [e] given (optional) pure formulae [pfs] and typing environment [gamma].
-    The [reduce_lvars] flag should not be used by Gillian instantiation developers. *)
+    The [reduce_lvars] and [matching] flags should not be used by Gillian instantiation developers. *)
 val reduce_lexpr :
+  ?matching:bool ->
   ?reduce_lvars:bool ->
   ?pfs:PFS.t ->
   ?gamma:Type_env.t ->
@@ -31,8 +32,13 @@ val reduce_lexpr :
   Gil_syntax.Expr.t
 
 (** [reduce_assertion ?matching ?pfs ?gamma a] reduces the assertion [a]
-    given (optional) pure formulae [pfs] and typing environment [gamma]. *)
+    given (optional) pure formulae [pfs] and typing environment [gamma].
+    The [matching] flag should not be used by Gillian instantiation developers. *)
 val reduce_assertion :
-  ?pfs:PFS.t -> ?gamma:Type_env.t -> Gil_syntax.Asrt.t -> Gil_syntax.Asrt.t
+  ?matching:bool ->
+  ?pfs:PFS.t ->
+  ?gamma:Type_env.t ->
+  Gil_syntax.Asrt.t ->
+  Gil_syntax.Asrt.t
 
 val is_tautology : ?pfs:PFS.t -> ?gamma:Type_env.t -> Gil_syntax.Expr.t -> bool

@@ -153,9 +153,11 @@ let check_sfvl ofs data none_case success_case =
   match SFVL.get ofs data with
   | Some SFVL.{ value; permission } -> success_case ofs value permission
   | None -> (
-      let* { pfs; gamma } = Delayed.leak_pc_copy () in
+      let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
       match
-        SFVL.get_first (fun name -> Solver.is_equal ~pfs ~gamma name ofs) data
+        SFVL.get_first
+          (fun name -> Solver.is_equal ~matching ~pfs ~gamma name ofs)
+          data
       with
       | None -> none_case ()
       | Some (o, SFVL.{ value; permission }) -> success_case o value permission)
@@ -215,8 +217,8 @@ let overwrite_cell heap loc_name ofs block_missing in_bounds =
 
 (* Helper function: Extends the block data with a new cell at offset ofs with the value v. *)
 let extend_block heap loc_name ofs value data bound permission =
-  let* { pfs; gamma } = Delayed.leak_pc_copy () in
-  let equality_test = Solver.is_equal ~pfs ~gamma in
+  let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
+  let equality_test = Solver.is_equal ~matching ~pfs ~gamma in
   let data =
     SFVL.add_with_test ~equality_test ofs SFVL.{ value; permission } data
   in

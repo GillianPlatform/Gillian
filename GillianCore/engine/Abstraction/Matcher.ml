@@ -325,7 +325,7 @@ module Make (State : SState.S) :
 
   let cons_pure (state : state_t) (f : Expr.t) : cons_pure_result =
     if !Config.under_approximation then
-      match State.assume_a state [ f ] with
+      match State.assume_a ~matching:true state [ f ] with
       | Some state -> Success state
       | None -> Vanish
     else if State.assert_a state [ f ] then Success state
@@ -337,9 +337,12 @@ module Make (State : SState.S) :
     let state' = State.set_store astate.state store in
     { astate with state = state' }
 
-  let simplify_astate ?(save = false) (astate : t) : SVal.SESubst.t * t list =
+  let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
+      SVal.SESubst.t * t list =
     let { state; preds; wands; pred_defs } = astate in
-    let subst, states = State.simplify ~save ~kill_new_lvars:false state in
+    let subst, states =
+      State.simplify ~save ~kill_new_lvars:false ~matching state
+    in
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
     match states with
@@ -641,7 +644,8 @@ module Make (State : SState.S) :
             let opt_res =
               Option.map
                 (fun state -> [ Ok { state; preds; wands; pred_defs } ])
-                (State.assume_a ~production:!Config.delay_entailment state
+                (State.assume_a ~matching:true
+                   ~production:!Config.delay_entailment state
                    [ BinOp (v_x, Equal, v_le) ])
             in
             Option.value
@@ -673,7 +677,8 @@ module Make (State : SState.S) :
                   m "About to assume %a in state:\n%a" Formula.pp f' pp_state state); *)
         (* FIXME: Understand why this causes a bug in Gillian-C *)
         match
-          State.assume_a ~production:!Config.delay_entailment state [ f' ]
+          State.assume_a ~matching:true ~production:!Config.delay_entailment
+            state [ f' ]
         with
         | None ->
             let msg =
@@ -699,7 +704,7 @@ module Make (State : SState.S) :
           try produce_assertion intermediate_state subst asrt
           with e ->
             let admissible =
-              State.assume_a ~time:"Produce: final check"
+              State.assume_a ~time:"Produce: final check" ~matching:true
                 intermediate_state.state [ Expr.true_ ]
             in
             if !Config.delay_entailment && Option.is_none admissible then (
@@ -715,7 +720,9 @@ module Make (State : SState.S) :
     in
     let admissible =
       L.verbose (fun fmt -> fmt "Produce: final check");
-      try State.assume_a ~time:"Produce: final check" state [ Expr.true_ ]
+      try
+        State.assume_a ~time:"Produce: final check" ~matching:true state
+          [ Expr.true_ ]
       with _ -> None
     in
     L.verbose (fun fmt -> fmt "Concluded final check");
@@ -870,7 +877,7 @@ module Make (State : SState.S) :
               L.verbose (fun m -> m "Warning: %a" pp_err_t err);
               Res_list.vanish
           | Ok state ->
-              let subst, states = simplify_astate state in
+              let subst, states = simplify_astate ~matching:true state in
               let+ state = states in
               Ok (subst, state))
     in
@@ -1074,7 +1081,8 @@ module Make (State : SState.S) :
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let** folded =
-          fold ~state:astate ~match_kind:(Fold pname) pred vs_ins
+          fold ~in_matching:true ~state:astate ~match_kind:(Fold pname) pred
+            vs_ins
         in
         (* Supposedly, we don't need a guard to make sure we're not looping indefinitely:
            if the fold worked, then consume_pred should not take this branch on the next try.
@@ -1116,7 +1124,7 @@ module Make (State : SState.S) :
              (fun (u, e) ->
                let se = SVal.SESubst.subst_in_expr pvar_subst ~partial:true e in
                (* let se = SVal.SESubst.subst_in_expr subst ~partial:true se in *)
-               (u, try Reduction.reduce_lexpr se with _ -> se))
+               (u, try Reduction.reduce_lexpr ~matching:true se with _ -> se))
              outs)
       with _ -> None
     in
@@ -1339,7 +1347,9 @@ module Make (State : SState.S) :
                   let discharges_pf =
                     List.fold_left Expr.Infix.( && ) Expr.true_ discharges
                   in
-                  let discharges_pf = Reduction.reduce_lexpr discharges_pf in
+                  let discharges_pf =
+                    Reduction.reduce_lexpr ~matching:true discharges_pf
+                  in
                   let to_asrt = Expr.Infix.( && ) pf discharges_pf in
                   match cons_pure state to_asrt with
                   | Success new_state ->
@@ -1373,7 +1383,7 @@ module Make (State : SState.S) :
               | _ ->
                   if !Config.under_approximation then
                     (* In under-approx we try to assume the types hold*)
-                    match State.assume_a state corrections with
+                    match State.assume_a ~matching:true state corrections with
                     | None -> Res_list.vanish
                     | Some state' ->
                         Res_list.return
@@ -1857,7 +1867,7 @@ module Make (State : SState.S) :
       match produced with
       | Error _ -> []
       | Ok state ->
-          let _, simplified = simplify_astate state in
+          let _, simplified = simplify_astate ~matching:true state in
           simplified
 
     let match_assertion astate subst step =
@@ -2038,7 +2048,7 @@ module Make (State : SState.S) :
       let outs =
         let+ u, e = outs in
         let se = SVal.SESubst.subst_in_expr pvar_subst ~partial:true e in
-        let se = try Reduction.reduce_lexpr se with _ -> se in
+        let se = try Reduction.reduce_lexpr ~matching:true se with _ -> se in
         (u, se)
       in
       List.iter (fun (u, v) -> SVal.SESubst.put subst u v) outs;
