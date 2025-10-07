@@ -1154,6 +1154,8 @@ module Prog : sig
 
   (** Print indexed *)
   val pp_indexed : Format.formatter -> ?pp_annot:'a Fmt.t -> ('a, int) t -> unit
+
+  val make_callgraph : ('a, 'b) t -> Call_graph.t
 end
 
 (** @canonical Gillian.Gil_syntax.Visitors *)
