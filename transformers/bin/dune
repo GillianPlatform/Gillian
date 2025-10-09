@@ -1,4 +1,4 @@
 (executables
- (public_names transformers t_c t_js t_wisl t_wislf)
+ (public_names transformers t_c t_ca t_cs t_js t_wisl t_wislf)
  (package transformers)
  (libraries prebuilt states gillian))

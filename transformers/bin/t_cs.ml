@@ -1,4 +1,4 @@
-open Prebuilt.Lib.C_Base
+open Prebuilt.Lib.C_Split
 module PatchedMem = States.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 
