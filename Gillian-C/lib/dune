@@ -17,7 +17,9 @@
   ppx_deriving_yojson.runtime
   dune-site)
  (preprocess
-  (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat)))
+  (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
+ (instrumentation
+  (backend landmarks --auto)))
 
 (generate_sites_module
  (module runtime_sites)

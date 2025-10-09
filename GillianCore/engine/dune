@@ -17,6 +17,8 @@
   debugger_log)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto))
  (flags
   :standard
   -open

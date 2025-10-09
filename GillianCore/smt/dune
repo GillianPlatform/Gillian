@@ -4,4 +4,6 @@
  (libraries gil_syntax utils simple_smt sexplib)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto))
  (flags :standard -open Utils.Prelude))

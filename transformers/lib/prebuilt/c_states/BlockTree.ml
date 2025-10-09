@@ -3,7 +3,7 @@ open Monadic
 module Subst = Gillian.Symbolic.Subst
 module DR = Delayed_result
 module DO = Delayed_option
-module SS = Utils.Containers.SS
+module SS = Gillian.Utils.Containers.SS
 module CoreP = Constr.Core
 module MyAsrt = States.MyAsrt
 

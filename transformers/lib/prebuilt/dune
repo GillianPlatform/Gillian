@@ -1,9 +1,10 @@
+(include_subdirs qualified)
+
 (library
  (name prebuilt)
  (public_name transformers.prebuilt)
  (libraries
   states
-  c_states
   gillian
   gillian.ppx_sat.runtime
   gillian-js.js2jsil_lib
@@ -12,4 +13,6 @@
   wisl.parserAndCompiler
   ppx_deriving_yojson.runtime)
  (preprocess
-  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson)))
+  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto)))
