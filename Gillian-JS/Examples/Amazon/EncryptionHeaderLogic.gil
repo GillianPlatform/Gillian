@@ -98,7 +98,7 @@ lemma AppendFieldCC(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
     apply CElementFirstFieldLength(#buffer, #readPos + #eLength1, #fCount2, #field, #fList2, #eLength2);
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
-        sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
+        sep_assert ((#fList1 == l+ ({{ #fl1 }}, #rfl1))) [bind: #fl1, #rfl1];
         sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
         apply AppendFieldCC(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2)
     }
@@ -173,9 +173,9 @@ lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, ele
 [*
     apply DestructList(#prefix);
     unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
-    if (not (#prefix = {{ }})) then {
+    if (not (#prefix == {{ }})) then {
         sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #elementLength)) [bind: #elementLength];
-        sep_assert (#prefix == l+ ({{ #head }}, #rest)) [bind: #head, #rest];
+        sep_assert ((#prefix == l+ ({{ #head }}, #rest))) [bind: #head, #rest];
         sep_assert (CElements(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
         apply CElementsElementLength(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
     }
@@ -261,7 +261,7 @@ lemma AppendFieldCI(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
 [*
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
-        sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
+        sep_assert ((#fList1 == l+ ({{ #fl1 }}, #rfl1))) [bind: #fl1, #rfl1];
         sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
         apply AppendFieldCI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2)
     }
@@ -279,7 +279,7 @@ lemma PrependCElementI(buffer, readPos, fCount1, fList1, eLength1, fCount2, fLis
 [*
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
-        sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
+        sep_assert ((#fList1 == l+ ({{ #fl1 }}, #rfl1))) [bind: #fl1, #rfl1];
         sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
         apply PrependCElementI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #fList2, #eLength2)
     }
@@ -367,7 +367,7 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
     if (0 < #eCount1) then {
         apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
         unfold Elements(#definition, #buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength + #esLength2));
-        if (definition = "Incomplete") then {
+        if (definition == "Incomplete") then {
             fold IElements(#buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
         }
     }

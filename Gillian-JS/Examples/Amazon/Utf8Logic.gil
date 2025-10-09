@@ -77,7 +77,7 @@ pure pred toUtf8Map(+data : List, utf8Data : List) :
     (data == {{ }}) * (utf8Data == {{ }}),
 
     (data == l+ ({{ #fst }}, #rest)) *
-    (toUtf8(#fst, #utf8Fst)) *
+    toUtf8(#fst, #utf8Fst) *
     toUtf8Map(#rest, #utf8Rest) *
     (utf8Data == l+ ({{ #utf8Fst }}, #utf8Rest));
 
@@ -93,7 +93,7 @@ lemma toUtf8MapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
 [*
     unfold toUtf8Map(#rawData1, #utf8Data1);
     unfold toUtf8Map(#rawData2, #utf8Data2);
-    if ((not (#rawData1 = {{ }})) and (not (#rawData2 = {{ }}))) then {
+    if ((!(#rawData1 == {{ }})) and (!(#rawData2 == {{ }}))) then {
         sep_assert ((#rawData1 == l+ ({{ #rd1 }}, #restd1)) * (#rawData2 == l+ ({{ #rd2 }}, #restd2)) *
                     (#utf8Data1 == l+ ({{ #ut1 }}, #restu1)) * (#utf8Data2 == l+ ({{ #ut2 }}, #restu2)))
                     [bind: #rd1, #restd1, #rd2, #restd2, #ut1, #restu1, #ut2, #restu2];
@@ -114,7 +114,7 @@ lemma toUtf8PairMapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
 [*
     unfold toUtf8PairMap(#rawData1, #utf8Data1);
     unfold toUtf8PairMap(#rawData2, #utf8Data2);
-    if ((not (#rawData1 = {{ }})) and (not (#rawData2 = {{ }}))) then {
+    if ((!(#rawData1 == {{ }})) and (!(#rawData2 == {{ }}))) then {
         sep_assert ((#rawData1 == l+ ({{ {{ #p1, #v1 }} }}, #restd1)) * (#rawData2 == l+ ({{ {{ #p2, #v2 }} }}, #restd2)) *
                     (#utf8Data1 == l+ ({{ {{ #up1, #uv1 }} }}, #restu1)) * (#utf8Data2 == l+ ({{ {{ #up2, #uv2 }} }}, #restu2)))
                     [bind: #p1, #v1, #restd1, #p2, #v2, #restd2, #up1, #uv1, #restu1, #up2, #uv2, #restu2];
@@ -136,8 +136,8 @@ lemma toUtf8PairMapAppendPair(data, utf8Data, prop, value)
 ]]
 [*
     unfold toUtf8PairMap(#data, #utf8Data);
-    if (not (#data = {{ }})) then {
-        sep_assert (#data == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+    if (!(#data == {{ }})) then {
+        sep_assert ((#data == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs))) [bind: #fProp, #fValue, #restPVPairs];
         sep_assert (toUtf8PairMap(#restPVPairs, #restUtf8Data)) [bind: #restUtf8Data];
         apply toUtf8PairMapAppendPair(#restPVPairs, #restUtf8Data, #prop, #value)
     }
