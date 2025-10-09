@@ -18,7 +18,7 @@ let chunk_to_type = function
   | Chunk.IntegerOrPtrChunk -> [ Ptr; Int (Llvmconfig.ptr_width ()) ]
 
 let type_to_string = function
-  | Int w -> "int-" ^ string_of_int w
+  | Int w -> "i-" ^ string_of_int w
   | F32 -> "float"
   | F64 -> "double"
   | Ptr -> "ptr"
@@ -29,7 +29,7 @@ let string_to_type = function
   | "ptr" -> Ptr
   | st ->
       let sp = String.split_on_char '-' st in
-      if List.length sp = 2 && List.hd sp = "int" then
+      if List.length sp = 2 && List.hd sp = "i" then
         Int (int_of_string (List.nth sp 1))
       else failwith ("Invalid runtime type: " ^ st)
 
@@ -60,7 +60,7 @@ let get_integer_type (expr : Expr.t) : t DO.t =
       let open DO.Syntax in
       let split = String.split_on_char '-' w in
       let width =
-        if List.length split = 2 && List.hd split = "int" then
+        if List.length split = 2 && List.hd split = "i" then
           int_of_string_opt (List.nth split 1)
         else None
       in

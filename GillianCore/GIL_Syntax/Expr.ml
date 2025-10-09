@@ -41,9 +41,11 @@ let true_ = Lit (Bool true)
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
-let extract_bv_width (e : t) =
+let rec extract_bv_width (e : t) =
   match e with
   | Lit (LBitvector (_, w)) -> w
+  | EList [ Lit (String _t); (Lit (LBitvector _) as x) ]
+  (* when String.starts_with ~prefix:"i-" t *) -> extract_bv_width x
   | BVExprIntrinsic (_, _, Some w) -> w
   | _ -> failwith "extract_bv_width: unrecognized bitvector expression"
 
@@ -60,10 +62,15 @@ let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
   List.fold_right f (List.tl list) (List.hd list)
 
 let bv_concat (lst : t List.t) =
-  (* HACK(tnytown): BvExpr requires a size here but we can't concretize *)
-  let exprs = List.map (fun e -> BvExpr (e, 0)) lst in
-  BVExprIntrinsic (BVOps.BVConcat, exprs, None)
-(* reduce (fun elem sum -> concat_single elem sum) lst *)
+  (* HACK(tnytown): BvExpr requires sized expressions *)
+  let len, exprs =
+    List.fold_left_map
+      (fun a e ->
+        let l = extract_bv_width e in
+        (a + l, BvExpr (e, l)))
+      0 lst
+  in
+  BVExprIntrinsic (BVOps.BVConcat, exprs, Some len)
 
 let bv_extract (low_index : int) (high_index : int) (e : t) : t =
   let src_width = extract_bv_width e in

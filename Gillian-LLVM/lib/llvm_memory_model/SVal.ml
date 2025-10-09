@@ -28,7 +28,9 @@ module SVal = struct
     let* runtimetype = LLVMRuntimeTypes.type_of_expr e in
     vanish_or_fail_on_none
       (fun runtimetype ->
-        make ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype) ~value:e)
+        (* XX(tnytown): create_sval is called by the store action with the tagged value, so we need to extract the raw value here *)
+        let value = Expr.list_nth e 1 in
+        make ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype) ~value)
       runtimetype
       (Format.asprintf "Expression is not a valid symbolic value: %a" Expr.pp e)
 
@@ -76,7 +78,7 @@ module SVal = struct
         Expr.BinOp (Expr.typeof e1, Equal, Expr.type_ ty)
       in
       let* learned, _ =
-        let act_value = Expr.list_nth t.value 1 in
+        let act_value = t.value in
         match chunk with
         | IntegerChunk w ->
             let learned = [ type_expr act_value (Type.BvType w) ] in
@@ -195,8 +197,9 @@ module SVal = struct
             Expr.BVExprIntrinsic
               ( BVOps.BVExtract,
                 [
+                  (* bvextract's bounds are inclusive *)
+                  Expr.Literal (ub - 1);
                   Expr.Literal lb;
-                  Expr.Literal ub;
                   Expr.BvExpr (sval.value, size * 8);
                 ],
                 Some 8 )
@@ -426,7 +429,7 @@ module SVArray = struct
           let num_elems = size_from / size_into in
           let each_elem =
             List.init num_elems (fun i ->
-                Expr.bv_extract i (i + size_into) sval.value)
+                Expr.bv_extract (i + size_into) i sval.value)
           in
           make ~chunk ~values:(Expr.list each_elem) |> Delayed.return
 
@@ -465,7 +468,7 @@ module SVArray = struct
             SVal.
               {
                 chunk;
-                value = Expr.bv_extract_between_sz size_from size_to selem.value;
+                value = Expr.bv_extract_between_sz size_to size_from selem.value;
               }
         else
           (* Same size conversion so just concat everything *)

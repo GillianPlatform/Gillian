@@ -1193,12 +1193,14 @@ module MemoryLib = struct
         pointer_op
           ~is_ptr_case:(fun bindr ->
             let tmp = fresh_sym () in
-            (* bind a tmp because after the load we have {{ {{value type, value}}}}*)
+            (* the load should give us a raw bitvector in a list: tag it with the chunk. *)
             let* _ =
               add_cmd (Cmd.LAction (tmp, load_name, [ chunk; base; offset ]))
             in
             let* _ =
-              add_cmd (Cmd.Assignment (bindr, Expr.list_nth (Expr.PVar tmp) 0))
+              add_cmd
+                (Cmd.Assignment
+                   (bindr, Expr.EList [ chunk; Expr.list_nth (Expr.PVar tmp) 0 ]))
             in
             return ())
           ptr
@@ -1208,10 +1210,16 @@ module MemoryLib = struct
       unit Codegenerator.t =
     let open Codegenerator in
     match exp_list with
+    (* the value here should be a tagged {{ ty; value }} *)
     | [ chunk; ptr; value ] ->
         let { base; offset } = access_ptr ptr in
         pointer_op
           ~is_ptr_case:(fun bindr ->
+            (* let tmp = fresh_sym () in
+            HACK(tnytown): assume that value is in tagged bv repr;
+               should we add a runtime check for if the tag matches the chunk?
+            let* _ =
+              add_cmd (Cmd.Assignment (tmp, Expr.list_nth value 1)) in*)
             (* in store we just return out the {{}}*)
             let* _ =
               add_cmd

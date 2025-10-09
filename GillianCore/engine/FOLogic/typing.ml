@@ -136,7 +136,7 @@ module Infer_types_to_gamma = struct
       List.combine bv_types ty_list
       |> List.map (fun ((e, w), expected_ty) ->
              let act_ty = BvType w in
-             Type.equal expected_ty act_ty && f e act_ty)
+             Type.equal expected_ty act_ty && (f e act_ty || f e act_ty))
       |> List.for_all (fun x -> x)
     in
     bv_types_match && lit_handler lit_types
@@ -199,7 +199,14 @@ module Infer_types_to_gamma = struct
                    (fun acc x ->
                      match x with
                      | Expr.BvExpr (_, w) -> (acc + w, BvType w)
-                     | _ -> failwith "untyped")
+                     | x ->
+                         Printf.eprintf "BVConcat fallthrough case: %s\n"
+                           (match x with
+                           | Expr.Literal w -> Printf.sprintf "%di" w
+                           | Expr.BvExpr (e, w) ->
+                               Printf.sprintf "BvExpr(%s, %di)"
+                                 (Fmt.str "%a" Expr.pp e) w);
+                         failwith "untyped")
                    0 es)
             with _ -> None
           in
@@ -207,21 +214,11 @@ module Infer_types_to_gamma = struct
           | Some (w, xs) -> Some (xs, no_lits_constraint, BvType w)
           | _ -> None)
       | BVExtract -> (
-          let x1 = List.nth_opt es 0 in
-          let x2 = List.nth_opt es 1 in
-          let x3 = List.nth_opt es 2 in
-          match (x1, x2, x3) with
-          | ( Some (Expr.Literal i0),
-              Some (Expr.Literal i2),
-              Some (Expr.BvExpr (_, w)) ) ->
-              if i0 < w && i2 < w then
-                Some
-                  ( [ BvType w ],
-                    (fun lts ->
-                      List.length lts = 2
-                      && List.for_all (fun x -> x < w) lts
-                      && List.hd lts >= List.nth lts 1),
-                    BvType (i0 - i2 + 1) )
+          match (width, es) with
+          | ( Some res_width,
+              [ Expr.Literal hi; Expr.Literal lo; Expr.BvExpr (_, w) ] ) ->
+              if hi <= w && lo <= w && lo <= hi then
+                Some ([ BvType w ], (fun _ -> true), BvType res_width)
               else None
           | _ -> None)
       | BVZeroExtend | BVSignExtend -> (
@@ -239,13 +236,13 @@ module Infer_types_to_gamma = struct
         let params_typed =
           type_bv_args_for_intrinsic flag gamma new_gamma type_list es handler
         in
-        let rets_tped =
+        let rets_typed =
           Type.equal res_ty
             (Option.value ~default:BooleanType
                (Option.map (fun w -> BvType w) width))
           && Type.equal tt res_ty
         in
-        rets_tped && params_typed)
+        rets_typed && params_typed)
       opt
     |> Option.value ~default:false
 
@@ -255,6 +252,7 @@ module Infer_types_to_gamma = struct
       (new_gamma : Type_env.t)
       (le : Expr.t)
       (tt : Type.t) : bool =
+    (* Format.printf "f: le = %a, tt = %a\n" Expr.pp le Type.pp tt; *)
     let f' = f flag in
     let f = f flag gamma new_gamma in
     let ( = ) = Type.equal in
@@ -578,7 +576,7 @@ module Type_lexpr = struct
         | BVPlus
         | BVAnd
         | BVOr
-        | BVConcat
+        | BVConcat -> max 2 (List.length es)
         | BVAshr
         | BVSdiv
         | BVSmod
@@ -663,7 +661,8 @@ module Type_lexpr = struct
       | UnOp (op, e) -> type_unop gamma le op e
       | BinOp (e1, op, e2) -> type_binop gamma le op e1 e2
       | BVExprIntrinsic (op, es, width) ->
-          type_bv_intrinsic gamma le op es width
+          let t_opt, b = type_bv_intrinsic gamma le op es width in
+          (t_opt, b)
       | NOp (SetUnion, les) | NOp (SetInter, les) ->
           let all_typable = typable_list ?target_type:(Some SetType) les in
           if all_typable then (Some SetType, true) else def_neg
