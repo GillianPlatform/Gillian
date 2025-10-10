@@ -6,8 +6,8 @@ predicate binary_tree(+x, tree, +p: Float) {
 
 predicate tree_height(+x, h: Int, +p: Float) {
     (x == null) * (h == 0);
-    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl >=# #hr) * (h == #hl + 1);
-    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl <# #hr) * (h == #hr + 1)
+    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl >= #hr) * (h == #hl + 1);
+    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl < #hr) * (h == #hr + 1)
 }
 
 predicate list_member(+vs, +v, r : Bool){
@@ -29,7 +29,7 @@ lemma replaced_concat {
 
     proof:
       unfold replaced(vs1, ws1, v, w);
-      if (not (vs1 == [])) {
+      if (!(vs1 == [])) {
         assert {bind: #nv, #nw, #nvs1, #nws1} (vs1 == #nv :: #nvs1) * (ws1 == #nw :: #nws1) * replaced(#nvs1, #nws1, v, w);
         apply replaced_concat(#nvs1, #nws1, vs2, ws2, v, w)
       }
@@ -42,7 +42,7 @@ lemma list_member_concat {
 
   proof:
     unfold list_member(vs1, v, #r1);
-    if (not (vs1 == [])) {
+    if (!(vs1 == [])) {
       if (hd vs1 == v) {
         fold list_member(vs1 @ vs2, v, true)
       } else {
@@ -57,8 +57,8 @@ predicate is_int(+a: Int) {
 }
 
 predicate max(+a:Int, +b:Int, c:Int) {
-    a >= b /\ c == a;
-    a <  b /\ c == b
+    (a >= b) * (c == a);
+    (a <  b) * (c == b)
 }
 
 { (a == #a) * is_int(#a) * (b == #b) * is_int(#b) }

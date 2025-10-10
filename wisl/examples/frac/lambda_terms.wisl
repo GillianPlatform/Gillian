@@ -21,12 +21,12 @@ predicate substituted(+t_in, +t, +v, +p1: Float, +p2: Float, +pt: Float, +t_out)
 lemma split_lambda_term_permission {
     statement:
         forall x, v, t1, t2, type, p, p1, p2.
-            (p == p1 f+ p2) * (p1 f># 0.0) * (p2 f># 0.0) * lambda_term(x, v, t1, t2, type, p) |- lambda_term(x, v, t1, t2, type, p1) * lambda_term(x, v, t1, t2, type, p2)
-    
+            (p == p1 f+ p2) * (p1 f> 0.0) * (p2 f> 0.0) * lambda_term(x, v, t1, t2, type, p) |- lambda_term(x, v, t1, t2, type, p1) * lambda_term(x, v, t1, t2, type, p2)
+
     proof:
         unfold lambda_term(x, v, t1, t2, type, p);
-        if (not (type = 2)) {
-            if (type = 1) {
+        if (!(type == 2)) {
+            if (type == 1) {
                 assert {bind: #v1, #t11, #t12, #type1, #v2, #t21, #t22, #type2} lambda_term(t1, #v1, #t11, #t12, #type1, p) * lambda_term(t2, #v2, #t21, #t22, #type2, p);
                 apply split_lambda_term_permission(t1, #v1, #t11, #t12, #type1, p, p1, p2);
                 apply split_lambda_term_permission(t2, #v2, #t21, #t22, #type2, p, p1, p2)
@@ -43,13 +43,13 @@ lemma split_lambda_term_permission {
 { (x == #x) * lambda_term(#x, #v, #t1, #t2, #type, #p) }
 function copy(x) {
     type := [x];
-    if (type = 2) {
+    if (type == 2) {
         r := new(2);
         v := [x + 1];
         [r + 1] := v
     } else {
         r := new(3);
-        if (type = 1) {
+        if (type == 1) {
             t1 := [x + 1];
             t2 := [x + 2];
             par {
@@ -75,9 +75,9 @@ function copy(x) {
 { (x == #x) * (y == #y) * (v == #v) * lambda_term(#x, #vx, #tx1, #tx2, #type_x, #px) * lambda_term(#y, #vy, #ty1, #ty2, #type_y, #py) }
 function subst(x, y, v) {
     type := [x];
-    if (type = 2) {
+    if (type == 2) {
         w := [x + 1];
-        if (v = w) {
+        if (v == w) {
             r := copy(y)[copy_spec: (#p: #py)]
         } else {
             r := copy(x)[copy_spec: (#p: #px)];
@@ -86,7 +86,7 @@ function subst(x, y, v) {
     } else {
         r := new(3);
         [r] := type;
-        if (type = 1) {
+        if (type == 1) {
             t1 := [x + 1];
             t2 := [x + 2];
             [[assert {bind: #py_half} (#py_half == #py f/ 2.0)]];
@@ -100,7 +100,7 @@ function subst(x, y, v) {
         } else {
             w := [x + 1];
             t := [x + 2];
-            if (v = w) {
+            if (v == w) {
                 ct := copy(t)[copy_spec: (#p: #px)]
             } else {
                 ct := subst(t, y, v)[subst_spec: (#px: #px), (#py: #py)]
