@@ -1,4 +1,4 @@
-open Prebuilt.Lib.JSIL_ALoc
+open Prebuilt.Lib.JSIL_Base
 module PatchedMem = States.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 

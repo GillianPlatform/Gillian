@@ -1,4 +1,4 @@
-open Prebuilt.Lib.WISLF_Base
+open Prebuilt.Lib.JSIL_ALocSplit
 module PatchedMem = States.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 
@@ -15,5 +15,4 @@ module CLI =
     end)
     (Lifter)
 
-let () = WUtils.WConfig.fractional_permissions := true
 let () = CLI.main ()
