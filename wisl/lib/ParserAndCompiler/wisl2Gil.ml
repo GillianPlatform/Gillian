@@ -30,6 +30,11 @@ let compile_type t =
     | WSet -> Some Type.SetType
     | WAny -> None)
 
+let invert_binop : WBinOp.t -> bool = function
+  | FGREATERTHAN -> true
+  | FGREATEREQUAL -> true
+  | _ -> false
+
 let compile_binop b =
   WBinOp.(
     match b with
@@ -37,7 +42,9 @@ let compile_binop b =
     | LESSTHAN -> BinOp.ILessThan
     | LESSEQUAL -> BinOp.ILessThanEqual
     | FLESSTHAN -> BinOp.FLessThan
+    | FGREATERTHAN -> BinOp.FLessThan
     | FLESSEQUAL -> BinOp.FLessThanEqual
+    | FGREATEREQUAL -> BinOp.FLessThanEqual
     | PLUS -> BinOp.IPlus
     | MINUS -> BinOp.IMinus
     | TIMES -> BinOp.ITimes
@@ -145,7 +152,10 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       (* Operator cannot do pointer arithmetics *)
       let cmdl1, comp_e1 = compile_expr e1 in
       let cmdl2, comp_e2 = compile_expr e2 in
-      (cmdl1 @ cmdl2, Expr.BinOp (comp_e1, compile_binop b, comp_e2))
+      let el, er =
+        if invert_binop b then (comp_e2, comp_e1) else (comp_e1, comp_e2)
+      in
+      (cmdl1 @ cmdl2, Expr.BinOp (el, compile_binop b, er))
   | UnOp (u, e) ->
       let cmdl, comp_expr = compile_expr e in
       (cmdl, Expr.UnOp (compile_unop u, comp_expr))
@@ -213,9 +223,10 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         (* Operator cannot do pointer arithmetics *)
         let gvars1, asrt1, comp_e1 = compile_lexpr e1 in
         let gvars2, asrt2, comp_e2 = compile_lexpr e2 in
-        ( gvars1 @ gvars2,
-          asrt1 @ asrt2,
-          Expr.BinOp (comp_e1, compile_binop b, comp_e2) )
+        let el, er =
+          if invert_binop b then (comp_e2, comp_e1) else (comp_e1, comp_e2)
+        in
+        (gvars1 @ gvars2, asrt1 @ asrt2, Expr.BinOp (el, compile_binop b, er))
     | LUnOp (u, e) ->
         let gvars, asrt, comp_expr = compile_lexpr e in
         (gvars, asrt, Expr.UnOp (compile_unop u, comp_expr))
@@ -330,7 +341,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   in
   let open WLAssert in
   match get asser with
-  | LEmp -> ([], [])
+  | LEmp -> ([], [ Asrt.Emp ])
   | LStar (la1, la2) ->
       let exs1, cla1 = compile_lassert la1 in
       let exs2, cla2 = compile_lassert la2 in
