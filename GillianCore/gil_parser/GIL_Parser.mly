@@ -174,6 +174,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token RETURN
 %token THROW
 %token EXTERN
+%token PAR
 (* Logic variables *)
 %token <string> LVAR
 (* Logical expressions *)
@@ -678,6 +679,14 @@ gcmd_with_annot:
       let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
+
+gcmd_call:
+  | v=VAR; DEFEQ; e=expr_target;
+    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+    {
+      ({ var_name = v; fun_name = e; args = es; bindings = subst }, oi)
+    }
+
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)
@@ -695,10 +704,20 @@ gcmd_target:
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { Cmd.GuardedGoto (e, i, j) }
 (* x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble] *)
-  | v=VAR; DEFEQ; e=expr_target;
-    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+  | call=gcmd_call
     {
-      Cmd.Call ({ var_name = v; fun_name = e; args = es; bindings = subst }, oi)
+      let call, oi = call in
+      Cmd.Call (call, oi)
+    }
+(* par [x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble]; ...] *)
+  | PAR; LBRACKET; calls=separated_list(SCOLON, gcmd_call); RBRACKET
+    {
+      let calls = List.map (fun (call, oi) ->
+          if Option.is_some oi then failwith "Par call doesn't support error label";
+          call
+        ) calls
+      in
+      Cmd.Par calls
     }
 (* x := e(e1, ..., en) with j *)
   | v=VAR; DEFEQ; EXTERN; pname=VAR;

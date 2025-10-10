@@ -145,7 +145,9 @@ let pp ~(pp_label : 'a Fmt.t) fmt (cmd : 'a t) =
       Fmt.pf fmt "@[<h>goto [%a] %a %a@]" Expr.pp e pp_label j pp_label k
   | Call (call, err) -> pp_fcall err fmt call
   | Par calls ->
-      Fmt.pf fmt "@[<h>par [%a]@]" Fmt.(list ~sep:semi (pp_fcall None)) calls
+      Fmt.pf fmt "@[<h>par [ @[%a@] ]@]"
+        Fmt.(list ~sep:semi (pp_fcall None))
+        calls
   | ECall (var, name, args, error) ->
       Fmt.pf fmt "%s := extern %a(@[%a@])%a" var Expr.pp name pp_params args
         (Fmt.option pp_error) error
