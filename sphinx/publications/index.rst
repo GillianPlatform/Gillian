@@ -4,6 +4,8 @@ Publications
 .. toctree::
    :maxdepth: 1
 
+   cse2
+   rust
    cse1
    mp
    debugger
