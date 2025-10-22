@@ -34,6 +34,7 @@ val check_entailment :
 (** [is_equal e1 e2 pfs gamma] checks whether or not << pfs, gamma |- e1 = e2
     >>. *)
 val is_equal :
+  ?matching:bool ->
   pfs:PFS.t ->
   gamma:Type_env.t ->
   Gil_syntax.Expr.t ->

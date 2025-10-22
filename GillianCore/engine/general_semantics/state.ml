@@ -126,10 +126,15 @@ module type S = sig
 
   val run_spec :
     MP.spec ->
-    t ->
     string ->
     vt list ->
     (string * (string * vt) list) option ->
+    t ->
+    (t * Flag.t, err_t) Res_list.t
+
+  val run_par_spec :
+    (MP.spec * string * vt list * (string * (string * vt) list) option) list ->
+    t ->
     (t * Flag.t, err_t) Res_list.t
 
   val sure_is_nonempty : t -> bool

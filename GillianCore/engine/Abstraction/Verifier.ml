@@ -434,33 +434,36 @@ struct
   let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
     let _, states = SPState.simplify state in
-    assert (List.length states = 1);
-    let state = List.hd states in
+    match states with
+    | [] ->
+        L.normal (fun m -> m "Analysis result: vanished during simplification");
+        true
+    | _ :: _ :: _ -> failwith "Simplification branched???"
+    | [ state ] ->
+        let subst = SSubst.copy subst in
 
-    let subst = SSubst.copy subst in
+        (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
+        List.iter
+          (fun x ->
+            if not (SSubst.mem subst (LVar x)) then
+              SSubst.add subst (LVar x) (LVar x))
+          (SS.elements (SPState.get_spec_vars state));
 
-    (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
-    List.iter
-      (fun x ->
-        if not (SSubst.mem subst (LVar x)) then
-          SSubst.add subst (LVar x) (LVar x))
-      (SS.elements (SPState.get_spec_vars state));
-
-    L.verbose (fun m ->
-        m "Analyse result: About to match one postcondition of %s. post: %a"
-          test.name MP.pp test.post_mp);
-    let matching_result =
-      SPState.matches state subst test.post_mp (Postcondition test.name)
-    in
-    L.normal (fun m ->
-        m "Analysis result: Postcondition %a"
-          (fun ft b ->
-            Fmt.string ft
-            @@ if b then "matched successfully" else "not matchable")
-          matching_result);
-    VerificationResults.set_result global_results test.name test.id
-      matching_result;
-    matching_result
+        L.verbose (fun m ->
+            m "Analyse result: About to match one postcondition of %s. post: %a"
+              test.name MP.pp test.post_mp);
+        let matching_result =
+          SPState.matches state subst test.post_mp (Postcondition test.name)
+        in
+        L.normal (fun m ->
+            m "Analysis result: Postcondition %a"
+              (fun ft b ->
+                Fmt.string ft
+                @@ if b then "matched successfully" else "not matchable")
+              matching_result);
+        VerificationResults.set_result global_results test.name test.id
+          matching_result;
+        matching_result
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
@@ -592,6 +595,7 @@ struct
                    (Fmt.Dump.pair Fmt.int Fmt.int)
                    test.id)
            in
+           let () = Fmt.pr "s @?" in
            None
          else
            let msg = "Couldn't satisfy postcondition" in
@@ -601,6 +605,7 @@ struct
                    (Fmt.Dump.pair Fmt.int Fmt.int)
                    test.id msg)
            in
+           let () = Fmt.pr "f @?" in
            Some
              (Gillian_result.Error.make_analysis_failure ?loc:test.post_loc msg)
     in

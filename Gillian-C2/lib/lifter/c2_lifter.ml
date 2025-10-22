@@ -373,7 +373,7 @@ struct
         in
         let> pid =
           match CmdReport.(cmd_report.cmd) with
-          | Call (_, Lit (String pid), _, _, _)
+          | Call ({ fun_name = Lit (String pid); _ }, _)
           | ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
           | _ -> None
         in

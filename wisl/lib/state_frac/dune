@@ -1,0 +1,14 @@
+(library
+ (name wStateFrac)
+ (public_name wisl.state_frac)
+ (libraries
+  wSyntax
+  wUtils
+  wSemantics
+  wParserAndCompiler
+  gillian
+  fmt
+  gillian.ppx_sat.runtime)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
+ (flags :standard -open WUtils -open Utils.Prelude -open WSemantics))

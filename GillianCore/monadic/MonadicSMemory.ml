@@ -6,17 +6,17 @@ module type S = sig
   type init_data
 
   (** Type of GIL values *)
-  type vt = SVal.M.t
+  type vt := SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SESubst.t
+  type st := SVal.SESubst.t
 
   type err_t [@@deriving show, yojson]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]
 
-  type action_ret = (t * vt list, err_t) result
+  type action_ret := (t * vt list, err_t) result
 
   (** Initialisation *)
   val init : init_data -> t
@@ -97,13 +97,11 @@ module Lift (MSM : S) :
       (t * Expr.Set.t * (string * Type.t) list) list =
     let process = substitution_in_place subst mem in
     let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
-    match Delayed.resolve ~curr_pc process with
-    | [] -> failwith "substitution killed every branch, that cannot happen"
-    | leeloo_dallas_multibranch ->
-        List.map
-          (fun (bch : t Branch.t) ->
-            (bch.value, bch.pc.learned, bch.pc.learned_types))
-          leeloo_dallas_multibranch
+    let branches = Delayed.resolve ~curr_pc process in
+    List.map
+      (fun (bch : t Branch.t) ->
+        (bch.value, bch.pc.learned, bch.pc.learned_types))
+      branches
 
   let of_yojson = MSM.of_yojson
   let to_yojson = MSM.to_yojson

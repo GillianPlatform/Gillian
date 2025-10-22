@@ -286,8 +286,8 @@ module Wrap
 module ParserAndCompiler = Js2jsil_lib.JS2GIL_ParserAndCompiler
 module ExternalSemantics = Semantics.External
 module MonadicSMemory_Base = Wrap (Object) (PatchedBasePMap (Object))
-module MonadicSMemory_ALoc = Wrap (SplitObject) (PatchedALocPMap (SplitObject))
-module MonadicSMemory_Split = Wrap (Object) (PatchedBasePMap (Object))
+module MonadicSMemory_ALoc = Wrap (Object) (PatchedALocPMap (Object))
+module MonadicSMemory_Split = Wrap (SplitObject) (PatchedBasePMap (SplitObject))
 
 module MonadicSMemory_ALocSplit =
   Wrap (SplitObject) (PatchedALocPMap (SplitObject))

@@ -144,15 +144,13 @@ let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
                 | GuardedGoto (e, lt, lf) ->
                     Cmd.GuardedGoto
                       (e, find_with_error mapping lt, find_with_error mapping lf)
-                | Call (x, e, le, ol, subst) ->
+                | Call (call, error_label) ->
                     Cmd.Call
-                      ( x,
-                        e,
-                        le,
-                        (match ol with
+                      ( call,
+                        match error_label with
                         | None -> None
-                        | Some lab -> Some (find_with_error mapping lab)),
-                        subst )
+                        | Some lab -> Some (find_with_error mapping lab) )
+                | Par fcalls -> Cmd.Par fcalls
                 | ECall (x, e, le, ol) ->
                     Cmd.ECall
                       ( x,

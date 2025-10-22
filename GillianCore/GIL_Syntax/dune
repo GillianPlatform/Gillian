@@ -4,4 +4,6 @@
  (libraries utils logging fmt visitors.runtime zarith)
  (preprocess
   (pps visitors.ppx ppx_deriving_yojson ppx_deriving.std))
+ (instrumentation
+  (backend landmarks --auto))
  (flags :standard -open Utils.Prelude -open Utils -w +A-40-42-41-4-70))

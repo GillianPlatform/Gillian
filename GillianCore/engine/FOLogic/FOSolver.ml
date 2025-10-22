@@ -209,14 +209,16 @@ let check_entailment
          (Sys.time () -. t); *)
       ret
 
-let is_equal ~pfs ~gamma e1 e2 =
+let is_equal ?matching ~pfs ~gamma e1 e2 =
   (* let t = Sys.time () in *)
-  let feq = Reduction.reduce_lexpr ~gamma ~pfs (BinOp (e1, Equal, e2)) in
+  let feq =
+    Reduction.reduce_lexpr ?matching ~gamma ~pfs (BinOp (e1, Equal, e2))
+  in
   let result =
     match feq with
     | Lit (Bool b) -> b
     | BinOp (_, Equal, _) | BinOp (_, And, _) ->
-        check_entailment SS.empty pfs [ feq ] gamma
+        check_entailment ?matching SS.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure

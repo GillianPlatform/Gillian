@@ -1,16 +1,14 @@
 open Gillian.Debugger
-
-module SMemory =
-  Gillian.Symbolic.Legacy_s_memory.Modernize (WSemantics.WislSMemory)
+module SMemory = Gillian.Monadic.MonadicSMemory.Lift (WStateEx.WislSMemory)
 
 module Lifter =
   Lifter.Gil_fallback_lifter.Make (SMemory) (WParserAndCompiler)
-    (WDebugging.WislLifter.Make)
+    (WStateEx.WislLifter.Make)
 
 module CLI =
   Gillian.Command_line.Make
     (Gillian.General.Init_data.Dummy)
-    (WSemantics.WislCMemory)
+    (WStateConcrete.WislCMemory)
     (SMemory)
     (WParserAndCompiler)
     (Gillian.General.External.Dummy (WParserAndCompiler.Annot))

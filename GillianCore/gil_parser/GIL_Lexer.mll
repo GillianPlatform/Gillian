@@ -84,6 +84,7 @@
         "return",       GIL_Parser.RETURN;
         "throw",        GIL_Parser.THROW;
         "extern",       GIL_Parser.EXTERN;
+        "par",          GIL_Parser.PAR;
 
         (* Logical expressions: most match with the program expressions *)
         "none", GIL_Parser.LNONE;

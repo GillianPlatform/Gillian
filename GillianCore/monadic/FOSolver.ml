@@ -51,7 +51,7 @@ let check_entailment ~(pc : Pc.t) formula =
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
   comp ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc) e1 e2
 
-let is_equal = of_comp_fun FOSolver.is_equal
+let is_equal = of_comp_fun (FOSolver.is_equal ?matching:None)
 let is_different = of_comp_fun FOSolver.is_different
 let num_is_less_or_equal = of_comp_fun FOSolver.num_is_less_or_equal
 
