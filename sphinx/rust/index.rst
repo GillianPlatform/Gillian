@@ -1,4 +1,4 @@
 Gillian-Rust
 ============
 
-In ongoing work, we are developing an instantiation of Gillian for Rust called Gillian-Rust. See `the current paper draft <https://arxiv.org/abs/2403.15122>`_.
+See the `the PLDI'25 paper <https://doi.org/10.1145/3729289>`_ for the instantiation of Gillian for Rust called Gillian-Rust.
