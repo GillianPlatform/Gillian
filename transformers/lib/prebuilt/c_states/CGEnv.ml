@@ -10,7 +10,7 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
   type t = Global_env.t [@@deriving yojson]
   type err_t = unit [@@deriving show, yojson]
   type action = GetDef
-  type pred = unit
+  type pred = unit [@@deriving show, yojson]
 
   let pp = Global_env.pp
 

@@ -156,7 +156,7 @@ struct
         (fun (a, args, ret) -> (SubAction a, "index" :: args, ret))
         (S.list_actions ())
 
-  type pred = DomainSet | SubPred of S.pred
+  type pred = DomainSet | SubPred of S.pred [@@deriving yojson]
 
   let pred_from_str = function
     | "domainset" -> Some DomainSet
@@ -287,6 +287,7 @@ struct
         match s with
         | _, Some _ -> Delayed.vanish ()
         | h, None ->
+            let* () = Delayed.assume_types [ (d', Type.SetType) ] in
             (* This would be the correct implementation, but the handling of sets is bad so
                it creates all sorts of issues (eg. in matching plans)...
                let dom = ExpMap.bindings h |> List.map fst in
@@ -389,18 +390,11 @@ struct
     | NotAllocated _ -> false
 
   let get_fixes = function
-    | SubError (idx, idx', e) ->
-        S.get_fixes e
-        |> MyUtils.deep_map @@ MyAsrt.map_cp @@ lift_corepred idx'
-        |> List.map @@ List.cons @@ MyAsrt.Pure Expr.Infix.(idx == idx')
+    | SubError (_idx, idx', e) ->
+        S.get_fixes e |> MyUtils.deep_map @@ lift_corepred idx'
     | MissingDomainSet ->
         let lvar = Expr.LVar (LVar.alloc ()) in
-        [
-          [
-            MyAsrt.CorePred (DomainSet, [], [ lvar ]);
-            MyAsrt.Types [ (lvar, Type.SetType) ];
-          ];
-        ]
+        [ [ (DomainSet, [], [ lvar ]) ] ]
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 
@@ -444,7 +438,7 @@ struct
         (fun (a, args, ret) -> (SubAction a, "index" :: args, ret))
         (S.list_actions ())
 
-  type pred = S.pred
+  type pred = S.pred [@@deriving yojson]
 
   let pred_from_str = S.pred_from_str
   let pred_to_str = S.pred_to_str
@@ -552,10 +546,8 @@ struct
     | InvalidIndexValue _ -> false
 
   let get_fixes = function
-    | SubError (idx, idx', e) ->
-        S.get_fixes e
-        |> MyUtils.deep_map @@ MyAsrt.map_cp @@ lift_corepred idx'
-        |> List.map @@ List.cons @@ MyAsrt.Pure Expr.Infix.(idx == idx')
+    | SubError (_idx, idx', e) ->
+        S.get_fixes e |> MyUtils.deep_map @@ lift_corepred idx'
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 
