@@ -50,7 +50,7 @@ js-init-env:
 	./Gillian-JS/scripts/setup_environment.sh
 
 docs:
-	$(OPAM-EXEC) dune build @doc
-	$(OPAM-EXEC) odoc html-generate --as-json -o _docs ./_build/default/_doc/_odocls/gillian/gillian.odocl
+	$(OPAM_EXEC) dune build @doc
+	$(OPAM_EXEC) odoc html-generate --as-json -o _docs ./_build/default/_doc/_odocls/gillian/gillian.odocl
 
 .PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs githooks switch deps opam
