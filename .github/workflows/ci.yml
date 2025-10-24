@@ -32,14 +32,9 @@ jobs:
       - name: Print Z3 version
         run: z3 --version
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
       - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "ocaml-variants.5.3.0+options"
-      - name: Installing Python prerequisites
-        run: sudo pip install sphinx furo
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v4
@@ -69,14 +64,14 @@ jobs:
         with:
           name: ${{ runner.os }}-opam
           path: opam.tar.gz
-      - name: Building docs
+      - name: Building API docs
         run: make docs
         if: runner.os == 'Linux'
       - name: Sending docs artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-docs
-          path: _docs
+          name: api-docs
+          path: _docs/gillian/Gillian
         if: runner.os == 'Linux'
       - name: Setting dependency cache
         run: opam clean
@@ -372,7 +367,7 @@ jobs:
           target: run
 
   deploy-docs:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     needs: [build]
     strategy:
@@ -383,16 +378,21 @@ jobs:
       - name: Download built docs
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-docs
-          path: docs
+          name: api-docs
+          path: odoc
       - name: Deploy docs
         run: |
           git config --global user.email "<>"
           git config --global user.name "GitHub Actions"
           git clone https://${{ secrets.DOCS_USER }}:${{ secrets.DOCS_TOKEN }}@github.com/GillianPlatform/GillianPlatform.github.io.git docs-repo --branch master
           cd docs-repo
-          rm ./* -rf
-          cp -r ../docs/* .
-          git add -A
-          git commit --allow-empty -m "Deployment from $GITHUB_REPOSITORY@$GITHUB_SHA"
-          git push --force
+          rm odoc -rf
+          mv ../odoc ./odoc
+          if [ -n "$(git status --porcelain=v1)" ]
+          then
+            git add -A
+            git commit -m "API docs update from $GITHUB_REPOSITORY@$GITHUB_SHA"
+            git push
+          else
+            echo "No changes detected; not pushing."
+          fi
