@@ -225,6 +225,10 @@ let make_get_value_call x err =
         [ x_v ] )
   | Some x_v -> (x_v, LBasic Skip, [])
 
+let make_check_nonzero_call x err =
+  let x_n = number_var_of_var x in
+  (x_n, LCall (x_n, Lit (String checkNonZero), [ x ], Some err, None))
+
 let make_to_number_call x x_v err =
   let x_n = number_var_of_var x in
   (x_n, LCall (x_n, Lit (String toNumberName), [ PVar x_v ], Some err, None))
@@ -408,16 +412,25 @@ let translate_multiplicative_binop x1 x2 x1_v x2_v aop err =
     LBasic (Assignment (x_r, BinOp (PVar x1_n, jsil_aop, PVar x2_n)))
   in
 
+  let nonzero_err, nonzero_cmd =
+    match aop with
+    | JS_Parser.Syntax.Div | JS_Parser.Syntax.Mod ->
+        make_check_nonzero_call (PVar x2_n) err
+    | _ -> ("", LBasic Skip)
+  in
+
   let new_cmds =
     [
       (None, cmd_tn_x1);
       (*  x1_n := i__toNumber (x1_v) with err  *)
       (None, cmd_tn_x2);
       (*  x2_n := i__toNumber (x2_v) with err  *)
+      (None, nonzero_cmd);
+      (* x2_n_n := "check_nonzero"(x_2_n) with elab; *)
       (None, cmd_ass_xr) (*  x_r := x1_n * x2_n                   *);
     ]
   in
-  let new_errs = [ x1_n; x2_n ] in
+  let new_errs = [ x1_n; x2_n; nonzero_err ] in
   (new_cmds, new_errs, x_r)
 
 let translate_binop_plus x1 x2 x1_v x2_v err =
