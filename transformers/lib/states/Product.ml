@@ -47,7 +47,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
 
   let empty () : t = (S1.empty (), S2.empty ())
 
-  let execute_action action (s1, s2) args =
+  let[@inline] execute_action action (s1, s2) args =
     let open Delayed.Syntax in
     match action with
     | A1 action -> (
@@ -61,7 +61,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', v) -> Ok ((s1, s2'), v)
         | Error e -> Error (E2 e))
 
-  let consume pred (s1, s2) args =
+  let[@inline] consume pred (s1, s2) args =
     let open Delayed.Syntax in
     match pred with
     | P1 pred -> (
@@ -75,7 +75,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', v) -> Ok ((s1, s2'), v)
         | Error e -> Error (E2 e))
 
-  let produce pred (s1, s2) args =
+  let[@inline] produce pred (s1, s2) args =
     let open Delayed.Syntax in
     match pred with
     | P1 pred ->

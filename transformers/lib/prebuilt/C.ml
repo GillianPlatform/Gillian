@@ -79,7 +79,7 @@ module ExtendMemory (S : C_PMapType) = struct
       let s' = S.produce pred_zero s args in
       Delayed.map s' (fun s' -> Ok (s', []))
 
-    let execute_action = function
+    let[@inline] execute_action = function
       | Move -> exec_move
       | SetZeros -> exec_set_zeros
 
@@ -107,7 +107,7 @@ module ExtendMemory (S : C_PMapType) = struct
 
   include ActionAdder (Addition) (S)
 
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     let open Delayed.Syntax in
     let action = action_to_str a in
     let args =

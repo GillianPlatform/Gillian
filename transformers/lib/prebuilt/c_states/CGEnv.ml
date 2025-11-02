@@ -24,7 +24,7 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
   let empty () = !init_data
 
   (* Execute action *)
-  let execute_action GetDef s args =
+  let[@inline] execute_action GetDef s args =
     match args with
     | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> (
         match Global_env.find_def_opt s loc with
@@ -40,8 +40,8 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
                 Global_env.pp s)
     | _ -> failwith "Invalid arguments for GetDef"
 
-  let consume () _ _ = failwith "Invalid C GEnv consume"
-  let produce () _ _ = failwith "Invalid C GEnv produce"
+  let[@inline] consume () _ _ = failwith "Invalid C GEnv consume"
+  let[@inline] produce () _ _ = failwith "Invalid C GEnv produce"
   let compose _ _ = Delayed.vanish () (* TODO *)
   let is_exclusively_owned _ _ = Delayed.return false
   let is_empty _ = false

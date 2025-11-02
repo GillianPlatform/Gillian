@@ -43,7 +43,7 @@ module DeleteActionAddition (S : MyMonadicSMemory) :
     | _ -> None
 
   let action_to_str Delete = "delete"
-  let execute_action Delete _ _ = Delayed.return (Ok (S.empty (), []))
+  let[@inline] execute_action Delete _ _ = Delayed.return (Ok (S.empty (), []))
   let can_fix () = false
   let get_fixes () = []
   let get_recovery_tactic () = Gillian.General.Recovery_tactic.none
@@ -55,7 +55,7 @@ module MoveInToOut (S : States.MyMonadicSMemory.S) :
   States.MyMonadicSMemory.S with type t = S.t = struct
   include S
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     match (pred_to_str pred, ins) with
     | "domainset", [ out ] -> (
         let open Delayed_result.Syntax in
@@ -250,7 +250,7 @@ struct
   module SMap = States.MyUtils.SMap
 
   (* Patch the alloc action *)
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     let open Delayed.Syntax in
     match (action_to_str a, args) with
     | "alloc", [ idx; v ] ->

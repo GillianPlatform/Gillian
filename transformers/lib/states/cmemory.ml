@@ -14,7 +14,8 @@ module Make (InitData : Gillian.General.Init_data.S) :
   let copy () = ()
 
   (* val execute_action : action_name:string -> t -> vt list -> action_ret Delayed.t*)
-  let execute_action (action_name : string) (_ : t) (_ : vt list) : action_ret =
+  let[@inline] execute_action (action_name : string) (_ : t) (_ : vt list) :
+      action_ret =
     failwith
       (Printf.sprintf "Implement here (CMem.execute_action %s)" action_name)
 

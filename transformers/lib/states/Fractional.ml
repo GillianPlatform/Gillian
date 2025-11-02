@@ -36,7 +36,7 @@ let pred_to_str = function
 let list_preds () = [ (Frac, [ "fraction" ], [ "value" ]) ]
 let empty () : t = None
 
-let execute_action action s args =
+let[@inline] execute_action action s args =
   let open Expr.Infix in
   match (action, s, args) with
   | _, None, _ -> DR.error MissingState
@@ -48,7 +48,7 @@ let execute_action action s args =
       Fmt.failwith "Invalid action %s with state %a and args %a"
         (action_to_str a) pp s (Fmt.Dump.list Expr.pp) args
 
-let consume core_pred s args =
+let[@inline] consume core_pred s args =
   let open Expr.Infix in
   match (core_pred, s, args) with
   | Frac, Some (v, q), [ q' ] ->
@@ -57,7 +57,7 @@ let consume core_pred s args =
   | Frac, None, _ -> DR.error MissingState
   | Frac, _, _ -> failwith "Invalid Agree consume"
 
-let produce core_pred s args =
+let[@inline] produce core_pred s args =
   let open Expr.Infix in
   match (core_pred, s, args) with
   | Frac, None, [ q'; v' ] -> Delayed.return (Some (v', q'))

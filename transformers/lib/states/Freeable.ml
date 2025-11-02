@@ -55,7 +55,7 @@ module Make (S : MyMonadicSMemory.S) :
   let empty () : t = None
   let simplify s = if S.is_empty s then None else SubState s
 
-  let execute_action action s (args : Values.t list) :
+  let[@inline] execute_action action s (args : Values.t list) :
       (t * Values.t list, err_t) DR.t =
     let open Delayed.Syntax in
     match (action, s) with
@@ -77,7 +77,7 @@ module Make (S : MyMonadicSMemory.S) :
     | Free, Freed -> DR.error DoubleFree
     | Free, None -> DR.error NotEnoughResourceToFree
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     match (pred, s) with
     | SubPred p, SubState s -> (
@@ -95,7 +95,7 @@ module Make (S : MyMonadicSMemory.S) :
     | FreedPred, Freed -> DR.ok (empty (), [])
     | FreedPred, None -> DR.error MissingFreed
 
-  let produce pred s args =
+  let[@inline] produce pred s args =
     let open Delayed.Syntax in
     match (pred, s) with
     | SubPred p, SubState s ->

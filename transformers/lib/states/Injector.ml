@@ -53,19 +53,19 @@ end
 module Make (I : Injection) (S : MyMonadicSMemory.S with type t = I.t) = struct
   include S
 
-  let consume p s ins =
+  let[@inline] consume p s ins =
     let p_str = pred_to_str p in
     let* s', ins' = I.pre_consume p_str (s, ins) in
     let** s'', outs = consume p s' ins' in
     let* s''', outs' = I.post_consume p_str (s'', outs) in
     Delayed_result.ok (s''', outs')
 
-  let produce p s insouts =
+  let[@inline] produce p s insouts =
     let p_str = pred_to_str p in
     let* s', insouts' = I.pre_produce p_str (s, insouts) in
     produce p s' insouts'
 
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     let a_str = action_to_str a in
     let* s', args' = I.pre_execute_action a_str (s, args) in
     let** s'', returns = execute_action a s' args' in

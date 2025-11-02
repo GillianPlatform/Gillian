@@ -68,7 +68,7 @@ module Make (S : MyMonadicSMemory.S) :
             else DR.error (OutOfBounds (idx, n))
         | None -> DR.ok (idx, S.empty ()))
 
-  let execute_action action ((b, n) : t) (args : Values.t list) :
+  let[@inline] execute_action action ((b, n) : t) (args : Values.t list) :
       (t * Values.t list, err_t) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
@@ -81,7 +81,7 @@ module Make (S : MyMonadicSMemory.S) :
         | Error e -> Error (SubError (idx', e)))
     | SubAction _, [] -> failwith "Missing index for sub-action"
 
-  let consume pred (b, n) ins =
+  let[@inline] consume pred (b, n) ins =
     let open DR.Syntax in
     let open Delayed.Syntax in
     match (pred, ins) with
@@ -100,7 +100,7 @@ module Make (S : MyMonadicSMemory.S) :
         | None -> DR.error MissingLength)
     | Length, _ -> failwith "Invalid arguments for length consume"
 
-  let produce pred (b, n) args =
+  let[@inline] produce pred (b, n) args =
     let open Delayed.Syntax in
     let open MyUtils.Syntax in
     match (pred, args) with

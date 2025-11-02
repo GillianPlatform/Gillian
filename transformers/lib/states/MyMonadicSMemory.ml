@@ -151,19 +151,22 @@ struct
 
   (* Wrap action / consume / produce with a nice type *)
 
-  let execute_action ~(action_name : string) (state : t) (args : vt list) :
-      action_ret Delayed.t =
+  let[@inline] execute_action
+      ~(action_name : string)
+      (state : t)
+      (args : vt list) : action_ret Delayed.t =
     match action_from_str action_name with
     | Some action -> execute_action action state args
     | None -> failwith ("Action not found: " ^ action_name)
 
-  let consume ~(core_pred : string) (state : t) (args : vt list) :
+  let[@inline] consume ~(core_pred : string) (state : t) (args : vt list) :
       action_ret Delayed.t =
     match pred_from_str core_pred with
     | Some pred -> consume pred state args
     | None -> failwith ("Predicate not found: " ^ core_pred)
 
-  let produce ~(core_pred : string) (state : t) (args : vt list) : t Delayed.t =
+  let[@inline] produce ~(core_pred : string) (state : t) (args : vt list) :
+      t Delayed.t =
     match pred_from_str core_pred with
     | Some pred -> produce pred state args
     | None -> failwith ("Predicate not found: " ^ core_pred)
