@@ -833,24 +833,27 @@ let rec reduce_binop_inttonum_const
       let* () = if snd (modf x) = 0.0 then Some () else None in
       let l = Expr.Lit (Int (Z.of_float x)) in
       let r = f e in
-      let+ op =
+      let+ (wrap, op) =
         BinOp.(
           match op with
-          | Equal -> Some Equal
-          | FLessThan -> Some ILessThan
-          | FLessThanEqual -> Some ILessThanEqual
-          | FPlus -> Some IPlus
-          | FMinus -> Some IMinus
-          | FTimes -> Some ITimes
-          | BitwiseAndF -> Some BitwiseAnd
-          | BitwiseOrF -> Some BitwiseOr
-          | BitwiseXorF -> Some BitwiseXor
-          | LeftShiftF -> Some LeftShiftF
-          | SignedRightShiftF -> Some SignedRightShift
-          | UnsignedRightShiftF -> Some UnsignedRightShift
+          | Equal -> Some (false, Equal)
+          | FLessThan -> Some (false, ILessThan)
+          | FLessThanEqual -> Some (false, ILessThanEqual)
+          | FPlus -> Some (true, IPlus)
+          | FMinus -> Some (true, IMinus)
+          | FTimes -> Some (true, ITimes)
+          | BitwiseAndF -> Some (true, BitwiseAnd)
+          | BitwiseOrF -> Some (true, BitwiseOr)
+          | BitwiseXorF -> Some (true, BitwiseXor)
+          | LeftShiftF -> Some (true, LeftShiftF)
+          | SignedRightShiftF -> Some (true, SignedRightShift)
+          | UnsignedRightShiftF -> Some (true, UnsignedRightShift)
           | _ -> None)
       in
-      Expr.BinOp (l, op, r)
+      let res = Expr.BinOp (l, op, r) in
+      (match wrap with
+      | true -> Expr.UnOp (IntToNum, res)
+      | false -> res)
   | _ -> None
 
 (** Reduction of logical expressions
@@ -1330,7 +1333,9 @@ and reduce_lexpr_loop
     | UnOp (LstLen, LstSub (_, _, e)) -> e
     | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))
       -> le
-    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> BinOp ((UnOp (IntToNum, le1)), FPlus, (UnOp (IntToNum, le2)))
+    (* Conversions *)
+    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) ->
+        BinOp ((UnOp (IntToNum, le1)), FPlus, (UnOp (IntToNum, le2)))
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in
