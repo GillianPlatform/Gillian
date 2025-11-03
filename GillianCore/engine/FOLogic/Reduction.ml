@@ -1330,6 +1330,7 @@ and reduce_lexpr_loop
     | UnOp (LstLen, LstSub (_, _, e)) -> e
     | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (UnOp (IsInt, le))
       -> le
+    | UnOp (IntToNum, BinOp (le1, IPlus, le2)) -> BinOp ((UnOp (IntToNum, le1)), FPlus, (UnOp (IntToNum, le2)))
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in

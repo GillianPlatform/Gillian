@@ -623,7 +623,7 @@ struct
     match test.flag with
     | Some _ ->
         let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
-        L.tmi (fun fmt -> fmt "%s" msg);
+        L.normal (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s@?" msg;
         (* Reset coverage for every procedure in verification *)
         { prog with coverage = Hashtbl.create 1 }
@@ -656,7 +656,7 @@ struct
             else Ok () (* It's already correct *)
         | Some proof -> (
             let msg = "Verifying lemma " ^ test.name ^ "... " in
-            L.tmi (fun fmt -> fmt "%s" msg);
+            L.normal (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
             let lemma_evaluation_results =
               SAInterpreter.evaluate_lcmds prog proof state

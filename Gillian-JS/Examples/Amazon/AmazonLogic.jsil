@@ -37,7 +37,6 @@ lemma ObjectTableAbsentProperty(l, PVPairs, prop)
     ((#l, #prop) -> none) *
     empty_fields(#l : -u- (#pSet, -{ #prop }-))
 ]]
-[*  *]
 
 (* Removing a property from a list of prop-value pairs *)
 pred RemoveProp(+PVPairs : List, +prop : Str, found : Bool, value : Str, newPairs : List) :

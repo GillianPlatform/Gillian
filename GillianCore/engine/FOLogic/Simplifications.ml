@@ -893,7 +893,13 @@ let simplify_pfs_and_gamma
                     (BinOp
                        ( Expr.zero_i,
                          ILessThanEqual,
-                         UnOp (LstLen, Expr.from_var_name v) ))
+                         UnOp (LstLen, Expr.from_var_name v) ));
+                  PFS.extend lpfs
+                    (BinOp
+                       ( Expr.num 0.,
+                         FLessThanEqual,
+                         UnOp (IntToNum,
+                         UnOp (LstLen, Expr.from_var_name v) )));
               | _ -> ());
 
           analyse_list_structure lpfs;

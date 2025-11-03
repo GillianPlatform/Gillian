@@ -179,7 +179,7 @@ lemma ListToSetAddElement(lst, set, element)
     ListToSet(l+ (#lst, {{ #element }}), -u- (#set, -{ #element }-))
 ]]
 [*
-    unfold ListToSet(#lst, #element);
+    unfold ListToSet(#lst, #set);
     if (!(#lst == {{ }})) then {
         sep_assert ((#lst == l+ ({{ #fProp }}, #restLst))) [bind: #fProp, #restLst];
         sep_assert (ListToSet(#restLst, #restSet)) [bind: #restSet];
