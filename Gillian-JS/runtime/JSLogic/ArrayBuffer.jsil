@@ -15,7 +15,7 @@ nounfold pred ArrayBuffer (+ab:Obj, data:List) :
   ((#md, "@extensible")            -> true) *          (* Array buffers are extensible                   *)
   ((#md, "@ArrayBufferData")       -> data) *          (* Array buffer contents                          *)
   ((#md, "@ArrayBufferByteLength") -> #len_data) *     (* Array buffer length                            *)
-  (#len_data == l-len data) *
+  ((as_int #len_data) == l-len data) *
 
   (* No other internal properties *)
   empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ArrayBufferData", "@ArrayBufferByteLength" }-);
@@ -44,7 +44,7 @@ nounfold pred ArrayBufferPrototype (proto) :
 
 axiomatic spec ABP_byteLength (xsc, vthis)
     [[ (vthis == #vthis) * ArrayBuffer(#vthis, #data) ]]
-    [[ ArrayBuffer(#vthis, #data) * (ret == l-len #data) ]]
+    [[ ArrayBuffer(#vthis, #data) * (ret == (l-len #data)) ]]
     normal
 
 axiomatic spec ABP_slice (xsc, vthis, start, end)

@@ -1336,6 +1336,10 @@ and reduce_lexpr_loop
     (* Conversions *)
     | UnOp (IntToNum, BinOp (le1, IPlus, le2)) ->
         BinOp ((UnOp (IntToNum, le1)), FPlus, (UnOp (IntToNum, le2)))
+    | UnOp (NumToInt, BinOp (le1, FPlus, le2)) ->
+        BinOp ((UnOp (NumToInt, le1)), IPlus, (UnOp (NumToInt, le2)))
+    | UnOp (NumToInt, BinOp (le1, FTimes, le2)) ->
+        BinOp ((UnOp (NumToInt, le1)), ITimes, (UnOp (NumToInt, le2)))
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in
@@ -1715,8 +1719,14 @@ and reduce_lexpr_loop
       when Expr.equal a c || Expr.equal b c -> Expr.num 0.
     | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> y
     | BinOp (BinOp (x, FDiv, y), FTimes, z) when y = z -> x
-    | BinOp (UnOp (NumToInt, x), Equal, y) | BinOp (y, Equal, UnOp (NumToInt, x))
-      -> BinOp (UnOp (IntToNum, y), Equal, x)
+    | BinOp (UnOp (NumToInt, x), Equal, y)
+        when (match y with
+        | UnOp (LstLen, _) -> false
+        | _ -> true) -> BinOp (UnOp (IntToNum, y), Equal, x)
+    | BinOp (y, Equal, UnOp (NumToInt, x))
+        when (match y with
+        | UnOp (LstLen, _) -> false
+        | _ -> true) -> BinOp (UnOp (IntToNum, y), Equal, x)
     (* BinOps: Equalities (strings) *)
     (* x = y ++ z
           /\ |x| < |y| => false

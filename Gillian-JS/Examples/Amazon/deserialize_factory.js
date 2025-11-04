@@ -75,6 +75,7 @@ function needs(condition, errorMessage) {
       (ret == false)
 */
 function readElements(elementCount, fieldsPerElement, buffer, readPos) {
+  /* @tactic unfold Uint8Array (#buffer, #ab, #viewOffset, #viewSize) */
   var dataView = new DataView(
     buffer.buffer,
     buffer.byteOffset,
