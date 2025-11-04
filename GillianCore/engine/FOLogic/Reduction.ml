@@ -1057,6 +1057,18 @@ and reduce_lexpr_loop
     | LstSub (e1, Lit (Int z), e3)
       when Z.equal z Z.zero
            && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> e1
+    | LstSub (e1, e2, e3)
+      when
+        SS.inter (Expr.lvars e1) (Expr.lvars e3) = SS.empty
+          &&
+        List.length (
+          List.filter (fun e -> SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty) (get_equal_expressions pfs e1)
+        ) > 0
+      ->
+        let eqs = get_equal_expressions pfs e1 in
+        let e1' = List.hd (List.filter (fun e -> SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty) eqs) in
+        L.verbose (fun fmt -> fmt "Replacement LstSub: %a -> %a" Expr.pp e1 Expr.pp e1');
+        LstSub (e1', e2, e3)
     | LstSub (le1, le2, le3) -> (
         let fle1 = f le1 in
         let fle2 = substitute_for_list_length pfs (f le2) in
@@ -1340,6 +1352,19 @@ and reduce_lexpr_loop
         BinOp ((UnOp (NumToInt, le1)), IPlus, (UnOp (NumToInt, le2)))
     | UnOp (NumToInt, BinOp (le1, FTimes, le2)) ->
         BinOp ((UnOp (NumToInt, le1)), ITimes, (UnOp (NumToInt, le2)))
+    | UnOp (IntToNum, UnOp (LstLen, x))
+      when
+        List.length
+          (get_equal_expressions pfs (UnOp (LstLen, x))
+          |> List.filter (fun x -> match x with | Expr.UnOp (NumToInt, _) -> true | _ -> false)) = 1
+      ->
+        L.verbose (fun fmt -> fmt "l-len conversion: %a" Expr.pp le);
+        let eqs =
+          (get_equal_expressions pfs (UnOp (LstLen, x))
+          |> List.filter (fun x -> match x with | Expr.UnOp (NumToInt, _) -> true | _ -> false)) in
+        (match List.hd eqs with
+        | UnOp (NumToInt, e) -> e
+        | _ -> raise (ReductionException (le, "Impossible")))
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in
