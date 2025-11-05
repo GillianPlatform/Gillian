@@ -587,22 +587,24 @@ module Make (State : SState.S) :
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
     let vars_to_forget = SS.inter state_lvars (SS.of_list lvar_binders) in
-    if vars_to_forget <> SS.empty then (
-      let oblivion_subst = fresh_subst vars_to_forget in
-      L.verbose (fun m ->
-          m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
-            vars_to_forget SVal.SESubst.pp oblivion_subst);
+    let astate =
+      if vars_to_forget <> SS.empty then (
+        let oblivion_subst = fresh_subst vars_to_forget in
+        L.verbose (fun m ->
+            m "Forget @[%a@] with subst: %a"
+              Fmt.(iter ~sep:comma SS.iter string)
+              vars_to_forget SVal.SESubst.pp oblivion_subst);
 
-      (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
-      let subst_in_place =
-        substitution_in_place ~subst_all:true oblivion_subst astate
-      in
-      assert (List.length subst_in_place = 1);
-      let astate = List.hd subst_in_place in
+        (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+        let subst_in_place =
+          substitution_in_place ~subst_all:true oblivion_subst astate
+        in
+        assert (List.length subst_in_place = 1);
+        let astate = List.hd subst_in_place in
 
-      L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate))
-    else ();
+        L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate);
+        astate)
+      else astate in
     let mp =
       match mp with
       | Error asrts ->

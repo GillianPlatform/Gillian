@@ -829,31 +829,56 @@ let rec reduce_binop_inttonum_const
   let open Utils.Syntaxes.Option in
   let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
   match (l, r) with
-  | Lit (Num x), UnOp (IntToNum, e) | UnOp (IntToNum, e), Lit (Num x) ->
-      let* () = if snd (modf x) = 0.0 then Some () else None in
-      let l = Expr.Lit (Int (Z.of_float x)) in
-      let r = f e in
-      let+ (wrap, op) =
-        BinOp.(
-          match op with
-          | Equal -> Some (false, Equal)
-          | FLessThan -> Some (false, ILessThan)
-          | FLessThanEqual -> Some (false, ILessThanEqual)
-          | FPlus -> Some (true, IPlus)
-          | FMinus -> Some (true, IMinus)
-          | FTimes -> Some (true, ITimes)
-          | BitwiseAndF -> Some (true, BitwiseAnd)
-          | BitwiseOrF -> Some (true, BitwiseOr)
-          | BitwiseXorF -> Some (true, BitwiseXor)
-          | LeftShiftF -> Some (true, LeftShiftF)
-          | SignedRightShiftF -> Some (true, SignedRightShift)
-          | UnsignedRightShiftF -> Some (true, UnsignedRightShift)
-          | _ -> None)
-      in
-      let res = Expr.BinOp (l, op, r) in
-      (match wrap with
-      | true -> Expr.UnOp (IntToNum, res)
-      | false -> res)
+  | Lit (Num x), UnOp (IntToNum, e) ->
+    let* () = if snd (modf x) = 0.0 then Some () else None in
+    let l = Expr.Lit (Int (Z.of_float x)) in
+    let r = f e in
+    let+ (wrap, op) =
+      BinOp.(
+        match op with
+        | Equal -> Some (false, Equal)
+        | FLessThan -> Some (false, ILessThan)
+        | FLessThanEqual -> Some (false, ILessThanEqual)
+        | FPlus -> Some (true, IPlus)
+        | FMinus -> Some (true, IMinus)
+        | FTimes -> Some (true, ITimes)
+        | BitwiseAndF -> Some (true, BitwiseAnd)
+        | BitwiseOrF -> Some (true, BitwiseOr)
+        | BitwiseXorF -> Some (true, BitwiseXor)
+        | LeftShiftF -> Some (true, LeftShiftF)
+        | SignedRightShiftF -> Some (true, SignedRightShift)
+        | UnsignedRightShiftF -> Some (true, UnsignedRightShift)
+        | _ -> None)
+    in
+    let res = Expr.BinOp (l, op, r) in
+    (match wrap with
+    | true -> Expr.UnOp (IntToNum, res)
+    | false -> res)
+  | UnOp (IntToNum, e), Lit (Num x) ->
+    let* () = if snd (modf x) = 0.0 then Some () else None in
+    let r = Expr.Lit (Int (Z.of_float x)) in
+    let l = f e in
+    let+ (wrap, op) =
+      BinOp.(
+        match op with
+        | Equal -> Some (false, Equal)
+        | FLessThan -> Some (false, ILessThan)
+        | FLessThanEqual -> Some (false, ILessThanEqual)
+        | FPlus -> Some (true, IPlus)
+        | FMinus -> Some (true, IMinus)
+        | FTimes -> Some (true, ITimes)
+        | BitwiseAndF -> Some (true, BitwiseAnd)
+        | BitwiseOrF -> Some (true, BitwiseOr)
+        | BitwiseXorF -> Some (true, BitwiseXor)
+        | LeftShiftF -> Some (true, LeftShiftF)
+        | SignedRightShiftF -> Some (true, SignedRightShift)
+        | UnsignedRightShiftF -> Some (true, UnsignedRightShift)
+        | _ -> None)
+    in
+    let res = Expr.BinOp (l, op, r) in
+    (match wrap with
+    | true -> Expr.UnOp (IntToNum, res)
+    | false -> res)
   | _ -> None
 
 (** Reduction of logical expressions
@@ -2298,16 +2323,19 @@ and simplify_num_arithmetic_lexpr
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> l
   (* Binary minus to unary minus *)
   | BinOp (l, FMinus, r) -> f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
-  (* Unary minus distributes over + *)
+  (* Unary minus distributes over +, - *)
   | UnOp (FUnaryMinus, e) -> (
       match e with
       | BinOp (l, FPlus, r) ->
           f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
+      | BinOp (l, FMinus, r) ->
+          f (BinOp (UnOp (FUnaryMinus, l), FPlus, r))
       | _ -> le)
   (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, FPlus, r) ->
       let cl = Cnum.of_expr l in
       let cr = Cnum.of_expr r in
+      L.verbose (fun fmt -> fmt "FPlus check:\n\t%a\t-->\t%a\n\t%a\t-->\t%a" Expr.pp l Expr.pp (Cnum.to_expr cl) Expr.pp r Expr.pp (Cnum.to_expr cr));
       Cnum.to_expr (Cnum.plus cl cr)
   | _ -> le
 
