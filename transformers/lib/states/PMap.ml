@@ -175,13 +175,7 @@ struct
   let domain_add k ((h, d) : t) =
     match d with
     | None -> (h, d)
-    | Some (Expr.ESet d) -> (h, Some (Expr.ESet (k :: d)))
-    | Some _ ->
-        (* Currently we only support "concrete" domain sets (ie. using Expr.ESet, instead of
-           as logical variables). To add support to "symbolic" domain sets one would need
-           to make this function return a Expr.t Delayed.t, adding to the PC that the key is in
-           the set. *)
-        failwith "Invalid index set; expected a set"
+    | Some d -> (h, Some (Expr.NOp (SetUnion, [d; Expr.ESet [ k ]])))
 
   let get ((h, d) as s) idx =
     let open Delayed.Syntax in
