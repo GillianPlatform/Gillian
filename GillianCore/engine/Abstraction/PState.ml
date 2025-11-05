@@ -628,6 +628,7 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let** new_state, subst', _ =
+      L.verbose (fun m -> m "State before matching:@\n@[%a@]\n" pp astate);
       let+ result = SMatcher.match_ astate subst mp Invariant in
       match result with
       | Ok state -> Ok state
