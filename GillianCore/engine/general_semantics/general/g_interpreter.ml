@@ -846,23 +846,6 @@ struct
           in
           L.verbose (fun fmt ->
               fmt "Run_spec returned %d Results" (List.length ret));
-          if ret = [] then
-            if spec.data.spec_incomplete then (
-              L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
-              symb_exec_proc ())
-            else
-              [
-                eval_state_to_err ~error_state:state
-                  ~errors:
-                    [
-                      EState
-                        (EOther
-                           (Fmt.str "Unable to use specification of function %s"
-                              spec.data.spec_name));
-                    ]
-                  eval_state;
-              ]
-          else
             let successes, errors =
               List.partition_map
                 (function
@@ -870,20 +853,24 @@ struct
                   | Error x -> Right (Exec_err.EState x))
                 ret
             in
-            let spec_name = spec.data.spec_name in
-            let success_confs =
-              successes
-              |> List.mapi (fun ix (ret_state, fl) ->
-                     process_ret pid j eval_state ix ret_state fl
-                       (eval_state.b_counter + 1) true spec_name)
-            in
-            let error_confs =
-              match errors with
-              | [] -> []
-              | errors ->
-                  [ eval_state_to_err ~error_state:state ~errors eval_state ]
-            in
-            success_confs @ error_confs
+            if errors != [] && spec.data.spec_incomplete then (
+              L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
+              symb_exec_proc ()
+            ) else (
+              let spec_name = spec.data.spec_name in
+              let success_confs =
+                successes
+                |> List.mapi (fun ix (ret_state, fl) ->
+                      process_ret pid j eval_state ix ret_state fl
+                        (eval_state.b_counter + 1) true spec_name)
+              in
+              let error_confs =
+                match errors with
+                | [] -> []
+                | errors ->
+                    [ eval_state_to_err ~error_state:state ~errors eval_state ]
+              in
+              success_confs @ error_confs)
 
         let f x pid v_args j subst eval_state =
           let { prog; cs; state; _ } = eval_state in

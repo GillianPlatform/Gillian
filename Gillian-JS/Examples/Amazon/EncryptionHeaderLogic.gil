@@ -15,11 +15,12 @@
                 readPos
 *)
 pred Field(+buffer : List, +readPos : Num, field : List, length : Num) :
-  (0 <=# readPos) * (#rawFL == l-sub(buffer, as_int readPos, 2i)) *
+  (0 <=# readPos) * (is_int readPos) *
+    (#rawFL == l-sub(buffer, as_int readPos, 2i)) *
     rawToUInt16(#rawFL, false, #fLength) *
     (field == l-sub(buffer, as_int (readPos + 2), as_int #fLength)) *
     (length == (2 + #fLength)) * ((readPos + length) <=# as_num (l-len buffer));
-  facts: (2 <=# length);
+  facts: (2 <=# length) and (is_int readPos) and (is_int length);
 
 
 (****************************
@@ -53,7 +54,10 @@ pred CElement(+buffer : List, +readPos : Num, +fCount : Num, element : List, len
       A complete element has a non-negative number of fields
       and length, and must be correctly positioned within a buffer
   *)
-  facts: (0 <=# readPos) and (0 <=# fCount) and (0 <=# length) and ((readPos + length) <=# as_num (l-len buffer)) and (l-len element == as_int fCount);
+  facts: (0 <=# readPos) and (0 <=# fCount) and (0 <=# length) and
+         ((readPos + length) <=# as_num (l-len buffer)) and
+         (l-len element == as_int fCount) and
+         (is_int readPos) and (is_int fCount) and (is_int length);
 
 (* The length of an element is not smaller than the length of its first field *)
 lemma CElementFirstFieldLength(buffer, readPos, fCount, field, restFields, eLength)
@@ -140,7 +144,11 @@ pred CElements(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
       correctly positioned within a buffer
   *)
   facts: (0 <=# readPos) and (0 <=# eCount) and (0 <# fCount) and (0 <=# length) and
-         ((readPos + length) <=# as_num (l-len buffer)) and (as_int eCount == l-len elements);
+         ((readPos + length) <=# as_num (l-len buffer)) and (as_int eCount == l-len elements) and
+         (is_int readPos) and
+         (is_int eCount) and
+         (is_int fCount) and
+         (is_int length);
 
 (* Appending a complete element to the given complete elements from the right *)
 lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, eLength)
@@ -247,7 +255,8 @@ pred IElement(+buffer : List, +readPos : Num, +fCount : Num, fList : List, eLeng
         An incomplete element must have a strictly positive number of fields,
         non-negative length, and must fit within the buffer
     *)
-  facts: (0 <=# readPos) and (readPos <=# as_num (l-len buffer)) and (0 <# fCount) and (0 <=# eLength);
+  facts: (0 <=# readPos) and (readPos <=# as_num (l-len buffer)) and (0 <# fCount) and (0 <=# eLength) and
+         (is_int readPos) and (is_int fCount) and (is_int eLength);
 
 (* Appending the first field of a given incomplete element to a complete element on its left *)
 lemma AppendFieldCI(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, fList2, eLength2)
@@ -332,7 +341,8 @@ pred IElements(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
     (#restECount == (eCount - 1)) *
     IElements(buffer, (readPos + #eLength), #restECount, fCount, #restEList, #restESLength) *
     (eList == l+ ({{ #fList }}, #restEList)) * (esLength == (#eLength + #restESLength));
-  facts: (0 <=# readPos) and (readPos <=# as_num (l-len buffer)) and (0 <# eCount) and (0 <# fCount) and (0 <=# esLength);
+  facts: (0 <=# readPos) and (readPos <=# as_num (l-len buffer)) and (0 <# eCount) and (0 <# fCount) and (0 <=# esLength) and
+         (is_int readPos) and (is_int eCount) and (is_int fCount) and (is_int esLength);
 
 
 
@@ -353,7 +363,8 @@ nounfold pred Elements(definition : Str, +buffer : List, +readPos : Num,
                        esLength : Num) :
   (definition == "Complete") * CElements(buffer, readPos, eCount, fCount, eList, esLength),
   (definition == "Incomplete") * IElements(buffer, readPos, eCount, fCount, eList, esLength);
-  facts: (0 <=# readPos) and (readPos <=# as_num (l-len buffer)) and (0 <=# eCount) and (0 <# fCount) and (0 <=# esLength);
+  facts: (0 <=# readPos) and (readPos <=# as_num (l-len buffer)) and (0 <=# eCount) and (0 <# fCount) and (0 <=# esLength) and
+         (is_int readPos) and (is_int eCount) and (is_int fCount) and (is_int esLength);
 
  (* An entire complete element sequence can be prepended to a general element sequence *)
 lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, esLength1, eCount2, fList2, esLength2)
@@ -409,24 +420,27 @@ nounfold pred CRawEncryptedDataKeys(+buffer : List, +readPos : Num,
 @nopath
 nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num) :
   (* Not enough data to read the number of EDKs *)
-  (0 <=# readPos) * (readPos <=# (l-len buffer)) * ((l-len buffer) <# (readPos + 2)),
+  (is_int readPos) * (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) * (as_num (l-len buffer) <# (readPos + 2)),
 
-    (* Enough data to read the number of EDKs, but not enough data to read the EDKs *)
-  (0 <=# readPos) * ((readPos + 2) <=# (l-len buffer)) * (#rawEC == l-sub(buffer, readPos, 2)) *
+  (* Enough data to read the number of EDKs, but not enough data to read the EDKs *)
+  (is_int readPos) * (0 <=# readPos) * ((readPos + 2) <=# as_num (l-len buffer)) * (#rawEC == l-sub(buffer, as_int readPos, 2i)) *
     rawToUInt16(#rawEC, false, #keyCount) * (0 <# #keyCount) *
     Elements("Incomplete", buffer, (readPos + 2), #keyCount, 3, #eList, #esLength);
+  facts: (is_int readPos);
 
 (* Broken serialised EDKs *)
 @nopath
 nounfold pred BRawEncryptedDataKeys(errorMessage : Str, +buffer : List, +readPos : Num) :
   (* Incorrect starting position *)
-  ((readPos <# 0) \/ ((l-len buffer) <# readPos)) *
+  (is_int readPos) * ((readPos <# 0) \/ (as_num (l-len buffer) <# readPos)) *
     (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
 
   (* Zero EDKs provided *)
-  (0 <=# readPos) * ((readPos + 2) <=# (l-len buffer)) *
-    (#rawEC == l-sub(buffer, readPos, 2)) * rawToUInt16(#rawEC, false, 0) *
+  (is_int readPos) * (0 <=# readPos) * ((readPos + 2) <=# as_num (l-len buffer)) *
+    (#rawEC == l-sub(buffer, as_int readPos, 2i)) * rawToUInt16(#rawEC, false, 0.) *
     (errorMessage == "Malformed Header: No EncryptedDataKey found.");
+
+  facts: (is_int readPos);
 
 (* General serialised EDKs *)
 @nopath
@@ -572,25 +586,26 @@ nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
                       contentType, headerIvLength, frameLength, headerLength,
                       headerIv, headerAuthTag) :
   (rawHeaderData == l+ (part_one, part_two)) *
-    ((l-len part_one) == 22) *
+    ((l-len part_one) == 22i) *
     (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-    ((l-len #rawSuiteId) == 2) *
-    ((l-len messageId) == 16) *
-    ((l-len #rawContextLength) == 2) * CVersionAndType(version, type) *
+    ((l-len #rawSuiteId) == 2i) *
+    ((l-len messageId) == 16i) *
+    ((l-len #rawContextLength) == 2i) * CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false, suiteId) *
     CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false, ECLength) *
     (part_two == l+ (#EC, part_three)) *
-    ((l-len #EC) == ECLength) *
+    ((l-len #EC) == as_int ECLength) *
     CRawEncryptionContext(#EC, ECKs) *
     (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
     RawEncryptedDataKeys("Complete", rawHeaderData, (22 + ECLength), EDKs, #EDKsLength, _) *
-    (#EDKsLength == (l-len #edks)) * ((l-len #rawFrameLength) == 4) *
+    (as_int #EDKsLength == (l-len #edks)) * ((l-len #rawFrameLength) == 4i) *
     rawToUInt32(#rawFrameLength, false, frameLength) *
     (headerLength == ((((((22 + ECLength) + #EDKsLength) + 1) + 4) + 1) + 4)) *
-    ((l-len headerIv) == headerIvLength) *
-    ((l-len headerAuthTag) == (#tagLength / 8)) *
-    (((headerLength + headerIvLength) + (#tagLength / 8)) <=# (l-len rawHeaderData));
+    ((l-len headerIv) == as_int headerIvLength) *
+    ((l-len headerAuthTag) == as_int (#tagLength / 8)) *
+    (((headerLength + headerIvLength) + (#tagLength / 8)) <=# as_num (l-len rawHeaderData));
+  facts: (is_int suiteId) and (is_int ECLength) and (is_int headerIvLength) and (is_int frameLength) and (is_int headerLength);
 
 (* Serialised incomplete header *)
 @nopath

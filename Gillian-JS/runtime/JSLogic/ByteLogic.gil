@@ -10,7 +10,7 @@
 pure pred rawToUInt8(+bytes:List, x:Num) :
     (bytes == {{ #b0 }}) * (x == #b0) *
     (0 <=# #b0) * (#b0 <# 256.) *
-    (as_num (as_int #b0) = #b0);
+    (is_int #b0);
 
 (* Interpretation: two bytes as an unsigned 16-bit integer *)
 @nopath
@@ -20,15 +20,16 @@ pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, x:Num) :
       (0. <=# #b0) * (#b0 <# 256.) *
       (0. <=# #b1) * (#b1 <# 256.) *
       (x == (#b0 * 256.) + #b1) *
-      (as_num (as_int #b0) = #b0) *
-      (as_num (as_int #b1) = #b1),
+      (is_int #b0) *
+      (is_int #b1),
     (littleEndian == true) *
       (bytes == {{ #b0, #b1 }}) *
       (0. <=# #b0) * (#b0 <# 256.) *
       (0. <=# #b1) * (#b1 <# 256.) *
       (x == (#b1 * 256.) + #b0) *
-      (as_num (as_int #b0) = #b0) *
-      (as_num (as_int #b1) = #b1);
+      (is_int #b0) *
+      (is_int #b1);
+  facts: (is_int x);
 
 (* Interpretation: four bytes as an unsigned 32-bit integer *)
 @nopath
@@ -40,10 +41,10 @@ pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, x:Num) :
       (0. <=# #b2) * (#b2 <# 256.) *
       (0. <=# #b3) * (#b3 <# 256.) *
       (x == (#b0 * 16777216.) + (#b1 * 65536.) + (#b2 * 256.) + #b3) *
-      (as_num (as_int #b0) = #b0) *
-      (as_num (as_int #b1) = #b1) *
-      (as_num (as_int #b2) = #b2) *
-      (as_num (as_int #b3) = #b3),
+      (is_int #b0) *
+      (is_int #b1) *
+      (is_int #b2) *
+      (is_int #b3),
     (littleEndian == true) *
       (bytes == {{ #b0, #b1, #b2, #b3 }}) *
       (0. <=# #b0) * (#b0 <# 256.) *
@@ -51,7 +52,8 @@ pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, x:Num) :
       (0. <=# #b2) * (#b2 <# 256.) *
       (0. <=# #b3) * (#b3 <# 256.) *
       (x == (#b3 * 16777216.) + (#b2 * 65536.) + (#b1 * 256.) + #b0) *
-      (as_num (as_int #b0) = #b0) *
-      (as_num (as_int #b1) = #b1) *
-      (as_num (as_int #b2) = #b2) *
-      (as_num (as_int #b3) = #b3);
+      (is_int #b0) *
+      (is_int #b1) *
+      (is_int #b2) *
+      (is_int #b3);
+    facts: (is_int x);

@@ -1365,6 +1365,24 @@ and reduce_lexpr_loop
         (match List.hd eqs with
         | UnOp (NumToInt, e) -> e
         | _ -> raise (ReductionException (le, "Impossible")))
+    (* IsInt *)
+    | UnOp (IsInt, UnOp (IntToNum, _)) -> Lit (Bool true)
+    | UnOp (IsInt, Lit (Num n)) -> Lit (Bool (Float.is_integer n))
+    | UnOp (IsInt, BinOp (le', FPlus, re'))
+    | UnOp (IsInt, BinOp (le', FMinus, re'))
+    | UnOp (IsInt, BinOp (le', FTimes, re')) ->
+        let resl = f (UnOp (IsInt, le')) in
+        L.verbose (fun fmt -> fmt "is_int_reduction: %a\n\tlhs: %a" Expr.pp le Expr.pp resl);
+        if resl = Lit (Bool true) || PFS.mem pfs resl then
+          UnOp (IsInt, re')
+        else (
+          let resr = f (UnOp (IsInt, re')) in
+           L.verbose (fun fmt -> fmt "\trhs: %a" Expr.pp resr);
+          if (f (UnOp (IsInt, re')) = Lit (Bool true)) || PFS.mem pfs resr then
+            UnOp (IsInt, le')
+          else
+            le
+        )
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in
