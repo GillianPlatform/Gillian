@@ -75,7 +75,6 @@ function needs(condition, errorMessage) {
       (ret == false)
 */
 function readElements(elementCount, fieldsPerElement, buffer, readPos) {
-  /* @tactic unfold Uint8Array (#buffer, #ab, #viewOffset, #viewSize) */
   var dataView = new DataView(
     buffer.buffer,
     buffer.byteOffset,
@@ -129,7 +128,6 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         [bind: #doneEl, #innerLoopReadPos, #fLeft, #remElList, #remElLength, #doneElList, #doneElLength] */
     while (fieldCount--) {
       /* @tactic
-          unfold innerLoopInvariantFacts(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #eLength, #remElsLength, #doneElLength, #remElLength);
           if (#definition = "Complete") then {
               unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
           } else {
@@ -810,19 +808,7 @@ function deserializeMessageHeader(messageBuffer) {
 
   var suiteId = dataView.getUint16(2, false)  // big endian
   /* Precondition: suiteId must match supported algorithm suite */
-  /*
-    @tactic
-        if (#definition = "Complete") then {
-            unfold CAlgorithmSuite(#suiteId, #stringId, #headerIvLength, #tagLength)
-        }
-  */
   needs(AlgorithmSuiteIdentifier[suiteId], 'Malformed Header: Unsupported algorithm suite.')
-  /*
-    @tactic
-        if (#definition = "Complete") then {
-            fold CAlgorithmSuite(#suiteId, #stringId, #headerIvLength, #tagLength)
-        }
-  */
   var messageId = messageBuffer.slice(4, 20)
   var contextLength = dataView.getUint16(20, false) // big endian
 
