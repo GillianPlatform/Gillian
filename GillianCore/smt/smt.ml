@@ -30,7 +30,7 @@ let solver : solver ref =
       command = (fun _ -> failwith "Uninitialized solver");
       stop = (fun () -> failwith "Uninitialized solver");
       force_stop = (fun () -> failwith "Uninitialized solver");
-      config = _debug_z3_config;
+      config = z3;
       raw_command = (fun _ -> failwith "Uninitialized solver");
     }
 
@@ -38,7 +38,7 @@ let cmd s = ack_command !solver s
 let () = Sys.(set_signal sigpipe Signal_ignore)
 
 let rec init_solver () =
-  let z3 = new_solver _debug_z3_config in
+  let z3 = new_solver z3 in
   let command = protected_command z3 in
   let () = solver := { z3 with command } in
   (* Config, initial decls *)
