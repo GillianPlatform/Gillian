@@ -487,7 +487,9 @@ struct
     | SubAction action, idx :: args ->
         Logging.tmi (fun m ->
             m "Executing action %s with args %a and idx %a"
-              (S.action_to_str action) (Fmt.list Expr.pp) args Expr.pp idx);
+              (S.action_to_str action)
+              (Fmt.list ~sep:Fmt.comma Expr.pp)
+              args Expr.pp idx);
         let** s, idx', ss = get s idx in
         let+ r = S.execute_action action ss args in
         let ( let+^ ) = lifting_err idx idx' in

@@ -1,11 +1,13 @@
+import "Gillian-LLVM/examples/rt/runtime.gil";
+
 proc main() {
     x := fresh_svar();
-    assume((x == 0i));
+    assume((x == 1i));
     goto [ x = 1i ] true_case false_case;
     true_case:
         y := fresh_svar();
         assume_type(y, Bitvector(32i));
-        z := {{ "int-32", y}};
+        z := {{ "i-32", y}};
         tyy := typeOf y;
         assert((tyy == Bitvector(32i)));
         goto end;
@@ -19,13 +21,11 @@ proc main() {
 
 
     end:
-        ptr_l := [alloc](0i, 4i);
-        ptr := l-nth(ptr_l, 0i);
-        a := [store]("i-32", ptr, 0i, z);
-        b := [load]("i-32", ptr, 0i);
-        end_val := l-nth(b, 0i);
-        value := l-nth(end_val, 1i);
-        assert((true));
+        ptr_l := "llvm_alloca"({{ "i-64", 0x0v64 }}, {{ "i-64", 0x4v64 }}); 
+        a := "llvm_store"("i-32", ptr_l, z);
+        b := "llvm_load"("i-32", ptr_l);
+        end_val := l-nth(b, 1i); 
+        assert(end_val == y);
         ret := end_val;
         return
 };
