@@ -60,7 +60,9 @@ module Error = struct
     | true, CompilationError { msg; _ } ->
         Fmt.pf fmt "Error during compilation.\n%s" msg
     | _, OperationError o -> Fmt.pf fmt "%s" o
-    | _, InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
+    | _, InternalError { msg; backtrace; _ } ->
+        let backtrace = Option.value backtrace ~default:"<missing backtrace>" in
+        Fmt.pf fmt "Internal error!\n%s\n\n%s" msg backtrace
 
   let show' ?brief = Fmt.to_to_string (pp' ?brief)
   let pp = pp' ~brief:false

@@ -22,11 +22,11 @@ let pp_err _ _ =
 
 let parse_and_compile_files files :
     ( Gil_parser.annot,
-      init_data,
-      tl_ast )
+      tl_ast,
+      init_data )
     Gillian.Command_line.ParserAndCompiler.compiled_progs
     Utils.Gillian_result.t =
-  let eprogs =
+  let gil_progs =
     List.map
       (fun fl ->
         let eprog = Gil_parser.parse_eprog_from_file fl in
@@ -40,13 +40,8 @@ let parse_and_compile_files files :
             failwith msg)
       files
   in
-  Ok
-    {
-      gil_progs = eprogs;
-      source_files = Gillian.IncrementalAnalysis.SourceFiles.make ();
-      tl_ast = ();
-      init_data = ();
-    }
+  let source_files = Gillian.IncrementalAnalysis.SourceFiles.make () in
+  Ok { gil_progs; source_files; tl_ast = (); init_data = () }
 
 let other_imports = []
 let default_import_paths = None

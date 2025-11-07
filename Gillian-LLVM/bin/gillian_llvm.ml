@@ -1,25 +1,26 @@
 open Llvm_memory_model
+open Gillian_llvm_lib
 module SMemory = Memories.SMemory
 module Init_data = Gillian.General.Init_data.Dummy
-module DummyParserAndCompiler = ParserAndCompiler.Dummy
+module PassthruParserAndCompiler = NoopParser
 
-module DummyLifter (V : Gillian.Abstraction.Verifier.S) :
+module PassthruLifter (V : Gillian.Abstraction.Verifier.S) :
   Debugger_lifter.S
     with type memory = SMemory.t
      and type memory_error = SMemory.err_t
-     and type tl_ast = DummyParserAndCompiler.tl_ast
+     and type tl_ast = PassthruParserAndCompiler.tl_ast
      and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-     and type annot = DummyParserAndCompiler.Annot.t
-     and type init_data = DummyParserAndCompiler.init_data
-     and type pc_err = DummyParserAndCompiler.err = struct
-  type pc_err = DummyParserAndCompiler.err
+     and type annot = PassthruParserAndCompiler.Annot.t
+     and type init_data = PassthruParserAndCompiler.init_data
+     and type pc_err = PassthruParserAndCompiler.err = struct
+  type pc_err = PassthruParserAndCompiler.err
   type init_data = unit
   type t = unit
   type memory = SMemory.t
   type memory_error = SMemory.err_t
-  type tl_ast = DummyParserAndCompiler.tl_ast
+  type tl_ast = PassthruParserAndCompiler.tl_ast
   type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
-  type annot = DummyParserAndCompiler.Annot.t
+  type annot = PassthruParserAndCompiler.Annot.t
 
   type exec_args =
     Logging.Report_id.t option
@@ -92,12 +93,12 @@ end
 module CLI =
   Gillian.Command_line.Make (Init_data) (States.Cmemory.Make (Init_data))
     (SMemory)
-    (DummyParserAndCompiler)
+    (PassthruParserAndCompiler)
     (LLVM.ExternalSemantics)
     (struct
       let runners : Gillian.Bulk.Runner.t list =
         [ (module Gillian_llvm_lib.SRunner) ]
     end)
-    (DummyLifter)
+    (PassthruLifter)
 
 let () = CLI.main ()
