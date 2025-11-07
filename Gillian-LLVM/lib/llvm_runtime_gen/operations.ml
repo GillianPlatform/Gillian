@@ -327,7 +327,7 @@ let pattern_function_unary
     let int_val = Expr.list_nth regular_val 1 in
     let result_type =
       match shape.width_of_result with
-      | Some width -> Expr.string ("int-" ^ string_of_int width)
+      | Some width -> Expr.string ("i-" ^ string_of_int width)
       | None -> failwith "Unary operations should have a result width"
     in
     let* _ =
@@ -589,7 +589,7 @@ let conversion_patterns
     let converted_val = op [ float_val ] shape in
     let target_type =
       match shape.width_of_result with
-      | Some width -> Expr.string ("int-" ^ string_of_int width)
+      | Some width -> Expr.string ("i-" ^ string_of_int width)
       | None -> failwith "Unary operations should have a result width"
     in
     let* _ = add_return_of_value (Expr.EList [ target_type; converted_val ]) in
@@ -652,7 +652,7 @@ let conversion_patterns_generalized
     let* converted_val = op [ float_val ] shape in
     let target_type =
       match shape.width_of_result with
-      | Some width -> Expr.string ("int-" ^ string_of_int width)
+      | Some width -> Expr.string ("i-" ^ string_of_int width)
       | None -> failwith "Unary operations should have a result width"
     in
     let* _ = add_return_of_value (Expr.EList [ target_type; converted_val ]) in
