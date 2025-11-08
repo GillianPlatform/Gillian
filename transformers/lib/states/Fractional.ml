@@ -13,7 +13,7 @@ type t = (Expr.t * Expr.t) option [@@deriving show, yojson]
 
 type err_t = MissingState | NotEnoughPermission [@@deriving show, yojson]
 type action = Load | Store
-type pred = Frac
+type pred = Frac [@@deriving yojson]
 
 let action_from_str = function
   | "load" -> Some Load
