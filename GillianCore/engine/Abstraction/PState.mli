@@ -24,6 +24,17 @@ module type S = sig
     unit ->
     t
 
+  val make_p_from_heap :
+    pred_defs:MP.preds_tbl_t ->
+    store:store_t ->
+    heap:heap_t ->
+    spec_vars:SS.t ->
+    wands:Wands.t ->
+    preds:Preds.t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    t
+
   val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)

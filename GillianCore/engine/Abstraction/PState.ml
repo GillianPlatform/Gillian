@@ -24,6 +24,17 @@ module type S = sig
     unit ->
     t
 
+  val make_p_from_heap :
+    pred_defs:MP.preds_tbl_t ->
+    store:store_t ->
+    heap:heap_t ->
+    spec_vars:SS.t ->
+    wands:Wands.t ->
+    preds:Preds.t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    t
+
   val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
@@ -121,6 +132,21 @@ module Make (State : SState.S) :
       () : t =
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
     { state; preds = Preds.init []; wands = Wands.init []; pred_defs = preds }
+
+  let make_s_from_heap ~heap:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ =
+    failwith "Calling make_s_from_heap on SState"
+
+  let make_p_from_heap
+      ~pred_defs
+      ~store
+      ~heap
+      ~spec_vars
+      ~wands
+      ~preds
+      ~pfs
+      ~gamma =
+    let sstate = State.make_s_from_heap ~store ~heap ~spec_vars ~pfs ~gamma in
+    { state = sstate; preds; wands; pred_defs }
 
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"

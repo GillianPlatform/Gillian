@@ -18,6 +18,14 @@ module type S = sig
     spec_vars:SS.t ->
     t
 
+  val make_s_from_heap :
+    heap:heap_t ->
+    store:store_t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    spec_vars:SS.t ->
+    t
+
   val init : init_data -> t
   val get_init_data : t -> init_data
   val clear_resource : t -> t
@@ -55,6 +63,14 @@ module Make (SMemory : SMemory.S) :
   type init_data = SMemory.init_data
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
+
+  let make_s_from_heap
+      ~(heap : heap_t)
+      ~(store : store_t)
+      ~(pfs : PFS.t)
+      ~(gamma : Type_env.t)
+      ~(spec_vars : SS.t) : t =
+    { heap; store; pfs; gamma; spec_vars }
 
   exception Internal_State_Error of err_t list * t
 
