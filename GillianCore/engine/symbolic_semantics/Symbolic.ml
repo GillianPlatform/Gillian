@@ -6,6 +6,8 @@ module Values = struct
 
   (** @inline *)
   include SVal.M
+
+  module Subst = SVal.SESubst
 end
 
 (** @canonical Gillian.Symbolic.Subst *)
@@ -56,3 +58,9 @@ module Dummy_memory = SMemory.Dummy
 
 (** @canonical Gillian.Symbolic.Legacy_s_memory *)
 module Legacy_s_memory = Legacy_s_memory
+
+(** @canonical Gillian.Symbolic.Store *)
+module Store = SStore
+
+module SState = SState
+module PState = PState
