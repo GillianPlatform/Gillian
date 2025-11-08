@@ -40,6 +40,8 @@ module type S = sig
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t
 
+  val get_wands : t -> Wands.t
+
   (** Set preds of given symbolic state *)
   val set_preds : t -> Preds.t -> t
 
@@ -179,6 +181,7 @@ module Make (State : SState.S) :
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
   let set_wands astate wands = { astate with wands }
+  let get_wands (astate : t) : Wands.t = astate.wands
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in

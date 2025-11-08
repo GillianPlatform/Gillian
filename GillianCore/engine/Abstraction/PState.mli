@@ -43,6 +43,8 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_preds : t -> Preds.t -> t
 
+  val get_wands : t -> Wands.t
+
   (** Set wands of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
