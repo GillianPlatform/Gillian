@@ -1,8 +1,8 @@
 
 proc main() {
     x := $l_sym;
-    r := [setZeros](x,0i,4i, "Freeable");
-    nr := [load]("i-32", x, 0i);
+    r := [setZeros](x,0x0v64,0x4v64, "Freeable");
+    nr := [load]("i-32", x, 0x0v64);
     ret := l-nth(nr,0i);
     return
 };
