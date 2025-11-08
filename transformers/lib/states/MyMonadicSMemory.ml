@@ -129,8 +129,8 @@ end
 
 (** Functor to convert composable, typed state models into Gillian monadic state
     models *)
-module Make (Mem : S) (ID : ID) : MonadicSMemory.S with type init_data = ID.t =
-struct
+module Make (Mem : S) (ID : ID) :
+  MonadicSMemory.S with type init_data = ID.t and type t = Mem.t = struct
   include Mem
   include Defaults
 
