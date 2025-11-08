@@ -4,15 +4,12 @@ module DL = Debugger_log
 
 module type S = sig
   type heap_t
-  type state
   type m_err
   type annot
 
-  module SPState :
-    PState.S
-      with type t = state
-       and type heap_t = heap_t
-       and type m_err_t = m_err
+  module SPState : PState.S with type heap_t = heap_t and type m_err_t = m_err
+
+  type state = SPState.t
 
   module SState :
     SState.S with type t = SPState.state_t and type heap_t = heap_t

@@ -1,11 +1,18 @@
 (** Interface for GIL Predicate States. They are considered to be mutable. *)
 module type S = sig
-  include SState.S
-
   type state_t
-  type abs_t = string * vt list
+  type abs_t = string * SVal.M.t list
 
   module SMatcher : Matcher.S with type state_t = state_t
+
+  type t = SMatcher.t = {
+    state : state_t;
+    preds : Preds.t;
+    wands : Wands.t;
+    pred_defs : MP.preds_tbl_t;
+  }
+
+  include SState.S with type t := t
 
   val make_p :
     preds:MP.preds_tbl_t ->
