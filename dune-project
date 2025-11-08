@@ -104,6 +104,8 @@
  (depends
   (gillian
    (= :version))
+  (transformers
+   (= :version))
   dune-site
   printbox-text))
 
