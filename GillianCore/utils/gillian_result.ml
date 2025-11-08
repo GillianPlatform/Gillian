@@ -96,7 +96,7 @@ module Exc = struct
 
   let () =
     Printexc.register_printer @@ function
-    | Gillian_error e -> Some (Error.show_brief e)
+    | Gillian_error e -> Some (Error.show e)
     | _ -> None
 
   let internal_error ?(additional_data : (string * Yojson.Safe.t) list = []) msg
