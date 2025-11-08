@@ -116,13 +116,13 @@ end
     callback, that is called whenever memory is initialised with some init data.
 *)
 module type ID = sig
-  type t
+  type t [@@deriving yojson]
 
   val init : t -> unit
 end
 
 module DummyID : ID with type t = unit = struct
-  type t = unit
+  type t = unit [@@deriving yojson]
 
   let init () = ()
 end

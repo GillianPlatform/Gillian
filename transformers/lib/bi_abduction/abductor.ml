@@ -9,10 +9,11 @@ module L = Gillian.Logging
 (** This functor expects to receive a symbolic memory that was *not* transformed
     through the Bi_abd combinator. *)
 module Make
-    (SMemory : States.MyMonadicSMemory.S)
     (Init_data : States.MyMonadicSMemory.ID)
+    (SMemory : States.MyMonadicSMemory.S)
     (PC : ParserAndCompiler.S with type init_data = Init_data.t)
-    (External : External.T(PC.Annot).S) =
+    (External : External.T(PC.Annot).S) :
+  Abductor.S with type init_data = PC.init_data and type annot = PC.Annot.t =
 struct
   (* We first construct memory that performs bi-abduction *)
   module BiMemory = States.Bi_abd.Make (SMemory)
@@ -101,5 +102,19 @@ struct
     (* So first we need to extract a state that corresponds to the *)
   end
 
-  module Abductor = Abductor.Make_raw (PC) (SPState) (BiProcess) (External)
+  include Abductor.Make_raw (PC) (SPState) (BiProcess) (External)
+end
+
+module Cli
+    (Init_data : States.MyMonadicSMemory.ID)
+    (SMemory : States.MyMonadicSMemory.S)
+    (PC : ParserAndCompiler.S with type init_data = Init_data.t)
+    (External : External.T(PC.Annot).S) =
+struct
+  module Gil_parsing = Gil_parsing.Make (PC.Annot)
+  module Abductor = Make (Init_data) (SMemory) (PC) (External)
+
+  include
+    Gillian.Command_line.Act_console.Make (Init_data) (PC) (Abductor)
+      (Gil_parsing)
 end

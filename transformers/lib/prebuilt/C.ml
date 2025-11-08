@@ -149,7 +149,7 @@ module ExternalSemantics =
 module InitData = Cgil_lib.Global_env
 
 module MyInitData = struct
-  type t = InitData.t
+  type t = InitData.t [@@deriving yojson]
 
   let init = C_states.CGEnv.set_init_data
 end

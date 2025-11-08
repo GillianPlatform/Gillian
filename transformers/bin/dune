@@ -13,6 +13,7 @@
   t_wisl_s
   t_wislf
   t_wislf_a
-  t_wislf_s)
+  t_wislf_s
+  c_bi_abd)
  (package transformers)
- (libraries prebuilt states gillian))
+ (libraries prebuilt states gillian transformers_abductor))

@@ -42,7 +42,7 @@ end
    We try to aggregate the logic of creating specs and running tests in a single module. *)
 module Make_raw
     (PC : ParserAndCompiler.S)
-    (State : SimplifiedSState)
+    (State : SimplifiedSState with type init_data = PC.init_data)
     (BiProcess :
       BiProcessingS
         with type state_t = State.t
