@@ -57,10 +57,6 @@ jobs:
         run: opam exec -- dune build @all
       - name: Basic tests
         run: opam exec -- dune test
-      - name: Generate LLVM Runtime
-        run: opam exec -- dune exec -- gillian-llvm-runtime-gen Gillian-LLVM/examples/rt/template.json Gillian-LLVM/examples/rt/runtime.gil
-      - name: Gillian-LLVM Tests
-        run: opam exec -- dune exec gillian-llvm  -- bulk-wpst Gillian-LLVM/examples/wpst
       - name: Wisl checks
         run: "opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh"
       - name: Format checking
@@ -87,7 +83,38 @@ jobs:
       #   if: runner.os == 'Linux'
       - name: Setting dependency cache
         run: opam clean
-        if: steps.restore-cache.outputs.cache-hit != 'true'
+        if: steps.restore-cache.outputs.cache-hit != 'true' 
+
+  gillian_llvm_tests:
+    strategy:
+      matrix:
+        operating-system: [ubuntu-latest]
+    runs-on: ${{ matrix.operating-system }}
+    needs: build
+    steps:
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "ocaml-variants.5.3.0+options"
+      - name: Checkout project
+        uses: actions/checkout@v3
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ runner.os }}-opam
+          path: opam
+      - name: Extract release
+        run: |
+          tar xzf opam/opam.tar.gz
+          rm -rf opam
+      - name: Generate runtime
+        run: opam exec -- dune exec -- gillian-llvm-runtime-gen Gillian-LLVM/examples/rt/template.json Gillian-LLVM/examples/rt/runtime.gil
+      - name: WPST mode tests
+        run: opam exec -- dune exec gillian-llvm -- bulk-wpst Gillian-LLVM/examples/wpst
 
   gillian_c_tests:
     strategy:
