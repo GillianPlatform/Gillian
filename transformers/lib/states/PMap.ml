@@ -42,7 +42,8 @@ module DO = Delayed_option
 type index_mode = Static | Dynamic
 
 module type PMapImpl = sig
-  type entry
+  module Entry : MyMonadicSMemory.S
+
   type t [@@deriving yojson]
 
   val mode : index_mode
@@ -70,29 +71,28 @@ module type PMapImpl = sig
 
       This function should assume the index is valid (ie. it was returned by
       `validate_index`). *)
-  val get : t -> Expr.t -> (Expr.t * entry) option Delayed.t
+  val get : t -> Expr.t -> (Expr.t * Entry.t) option Delayed.t
 
   (** Updates the entry with the given state; `idx` represents the previous
       index of the state, in case a new index was found for it. In other words,
       after this operation the map must store nothing at `idx`, and the new
       state at `idx'`. `idx` and `idx'` can be equal, in which case the state is
       just added/updated. *)
-  val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
+  val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
 
   val empty : t
-  val fold : (Expr.t -> entry -> 'a -> 'a) -> t -> 'a -> 'a
-  val for_all : (entry -> bool) -> t -> bool
+  val fold : (Expr.t -> Entry.t -> 'a -> 'a) -> t -> 'a -> 'a
+  val for_all : (Entry.t -> bool) -> t -> bool
   val compose : t -> t -> t Delayed.t
   val substitution_in_place : Subst.t -> t -> t Delayed.t
 end
 
 module type OpenPMapType = sig
   include MyMonadicSMemory.S
+  module Entry : MyMonadicSMemory.S
 
-  type entry
-
-  val get : t -> Expr.t -> (t * Expr.t * entry, err_t) DR.t
-  val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
+  val get : t -> Expr.t -> (t * Expr.t * Entry.t, err_t) DR.t
+  val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
 end
 
 module type PMapType = sig
@@ -102,12 +102,12 @@ module type PMapType = sig
 end
 
 module Make
-    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with type entry = S.t)
+    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with module Entry = S)
     (S : MyMonadicSMemory.S) =
 struct
   module I = I_Cons (S)
+  module Entry = S
 
-  type entry = S.t
   type t = I.t * Expr.t option [@@deriving yojson]
 
   let pp fmt ((h, d) : t) =
@@ -405,7 +405,7 @@ struct
 end
 
 module MakeOpen
-    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with type entry = S.t)
+    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with module Entry = S)
     (S : MyMonadicSMemory.S) =
 struct
   module I = I_Cons (S)
@@ -413,7 +413,8 @@ struct
   let () =
     if I.mode = Dynamic then failwith "Dynamic mode not supported for OpenPMap"
 
-  type entry = S.t
+  module Entry = S
+
   type t = I.t [@@deriving yojson]
 
   let pp fmt (h : t) =
@@ -639,7 +640,8 @@ module MakeBaseImpl
     (I : PMapIndex)
     (S : MyMonadicSMemory.S) =
 struct
-  type entry = S.t
+  module Entry = S
+
   type t = S.t ExpMap.t [@@deriving yojson]
 
   let mode = I.mode
@@ -678,7 +680,8 @@ module MakeSplitImpl
     (I : PMapIndex)
     (S : MyMonadicSMemory.S) =
 struct
-  type entry = S.t
+  module Entry = S
+
   type t = S.t ExpMap.t * S.t ExpMap.t [@@deriving yojson]
 
   let mode = I.mode
@@ -753,8 +756,8 @@ module SplitImplEnt = MakeSplitImpl (MyUtils.ExpMapEnt)
 (** Implementation of an open PMap with abstract locations. *)
 module ALocImpl (S : MyMonadicSMemory.S) = struct
   module SMap = MyUtils.SMap
+  module Entry = S
 
-  type entry = S.t
   type t = S.t MyUtils.SMap.t [@@deriving yojson]
 
   let mode : index_mode = Static

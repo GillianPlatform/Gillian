@@ -205,7 +205,7 @@ end
 
 (* Patch map pretty-printing for nicer diffs *)
 module PatchedBasePMap (S : MyMonadicSMemory) :
-  OpenPMapType with type entry = S.t = struct
+  OpenPMapType with module Entry = S = struct
   include OpenPMap (LocationIndex) (S)
 
   let pp ft (h : t) =
@@ -237,13 +237,8 @@ end
     - the address to allocate into (can be 'empty' to generate new address) - defaults to empty
     - the metadata address, which is the value of the agreement (rhs of the object product) - defaults to null
    Need to take that into consideration + similarly to WISL, return the index on each action. *)
-module PatchAlloc
-    (Obj : MyMonadicSMemory)
-    (Map : OpenPMapType with type entry = Obj.t) =
-struct
+module PatchAlloc (Map : OpenPMapType) = struct
   include Map
-  module SS = Gillian.Utils.Containers.SS
-  module SMap = States.MyUtils.SMap
 
   (* Patch the alloc action *)
   let[@inline] execute_action a s args =
@@ -262,7 +257,7 @@ struct
               failwith "Invalid index given for alloc (no error handles this)"
         in
         let idx = Expr.loc_from_loc_name idx in
-        let ss, v = Obj.instantiate [ v ] in
+        let ss, v = Map.Entry.instantiate [ v ] in
         let s' = set ~idx ~idx':idx ss s in
         Delayed_result.ok (s', idx :: v)
     | _ -> execute_action a s args
@@ -272,18 +267,14 @@ end
 module Object = BaseMemoryContent (PatchDomainsetObject (ObjectBase))
 module SplitObject = BaseMemoryContent (PatchDomainsetObject (SplitObjectBase))
 
-module Wrap
-    (Obj : MyMonadicSMemory)
-    (Map : OpenPMapType with type entry = Obj.t) =
-  Filter (JSFilter) (Mapper (JSSubst) (PatchAlloc (Obj) (Map)))
+module Wrap (Map : OpenPMapType) =
+  Filter (JSFilter) (Mapper (JSSubst) (PatchAlloc (Map)))
 
 (* Actual exports *)
 
 module ParserAndCompiler = Js2jsil_lib.JS2GIL_ParserAndCompiler
 module ExternalSemantics = Semantics.External
-module MonadicSMemory_Base = Wrap (Object) (PatchedBasePMap (Object))
-module MonadicSMemory_ALoc = Wrap (Object) (PatchedALocPMap (Object))
-module MonadicSMemory_Split = Wrap (SplitObject) (PatchedBasePMap (SplitObject))
-
-module MonadicSMemory_ALocSplit =
-  Wrap (SplitObject) (PatchedALocPMap (SplitObject))
+module MonadicSMemory_Base = Wrap (PatchedBasePMap (Object))
+module MonadicSMemory_ALoc = Wrap (PatchedALocPMap (Object))
+module MonadicSMemory_Split = Wrap (PatchedBasePMap (SplitObject))
+module MonadicSMemory_ALocSplit = Wrap (PatchedALocPMap (SplitObject))

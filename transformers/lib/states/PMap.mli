@@ -4,29 +4,29 @@ open Gillian.Monadic
 type index_mode = Static | Dynamic
 
 module type PMapImpl = sig
-  type entry
+  module Entry : MyMonadicSMemory.S
+
   type t [@@deriving yojson]
 
   val mode : index_mode
   val make_fresh : unit -> Expr.t Delayed.t
   val default_instantiation : Expr.t list
   val validate_index : Expr.t -> Expr.t option Delayed.t
-  val get : t -> Expr.t -> (Expr.t * entry) option Delayed.t
-  val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
+  val get : t -> Expr.t -> (Expr.t * Entry.t) option Delayed.t
+  val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
   val empty : t
-  val fold : (Expr.t -> entry -> 'a -> 'a) -> t -> 'a -> 'a
-  val for_all : (entry -> bool) -> t -> bool
+  val fold : (Expr.t -> Entry.t -> 'a -> 'a) -> t -> 'a -> 'a
+  val for_all : (Entry.t -> bool) -> t -> bool
   val compose : t -> t -> t Delayed.t
   val substitution_in_place : Gillian.Symbolic.Subst.t -> t -> t Delayed.t
 end
 
 module type OpenPMapType = sig
   include MyMonadicSMemory.S
+  module Entry : MyMonadicSMemory.S
 
-  type entry
-
-  val get : t -> Expr.t -> (t * Expr.t * entry, err_t) result Delayed.t
-  val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
+  val get : t -> Expr.t -> (t * Expr.t * Entry.t, err_t) result Delayed.t
+  val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
 end
 
 module type PMapType = sig
@@ -36,14 +36,14 @@ module type PMapType = sig
 end
 
 module Make
-    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with type entry = S.t)
+    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with module Entry = S)
     (S : MyMonadicSMemory.S) :
-  PMapType with type entry = S.t and type t = I_Cons(S).t * Expr.t option
+  PMapType with module Entry = S and type t = I_Cons(S).t * Expr.t option
 
 module MakeOpen
-    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with type entry = S.t)
+    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with module Entry = S)
     (S : MyMonadicSMemory.S) :
-  OpenPMapType with type entry = S.t and type t = I_Cons(S).t
+  OpenPMapType with module Entry = S and type t = I_Cons(S).t
 
 module type PMapIndex = sig
   val mode : index_mode
@@ -63,16 +63,16 @@ type 'e t_split_ent := 'e MyUtils.ExpMapEnt.t * 'e MyUtils.ExpMapEnt.t
 type 'e t_aloc := 'e MyUtils.SMap.t
 
 module BaseImplSat : functor (I : PMapIndex) (S : MyMonadicSMemory.S) ->
-  PMapImpl with type t = S.t t_base_sat and type entry = S.t
+  PMapImpl with type t = S.t t_base_sat and module Entry = S
 
 module BaseImplEnt : functor (I : PMapIndex) (S : MyMonadicSMemory.S) ->
-  PMapImpl with type t = S.t t_base_ent and type entry = S.t
+  PMapImpl with type t = S.t t_base_ent and module Entry = S
 
 module SplitImplSat : functor (I : PMapIndex) (S : MyMonadicSMemory.S) ->
-  PMapImpl with type t = S.t t_split_sat and type entry = S.t
+  PMapImpl with type t = S.t t_split_sat and module Entry = S
 
 module SplitImplEnt : functor (I : PMapIndex) (S : MyMonadicSMemory.S) ->
-  PMapImpl with type t = S.t t_split_ent and type entry = S.t
+  PMapImpl with type t = S.t t_split_ent and module Entry = S
 
 module ALocImpl : functor (S : MyMonadicSMemory.S) ->
-  PMapImpl with type t = S.t t_aloc and type entry = S.t
+  PMapImpl with type t = S.t t_aloc and module Entry = S
