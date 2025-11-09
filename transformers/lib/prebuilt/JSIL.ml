@@ -155,6 +155,8 @@ module BaseMemoryContent (S : MyMonadicSMemory) = struct
     PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S))) (Agreement)
 
   include ActionAdder (DeleteActionAddition (S)) (S)
+
+  let get_metadata (_, s2) = s2
 end
 
 (* Override pretty printing, implement `is_not_nono` *)
@@ -224,7 +226,12 @@ module PatchedBasePMap (S : MyMonadicSMemory) :
 end
 
 (* Patch map pretty-printing for nicer diffs *)
-module PatchedALocPMap (S : MyMonadicSMemory) = struct
+module PatchedALocPMap (S : sig
+  include MyMonadicSMemory
+
+  val get_metadata : t -> Expr.t option
+end) =
+struct
   include OpenALocPMap (S)
 
   let pp ft (h : t) =
@@ -235,6 +242,39 @@ module PatchedALocPMap (S : MyMonadicSMemory) = struct
     in
     let pp_one ft (loc, fv_pairs) = pf ft "@[%s |-> %a@]" loc S.pp fv_pairs in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
+
+  let get_recovery_tactic s e =
+    let current_recovery =
+      (* We use the regular recovery tactic of the map *)
+      get_recovery_tactic s e
+    in
+    match current_recovery.try_unfold with
+    | Some l ->
+        let alocs =
+          List.filter
+            (function
+              | Expr.ALoc _ | Lit (Loc _) -> true
+              | _ -> false)
+            l
+        in
+        if List.is_empty alocs then
+          (* Saves us some iterations *)
+          current_recovery
+        else
+          let locs_to_add =
+            States.MyUtils.SMap.fold
+              (fun key obj acc ->
+                match S.get_metadata obj with
+                | Some e when List.exists (Expr.equal e) alocs -> key :: acc
+                | _ -> acc)
+              s []
+          in
+          let expr_to_add = List.map Expr.loc_from_loc_name locs_to_add in
+          let try_unfold =
+            Some (List.sort_uniq Expr.compare (expr_to_add @ l))
+          in
+          { current_recovery with try_unfold }
+    | None -> current_recovery
 end
 
 (* When allocating, two params are given:
