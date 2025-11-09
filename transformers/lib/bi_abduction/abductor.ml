@@ -1,6 +1,7 @@
 open Gillian
 open Gillian.Symbolic
 open Gillian.General
+open Gil_syntax
 module MP = Gillian.Abstraction.MP
 module L = Gillian.Logging
 module SSubst = Symbolic.Subst
@@ -64,8 +65,19 @@ struct
           ~wands:(SPState.get_wands bi_state)
           ~preds:(SPState.get_preds bi_state)
       in
+      (* To avoid unfeasible matching plans, we bring up equalities that avoid variable disconnection. *)
       let anti_frame =
-        States.Fix.to_asrt ~pred_to_str:SMemory.pred_to_str anti_frame
+        let spatial =
+          States.Fix.to_asrt ~pred_to_str:SMemory.pred_to_str anti_frame
+        in
+        let equalities =
+          SPState.get_pfs bi_state |> Pure_context.to_list
+          |> List.filter (function
+               | Expr.BinOp (_, Equal, _) -> true
+               | _ -> false)
+          |> List.map (fun e -> Asrt.Pure e)
+        in
+        spatial @ equalities
       in
       (current, anti_frame)
   end

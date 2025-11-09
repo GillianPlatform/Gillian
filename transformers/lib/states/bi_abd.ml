@@ -37,7 +37,12 @@ module Make (Mem : MyMonadicSMemory.S) :
           (* This is the missing error case *)
           (* We take each fix one by one *)
           let* cp_list =
-            Mem.get_fixes err |> List.map Delayed.return |> Delayed.branches
+            let fixes = Mem.get_fixes err in
+            Logging.verbose (fun m ->
+                m "Attempting to fix %a with candidates: %a" Mem.pp_err_t err
+                  (Fmt.Dump.list (Fix.pp (Fmt.of_to_string Mem.pred_to_str)))
+                  fixes);
+            List.map Delayed.return fixes |> Delayed.branches
           in
           let* state' =
             List.fold_left
