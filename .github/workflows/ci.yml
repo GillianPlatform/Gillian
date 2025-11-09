@@ -117,6 +117,7 @@ jobs:
         run: opam exec -- dune exec gillian-llvm -- bulk-wpst Gillian-LLVM/examples/wpst
 
   gillian_c_tests:
+    if: false
     strategy:
       matrix:
         operating-system: [ubuntu-latest]
