@@ -391,10 +391,10 @@ struct
 
   let get_fixes = function
     | SubError (_idx, idx', e) ->
-        S.get_fixes e |> MyUtils.deep_map @@ lift_corepred idx'
+        S.get_fixes e |> Fix.deep_map_cps @@ lift_corepred idx'
     | MissingDomainSet ->
         let lvar = Expr.LVar (LVar.alloc ()) in
-        [ [ (DomainSet, [], [ lvar ]) ] ]
+        [ [ Res (DomainSet, [], [ lvar ]); Ty (lvar, SetType) ] ]
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 
@@ -547,7 +547,7 @@ struct
 
   let get_fixes = function
     | SubError (_idx, idx', e) ->
-        S.get_fixes e |> MyUtils.deep_map @@ lift_corepred idx'
+        S.get_fixes e |> Fix.deep_map_cps @@ lift_corepred idx'
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 

@@ -103,4 +103,5 @@ let can_fix = function
   | MissingState -> true
 
 let get_fixes = function
-  | MissingState -> [ [ (Ag, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]
+  | MissingState ->
+      [ [ Fix.Res (Ag, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]

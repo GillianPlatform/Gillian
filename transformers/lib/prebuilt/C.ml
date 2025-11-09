@@ -89,7 +89,7 @@ module ExtendMemory (S : C_PMapType) = struct
       | _ -> false
 
     let map_fixes mapper =
-      States.MyUtils.deep_map (fun (p, i, o) -> (mapper p, i, o))
+      States.Fix.deep_map_cps (fun (p, i, o) -> (mapper p, i, o))
 
     let get_fixes = function
       | BaseError e -> S.get_fixes e |> map_fixes S.pred_to_str

@@ -177,7 +177,9 @@ module Make (Mem : S) (ID : ID) :
   let get_fixes (e : err_t) =
     let fixes = get_fixes e in
     MyUtils.deep_map
-      (fun (p, ins, outs) -> Asrt.CorePred (pred_to_str p, ins, outs))
+      (function
+        | Fix.Res (p, ins, outs) -> Asrt.CorePred (pred_to_str p, ins, outs)
+        | Ty (e, t) -> Asrt.Types [ (e, t) ])
       fixes
 
   (* Override methods to keep implementations light *)

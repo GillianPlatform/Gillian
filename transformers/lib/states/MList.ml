@@ -230,9 +230,9 @@ module Make (S : MyMonadicSMemory.S) :
     | OutOfBounds _ -> false
 
   let get_fixes = function
-    | SubError (idx, e) -> S.get_fixes e |> MyUtils.deep_map (lift_corepred idx)
+    | SubError (idx, e) -> S.get_fixes e |> Fix.deep_map_cps (lift_corepred idx)
     | MissingLength ->
         let lvar = Expr.LVar (LVar.alloc ()) in
-        [ [ (Length, [], [ lvar ]) ] ]
+        [ [ Fix.Res (Length, [], [ lvar ]); Ty (lvar, IntType) ] ]
     | _ -> failwith "Called get_fixes on unfixable error"
 end

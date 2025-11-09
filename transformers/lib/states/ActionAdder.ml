@@ -65,7 +65,7 @@ struct
     | BaseErr e -> S.get_fixes e
     | AddedErr e ->
         A.get_fixes e
-        |> MyUtils.deep_map @@ fun (p, i, o) ->
+        |> Fix.deep_map_cps @@ fun (p, i, o) ->
            (S.pred_from_str p |> Option.get, i, o)
 
   let get_recovery_tactic = function

@@ -46,9 +46,14 @@ module Make (Mem : MyMonadicSMemory.S) :
           in
           let* state' =
             List.fold_left
-              (fun state (pred, ins, outs) ->
+              (fun state atom ->
                 let* state = state in
-                Mem.produce pred state (ins @ outs))
+                match atom with
+                | Fix.Res (pred, ins, outs) ->
+                    Mem.produce pred state (ins @ outs)
+                | Ty (e, ty) ->
+                    let+ () = Delayed.assume_types [ (e, ty) ] in
+                    state)
               (Delayed.return state.state)
               cp_list
           in

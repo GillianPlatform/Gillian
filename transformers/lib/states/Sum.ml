@@ -192,7 +192,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
 
   let get_fixes e =
     match e with
-    | E1 e1 -> S1.get_fixes e1 |> MyUtils.deep_map lift_corepred_1
-    | E2 e2 -> S2.get_fixes e2 |> MyUtils.deep_map lift_corepred_2
+    | E1 e1 -> S1.get_fixes e1 |> Fix.deep_map_cps lift_corepred_1
+    | E2 e2 -> S2.get_fixes e2 |> Fix.deep_map_cps lift_corepred_2
     | _ -> failwith "get_fixes: invalid error"
 end
