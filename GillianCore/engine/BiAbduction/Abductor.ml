@@ -70,7 +70,7 @@ struct
       List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (Expr.LVar x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (SS.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -101,11 +101,8 @@ struct
 
       L.verbose (fun m ->
           m
-            "Going to create a spec for @[<h>%s(%a)@]\n\
-             @[<v 2>AF:@\n\
-             %a@]@\n\
-             @[<v 2>Final STATE:@\n\
-             %a@]"
+            "Going to create a spec for @[<h>%s(%a)@]@\n\
+             @[<v 0>@[<v 2>AF:@ %a@] @[<v 2>Final STATE: %a@]@]"
             name
             Fmt.(list ~sep:comma string)
             params Asrt.pp af_asrt BiProcess.NonBiPState.pp state_f);
