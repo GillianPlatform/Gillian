@@ -29,3 +29,7 @@ let subst (subst : Gillian.Symbolic.Subst.t) (fix : 'a t) : 'a t =
     (cp, List.map le_subst ins, List.map le_subst outs)
   in
   List.map subst_atom fix
+
+let to_asrt ~pred_to_str fix : Asrt.t =
+  ListLabels.map fix ~f:(fun (cp, ins, outs) ->
+      Asrt.CorePred (pred_to_str cp, ins, outs))

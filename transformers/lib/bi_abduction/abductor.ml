@@ -1,10 +1,9 @@
 open Gillian
 open Gillian.Symbolic
 open Gillian.General
-open Gillian.Gil_syntax
-open Utils.Containers
 module MP = Gillian.Abstraction.MP
 module L = Gillian.Logging
+module SSubst = Symbolic.Subst
 
 (** This functor expects to receive a symbolic memory that was *not* transformed
     through the Bi_abd combinator. *)
@@ -30,7 +29,6 @@ struct
   module NonBiMemory = States.MyMonadicSMemory.Make (SMemory) (Init_data)
   module NonBiMemoryLegacy = Monadic.MonadicSMemory.Lift (NonBiMemory)
   module NonBiSState = SState.Make (NonBiMemoryLegacy)
-  module NonBiSPState = PState.Make (NonBiSState)
 
   (* We define a helper to run functions under bi-abduction *)
 
@@ -45,6 +43,8 @@ struct
     type state_t = SPState.t
     type init_data = Init_data.t
 
+    module NonBiPState = PState.Make (NonBiSState)
+
     let normalise_assertion ~init_data ~prog ~pvars assertion =
       match
         Normaliser.normalise_assertion ~init_data ~pred_defs:prog.MP.preds
@@ -53,53 +53,21 @@ struct
       | Ok l -> List.map fst l
       | Error _ -> []
 
-    let make_spec
-        name
-        params
-        (_initial_state : state_t)
-        (final_state : state_t)
-        fl =
-      let pvars = SS.of_list (Utils.Names.return_variable :: params) in
-      let States.Bi_abd.{ anti_frame = _; state } =
-        SPState.get_heap final_state
+    let bistate_to_pstate_and_af (bi_state : state_t) =
+      let States.Bi_abd.{ anti_frame; state } = SPState.get_heap bi_state in
+      let current =
+        NonBiPState.make_p_from_heap ~pred_defs:bi_state.pred_defs
+          ~store:(SPState.get_store bi_state)
+          ~heap:state ~pfs:(SPState.get_pfs bi_state)
+          ~gamma:(SPState.get_typ_env bi_state)
+          ~spec_vars:(SPState.get_spec_vars bi_state)
+          ~wands:(SPState.get_wands bi_state)
+          ~preds:(SPState.get_preds bi_state)
       in
-      let final_state =
-        NonBiSPState.make_p_from_heap ~pred_defs:final_state.pred_defs
-          ~store:(SPState.get_store final_state)
-          ~heap:state
-          ~pfs:(SPState.get_pfs final_state)
-          ~gamma:(SPState.get_typ_env final_state)
-          ~spec_vars:(SPState.get_spec_vars final_state)
-          ~wands:(SPState.get_wands final_state)
-          ~preds:(SPState.get_preds final_state)
+      let anti_frame =
+        States.Fix.to_asrt ~pred_to_str:SMemory.pred_to_str anti_frame
       in
-      let post = NonBiSPState.to_assertions ~to_keep:pvars final_state in
-      let pre = [ Asrt.Emp ] in
-      let sspec =
-        Spec.
-          {
-            ss_pre = (pre, None);
-            ss_posts = [ (post, None) ];
-            ss_variant = None;
-            ss_flag = fl;
-            ss_label = None;
-            ss_to_verify = false;
-          }
-      in
-      let spec =
-        Spec.
-          {
-            spec_name = name;
-            spec_params = params;
-            spec_sspecs = [ sspec ];
-            spec_normalised = true;
-            spec_incomplete = true;
-            spec_to_verify = false;
-            spec_location = None;
-          }
-      in
-      Some spec
-    (* So first we need to extract a state that corresponds to the *)
+      (current, anti_frame)
   end
 
   include Abductor.Make_raw (PC) (SPState) (BiProcess) (External)
