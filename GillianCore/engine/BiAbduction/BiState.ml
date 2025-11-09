@@ -469,16 +469,17 @@ module Make (State : SState.S) = struct
     | Ok (state', outs) -> [ Ok ({ state = state'; af_state }, outs) ]
     | Error err when not (State.can_fix err) ->
         [ Error (lift_error { state; af_state } err) ]
-    | Error err -> (
-        match State.get_fixes err with
-        | [] -> [] (* No fix, we stop *)
-        | fixes ->
-            let* fix = fixes in
-            let state' = State.copy state in
-            let af_state' = State.copy af_state in
-            let* state' = fix_list_apply state' fix in
-            let* af_state' = fix_list_apply af_state' fix in
-            execute_action action { state = state'; af_state = af_state' } args)
+    | Error err ->
+        let fixes = State.get_fixes err in
+        Logging.verbose (fun m ->
+            m "Attempting to fix %a with candidates: %a" State.pp_err_t err
+              (Fmt.Dump.list Asrt.pp) fixes);
+        let* fix = fixes in
+        let state' = State.copy state in
+        let af_state' = State.copy af_state in
+        let* state' = fix_list_apply state' fix in
+        let* af_state' = fix_list_apply af_state' fix in
+        execute_action action { state = state'; af_state = af_state' } args
 
   let get_equal_values { state; _ } = State.get_equal_values state
   let get_heap { state; _ } = State.get_heap state
