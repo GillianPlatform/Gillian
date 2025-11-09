@@ -1681,19 +1681,19 @@ module M = struct
         let fixes =
           match chunk with
           | Mptr ->
-              let new_var1 = Expr.LVar (LVar.alloc ()) in
+              let new_var1 = Expr.ALoc (ALoc.alloc ()) in
               let new_var2 = Expr.LVar (LVar.alloc ()) in
               let value = Expr.EList [ new_var1; new_var2 ] in
-              (* let null_typ =
+              let null_typ =
                 if Compcert.Archi.ptr64 then Expr.string long_type
                 else Expr.string int_type
               in
-              let null_ptr = Expr.EList [ null_typ; Expr.int 0 ] in *)
+              let null_ptr = Expr.EList [ null_typ; Expr.int 0 ] in
               [
                 [ (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]) ];
-                (* [
+                [
                   (Single, [ ofs; chunk_as_expr ], [ null_ptr; freeable_perm ]);
-                ]; *)
+                ];
               ]
           | _ ->
               let type_str =
