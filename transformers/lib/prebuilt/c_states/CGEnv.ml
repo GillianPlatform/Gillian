@@ -56,7 +56,7 @@ module M : States.MyMonadicSMemory.S with type t = Global_env.t = struct
   let lvars _ = Gillian.Utils.Containers.SS.empty
   let alocs _ = Gillian.Utils.Containers.SS.empty
   let substitution_in_place _ s = Delayed.return s
-  let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
+  let get_recovery_tactic _ _ = Gillian.General.Recovery_tactic.none
   let list_actions () = [ (GetDef, [], []) ]
   let list_preds () = []
 end

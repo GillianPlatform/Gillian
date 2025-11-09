@@ -111,7 +111,7 @@ let assertions = function
   | Some (v, q) -> [ (Frac, [ q ], [ v ]) ]
 
 let assertions_others _ = []
-let get_recovery_tactic _ = Recovery_tactic.none
+let get_recovery_tactic _ _ = Recovery_tactic.none
 
 let can_fix = function
   | _ -> false

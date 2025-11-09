@@ -7,6 +7,7 @@ module type PMapImpl = sig
   type entry
   type t [@@deriving yojson]
 
+  val find_opt_unsafe : t -> Expr.t -> entry option
   val mode : index_mode
   val make_fresh : unit -> Expr.t Delayed.t
   val default_instantiation : Expr.t list

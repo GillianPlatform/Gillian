@@ -46,7 +46,7 @@ module DeleteActionAddition (S : MyMonadicSMemory) :
   let execute_action Delete _ _ = Delayed.return (Ok (S.empty (), []))
   let can_fix () = false
   let get_fixes () = []
-  let get_recovery_tactic () = Gillian.General.Recovery_tactic.none
+  let get_recovery_tactic _ () = Gillian.General.Recovery_tactic.none
 end
 
 (* the "Props" predicate considers its out an in, so it must be removed

@@ -215,11 +215,16 @@ module Make (S : MyMonadicSMemory.S) :
   let assertions_others (b, _) =
     List.concat_map (fun (_, v) -> S.assertions_others v) (ExpMap.bindings b)
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (idx, e) ->
+        let sub_recover =
+          match ExpMap.find_opt idx (fst st) with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
         Gillian.General.Recovery_tactic.merge
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
-          (S.get_recovery_tactic e)
+          sub_recover
     | _ -> Gillian.General.Recovery_tactic.none
 
   let can_fix = function

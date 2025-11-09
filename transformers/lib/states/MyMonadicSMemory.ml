@@ -70,7 +70,7 @@ module type S = sig
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding
       predicates *)
-  val get_recovery_tactic : err_t -> Expr.t Recovery_tactic.t
+  val get_recovery_tactic : t -> err_t -> Expr.t Recovery_tactic.t
 
   (** The set of logical variables in the state *)
   val lvars : t -> Containers.SS.t
@@ -186,6 +186,5 @@ struct
   (* Override methods to keep implementations light *)
   let clear _ = empty ()
   let pp_err = pp_err_t
-  let get_recovery_tactic _ = get_recovery_tactic
   let pp_by_need _ = pp
 end

@@ -124,9 +124,9 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
   let assertions_others (s1, s2) =
     S1.assertions_others s1 @ S2.assertions_others s2
 
-  let get_recovery_tactic = function
-    | E1 e -> S1.get_recovery_tactic e
-    | E2 e -> S2.get_recovery_tactic e
+  let get_recovery_tactic (s1, s2) = function
+    | E1 e -> S1.get_recovery_tactic s1 e
+    | E2 e -> S2.get_recovery_tactic s2 e
 
   let can_fix = function
     | E1 e -> S1.can_fix e

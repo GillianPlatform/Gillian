@@ -45,6 +45,7 @@ module type PMapImpl = sig
   type entry
   type t [@@deriving yojson]
 
+  val find_opt_unsafe : t -> Expr.t -> entry option
   val mode : index_mode
 
   (** Creates a new address, for allocating new state. Only used in static mode
@@ -175,7 +176,7 @@ struct
   let domain_add k ((h, d) : t) =
     match d with
     | None -> (h, d)
-    | Some d -> (h, Some (Expr.NOp (SetUnion, [d; Expr.ESet [ k ]])))
+    | Some d -> (h, Some (Expr.NOp (SetUnion, [ d; Expr.ESet [ k ] ])))
 
   let get ((h, d) as s) idx =
     let open Delayed.Syntax in
@@ -367,9 +368,14 @@ struct
   let assertions_others (h, _) =
     I.fold (fun _ s acc -> S.assertions_others s @ acc) h []
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (_, idx, e) ->
-        Gillian.General.Recovery_tactic.merge (S.get_recovery_tactic e)
+        let sub_recover =
+          match I.find_opt_unsafe (fst st) idx with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
+        Gillian.General.Recovery_tactic.merge sub_recover
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
     | NotAllocated idx | InvalidIndexValue idx ->
         Gillian.General.Recovery_tactic.try_unfold [ idx ]
@@ -534,9 +540,14 @@ struct
   let assertions_others h =
     I.fold (fun _ s acc -> S.assertions_others s @ acc) h []
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (_, idx, e) ->
-        Gillian.General.Recovery_tactic.merge (S.get_recovery_tactic e)
+        let sub_recover =
+          match I.find_opt_unsafe st idx with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
+        Gillian.General.Recovery_tactic.merge sub_recover
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
     | InvalidIndexValue idx ->
         Gillian.General.Recovery_tactic.try_unfold [ idx ]
@@ -636,6 +647,7 @@ struct
   type entry = S.t
   type t = S.t ExpMap.t [@@deriving yojson]
 
+  let find_opt_unsafe h idx = ExpMap.find_opt idx h
   let mode = I.mode
   let make_fresh = I.make_fresh
   let default_instantiation = I.default_instantiation
@@ -674,6 +686,11 @@ module MakeSplitImpl
 struct
   type entry = S.t
   type t = S.t ExpMap.t * S.t ExpMap.t [@@deriving yojson]
+
+  let find_opt_unsafe (h1, h2) idx =
+    match ExpMap.find_opt idx h1 with
+    | Some v -> Some v
+    | None -> ExpMap.find_opt idx h2
 
   let mode = I.mode
   let make_fresh = I.make_fresh
@@ -749,7 +766,17 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
   module SMap = MyUtils.SMap
 
   type entry = S.t
-  type t = S.t MyUtils.SMap.t [@@deriving yojson]
+  type t = S.t SMap.t [@@deriving yojson]
+
+  let find_opt_unsafe h idx =
+    let open Utils.Syntaxes.Option in
+    let* loc =
+      match idx with
+      | Expr.Lit (Loc loc) -> Some loc
+      | Expr.ALoc loc -> Some loc
+      | _ -> None
+    in
+    SMap.find_opt loc h
 
   let mode : index_mode = Static
   let make_fresh () = ALoc.alloc () |> Expr.loc_from_loc_name |> Delayed.return

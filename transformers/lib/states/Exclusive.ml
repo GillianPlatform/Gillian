@@ -91,7 +91,7 @@ let assertions = function
   | Some v -> [ (Ex, [], [ v ]) ]
 
 let assertions_others _ = []
-let get_recovery_tactic _ = Recovery_tactic.none
+let get_recovery_tactic _ _ = Recovery_tactic.none
 let can_fix MissingState = true
 
 let get_fixes MissingState =

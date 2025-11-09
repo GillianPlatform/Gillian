@@ -98,8 +98,8 @@ module ExtendMemory (S : C_PMapType) = struct
           BlockTree.get_fixes e |> map_fixes BlockTree.pred_to_str
       | _ -> []
 
-    let get_recovery_tactic = function
-      | BaseError e -> S.get_recovery_tactic e
+    let get_recovery_tactic s = function
+      | BaseError e -> S.get_recovery_tactic s e
       | BlockTreeErr (dest_idx, src_idx, _) ->
           Gillian.General.Recovery_tactic.try_unfold [ dest_idx; src_idx ]
       | _ -> Gillian.General.Recovery_tactic.none

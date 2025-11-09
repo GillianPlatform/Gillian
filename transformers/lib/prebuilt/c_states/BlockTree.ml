@@ -1655,7 +1655,7 @@ module M = struct
     let svarr_subst = SVal.SVArray.subst ~le_subst in
     substitution ~le_subst ~sval_subst ~svarr_subst s |> Delayed.return
 
-  let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
+  let get_recovery_tactic _ _ = Gillian.General.Recovery_tactic.none
 
   let instantiate = function
     | [ low; high ] ->

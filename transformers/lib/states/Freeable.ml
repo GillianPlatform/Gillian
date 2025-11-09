@@ -165,8 +165,9 @@ module Make (S : MyMonadicSMemory.S) :
     | SubState s -> S.assertions_others s
     | _ -> []
 
-  let get_recovery_tactic = function
-    | SubError e -> S.get_recovery_tactic e
+  let get_recovery_tactic s e =
+    match (s, e) with
+    | SubState s, SubError e -> S.get_recovery_tactic s e
     | _ -> Gillian.General.Recovery_tactic.none (* TODO *)
 
   let can_fix = function
