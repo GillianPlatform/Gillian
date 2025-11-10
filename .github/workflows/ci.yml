@@ -480,6 +480,7 @@ jobs:
   # #       run: "opam exec -- gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
   build-docker:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
