@@ -1,15 +1,18 @@
+open Syntaxes.Result
+
 type t = TypeDef__.pred = {
-  pred_name : string;  (** Name of the predicate  *)
+  pred_name : string;  (** Name of the predicate *)
   pred_source_path : string option;
+  pred_loc : Location.t option;
   pred_internal : bool;
-  pred_num_params : int;  (** Number of parameters   *)
-  pred_params : (string * Type.t option) list;  (** Actual parameters      *)
-  pred_ins : int list;  (** Ins                    *)
+  pred_num_params : int;  (** Number of parameters *)
+  pred_params : (string * Type.t option) list;  (** Actual parameters *)
+  pred_ins : int list;  (** Ins *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
-      (** Predicate definitions  *)
+      (** Predicate definitions *)
   pred_facts : Expr.t list;  (** Facts that hold for every definition *)
   pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
-  pred_pure : bool;  (** Is the predicate pure  *)
+  pred_pure : bool;  (** Is the predicate pure *)
   pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
   pred_normalised : bool;  (** If the predicate has been previously normalised *)
@@ -141,8 +144,8 @@ let pp fmt pred =
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =
     (* Step 1 - Extract all the program variables used in the definition
-       * -----------------------------------------------------------------------------------
-    *)
+     * -----------------------------------------------------------------------------------
+     *)
     let all_pred_pvars : string list =
       List.concat
         (List.map
@@ -151,8 +154,8 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
     in
 
     (* Step 2 - Check all predicates
-       * -----------------------------------------------------------------------------------
-    *)
+     * -----------------------------------------------------------------------------------
+     *)
     let string_of_params =
       List.map (fun (pvar, _) -> pvar) predicate.pred_params
     in
@@ -175,48 +178,45 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
 
   Hashtbl.iter check_pred_pvars predicates
 
-let extend_asrt_pred_types (preds : (string, t) Hashtbl.t) : Asrt.t -> Asrt.t =
-  List.concat_map @@ function
-  | Asrt.Pred (name, les) as a ->
-      let pred =
-        try Hashtbl.find preds name
-        with _ ->
-          raise
-            (Failure
-               ("DEATH. parameter_types: predicate " ^ name ^ " does not exist."))
-      in
-      Logging.tmi (fun fmt ->
-          fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
-            (List.length pred.pred_params)
-            (List.length les));
-      let combined =
-        try List.combine pred.pred_params les
-        with Invalid_argument _ ->
-          let message =
-            Fmt.str
+let extend_asrt_pred_types (preds : (string, t) Hashtbl.t) (a : Asrt.t) :
+    (Asrt.t, string) result =
+  let f : Asrt.atom -> (Asrt.t, string) result = function
+    | Asrt.Pred (name, les) as a ->
+        let* pred =
+          match Hashtbl.find_opt preds name with
+          | Some pred -> Ok pred
+          | None -> Error ("Predicate " ^ name ^ " does not exist.")
+        in
+        Logging.tmi (fun fmt ->
+            fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
+              (List.length pred.pred_params)
+              (List.length les));
+        let* combined =
+          try Ok (List.combine pred.pred_params les)
+          with Invalid_argument _ ->
+            Fmt.error
               "Invalid number of parameters for predicate %s which requires %i \
                parameters and was used with the following %i parameters: %a"
               pred.pred_name pred.pred_num_params (List.length les)
               (Fmt.Dump.list Expr.pp) les
-          in
-          raise (Invalid_argument message)
-      in
-      let ac_types =
-        List.fold_left
-          (fun ac_types ((_, t_x), le) ->
-            match t_x with
-            | None -> ac_types
-            | Some t_x -> (le, t_x) :: ac_types)
-          [] combined
-      in
-      [ Asrt.Types ac_types; a ]
-  | a -> [ a ]
+        in
+        let ac_types =
+          List.fold_left
+            (fun ac_types ((_, t_x), le) ->
+              match t_x with
+              | None -> ac_types
+              | Some t_x -> (le, t_x) :: ac_types)
+            [] combined
+        in
+        Ok [ Asrt.Types ac_types; a ]
+    | a -> Ok [ a ]
+  in
+  Result.map List.concat (List_utils.map_results f a)
 
-(**
-   GIL Predicates can have non-pvar parameters - to say that a given parameter
-   always has a certain value...
-  *)
-let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
+(** GIL Predicates can have non-pvar parameters - to say that a given parameter
+    always has a certain value... *)
+let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) :
+    (t, string) result =
   let new_asrts =
     List.fold_right
       (fun (x, t_x) new_asrts ->
@@ -225,9 +225,11 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
         | Some t_x -> Asrt.Types [ (PVar x, t_x) ] :: new_asrts)
       pred.pred_params []
   in
-  let new_defs =
-    List.map
-      (fun (oid, a) -> (oid, extend_asrt_pred_types preds (a @ new_asrts)))
+  let* new_defs =
+    List_utils.map_results
+      (fun (oid, a) ->
+        let* a' = extend_asrt_pred_types preds (a @ new_asrts) in
+        Ok (oid, a'))
       pred.pred_definitions
   in
   let new_facts =
@@ -240,11 +242,12 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
             :: new_facts)
       pred.pred_params []
   in
-  {
-    pred with
-    pred_definitions = new_defs;
-    pred_facts = pred.pred_facts @ new_facts;
-  }
+  Ok
+    {
+      pred with
+      pred_definitions = new_defs;
+      pred_facts = pred.pred_facts @ new_facts;
+    }
 
 let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
   let in_indexes = SI.of_list pred.pred_ins in

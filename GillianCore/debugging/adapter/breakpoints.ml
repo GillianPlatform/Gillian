@@ -1,4 +1,4 @@
-open Debug_protocol_ext
+open Protocol
 
 (**/**)
 
@@ -7,7 +7,7 @@ module DL = Debugger_log
 (**/**)
 
 module Make (Debugger : Debugger.S) = struct
-  let run dbg rpc =
+  let run { dbg; rpc; _ } =
     Lwt.pause ();%lwt
     DL.set_rpc_command_handler rpc ~name:"Set breakpoints"
       (module Set_breakpoints_command)

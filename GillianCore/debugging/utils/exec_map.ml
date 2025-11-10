@@ -1,33 +1,34 @@
 (** A map of execution of a function (symbolic or otherwise).
 
-  This is represented in a tree structure, where each node represents a command.
+    This is represented in a tree structure, where each node represents a
+    command.
 
-  Each command node comes in one of these forms:
-  - Normal ( {!Cmd} ) - a normal command with one command node as its child.
-  - Branching ({!BranchCmd}) - a command with one or more children, with each
-    child identified by a branch case type; this represents a command that has
-    multiple potential outcomes, depending on the program state (e.g. an
-    if/else). Note that this is only interesting in symbolic execution; in
-    concrete execution, they will always have exactly one branch case, thus
-    functioning similarly to normal command nodes.
-  - Final ({!FinalCmd}) - a command with no children; this represents the end
-    of an execution branch, either due to errors, or normal termination (i.e.
-    when returning from the function).
-  
-  These nodes also contain some (configurable) set of information - this
-  usually includes the relevant report ID from the log database, a
-  human-readable representation of the command, and any errors and
-  matches that occurred during executing the command.
-  
-  The child of a {!Cmd} node may be {!Nothing}, as can any child of a
-  {!BranchCmd} node; this represents that there is a command here in the code,
-  but it hasn't yet been executed. This is to facilitate the debugger's
-  step-by-step behaviour.
-  
-  A command node may also contain a submap; this embeds another exec map inside
-  this command node, either described in full or referred to by name (see
-  {!submap}). This is used to, for example, embed the body of a while-loop in
-  the while-loop command itself. *)
+    Each command node comes in one of these forms:
+    - Normal ( {!Cmd} ) - a normal command with one command node as its child.
+    - Branching ({!BranchCmd}) - a command with one or more children, with each
+      child identified by a branch case type; this represents a command that has
+      multiple potential outcomes, depending on the program state (e.g. an
+      if/else). Note that this is only interesting in symbolic execution; in
+      concrete execution, they will always have exactly one branch case, thus
+      functioning similarly to normal command nodes.
+    - Final ({!FinalCmd}) - a command with no children; this represents the end
+      of an execution branch, either due to errors, or normal termination (i.e.
+      when returning from the function).
+
+    These nodes also contain some (configurable) set of information - this
+    usually includes the relevant report ID from the log database, a
+    human-readable representation of the command, and any errors and matches
+    that occurred during executing the command.
+
+    The child of a {!Cmd} node may be {!Nothing}, as can any child of a
+    {!BranchCmd} node; this represents that there is a command here in the code,
+    but it hasn't yet been executed. This is to facilitate the debugger's
+    step-by-step behaviour.
+
+    A command node may also contain a submap; this embeds another exec map
+    inside this command node, either described in full or referred to by name
+    (see {!submap}). This is used to, for example, embed the body of a
+    while-loop in the while-loop command itself. *)
 
 (**/**)
 
@@ -50,10 +51,9 @@ let kind_of_cases = function
   | cases -> Many (List.map (fun case -> (case, ())) cases)
 
 (** An exec map / node in an exec map; takes the following type parameters:
-  - ['branch_case]: the type that identifies a branch case
-  - ['cmd_data]: the type of the data attached to each non-[Nothing] node
-  - ['branch_data]: additional data attached to each branch case
-  *)
+    - ['branch_case]: the type that identifies a branch case
+    - ['cmd_data]: the type of the data attached to each non-[Nothing] node
+    - ['branch_data]: additional data attached to each branch case *)
 (* type ('branch_case, 'cmd_data, 'branch_data) t =
      | Nothing  (** An empty space; represents a command yet to be executed*)
      | Cmd of {
@@ -99,20 +99,14 @@ type ('id, 'branch_case, 'cmd_data, 'branch_data) map = {
 
 (** A command in an exec map *)
 
-(** Used for various map-traversal commands; signifies when to stop exploring paths *)
+(** Used for various map-traversal commands; signifies when to stop exploring
+    paths *)
 type stop_at =
   | StartOfPath  (** Stop at the start of the path, i.e. as soon as possible *)
   | EndOfPath  (** Stop at the end of the path, i.e. as late as possible*)
   | BeforeNothing
-      (** As with [EndOfPath], but if the path ends with [Nothing], step back to the previous command *)
-
-(** Data about a matching *)
-type matching = {
-  id : L.Report_id.t;
-  kind : Matcher.match_kind;
-  result : Match_map.match_result;
-}
-[@@deriving yojson]
+      (** As with [EndOfPath], but if the path ends with [Nothing], step back to
+          the previous command *)
 
 type 't submap =
   | NoSubmap
@@ -167,7 +161,8 @@ let get_exn map id =
   | Some node -> node
   | None -> failwith "Exec_map.get"
 
-(** Traverse the map depth-first, giving the path to the first node that matches the given predicate (or [None] otherwise) *)
+(** Traverse the map depth-first, giving the path to the first node that matches
+    the given predicate (or [None] otherwise) *)
 let find_path pred map =
   let rec aux acc node =
     let/ () = if pred node then Some acc else None in
@@ -238,13 +233,14 @@ module Packaged = struct
     id : L.Report_id.t;
     all_ids : L.Report_id.t list;
     display : string;
-    matches : matching list;
+    matches : Match_map.matching list;
     errors : string list;
     submap : id submap;
   }
   [@@deriving yojson]
 
   type branch_data = string [@@deriving yojson]
+  type nonrec node = (L.Report_id.t, branch_case, cmd_data, branch_data) node
 
   type t = (L.Report_id.t, branch_case, cmd_data, branch_data) map
   [@@deriving yojson]

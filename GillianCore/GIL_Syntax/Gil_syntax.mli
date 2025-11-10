@@ -1,17 +1,3 @@
-(** @canonical Gillian.Gil_syntax.Location *)
-module Location : sig
-  (** Representation of a location in a source file *)
-
-  type position = { pos_line : int; pos_column : int } [@@deriving yojson]
-
-  type t = { loc_start : position; loc_end : position; loc_source : string }
-  [@@deriving yojson, eq]
-
-  val none : t
-  val pp : t Fmt.t
-  val pp_log_opt : Format.formatter -> t option -> unit
-end
-
 (** @canonical Gillian.Gil_syntax.LVar *)
 module LVar : sig
   (** Allocator for logical variable names *)
@@ -321,6 +307,7 @@ module Expr : sig
   val bv_extract : int -> int -> t -> t
   val bv_plus : t -> t -> t
   val bv_mul : t -> t -> t
+  val bv_udiv : t -> t -> t
   val bv_sub : t -> t -> t
   val bv_ule : t -> t -> t
   val bv_ult : t -> t -> t
@@ -427,6 +414,8 @@ module Expr : sig
   val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
 
   (** Pretty-printer *)
+  val pp_custom : pp:t Fmt.t -> t Fmt.t
+
   val pp : t Fmt.t
 
   (** Pretty-printer with constructors (will not parse) *)
@@ -703,6 +692,7 @@ module Pred : sig
   type t = TypeDef__.pred = {
     pred_name : string;  (** Name of the predicate *)
     pred_source_path : string option;
+    pred_loc : Location.t option;
     pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
@@ -743,7 +733,7 @@ module Pred : sig
   val check_pvars : (string, t) Hashtbl.t -> unit
 
   (** Infers parameter types and makes them explicit in the assertions *)
-  val explicit_param_types : (string, t) Hashtbl.t -> t -> t
+  val explicit_param_types : (string, t) Hashtbl.t -> t -> (t, string) result
 
   (** Combines a list of ins and a list of outs putting them in the right order
       according to a given predicate. *)
@@ -785,8 +775,8 @@ module Lemma : sig
   (** GIL Lemmas *)
 
   type spec = TypeDef__.lemma_spec = {
-    lemma_hyp : Asrt.t;  (** Hypothesis *)
-    lemma_concs : Asrt.t list;  (** Conclusion *)
+    lemma_hyp : Asrt.t Location.located;  (** Hypothesis *)
+    lemma_concs : Asrt.t Location.located list;  (** Conclusion *)
     lemma_spec_variant : Expr.t option;  (** Variant *)
   }
 
@@ -799,6 +789,7 @@ module Lemma : sig
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
     lemma_existentials : string list; (* Existentials *)
+    lemma_location : Location.t option;
   }
 
   (** Pretty-printer *)
@@ -851,10 +842,12 @@ end
 module Spec : sig
   (** GIL specifications *)
 
+  open Location
+
   (** Single specification *)
   type st = TypeDef__.single_spec = {
-    ss_pre : Asrt.t;  (** Precondition *)
-    ss_posts : Asrt.t list;  (** Postcondition *)
+    ss_pre : Asrt.t located;  (** Precondition *)
+    ss_posts : Asrt.t located list;  (** Postcondition *)
     ss_variant : Expr.t option;  (** Variant *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
@@ -869,14 +862,15 @@ module Spec : sig
     spec_normalised : bool;  (** If the spec is already normalised *)
     spec_incomplete : bool;  (** If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
+    spec_location : Location.t option;
   }
 
   (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single
       specification with the given values *)
   val s_init :
     ?ss_label:string * string list ->
-    Asrt.t ->
-    Asrt.t list ->
+    Asrt.t located ->
+    Asrt.t located list ->
     Expr.t option ->
     Flag.t ->
     bool ->
@@ -884,7 +878,15 @@ module Spec : sig
 
   (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify]
       creates a full specification with the given values *)
-  val init : string -> string list -> st list -> bool -> bool -> bool -> t
+  val init :
+    string ->
+    string list ->
+    st list ->
+    bool ->
+    bool ->
+    bool ->
+    Location.t option ->
+    t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
@@ -916,16 +918,18 @@ end
 module BiSpec : sig
   (** Bi-abductive specifications *)
 
+  open Location
+
   type t = {
     bispec_name : string;  (** Procedure/spec name *)
     bispec_params : string list;  (** Procedure/spec parameters *)
-    bispec_pres : Asrt.t list;  (** Possible preconditions *)
+    bispec_pres : Asrt.t located list;  (** Possible preconditions *)
     bispec_normalised : bool;  (** If the spec is already normalised *)
   }
 
   type t_tbl = (string, t) Hashtbl.t
 
-  val init : string -> string list -> Asrt.t list -> bool -> t
+  val init : string -> string list -> Asrt.t located list -> bool -> t
   val init_tbl : unit -> t_tbl
 
   (** Pretty-printer *)
@@ -1004,6 +1008,8 @@ module Proc : sig
     proc_spec : Spec.t option;
     proc_aliases : string list;
     proc_calls : string list;
+    proc_display_name : (string * string) option;
+    proc_hidden : bool;
   }
   [@@deriving yojson]
 

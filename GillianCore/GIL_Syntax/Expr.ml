@@ -33,6 +33,7 @@ let int n = lit (Int (Z.of_int n))
 let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let bv n w = lit (LBitvector (Z.of_int n, w))
 let bv_z (z : Z.t) (w : int) = lit (LBitvector (z, w))
 let zero_bv (w : int) = bv_z Z.zero w
 let false_ = Lit (Bool false)
@@ -40,11 +41,13 @@ let true_ = Lit (Bool true)
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
-let extract_bv_width (e : t) =
+let rec extract_bv_width (e : t) =
   match e with
   | Lit (LBitvector (_, w)) -> w
+  | EList [ Lit (String _t); (Lit (LBitvector _) as x) ]
+  (* when String.starts_with ~prefix:"i-" t *) -> extract_bv_width x
   | BVExprIntrinsic (_, _, Some w) -> w
-  | _ -> failwith "unrecoginized bitvector expression"
+  | _ -> failwith "extract_bv_width: unrecognized bitvector expression"
 
 let concat_single (little : t) (big : t) : t =
   let little_size = extract_bv_width little in
@@ -59,7 +62,15 @@ let reduce (f : 'a -> 'a -> 'a) (list : 'a List.t) : 'a =
   List.fold_right f (List.tl list) (List.hd list)
 
 let bv_concat (lst : t List.t) =
-  reduce (fun elem sum -> concat_single elem sum) lst
+  (* HACK(tnytown): BvExpr requires sized expressions *)
+  let len, exprs =
+    List.fold_left_map
+      (fun a e ->
+        let l = extract_bv_width e in
+        (a + l, BvExpr (e, l)))
+      0 lst
+  in
+  BVExprIntrinsic (BVOps.BVConcat, exprs, Some len)
 
 let bv_extract (low_index : int) (high_index : int) (e : t) : t =
   let src_width = extract_bv_width e in
@@ -87,6 +98,11 @@ let bv_mul a b =
   let width = extract_bv_width a in
   BVExprIntrinsic
     (BVOps.BVMul, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
+
+let bv_udiv a b =
+  let width = extract_bv_width a in
+  BVExprIntrinsic
+    (BVOps.BVUDiv, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_sub a b =
   let width = extract_bv_width a in
@@ -148,11 +164,12 @@ let list_nth_e x n =
   | Lit (Num _) -> failwith "l-nth of list and Num!"
   | _ -> BinOp (x, LstNth, n)
 
-let list_length x =
+let rec list_length x =
   match x with
   | EList l -> int (List.length l)
   | Lit (LList l) -> int (List.length l)
   | LstSub (_, _, len) -> len
+  | UnOp (LstRev, l) -> list_length l
   | _ -> UnOp (LstLen, x)
 
 let list_repeat x len =
@@ -494,17 +511,21 @@ let rec map_opt
       Option.map f_after mapped_expr
 
 (** Printer *)
-let rec pp fmt e =
+let pp_custom ~pp ft =
   let pp_var_with_type fmt (x, t_opt) =
     Fmt.pf fmt "%s%a" x
       (Fmt.option (fun fm t -> Fmt.pf fm " : %s" (Type.str t)))
       t_opt
+  and pp_bv_arg fmt (arg : bv_arg) =
+    match arg with
+    | Literal w -> Fmt.pf fmt "%di" w
+    | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %di)" pp e w
   in
-  match e with
-  | Lit l -> Literal.pp fmt l
-  | PVar v | LVar v | ALoc v -> Fmt.string fmt v
+  function
+  | Lit l -> Literal.pp ft l
+  | PVar v | LVar v | ALoc v -> Fmt.string ft v
   | BVExprIntrinsic (op, es, w) ->
-      Fmt.pf fmt "%s(%a : %a)" (BVOps.str op)
+      Fmt.pf ft "%s(%a : %a)" (BVOps.str op)
         (Fmt.list ~sep:Fmt.comma pp_bv_arg)
         es
         (Fmt.option ~none:Fmt.nop (fun pf i -> Fmt.pf pf "%di" i))
@@ -512,32 +533,29 @@ let rec pp fmt e =
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->
-          Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
-      | Equal -> Fmt.pf fmt "@[(%a %s %a)@]" pp e1 (BinOp.str op) pp e2
-      | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
-  | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
+          Fmt.pf ft "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
+      | Equal -> Fmt.pf ft "@[(%a %s %a)@]" pp e1 (BinOp.str op) pp e2
+      | _ -> Fmt.pf ft "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
+  | LstSub (e1, e2, e3) -> Fmt.pf ft "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
-  | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
-  | EList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
+  | UnOp (op, e) -> Fmt.pf ft "(%s %a)" (UnOp.str op) pp e
+  | EList ll -> Fmt.pf ft "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
   (* -{ e1, e2, ... }- *)
-  | ESet ll -> Fmt.pf fmt "-{ %a }-" (Fmt.list ~sep:Fmt.comma pp) ll
+  | ESet ll -> Fmt.pf ft "-{ %a }-" (Fmt.list ~sep:Fmt.comma pp) ll
   | NOp (op, le) ->
-      Fmt.pf fmt "%s %a" (NOp.str op)
+      Fmt.pf ft "%s %a" (NOp.str op)
         (Fmt.parens (Fmt.list ~sep:Fmt.comma pp))
         le
   | Exists (bt, e) ->
-      Fmt.pf fmt "(exists %a . %a)"
+      Fmt.pf ft "(exists %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
   | ForAll (bt, e) ->
-      Fmt.pf fmt "(forall %a . %a)"
+      Fmt.pf ft "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
 
-and pp_bv_arg fmt (arg : bv_arg) =
-  match arg with
-  | Literal w -> Fmt.pf fmt "%di" w
-  | BvExpr (e, w) -> Fmt.pf fmt "Bitvector(%a, %di)" pp e w
+let rec pp ft t = pp_custom ~pp ft t
 
 let rec full_pp fmt e =
   match e with

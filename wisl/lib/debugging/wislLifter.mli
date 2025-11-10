@@ -2,7 +2,9 @@ open WSemantics
 open Gillian.Debugger
 
 module Make
-    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
+    (Gil :
+      Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
+        with type Lifter.memory = WislSMemory.t)
     (V : Engine.Verifier.S with type annot = WParserAndCompiler.Annot.t) :
   Lifter.S
     with type memory_error = WSemantics.WislSHeap.err

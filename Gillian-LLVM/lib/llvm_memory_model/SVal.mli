@@ -49,28 +49,27 @@ module SVArray : sig
   val byte_array_of_sval : SVal.t -> t Monadic.Delayed.t
   val singleton : SVal.t -> t
 
-  (** Reencodes an array with another chunk.
-      Should really be avoided if possible. *)
+  (** Reencodes an array with another chunk. Should really be avoided if
+      possible. *)
   val reencode : chunk:Chunk.t -> t -> t Monadic.Delayed.t
 
   val array_sub :
     arr:t -> start:Gil_syntax.Expr.t -> size:Gil_syntax.Expr.t -> t
 
-  (** Splits at an offset in the array.
-     For example, for an array of 4 u32 numbers, spliting at 2 gives 2 arrays of 2 u32s *)
+  (** Splits at an offset in the array. For example, for an array of 4 u32
+      numbers, spliting at 2 gives 2 arrays of 2 u32s *)
   val split_at_offset : at:Expr.t -> t -> t * t
 
-  (** Splits at a byte in the array.
-     For example, spliting an array containing 1 value of type u32 at byte 2,
-     gives 2 arrays of u8s. *)
+  (** Splits at a byte in the array. For example, spliting an array containing 1
+      value of type u32 at byte 2, gives 2 arrays of u8s. *)
   val split_at_byte : at:Expr.t -> t -> (t * t) Monadic.Delayed.t
 
-  (** Creates an array of two sval if they have the same chunk,
-     otherwise, returns None *)
+  (** Creates an array of two sval if they have the same chunk, otherwise,
+      returns None *)
   val of_two_svals_same_chunk : SVal.t -> SVal.t -> t option
 
-  (** Concatenates two arrays if they have the same chunk,
-     otherwise returns None *)
+  (** Concatenates two arrays if they have the same chunk, otherwise returns
+      None *)
   val concat_same_chunk : t -> t -> t option
 
   (** [cons_same_chunk el arr] is [concat_same_chunk (singleting el) arr] *)

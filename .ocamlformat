@@ -4,3 +4,4 @@ break-cases=fit-or-vertical
 break-fun-decl=fit-or-vertical
 break-fun-sig=fit-or-vertical
 doc-comments=before
+ocaml-version = 5.3

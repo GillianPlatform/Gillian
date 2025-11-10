@@ -232,9 +232,7 @@ let rtype r = Expr.BinOp (r, LstNth, lit_num 0.)
 let base r = Expr.BinOp (r, LstNth, lit_num 1.)
 let field r = Expr.BinOp (r, LstNth, lit_num 2.)
 
-(**
- *  Fresh identifiers
- *)
+(** * Fresh identifiers *)
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
   let f () =

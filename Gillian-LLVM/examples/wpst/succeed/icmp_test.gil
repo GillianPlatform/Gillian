@@ -1,12 +1,12 @@
 
 import "Gillian-LLVM/examples/rt/runtime.gil";
 proc main() {
-  v_t := {{"int-1",0x1v1}};
-  v_f := {{"int-1",0x0v1}};
+  v_t := {{"i-1",0x1v1}};
+  v_f := {{"i-1",0x0v1}};
 
-  v_1 := {{"int-32",0x1v32}};
-  v_2 := {{"int-32",0xFFFFFFFEv32}};
-  v_3 := {{"int-32",0x3v32}};
+  v_1 := {{"i-32",0x1v32}};
+  v_2 := {{"i-32",0xFFFFFFFEv32}};
+  v_3 := {{"i-32",0x3v32}};
   
   (* Test EQ *)
   r_1 := "icmp_eq_32_32_1"(v_1, v_2);

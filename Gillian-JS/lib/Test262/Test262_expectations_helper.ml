@@ -60,6 +60,11 @@ let error_has_proto str ret_val ret_state =
 let is_syntax_error = error_has_proto "$lserr_proto"
 let is_ref_error = error_has_proto "$lrferr"
 
-let parsing_failure_is_jsparser = function
-  | Js2jsil_lib.JS2GIL_ParserAndCompiler.JSParserErr _ -> true
+let parsing_failure_is_jsparser
+    ({ additional_data; _ } : Utils.Gillian_result.Error.compilation_error) =
+  match additional_data with
+  | Some (`Assoc a) -> (
+      match List.assoc_opt "is_parser_error" a with
+      | Some (`Bool true) -> true
+      | _ -> false)
   | _ -> false

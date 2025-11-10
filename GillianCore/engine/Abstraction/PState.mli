@@ -1,12 +1,11 @@
-(**
-    Interface for GIL General States.
-    They are considered to be mutable.
-*)
+(** Interface for GIL General States. They are considered to be mutable. *)
 module type S = sig
   include SState.S
 
   type state_t
   type abs_t = string * vt list
+
+  module SMatcher : Matcher.S with type state_t = state_t
 
   val make_p :
     preds:MP.preds_tbl_t ->
@@ -28,9 +27,6 @@ module type S = sig
 
   (** Set wands of given symbolic state *)
   val set_wands : t -> Wands.t -> t
-
-  (** Set variants of given symbolic state *)
-  val set_variants : t -> variants_t -> t
 
   val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
   val add_pred_defs : MP.preds_tbl_t -> t -> t

@@ -5,10 +5,10 @@ JaVerT 2.0
 
 Authors
 -------
-José Fragoso Santos
-Petar Maksimović
-Gabriela Sampaio
-Philippa Gardner
+* José Fragoso Santos
+* Petar Maksimović
+* Gabriela Sampaio
+* Philippa Gardner
 
 Abstract
 --------

@@ -28,7 +28,9 @@ module SVal = struct
     let* runtimetype = LLVMRuntimeTypes.type_of_expr e in
     vanish_or_fail_on_none
       (fun runtimetype ->
-        make ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype) ~value:e)
+        (* XX(tnytown): create_sval is called by the store action with the tagged value, so we need to extract the raw value here *)
+        let value = Expr.list_nth e 1 in
+        make ~chunk:(LLVMRuntimeTypes.type_to_chunk runtimetype) ~value)
       runtimetype
       (Format.asprintf "Expression is not a valid symbolic value: %a" Expr.pp e)
 
@@ -76,7 +78,7 @@ module SVal = struct
         Expr.BinOp (Expr.typeof e1, Equal, Expr.type_ ty)
       in
       let* learned, _ =
-        let act_value = Expr.list_nth t.value 1 in
+        let act_value = t.value in
         match chunk with
         | IntegerChunk w ->
             let learned = [ type_expr act_value (Type.BvType w) ] in
@@ -195,8 +197,9 @@ module SVal = struct
             Expr.BVExprIntrinsic
               ( BVOps.BVExtract,
                 [
+                  (* bvextract's bounds are inclusive *)
+                  Expr.Literal (ub - 1);
                   Expr.Literal lb;
-                  Expr.Literal ub;
                   Expr.BvExpr (sval.value, size * 8);
                 ],
                 Some 8 )
@@ -355,7 +358,13 @@ module SVArray = struct
   let byte_array_of_sval (sval : SVal.t) : t Delayed.t =
     let open Delayed.Syntax in
     let+ result = SVal.to_raw_bytes_se sval in
-    { chunk = sval.chunk; values = Expr.EList result }
+    (* At this point we know that the chunk is: *)
+    (* IntegerChunk | IntegerOrPtrChunk *)
+    (* Unconditionally decompose into an IntegerChunk of width 8, matching the *)
+    (* array element type *)
+    let result_expr = Expr.EList result in
+    let chunk = Chunk.IntegerChunk 8 in
+    { chunk; values = result_expr }
 
   let decode_sval_into ~chunk (sval : SVal.t) =
     let open Delayed.Syntax in
@@ -420,7 +429,7 @@ module SVArray = struct
           let num_elems = size_from / size_into in
           let each_elem =
             List.init num_elems (fun i ->
-                Expr.bv_extract i (i + size_into) sval.value)
+                Expr.bv_extract (i + size_into) i sval.value)
           in
           make ~chunk ~values:(Expr.list each_elem) |> Delayed.return
 
@@ -459,7 +468,7 @@ module SVArray = struct
             SVal.
               {
                 chunk;
-                value = Expr.bv_extract_between_sz size_from size_to selem.value;
+                value = Expr.bv_extract_between_sz size_to size_from selem.value;
               }
         else
           (* Same size conversion so just concat everything *)
@@ -467,6 +476,15 @@ module SVArray = struct
           let bts =
             List.init ln (fun i ->
                 let elem = Expr.list_nth arr.values i in
+                (*let elem' = try
+                    Engine.Reduction.reduce_lexpr elem
+                  with
+                    _ as err ->
+                    Logging.tmi (fun m -> m "Attempted to simplify decode_as_sval elem but: %s" (Printexc.to_string err));
+                    elem
+                  in*)
+                Logging.tmi (fun m ->
+                    m "decode_as_sval i=%d expr=@,%a" i Expr.pp elem);
                 elem)
           in
           let built = Expr.bv_concat bts in
@@ -485,24 +503,35 @@ module SVArray = struct
     else failwith "unimplemented: decoding an array as another one"
 
   let array_sub ~arr ~start ~size : t =
-    { arr with values = Expr.list_sub ~lst:arr.values ~start ~size }
+    let e = Expr.list_sub ~lst:arr.values ~start ~size in
+    let values =
+      try Engine.Reduction.reduce_lexpr e
+      with _ as err ->
+        Logging.tmi (fun m ->
+            m "Attempted to simplify array expression but: %s"
+              (Printexc.to_string err));
+        e
+    in
+    { arr with values }
 
   let split_at_offset ~at arr : t * t =
-    let size_right =
-      let open Expr.Infix in
-      Expr.list_length arr.values - at
+    let len_bv =
+      match Expr.list_length arr.values with
+      | Expr.Lit (Literal.Int x) -> Expr.Lit (LBitvector (x, 64))
+      | _ -> failwith "unexpected value in list length"
     in
-    ( array_sub ~arr ~start:Expr.zero_i ~size:at,
+    let size_right = Expr.bv_sub len_bv at in
+    ( array_sub ~arr ~start:(Expr.zero_bv 64) ~size:at,
       array_sub ~arr ~start:at ~size:size_right )
 
   let split_at_byte ~at arr : (t * t) Delayed.t =
-    let chunk_size = Expr.int (Chunk.size arr.chunk) in
+    let chunk_size = Expr.bv_z (Z.of_int (Chunk.size arr.chunk)) 64 in
     let can_keep_chunk =
       let open Expr.Infix in
-      Expr.imod at chunk_size == Expr.zero_i
+      Expr.imod at chunk_size == Expr.zero_bv 64
     in
     if%ent can_keep_chunk then
-      Delayed.return (split_at_offset ~at:Expr.Infix.(at / chunk_size) arr)
+      Delayed.return (split_at_offset ~at:(Expr.bv_udiv at chunk_size) arr)
     else failwith "Unhandled: split_at_byte that doesn't preserve chunk"
 
   (* let split_array_in ~size ~amount arr =

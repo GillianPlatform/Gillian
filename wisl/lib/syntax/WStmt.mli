@@ -36,7 +36,6 @@ val get_by_id :
   | `WLAssert of WLAssert.t
   | `WLCmd of WLCmd.t
   | `WLExpr of WLExpr.t
-  | `WLFormula of WLFormula.t
   | `WStmt of t ]
 
 val functions_called_by_list : t list -> string list

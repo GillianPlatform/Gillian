@@ -9,11 +9,12 @@ homepage: "https://github.com/GillianPlatform/Gillian"
 bug-reports: "https://github.com/GillianPlatform/Gillian/issues"
 depends: [
   "dune" {>= "3.16"}
-  "ocaml" {>= "5.1.0"}
+  "ocaml" {>= "5.3.0"}
   "alcotest" {= "1.0.1"}
   "cmdliner" {>= "1.1.1"}
-  "dap" {= "1.0.6"}
+  "sedap"
   "fmt" {>= "0.8.8"}
+  "linol-lwt" {>= "0.10"}
   "memtrace" {= "0.2.3"}
   "menhir" {= "20231231"}
   "ppx_deriving_yojson"
@@ -22,7 +23,7 @@ depends: [
   "simple_smt"
   "sqlite3" {= "5.0.2"}
   "visitors" {>= "2.3"}
-  "yojson" {>= "1.7.0"}
+  "yojson" {>= "1.7.0" & < "3.0"}
   "zarith" {>= "1.12"}
   "odoc" {with-doc}
 ]
@@ -44,5 +45,6 @@ build: [
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
 pin-depends: [
-  "simple_smt.~dev" "git+https://github.com/trail-of-forks/simple-smt-ocaml#6c844de9e54ad3696c98721681e6d9018d0a46ff"
+  ["simple_smt.~dev" "git+https://github.com/trail-of-forks/simple-smt-ocaml#c992e9ec8e7a68c46dd49632da38a411846e6bf4"]
+  ["sedap.~dev" "git+https://github.com/GillianPlatform/ocaml-sedap#1255830f659a806639468d143ed0e4fa39becfa0"]
 ]

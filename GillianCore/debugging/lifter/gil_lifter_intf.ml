@@ -1,8 +1,9 @@
 module type S = sig
   include Lifter.S
 
-  (** A version of [init] that allows manually supplying exec_data instead of triggering
-      the Step effect - this is used when Gil is not the primary lifter. *)
+  (** A version of [init] that allows manually supplying exec_data instead of
+      triggering the Step effect - this is used when Gil is not the primary
+      lifter. *)
   val init_manual :
     string ->
     string list ->
@@ -21,6 +22,9 @@ module type S = sig
   val path_of_id : Logging.Report_id.t -> t -> Branch_case.path
   val should_skip_cmd : cmd_report Lifter.executed_cmd_data -> t -> bool
   val cases_at_id : Logging.Report_id.t -> t -> Branch_case.t list
+  val get_type_env_vars : Type_env.t -> Variable.t list
+  val get_pred_vars : Preds.t -> Variable.t list
+  val get_pure_formulae_vars : PFS.t -> Variable.t list
 end
 
 module type Make = functor

@@ -8,7 +8,7 @@ type t = {
   return_expr : WExpr.t;
   floc : CodeLoc.t;
   fid : int;
-  is_loop_body : bool;
+  loop_body_of : string option;
 }
 
 let get_id f = f.fid
@@ -52,7 +52,8 @@ let pp fmt f =
          %a;@,\
          @[<h 0>return@ %a@]@]@\n\
          }@\n\
-         @[{ %a }@]" WLAssert.pp (WSpec.get_pre spec) f.name
+         @[{ %a }@]"
+        WLAssert.pp (WSpec.get_pre spec) f.name
         (WPrettyUtils.pp_list Format.pp_print_string)
         f.params pp_list_stmt f.body WExpr.pp f.return_expr WLAssert.pp
         (WSpec.get_post spec)

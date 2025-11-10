@@ -179,13 +179,6 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     | LVal v -> ([], [], Expr.Lit (compile_val v))
     | PVar x -> ([], [], Expr.PVar x)
     | LVar x -> ([], [], Expr.LVar x)
-    | LBinOp (e1, WBinOp.NEQ, e2) ->
-        let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
-        let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
-        let expr =
-          Expr.UnOp (UnOp.Not, Expr.BinOp (comp_expr1, BinOp.Equal, comp_expr2))
-        in
-        (gvars1 @ gvars2, asrtl1 @ asrtl2, expr)
     | LBinOp (e1, b, e2) when is_internal_pred b ->
         (* Operator corresponds to pointer arithmetics *)
         let lout = gen_str sgvar in
@@ -236,61 +229,11 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         in
         (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
 
-(* TODO: compile_lformula should return also the list of created existentials *)
-let rec compile_lformula ?(fname = "main") formula : Asrt.t * Expr.t =
-  let gen_str = Generators.gen_str fname in
-  let compile_lformula = compile_lformula ~fname in
-  let compile_lexpr = compile_lexpr ~fname in
-  WLFormula.(
-    match get formula with
-    | LTrue -> ([], Expr.true_)
-    | LFalse -> ([], Expr.false_)
-    | LNot lf ->
-        let a1, c1 = compile_lformula lf in
-        (a1, UnOp (Not, c1))
-    | LAnd (lf1, lf2) ->
-        let a1, c1 = compile_lformula lf1 in
-        let a2, c2 = compile_lformula lf2 in
-        (a1 @ a2, BinOp (c1, And, c2))
-    | LOr (lf1, lf2) ->
-        let a1, c1 = compile_lformula lf1 in
-        let a2, c2 = compile_lformula lf2 in
-        (a1 @ a2, BinOp (c1, Or, c2))
-    | LEq (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        (a1 @ a2, BinOp (c1, Equal, c2))
-    | LLess (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
-    | LGreater (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
-    | LLessEq (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_leq, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_))
-    | LGreaterEq (le1, le2) ->
-        let _, a1, c1 = compile_lexpr le1 in
-        let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_geq, [ c1; c2; expr_l_var_out ]) in
-        (a1 @ a2 @ [ pred ], BinOp (expr_l_var_out, Equal, Expr.true_)))
-
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lassert = compile_lassert ~fname in
   let gen_str = Generators.gen_str fname in
   let compile_lexpr = compile_lexpr ~fname in
-  let compile_lformula = compile_lformula ~fname in
   let gil_add e k =
     (* builds GIL expression that is e + k *)
     let k_e = Expr.int k in
@@ -353,7 +296,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           (Format.asprintf
              "In LPointsTo assertions, a location should always point to at \
               least one value\n\
-              It is not the case in : %a" WLAssert.pp asser)
+              It is not the case in : %a"
+             WLAssert.pp asser)
     | [ le ] ->
         let exs2, la2, e2 = compile_lexpr le in
         ( exs1 @ exs2,
@@ -370,29 +314,37 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           Asrt.CorePred (cell, [ eloc; eoffs ], [ e2 ])
           :: (bound @ la1 @ la2 @ la3) )
   in
-  WLAssert.(
-    match get asser with
-    | LEmp -> ([], [])
-    | LStar (la1, la2) ->
-        let exs1, cla1 = compile_lassert la1 in
-        let exs2, cla2 = compile_lassert la2 in
-        (exs1 @ exs2, cla1 @ cla2)
-    | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
-    | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
-    | LPred (pr, lel) ->
-        let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
-        let exs = List.concat exsl in
-        let al = List.concat all in
-        (exs, Asrt.Pred (pr, el) :: al)
-    | LWand { lhs = lname, largs; rhs = rname, rargs } ->
-        let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
-        let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
-        let exs = List.concat (exs1 @ exs2) in
-        let al = List.concat (al1 @ al2) in
-        (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
-    | LPure lf ->
-        let al, f = compile_lformula lf in
-        ([], Asrt.Pure f :: al))
+  let open WLAssert in
+  match get asser with
+  | LEmp -> ([], [])
+  | LStar (la1, la2) ->
+      let exs1, cla1 = compile_lassert la1 in
+      let exs2, cla2 = compile_lassert la2 in
+      (exs1 @ exs2, cla1 @ cla2)
+  | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
+  | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
+  | LPred (pr, lel) ->
+      let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
+      let exs = List.concat exsl in
+      let al = List.concat all in
+      (exs, Asrt.Pred (pr, el) :: al)
+  | LWand { lhs = lname, largs; rhs = rname, rargs } ->
+      let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
+      let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
+      let exs = List.concat (exs1 @ exs2) in
+      let al = List.concat (al1 @ al2) in
+      (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
+  | LPure lf ->
+      let _, al, e = compile_lexpr lf in
+      let e =
+        match e with
+        | LVar _ -> Expr.BinOp (e, Equal, Expr.true_)
+        | _ -> e
+      in
+      ([], Asrt.Pure e :: al)
+  | LType (le, ty) ->
+      let _, al, el = compile_lexpr le in
+      ([], Asrt.Types [ (el, WType.to_gil ty) ] :: al)
 
 let rec compile_lcmd ?(fname = "main") lcmd =
   let compile_lassert = compile_lassert ~fname in
@@ -455,7 +407,7 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       (None, LCmd.SL (SLCmd.SepAssert (comp_la, exs @ lb)))
   | Invariant _ -> failwith "Invariant is not before a loop."
 
-let compile_inv_and_while ~fname ~while_stmt ~invariant =
+let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
   (* FIXME: Variables that are in the invariant but not existential might be wrong. *)
   let loopretvar = "loopretvar__" in
   let gen_str = Generators.gen_str fname in
@@ -486,7 +438,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         let px = WLExpr.PVar x in
         let px = WLExpr.make px invariant_loc in
         let lx = WLExpr.make lx invariant_loc in
-        let f = WLFormula.make (LEq (px, lx)) invariant_loc in
+        let f = WLExpr.make (LBinOp (px, EQUAL, lx)) invariant_loc in
         let new_a = WLAssert.make (LPure f) invariant_loc in
         match WLAssert.get acc with
         | LEmp -> new_a
@@ -515,9 +467,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     let post_guard =
       WLAssert.make
         (LPure
-           (WLFormula.not
-              (WLFormula.lexpr_is_true ~codeloc:guard_loc
-                 (WLExpr.from_expr guard))))
+           (WLExpr.not
+              (WLExpr.as_bool_fml ~codeloc:guard_loc (WLExpr.from_expr guard))))
         guard_loc
     in
     let post_ret =
@@ -527,12 +478,11 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         let new_name = if List.mem x var_exs then new_lv x else old_lv x in
         make_lexpr (LVar new_name)
       in
+      let ret_list = make_lexpr (LEList (List.map make_pvar_lexpr vars)) in
       WLAssert.make
         (LPure
-           (WLFormula.make
-              (LEq
-                 ( make_var_lexpr "ret",
-                   make_lexpr (LEList (List.map make_pvar_lexpr vars)) ))
+           (WLExpr.make
+              (LBinOp (make_var_lexpr "ret", EQUAL, ret_list))
               while_loc))
         while_loc
     in
@@ -561,12 +511,23 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     let rec_call =
       WStmt.make (FunCall (loopretvar, loop_fname, pvars, None)) while_loc
     in
+    let loop_vanish_hack =
+      if not !WConfig.loop_hack then []
+      else
+        let false_ = WExpr.make (Val (Bool false)) while_loc in
+        [ WStmt.make (Assume false_) while_loc ]
+    in
     let allvars = WExpr.make (WExpr.List pvars) while_loc in
     let ret_not_rec = WStmt.make (VarAssign (loopretvar, allvars)) while_loc in
     let body =
-      [
-        WStmt.make (If (guard, wcmds @ [ rec_call ], [ ret_not_rec ])) while_loc;
-      ]
+      let then_ = wcmds @ [ rec_call ] @ loop_vanish_hack in
+      let else_ = [ ret_not_rec ] in
+      [ WStmt.make (If (guard, then_, else_)) while_loc ]
+    in
+    let loop_body_of =
+      match loop_body_of with
+      | Some _ -> loop_body_of
+      | None -> Some fname
     in
     WFun.
       {
@@ -577,7 +538,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         return_expr = WExpr.make (Var loopretvar) while_loc;
         floc = while_loc;
         fid = Generators.gen_id ();
-        is_loop_body = true;
+        loop_body_of;
       }
   in
   let retv = gen_str gvar in
@@ -619,11 +580,15 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   in
   (lab_cmds, loop_funct)
 
-let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
+let rec compile_stmt_list
+    ?(fname = "main")
+    ?(is_loop_prefix = false)
+    ?loop_body_of
+    stmtl =
   (* create generator that works in the context of this function *)
-  let compile_expr = compile_expr ~fname in
+  let compile_expr = compile_expr ~is_loop_prefix ~fname in
   let compile_lcmd = compile_lcmd ~fname in
-  let compile_list = compile_stmt_list ~fname in
+  let compile_list = compile_stmt_list ~fname ?loop_body_of in
   let gen_str = Generators.gen_str fname in
   let gil_expr_of_str s = Expr.Lit (Literal.String s) in
   let get_or_create_lab cmdl pre =
@@ -647,7 +612,9 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Logic invariant; _ } :: while_stmt :: rest
     when WLCmd.is_inv invariant && WStmt.is_while while_stmt
          && !Gillian.Utils.Config.current_exec_mode = Verification ->
-      let cmds, fct = compile_inv_and_while ~fname ~while_stmt ~invariant in
+      let cmds, fct =
+        compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of
+      in
       let comp_rest, new_functions = compile_list rest in
       (cmds @ comp_rest, fct :: new_functions)
   | { snode = While _; _ } :: _
@@ -910,9 +877,17 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
 
 let compile_spec
     ?(fname = "main")
-    WSpec.{ pre; post; variant; fparams; existentials; _ } =
-  let _, comp_pre = compile_lassert ~fname pre in
-  let _, comp_post = compile_lassert ~fname post in
+    WSpec.{ pre; post; variant; fparams; existentials; sploc; _ } =
+  let comp_pre =
+    let _, comp_pre = compile_lassert ~fname pre in
+    let loc = WLAssert.get_loc pre |> CodeLoc.to_location in
+    (comp_pre, Some loc)
+  in
+  let comp_post =
+    let _, comp_post = compile_lassert ~fname post in
+    let loc = WLAssert.get_loc post |> CodeLoc.to_location in
+    (comp_post, Some loc)
+  in
   let comp_variant =
     Option.map
       (fun variant ->
@@ -933,12 +908,16 @@ let compile_spec
         Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
           true
   in
-  Spec.init fname fparams [ single_spec ] false false true
+  let location = CodeLoc.to_location sploc in
+  Spec.init fname fparams [ single_spec ] false false true (Some location)
 
 let compile_pred filepath pred =
-  let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
-  let types = WType.infer_types_pred pred_params pred_definitions in
-  let getWISLTypes str = (str, WType.of_variable str types) in
+  let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
+      =
+    pred
+  in
+  let types = WTypeMap.infer_types_pred pred_params pred_definitions in
+  let getWISLTypes str = (str, WTypeMap.type_of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
     (str, Option.fold ~some:compile_type ~none:None t)
@@ -948,10 +927,12 @@ let compile_pred filepath pred =
     let _, casrt = compile_lassert pred_def in
     (None, casrt)
   in
+  let pred_loc = Some (CodeLoc.to_location pred_loc) in
   Pred.
     {
       pred_name;
       pred_source_path = Some filepath;
+      pred_loc;
       pred_internal = false;
       pred_num_params = List.length pred_params;
       pred_params;
@@ -968,9 +949,15 @@ let compile_pred filepath pred =
 
 let rec compile_function
     filepath
-    WFun.{ name; params; body; spec; return_expr; is_loop_body; _ } =
+    WFun.{ name; params; body; spec; return_expr; loop_body_of; _ } =
+  let is_loop_body, proc_display_name =
+    match loop_body_of with
+    | Some p -> (true, Some ("Loop body", p))
+    | None -> (false, None)
+  in
   let lbodylist, new_functions =
-    compile_stmt_list ~fname:name ~is_loop_prefix:is_loop_body body
+    compile_stmt_list ~fname:name ~is_loop_prefix:is_loop_body ?loop_body_of
+      body
   in
   let other_procs =
     List.concat (List.map (compile_function filepath) new_functions)
@@ -1004,6 +991,8 @@ let rec compile_function
       proc_aliases = [];
       proc_calls = [];
       (* TODO *)
+      proc_display_name;
+      proc_hidden = is_loop_body;
     }
   :: other_procs
 
@@ -1027,7 +1016,7 @@ let preprocess_lemma
         let ex = WLExpr.make (PVar x) lemma_loc in
         let elx = WLExpr.make (LVar lvarx) lemma_loc in
         Hashtbl.replace param_subst x (WLExpr.LVar lvarx);
-        let formula = WLFormula.make (LEq (ex, elx)) lemma_loc in
+        let formula = WLExpr.make (LBinOp (ex, EQUAL, elx)) lemma_loc in
         WLAssert.make (LPure formula) lemma_loc)
       lemma_params lvar_params
   in
@@ -1075,6 +1064,7 @@ let compile_lemma
         lemma_variant;
         lemma_hypothesis;
         lemma_conclusion;
+        lemma_loc;
         _;
       } =
   let compile_lcmd = compile_lcmd ~fname:lemma_name in
@@ -1100,9 +1090,18 @@ let compile_lemma
         comp_lexpr)
       lemma_variant
   in
-  let _, lemma_hyp = compile_lassert lemma_hypothesis in
-  let _, post = compile_lassert lemma_conclusion in
+  let lemma_hyp =
+    let _, lemma_hyp = compile_lassert lemma_hypothesis in
+    let loc = WLAssert.get_loc lemma_hypothesis |> CodeLoc.to_location in
+    (lemma_hyp, Some loc)
+  in
+  let post =
+    let _, post = compile_lassert lemma_conclusion in
+    let loc = WLAssert.get_loc lemma_conclusion |> CodeLoc.to_location in
+    (post, Some loc)
+  in
   let lemma_existentials = [] in
+  let lemma_location = Some (CodeLoc.to_location lemma_loc) in
   (* TODO: What about existentials for lemma in WISL ? *)
   Lemma.
     {
@@ -1121,6 +1120,7 @@ let compile_lemma
           };
         ];
       lemma_existentials;
+      lemma_location;
     }
 
 let compile ~filepath WProg.{ context; predicates; lemmas } =
@@ -1164,7 +1164,7 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
             {
               bispec_name = name;
               bispec_params = proc.Proc.proc_params;
-              bispec_pres = [ pre ];
+              bispec_pres = [ (pre, None) ];
               bispec_normalised = false;
             }
         in

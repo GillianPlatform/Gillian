@@ -26,9 +26,8 @@ module Func = struct
   type t = {
     params : Param.t list;
     body : Stmt.t option;
-        (** If the body is empty,
-            it means that the function is not defined,
-            and it should return nondet *)
+        (** If the body is empty, it means that the function is not defined, and
+            it should return nondet *)
     return_type : Type.t;
     location : Location.t;
     symbol : string;

@@ -4,7 +4,15 @@ let z_of_yojson = function
   | `String s -> ( try Ok (Z.of_string s) with Invalid_argument m -> Error m)
   | _ -> Error "Invalid yojson for Z"
 
-type constant =
+type position = Location.position = { pos_line : int; pos_column : int }
+
+and location = Location.t = {
+  loc_start : position;
+  loc_end : position;
+  loc_source : string;
+}
+
+and constant =
   | Min_float
   | Max_float
   | MaxSafeInteger
@@ -237,6 +245,7 @@ and flag = Normal | Error | Bug
 and pred = {
   pred_name : string;
   pred_source_path : string option;
+  pred_loc : location option;
   pred_internal : bool;
   pred_num_params : int;
   pred_params : (string * typ option) list;
@@ -251,8 +260,8 @@ and pred = {
 }
 
 and lemma_spec = {
-  lemma_hyp : assertion;
-  lemma_concs : assertion list;
+  lemma_hyp : assertion * location option;
+  lemma_concs : (assertion * location option) list;
   lemma_spec_variant : expr option;
 }
 
@@ -265,11 +274,12 @@ and lemma = {
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
   lemma_existentials : string list;
+  lemma_location : location option;
 }
 
 and single_spec = {
-  ss_pre : assertion;
-  ss_posts : assertion list;
+  ss_pre : assertion * location option;
+  ss_posts : (assertion * location option) list;
   ss_variant : expr option;
   ss_flag : flag;
   ss_to_verify : bool;
@@ -283,12 +293,13 @@ and spec = {
   spec_normalised : bool;
   spec_incomplete : bool;
   spec_to_verify : bool;
+  spec_location : location option;
 }
 
 and bispec = {
   bispec_name : string;
   bispec_params : string list;
-  bispec_pres : assertion list;
+  bispec_pres : (assertion * location option) list;
   bispec_normalised : bool;
 }
 
@@ -307,10 +318,12 @@ and ('annot, 'label) proc = {
   proc_spec : spec option;
   proc_aliases : string list;
   proc_calls : string list;
+  proc_display_name : (string * string) option;
+  proc_hidden : bool;
 }
 [@@deriving
   visitors { variety = "reduce" },
-    visitors { variety = "endo" },
-    visitors { variety = "iter" },
-    yojson,
-    eq]
+  visitors { variety = "endo" },
+  visitors { variety = "iter" },
+  yojson,
+  eq]

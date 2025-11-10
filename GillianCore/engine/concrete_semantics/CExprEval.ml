@@ -1,4 +1,5 @@
 open Arith_utils
+open BVOps
 module CStore = Store.Make (CVal.M)
 
 (* Expression Evaluation *)
@@ -26,6 +27,11 @@ let as_bool ?msg = function
 let as_int ?msg = function
   | Literal.Int i -> i
   | lit -> typeerr ?msg "integer" lit
+
+let as_bvorint ?msg = function
+  | Literal.Int i -> i
+  | Literal.LBitvector (i, _) -> i
+  | lit -> typeerr ?msg "bitvector or integer" lit
 
 let as_num ?msg = function
   | Literal.Num n -> n
@@ -305,12 +311,103 @@ and evaluate_lstsub (store : CStore.t) (e1 : Expr.t) (e2 : Expr.t) (e3 : Expr.t)
   let ve2 = ee e2 in
   let ve3 = ee e3 in
   let les = as_list ve1 in
-  let start = as_int ve2 in
-  let len = as_int ve3 in
+  let start = as_bvorint ve2 in
+  let len = as_bvorint ve3 in
   let sub_list =
     List_utils.list_sub les (Z.to_int start) (Z.to_int len) |> Option.get
   in
   LList sub_list
+
+and map_bvbinop width =
+  let bv f l r = Literal.LBitvector (f l r, width)
+  and bool f l r = Literal.Bool (f l r) in
+  function
+  | BVPlus -> bv Z.add
+  | BVSub -> bv Z.sub
+  | BVUleq -> bool Z.leq
+  | BVUlt -> bool Z.lt
+  | _ as op ->
+      raise
+        (Exceptions.Unsupported
+           (Printf.sprintf "Unimplemented concrete BVOp %s" (BVOps.str op)))
+
+and map_bvunop width =
+  let _bv f x = Literal.LBitvector (f x, width)
+  and _bool f x = Literal.Bool (f x) in
+  function
+  | _ as op ->
+      raise
+        (Exceptions.Unsupported
+           (Printf.sprintf "Unimplemented concrete BVOp %s" (BVOps.str op)))
+
+and evaluate_bvop
+    (store : CStore.t)
+    (op : BVOps.t)
+    (es : Expr.bv_arg list)
+    width : CVal.M.t =
+  let _eval = evaluate_expr store
+  and bv_lit = function
+    | Expr.Literal i ->
+        failwith "unhandled Literal in position expecting BvExpr, API misuse?"
+    | Expr.BvExpr
+        (Expr.Lit (Literal.LList [ String ty; (LBitvector (_, w) as bv) ]), _)
+      -> (bv, w)
+    | Expr.BvExpr (e, w) -> (evaluate_expr store e, w)
+  in
+  match (op, es) with
+  | _, [ lhs; rhs ] -> (
+      let lhs, lw = bv_lit lhs and rhs, rw = bv_lit rhs in
+      assert (lw = rw);
+      let f = map_bvbinop lw op in
+      match (lhs, rhs) with
+      | LBitvector (lhs, lw), LBitvector (rhs, rw) ->
+          assert (lw = rw);
+          f lhs rhs
+      | _ -> failwith "Unhandled non-bitvector literal in evaluate_bvop")
+  | _, [ e ] -> (
+      let e, w = bv_lit e in
+      let f = map_bvunop w op in
+      match e with
+      | LBitvector (e, w) -> f e
+      | _ -> failwith "Unhandled non-bitvector literal in evaluate_binop")
+  | BVExtract, [ Expr.Literal lo; Expr.Literal hi; (Expr.BvExpr _ as e) ] -> (
+      let e, w = bv_lit e in
+      let size_of_chunk x =
+        let lst = String.split_on_char '-' x in
+        if List.length lst = 2 && String.equal (List.hd lst) "int" then
+          let st = List.nth lst 1 in
+          int_of_string st
+        else failwith ("invalid chunk " ^ x)
+      in
+      match e with
+      | LBitvector (e, w) ->
+          Literal.LBitvector (Z.extract e lo (hi - lo), hi - lo)
+      | LList [ String ty; LBitvector (e, w) ] ->
+          let w = hi - lo in
+          let _chunk = size_of_chunk ty in
+          Literal.LList
+            [ String ty; Literal.LBitvector (Z.extract e lo (hi - lo), w) ]
+      | _ as v ->
+          Logging.tmi (fun m -> m "fallthru bvextract: %a" Literal.pp v);
+          failwith "Unimplemented bvextract")
+  | BVConcat, _ ->
+      let v =
+        List.fold_left
+          (fun acc x ->
+            match bv_lit x with
+            | (LBitvector (v, w) | LList [ String _; LBitvector (v, w) ]), _ ->
+                Logging.tmi (fun m -> m "+= %d" (Z.to_int v));
+                (v, w)
+            | (_ as l), _ ->
+                Logging.tmi (fun m -> m "unhandled BVConcat: %a" Literal.pp l);
+                failwith "?")
+          (Z.zero, 0) es
+      in
+      Literal.LBitvector v
+  | _ ->
+      let op_name = BVOps.str op in
+      failwith
+        (Printf.sprintf "unhandled %s (%d args)" op_name (List.length es))
 
 and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
   try
@@ -325,10 +422,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
         | Some v -> v)
-    | BVExprIntrinsic (_, _, _) ->
-        raise
-          (Failure
-             "Bitvector intrinsics currently unsupported in concrete semantics")
+    | BVExprIntrinsic (op, es, width) -> evaluate_bvop store op es width
     | BinOp (e1, bop, e2) -> evaluate_binop store bop e1 e2
     | UnOp (unop, e) -> evaluate_unop unop (ee e)
     | NOp (nop, le) -> evaluate_nop nop (List.map ee le)

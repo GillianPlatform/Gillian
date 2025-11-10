@@ -135,21 +135,23 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
     (* Uninteresting cases **)
     | EList lst -> EList (List.map f lst)
     | ESet lst -> ESet (List.map f lst)
-    | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3)
+    (* | LstSub (le1, le2, le3) -> LstSub (f le1, f le2, f le3) *)
     | Exists (bt, le) -> Exists (bt, f le)
     | ForAll (bt, le) -> ForAll (bt, f le)
-    (*
-    | LstSub(le1, le2, le3) ->
-      (match f le1, f le2, f le3 with
-      | EList lst, Lit (Num _start), Lit (Num _end) ->
-          (try EList (Array.to_list (Array.sub (Array.of_list lst) (int_of_float _start) (int_of_float _end)))
-            with _ -> raise (ReductionException (LstSub(le1, le2, le3), "Invalid List Expression")))
-      | Lit (LList lst), Lit (Num _start), Lit (Num _end) ->
-          (try Lit (LList (Array.to_list (Array.sub (Array.of_list lst) (int_of_float _start) (int_of_float _end))))
-            with _ -> raise (ReductionException (LstSub(le1, le2, le3), "Invalid List Expression")))
-      | le1, le2, le3 -> LstSub(le1, le2, le3)
-      )
-    *)
+    | LstSub (le1, le2, le3) as expr -> (
+        let reduce lst pos len =
+          try
+            Array.to_list
+              (Array.sub (Array.of_list lst) (Z.to_int pos) (Z.to_int len))
+          with _ ->
+            raise (ReductionException (expr, "Invalid List Expression"))
+        in
+        match (f le1, f le2, f le3) with
+        | EList lst, Lit (LBitvector (pos, _)), Lit (LBitvector (len, _)) ->
+            EList (reduce lst pos len)
+        | Lit (LList lst), Lit (LBitvector (pos, _)), Lit (LBitvector (len, _))
+          -> Lit (LList (reduce lst pos len))
+        | le1, le2, le3 -> LstSub (le1, le2, le3))
   in
 
   result
@@ -859,19 +861,21 @@ let rec reduce_binop_inttonum_const
       Expr.BinOp (l, op, r)
   | _ -> None
 
-(**
-  Reduction of logical expressions
-  - gamma is used for:
-  - pfs  are used for: Car, Cdr, SetDiff
-*)
+(** Reduction of logical expressions
+    - gamma is used for:
+    - pfs are used for: Car, Cdr, SetDiff *)
 (* TODO: can this whole mess be removed since we did sth similar with formulae? *)
 and reduce_lexpr_loop
     ?(matching = false)
     ?(reduce_lvars = false)
+    ?(fuel = 20)
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (le : Expr.t) =
-  let f = reduce_lexpr_loop ~matching ~reduce_lvars pfs gamma in
+  let f =
+    if fuel <= 0 then Fun.id
+    else reduce_lexpr_loop ~matching ~reduce_lvars ~fuel:(fuel - 1) pfs gamma
+  in
 
   (* L.verbose (fun fmt -> fmt "Reducing Expr: %a" Expr.pp le); *)
   let rec find_lstsub_inn (lst : Expr.t) (start : Expr.t) =
@@ -886,73 +890,137 @@ and reduce_lexpr_loop
               Base cases
        ------------------------- *)
     | Lit _ | PVar _ | ALoc _ -> le
-    | BVExprIntrinsic (op, es, width) ->
+    (* | BVExprIntrinsic (op, args, width) -> (
+        let args = Expr.map_bv_arg_exprs f args
+        and reduced =
+          try
+            let lit = CExprEval.evaluate_bvop (CStore.init []) op args width in
+            Some (Expr.Lit lit)
+          with
+          | CExprEval.TypeError err_msg ->
+              Logging.tmi (fun m ->
+                  m "Failed to reduce BVOp: TypeError: %s" err_msg);
+              None
+          | CExprEval.EvaluationError err_msg ->
+              Logging.tmi (fun m ->
+                  m "Failed to reduce BVOp: EvaluationError: %s" err_msg);
+              None
+          | e -> raise e
+        in
+        match reduced with
+        | None -> BVExprIntrinsic (op, args, width)
+        | Some x -> x) *)
+    | BVExprIntrinsic (op, es, width) -> (
         let reduced_es = Expr.map_bv_arg_exprs f es in
         (* Try to evaluate concrete bitvector operations *)
         let try_evaluate_concrete () =
-          let all_concrete = 
-            List.for_all (function
-              | Expr.Literal _ -> true
-              | Expr.BvExpr (Expr.Lit (Literal.LBitvector _), _) -> true
-              | _ -> false) reduced_es
+          let all_concrete =
+            List.for_all
+              (function
+                | Expr.Literal _ -> true
+                | Expr.BvExpr (Expr.Lit (Literal.LBitvector _), _) -> true
+                | _ -> false)
+              reduced_es
           in
           if all_concrete then
             try
               match (op, reduced_es) with
               (* Binary comparison operations that return boolean *)
-              | (BVOps.BVUlt, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, _)), w1); 
-                              Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, _)), w2)]) when w1 = w2 ->
-                  Some (Expr.Lit (Literal.Bool (Z.lt v1 v2)))
-              | (BVOps.BVUleq, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, _)), w1); 
-                               Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, _)), w2)]) when w1 = w2 ->
-                  Some (Expr.Lit (Literal.Bool (Z.leq v1 v2)))
-              | (BVOps.BVSlt, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                              Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVUlt,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, _)), w1);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, _)), w2);
+                  ] )
+                when w1 = w2 -> Some (Expr.Lit (Literal.Bool (Z.lt v1 v2)))
+              | ( BVOps.BVUleq,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, _)), w1);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, _)), w2);
+                  ] )
+                when w1 = w2 -> Some (Expr.Lit (Literal.Bool (Z.leq v1 v2)))
+              | ( BVOps.BVSlt,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   (* Convert to signed comparison *)
                   let sign_bit = Z.shift_left Z.one (w1 - 1) in
                   let max_val = Z.sub (Z.shift_left Z.one w1) Z.one in
-                  let to_signed v = if Z.geq v sign_bit then Z.sub v (Z.add max_val Z.one) else v in
+                  let to_signed v =
+                    if Z.geq v sign_bit then Z.sub v (Z.add max_val Z.one)
+                    else v
+                  in
                   let sv1 = to_signed v1 and sv2 = to_signed v2 in
                   Some (Expr.Lit (Literal.Bool (Z.lt sv1 sv2)))
-              | (BVOps.BVSleq, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                               Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVSleq,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   (* Convert to signed comparison *)
                   let sign_bit = Z.shift_left Z.one (w1 - 1) in
                   let max_val = Z.sub (Z.shift_left Z.one w1) Z.one in
-                  let to_signed v = if Z.geq v sign_bit then Z.sub v (Z.add max_val Z.one) else v in
+                  let to_signed v =
+                    if Z.geq v sign_bit then Z.sub v (Z.add max_val Z.one)
+                    else v
+                  in
                   let sv1 = to_signed v1 and sv2 = to_signed v2 in
                   Some (Expr.Lit (Literal.Bool (Z.leq sv1 sv2)))
               (* Binary arithmetic operations that return bitvectors *)
-              | (BVOps.BVPlus, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                               Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVPlus,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   let result = Z.add v1 v2 in
                   let mask = Z.sub (Z.shift_left Z.one w1) Z.one in
                   let masked_result = Z.logand result mask in
                   Some (Expr.Lit (Literal.LBitvector (masked_result, w1)))
-              | (BVOps.BVSub, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                              Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVSub,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   let result = Z.sub v1 v2 in
                   let mask = Z.sub (Z.shift_left Z.one w1) Z.one in
                   let masked_result = Z.logand result mask in
                   Some (Expr.Lit (Literal.LBitvector (masked_result, w1)))
-              | (BVOps.BVAnd, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                              Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVAnd,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   let result = Z.logand v1 v2 in
                   Some (Expr.Lit (Literal.LBitvector (result, w1)))
-              | (BVOps.BVOr, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                             Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVOr,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   let result = Z.logor v1 v2 in
                   Some (Expr.Lit (Literal.LBitvector (result, w1)))
-              | (BVOps.BVXor, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _); 
-                              Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _)]) when w1 = w2 ->
+              | ( BVOps.BVXor,
+                  [
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v1, w1)), _);
+                    Expr.BvExpr (Expr.Lit (Literal.LBitvector (v2, w2)), _);
+                  ] )
+                when w1 = w2 ->
                   let result = Z.logxor v1 v2 in
                   Some (Expr.Lit (Literal.LBitvector (result, w1)))
               (* Unary operations *)
-              | (BVOps.BVNot, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v, w)), _)]) ->
+              | ( BVOps.BVNot,
+                  [ Expr.BvExpr (Expr.Lit (Literal.LBitvector (v, w)), _) ] ) ->
                   let mask = Z.sub (Z.shift_left Z.one w) Z.one in
                   let result = Z.logxor v mask in
                   Some (Expr.Lit (Literal.LBitvector (result, w)))
-              | (BVOps.BVNeg, [Expr.BvExpr (Expr.Lit (Literal.LBitvector (v, w)), _)]) ->
+              | ( BVOps.BVNeg,
+                  [ Expr.BvExpr (Expr.Lit (Literal.LBitvector (v, w)), _) ] ) ->
                   let result = Z.neg v in
                   let mask = Z.sub (Z.shift_left Z.one w) Z.one in
                   let masked_result = Z.logand result mask in
@@ -961,9 +1029,9 @@ and reduce_lexpr_loop
             with _ -> None
           else None
         in
-        (match try_evaluate_concrete () with
-         | Some concrete_result -> concrete_result
-         | None -> BVExprIntrinsic (op, reduced_es, width))
+        match try_evaluate_concrete () with
+        | Some concrete_result -> concrete_result
+        | None -> BVExprIntrinsic (op, reduced_es, width))
     (* -------------------------
                  LVar
        ------------------------- *)
@@ -1257,12 +1325,11 @@ and reduce_lexpr_loop
             let eqs = get_equal_expressions pfs le in
             let first =
               List.find_map
-                (fun e ->
-                  match e with
-                  | Expr.EList les
+                (function
+                  | Expr.EList les as e
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
                       Some e
-                  | Lit (LList les)
+                  | Lit (LList les) as e
                     when List.compare_length_with les (Z.to_int n) >= 0 ->
                       Some e
                   | NOp (LstCat, (EList les as e) :: _)
@@ -1472,6 +1539,7 @@ and reduce_lexpr_loop
             let les = List.map Expr.list_length les in
             List.fold_left Expr.Infix.( + ) (List.hd les) (List.tl les)
         | LstLen, LstSub (_, _, len) when lexpr_is_list gamma fle -> len
+        | LstLen, UnOp (LstRev, le) -> UnOp (LstLen, f le)
         | LstLen, _ when lexpr_is_list gamma fle -> def
         (* List operations: reverse *)
         | LstRev, EList le -> EList (List.rev le)
@@ -1621,6 +1689,9 @@ and reduce_lexpr_loop
         else
           List.map2 (fun x y -> Expr.Infix.( == ) x (Lit y)) le ll
           |> Expr.conjunct
+    (* Z3 edge case: A list can't contain itself *)
+    | BinOp (EList [ x ], Equal, y) when Expr.equal x y -> Expr.false_
+    | BinOp (x, Equal, EList [ y ]) when Expr.equal x y -> Expr.false_
     | BinOp (EList ll, Equal, EList lr) ->
         if List.length ll <> List.length lr then Expr.(false_)
         else if ll = [] then Expr.(true_)
@@ -1717,10 +1788,12 @@ and reduce_lexpr_loop
         BinOp (e2, FLessThanEqual, e1)
     | BinOp (Lit (Bool false), Equal, BinOp (e1, FLessThanEqual, e2)) ->
         BinOp (e2, FLessThan, e1)
-    | BinOp (* x + (-y) = 0f <=> x = y *)
+    | BinOp
+        (* x + (-y) = 0f <=> x = y *)
         (BinOp (LVar x, FPlus, UnOp (FUnaryMinus, LVar y)), Equal, Lit (Num 0.))
       -> BinOp (LVar x, Equal, LVar y)
-    | BinOp (* x + (-y) = 0i <=> x = y *)
+    | BinOp
+        (* x + (-y) = 0i <=> x = y *)
         (BinOp (LVar x, IPlus, UnOp (IUnaryMinus, LVar y)), Equal, Lit (Int z))
       when Z.equal z Z.zero -> BinOp (LVar x, Equal, LVar y)
     | BinOp (BinOp (Lit (Num x), FPlus, LVar y), Equal, LVar z)
@@ -1894,7 +1967,7 @@ and reduce_lexpr_loop
         let fidx = f idx in
         match fidx with
         (* Index is a non-negative integer *)
-        | Lit (Int n) when Z.leq Z.zero n ->
+        | (Lit (Int n) | Lit (LBitvector (n, _))) when Z.leq Z.zero n ->
             if lexpr_is_list gamma fle then
               Option.value
                 ~default:(Expr.BinOp (fle, LstNth, fidx))
@@ -2053,6 +2126,10 @@ and reduce_lexpr_loop
                          les -> Expr.false_
                 | _ -> def)
             (* Booleans *)
+            (* Need this case, otherwise we end up with lvars as assertions, which the matcher
+               doesn't enjoy much. *)
+            | Lit (Bool true), LVar _ | LVar _, Lit (Bool true) ->
+                BinOp (flel, Equal, fler)
             | Lit (Bool true), _ when t2 = Some Type.BooleanType -> fler
             | _, Lit (Bool true) when t1 = Some Type.BooleanType -> flel
             (* Nested equalities *)
@@ -2347,8 +2424,9 @@ and simplify_int_arithmetic_lexpr
 
 (** Checks if an int expression is greater than zero.
 
-    @returns [Some true] if definitely > 0, [Some false] if definitely < 0,
-      and [None] if both outcomes are satisfiable. *)
+    @return
+      [Some true] if definitely > 0, [Some false] if definitely < 0, and [None]
+      if both outcomes are satisfiable. *)
 and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
     bool option =
   (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)
@@ -2894,12 +2972,71 @@ let extract_lvar_equalities : Asrt.t -> (string * Expr.t) list =
       else None
   | _ -> None
 
+let clean_double_equalities (a : Asrt.t) : Asrt.t =
+  let pures = Asrt.pure_asrts a in
+  let true_vars =
+    pures
+    |> List.filter_map @@ function
+       | Expr.BinOp (LVar x, Equal, Lit (Bool true))
+       | BinOp (Lit (Bool true), Equal, LVar x) -> Some x
+       | _ -> None
+  in
+  let is_bool_binop = function
+    | BinOp.Equal
+    | ILessThan
+    | ILessThanEqual
+    | FLessThan
+    | FLessThanEqual
+    | StrLess
+    | And
+    | Or
+    | Impl
+    | SetMem
+    | SetSub -> true
+    | _ -> false
+  in
+  let pures', vars_to_remove =
+    List.fold_left
+      (fun (pures, to_remove) v ->
+        let found = ref false in
+        let pures' =
+          pures
+          |> List.map @@ function
+             | (Expr.BinOp (LVar x, Equal, (BinOp (_, b, _) as e)) as a)
+             | (Expr.BinOp ((BinOp (_, b, _) as e), Equal, LVar x) as a) ->
+                 if List.mem x true_vars && is_bool_binop b then (
+                   found := true;
+                   e)
+                 else a
+             | a -> a
+        in
+        if !found then (pures', v :: to_remove) else (pures', to_remove))
+      (pures, []) true_vars
+  in
+  let pures' =
+    pures'
+    |> List.filter @@ function
+       | Expr.BinOp (LVar x, Equal, Lit (Bool true))
+       | Expr.BinOp (Lit (Bool true), Equal, LVar x)
+         when List.mem x vars_to_remove -> false
+       | _ -> true
+  in
+  let non_pures =
+    a
+    |> List.filter @@ function
+       | Asrt.Pure _ -> false
+       | _ -> true
+  in
+  let pures = pures' |> List.map @@ fun x -> Asrt.Pure x in
+  pures @ non_pures
+
 let reduce_assertion
     ?(matching = false)
     ?(pfs = PFS.init ())
     ?(gamma = Type_env.init ())
     (a : Asrt.t) : Asrt.t =
   let a = reduce_types a in
+  let a = clean_double_equalities a in
 
   let rec loop (a : Asrt.t) =
     let a' = reduce_assertion_loop matching pfs gamma a in

@@ -28,8 +28,8 @@ module PatchedMem = MyMonadicSMemory.Make (MyMem) (Prebuilt.MyInitData)
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 
 module Lifter
-    (Verifier : Gillian.Abstraction.Verifier.S
-                  with type annot = Gil_syntax.Annot.Basic.t) =
+    (Verifier :
+      Gillian.Abstraction.Verifier.S with type annot = Gil_syntax.Annot.Basic.t) =
   Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (PC) (Verifier)
 
 module CLI =

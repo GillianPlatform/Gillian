@@ -101,7 +101,7 @@ let set_met (heap : t) (loc : string) (met : Expr.t option) : unit =
   Hashtbl.remove rem loc
 
 (*************************************)
-(** Symbolic heap functions         **)
+(** Symbolic heap functions **)
 
 (*************************************)
 

@@ -1,7 +1,7 @@
 
 proc split_vector(x) {
-    xtopslice := extract(31i, 16i, Bitvector(x, 32i): 16i);
-    xbotslice := extract(15i, 0i, Bitvector(x, 32i): 16i);
+    xtopslice := bvextract(31i, 16i, Bitvector(x, 32i): 16i);
+    xbotslice := bvextract(15i, 0i, Bitvector(x, 32i): 16i);
     ret := {{ xtopslice, xbotslice }};
     return
 };
@@ -21,21 +21,20 @@ proc main() {
 
     sum0 := bvadd(Bitvector(x,32i), Bitvector(y,32i): 32i);
     sum1 := bvadd(Bitvector(newx,32i), Bitvector(newy,32i): 32i);
-    ptrptr_l := [alloc](0i, 8i);
+    ptrptr_l := [alloc](0x0v64, 0x8v64);
     ptrptr := l-nth(ptrptr_l, 0i);
-    xptr_l := [alloc](0i, 4i);
+    xptr_l := [alloc](0x0v64, 0x4v64);
     xptr := l-nth(xptr_l, 0i);
-    xptr_with_offset := {{"ptr", {{ xptr, 0i }}}};
-    b := [store]("i-or-ptr", ptrptr, 0i, xptr_with_offset);
-    a := [store]("i-32", xptr, 0i, {{"int-32", sum0}});
-    xptr2_l := [load]("i-or-ptr", ptrptr, 0i);
+    xptr_with_offset := {{"ptr", {{ xptr, 0x0v64 }}}};
+    b := [store]("i-or-ptr", ptrptr, 0x0v64, {{"ptr", xptr_with_offset}});
+    a := [store]("i-32", xptr, 0x0v64, {{"i-32", sum0}});
+    xptr2_l := [load]("i-or-ptr", ptrptr, 0x0v64);
     typed_xptr2_l := l-nth(xptr2_l, 0i);
     xptr2_with_offset := l-nth(typed_xptr2_l, 1i);
     xptr2 := l-nth(xptr2_with_offset, 0i);
     xptr2_offset := l-nth(xptr2_with_offset, 1i);
-    rtt_l_typed_l := [load]("i-32", xptr2, xptr2_offset);
-    rtt_typed := l-nth(rtt_l_typed_l, 0i);
-    rtt := l-nth(rtt_typed, 1i);
+    rtt_typed := [load]("i-32", xptr2, xptr2_offset);
+    rtt := l-nth(rtt_typed, 0i); 
     assert((!(bvult(Bitvector(sum1, 32i), Bitvector(sum0, 32i):))));
     assert((rtt == sum1));
     ret := x;

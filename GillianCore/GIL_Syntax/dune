@@ -1,7 +1,7 @@
 (library
  (name gil_syntax)
  (public_name gillian.gil_syntax)
- (libraries utils fmt visitors.runtime zarith)
+ (libraries utils logging fmt visitors.runtime zarith)
  (preprocess
   (pps visitors.ppx ppx_deriving_yojson ppx_deriving.std))
  (flags :standard -open Utils.Prelude -open Utils -w +A-40-42-41-4-70))

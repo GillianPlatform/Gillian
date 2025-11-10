@@ -31,7 +31,9 @@ let ( let** ) o f = Result.bind o f
 
 module Make
     (SMemory : Gillian.Symbolic.Memory_S)
-    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
+    (Gil :
+      Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
+        with type Lifter.memory = SMemory.t)
     (Verification : Engine.Verifier.S with type annot = C2_annot.t) =
 struct
   open Exec_map
@@ -57,7 +59,7 @@ struct
     id : id;
     all_ids : id list;
     display : string;
-    matches : matching list;
+    matches : Match_map.matching list;
     errors : string list;
     submap : id submap;
     prev : (id * Branch_case.t option) option;
@@ -94,12 +96,14 @@ struct
       prev : (id * Branch_case.t option * id list) option;
           (** Where to put the finished cmd in the map. *)
       all_ids : (id * (Branch_case.kind option * Branch_case.case)) Ext_list.t;
-          (** All the GIL cmd IDs that build into this one (and the relevant branch case info). *)
+          (** All the GIL cmd IDs that build into this one (and the relevant
+              branch case info). *)
       unexplored_paths : (id * Gil_branch_case.t option) Stack.t;
-          (** All the paths that haven't been explored yet; a stack means depth-first exploration. *)
+          (** All the paths that haven't been explored yet; a stack means
+              depth-first exploration. *)
       ends : partial_end Ext_list.t;
           (** All the end points; there may be multiple if the cmd branches. *)
-      matches : matching Ext_list.t;
+      matches : Match_map.matching Ext_list.t;
           (** Unifications contained in this command *)
       errors : string Ext_list.t;  (** Errors occurring during this command *)
       mutable canonical_data : canonical_cmd_data option;
@@ -115,7 +119,7 @@ struct
       id : id;
       all_ids : id list;
       display : string;
-      matches : Exec_map.matching list;
+      matches : Match_map.matching list;
       errors : string list;
       next_kind : (Branch_case.t, branch_data) next_kind;
       callers : id list;
@@ -498,16 +502,6 @@ struct
           let++ prev = get_prev () in
           init_partial ~prev
 
-    let failwith ~exec_data ?partial ~partials msg =
-      DL.failwith
-        (fun () ->
-          [
-            ("exec_data", exec_data_to_yojson exec_data);
-            ("partial_data", opt_to_yojson partial_data_to_yojson partial);
-            ("partials_state", to_yojson partials);
-          ])
-        ("C2_lifter.PartialCmds.handle: " ^ msg)
-
     let handle ~prog ~(partials : t) ~get_prev ~prev_id exec_data =
       DL.log (fun m ->
           let report = exec_data.cmd_report in
@@ -517,16 +511,9 @@ struct
           m
             ~json:[ ("exec_data", exec_data); ("annot", annot) ]
             "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
-      let partial =
-        find_or_init ~partials ~get_prev prev_id
-        |> Result_utils.or_else (fun e -> failwith ~exec_data ~partials e)
-      in
+      let** partial = find_or_init ~partials ~get_prev prev_id in
       Hashtbl.replace partials exec_data.id partial;
-      let result =
-        update ~prog ~prev_id exec_data partial
-        |> Result_utils.or_else (fun e ->
-               failwith ~exec_data ~partial ~partials e)
-      in
+      let** result = update ~prog ~prev_id exec_data partial in
       let () =
         match result with
         | Finished f ->
@@ -538,7 +525,7 @@ struct
             |> Ext_list.iter (fun (id, _) -> Hashtbl.remove_all partials id)
         | _ -> ()
       in
-      result
+      Ok result
   end
 
   type t = {
@@ -552,6 +539,31 @@ struct
     mutable func_return_count : int;
   }
   [@@deriving to_yojson]
+
+  let package_case case =
+    let json = Branch_case.to_yojson case in
+    let display = Branch_case.display case in
+    (json, display)
+
+  let package_data { id; all_ids; display; matches; errors; submap; _ } =
+    Packaged.{ id; all_ids; display; matches; errors; submap }
+
+  let package_node { data : cmd_data; next } =
+    let data = package_data data in
+    let next =
+      match next with
+      | None -> None
+      | Some (Single (next, _)) -> Some (Single (next, ""))
+      | Some (Branch nexts) ->
+          let nexts =
+            nexts
+            |> List.map (fun (case, (next, _)) ->
+                   let case, bdata = package_case case in
+                   (case, (next, bdata)))
+          in
+          Some (Branch nexts)
+    in
+    { data; next }
 
   module Insert_new_cmd = struct
     let failwith ~state ~finished_partial msg =
@@ -587,11 +599,19 @@ struct
                     pp_id caller_id
             in
             match new_next with
-            | Ok next -> ({ node with next }, Ok ())
+            | Ok next ->
+                let node = { node with next } in
+                (node, Ok node)
             | Error e -> (node, Error e))
       in
       match result with
-      | Some r -> r
+      | Some r ->
+          let++ new_node = r in
+          let () =
+            Effect.perform
+              (Node_updated (caller_id, Some (package_node new_node)))
+          in
+          ()
       | None ->
           Fmt.error "update_caller_branches - caller %a not found" pp_id
             caller_id
@@ -661,43 +681,58 @@ struct
       { data; next }
 
     let insert_as_next ~state ~prev_id ?case new_id =
-      map_node_extra_exn state.map prev_id (fun prev ->
-          let new_next =
-            let** next =
-              match prev.next with
-              | Some next -> Ok next
-              | None -> Error "trying to insert next of final cmd!"
+      let++ new_prev =
+        map_node_extra_exn state.map prev_id (fun prev ->
+            let new_next =
+              let** next =
+                match prev.next with
+                | Some next -> Ok next
+                | None -> Error "trying to insert next of final cmd!"
+              in
+              match (next, case) with
+              | Single _, Some _ ->
+                  Error "trying to insert to non-branch cmd with branch"
+              | Branch _, None ->
+                  Error "trying to insert to branch cmd with no branch"
+              | Single (Some _, _), _ -> Error "duplicate insertion"
+              | Single (None, bdata), None ->
+                  Ok (Some (Single (Some new_id, bdata)))
+              | Branch nexts, Some case -> (
+                  match List.assoc_opt case nexts with
+                  | None -> Error "case not found"
+                  | Some (Some _, _) -> Error "duplicate insertion"
+                  | Some (None, bdata) ->
+                      let nexts =
+                        List_utils.assoc_replace case (Some new_id, bdata) nexts
+                      in
+                      Ok (Some (Branch nexts)))
             in
-            match (next, case) with
-            | Single _, Some _ ->
-                Error "trying to insert to non-branch cmd with branch"
-            | Branch _, None ->
-                Error "trying to insert to branch cmd with no branch"
-            | Single (Some _, _), _ -> Error "duplicate insertion"
-            | Single (None, bdata), None ->
-                Ok (Some (Single (Some new_id, bdata)))
-            | Branch nexts, Some case -> (
-                match List.assoc_opt case nexts with
-                | None -> Error "case not found"
-                | Some (Some _, _) -> Error "duplicate insertion"
-                | Some (None, bdata) ->
-                    let nexts =
-                      List_utils.assoc_replace case (Some new_id, bdata) nexts
-                    in
-                    Ok (Some (Branch nexts)))
-          in
-          match new_next with
-          | Ok next -> ({ prev with next }, Ok ())
-          | Error e ->
-              (prev, Fmt.error "insert_as_next (%a) - %s" pp_id prev_id e))
+            match new_next with
+            | Ok next ->
+                let prev = { prev with next } in
+                (prev, Ok prev)
+            | Error e ->
+                (prev, Fmt.error "insert_as_next (%a) - %s" pp_id prev_id e))
+      in
+      let () =
+        Effect.perform (Node_updated (prev_id, Some (package_node new_prev)))
+      in
+      ()
 
     let insert_as_submap ~state ~parent_id new_id =
-      map_node_extra_exn state.map parent_id (fun parent ->
-          match parent.data.submap with
-          | Proc _ | Submap _ -> (parent, Error "duplicate submaps!")
-          | NoSubmap ->
-              let data = { parent.data with submap = Submap new_id } in
-              ({ parent with data }, Ok ()))
+      let++ parent =
+        map_node_extra_exn state.map parent_id (fun parent ->
+            match parent.data.submap with
+            | Proc _ | Submap _ -> (parent, Error "duplicate submaps!")
+            | NoSubmap ->
+                let data = { parent.data with submap = Submap new_id } in
+                let parent = { parent with data } in
+                (parent, Ok parent))
+      in
+      let () =
+        Effect.perform (Node_updated (parent_id, Some (package_node parent)))
+      in
+      ()
 
     let insert_to_empty_map ~state ~prev ~stack_direction new_cmd =
       let- () =
@@ -753,6 +788,9 @@ struct
         let new_cmd = make_new_cmd ~func_return_label finished_partial in
         let** new_cmd = insert_cmd ~state ~prev ~stack_direction new_cmd in
         let () = insert state.map ~id ~all_ids new_cmd in
+        let () =
+          Effect.perform (Node_updated (id, Some (package_node new_cmd)))
+        in
         Ok new_cmd
       in
       Result_utils.or_else (failwith ~state ~finished_partial) r
@@ -809,10 +847,24 @@ struct
             Partial_cmds.handle ~prog ~get_prev ~partials ~prev_id exec_data
           in
           match partial_result with
-          | Finished finished ->
+          | Ok (Finished finished) ->
               let cmd = insert_new_cmd ~state finished in
               Either.Right cmd
-          | StepAgain (id, case) -> Either.Left (id, case))
+          | Ok (StepAgain (id, case)) -> Either.Left (id, case)
+          | Error msg ->
+              DL.failwith
+                (fun () ->
+                  let prev_id =
+                    match prev_id with
+                    | Some id -> L.Report_id.to_yojson id
+                    | None -> `Null
+                  in
+                  [
+                    ("state", to_yojson state);
+                    ("exec_data", exec_data_to_yojson exec_data);
+                    ("prev_id", prev_id);
+                  ])
+                ("Error while handling command: " ^ msg))
   end
 
   let init_or_handle = Init_or_handle.f
@@ -821,36 +873,6 @@ struct
     init_or_handle ~state ~prev_id ?gil_case exec_data
 
   let dump = to_yojson
-  let get_gil_map _ = failwith "get_gil_map: not implemented!"
-
-  let package_case case =
-    let json = Branch_case.to_yojson case in
-    let display = Branch_case.display case in
-    (json, display)
-
-  let package_data { id; all_ids; display; matches; errors; submap; _ } =
-    Packaged.{ id; all_ids; display; matches; errors; submap }
-
-  let package_node { data : cmd_data; next } =
-    let data = package_data data in
-    let next =
-      match next with
-      | None -> None
-      | Some (Single (next, _)) -> Some (Single (next, ""))
-      | Some (Branch nexts) ->
-          let nexts =
-            nexts
-            |> List.map (fun (case, (next, _)) ->
-                   let case, bdata = package_case case in
-                   (case, (next, bdata)))
-          in
-          Some (Branch nexts)
-    in
-    { data; next }
-
-  let package = Packaged.package Fun.id package_node
-  let get_lifted_map_exn { map; _ } = package map
-  let get_lifted_map state = Some (get_lifted_map_exn state)
   let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
@@ -864,6 +886,37 @@ struct
     { id = "unknown"; description = Some "Error lifting not supported yet!" }
 
   let add_variables = Memory_model.MonadicSMemory.Lift.add_variables
+
+  let get_variables _ { store; memory; pfs; types; preds } _ =
+    let open Gil_lifter in
+    let open Variable in
+    let variables = Hashtbl.create 0 in
+    (* New scope ids must be higher than last top level scope id to prevent
+        duplicate scope ids *)
+    let scope_id = ref (List.length top_level_scopes) in
+    let get_new_scope_id () =
+      let () = scope_id := !scope_id + 1 in
+      !scope_id
+    in
+    let lifted_scopes =
+      let lifted_scopes =
+        add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
+          variables
+      in
+      let pure_formulae_vars =
+        Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
+      in
+      let type_env_vars = Option.fold ~some:get_type_env_vars ~none:[] types in
+      let pred_vars = Option.fold ~some:get_pred_vars preds ~none:[] in
+      let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
+      let () =
+        List.iter2
+          (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
+          top_level_scopes vars_list
+      in
+      lifted_scopes
+    in
+    (lifted_scopes, variables)
 
   let select_case nexts =
     let result =
@@ -924,15 +977,12 @@ struct
         | Some (id, case) -> find_next state id case
         | None -> Either.left id)
 
-  let request_next state id case =
-    let rec aux id case =
-      let path = path_of_id id state in
-      let exec_data = Effect.perform (Step (Some id, case, path)) in
-      match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
-      | Either.Left (id, case) -> aux id case
-      | Either.Right map -> map.data.id
-    in
-    aux id case
+  let rec request_next state id case =
+    let path = path_of_id id state in
+    let exec_data = Effect.perform (Step (Some id, case, path)) in
+    match init_or_handle ~state ~prev_id:id ?gil_case:case exec_data with
+    | Either.Left (id, case) -> request_next state id case
+    | Either.Right map -> map.data.id
 
   let step state id case =
     let () =
@@ -1139,4 +1189,7 @@ struct
     let () = Kconfig.harness := Some entrypoint in
     C2ParserAndCompiler.parse_and_compile_files files
     |> Result.map (fun r -> (r, Constants.CBMC_names.start))
+
+  let pp_expr _ = Gil_syntax.Expr.pp
+  let pp_asrt _ = Gil_syntax.Asrt.pp_atom
 end

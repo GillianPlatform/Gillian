@@ -204,7 +204,7 @@ VERIFICATION FAILURE: Spec decodeEncryptionContext 0 - post condition not unifia
 which can then be traced back to line the line which says:
 
 ```
-WARNING: Unify Assertion Failed: (<Cell>(_lvar_3039, "@extensible"; false), ) with subst 
+WARNING: Unify Assertion Failed: (<Cell>(#lvar_3039, "@extensible"; false), ) with subst 
 ```
 
 revealing that the object is not non-extensible as intended, which is then understood to come from the object not being frozen.

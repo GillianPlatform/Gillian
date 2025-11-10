@@ -1,3 +1,9 @@
+(** @canonical Gillian.Command_line.ParserAndCompiler
+
+    This defines an interface that allows a user to indicate how to parse their
+    own programming language, preprocess the obtained language and compile it to
+    GIL (type [Prog.t]) *)
+
 type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   gil_progs : (string * ('annot, string) Prog.t) list;
   source_files : SourceFiles.t;
@@ -24,7 +30,8 @@ module type S = sig
     (** A term that will be added to every command. *)
     val term : t Cmdliner.Term.t
 
-    (** A side-effect function that will determine the behaviour of the target-language specific options *)
+    (** A side-effect function that will determine the behaviour of the
+        target-language specific options *)
     val apply : t -> unit
   end
 
@@ -41,28 +48,33 @@ module type S = sig
   (** Pretty printer for type {!err} *)
   val pp_err : Format.formatter -> err -> unit
 
-  (** Takes a set of source file paths, parses them with the user's language, and
-      then compiles them to a single or a set of GIL programs. The returned GIL
-      program(s) should be ready to be analysed. *)
+  (** Takes a set of source file paths, parses them with the user's language,
+      and then compiles them to a single or a set of GIL programs. The returned
+      GIL program(s) should be ready to be analysed. *)
   val parse_and_compile_files :
-    string list -> ((Annot.t, tl_ast, init_data) compiled_progs, err) result
+    string list -> (Annot.t, tl_ast, init_data) compiled_progs Gillian_result.t
 
   (** [other_imports] is an association list that maps extensions to a parser
       and compiler. For example, it is possible to import a JSIL file in a GIL
-      program using [import "file.jsil";]. In order to do so, the [other_imports]
-      list should contain the tuple [("jsil", parse_and_compile_jsil_file)] where
+      program using [import "file.jsil";]. In order to do so, the
+      [other_imports] list should contain the tuple
+      [("jsil", parse_and_compile_jsil_file)] where
       [parse_and_compile_jsil_file] is a function that takes a file path, parses
       the file as a JSIL program, and compiles this to a GIL program. *)
   val other_imports :
-    (string * (string -> ((Annot.t, string) Prog.t, err) result)) list
+    (string * (string -> (Annot.t, string) Prog.t Gillian_result.t)) list
 
-  (** Contains the name of the environment variable which contains the path to where the runtime is stored. *)
+  (** Contains the name of the environment variable which contains the path to
+      where the runtime is stored. *)
   val default_import_paths : string list option
 
-  (** Function that will be executed at initialisation. It will be passed the current execution mode as parameter *)
+  (** Function that will be executed at initialisation. It will be passed the
+      current execution mode as parameter *)
   val initialize : Exec_mode.t -> unit
 end
 
+(** Dummy ParserAndCompiler that will simply always fail. This is used when
+    someone wants to build a command line interface to only reason about GIL. *)
 module Dummy :
   S with type init_data = unit and type Annot.t = Gil_syntax.Annot.Basic.t =
 struct

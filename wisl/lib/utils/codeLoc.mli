@@ -11,4 +11,4 @@ val json : t -> Yojson.Safe.t
 val json_with_uri : t -> Yojson.Safe.t
 val merge : t -> t -> t
 val dummy : t
-val to_location : t -> Gillian.Gil_syntax.Location.t
+val to_location : t -> Gillian.Utils.Location.t

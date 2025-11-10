@@ -7,7 +7,7 @@ type 'cp t =
   | Emp  (** Empty heap *)
   | Pure of Expr.t  (** Pure formula *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion *)
-  | CorePred of 'cp * Expr.t list * Expr.t list  (** Core predicate  *)
+  | CorePred of 'cp * Expr.t list * Expr.t list  (** Core predicate *)
 
 let map_cp
     (f : 'cp1 * Expr.t list * Expr.t list -> 'cp2 * Expr.t list * Expr.t list) :

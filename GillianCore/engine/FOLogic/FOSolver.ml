@@ -124,11 +124,11 @@ let sat ~matching ~pfs ~gamma formula : bool =
       b
   | _ ->
       (*let relevant_info =
-        (Expr.pvars formula', Expr.lvars formula', Expr.locs formula')
-      in*)
-      (* TODO(Ian): you cant just remove relevant info like this what if the 
-        formula is just false concretely? This assuems that reduction is fully normalizing
-      is that a requirement?*)
+          (Expr.pvars formula', Expr.lvars formula', Expr.locs formula')
+        in*)
+      (* TODO(Ian): you cant just remove relevant info like this what if the
+           formula is just false concretely? This assuems that reduction is fully normalizing
+         is that a requirement?*)
       check_satisfiability ~matching (* ~relevant_info *)
         (formula' :: PFS.to_list pfs)
         gamma

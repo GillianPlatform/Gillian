@@ -1,11 +1,10 @@
 (** {b GIL logic assertions}. *)
 type atom = TypeDef__.assertion_atom =
-  | Emp  (** Empty heap             *)
-  | Pred of string * Expr.t list  (** Predicates             *)
-  | Pure of Expr.t  (** Pure formula           *)
-  | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
-  | CorePred of string * Expr.t list * Expr.t list
-      (** Core assertion         *)
+  | Emp  (** Empty heap *)
+  | Pred of string * Expr.t list  (** Predicates *)
+  | Pure of Expr.t  (** Pure formula *)
+  | Types of (Expr.t * Type.t) list  (** Typing assertion *)
+  | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
   | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
       (** Magic wand of the form [P(...) -* Q(...)] *)
 [@@deriving eq]
@@ -112,14 +111,9 @@ let pred_names : t -> string list =
 
 (* Returns a list with the pure assertions that occur in --a-- *)
 let pure_asrts : t -> Expr.t list =
-  let collector =
-    object
-      inherit [_] Visitors.reduce
-      inherit Visitors.Utils.non_ordered_list_monoid
-      method! visit_Pure () f = [ f ]
-    end
-  in
-  collector#visit_assertion ()
+  List.filter_map @@ function
+  | Pure f -> Some f
+  | _ -> None
 
 (* Check if --a-- is a pure assertion *)
 let is_pure_asrt : atom -> bool = function

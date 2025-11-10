@@ -1,5 +1,4 @@
 type t =
-  | NEQ
   | EQUAL
   | LESSTHAN
   | GREATERTHAN
@@ -23,7 +22,7 @@ type t =
 let pp fmt b =
   let s = Format.fprintf fmt "@[%s@]" in
   match b with
-  | EQUAL -> s "="
+  | EQUAL -> s "=="
   | LESSTHAN -> s "<"
   | GREATERTHAN -> s ">"
   | LESSEQUAL -> s "<="
@@ -35,7 +34,6 @@ let pp fmt b =
   | MOD -> s "%"
   | AND -> s "&&"
   | OR -> s "||"
-  | NEQ -> s "!="
   | LSTCAT -> s "@"
   | LSTCONS -> s "::"
   | LSTNTH -> s "lnth"

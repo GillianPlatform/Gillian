@@ -1,4 +1,4 @@
-open Debug_protocol_ext
+open Protocol
 
 (**/**)
 
@@ -13,18 +13,20 @@ module Make (Debugger : Debugger.S) = struct
       Debug_rpc.remove_command_handler rpc (module Launch_command);
       Debug_rpc.remove_command_handler rpc (module Attach_command)
     in
-    DL.set_rpc_command_handler rpc ~name:"Launch"
+    DL.set_rpc_command_handler rpc ~name:"Launch" ~catchall:false
       (module Launch_command)
       (fun (launch_args : Launch_command.Arguments.t) ->
         prevent_reenter ();
-        let () =
-          match
-            Debugger.launch launch_args.program launch_args.procedure_name
-          with
-          | Ok dbg -> Lwt.wakeup_later resolver (launch_args, dbg)
-          | Error err ->
-              DL.log (fun m -> m "%s" err);
-              Lwt.wakeup_later_exn resolver Exit
+        let r =
+          try Debugger.launch launch_args.program launch_args.procedure_name
+          with e -> Gillian_result.internal_error (Printexc.to_string e)
+        in
+        let%lwt () =
+          match r with
+          | Ok dbg ->
+              Lwt.wakeup_later resolver (launch_args, dbg);
+              Lwt.return_unit
+          | Error e -> raise (Gillian_result.Exc.Gillian_error e)
         in
         Lwt.return_unit);
     DL.set_rpc_command_handler rpc ~name:"Attach"

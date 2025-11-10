@@ -57,7 +57,7 @@ let pp fmt lcmd =
     match binds with
     | [] -> ()
     | _ ->
-        Format.fprintf fmt "{binds: %a}"
+        Format.fprintf fmt "{bind: %a}"
           (WPrettyUtils.pp_list Format.pp_print_string)
           binds
   in
@@ -80,7 +80,7 @@ let pp fmt lcmd =
         (WPrettyUtils.pp_list WLExpr.pp)
         wlel
   | Assert (asrt, binds) ->
-      Format.fprintf fmt "assert %a%a" pp_binds binds WLAssert.pp asrt
+      Format.fprintf fmt "assert %a %a" pp_binds binds WLAssert.pp asrt
   | Invariant (asrt, binds, variant) ->
       Format.fprintf fmt "invariant %a%a%a" pp_binds binds WLAssert.pp asrt
         pp_variant variant

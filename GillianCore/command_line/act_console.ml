@@ -1,13 +1,13 @@
 open Cmdliner
 open Command_line_utils
+open Utils.Syntaxes.Result
 module L = Logging
 
 module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Abductor : Abductor.S
-                  with type init_data = ID.t
-                   and type annot = PC.Annot.t)
+    (Abductor :
+      Abductor.S with type init_data = ID.t and type annot = PC.Annot.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -32,20 +32,17 @@ struct
                *** Stage 1: Parsing program in original language and compiling \
                to Gil. ***@\n")
       in
-      let progs =
-        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
-          (PC.parse_and_compile_files files)
-      in
+      let* progs = PC.parse_and_compile_files files in
       let e_progs = progs.gil_progs in
       let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
       let e_prog = snd (List.hd e_progs) in
       let source_files = progs.source_files in
-      (e_prog, progs.init_data, Some source_files)
+      Ok (e_prog, progs.init_data, Some source_files)
     else
       let () =
         L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
       in
-      let Gil_parsing.{ labeled_prog; init_data } =
+      let* Gil_parsing.{ labeled_prog; init_data } =
         Gil_parsing.parse_eprog_from_file file
       in
       let init_data =
@@ -53,7 +50,7 @@ struct
         | Ok d -> d
         | Error e -> failwith e
       in
-      (labeled_prog, init_data, None)
+      Ok (labeled_prog, init_data, None)
 
   let pp_annot fmt annot =
     Fmt.pf fmt "%a"
@@ -107,7 +104,7 @@ struct
       should_emit_specs
       incremental =
     let file = List.hd files in
-    let e_prog, init_data, source_files_opt =
+    let* e_prog, init_data, source_files_opt =
       parse_eprog file files already_compiled
     in
     let () =
@@ -118,10 +115,8 @@ struct
     let () =
       L.normal (fun m -> m "*** Stage 2: Transforming the program.@\n")
     in
-    let prog =
-      Gil_parsing.eprog_to_prog
-        ~other_imports:(convert_other_imports PC.other_imports)
-        e_prog
+    let+ prog =
+      Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
     let call_graph = make_callgraph prog in
     let () =
@@ -130,14 +125,12 @@ struct
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.@\n") in
     let () = Config.unfolding := false in
     let prog = LogicPreprocessing.preprocess prog true in
-    match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed."
-    | Ok prog' ->
-        let () =
-          Abductor.test_prog ~init_data ~call_graph prog' incremental
-            source_files_opt
-        in
-        if should_emit_specs then emit_specs e_prog prog' file
+    let prog' = MP.init_prog prog in
+    let () =
+      Abductor.test_prog ~init_data ~call_graph prog' incremental
+        source_files_opt
+    in
+    if should_emit_specs then emit_specs e_prog prog' file
 
   let act
       files
@@ -160,12 +153,13 @@ struct
     let () = Config.specs_to_stdout := specs_to_stdout in
     let () = Config.max_branching := bi_unroll_depth in
     let () = Config.under_approximation := true in
-    let () =
+    let r =
       process_files files already_compiled outfile_opt should_emit_specs
         incremental
     in
-    let () = if !Config.stats then Statistics.print_statistics () in
-    Logging.wrap_up ()
+    let () = if !Config.stats then L.Statistics.print_statistics () in
+    let () = Common_args.exit_on_error r in
+    exit 0
 
   let act_t =
     Term.(
@@ -185,8 +179,8 @@ struct
            compiling it to GIL";
       ]
     in
-    Cmd.info "act" ~doc ~man
+    Cmd.info ~exits:Common_args.exit_code_info "act" ~doc ~man
 
-  let act_cmd = Cmd.v act_info (Common_args.use act_t)
+  let act_cmd = Console.Normal (Cmd.v act_info (Common_args.use act_t))
   let cmds = [ act_cmd ]
 end

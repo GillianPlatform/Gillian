@@ -1,6 +1,4 @@
-(**
-	GIL Literals
-*)
+(** GIL Literals *)
 
 type t = TypeDef__.literal =
   | Undefined  (** The literal [undefined] *)
