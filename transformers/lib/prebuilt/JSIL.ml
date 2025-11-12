@@ -119,6 +119,7 @@ end
 module PatchDomainsetObject (S : sig
   include MyMonadicSMemory
 
+  val get_nonos : t -> Expr.t list
   val is_not_nono : t -> Expr.t -> bool
 end) =
   Injector
@@ -127,15 +128,21 @@ end) =
 
       let post_execute_action a (s, args, rets) =
         match (a, rets) with
-        | "get_domainset", [ (Expr.Lit (LList _) as dom) ]
-        | "get_domainset", [ (Expr.EList _ as dom) ] ->
-            let dom =
-              (match dom with
-              | Expr.Lit (LList lits) -> List.map Expr.lit lits
-              | Expr.EList lits -> lits
-              | _ -> failwith "Unexpected domainset type")
-              |> List.filter (S.is_not_nono s)
-              |> Expr.list
+        | "get_domainset", [ dom ] ->
+            let open Delayed.Syntax in
+            let* dom =
+              match dom with
+              | Expr.Lit (LList lits) ->
+                  List.map Expr.lit lits
+                  |> List.filter (S.is_not_nono s)
+                  |> Expr.list |> Delayed.return
+              | Expr.EList lits ->
+                  lits
+                  |> List.filter (S.is_not_nono s)
+                  |> Expr.list |> Delayed.return
+              | dom ->
+                  let nonos = Expr.ESet (S.get_nonos s) in
+                  Delayed.reduce (BinOp (dom, SetDiff, nonos))
             in
             Delayed.return (s, args, [ dom ])
         | _ -> Delayed.return (s, args, rets)
@@ -176,6 +183,14 @@ module ObjectBase = struct
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
 
+  let get_nonos (h, _) =
+    ExpMap.fold
+      (fun _ v acc ->
+        match v with
+        | Some (Expr.Lit Nono) -> Expr.Lit Nono :: acc
+        | _ -> acc)
+      h []
+
   let is_not_nono (h, _) idx =
     match ExpMap.find_opt idx h with
     | Some (Some (Expr.Lit Nono)) -> false
@@ -199,6 +214,17 @@ module SplitObjectBase = struct
         (hbox (parens (pair ~sep:(any " :") Expr.pp Exclusive.pp)))
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
+
+  let get_nonos (((ch, sh), _) : t) =
+    let nonos_from_map m =
+      ExpMap.fold
+        (fun _ v acc ->
+          match v with
+          | Some (Expr.Lit Nono) -> Expr.Lit Nono :: acc
+          | _ -> acc)
+        m []
+    in
+    nonos_from_map ch @ nonos_from_map sh
 
   let is_not_nono ((ch, sh), _) idx =
     match ExpMap.find_opt idx ch with
@@ -309,6 +335,7 @@ struct
         let ss, v = Obj.instantiate [ v ] in
         let s' = set ~idx ~idx':idx ss s in
         Delayed_result.ok (s', idx :: v)
+    | "alloc", _ -> failwith "Invalid arguments for alloc"
     | _ -> execute_action a s args
 end
 
