@@ -33,7 +33,7 @@ end
 module type PMapType = sig
   include OpenPMapType
 
-  val domain_add : Expr.t -> t -> t
+  val domain_add : Expr.t -> t -> t Delayed.t
 end
 
 module Make

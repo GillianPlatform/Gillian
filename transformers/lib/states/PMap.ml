@@ -99,7 +99,7 @@ end
 module type PMapType = sig
   include OpenPMapType
 
-  val domain_add : Expr.t -> t -> t
+  val domain_add : Expr.t -> t -> t Delayed.t
 end
 
 module Make
@@ -175,8 +175,12 @@ struct
 
   let domain_add k ((h, d) : t) =
     match d with
-    | None -> (h, d)
-    | Some d -> (h, Some (Expr.NOp (SetUnion, [ d; Expr.ESet [ k ] ])))
+    | None -> Delayed.return (h, d)
+    | Some (Expr.ESet d) -> Delayed.return (h, Some (Expr.ESet (k :: d)))
+    | Some d ->
+        let open Delayed.Syntax in
+        let+ d' = Delayed.reduce (NOp (SetUnion, [ d; ESet [ k ] ])) in
+        (h, Some d')
 
   let get ((h, d) as s) idx =
     let open Delayed.Syntax in
@@ -199,7 +203,7 @@ struct
               | Dynamic ->
                   let ss, _ = S.instantiate I.default_instantiation in
                   let h' = I.set ~idx:idx' ~idx':idx ss h in
-                  let s' = (h', Some d) |> domain_add idx' in
+                  let* s' = domain_add idx' (h', Some d) in
                   DR.ok (s', idx', ss)))
 
   let set ~idx ~idx' entry ((h, d) : t) = (I.set ~idx ~idx' entry h, d)
@@ -229,7 +233,8 @@ struct
           failwith "Alloc not allowed using dynamic indexing";
         let* idx = I.make_fresh () in
         let ss, v = S.instantiate args in
-        let s' = set ~idx ~idx':idx ss s |> domain_add idx in
+        let s' = set ~idx ~idx':idx ss s in
+        let* s' = domain_add idx s' in
         DR.ok (s', idx :: v)
     | GetDomainSet, [] -> (
         match s with
