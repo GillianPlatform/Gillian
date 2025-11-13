@@ -288,6 +288,9 @@ struct
     let rec run_tests_aux tests succ_specs err_specs bug_specs i =
       match tests with
       | [] -> (succ_specs, err_specs, bug_specs)
+      | test :: rest when List.mem test.name !Config.bi_ignore_procs ->
+          Fmt.pr "Skipping %s... (%d/%d)\n@?" test.name i num_tests;
+          run_tests_aux rest succ_specs err_specs bug_specs (i + 1)
       | test :: rest ->
           let rec part3 = function
             | [] -> ([], [], [])
@@ -348,30 +351,41 @@ struct
         (fun Spec.{ spec_name = name1; _ } Spec.{ spec_name = name2; _ } ->
           String.compare name1 name2)
     in
-    let bug_specs_txt =
-      Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        (sort_specs bug_specs)
-    in
-    let error_specs_txt =
-      Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        (sort_specs error_specs)
-    in
-    let normal_specs_txt =
-      Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        (sort_specs succ_specs)
-    in
 
+    Fmt.pr "Ok 3 - %f@." (Sys.time ());
     if !Config.specs_to_stdout then (
+      let bug_specs_txt =
+        Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
+          Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+          (sort_specs bug_specs)
+      in
+      let error_specs_txt =
+        Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
+          Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+          (sort_specs error_specs)
+      in
+      let normal_specs_txt =
+        Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+          Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+          (sort_specs succ_specs)
+      in
       L.print_to_all bug_specs_txt;
       L.print_to_all error_specs_txt;
       L.print_to_all normal_specs_txt)
     else (
-      L.normal (fun m -> m "%s" bug_specs_txt);
-      L.normal (fun m -> m "%s" error_specs_txt);
-      L.normal (fun m -> m "%s" normal_specs_txt));
+      L.normal (fun m ->
+          m "@[<v 2>BUG SPECS:@\n%a@]@\n"
+            Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+            (sort_specs bug_specs));
+      L.normal (fun m ->
+          m "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+            Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+            (sort_specs succ_specs));
+      L.normal (fun m ->
+          m "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+            Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+            (sort_specs succ_specs)));
+
 
     (* This is a hack to not count auxiliary functions that are bi-abduced *)
     let len_succ = List.length succ_specs in

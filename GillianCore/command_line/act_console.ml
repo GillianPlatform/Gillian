@@ -23,6 +23,10 @@ struct
     let doc = "Emit specs to stdout, useful for testing." in
     Arg.(value & flag & info [ "specs-to-stdout" ] ~doc)
 
+  let ignored_procs =
+    let doc = "Procs to ignore" in
+    Arg.(value & opt_all string [] & info [ "ignore" ] ~doc)
+
   let parse_eprog file files already_compiled =
     if not already_compiled then
       let () =
@@ -110,6 +114,7 @@ struct
       incremental
       bi_unroll_depth
       bi_no_spec_depth
+      ignored_specs
       () =
     let () = Config.current_exec_mode := BiAbduction in
     let () = PC.initialize BiAbduction in
@@ -119,6 +124,7 @@ struct
     let () = Config.bi_no_spec_depth := bi_no_spec_depth in
     let () = Config.specs_to_stdout := specs_to_stdout in
     let () = Config.max_branching := bi_unroll_depth in
+    let () = Config.bi_ignore_procs := ignored_specs in
     let () = Config.under_approximation := true in
     let r =
       process_files files already_compiled outfile_opt should_emit_specs
@@ -132,7 +138,7 @@ struct
     Term.(
       const act $ files $ already_compiled $ output_gil $ no_heap $ stats
       $ should_emit_specs $ specs_to_stdout $ incremental $ bi_unroll_depth
-      $ bi_no_spec_depth)
+      $ bi_no_spec_depth $ ignored_procs)
 
   let act_info =
     let doc =
