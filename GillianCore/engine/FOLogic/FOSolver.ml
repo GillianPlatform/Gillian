@@ -86,7 +86,11 @@ let check_satisfiability
   if Expr.Set.is_empty fs then true
   else if Expr.Set.mem Expr.false_ fs then false
   else
-    let result = Smt.is_sat fs (Type_env.as_hashtbl gamma) in
+    let result =
+      try Smt.is_sat fs (Type_env.as_hashtbl gamma)
+      with Smt.SMT_error _ | Smt.SMT_unknown ->
+        if !Config.under_approximation then false else raise Smt.SMT_unknown
+    in
     (* if time <> "" then
        Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
          (Sys.time () -. t); *)

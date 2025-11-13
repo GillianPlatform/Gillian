@@ -287,7 +287,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       @return unit *)
   let full_pp fmt (subst : t) =
     let pp_pair fmt (e, e_val) =
-      Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.full_pp e_val
+      Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.full_pp e Val.full_pp e_val
     in
     Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
 

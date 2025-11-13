@@ -6,6 +6,10 @@ open Syntaxes.Option
 (* open Ctx *)
 module L = Logging
 
+exception SMT_error of string
+
+let exceptf fmt = Fmt.kstr (fun s -> raise (SMT_error s)) fmt
+
 let z3_config =
   [
     ("model", "true");
@@ -350,7 +354,7 @@ let encode_type (t : Type.t) =
     | ListType -> Type_operations.List.construct
     | TypeType -> Type_operations.Type.construct
     | SetType -> Type_operations.Set.construct
-  with _ -> Fmt.failwith "DEATH: encode_type with arg: %a" Type.pp t
+  with _ -> exceptf "DEATH: encode_type with arg: %a" Type.pp t
 
 module Encoding = struct
   type kind =
@@ -449,7 +453,7 @@ module Encoding = struct
           | BooleanType -> Bool.construct
           | ListType -> List.construct
           | UndefinedType | NullType | EmptyType | NoneType | SetType ->
-              Fmt.failwith "Cannot simple-wrap value of type %s"
+              exceptf "Cannot simple-wrap value of type %s"
                 (Gil_syntax.Type.str typ)
         in
         construct expr
@@ -470,7 +474,7 @@ module Encoding = struct
     match kind with
     | Native SetType -> expr
     | Extended_wrapped -> Ext_lit_operations.Gil_set.access expr
-    | _ -> failwith "wrong encoding of set"
+    | _ -> exceptf "wrong encoding of set"
 
   let get_string = get_native ~accessor:Lit_operations.String.access
 end
@@ -561,8 +565,7 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
         let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
         list args >- ListType
     | Constant _ -> raise (Exceptions.Unsupported "Z3 encoding: constants")
-  with Failure msg ->
-    Fmt.failwith "DEATH: encode_lit %a. %s" Literal.pp lit msg
+  with Failure msg -> exceptf "DEATH: encode_lit %a. %s" Literal.pp lit msg
 
 let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
   let open Encoding in
@@ -578,7 +581,7 @@ let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
         else eq p1.expr p2.expr
     | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
         eq p1.expr p2.expr
-    | Native _, Native _ -> failwith "incompatible equality, type error!"
+    | Native _, Native _ -> exceptf "incompatible equality, type error!"
     | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
         eq (simple_wrap p1) (simple_wrap p2)
     | Extended_wrapped, _ | _, Extended_wrapped ->
@@ -652,7 +655,7 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | M_atan2
   | M_pow
   | StrCat ->
-      Fmt.failwith "SMT encoding: Costruct not supported yet - binop: %s"
+      exceptf "SMT encoding: Costruct not supported yet - binop: %s"
         (BinOp.str op)
 
 let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
@@ -747,7 +750,7 @@ let encode_quantified_expr
     match encode_expr ~gamma ~llen_lvars ~list_elem_vars assertion with
     | { kind = Native BooleanType; expr; consts; extra_asrts } ->
         (expr, consts, extra_asrts)
-    | _ -> failwith "the thing inside forall is not boolean!"
+    | _ -> exceptf "the thing inside forall is not boolean!"
   in
   let quantified_vars =
     quantified_vars
@@ -788,7 +791,7 @@ let rec encode_logical_expression
       in
       make_const ~typ kind var
   | ALoc var -> native_const ObjectType var
-  | PVar _ -> failwith "HORROR: Program variable in pure formula"
+  | PVar _ -> exceptf "HORROR: Program variable in pure formula"
   | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | NOp (SetUnion, les) ->
@@ -1093,7 +1096,7 @@ let lift_model
            match x with
            | LVar x -> x
            | _ ->
-               failwith "INTERNAL ERROR: SMT lifting of a non-logical variable"
+               exceptf "INTERNAL ERROR: SMT lifting of a non-logical variable"
          in
          let v = lift_val x in
          let () =

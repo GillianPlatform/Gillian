@@ -14,7 +14,7 @@ module type S = sig
 
   (* Type of predicates and actions  *)
   type action
-  type pred
+  type pred [@@deriving yojson]
 
   val action_from_str : string -> action option
   val action_to_str : action -> string
@@ -66,7 +66,7 @@ module type S = sig
 
   (** Get the fixes for an error, as a list of fixes -- a fix is a list of core
       predicates to produce onto the state. *)
-  val get_fixes : err_t -> pred MyAsrt.t list list
+  val get_fixes : err_t -> pred Fix.t list
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding
       predicates *)
@@ -116,21 +116,21 @@ end
     callback, that is called whenever memory is initialised with some init data.
 *)
 module type ID = sig
-  type t
+  type t [@@deriving yojson]
 
   val init : t -> unit
 end
 
 module DummyID : ID with type t = unit = struct
-  type t = unit
+  type t = unit [@@deriving yojson]
 
   let init () = ()
 end
 
 (** Functor to convert composable, typed state models into Gillian monadic state
     models *)
-module Make (Mem : S) (ID : ID) : MonadicSMemory.S with type init_data = ID.t =
-struct
+module Make (Mem : S) (ID : ID) :
+  MonadicSMemory.S with type init_data = ID.t and type t = Mem.t = struct
   include Mem
   include Defaults
 
@@ -174,14 +174,11 @@ struct
     let mapping (p, ins, outs) = Asrt.CorePred (pred_to_str p, ins, outs) in
     List.map mapping core_preds @ formulas
 
-  let get_fixes e =
-    get_fixes e
-    |> MyUtils.deep_map @@ function
-       | MyAsrt.Emp -> Asrt.Emp
-       | MyAsrt.Pure f -> Asrt.Pure f
-       | MyAsrt.Types ts -> Asrt.Types ts
-       | MyAsrt.CorePred (p, ins, outs) ->
-           Asrt.CorePred (pred_to_str p, ins, outs)
+  let get_fixes (e : err_t) =
+    let fixes = get_fixes e in
+    MyUtils.deep_map
+      (fun (p, ins, outs) -> Asrt.CorePred (pred_to_str p, ins, outs))
+      fixes
 
   (* Override methods to keep implementations light *)
   let clear _ = empty ()

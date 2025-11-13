@@ -13,23 +13,53 @@ module type S = sig
     unit
 end
 
-module Make
-    (SPState : PState.S)
-    (PC : ParserAndCompiler.S with type init_data = SPState.init_data)
-    (External : External.T(PC.Annot).S) :
-  S with type annot = PC.Annot.t and type init_data = PC.init_data = struct
+module type SimplifiedSState =
+  State.S
+    with type vt = SVal.M.t
+     and type st = SVal.SESubst.t
+     and type store_t = SStore.t
+
+module type BiProcessingS = sig
+  module NonBiPState : PState.S
+
+  type annot
+  type init_data
+  type state_t
+
+  (** Similar to Normaliser.normalise_assertion but all failed normalisations
+      are discarded, and it produces something of the adapted state type *)
+  val normalise_assertion :
+    init_data:init_data ->
+    prog:'a MP.prog ->
+    pvars:SS.t ->
+    Asrt.t ->
+    state_t list
+
+  val bistate_to_pstate_and_af : state_t -> NonBiPState.t * Asrt.t
+end
+
+(* A bit of hack around as the legacy hardcoded BiState and the new,
+   simpler, BiAbd combinator approach expose different state types.
+   We try to aggregate the logic of creating specs and running tests in a single module. *)
+module Make_raw
+    (PC : ParserAndCompiler.S)
+    (State : SimplifiedSState with type init_data = PC.init_data)
+    (BiProcess :
+      BiProcessingS
+        with type state_t = State.t
+         and type init_data = State.init_data)
+    (External : External.T(PC.Annot).S) =
+struct
   module L = Logging
   module SSubst = SVal.SESubst
-  module Normaliser = Normaliser.Make (SPState)
-  module SBAState = BiState.Make (SPState)
 
-  module SBAInterpreter =
-    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (PC)
-      (External)
+  module Interp =
+    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (State) (PC) (External)
+  (* module Normaliser = Normaliser.Make (SPState) *)
 
-  type bi_state_t = SBAState.t
-  type result_t = SBAInterpreter.result_t
-  type t = { name : string; params : string list; state : bi_state_t }
+  type state_t = Interp.state_t
+  type result_t = Interp.result_t
+  type t = { name : string; params : string list; state : state_t }
   type annot = PC.Annot.t
   type init_data = PC.init_data
 
@@ -40,7 +70,7 @@ module Make
       List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (Expr.LVar x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (SS.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -54,11 +84,10 @@ module Make
     SSubst.init bindings'
 
   let make_spec
-      (_ : annot MP.prog)
       (name : string)
       (params : string list)
-      (bi_state_i : bi_state_t)
-      (bi_state_f : bi_state_t)
+      (bi_state_i : state_t)
+      (bi_state_f : state_t)
       (fl : Flag.t) : Spec.t option =
     let open Syntaxes.List in
     let sspecs =
@@ -66,46 +95,44 @@ module Make
 
       (* HMMMMM *)
       (* let _              = SBAState.simplify ~kill_new_lvars:true bi_state_f in *)
-      let state_i, _ = SBAState.get_components bi_state_i in
-      let state_f, state_af = SBAState.get_components bi_state_f in
+      let state_i, _ = BiProcess.bistate_to_pstate_and_af bi_state_i in
+      let state_f, af_asrt = BiProcess.bistate_to_pstate_and_af bi_state_f in
       let pvars = SS.of_list (Names.return_variable :: params) in
 
       L.verbose (fun m ->
           m
-            "Going to create a spec for @[<h>%s(%a)@]\n\
-             @[<v 2>AF:@\n\
-             %a@]@\n\
-             @[<v 2>Final STATE:@\n\
-             %a@]"
+            "Going to create a spec for @[<h>%s(%a)@]@\n\
+             @[<v 0>@[<v 2>AF:@ %a@] @[<v 2>Final STATE: %a@]@]"
             name
             Fmt.(list ~sep:comma string)
-            params SPState.pp state_af SPState.pp state_f);
+            params Asrt.pp af_asrt BiProcess.NonBiPState.pp state_f);
       (* Drop all pvars except ret/err from the state *)
       let () =
-        SStore.filter_map_inplace (SPState.get_store state_f) (fun x v ->
-            if x = Names.return_variable then Some v else None)
+        SStore.filter_map_inplace (BiProcess.NonBiPState.get_store state_f)
+          (fun x v -> if x = Names.return_variable then Some v else None)
       in
       let* post =
         let _, finals_simplified =
-          SPState.simplify ~kill_new_lvars:true state_f
+          BiProcess.NonBiPState.simplify ~kill_new_lvars:true state_f
         in
         let+ final_simplified = finals_simplified in
         List.sort Asrt.compare
-          (SPState.to_assertions ~to_keep:pvars final_simplified)
+          (BiProcess.NonBiPState.to_assertions ~to_keep:pvars final_simplified)
       in
 
       let+ pre =
-        let af_asrt = SPState.to_assertions state_af in
         let af_subst = make_id_subst af_asrt in
-        let* af_produce_res = SPState.produce state_i af_subst af_asrt in
+        let* af_produce_res =
+          BiProcess.NonBiPState.produce state_i af_subst af_asrt
+        in
         match af_produce_res with
         | Ok state_i' ->
             let _, simplifieds =
-              SPState.simplify ~kill_new_lvars:true state_i'
+              BiProcess.NonBiPState.simplify ~kill_new_lvars:true state_i'
             in
             let+ simplified = simplifieds in
             List.sort Asrt.compare
-              (SPState.to_assertions ~to_keep:pvars simplified)
+              (BiProcess.NonBiPState.to_assertions ~to_keep:pvars simplified)
         | Error _ ->
             L.verbose (fun m -> m "Failed to produce anti-frame");
             []
@@ -159,39 +186,25 @@ module Make
         Some spec
 
   let testify ~init_data ~(prog : annot MP.prog) (bi_spec : BiSpec.t) : t list =
+    let open Syntaxes.List in
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
-    let proc_names = Prog.get_proc_names prog.prog in
     let params = SS.of_list bi_spec.bispec_params in
-    let normalise =
-      Normaliser.normalise_assertion ~init_data ~pred_defs:prog.preds
-        ~pvars:params
+    (* For each pre in the bispec *)
+    let* pre, _ = bi_spec.bispec_pres in
+    let+ state =
+      BiProcess.normalise_assertion ~init_data ~pvars:params ~prog pre
     in
-    let make_test asrt =
-      match normalise asrt with
-      | Error _ -> []
-      | Ok l ->
-          List.map
-            (fun (ss_pre, _) ->
-              {
-                name = bi_spec.bispec_name;
-                params = bi_spec.bispec_params;
-                state =
-                  SBAState.make ~procs:(SS.of_list proc_names) ~state:ss_pre
-                    ~init_data;
-              })
-            l
-    in
-    List.concat_map (fun (pre, _) -> make_test pre) bi_spec.bispec_pres
+    { name = bi_spec.bispec_name; params = bi_spec.bispec_params; state }
 
   let run_test
       (ret_fun : result_t -> (Spec.t * Flag.t) option)
       (prog : annot MP.prog)
       (test : t) : (Spec.t * Flag.t) list =
-    let state = SBAState.copy test.state in
-    let state = SBAState.add_spec_vars state (SBAState.get_lvars state) in
+    let state = State.copy test.state in
+    let state = State.add_spec_vars state (State.get_lvars state) in
     try
       let opt_results =
-        SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
+        Interp.evaluate_proc ret_fun prog test.name test.params state
       in
       let count = ref 0 in
       let result =
@@ -216,11 +229,11 @@ module Make
       (prog : annot MP.prog)
       (name : string)
       (params : string list)
-      (state_i : bi_state_t)
+      (state_i : state_t)
       (result : result_t) : (Spec.t * Flag.t) option =
     let open Syntaxes.Option in
-    let process_spec = make_spec prog in
-    let state_i = SBAState.copy state_i in
+    let process_spec = make_spec in
+    let state_i = State.copy state_i in
     let add_spec spec =
       try MP.add_spec prog spec
       with _ ->
@@ -228,13 +241,8 @@ module Make
           (Format.asprintf "When trying to build an MP for %s, I died!" name)
     in
     match result with
-    | RFail { error_state; errors; _ } ->
-        (* Because of fixes, the state may have changed since between the start of execution
-           and the failure: the anti-frame might have been modified before immediately erroring.
-           BiState thus returns, with every error, the state immeditaly before the error happens
-           with any applied fixes - this is the state that should be used to ensure fixes
-           don't get lost. *)
-        let rec find_error_state (aux : SBAInterpreter.err_t list) =
+    | RFail { error_state; _ } ->
+        (* let rec find_error_state (aux : Interp.err_t list) =
           match aux with
           | [] -> error_state
           | e :: errs -> (
@@ -242,7 +250,7 @@ module Make
               | EState (EMem (s, _)) -> s
               | _ -> find_error_state errs)
         in
-        let error_state = find_error_state errors in
+        let error_state = find_error_state errors in *)
         let+ spec = process_spec name params state_i error_state Flag.Bug in
         add_spec spec;
         (spec, Flag.Bug)
@@ -280,6 +288,9 @@ module Make
     let rec run_tests_aux tests succ_specs err_specs bug_specs i =
       match tests with
       | [] -> (succ_specs, err_specs, bug_specs)
+      | test :: rest when List.mem test.name !Config.bi_ignore_procs ->
+          Fmt.pr "Skipping %s... (%d/%d)\n@?" test.name i num_tests;
+          run_tests_aux rest succ_specs err_specs bug_specs (i + 1)
       | test :: rest ->
           let rec part3 = function
             | [] -> ([], [], [])
@@ -340,30 +351,41 @@ module Make
         (fun Spec.{ spec_name = name1; _ } Spec.{ spec_name = name2; _ } ->
           String.compare name1 name2)
     in
-    let bug_specs_txt =
-      Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        (sort_specs bug_specs)
-    in
-    let error_specs_txt =
-      Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        (sort_specs error_specs)
-    in
-    let normal_specs_txt =
-      Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
-        Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
-        (sort_specs succ_specs)
-    in
 
+    Fmt.pr "Ok 3 - %f@." (Sys.time ());
     if !Config.specs_to_stdout then (
+      let bug_specs_txt =
+        Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
+          Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+          (sort_specs bug_specs)
+      in
+      let error_specs_txt =
+        Format.asprintf "@[<v 2>ERROR SPECS:@\n%a@]@\n"
+          Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+          (sort_specs error_specs)
+      in
+      let normal_specs_txt =
+        Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+          Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+          (sort_specs succ_specs)
+      in
       L.print_to_all bug_specs_txt;
       L.print_to_all error_specs_txt;
       L.print_to_all normal_specs_txt)
     else (
-      L.normal (fun m -> m "%s" bug_specs_txt);
-      L.normal (fun m -> m "%s" error_specs_txt);
-      L.normal (fun m -> m "%s" normal_specs_txt));
+      L.normal (fun m ->
+          m "@[<v 2>BUG SPECS:@\n%a@]@\n"
+            Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+            (sort_specs bug_specs));
+      L.normal (fun m ->
+          m "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+            Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+            (sort_specs succ_specs));
+      L.normal (fun m ->
+          m "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+            Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
+            (sort_specs succ_specs)));
+
 
     (* This is a hack to not count auxiliary functions that are bi-abduced *)
     let len_succ = List.length succ_specs in
@@ -427,7 +449,7 @@ module Make
 
   let test_procs_incrementally
       (prog : annot MP.prog)
-      ~(init_data : SPState.init_data)
+      ~(init_data : State.init_data)
       ~(prev_results : BiAbductionResults.t)
       ~(reverse_graph : Call_graph.t)
       ~(changed_procs : string list)
@@ -522,7 +544,7 @@ module Make
         test_procs_incrementally prog ~init_data ~prev_results ~reverse_graph
           ~changed_procs:proc_changes.changed_procs ~to_test
       in
-      let cur_call_graph = SBAInterpreter.call_graph in
+      let cur_call_graph = Interp.call_graph in
       let () = Call_graph.prune_procs prev_call_graph to_prune in
       let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
       let results = BiAbductionResults.merge prev_results cur_results in
@@ -533,9 +555,54 @@ module Make
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let dyn_call_graph = SBAInterpreter.call_graph in
+      let dyn_call_graph = Interp.call_graph in
       let results = test_procs ~init_data ~call_graph prog in
       write_biabduction_results cur_source_files dyn_call_graph ~diff:"" results
+end
+
+module Make
+    (SPState : PState.S)
+    (PC : ParserAndCompiler.S with type init_data = SPState.init_data)
+    (External : External.T(PC.Annot).S) :
+  S with type annot = PC.Annot.t and type init_data = PC.init_data = struct
+  module Pre_constructions = struct
+    module Normaliser = Normaliser.Make (SPState)
+    module SBAState = BiState.Make (SPState)
+    module SSubst = SVal.SESubst
+    module L = Logging
+
+    module BiProcess = struct
+      type state_t = SBAState.t
+      type init_data = SBAState.init_data
+      type annot = PC.Annot.t
+
+      module NonBiPState = SPState
+
+      let normalise_assertion
+          ~(init_data : init_data)
+          ~(prog : 'a MP.prog)
+          ~(pvars : SS.t)
+          assertion =
+        let open Syntaxes.List in
+        let+ ss_pre, _ =
+          match
+            Normaliser.normalise_assertion ~pred_defs:prog.preds ~init_data
+              ~pvars assertion
+          with
+          | Ok l -> l
+          | Error _ -> []
+        in
+        SBAState.make ~state:ss_pre ~init_data
+
+      let bistate_to_pstate_and_af bistate =
+        let post, af = SBAState.get_components bistate in
+        (post, NonBiPState.to_assertions af)
+    end
+  end
+
+  include
+    Make_raw (PC) (Pre_constructions.SBAState) (Pre_constructions.BiProcess)
+      (External)
 end
 
 module From_scratch

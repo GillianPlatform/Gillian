@@ -1,11 +1,18 @@
 (** Interface for GIL Predicate States. They are considered to be mutable. *)
 module type S = sig
-  include SState.S
-
   type state_t
-  type abs_t = string * vt list
+  type abs_t = string * SVal.M.t list
 
   module SMatcher : Matcher.S with type state_t = state_t
+
+  type t = SMatcher.t = {
+    state : state_t;
+    preds : Preds.t;
+    wands : Wands.t;
+    pred_defs : MP.preds_tbl_t;
+  }
+
+  include SState.S with type t := t
 
   val make_p :
     preds:MP.preds_tbl_t ->
@@ -17,6 +24,17 @@ module type S = sig
     unit ->
     t
 
+  val make_p_from_heap :
+    pred_defs:MP.preds_tbl_t ->
+    store:store_t ->
+    heap:heap_t ->
+    spec_vars:SS.t ->
+    wands:Wands.t ->
+    preds:Preds.t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    t
+
   val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
@@ -24,6 +42,8 @@ module type S = sig
 
   (** Set preds of given symbolic state *)
   val set_preds : t -> Preds.t -> t
+
+  val get_wands : t -> Wands.t
 
   (** Set preds of given symbolic state *)
   val set_wands : t -> Wands.t -> t
@@ -115,6 +135,21 @@ module Make (State : SState.S) :
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
     { state; preds = Preds.init []; wands = Wands.init []; pred_defs = preds }
 
+  let make_s_from_heap ~heap:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ =
+    failwith "Calling make_s_from_heap on SState"
+
+  let make_p_from_heap
+      ~pred_defs
+      ~store
+      ~heap
+      ~spec_vars
+      ~wands
+      ~preds
+      ~pfs
+      ~gamma =
+    let sstate = State.make_s_from_heap ~store ~heap ~spec_vars ~pfs ~gamma in
+    { state = sstate; preds; wands; pred_defs }
+
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
 
@@ -146,6 +181,7 @@ module Make (State : SState.S) :
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
   let set_wands astate wands = { astate with wands }
+  let get_wands (astate : t) : Wands.t = astate.wands
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in

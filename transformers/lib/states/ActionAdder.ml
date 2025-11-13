@@ -14,7 +14,7 @@ module type ActionAddition = sig
     action -> t -> Expr.t list -> (t * Expr.t list, err_t) result Delayed.t
 
   val can_fix : err_t -> bool
-  val get_fixes : err_t -> string MyAsrt.t list list
+  val get_fixes : err_t -> string Fix.t list
   val get_recovery_tactic : err_t -> Expr.t Gillian.General.Recovery_tactic.t
 end
 
@@ -65,9 +65,8 @@ struct
     | BaseErr e -> S.get_fixes e
     | AddedErr e ->
         A.get_fixes e
-        |> MyUtils.deep_map
-           @@ MyAsrt.map_cp (fun (p, i, o) ->
-                  (S.pred_from_str p |> Option.get, i, o))
+        |> MyUtils.deep_map @@ fun (p, i, o) ->
+           (S.pred_from_str p |> Option.get, i, o)
 
   let get_recovery_tactic = function
     | BaseErr e -> S.get_recovery_tactic e

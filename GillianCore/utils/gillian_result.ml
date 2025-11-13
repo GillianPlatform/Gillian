@@ -53,7 +53,10 @@ module Error = struct
           msgs
     | true, AnalysisFailures es ->
         let len = List.length es in
-        Fmt.pf fmt "%d analysis failure%s!" len (if len > 1 then "s" else "")
+        Fmt.pf fmt "%d analysis failure%s!\n%a" len
+          (if len > 1 then "s" else "")
+          (Fmt.Dump.list Yojson.Safe.pp)
+          (List.map analysis_failure_to_yojson es)
     | false, CompilationError { msg; loc; _ } ->
         Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc
           msg

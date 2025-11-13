@@ -64,6 +64,7 @@ let bi_dflt = ref true
 let bi_unfold_depth = ref 1
 let bi_unroll_depth = ref 1
 let bi_no_spec_depth = ref 0
+let bi_ignore_procs : string list ref = ref []
 let delay_entailment = ref true
 
 (* If true, will dump a folder containing all smt queries made to the solver *)

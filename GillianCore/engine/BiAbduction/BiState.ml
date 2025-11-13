@@ -2,7 +2,7 @@ open Containers
 open Literal
 module L = Logging
 
-type 'a _t = { procs : SS.t; state : 'a; af_state : 'a } [@@deriving yojson]
+type 'a _t = { state : 'a; af_state : 'a } [@@deriving yojson]
 
 module Make (State : SState.S) = struct
   type heap_t = State.heap_t
@@ -19,9 +19,8 @@ module Make (State : SState.S) = struct
 
   type action_ret = (t * Expr.t list, err_t) result list
 
-  let make ~(procs : SS.t) ~(state : State.t) ~(init_data : State.init_data) : t
-      =
-    { procs; state; af_state = State.init init_data }
+  let make ~(state : State.t) ~(init_data : State.init_data) : t =
+    { state; af_state = State.init init_data }
 
   let lift_error st : State.err_t -> err_t = function
     | StateErr.EMem e -> StateErr.EMem (st, e)
@@ -54,8 +53,7 @@ module Make (State : SState.S) = struct
     let state' = State.set_store state store in
     { bi_state with state = state' }
 
-  let assume ?(unfold = false) ({ procs; state; af_state } : t) (v : Expr.t) :
-      t list =
+  let assume ?(unfold = false) ({ state; af_state } : t) (v : Expr.t) : t list =
     let new_states = State.assume ~unfold state v in
     match new_states with
     | [] -> []
@@ -63,11 +61,10 @@ module Make (State : SState.S) = struct
         (* Slight optim, we don't copy the anti_frame if we have only one state. *)
         let rest =
           List.map
-            (fun state' ->
-              { procs; state = state'; af_state = State.copy af_state })
+            (fun state' -> { state = state'; af_state = State.copy af_state })
             rest
         in
-        { procs; state = first_state; af_state } :: rest
+        { state = first_state; af_state } :: rest
 
   let assume_a
       ?(matching = false)
@@ -99,17 +96,12 @@ module Make (State : SState.S) = struct
   let get_type ({ state; _ } : t) (v : Expr.t) : Type.t option =
     State.get_type state v
 
-  let copy ({ procs; state; af_state } : t) : t =
-    { procs; state = State.copy state; af_state = State.copy af_state }
+  let copy ({ state; af_state } : t) : t =
+    { state = State.copy state; af_state = State.copy af_state }
 
-  let simplify
-      ?(save = false)
-      ?(kill_new_lvars : bool option)
-      ?matching:_
-      ({ procs; state; af_state } : t) : SVal.SESubst.t * t list =
-    let kill_new_lvars = Option.value ~default:true kill_new_lvars in
-    let subst, states = State.simplify ~save ~kill_new_lvars state in
-
+  let simplify ?save ?kill_new_lvars ?matching:_ ({ state; af_state } : t) :
+      SVal.SESubst.t * t list =
+    let subst, states = State.simplify ?save ?kill_new_lvars state in
     let states =
       List.concat_map
         (fun state ->
@@ -120,7 +112,7 @@ module Make (State : SState.S) = struct
               | LVar x -> if SS.mem x svars then None else Some x_v
               | _ -> Some x_v);
           List.map
-            (fun af_state -> { procs; state; af_state })
+            (fun af_state -> { state; af_state })
             (State.substitution_in_place af_subst af_state))
         states
     in
@@ -130,10 +122,9 @@ module Make (State : SState.S) = struct
   let simplify_val ({ state; _ } : t) (v : Expr.t) : Expr.t =
     State.simplify_val state v
 
-  let pp fmt { procs; state; af_state } =
-    Fmt.pf fmt "PROCS:@\n@[<h>%a@]@\nMAIN STATE:@\n%a@\nANTI FRAME:@\n%a@\n"
-      Fmt.(iter ~sep:comma SS.iter string)
-      procs State.pp state State.pp af_state
+  let pp fmt { state; af_state } =
+    Fmt.pf fmt "MAIN STATE:@\n%a@\nANTI FRAME:@\n%a@\n" State.pp state State.pp
+      af_state
 
   (* TODO: By-need formatter *)
   let pp_by_need _ _ _ fmt state = pp fmt state
@@ -219,7 +210,6 @@ module Make (State : SState.S) = struct
   type post_res = (Flag.t * Asrt.t list) option
 
   let match_
-      (_ : SS.t)
       (state : State.t)
       (af_state : State.t)
       (subst : SVal.SESubst.t)
@@ -350,7 +340,7 @@ module Make (State : SState.S) = struct
             Fmt.(list ~sep:comma Expr.pp)
             args SVal.SESubst.pp subst_i));
 
-    let { procs; state; af_state } = bi_state in
+    let { state; af_state } = bi_state in
 
     let old_store = State.get_store state in
 
@@ -369,7 +359,7 @@ module Make (State : SState.S) = struct
              BI-ABDUCTION:@\n\
              %a@]@\n"
             spec.data.spec_name MP.pp spec.mp));
-    let ret_states = match_ procs state' af_state subst spec.mp in
+    let ret_states = match_ state' af_state subst spec.mp in
     L.(
       verbose (fun m ->
           m "Concluding matching With %d results" (List.length ret_states)));
@@ -409,7 +399,7 @@ module Make (State : SState.S) = struct
     let final_state' : State.t = update_store final_state' (Some x) v_ret in
     (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
     let _ = State.simplify ~matching:true final_state' in
-    let bi_state : t = { procs; state = final_state'; af_state = af_state' } in
+    let bi_state : t = { state = final_state'; af_state = af_state' } in
 
     L.(
       verbose (fun m ->
@@ -471,26 +461,25 @@ module Make (State : SState.S) = struct
 
   let rec execute_action
       (action : string)
-      ({ procs; state; af_state } : t)
+      ({ state; af_state } : t)
       (args : Expr.t list) : action_ret =
     let open Syntaxes.List in
     let* ret = State.execute_action action state args in
     match ret with
-    | Ok (state', outs) -> [ Ok ({ procs; state = state'; af_state }, outs) ]
+    | Ok (state', outs) -> [ Ok ({ state = state'; af_state }, outs) ]
     | Error err when not (State.can_fix err) ->
-        [ Error (lift_error { procs; state; af_state } err) ]
-    | Error err -> (
-        match State.get_fixes err with
-        | [] -> [] (* No fix, we stop *)
-        | fixes ->
-            let* fix = fixes in
-            let state' = State.copy state in
-            let af_state' = State.copy af_state in
-            let* state' = fix_list_apply state' fix in
-            let* af_state' = fix_list_apply af_state' fix in
-            execute_action action
-              { procs; state = state'; af_state = af_state' }
-              args)
+        [ Error (lift_error { state; af_state } err) ]
+    | Error err ->
+        let fixes = State.get_fixes err in
+        Logging.verbose (fun m ->
+            m "Attempting to fix %a with candidates: %a" State.pp_err_t err
+              (Fmt.Dump.list Asrt.pp) fixes);
+        let* fix = fixes in
+        let state' = State.copy state in
+        let af_state' = State.copy af_state in
+        let* state' = fix_list_apply state' fix in
+        let* af_state' = fix_list_apply af_state' fix in
+        execute_action action { state = state'; af_state = af_state' } args
 
   let get_equal_values { state; _ } = State.get_equal_values state
   let get_heap { state; _ } = State.get_heap state
