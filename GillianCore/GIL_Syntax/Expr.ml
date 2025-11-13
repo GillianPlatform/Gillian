@@ -44,10 +44,17 @@ let one_i = int_z Z.one
 let rec extract_bv_width (e : t) =
   match e with
   | Lit (LBitvector (_, w)) -> w
+  (* TODO(tnytown): we wouldn't need this hack if we get rid of lists in bitvector literal representations *)
   | EList [ Lit (String _t); (Lit (LBitvector _) as x) ]
   (* when String.starts_with ~prefix:"i-" t *) -> extract_bv_width x
   | BVExprIntrinsic (_, _, Some w) -> w
-  | _ -> failwith "extract_bv_width: unrecognized bitvector expression"
+  | _ ->
+      Logging.verbose (fun m -> m "UNSOUND: assuming unknown BV width is 64");
+      64
+
+let extract_bin_bv_width (a : t) (b : t) =
+  Logging.tmi (fun m -> m "extract_bin_bv_width");
+  try extract_bv_width a with _ -> extract_bv_width b
 
 let concat_single (little : t) (big : t) : t =
   let little_size = extract_bv_width little in
@@ -81,42 +88,42 @@ let bv_extract (low_index : int) (high_index : int) (e : t) : t =
       Some nsize )
 
 let bv_ugt a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic (BVOps.BVUlt, [ BvExpr (b, width); BvExpr (a, width) ], None)
 
 let bv_plus a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic
     (BVOps.BVPlus, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_urem a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic
     (BVOps.BVUrem, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_mul a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic
     (BVOps.BVMul, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_udiv a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic
     (BVOps.BVUDiv, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_sub a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic
     (BVOps.BVSub, [ BvExpr (a, width); BvExpr (b, width) ], Some width)
 
 let bv_width a = extract_bv_width a
 
 let bv_ule a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic (BVOps.BVUleq, [ BvExpr (a, width); BvExpr (b, width) ], None)
 
 let bv_ult a b =
-  let width = extract_bv_width a in
+  let width = extract_bin_bv_width a b in
   BVExprIntrinsic (BVOps.BVUlt, [ BvExpr (a, width); BvExpr (b, width) ], None)
 
 let bv_extract_between_sz (src : int) (dst : int) (e : t) : t =
