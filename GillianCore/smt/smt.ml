@@ -552,6 +552,9 @@ module Encoding = struct
   let get_list = get_native ~accessor:Lit_operations.List.access
 
   let get_bv (width : int) (e : t) : sexp =
+    (* XX(tnytown): this is called while encoding BV ops *)
+    (* We need to add our BV width to the defined variants here because the BV type of the argument may not be encoded in certain cases; i.e. when BV arg is l-len(list). *)
+    defined_bv_variants := width :: !defined_bv_variants;
     get_native
       ~accessor:(fun x ->
         let m = BvLiteral.make_mod width in
