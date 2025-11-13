@@ -360,10 +360,10 @@ module SVArray = struct
     let+ result = SVal.to_raw_bytes_se sval in
     (* At this point we know that the chunk is: *)
     (* IntegerChunk | IntegerOrPtrChunk *)
-    (* Unconditionally decompose into an IntegerChunk of width 8, matching the *)
+    (* Unconditionally decompose into an IntegerChunk of ptr width, matching the *)
     (* array element type *)
     let result_expr = Expr.EList result in
-    let chunk = Chunk.IntegerChunk 8 in
+    let chunk = Chunk.IntegerChunk (Llvmconfig.ptr_width ()) in
     { chunk; values = result_expr }
 
   let decode_sval_into ~chunk (sval : SVal.t) =
