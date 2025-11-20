@@ -24,7 +24,8 @@ jobs:
         operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
-      - name: Setup Z3
+      - &SETUP_Z3
+        name: Setup Z3
         id: z3
         uses: cda-tum/setup-z3@v1
         env:
@@ -58,14 +59,14 @@ jobs:
           mkdir _dist
           opam exec -- dune install --relocatable --prefix ./_dist
           cd _dist
-          zip -r ../gillian.zip ./*
+          zip -r ../gillian-${{ runner.os }}.zip ./*
           cd ..
-          rm ./_dist -rf
+          rm -rf ./_dist
       - name: Sending artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-gillian
-          path: gillian.zip
+          name: gillian-${{ runner.os }}.zip
+          path: gillian-${{ runner.os }}.zip
       - name: Building API docs
         run: make docs
         if: runner.os == 'Linux'
@@ -86,32 +87,26 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: Setup Z3
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Checkout project
-        uses: actions/checkout@v3
-        with:
-          path: Gillian
-      - name: Download artifact
+      - *SETUP_Z3
+      - &DOWNLOAD_ARTIFACT
+        name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-gillian
-      - name: Extract and install Gillian
+          name: gillian-${{ runner.os }}.zip
+      - &INSTALL_ARTIFACT
+        name: Extract and install Gillian
         run: |
-          unzip /gillian.zip -d /usr/local
+          unzip /gillian-${{ runner.os }}.zip -d /usr/local
           rm /gillian.zip
+      - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C/scripts/setup_environment.sh"
-        working-directory: "Gillian"
       - name: Test All
         run: "./testAll.sh"
-        working-directory: "Gillian/Gillian-C/environment/"
+        working-directory: "Gillian-C/environment/"
       - name: Test Amazon
         run: "make"
-        working-directory: "Gillian/Gillian-C/examples/amazon/"
+        working-directory: "Gillian-C/examples/amazon/"
 
   gillian_js_tests:
     strategy:
@@ -120,28 +115,18 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: Setup Z3
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ runner.os }}-gillian
-      - name: Extract and install Gillian
-        run: |
-          unzip /gillian.zip -d /usr/local
-          rm /gillian.zip
+      - *SETUP_Z3
+      - *DOWNLOAD_ARTIFACT
+      - *INSTALL_ARTIFACT
+      - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-JS/scripts/setup_environment.sh"
-        working-directory: "Gillian"
       - name: Test JaVerT
         run: "./testJaVerT.sh"
-        working-directory: "Gillian/Gillian-JS/environment/"
+        working-directory: "Gillian-JS/environment/"
       # - name: Test Amazon
       #   run: "make"
-      #   working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
+      #   working-directory: "Gillian-JS/Examples/Amazon/"
 
   gillian_c2_tests:
     strategy:
@@ -150,31 +135,15 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: Setup Z3
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "ocaml-variants.5.3.0+options"
+      - *SETUP_Z3
       - name: install CBMC
         run: |
           curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb
           sudo dpkg -i cbmc.deb
           rm cbmc.deb
-      - name: Checkout project
-        uses: actions/checkout@v3
-        with:
-          path: Gillian
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ runner.os }}-gillian
-      - name: Extract and install Gillian
-        run: |
-          unzip /gillian.zip -d /usr/local
-          rm /gillian.zip
+      - *DOWNLOAD_ARTIFACT
+      - *INSTALL_ARTIFACT
+      - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C2/scripts/setup_environment.sh"
         working-directory: "Gillian"
@@ -190,28 +159,15 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: Setup Z3
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "ocaml-variants.5.3.0+options"
-      - name: Checkout project
-        uses: actions/checkout@v3
+      - *SETUP_Z3
+      - *DOWNLOAD_ARTIFACT
+      - *INSTALL_ARTIFACT
+      - name: Checkout javert-test262
+        uses: actions/checkout@v4
         with:
           repository: GillianPlatform/javert-test262
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ runner.os }}-gillian
-      - name: Extract and install Gillian
-        run: |
-          unzip /gillian.zip -d /usr/local
-          rm /gillian.zip
       - name: Test262
         run: "opam exec -- gillian-js test262 test262/test --ci"
 
@@ -223,28 +179,15 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
-      - name: Setup Z3
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "ocaml-variants.5.3.0+options"
-      - name: checkout project
-        uses: actions/checkout@v3
+      - *SETUP_Z3
+      - *DOWNLOAD_ARTIFACT
+      - *INSTALL_ARTIFACT
+      - name: Checkout collections-c-for-gillian
+        uses: actions/checkout@v4
         with:
           repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
           ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ runner.os }}-gillian
-      - name: Extract and install Gillian
-        run: |
-          unzip /gillian.zip -d /usr/local
-          rm /gillian.zip
       - name: Symbolic Testing Collections-C
         run: "opam exec -- bash ./scripts/gillian-compcert/runTests.sh"
         working-directory: collections-c
@@ -257,28 +200,12 @@ jobs:
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
-  #     - name: Setup Z3
-  #       id: z3
-  #       uses: cda-tum/setup-z3@v1
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #     - uses: ocaml/setup-ocaml@v3
-  #       with:
-  #         ocaml-compiler: "ocaml-variants.5.3.0+options"
-  #     - name: Checkout project
-  #       uses: actions/checkout@v3
-  #       with:
-  #         path: Gillian
-  #     - name: Download artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: ${{ runner.os }}-gillian
-  #     - name: Extract and install Gillian
-  #       run: |
-  #         unzip /gillian.zip -d /usr/local
-  #         rm /gillian.zip
+  #     - *SETUP_Z3
+  #     - *DOWNLOAD_ARTIFACT
+  #     - *INSTALL_ARTIFACT
+  #     - uses: actions/checkout@v4
   #     - name: Symbolic Testing Buckets.js
-  #       run: "opam exec -- gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
+  #       run: "gillian-js cosette-bulk Gillian-JS/Examples/Cosette/Buckets --ci"
 
   build-docker:
     runs-on: ubuntu-latest
