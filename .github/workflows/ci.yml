@@ -14,7 +14,8 @@ on:
 
 env:
   NODE_VERSION: 18
-  DOCKER_IMG_NAME: ghcr.io/gillianplatform/gillian
+  LOCAL_DOCKER_IMG: gillian-src:local
+  DOCKER_IMG_PRE: ghcr.io/gillianplatform/
 
 jobs:
   build:
@@ -35,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ocaml/setup-ocaml@v3
         with:
-          ocaml-compiler: "ocaml-variants.5.3.0+options"
+          ocaml-compiler: "5.3.0"
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v4
@@ -43,7 +44,7 @@ jobs:
             cache-name: cache-ocaml
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ env.cache-name}}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
+          key: ${{ runner.os }}-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
       - name: Install dependencies
         run: make init-ci
       - name: Build Gillian
@@ -96,8 +97,8 @@ jobs:
       - &INSTALL_ARTIFACT
         name: Extract and install Gillian
         run: |
-          unzip /gillian-${{ runner.os }}.zip -d /usr/local
-          rm /gillian.zip
+          sudo unzip gillian-${{ runner.os }}.zip -d /usr/local > /dev/null
+          rm gillian-${{ runner.os }}.zip
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C/scripts/setup_environment.sh"
@@ -146,10 +147,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C2/scripts/setup_environment.sh"
-        working-directory: "Gillian"
       - name: Test All
         run: "./testAll.sh"
-        working-directory: "Gillian/Gillian-C2/environment/"
+        working-directory: "Gillian-C2/environment/"
 
   test262:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
@@ -169,7 +169,7 @@ jobs:
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
       - name: Test262
-        run: "opam exec -- gillian-js test262 test262/test --ci"
+        run: "gillian-js test262 test262/test --ci"
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
@@ -189,7 +189,7 @@ jobs:
           path: collections-c
           ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
       - name: Symbolic Testing Collections-C
-        run: "opam exec -- bash ./scripts/gillian-compcert/runTests.sh"
+        run: "bash ./scripts/gillian-compcert/runTests.sh"
         working-directory: collections-c
 
   # test-Buckets:
@@ -207,15 +207,18 @@ jobs:
   #     - name: Symbolic Testing Buckets.js
   #       run: "gillian-js cosette-bulk Gillian-JS/Examples/Cosette/Buckets --ci"
 
-  build-docker:
+  docker-build:
     runs-on: ubuntu-latest
     steps:
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo docker builder prune -a
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          driver: docker
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v4
@@ -223,47 +226,63 @@ jobs:
             cache-name: cache-ocaml
         with:
           path: .docker_opam_cache
-          key: docker-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**/*.opam') }}
+          key: docker-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
           restore-keys: |
             docker-${{ env.cache-name }}-ocaml-5.3.0
       - name: Build and export docker image
         uses: docker/build-push-action@v4
         with:
+          file: docker/Dockerfile.build
           context: .
-          load: true
-          tags: ${{ env.DOCKER_IMG_NAME }}:test
-          target: test
+          tags: ${{ env.LOCAL_DOCKER_IMG }}
+          outputs: type=docker, dest=${{ runner.temp }}/docker.tar
+      - name: Upload docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: gillian-src-docker
+          path: ${{ runner.temp }}/docker.tar
+      - name: Load image
+        run: |
+          docker load --input ${{ runner.temp }}/docker.tar
+          docker image ls -a
       - name: Dune test
-        run: docker run --rm ${{ env.DOCKER_IMG_NAME }}:test opam exec -- dune test
+        run: docker run --rm ${{ env.LOCAL_DOCKER_IMG }} opam exec -- dune test
       - name: Extract cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           rm -rf .docker_opam_cache
-          docker run --name deps ${{ env.DOCKER_IMG_NAME }}:test bash -c "opam clean"
+          docker run --name deps ${{ env.LOCAL_DOCKER_IMG }} bash -c "opam clean"
           docker cp deps:/home/opam/.opam/5.3 ./.docker_opam_cache
           docker rm deps
 
-  push-docker:
+  docker-push:
     runs-on: ubuntu-latest
+    needs: docker-build
     if: ${{ contains(fromJSON('["push", "workflow_dispatch", "release"]'), github.event_name) }}
+    strategy:
+      matrix:
+        include:
+          - image: wisl
+            packages: wisl
+            no_cbmc: 1
+          - image: gillian
+            packages: "wisl gillian-c gillian-js gillian-c2"
+            no_cbmc: ""
+          - image: gillian-extra
+            packages: ""
+            no_cbmc: ""
     env:
-      DOCKER_TAG_PRE: ${{ github.event.inputs.docker-tag || (github.ref_name == 'master' && 'nightly' || github.ref_name) }}
-    needs: build-docker
+      DOCKER_TAG_RAW: ${{ github.event.inputs.docker-tag || (github.ref_name == 'master' && 'nightly' || github.ref_name) }}
     steps:
-      - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Download base image
+        uses: actions/download-artifact@v4
         with:
-          driver: docker
-      - name: Restore Cache
-        id: restore-cache
-        uses: actions/cache/restore@v4
-        env:
-            cache-name: cache-ocaml
-        with:
-          path: .docker_opam_cache
-          key: docker-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**/*.opam') }}
-          restore-keys: |
-            docker-${{ env.cache-name }}-ocaml-5.3.0
+          name: gillian-src-docker
+          path: ${{ runner.temp }}
+      - name: Load image
+        run: |
+          docker load --input ${{ runner.temp }}/docker.tar
+          docker image ls -a
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -271,13 +290,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set docker tag
-        run: echo "DOCKER_TAG=$DOCKER_TAG_PRE" | tr "/" "-" >> "$GITHUB_ENV"
+        run: echo "DOCKER_TAG=$DOCKER_TAG_RAW" | tr "/" "-" >> "$GITHUB_ENV"
       - name: Build and export docker image
         uses: docker/build-push-action@v6
         with:
-          tags: ${{ env.DOCKER_IMG_NAME }}:${{ env.DOCKER_TAG }}
+          file: docker/Dockerfile.dist
+          tags: ${{ env.DOCKER_IMG_PRE }}${{ env.image }}:${{ env.DOCKER_TAG }}
+          build-args: |
+            packages=${{ env.packages }}
+            no_cbmc=${{ env.no_cbmc }}
           push: true
-          target: run
 
   deploy-docs:
     if: github.ref_name == github.event.repository.default_branch
