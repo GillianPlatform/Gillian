@@ -204,26 +204,27 @@ struct
         | LogicCommand -> "Logic command"
         | PredicateGuard -> "Predicate Guard"
 
-      let make_basic_next ids =
+      let make_basic_next' ids =
         let open Map_node_next in
-        let cases =
-          ids
-          |> List.map @@ fun id ->
-             Cases.
-               {
-                 branch_label = "";
-                 branch_case = `Null;
-                 id = Some (show_id id);
-               }
-        in
-        Branch { cases }
+        match ids with
+        | [] -> Final
+        | [ id ] -> Single { id = Some id }
+        | _ ->
+            let cases =
+              ids
+              |> List.map @@ fun id ->
+                 Cases.{ branch_label = ""; branch_case = `Null; id = Some id }
+            in
+            Branch { cases }
+
+      let make_basic_next ids = ids |> List.map show_id |> make_basic_next'
 
       let convert_match_root
           state
           (matching : Match_map.matching)
-          (map : Match_map.t) =
+          (nexts : string list) =
         let id = show_id matching.id in
-        let next = make_basic_next map.roots in
+        let next = make_basic_next' nexts in
         let options =
           Map_node_options.Root
             {
@@ -291,24 +292,49 @@ struct
         in
         (next_ids, folds)
 
-      let convert_match_map' proc_state state (matching : Match_map.matching) =
+      let make_match_emp_node state (matching : Match_map.matching) =
+        let id = show_id matching.id ^ "_emp" in
+        let next = Map_node_next.Final in
+        let display = "emp" in
+        let selectable = Some false in
+        let highlight =
+          let open Map_node_options.Highlight in
+          Some
+            (match matching.result with
+            | Match_map.Success -> Success
+            | Match_map.Failure -> Error)
+        in
+        let extras = None in
+        let options =
+          Map_node_options.Basic { display; selectable; highlight; extras }
+        in
+        let () = Map_node.make ~id ~next ~options () |> add_node state in
+        id
+
+      let convert_match_map proc_state state (matching : Match_map.matching) =
         let map = get_match_map matching.id state.debug_state proc_state in
         let () = Hashtbl.add state.debug_state.matches matching.id map in
-        let () = convert_match_root state matching map in
-        let rec aux other_matches = function
-          | [] -> other_matches
-          | node_id :: rest ->
-              let nexts, folds =
-                convert_match_node proc_state state map node_id
+        let roots, folds =
+          match map.roots with
+          | [] -> ([ make_match_emp_node state matching ], [])
+          | roots ->
+              let rec aux other_matches = function
+                | [] -> other_matches
+                | node_id :: rest ->
+                    let nexts, folds =
+                      convert_match_node proc_state state map node_id
+                    in
+                    aux (folds @ other_matches) (nexts @ rest)
               in
-              aux (folds @ other_matches) (nexts @ rest)
+              (List.map show_id roots, aux [] roots)
         in
-        aux [] map.roots
+        let () = convert_match_root state matching roots in
+        folds
 
       let rec convert_match_maps proc_state state = function
         | [] -> ()
         | matching :: rest ->
-            let folds = convert_match_map' proc_state state matching in
+            let folds = convert_match_map proc_state state matching in
             convert_match_maps proc_state state (folds @ rest)
 
       let get_node_extras (node : Exec_map.Packaged.node) =
