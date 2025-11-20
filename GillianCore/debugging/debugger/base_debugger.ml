@@ -863,13 +863,17 @@ struct
 
       (* A command step with no results *should* mean that we're returning.
          If we're at the top of the callstack, this *should* mean that we're hitting the end of the program. *)
-      let is_eob ~id =
-        L.Log_queryer.get_cmd_results id
-        |> List.for_all (fun (_, content) ->
-               let result = content |> of_yojson_string CmdResult.of_yojson in
-               result.errors <> [])
+      let check_cmd_results id =
+        let results = L.Log_queryer.get_cmd_results id in
+        List.fold_left
+          (fun (has_success, errors) (_, content) ->
+            let result = content |> of_yojson_string CmdResult.of_yojson in
+            match result.errors with
+            | [] -> (true, errors)
+            | errors' -> (has_success, errors @ errors'))
+          (false, []) results
 
-      type continue_kind = ProcInit | EoB | Continue
+      type continue_kind = ProcInit | EoB | Continue of err_t list
 
       let get_report_and_check_type ?(log_context = "execute_step") id =
         let content, type_ = Option.get @@ L.Log_queryer.get_report id in
@@ -877,14 +881,18 @@ struct
           if type_ = Content_type.proc_init then (
             DL.log (fun m -> m "Debugger.%s: Skipping proc_init..." log_context);
             ProcInit)
-          else if is_eob ~id then (
-            DL.log (fun m ->
-                m
-                  "Debugger.%s: No non-error results for %a; stepping again \
-                   for EoB"
-                  log_context L.Report_id.pp id);
-            EoB)
-          else Continue
+          else
+            let has_success, errors = check_cmd_results id in
+            if has_success then Continue errors
+            else
+              let () =
+                DL.log (fun m ->
+                    m
+                      "Debugger.%s: No non-error results for %a; stepping \
+                       again for EoB"
+                      log_context L.Report_id.pp id)
+              in
+              EoB
         in
         (kind, content)
 
@@ -963,13 +971,15 @@ struct
         let exec_data, cont_func =
           match continue_kind with
           | ProcInit -> failwith "Unexpected ProcInit!"
-          | Continue ->
+          | Continue exec_errors ->
               let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
               let matches = get_matches id debug_state proc_state in
               let report =
                 of_yojson_string Logging.ConfigReport.of_yojson content
               in
-              let errors = errors_of_matches matches in
+              let errors =
+                List.map show_err_t exec_errors @ errors_of_matches matches
+              in
               let exec_data =
                 Lift.make_executed_cmd_data cmd_kind id report ~matches ~errors
                   path
