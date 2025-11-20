@@ -3,7 +3,7 @@
 set -e
 
 if [[ "${GITHUB_ACTIONS}" ]]; then
-	VERIFY="opam exec -- gillian-js verify"
+	VERIFY="gillian-js verify"
 else
   VERIFY="dune exec -- gillian-js verify"
 fi

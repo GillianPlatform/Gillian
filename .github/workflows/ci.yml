@@ -50,20 +50,22 @@ jobs:
       - name: Basic tests
         run: opam exec -- dune test
       - name: Wisl checks
-        run: "opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh"
+        run: opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh
       - name: Format checking
         run: opam exec -- dune fmt
-      - name: Installing to opam switch
+      - name: Build and compress binaries
         run: |
-          opam exec -- dune build @install
-          opam install . -y
-      - name: Compressing artifact
-        run: tar czf opam.tar.gz _opam
-      - name: Sending artifact for next jobs
+          mkdir _dist
+          opam exec -- dune install --relocatable --prefix ./_dist
+          cd _dist
+          zip -r ../gillian.zip ./*
+          cd ..
+          rm ./_dist -rf
+      - name: Sending artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}-opam
-          path: opam.tar.gz
+          name: ${{ runner.os }}-gillian
+          path: gillian.zip
       - name: Building API docs
         run: make docs
         if: runner.os == 'Linux'
@@ -89,22 +91,18 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "ocaml-variants.5.3.0+options"
       - name: Checkout project
         uses: actions/checkout@v3
         with:
           path: Gillian
-      - name: Download release
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-opam
-          path: opam
-      - name: Extract release
+          name: ${{ runner.os }}-gillian
+      - name: Extract and install Gillian
         run: |
-          tar xzf opam/opam.tar.gz
-          rm -rf opam
+          unzip /gillian.zip -d /usr/local
+          rm /gillian.zip
       - name: init env
         run: "Gillian-C/scripts/setup_environment.sh"
         working-directory: "Gillian"
@@ -127,22 +125,14 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: "ocaml-variants.5.3.0+options"
-      - name: Checkout project
-        uses: actions/checkout@v3
-        with:
-          path: Gillian
-      - name: Download release
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-opam
-          path: opam
-      - name: Extract release
+          name: ${{ runner.os }}-gillian
+      - name: Extract and install Gillian
         run: |
-          tar xzf opam/opam.tar.gz
-          rm opam -rf
+          unzip /gillian.zip -d /usr/local
+          rm /gillian.zip
       - name: init env
         run: "Gillian-JS/scripts/setup_environment.sh"
         working-directory: "Gillian"
@@ -177,20 +167,19 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: Gillian
-      - name: Download release
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-opam
-          path: opam
-      - name: Extract release
+          name: ${{ runner.os }}-gillian
+      - name: Extract and install Gillian
         run: |
-          tar xzf opam/opam.tar.gz
-          rm -rf opam
+          unzip /gillian.zip -d /usr/local
+          rm /gillian.zip
       - name: init env
         run: "Gillian-C2/scripts/setup_environment.sh"
         working-directory: "Gillian"
       - name: Test All
-        run: "opam exec -- bash ./testAll.sh"
+        run: "./testAll.sh"
         working-directory: "Gillian/Gillian-C2/environment/"
 
   test262:
@@ -215,15 +204,14 @@ jobs:
           repository: GillianPlatform/javert-test262
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
-      - name: Download release
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-opam
-          path: opam
-      - name: Extract release
+          name: ${{ runner.os }}-gillian
+      - name: Extract and install Gillian
         run: |
-          tar xzf opam/opam.tar.gz
-          rm -rf opam
+          unzip /gillian.zip -d /usr/local
+          rm /gillian.zip
       - name: Test262
         run: "opam exec -- gillian-js test262 test262/test --ci"
 
@@ -249,15 +237,14 @@ jobs:
           repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
           ref: ffa76e788a1fbdb67910bb7b794214ebc22c1b8c
-      - name: Download release
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ runner.os }}-opam
-          path: opam
-      - name: Extract release
+          name: ${{ runner.os }}-gillian
+      - name: Extract and install Gillian
         run: |
-          tar xzf opam/opam.tar.gz
-          rm -rf opam
+          unzip /gillian.zip -d /usr/local
+          rm /gillian.zip
       - name: Symbolic Testing Collections-C
         run: "opam exec -- bash ./scripts/gillian-compcert/runTests.sh"
         working-directory: collections-c
@@ -282,15 +269,14 @@ jobs:
   #       uses: actions/checkout@v3
   #       with:
   #         path: Gillian
-  #     - name: Download release
+  #     - name: Download artifact
   #       uses: actions/download-artifact@v4
   #       with:
-  #        name: ${{ runner.os }}-opam
-  #        path: opam
-  #     - name: Extract release
+  #         name: ${{ runner.os }}-gillian
+  #     - name: Extract and install Gillian
   #       run: |
-  #         tar xzf opam/opam.tar.gz
-  #         rm -rf opam
+  #         unzip /gillian.zip -d /usr/local
+  #         rm /gillian.zip
   #     - name: Symbolic Testing Buckets.js
   #       run: "opam exec -- gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
