@@ -93,12 +93,12 @@ module Make (Mem : MyMonadicSMemory.S) :
   let get_recovery_tactic = Mem.get_recovery_tactic
   let can_fix e = Mem.can_fix e
 
+  (* The rest of the functions remain unimplemented as Bi_abd makes no sense being an input to other transformers. *)
+
   let get_fixes _ =
     failwith
       "Bi_abd state should not be used as an input to the bi-abduction state \
        module. That one is legacy."
-
-  (* Assertions *)
 
   let assertions_others _ =
     failwith
@@ -109,8 +109,6 @@ module Make (Mem : MyMonadicSMemory.S) :
     failwith
       "Should not be transforming bi-abd state to assertions, only its first \
        component"
-
-  (* The rest of the functions remain unimplemented as Bi_abd makes no sense being an input to other transformers. *)
 
   let instantiate _ =
     failwith "Bi_abd state should not be used as an input state"
