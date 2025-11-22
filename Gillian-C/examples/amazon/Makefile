@@ -1,5 +1,5 @@
 ifdef GITHUB_ACTIONS
-	VERIFY=opam exec -- gillian-c verify
+	VERIFY=gillian-c verify
 else
 	VERIFY=dune exec -- gillian-c verify
 endif
