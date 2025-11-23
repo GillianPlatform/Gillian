@@ -267,18 +267,23 @@ module Make (State : SState.S) :
       (x : string option)
       (args : vt list)
       (astate : t) : (t * Flag.t, SMatcher.err_t) Res_list.t =
+    let open Res_list.Syntax in
+    let open Syntaxes.List in
     L.verbose (fun m ->
         m "INSIDE RUN spec of %s (%d more) with the following MP:@\n%a@\n" name
           (List.length more_specs) MP.pp mp);
     let old_store = get_store astate in
-    let new_store =
-      try SStore.init (List.combine params args)
+    let** new_store =
+      try SStore.init (List.combine params args) |> Res_list.return
       with Invalid_argument _ ->
-        Fmt.failwith
-          "Running spec of %s which takes %i parameters with the following %i \
-           arguments : %a"
-          name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
-          args
+        let msg =
+          Fmt.str
+            "Running spec of %s which takes %i parameters with the following \
+             %i arguments : %a"
+            name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
+            args
+        in
+        Res_list.error_with (StateErr.EOther msg)
     in
 
     let astate' = set_store astate new_store in
@@ -295,8 +300,6 @@ module Make (State : SState.S) :
         m "About to use the spec of %s with the following MP:@\n%a@\n" name
           MP.pp mp);
 
-    let open Res_list.Syntax in
-    let open Syntaxes.List in
     let res = SMatcher.match_ astate' subst mp (FunctionCall name) in
     if List.exists Result.is_error res then
       L.normal (fun m ->
