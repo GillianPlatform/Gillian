@@ -1266,6 +1266,9 @@ struct
       | Lit l -> Fmt.pf ft "%a" pp_lit l
       | UnOp (LstLen, e) -> Fmt.pf ft "len(%a)" pp_o e
       | BinOp (e1, LstNth, e2) -> Fmt.pf ft "%a[%a]" pp e1 pp_o e2
+      | BinOp (Lit (Int x), IPlus, e2) ->
+          if Z.sign x = -1 then Fmt.pf ft "%a - %a" pp e2 Z.pp_print (Z.neg x)
+          else Fmt.pf ft "%a + %a" pp e2 Z.pp_print x
       | BinOp (e1, op, e2) when outermost ->
           Fmt.pf ft "%a %a %a" pp e1 pp_binop op pp e2
       | BinOp (e1, op, e2) -> Fmt.pf ft "(%a %a %a)" pp e1 pp_binop op pp e2
