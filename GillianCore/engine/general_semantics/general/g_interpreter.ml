@@ -453,12 +453,13 @@ struct
       raise (Interpreter_error (List.map (fun x -> Exec_err.EState x) errs, s))
 
   let check_loop_ids actual expected =
-    match actual = expected with
-    | false ->
-        Fmt.failwith
-          "Malformed loop structure: current loops: %a; expected loops: %a"
-          pp_str_list actual pp_str_list expected
-    | true -> ()
+    if Exec_mode.is_verification_exec !Config.current_exec_mode then
+      match actual = expected with
+      | false ->
+          Fmt.failwith
+            "Malformed loop structure: current loops: %a; expected loops: %a"
+            pp_str_list actual pp_str_list expected
+      | true -> ()
 
   let rec loop_ids_to_frame_on_at_the_end end_ids start_ids =
     if end_ids = start_ids then []

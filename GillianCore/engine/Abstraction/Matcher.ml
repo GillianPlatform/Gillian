@@ -1508,8 +1508,6 @@ module Make (State : SState.S) :
             let successes, errors = Res_list.split res_list in
             match (!Config.under_approximation, successes, errors) with
             (* We start by handling the crash cases that should never happen *)
-            | true, _, _ :: _ ->
-                L.fail "ERROR: IMPOSSIBLE! MATCHING ERRORS IN UX MODE!!!!"
             | true, [], _ ->
                 (* Vanished in UX *)
                 match_mp' (rest_search_states, errs_so_far)
@@ -1556,7 +1554,7 @@ module Make (State : SState.S) :
                 | Ok res -> Ok res
                 | Error errs ->
                     match_mp' (rest_search_states, errs @ errs_so_far))
-            | true, first :: rem, [] ->
+            | true, first :: rem, _ ->
                 let rem =
                   List.map
                     (fun state ->

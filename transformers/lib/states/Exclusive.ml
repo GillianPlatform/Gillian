@@ -8,7 +8,7 @@ module Recovery_tactic = Gillian.General.Recovery_tactic
 type t = Expr.t option [@@deriving show, yojson]
 type err_t = MissingState [@@deriving show, yojson]
 type action = Load | Store
-type pred = Ex
+type pred = Ex [@@deriving yojson]
 
 let pp = Fmt.(option ~none:(any "None") Expr.pp)
 
@@ -95,4 +95,4 @@ let get_recovery_tactic _ = Recovery_tactic.none
 let can_fix MissingState = true
 
 let get_fixes MissingState =
-  [ [ MyAsrt.CorePred (Ex, [], [ LVar (Generators.fresh_svar ()) ]) ] ]
+  [ [ (Ex, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]

@@ -1,5 +1,6 @@
 open Cmdliner
 module ParserAndCompiler = ParserAndCompiler
+module Act_console = Act_console
 
 module Make
     (ID : Init_data.S)

@@ -57,7 +57,10 @@ end
 module Abstraction = struct
   module MP = Engine.MP
   module Verifier = Engine.Verifier
+  module Normaliser = Engine.Normaliser
 end
+
+module Abductor = Engine.Abductor
 
 (* module Test262 = Test262_main *)
 
