@@ -13,8 +13,16 @@ let make =
     { id; sub; named_sub; unique_id }
 
 let nil = make Nil
-let lookup name irep = List.assoc name irep.named_sub
 let lookup_opt name irep = List.assoc_opt name irep.named_sub
+
+let lookup name irep =
+  match lookup_opt name irep with
+  | Some x -> x
+  | None ->
+      let msg =
+        Fmt.str "Couldn't find '%a' in irep %a" Id.pp name Id.pp irep.id
+      in
+      raise (Kutils.Gillian_result.Exc.internal_error msg)
 
 module Infix = struct
   let ( $ ) irep name = lookup name irep

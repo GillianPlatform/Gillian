@@ -62,9 +62,12 @@ open Irep.Infix
    constant lifting should be done in exactly one place and then used in other files. *)
 
 let as_int (sym : Symbol.t) =
-  sym.value $ Value
-  |> Irep.as_just_bitpattern ~width:32 ~signed:false
-  |> Z.to_int
+  match sym.value.sub with
+  | [] ->
+      Gerror.unexpected ~irep:sym.value
+        "Expected sub when building machine model!"
+  | sub :: _ ->
+      sub $ Value |> Irep.as_just_bitpattern ~width:32 ~signed:false |> Z.to_int
 
 let as_bool sym =
   match as_int sym with
