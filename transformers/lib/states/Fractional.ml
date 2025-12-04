@@ -53,7 +53,10 @@ let[@inline] consume core_pred s args =
   match (core_pred, s, args) with
   | Frac, Some (v, q), [ q' ] ->
       if%sat q == q' then DR.ok (None, [ v ])
-      else DR.ok ~learned:[ q' >. _0; q -. q' >. _0 ] (Some (v, q -. q'), [ v ])
+      else
+        if%sat q >=. q' then
+          DR.ok ~learned:[ q' >. _0 ] (Some (v, q -. q'), [ v ])
+        else DR.error NotEnoughPermission
   | Frac, None, _ -> DR.error MissingState
   | Frac, _, _ -> failwith "Invalid Agree consume"
 
