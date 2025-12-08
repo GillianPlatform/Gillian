@@ -2,7 +2,7 @@
 
 set -e
 
-WPST="time opam exec -- gillian-c wpst"
+WPST="time gillian-c wpst"
 
 # TODO (Alexis): Make incremental analysis thread-safe to allow the use of --parallel
 echo "--- testing SLL ---"

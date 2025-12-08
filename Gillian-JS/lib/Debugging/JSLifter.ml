@@ -312,6 +312,13 @@ struct
       in
       scopes
 
+  let top_level_scopes : Variable.scope list =
+    [
+      { id = 1; name = "Pure Formulae" };
+      { id = 2; name = "Typing Environment" };
+      { id = 3; name = "Predicates" };
+    ]
+
   let get_variables _ { store; memory; pfs; types; preds } _ =
     let open Gil_lifter in
     let open Variable in

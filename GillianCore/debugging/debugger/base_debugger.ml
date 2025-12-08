@@ -204,26 +204,27 @@ struct
         | LogicCommand -> "Logic command"
         | PredicateGuard -> "Predicate Guard"
 
-      let make_basic_next ids =
+      let make_basic_next' ids =
         let open Map_node_next in
-        let cases =
-          ids
-          |> List.map @@ fun id ->
-             Cases.
-               {
-                 branch_label = "";
-                 branch_case = `Null;
-                 id = Some (show_id id);
-               }
-        in
-        Branch { cases }
+        match ids with
+        | [] -> Final
+        | [ id ] -> Single { id = Some id }
+        | _ ->
+            let cases =
+              ids
+              |> List.map @@ fun id ->
+                 Cases.{ branch_label = ""; branch_case = `Null; id = Some id }
+            in
+            Branch { cases }
+
+      let make_basic_next ids = ids |> List.map show_id |> make_basic_next'
 
       let convert_match_root
           state
           (matching : Match_map.matching)
-          (map : Match_map.t) =
+          (nexts : string list) =
         let id = show_id matching.id in
-        let next = make_basic_next map.roots in
+        let next = make_basic_next' nexts in
         let options =
           Map_node_options.Root
             {
@@ -291,24 +292,49 @@ struct
         in
         (next_ids, folds)
 
-      let convert_match_map' proc_state state (matching : Match_map.matching) =
+      let make_match_emp_node state (matching : Match_map.matching) =
+        let id = show_id matching.id ^ "_emp" in
+        let next = Map_node_next.Final in
+        let display = "emp" in
+        let selectable = Some false in
+        let highlight =
+          let open Map_node_options.Highlight in
+          Some
+            (match matching.result with
+            | Match_map.Success -> Success
+            | Match_map.Failure -> Error)
+        in
+        let extras = None in
+        let options =
+          Map_node_options.Basic { display; selectable; highlight; extras }
+        in
+        let () = Map_node.make ~id ~next ~options () |> add_node state in
+        id
+
+      let convert_match_map proc_state state (matching : Match_map.matching) =
         let map = get_match_map matching.id state.debug_state proc_state in
         let () = Hashtbl.add state.debug_state.matches matching.id map in
-        let () = convert_match_root state matching map in
-        let rec aux other_matches = function
-          | [] -> other_matches
-          | node_id :: rest ->
-              let nexts, folds =
-                convert_match_node proc_state state map node_id
+        let roots, folds =
+          match map.roots with
+          | [] -> ([ make_match_emp_node state matching ], [])
+          | roots ->
+              let rec aux other_matches = function
+                | [] -> other_matches
+                | node_id :: rest ->
+                    let nexts, folds =
+                      convert_match_node proc_state state map node_id
+                    in
+                    aux (folds @ other_matches) (nexts @ rest)
               in
-              aux (folds @ other_matches) (nexts @ rest)
+              (List.map show_id roots, aux [] roots)
         in
-        aux [] map.roots
+        let () = convert_match_root state matching roots in
+        folds
 
       let rec convert_match_maps proc_state state = function
         | [] -> ()
         | matching :: rest ->
-            let folds = convert_match_map' proc_state state matching in
+            let folds = convert_match_map proc_state state matching in
             convert_match_maps proc_state state (folds @ rest)
 
       let get_node_extras (node : Exec_map.Packaged.node) =
@@ -837,13 +863,17 @@ struct
 
       (* A command step with no results *should* mean that we're returning.
          If we're at the top of the callstack, this *should* mean that we're hitting the end of the program. *)
-      let is_eob ~id =
-        L.Log_queryer.get_cmd_results id
-        |> List.for_all (fun (_, content) ->
-               let result = content |> of_yojson_string CmdResult.of_yojson in
-               result.errors <> [])
+      let check_cmd_results id =
+        let results = L.Log_queryer.get_cmd_results id in
+        List.fold_left
+          (fun (has_success, errors) (_, content) ->
+            let result = content |> of_yojson_string CmdResult.of_yojson in
+            match result.errors with
+            | [] -> (true, errors)
+            | errors' -> (has_success, errors @ errors'))
+          (false, []) results
 
-      type continue_kind = ProcInit | EoB | Continue
+      type continue_kind = ProcInit | EoB | Continue of err_t list
 
       let get_report_and_check_type ?(log_context = "execute_step") id =
         let content, type_ = Option.get @@ L.Log_queryer.get_report id in
@@ -851,14 +881,18 @@ struct
           if type_ = Content_type.proc_init then (
             DL.log (fun m -> m "Debugger.%s: Skipping proc_init..." log_context);
             ProcInit)
-          else if is_eob ~id then (
-            DL.log (fun m ->
-                m
-                  "Debugger.%s: No non-error results for %a; stepping again \
-                   for EoB"
-                  log_context L.Report_id.pp id);
-            EoB)
-          else Continue
+          else
+            let has_success, errors = check_cmd_results id in
+            if has_success then Continue errors
+            else
+              let () =
+                DL.log (fun m ->
+                    m
+                      "Debugger.%s: No non-error results for %a; stepping \
+                       again for EoB"
+                      log_context L.Report_id.pp id)
+              in
+              EoB
         in
         (kind, content)
 
@@ -937,13 +971,15 @@ struct
         let exec_data, cont_func =
           match continue_kind with
           | ProcInit -> failwith "Unexpected ProcInit!"
-          | Continue ->
+          | Continue exec_errors ->
               let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
               let matches = get_matches id debug_state proc_state in
               let report =
                 of_yojson_string Logging.ConfigReport.of_yojson content
               in
-              let errors = errors_of_matches matches in
+              let errors =
+                List.map show_err_t exec_errors @ errors_of_matches matches
+              in
               let exec_data =
                 Lift.make_executed_cmd_data cmd_kind id report ~matches ~errors
                   path

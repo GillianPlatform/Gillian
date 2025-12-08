@@ -1,3 +1,3 @@
 #!/bin/bash
 
-opam exec -- gillian-c bulk-exec concrete
+gillian-c bulk-exec concrete

@@ -1868,16 +1868,9 @@ struct
       selector : conf_selector option;
     }
 
-    let log_confcont parent_id_ref is_first = function
+    let log_cmd_result = function
       | ConfCont
-          {
-            state;
-            callstack;
-            next_idx = proc_body_index;
-            branch_case;
-            prev_cmd_report_id;
-            _;
-          } ->
+          { state; callstack; next_idx = proc_body_index; branch_case; _ } ->
           let cmd_step : CmdResult.t =
             {
               callstack;
@@ -1887,35 +1880,29 @@ struct
               branch_case;
             }
           in
-          (* if is_first then (
-             prev_cmd_report_id
-             |> Option.iter (fun prev_report_id ->
-                    L.Parent.release !parent_id_ref;
-                    L.Parent.set prev_report_id;
-                    parent_id_ref := Some prev_report_id);
-             DL.log (fun m ->
-                 m
-                   ~json:[ ("conf", CmdResult.to_yojson cmd_step) ]
-                   "Debugger.evaluate_cmd_step: New ConfCont")); *)
-          ignore (parent_id_ref, is_first, prev_cmd_report_id);
-          CmdResult.log_result cmd_step |> ignore;
-          Some cmd_step
-      | _ -> None
+          let _ = CmdResult.log_result cmd_step in
+          ()
+      | ConfErr { callstack; proc_idx; error_state; errors; _ } ->
+          let _ =
+            CmdResult.log_result
+              {
+                callstack;
+                proc_body_index = proc_idx;
+                state = Some error_state;
+                errors;
+                branch_case = None;
+              }
+          in
+          ()
+      | _ -> ()
 
-    let continue_or_pause
-        ?(new_confs = false)
-        rest_confs
-        cont_func
-        eval_step_state =
+    let continue_or_pause ?(new_confs = false) confs cont_func eval_step_state =
       let { parent_id_ref; branch_path; _ } = eval_step_state in
-      match rest_confs with
+      let () = if new_confs then List.iter log_cmd_result confs in
+      match confs with
       | ConfCont { branch_path; _ } :: _ ->
-          rest_confs
-          |> List.iteri (fun i conf ->
-                 log_confcont parent_id_ref (i = 0) conf |> ignore);
           let new_branch_cases =
-            if new_confs then
-              rest_confs |> List.filter_map CConf.get_branch_case
+            if new_confs then List.filter_map CConf.get_branch_case confs
             else []
           in
           Continue

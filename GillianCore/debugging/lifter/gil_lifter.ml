@@ -212,36 +212,24 @@ functor
     let memory_error_to_exception_info { error; _ } : exception_info =
       { id = Fmt.to_to_string SMemory.pp_err error; description = None }
 
-    let add_variables ~store ~memory ~is_gil_file ~get_new_scope_id variables :
-        Variable.scope list =
-      let () = ignore is_gil_file in
-      let store_id = get_new_scope_id () in
-      let memory_id = get_new_scope_id () in
-      let scopes : Variable.scope list =
-        [
-          { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" };
-        ]
-      in
-      let store_vars =
+    module Variables = struct
+      open Variable
+
+      module Scopes = struct
+        let pvars = { id = 1; name = "Store" }
+        let heap = { id = 2; name = "Memory" }
+        let preds = { id = 3; name = "Predicates" }
+        let pfs = { id = 4; name = "Pure formulae" }
+        let types = { id = 5; name = "Types" }
+        let all = [ pvars; heap; preds; pfs; types ]
+      end
+
+      let get_store_vars store =
         store
         |> List.map (fun (var, value) : Variable.t ->
                let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-               Variable.create_leaf var value ())
-        |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
-      in
-      let memory_vars =
-        [
-          Variable.create_leaf ""
-            (Fmt.to_to_string (Fmt.hbox SMemory.pp) memory)
-            ();
-        ]
-      in
-      let () = Hashtbl.replace variables store_id store_vars in
-      let () = Hashtbl.replace variables memory_id memory_vars in
-      scopes
-
-    module Variables = struct
-      open Variable
+               { name = var; value; type_ = None; var_ref = 0 })
+        |> List.sort (fun v w -> Stdlib.compare v.name w.name)
 
       let get_type_env_vars (types : Type_env.t) : Variable.t list =
         Type_env.to_list types
@@ -265,37 +253,83 @@ functor
                { name = ""; value; type_ = None; var_ref = 0 })
         |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-      let get_variables _ { store; memory; pfs; types; preds } _ =
+      let get_variables'
+          ?add_heap_variables
+          _
+          { store; memory; pfs; types; preds }
+          _ =
         let variables = Hashtbl.create 0 in
-        (* New scope ids must be higher than last top level scope id to prevent
-            duplicate scope ids *)
-        let scope_id = ref (List.length top_level_scopes) in
-        let get_new_scope_id () =
-          let () = scope_id := !scope_id + 1 in
-          !scope_id
+        (* Scopes and var refs share IDs; they can't clash *)
+        let new_var_ref =
+          let count = ref (List.length Scopes.all) in
+          fun () ->
+            let () = count := !count + 1 in
+            !count
         in
-        let lifted_scopes =
-          let lifted_scopes =
-            add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
-              variables
-          in
-          let pure_formulae_vars =
-            Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
-          in
-          let type_env_vars =
-            Option.fold ~some:get_type_env_vars ~none:[] types
-          in
-          let pred_vars = Option.fold ~some:get_pred_vars preds ~none:[] in
-          let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
-          let () =
-            List.iter2
-              (fun (scope : scope) vars ->
-                Hashtbl.replace variables scope.id vars)
-              top_level_scopes vars_list
-          in
-          lifted_scopes
+        let var_groups = [] in
+
+        (* Program variables *)
+        let var_groups =
+          let pvars = get_store_vars store in
+          (Scopes.pvars, pvars) :: var_groups
         in
-        (lifted_scopes, variables)
+
+        (* Heap *)
+        let var_groups =
+          match add_heap_variables with
+          | Some f ->
+              let new_groups =
+                f memory variables new_var_ref
+                |> List.map @@ fun scope -> (scope, [])
+              in
+              new_groups @ var_groups
+          | None ->
+              let heap_vars =
+                [
+                  Variable.create_leaf ""
+                    (Fmt.to_to_string (Fmt.hbox SMemory.pp) memory)
+                    ();
+                ]
+              in
+              (Scopes.heap, heap_vars) :: var_groups
+        in
+
+        (* Predicates *)
+        let var_groups =
+          match preds with
+          | Some preds ->
+              let pred_vars = get_pred_vars preds in
+              (Scopes.preds, pred_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        (* Pure formulae *)
+        let var_groups =
+          match pfs with
+          | Some pfs ->
+              let pfs_vars = get_pure_formulae_vars pfs in
+              (Scopes.pfs, pfs_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        (* Type environment *)
+        let var_groups =
+          match types with
+          | Some types ->
+              let type_vars = get_type_env_vars types in
+              (Scopes.types, type_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        let scopes =
+          var_groups
+          |> List.rev_map @@ fun (scope, vars) ->
+             let () = Hashtbl.replace variables Variable.(scope.id) vars in
+             scope
+        in
+        (scopes, variables)
+
+      let get_variables = get_variables' ?add_heap_variables:None
     end
 
     include Variables
