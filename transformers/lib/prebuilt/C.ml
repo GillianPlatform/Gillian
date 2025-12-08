@@ -10,15 +10,12 @@ module CGEnv = C_states.CGEnv.M
 
 (* Base memories *)
 module BaseBlock = Freeable (BlockTree)
-
-module type C_PMapType = OpenPMapType with type entry = BaseBlock.t
-
-module BaseMemory : C_PMapType = OpenPMap (LocationIndex) (BaseBlock)
-module SplitMemory : C_PMapType = OpenSplitPMap (LocationIndex) (BaseBlock)
-module ALocMemory : C_PMapType = OpenALocPMap (BaseBlock)
+module BaseMemory = OpenPMap (LocationIndex) (BaseBlock)
+module SplitMemory = OpenSplitPMap (LocationIndex) (BaseBlock)
+module ALocMemory = OpenALocPMap (BaseBlock)
 
 (* Add move action implementation *)
-module ExtendMemory (S : C_PMapType) = struct
+module ExtendMemory (S : OpenPMapType with module Entry = BaseBlock) = struct
   module Addition : ActionAddition with type t = S.t = struct
     type t = S.t
     type action = Move | SetZeros
@@ -79,7 +76,7 @@ module ExtendMemory (S : C_PMapType) = struct
       let s' = S.produce pred_zero s args in
       Delayed.map s' (fun s' -> Ok (s', []))
 
-    let execute_action = function
+    let[@inline] execute_action = function
       | Move -> exec_move
       | SetZeros -> exec_set_zeros
 
@@ -107,7 +104,7 @@ module ExtendMemory (S : C_PMapType) = struct
 
   include ActionAdder (Addition) (S)
 
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     let open Delayed.Syntax in
     let action = action_to_str a in
     let args =
@@ -124,7 +121,7 @@ module ExtendMemory (S : C_PMapType) = struct
     | _, r -> r
 end
 
-module Wrap (S : C_PMapType) = struct
+module Wrap (S : OpenPMapType with module Entry = BaseBlock) = struct
   module CMapMemory = ExtendMemory (S)
 
   include

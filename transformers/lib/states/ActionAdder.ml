@@ -50,12 +50,12 @@ struct
       | Ok x -> Ok x
       | Error e -> Error (AddedErr e))
 
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     match a with
     | BaseAct a -> S.execute_action a s args |> map_base_err
     | AddedAct a -> A.execute_action a s args |> map_added_err
 
-  let consume p s ins = S.consume p s ins |> map_base_err
+  let[@inline] consume p s ins = S.consume p s ins |> map_base_err
 
   let can_fix = function
     | BaseErr e -> S.can_fix e
