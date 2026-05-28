@@ -13,5 +13,7 @@
   internals.gil
   internals_act.gil
   rust_allocation_internals.gil
-  string.gil)
+  string.gil
+  logic_common.gil
+  archi64_logic.gil)
  (package gillian-c2))
