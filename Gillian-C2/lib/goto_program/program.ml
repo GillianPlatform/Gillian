@@ -97,7 +97,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
                Hashtbl.add env.base_names name sym.base_name
            in
            let () = add_struct_tag env.struct_tags sym in
-           let location = Location.of_irep sym.location in
+           let location = Location.of_yojson sym.location in
            let type_ = Type.of_irep ~machine sym.type_ in
            let value = SymbolValue.of_irep ~machine ~type_ sym.value in
            if sym.is_type then Hashtbl.add env.types name type_

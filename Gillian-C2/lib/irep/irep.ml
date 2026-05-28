@@ -5,12 +5,15 @@ type t = {
   unique_id : int;
 }
 
-let make =
+let fresh_id =
   let counter = ref 0 in
-  fun ?(sub = []) ?(named_sub = []) id ->
-    let unique_id = !counter in
+  fun () ->
+    let id = !counter in
     incr counter;
-    { id; sub; named_sub; unique_id }
+    id
+
+let make ?(sub = []) ?(named_sub = []) id =
+  { id; sub; named_sub; unique_id = fresh_id () }
 
 let nil = make Nil
 let lookup_opt name irep = List.assoc_opt name irep.named_sub
