@@ -171,12 +171,17 @@ let create_compilation_result path goto_prog gil_prog =
 
 let cbmc_version_checked = ref false
 
+let cbmc_exec =
+  match Sys.getenv_opt "CBMC_EXEC" with
+  | Some s -> s
+  | None -> "cbmc"
+
 let check_cbmc_version () =
   if not !cbmc_version_checked then
     let () = cbmc_version_checked := true in
     let expected_cbmc_version = Cbmc_version.expected in
     let cbmc_version =
-      let inp = Unix.open_process_in "cbmc --version" in
+      let inp = Unix.open_process_in (cbmc_exec ^ " --version") in
       let r = In_channel.input_all inp in
       let () =
         match Unix.close_process_in inp with
@@ -220,8 +225,8 @@ let compile_c_to_symtab c_file =
   in
   let status =
     Sys.command
-      (Fmt.str "cbmc %s %s --show-symbol-table --json-ui > %s" c_files includes
-         symtab_file)
+      (Fmt.str "%s %s %s --show-symbol-table --json-ui > %s" cbmc_exec c_files
+         includes symtab_file)
   in
   if status <> 0 then
     Fmt.failwith "CMBC failed to compile %s with return code %d" c_file status;
