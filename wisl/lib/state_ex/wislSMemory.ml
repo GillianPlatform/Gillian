@@ -36,9 +36,9 @@ let get_cell heap (loc : vt) (offset : vt) =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc; ofs; value ])
 
-let set_cell ?alloc_if_missing heap (loc : vt) (offset : vt) (value : vt) =
-  let** loc = resolve_loc ?alloc_if_missing loc in
-  let++ () = WislSHeap.set_cell heap loc offset value in
+let set_cell ~alloc_if_missing heap (loc : vt) (offset : vt) (value : vt) =
+  let** loc = resolve_loc ~alloc_if_missing loc in
+  let++ () = WislSHeap.set_cell ~alloc_if_missing heap loc offset value in
   (heap, [])
 
 let rem_cell heap (loc : vt) (offset : vt) =
@@ -53,9 +53,9 @@ let get_bound heap loc =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc; b ])
 
-let set_bound ?alloc_if_missing heap (loc : vt) (bound : int) =
-  let** loc = resolve_loc ?alloc_if_missing loc in
-  let++ () = WislSHeap.set_bound heap loc bound in
+let set_bound ~alloc_if_missing heap (loc : vt) (bound : int) =
+  let** loc = resolve_loc ~alloc_if_missing loc in
+  let++ () = WislSHeap.set_bound ~alloc_if_missing heap loc bound in
   (heap, [])
 
 let rem_bound heap loc =
@@ -69,10 +69,10 @@ let get_freed heap loc =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc ])
 
-let set_freed ?alloc_if_missing heap (loc : vt) =
-  let** loc = resolve_loc ?alloc_if_missing loc in
-  let+ () = WislSHeap.set_freed heap loc in
-  Ok (heap, [])
+let set_freed ~alloc_if_missing heap (loc : vt) =
+  let** loc = resolve_loc ~alloc_if_missing loc in
+  let++ () = WislSHeap.set_freed ~alloc_if_missing heap loc in
+  (heap, [])
 
 let rem_freed heap loc =
   let** loc = resolve_loc loc in
