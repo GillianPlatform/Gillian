@@ -130,7 +130,7 @@ let convert_struct_field
               | Padding _ -> (acc, i))
             ([], 0) components
         in
-        let field_arg_list = pvmember #== (Expr.list field_args) in
+        let field_arg_list = pvmember#==(Expr.list field_args) in
         let args = pvloc :: ofs :: field_args in
         let pred_call = Asrt.Pred (pred_name, args) in
         (GilType.ListType, [ field_arg_list; pred_call ])
@@ -297,8 +297,8 @@ let trans_sval ~pvar_map (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
       let ptr = Expr.EList [ Lit (Loc loc); Expr.zero_i ] in
       ([], [], ptr)
 
-(** Returns assertions that are necessary to define the expression,
-      the created variable for binding when necessary, and the used expression *)
+(** Returns assertions that are necessary to define the expression, the created
+    variable for binding when necessary, and the used expression *)
 let rec trans_expr ~pvar_map (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
   let te = trans_expr ~pvar_map in
   match e with
@@ -712,6 +712,7 @@ let trans_lemma ~ctx ~pvar_map ~filepath lemma =
       lemma_variant = None;
       lemma_specs;
       lemma_proof;
+      lemma_location = None;
     }
 
 let trans_spec ~ctx ?(only_spec = false) cl_spec =
@@ -730,6 +731,7 @@ let trans_spec ~ctx ?(only_spec = false) cl_spec =
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
+        spec_location = None;
       }
   in
   let _ =

@@ -32,7 +32,7 @@ let of_string = function
   | "i128" -> I128
   | "f32" -> F32
   | "f64" -> F64
-  | _ -> failwith "invalid chunk"
+  | s -> Fmt.failwith "invalid chunk '%s'" s
 
 let bounds =
   let open Z in
