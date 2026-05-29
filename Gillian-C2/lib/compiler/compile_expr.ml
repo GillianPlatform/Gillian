@@ -1763,11 +1763,16 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
         |> Body_item.with_branch_kind (Some Branch_case.If_else_kind)
         |> Body_item.set_end
       in
+      let goto_end =
+        b (Cmd.Goto end_lab) |> Body_item.with_cmd_kind C2_annot.Hidden
+      in
       let end_ =
         b ~label:end_lab Skip |> Body_item.with_cmd_kind C2_annot.Hidden
       in
       let c =
-        cmd_guard @ [ goto_guard ] @ comp_then_ @ comp_else @ [ end_ ] |> void
+        cmd_guard @ [ goto_guard ] @ comp_then_ @ [ goto_end ] @ comp_else
+        @ [ end_ ]
+        |> void
       in
       (c, pvar_map)
   | For { init; guard; update; body } ->
