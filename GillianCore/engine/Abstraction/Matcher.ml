@@ -592,8 +592,7 @@ module Make (State : SState.S) :
             (Some state) les
         in
         match state' with
-        | None ->
-            other_state_err "Produce Simple Assertion: Cannot produce types"
+        | None -> []
         | Some _ -> [ Ok { state; preds; wands; pred_defs } ])
     | Pred (pname, les) ->
         L.verbose (fun fmt -> fmt "Predicate assertion.");
