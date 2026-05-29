@@ -827,7 +827,7 @@ module Make (State : SState.S) :
     in
     L.verbose (fun m ->
         m
-          "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a]. \
+          "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a@]. \
            Args: @[<h>%a@]"
           pname
           Fmt.(list ~sep:comma Expr.pp)
@@ -862,6 +862,8 @@ module Make (State : SState.S) :
               m "Going to produce %d definitions with subst@\n%a"
                 (List.length (first_def :: rest_defs))
                 SVal.SESubst.pp subst_i);
+          L.tmi (fun m ->
+              m "%a" Fmt.(list ~sep:(any "\n;\n") Asrt.pp) definitions);
           let state' = State.add_spec_vars state new_spec_vars in
           let astate = { state = state'; preds; wands; pred_defs } in
           let rest_results =
