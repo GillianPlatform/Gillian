@@ -4,6 +4,10 @@ pred i__is_ptr (e: List):
   (e == {{ #loc, #ofs }}) * (0i i<=# #ofs) *
   types(#loc : Obj, #ofs : Int);
 
+pred i__is_ptr_opt (e):
+  types(e : List) * i__is_ptr(e),
+  types(e : Int) * (e == 0i);
+
 pred i__ptr (+e: List, l: Obj, o: Int):
   (e == {{ l, o }}) * (0i i<=# o);
 

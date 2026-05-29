@@ -133,7 +133,7 @@ let convert_struct_field
         let field_arg_list = pvmember#==(Expr.list field_args) in
         let args = pvloc :: ofs :: field_args in
         let pred_call = Asrt.Pred (pred_name, args) in
-        (GilType.ListType, [ field_arg_list; pred_call ])
+        (Some GilType.ListType, [ field_arg_list; pred_call ])
     | Array (type_', len) ->
         let chunk =
           match Memory.chunk_for_type ~ctx type_' with
@@ -148,7 +148,7 @@ let convert_struct_field
           CoreP.array ~loc:pvloc ~ofs ~chunk ~size:(Expr.int len)
             ~sval_arr:pvmember ~perm:(Some Freeable)
         in
-        (GilType.ListType, [ mem_array ])
+        (Some ListType, [ mem_array ])
     | _ ->
         let chunk, gil_type, extra_asrts =
           match
@@ -158,13 +158,13 @@ let convert_struct_field
               let open GilType in
               match type_ with
               | CInteger _ | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
-                  Some (IntType, [])
-              | Double | Float -> Some (NumberType, [])
+                  Some (Some IntType, [])
+              | Double | Float -> Some (Some NumberType, [])
               | Pointer _ ->
                   let is_ptr_asrt =
-                    Asrt.Pred (Internal_Predicates.is_ptr, [ pvmember ])
+                    Asrt.Pred (Internal_Predicates.is_ptr_opt, [ pvmember ])
                   in
-                  Some (ListType, [ is_ptr_asrt ])
+                  Some (None, [ is_ptr_asrt ])
               | _ -> None
             in
             Some (chunk, gil_type, extra_asrts)
@@ -181,7 +181,7 @@ let convert_struct_field
         in
         (gil_type, extra_asrts @ [ mem ])
   in
-  ([ (name, Some gil_type) ], asrts, Stdlib.(offset + size))
+  ([ (name, gil_type) ], asrts, Stdlib.(offset + size))
 
 let convert_struct_padding ~offset ~struct_name ~bits =
   let open Stdlib in
