@@ -336,10 +336,12 @@ module Make (State : SState.S) :
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
-    let+ final_state = final_states in
-    match SMatcher.unfold_concrete_preds final_state with
-    | Some (_, with_unfolded_concrete) -> Ok (with_unfolded_concrete, fl)
-    | None -> raise (Internal_State_Error ([], final_state))
+    final_states
+    |> List.filter_map @@ fun final_state ->
+       match SMatcher.unfold_concrete_preds final_state with
+       | Some (_, with_unfolded_concrete) ->
+           Some (Ok (with_unfolded_concrete, fl))
+       | None -> None
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
