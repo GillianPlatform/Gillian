@@ -654,13 +654,13 @@ module Make (State : SState.S) :
                     formula")
               opt_res
         | None ->
-            let v = subst_in_expr subst le in
-            L.verbose (fun m ->
-                m
-                  "UNHAPPY. update_store inside produce assertions with prog \
-                   variable: %s!!!\n"
-                  x);
-            Res_list.return (update_store astate x v))
+            if x = Names.return_variable then
+              let v = subst_in_expr subst le in
+              Res_list.return (update_store astate x v)
+            else
+              other_state_err
+                "Produce Simple Assertion: Trying to produce un-substituted \
+                 PVar")
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         let f' = SVal.SESubst.subst_in_expr subst ~partial:false f in
