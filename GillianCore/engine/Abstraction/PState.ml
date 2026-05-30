@@ -1102,10 +1102,11 @@ module Make (State : SState.S) :
       failwith
         "WE CAN'T CHECK IF SOMETHING FULLY MATCHES IN UNDER-APPROXIMATION MODE";
     let matching_results = SMatcher.match_ astate subst mp match_type in
-    let success = List.for_all Result.is_ok matching_results in
+    let success =
+      (not (List.is_empty matching_results))
+      && List.for_all Result.is_ok matching_results
+    in
     L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success);
-    if List.is_empty matching_results then
-      L.verbose (fun fmt -> fmt "PSTATE.matches: vacuously successful");
     success
 
   let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
