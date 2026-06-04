@@ -157,7 +157,19 @@ let convert_struct_field
             let* gil_type, extra_asrts =
               let open GilType in
               match type_ with
-              | CInteger _ | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
+              | CInteger int_type ->
+                  let pred =
+                    let open Internal_Predicates in
+                    match int_type with
+                    | I_int -> is_int
+                    | I_size_t -> is_size_t
+                    | I_char -> is_char
+                    | I_ssize_t -> is_ssize_t
+                    | I_bool -> is_bool
+                  in
+                  let asrt = Asrt.Pred (pred, [ pvmember ]) in
+                  Some (Some IntType, [ asrt ])
+              | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
                   Some (Some IntType, [])
               | Double | Float -> Some (Some NumberType, [])
               | Pointer _ ->

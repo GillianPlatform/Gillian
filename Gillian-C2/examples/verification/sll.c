@@ -33,7 +33,7 @@ lemma lsegToList(p, alpha) {
 }
 
 lemma listSegAppend(p, q, alpha, a, end) {
-    hypothesis: listSeg(#p, #q, #alpha) * (#q -m> struct ln { #a; #end }) * i__is_int((len #alpha) + 1)
+    hypothesis: listSeg(#p, #q, #alpha) * (#q -m> struct ln { #a; #end }) * i__is_int(len (#alpha @ [#a]))
     conclusions: listSeg(#p, #end, #alpha @ [#a])
     proof:
       unfold listSeg(#p, #q, #alpha)[[bind #head: #head,
@@ -47,7 +47,7 @@ lemma listSegAppend(p, q, alpha, a, end) {
 */
 
 /*@ spec listAppend(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * (#v == int(#z)) * i__is_int((len #alpha) + 1)
+  requires: (x == #x) * list(#x, #alpha) * (v == #v) * i__is_int(#v) * i__is_int((len #alpha) + 1)
   ensures:  list(ret, #alpha @ [ #v ])
 } */
 SLL *listAppend(SLL *x, int v) {
@@ -81,7 +81,7 @@ SLL *listPrepend(SLL *x, SLL *z) {
 }
 
 /*@ spec listPrependV(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * (#v == int(#z)) * i__is_int((len #alpha) + 1)
+  requires: (x == #x) * list(#x, #alpha) * (v == #v) * i__is_int(#v) * i__is_int((len #alpha) + 1)
   ensures: list(ret, #v::#alpha)
 }
 */
