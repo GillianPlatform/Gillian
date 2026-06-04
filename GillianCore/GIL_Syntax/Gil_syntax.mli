@@ -1004,7 +1004,7 @@ module Prog : sig
     preds : (string, Pred.t) Hashtbl.t;  (** Predicates *)
     only_specs : (string, Spec.t) Hashtbl.t;
         (** Specs without function definitions *)
-    procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Proceudes *)
+    procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Procedures *)
     macros : (string, Macro.t) Hashtbl.t;  (** Macros *)
     bi_specs : (string, BiSpec.t) Hashtbl.t;  (** Bi-abductive specs *)
     proc_names : string list;  (** Names of the procedures *)

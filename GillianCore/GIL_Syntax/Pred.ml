@@ -7,7 +7,7 @@ type t = TypeDef__.pred = {
   pred_internal : bool;
   pred_num_params : int;  (** Number of parameters *)
   pred_params : (string * Type.t option) list;  (** Actual parameters *)
-  pred_ins : int list;  (** Ins *)
+  pred_ins : int list;  (** List of which parameters are ins, by index *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions *)
   pred_facts : Expr.t list;  (** Facts that hold for every definition *)

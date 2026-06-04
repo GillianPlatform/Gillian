@@ -112,12 +112,13 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
   let open WExpr in
   match get expr with
   | Val v -> ([], Expr.Lit (compile_val v))
-  | Var "ret" ->
+  | Var x when x = Utils.Names.return_variable ->
       failwith
         (Format.asprintf
-           "ret (at location %s) is the special name used for the return\n\
+           "%s (at location %s) is the special name used for the return\n\
            \                            value in the logic. It cannot be used \
             as a variable name"
+           x
            (CodeLoc.str (get_loc expr)))
   | Var x -> ([], Expr.PVar x)
   | BinOp (e1, WBinOp.LSTCONS, e2) ->
@@ -507,7 +508,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
       WLAssert.make
         (LPure
            (WLExpr.make
-              (LBinOp (make_var_lexpr "ret", EQUAL, ret_list))
+              (LBinOp
+                 (make_var_lexpr Utils.Names.return_variable, EQUAL, ret_list))
               while_loc))
         while_loc
     in

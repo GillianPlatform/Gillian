@@ -425,7 +425,7 @@ let bi_post_parse_cmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
         LabCmd.LCall
           ( x_r,
             Lit (String JS2JSIL_Helpers.isNativeErrorName),
-            [ PVar "ret" ],
+            [ PVar Utils.Names.return_variable ],
             None,
             None )
       in
