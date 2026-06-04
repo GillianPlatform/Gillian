@@ -96,47 +96,60 @@ module Prefix = struct
 end
 
 module Internal_Predicates = struct
-  let is_int = Prefix.internal_pred ^ "is_int"
-  let is_ptr_to_0 = Prefix.internal_pred ^ "is_ptr_to_0"
-  let is_ptr = Prefix.internal_pred ^ "is_ptr"
-  let is_ptr_to_0_opt = Prefix.internal_pred ^ "is_ptr_to_0_opt"
-  let is_ptr_opt = Prefix.internal_pred ^ "is_ptr_opt"
-  let is_ptr_to_int_opt = Prefix.internal_pred ^ "is_ptr_to_int_opt"
-  let is_ptr_to_float_opt = Prefix.internal_pred ^ "is_ptr_to_float_opt"
-  let is_ptr_to_long_opt = Prefix.internal_pred ^ "is_ptr_to_long_opt"
-  let is_ptr_to_single_opt = Prefix.internal_pred ^ "is_ptr_to_single_opt"
-  let is_long = Prefix.internal_pred ^ "is_long"
-  let is_single = Prefix.internal_pred ^ "is_single"
-  let is_float = Prefix.internal_pred ^ "is_float"
+  open struct
+    let i = ( ^ ) Prefix.internal_pred
+  end
+
+  (* Int types *)
+  let is_int = i "is_int"
+  let is_size_t = i "is_size_t"
+  let is_char = i "is_char"
+  let is_ssize_t = i "is_ssize_t"
+  let is_bool = i "is_bool"
+
+  (* Pointers *)
+  let is_ptr_to_0 = i "is_ptr_to_0"
+  let is_ptr = i "is_ptr"
+  let is_ptr_to_0_opt = i "is_ptr_to_0_opt"
+  let is_ptr_opt = i "is_ptr_opt"
+  let is_ptr_to_int_opt = i "is_ptr_to_int_opt"
+  let is_ptr_to_float_opt = i "is_ptr_to_float_opt"
+  let is_ptr_to_long_opt = i "is_ptr_to_long_opt"
+  let is_ptr_to_single_opt = i "is_ptr_to_single_opt"
+  let is_long = i "is_long"
+  let is_single = i "is_single"
+  let is_float = i "is_float"
 
   (** Internal value getters *)
-  let ptr_to_0_get = Prefix.internal_pred ^ "ptr_to_0"
+  let ptr_to_0_get = i "ptr_to_0"
 
-  let ptr_get = Prefix.internal_pred ^ "ptr"
-  let int_get = Prefix.internal_pred ^ "int"
-  let single_get = Prefix.internal_pred ^ "single"
-  let long_get = Prefix.internal_pred ^ "long"
-  let float_get = Prefix.internal_pred ^ "float"
+  let ptr_get = i "ptr"
+  let int_get = i "int"
+  let single_get = i "single"
+  let long_get = i "long"
+  let float_get = i "float"
 
   (** global_env *)
-  let global_env = Prefix.internal_pred ^ "global_env"
+  let global_env = i "global_env"
 
-  let glob_fun = Prefix.internal_pred ^ "glob_fun"
-  let glob_var_unallocated = Prefix.internal_pred ^ "glob_var_unallocated"
-
-  let glob_var_unallocated_loc =
-    Prefix.internal_pred ^ "glob_var_unallocated_loc"
-
-  let fun_ptr = Prefix.internal_pred ^ "function_ptr"
+  let glob_fun = i "glob_fun"
+  let glob_var_unallocated = i "glob_var_unallocated"
+  let glob_var_unallocated_loc = i "glob_var_unallocated_loc"
+  let fun_ptr = i "function_ptr"
 
   (* Arrays *)
 
-  let malloced = Prefix.internal_pred ^ "malloced"
-  let zeros_ptr_size = Prefix.internal_pred ^ "zeros_ptr_size"
-  let undefs_ptr_size = Prefix.internal_pred ^ "undefs_ptr_size"
-  let array_ptr = Prefix.internal_pred ^ "array_ptr"
+  let malloced = i "malloced"
+  let zeros_ptr_size = i "zeros_ptr_size"
+  let undefs_ptr_size = i "undefs_ptr_size"
+  let array_ptr = i "array_ptr"
 
   (* Pointer arithmetic *)
 
-  let ptr_add = Prefix.internal_pred ^ "ptr_add"
+  let ptr_add = i "ptr_add"
+
+  (* Architecture constants *)
+  let archi_usize_bounds = i "archi_usize_bounds"
+  let ptr_chunk = i "ptr_chunk"
+  let ptr_size = i "ptr_size"
 end

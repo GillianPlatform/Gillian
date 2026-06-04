@@ -115,3 +115,8 @@ let int_chunk_to_signed_and_size chunk =
 let is_int = function
   | U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | I128 -> true
   | F32 | F64 -> false
+
+let int_type_to_string ~signed ~size =
+  match of_int_type ~signed ~size with
+  | None -> failwith "int_type_to_expr: invalid int type"
+  | Some c -> to_string c

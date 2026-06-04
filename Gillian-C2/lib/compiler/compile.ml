@@ -355,6 +355,59 @@ end
 
 let start_for_harness = Start_for_harness.f
 
+module Machine_procs = struct
+  open Constants.Internal_Predicates
+
+  let add_proc = Fun.flip Prog.add_proc
+
+  let mk_expr_proc proc_name expr =
+    let proc_body =
+      let annot = C2_annot.make ~cmd_kind:Internal () in
+      Cmd.
+        [|
+          (annot, None, Assignment (Utils.Names.return_variable, expr));
+          (annot, None, ReturnNormal);
+        |]
+    in
+    Proc.
+      {
+        proc_name;
+        proc_source_path = None;
+        proc_internal = true;
+        proc_body;
+        proc_params = [];
+        proc_spec = None;
+        proc_aliases = [];
+        proc_calls = [];
+        proc_display_name = None;
+        proc_hidden = true;
+      }
+
+  let archi_usize_bounds ptr_width =
+    let expr =
+      let max = Expr.int_z Z.(of_int 2 ** ptr_width) in
+      Expr.(list [ zero_i; max ])
+    in
+    mk_expr_proc archi_usize_bounds expr
+
+  let ptr_chunk ptr_width =
+    let expr =
+      Chunk.int_type_to_string ~signed:false ~size:ptr_width |> Expr.string
+    in
+    mk_expr_proc ptr_chunk expr
+
+  let ptr_size ptr_width =
+    let expr = Expr.int (ptr_width / 8) in
+    mk_expr_proc ptr_size expr
+
+  let add (ctx : Ctx.t) gil_prog =
+    let ptr_width = ctx.machine.pointer_width in
+    gil_prog
+    |> add_proc (archi_usize_bounds ptr_width)
+    |> add_proc (ptr_chunk ptr_width)
+    |> add_proc (ptr_size ptr_width)
+end
+
 let compile (context : Ctx.t) : (C2_annot.t, string) Prog.t =
   let program = context.prog in
   let gil_prog = Prog.create () in
@@ -386,8 +439,6 @@ let compile (context : Ctx.t) : (C2_annot.t, string) Prog.t =
         gil_prog)
       context.harness
   in
-  assert (Machine_model.equal context.machine Machine_model.archi64);
-  let imports =
-    Imports.imports Arch64 !Gillian.Utils.Config.current_exec_mode
-  in
+  let gil_prog = Machine_procs.add context gil_prog in
+  let imports = Imports.imports !Gillian.Utils.Config.current_exec_mode in
   { gil_prog with imports }

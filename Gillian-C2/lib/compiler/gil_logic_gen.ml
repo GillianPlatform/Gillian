@@ -760,15 +760,104 @@ let add_trans_lemma ~ctx ~pvar_map filepath ann cl_lemma =
     lemmas = trans_lemma ~ctx ~pvar_map ~filepath cl_lemma :: ann.lemmas;
   }
 
+module Machine_preds = struct
+  let mk_pred pred_name params def =
+    let ins = ref [] in
+    let pred_params =
+      params
+      |> List.mapi (fun i (p, ty, is_in) ->
+             let () = if is_in then ins := i :: !ins in
+             (p, ty))
+    in
+    Pred.
+      {
+        pred_name;
+        pred_source_path = None;
+        pred_loc = None;
+        pred_internal = true;
+        pred_num_params = List.length params;
+        pred_params;
+        pred_ins = List.rev !ins;
+        pred_definitions = [ (None, def) ];
+        pred_facts = [];
+        pred_guard = None;
+        pred_pure = true;
+        pred_abstract = false;
+        pred_nounfold = false;
+        pred_normalised = false;
+      }
+
+  let int_range_pred pred_name width signed =
+    let min, max =
+      let open Z in
+      let two = of_int 2 in
+      if signed then
+        let x = two ** Stdlib.( - ) width 1 in
+        (neg x, x - one)
+      else (zero, (two ** width) - one)
+    in
+    let params = [ ("n", Some Type.IntType, true) ] in
+    let def =
+      let open Expr in
+      let n = PVar "n" in
+      let e_min = int_z min <= n in
+      let e_max = n <= int_z max in
+      Asrt.[ Pure e_min; Pure e_max ]
+    in
+    mk_pred pred_name params def
+
+  let malloced_pred (ctx : Ctx.t) =
+    let params =
+      Type.[ ("p", Some ListType, true); ("bytes", Some IntType, false) ]
+    in
+    let def =
+      let pw = ctx.machine.pointer_width in
+      let l = Expr.LVar "#l" in
+      let start = Expr.int Stdlib.(-(pw / 8)) in
+      let chunk =
+        Chunk.int_type_to_string ~signed:true ~size:pw |> Expr.string
+      in
+      let perm = Expr.string Perm.(to_string Freeable) in
+      Asrt.
+        [
+          Pred (Internal_Predicates.ptr_get, [ PVar "p"; l; Expr.zero_i ]);
+          CorePred
+            ( LActions.(str_ga Single),
+              [ l; start; chunk ],
+              [ PVar "bytes"; perm ] );
+          CorePred
+            ( LActions.(str_ga Bounds),
+              [ l ],
+              [ Expr.list [ start; PVar "bytes" ] ] );
+        ]
+    in
+    mk_pred Internal_Predicates.malloced params def
+
+  let add (ctx : Ctx.t) annots =
+    let open Internal_Predicates in
+    let m = ctx.machine in
+    let preds =
+      malloced_pred ctx
+      :: int_range_pred is_int m.int_width true
+      :: int_range_pred is_size_t m.pointer_width false
+      :: int_range_pred is_char m.char_width (Stdlib.not m.char_is_unsigned)
+      :: int_range_pred is_ssize_t m.pointer_width true
+      :: int_range_pred is_bool 1 false
+      :: annots.preds
+    in
+    { annots with preds }
+end
+
 let trans_annots ~(ctx : Ctx.t) ?(pvar_map = []) (lprog : C2_lprog.t) filepath =
   let structs_not_annot = get_structs_not_annot ctx in
-  let struct_annots =
-    List.fold_left (gen_pred_of_struct ctx) empty structs_not_annot
+  let with_machine_preds = Machine_preds.add ctx empty in
+  let with_struct_annots =
+    List.fold_left (gen_pred_of_struct ctx) with_machine_preds structs_not_annot
   in
   let with_preds =
     List.fold_left
       (add_trans_pred ~ctx ~pvar_map filepath)
-      struct_annots lprog.CProg.preds
+      with_struct_annots lprog.CProg.preds
   in
   let with_abs_preds =
     List.fold_left
