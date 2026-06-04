@@ -431,15 +431,16 @@ struct
     in
     (tests, { lemma with lemma_specs = specs })
 
-  let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
+  let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) :
+      bool option =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
     let _, states = SPState.simplify state in
     match states with
     | [] ->
         L.normal (fun m -> m "Analysis result: vanished during simplification");
-        true
+        None
     | _ :: _ :: _ -> failwith "Simplification branched???"
-    | [ state ] ->
+    | [ state ] -> (
         let subst = SSubst.copy subst in
 
         (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
@@ -452,18 +453,26 @@ struct
         L.verbose (fun m ->
             m "Analyse result: About to match one postcondition of %s. post: %a"
               test.name MP.pp test.post_mp);
-        let matching_result =
+
+        match
           SPState.matches state subst test.post_mp (Postcondition test.name)
-        in
-        L.normal (fun m ->
-            m "Analysis result: Postcondition %a"
-              (fun ft b ->
-                Fmt.string ft
-                @@ if b then "matched successfully" else "not matchable")
-              matching_result);
-        VerificationResults.set_result global_results test.name test.id
-          matching_result;
-        matching_result
+        with
+        | None ->
+            let () =
+              L.normal (fun m ->
+                  m "Analysis result: vanished during post match")
+            in
+            None
+        | Some matching_result ->
+            L.normal (fun m ->
+                m "Analysis result: Postcondition %a"
+                  (fun ft b ->
+                    Fmt.string ft
+                    @@ if b then "matched successfully" else "not matchable")
+                  matching_result);
+            VerificationResults.set_result global_results test.name test.id
+              matching_result;
+            Some matching_result)
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
@@ -475,6 +484,44 @@ struct
     in
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
+
+  let analyse_final_state test final_state :
+      (unit, Gillian_result.Error.analysis_failure) result =
+    let subst = make_post_subst test final_state in
+    match analyse_result subst test final_state with
+    | None ->
+        let () =
+          L.normal (fun m ->
+              m "(VACUOUS) VERIFICATION SUCCESS: Spec %s %a vanished\n"
+                test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id)
+        in
+        let () = Fmt.pr "v @?" in
+        Ok ()
+    | Some true ->
+        let () =
+          L.normal (fun m ->
+              m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id)
+        in
+        let () = Fmt.pr "s @?" in
+        Ok ()
+    | Some false ->
+        let msg = "Couldn't satisfy postcondition" in
+        let () =
+          L.normal (fun m ->
+              m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id msg)
+        in
+        let () = Fmt.pr "f @?" in
+        let e =
+          Gillian_result.Error.make_analysis_failure ?loc:test.post_loc msg
+        in
+        Error e
 
   let analyse_proc_result test flag ?parent_id result : unit Gillian_result.t =
     match (result : SAInterpreter.result_t) with
@@ -500,7 +547,7 @@ struct
              Gillian_result.Error.make_analysis_failure ?loc msg
         in
         Error (Gillian_result.Error.AnalysisFailures errors)
-    | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } ->
+    | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } -> (
         if Some fl <> test.flag then (
           let msg =
             Fmt.str "Terminated with flag %s instead of %s" (Flag.str fl)
@@ -529,30 +576,9 @@ struct
             SStore.filter_map_inplace store (fun x v ->
                 if x = Names.return_variable then Some v else None)
           in
-          let subst = make_post_subst test final_state in
-          if analyse_result subst test final_state then
-            let () =
-              L.normal (fun m ->
-                  m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                    test.name
-                    (Fmt.Dump.pair Fmt.int Fmt.int)
-                    test.id)
-            in
-            let () = Fmt.pr "s @?" in
-            Ok ()
-          else
-            let msg = "Couldn't satisfy postcondition" in
-            let () =
-              L.normal (fun m ->
-                  m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
-                    (Fmt.Dump.pair Fmt.int Fmt.int)
-                    test.id msg)
-            in
-            let () = Fmt.pr "f @?" in
-            let e =
-              Gillian_result.Error.make_analysis_failures ?loc:test.post_loc msg
-            in
-            Error e
+          match analyse_final_state test final_state with
+          | Ok () -> Ok ()
+          | Error e -> Error (Gillian_result.Error.AnalysisFailures [ e ]))
 
   let analyse_proc_results
       (test : t)
@@ -586,28 +612,9 @@ struct
       |> List.filter_map @@ fun final_state ->
          let empty_store = SStore.init [] in
          let final_state = SPState.set_store final_state empty_store in
-         let subst = make_post_subst test final_state in
-         if analyse_result subst test final_state then
-           let () =
-             L.normal (fun m ->
-                 m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                   test.name
-                   (Fmt.Dump.pair Fmt.int Fmt.int)
-                   test.id)
-           in
-           let () = Fmt.pr "s @?" in
-           None
-         else
-           let msg = "Couldn't satisfy postcondition" in
-           let () =
-             L.normal (fun m ->
-                 m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
-                   (Fmt.Dump.pair Fmt.int Fmt.int)
-                   test.id msg)
-           in
-           let () = Fmt.pr "f @?" in
-           Some
-             (Gillian_result.Error.make_analysis_failure ?loc:test.post_loc msg)
+         match analyse_final_state test final_state with
+         | Ok () -> None
+         | Error e -> Some e
     in
     let result =
       match errors with

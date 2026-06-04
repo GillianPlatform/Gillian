@@ -28,7 +28,7 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
-  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
@@ -341,7 +341,9 @@ module Make (State : SState.S) :
        match SMatcher.unfold_concrete_preds final_state with
        | Some (_, with_unfolded_concrete) ->
            Some (Ok (with_unfolded_concrete, fl))
-       | None -> None
+       | None ->
+           L.verbose (fun m -> m "WARNING: late unsat");
+           None
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
@@ -1097,17 +1099,23 @@ module Make (State : SState.S) :
       (astate : t)
       (subst : st)
       (mp : MP.t)
-      (match_type : Matcher.match_kind) : bool =
+      (match_type : Matcher.match_kind) : bool option =
     if !Config.under_approximation then
       failwith
         "WE CAN'T CHECK IF SOMETHING FULLY MATCHES IN UNDER-APPROXIMATION MODE";
     let matching_results = SMatcher.match_ astate subst mp match_type in
-    let success =
-      (not (List.is_empty matching_results))
-      && List.for_all Result.is_ok matching_results
-    in
-    L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success);
-    success
+    match matching_results with
+    | [] ->
+        let () =
+          L.verbose (fun fmt -> fmt "PSTATE.matches: vacuously successful")
+        in
+        None
+    | _ ->
+        let success = List.for_all Result.is_ok matching_results in
+        let () =
+          L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success)
+        in
+        Some success
 
   let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
     State.unfolding_vals astate.state fs

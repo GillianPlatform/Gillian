@@ -28,7 +28,7 @@ module type S = sig
   (** Set wands of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
-  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
