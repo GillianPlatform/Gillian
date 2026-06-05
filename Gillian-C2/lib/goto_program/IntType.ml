@@ -1,5 +1,5 @@
 type t = I_bool | I_char | I_int | I_size_t | I_ssize_t
-[@@deriving show { with_path = false }, eq]
+[@@deriving to_yojson, show { with_path = false }, eq]
 
 module Bv_encoding = struct
   type int_type = t

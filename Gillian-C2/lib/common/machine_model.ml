@@ -20,7 +20,7 @@ type t = {
   wchar_t_width : int;
   word_size : int;
 }
-[@@deriving eq, show { with_path = false }]
+[@@deriving to_yojson, eq, show { with_path = false }]
 
 let archi64 =
   {

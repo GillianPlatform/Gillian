@@ -1,4 +1,4 @@
-module Hashset = Utils.Prelude.Hashset
+open Utils.Prelude
 
 let should_be_filtered = function
   (* The next 4 names contain arrays of size infinity.
@@ -20,6 +20,7 @@ module Global_var = struct
     value : Expr.t option;
     location : Location.t;
   }
+  [@@deriving to_yojson]
 end
 
 module Func = struct
@@ -34,6 +35,7 @@ module Func = struct
     internal : bool;
     param_map : (string * string) list;
   }
+  [@@deriving to_yojson]
 end
 
 type t = {
@@ -45,6 +47,7 @@ type t = {
   struct_tags : (string, string) Hashtbl.t;
   unevaluated_funcs : string Hashset.t;
 }
+[@@deriving to_yojson]
 
 let add_struct_tag struct_tags (sym : Irep_lib.Symbol.t) =
   let open Irep_lib.Irep.Infix in

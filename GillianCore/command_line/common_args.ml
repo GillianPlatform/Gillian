@@ -17,6 +17,9 @@ module Make (PC : ParserAndCompiler.S) = struct
     | Ok x -> x
     | Error e ->
         let () = Logging.print_to_all (Gillian_result.Error.show e) in
+        Option.iter
+          (fun j -> L.verbose (fun m -> m "%s" (Yojson.Safe.to_string j)))
+          (Gillian_result.Error.additional_data e);
         exit (Gillian_result.Error.to_error_code e)
 
   let entry_point =

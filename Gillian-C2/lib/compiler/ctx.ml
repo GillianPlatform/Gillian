@@ -68,6 +68,7 @@ module Local = struct
   open Goto_lib
 
   type t = { symbol : string; type_ : Type.t; location : Location.t }
+  [@@deriving to_yojson]
 
   (** Returns the locals Hashtbl and the in_memory hashset *)
   let gather ~prog ~machine stmt =
@@ -110,15 +111,16 @@ type t = {
   exec_mode : Kutils.Exec_mode.t;
   machine : Machine_model.t;
   prog : Program.t;
-  fresh_v : unit -> string;
+  fresh_v : unit -> string; [@to_yojson fun _ -> `Null]
   in_memory : string Hashset.t;
   locals : (string, Local.t) Hashtbl.t;
   allocated_temps : Local.t Hashset.t;
-  fresh_lab : unit -> string;
+  fresh_lab : unit -> string; [@to_yojson fun _ -> `Null]
   harness : string option;
   break_lab : string option;
   continue_lab : string option;
 }
+[@@deriving to_yojson]
 
 let make ~exec_mode ~machine ~prog ~harness () =
   {
@@ -142,7 +144,16 @@ let fresh_v t = t.fresh_v ()
 let fresh_lab t = t.fresh_lab ()
 let in_memory t x = Hashset.mem t.in_memory x
 let is_local t x = Hashtbl.mem t.locals x
-let tag_lookup ctx x = Hashtbl.find ctx.prog.types x
+
+let tag_lookup ctx x =
+  match Hashtbl.find_opt ctx.prog.types x with
+  | Some t -> t
+  | None ->
+      let open Utils.Gillian_result in
+      let msg = "Couldn't find tag " ^ x in
+      let additional_data = Some (`Assoc [ ("ctx", to_yojson ctx) ]) in
+      let e = Error.CompilationError { msg; loc = None; additional_data } in
+      raise (Exc.Gillian_error e)
 
 let resolve_type ctx t =
   match t with

@@ -8,7 +8,7 @@ type t = {
   col : int option;
   comment : string option;
 }
-[@@deriving show { with_path = false }]
+[@@deriving to_yojson, show { with_path = false }]
 
 let pp_short fmt { source; line; col; _ } =
   match (source, line) with

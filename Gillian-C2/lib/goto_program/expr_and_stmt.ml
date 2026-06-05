@@ -1,5 +1,13 @@
 open Gillian.Utils.Syntaxes.Option
 
+open struct
+  module Z = struct
+    include Z
+
+    let to_yojson x = `Intlit (to_string x)
+  end
+end
+
 module rec Expr : sig
   type value =
     | Array of t list
@@ -31,7 +39,7 @@ module rec Expr : sig
     | EUnhandled of Id.t * string
 
   and t = { value : value; type_ : Type.t; location : Location.t }
-  [@@deriving show]
+  [@@deriving to_yojson, show]
 
   val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
   val pp_full : Format.formatter -> t -> unit
@@ -70,7 +78,7 @@ end = struct
     | EUnhandled of Id.t * string
 
   and t = { value : value; type_ : Type.t; location : Location.t }
-  [@@deriving show { with_path = false }]
+  [@@deriving to_yojson, show { with_path = false }]
 
   let pp_custom ~pp ?(pp_type = Type.pp) ft t =
     let open Fmt in
@@ -416,7 +424,9 @@ and Stmt : sig
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
+
   and t = { stmt_location : Location.t; body : body; comment : string option }
+  [@@deriving to_yojson]
 
   val pp : Format.formatter -> t -> unit
 
@@ -460,7 +470,9 @@ end = struct
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
+
   and t = { stmt_location : Location.t; body : body; comment : string option }
+  [@@deriving to_yojson]
 
   let unhandled ~irep id =
     let () =

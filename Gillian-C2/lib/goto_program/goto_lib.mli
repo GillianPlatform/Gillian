@@ -1,3 +1,5 @@
+open Gillian.Utils.Prelude
+
 module Gerror : sig
   exception Unexpected_irep of Irep.t option * string
   exception Code_error of Irep.t option * string
@@ -80,7 +82,7 @@ module Location : sig
     col : int option;
     comment : string option;
   }
-  [@@deriving show]
+  [@@deriving to_yojson, show]
 
   val pp_short : t Fmt.t
   val of_irep : Irep.t -> t
@@ -88,7 +90,7 @@ end
 
 module IntType : sig
   type t = I_bool | I_char | I_int | I_size_t | I_ssize_t
-  [@@deriving show, eq]
+  [@@deriving to_yojson, show, eq]
 
   module Bv_encoding : sig
     type int_type = t
@@ -142,7 +144,7 @@ and Type : sig
     | Constructor
     | Empty
     | Vector of { type_ : t; size : int }
-  [@@deriving show, eq]
+  [@@deriving to_yojson, show, eq]
 
   val show_simple : t -> string
 
@@ -257,6 +259,7 @@ module Program : sig
       value : Expr.t option;
       location : Location.t;
     }
+    [@@deriving to_yojson]
   end
 
   module Func : sig
@@ -269,6 +272,7 @@ module Program : sig
       internal : bool;
       param_map : (string * string) list;
     }
+    [@@deriving to_yojson]
   end
 
   type t = {
@@ -278,8 +282,9 @@ module Program : sig
     constrs : (string, unit) Hashtbl.t;
     base_names : (string, string) Hashtbl.t;
     struct_tags : (string, string) Hashtbl.t;
-    unevaluated_funcs : string Gillian.Utils.Prelude.Hashset.t;
+    unevaluated_funcs : string Hashset.t;
   }
+  [@@deriving to_yojson]
 
   val of_symtab : machine:Machine_model.t -> Symtab.t -> t
   val fold_functions : (string -> Func.t -> 'a -> 'a) -> t -> 'a -> 'a

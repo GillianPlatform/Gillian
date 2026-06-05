@@ -54,11 +54,12 @@ module Error = struct
     | true, AnalysisFailures es ->
         let len = List.length es in
         Fmt.pf fmt "%d analysis failure%s!" len (if len > 1 then "s" else "")
+    | true, CompilationError { msg; _ }
+    | _, CompilationError { msg; loc = None; _ } ->
+        Fmt.pf fmt "Error during compilation.\n%s" msg
     | false, CompilationError { msg; loc; _ } ->
         Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc
           msg
-    | true, CompilationError { msg; _ } ->
-        Fmt.pf fmt "Error during compilation.\n%s" msg
     | _, OperationError o -> Fmt.pf fmt "%s" o
     | _, InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
 
@@ -73,6 +74,11 @@ module Error = struct
     | CompilationError _ -> 2
     | OperationError _ -> 124
     | InternalError _ -> 125
+
+  let additional_data = function
+    | CompilationError { additional_data; _ }
+    | InternalError { additional_data; _ } -> additional_data
+    | AnalysisFailures _ | OperationError _ -> None
 end
 
 open Error
