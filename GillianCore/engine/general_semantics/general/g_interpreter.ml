@@ -638,20 +638,24 @@ struct
       | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
 
     and eval_lcmds
+        ?(top = false)
         (prog : annot MP.prog)
         (lcmds : LCmd.t list)
         ?(annot : annot option = None)
         (state : State.t) : (State.t, state_err_t) Res_list.t =
       let open Res_list.Syntax in
       match lcmds with
-      | [] -> Res_list.return state
+      | [] ->
+          if top then
+            L.verbose (fun m -> m "LCMDs done with state:\n%a" pp_state_t state);
+          Res_list.return state
       | lcmd :: rest_lcmds ->
           let** new_state = eval_lcmd prog lcmd ?annot state in
-          eval_lcmds prog rest_lcmds ~annot new_state
+          eval_lcmds ~top prog rest_lcmds ~annot new_state
   end
 
   let evaluate_lcmd = Evaluate_lcmd.eval_lcmd
-  let evaluate_lcmds = Evaluate_lcmd.eval_lcmds
+  let evaluate_lcmds = Evaluate_lcmd.eval_lcmds ~top:true
 
   (** Evaluation of commands
 

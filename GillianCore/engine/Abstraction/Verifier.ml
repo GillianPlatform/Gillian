@@ -91,8 +91,12 @@ struct
   module SMatcher = SPState.SMatcher
 
   let print_success_or_failure success =
-    if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
-    else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n";
+    (if success then Fmt.(pr "%a" (styled `Green string) "Success\n")
+     else Fmt.(pr "%a" (styled `Red string) "Failure\n"));
+    Format.print_flush ()
+
+  let print_vanish () =
+    Fmt.(pr "%a" (styled `Yellow string) "Vanished\n");
     Format.print_flush ()
 
   let yojson_of_expr_set set =
@@ -585,44 +589,41 @@ struct
       (flag : Flag.t)
       (rets : SAInterpreter.result_t list) : unit Gillian_result.t =
     if rets = [] then (
-      L.(
-        normal (fun m ->
-            m "ERROR: Function %s evaluates to 0 results." test.name));
-      exit 1);
-    let result =
-      List.fold_left
-        (fun acc ret ->
-          let res = analyse_proc_result test flag ret in
-          Gillian_result.merge acc res)
-        (Ok ()) rets
-    in
-    print_success_or_failure (Result.is_ok result);
-    result
+      print_vanish ();
+      Ok ())
+    else
+      let result =
+        List.fold_left
+          (fun acc ret ->
+            let res = analyse_proc_result test flag ret in
+            Gillian_result.merge acc res)
+          (Ok ()) rets
+      in
+      print_success_or_failure (Result.is_ok result);
+      result
 
   let analyse_lemma_results (test : t) (rets : SPState.t list) :
       unit Gillian_result.t =
-    let open Syntaxes.Result in
-    let* () =
-      if rets = [] then
-        Gillian_result.internal_error "Lemma evaluates to 0 results."
-      else Ok ()
-    in
-    let errors =
-      rets
-      |> List.filter_map @@ fun final_state ->
-         let empty_store = SStore.init [] in
-         let final_state = SPState.set_store final_state empty_store in
-         match analyse_final_state test final_state with
-         | Ok () -> None
-         | Error e -> Some e
-    in
-    let result =
-      match errors with
-      | [] -> Ok ()
-      | _ -> Error (Gillian_result.Error.AnalysisFailures errors)
-    in
-    print_success_or_failure (Result.is_ok result);
-    result
+    if rets = [] then (
+      print_vanish ();
+      Ok ())
+    else
+      let errors =
+        rets
+        |> List.filter_map @@ fun final_state ->
+           let empty_store = SStore.init [] in
+           let final_state = SPState.set_store final_state empty_store in
+           match analyse_final_state test final_state with
+           | Ok () -> None
+           | Error e -> Some e
+      in
+      let result =
+        match errors with
+        | [] -> Ok ()
+        | _ -> Error (Gillian_result.Error.AnalysisFailures errors)
+      in
+      print_success_or_failure (Result.is_ok result);
+      result
 
   (* FIXME: This function name is very bad! *)
   let verify_up_to_procs (prog : annot MP.prog) (test : t) : annot MP.prog =

@@ -659,8 +659,8 @@ module Make (State : SState.S) :
               Res_list.return (update_store astate x v)
             else
               other_state_err
-                "Produce Simple Assertion: Trying to produce un-substituted \
-                 PVar")
+                ("Produce Simple Assertion: Trying to produce un-substituted \
+                  PVar " ^ x))
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         let f' = SVal.SESubst.subst_in_expr subst ~partial:false f in
