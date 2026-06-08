@@ -449,7 +449,7 @@ expression:
 
 sval:
   | NULL
-    { if machine.pointer_width = machine.int_width then CSVal.Sint (Int Z.zero) else CSVal.Slong (Int Z.zero) }
+    { CSVal.Sptr (CSimplExpr.Loc "$l_null", CSimplExpr.Int Z.zero) }
   | CTRUE
     { CSVal.Sint (Int Z.one) }
   | CFALSE

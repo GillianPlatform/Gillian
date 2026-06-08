@@ -176,7 +176,7 @@ let convert_struct_field
                   let is_ptr_asrt =
                     Asrt.Pred (Internal_Predicates.is_ptr_opt, [ pvmember ])
                   in
-                  Some (None, [ is_ptr_asrt ])
+                  Some (Some ListType, [ is_ptr_asrt ])
               | _ -> None
             in
             Some (chunk, gil_type, extra_asrts)

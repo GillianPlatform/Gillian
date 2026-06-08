@@ -602,65 +602,70 @@ type cast_with =
 
 let compile_cast ~(ctx : Ctx.t) ~(from : GType.t) ~(into : GType.t) e :
     Val_repr.t Cs.with_cmds =
-  let from_chunk = Memory.chunk_for_type ~ctx from in
-  let into_chunk = Memory.chunk_for_type ~ctx into in
-  let cast_with =
-    match (from_chunk, into_chunk) with
-    | None, Some _ -> (
-        (* Special case of casting a boolean into an int.
+  match (into, e) with
+  | Pointer _, Val_repr.ByValue (Lit (Int i)) when Z.(equal i zero) ->
+      (* Special case for casting constant 0 to a pointer (NULL) *)
+      Cs.return (Val_repr.ByValue Constants.nullptr)
+  | _ -> (
+      let from_chunk = Memory.chunk_for_type ~ctx from in
+      let into_chunk = Memory.chunk_for_type ~ctx into in
+      let cast_with =
+        match (from_chunk, into_chunk) with
+        | None, Some _ -> (
+            (* Special case of casting a boolean into an int.
            Handled separately because there's no chunk involved there,
            it's not a real C value. *)
-        match (from, into) with
-        | Bool, (CInteger _ | Unsignedbv _ | Signedbv _) ->
-            Proc (Constants.Internal_functions.val_of_bool, [])
-        | _ -> Unhandled)
-    | _, None -> Unhandled
-    | Some from_chunk, Some into_chunk -> (
-        match (from_chunk, into_chunk) with
-        | x, y when Chunk.equal x y -> Nop
-        (* Casting a value into a bigger chunk doesn't affect the mathematical
+            match (from, into) with
+            | Bool, (CInteger _ | Unsignedbv _ | Signedbv _) ->
+                Proc (Constants.Internal_functions.val_of_bool, [])
+            | _ -> Unhandled)
+        | _, None -> Unhandled
+        | Some from_chunk, Some into_chunk -> (
+            match (from_chunk, into_chunk) with
+            | x, y when Chunk.equal x y -> Nop
+            (* Casting a value into a bigger chunk doesn't affect the mathematical
            value, and can always be done *)
-        | (U8 | I8), (U16 | U32 | U64 | U128 | I16 | I32 | I64 | I128)
-        | (U16 | I16), (U32 | U64 | U128 | I32 | I64 | I128)
-        | (U32 | I32), (U64 | U128 | I64 | I128)
-        | (U64 | I64), (U128 | I128) -> Nop
-        | U128, (U64 | U32 | U16 | U8)
-        | U64, (U32 | U16 | U8)
-        | U32, (U16 | U8)
-        | U16, U8 ->
-            let chunk_size_bits = Chunk.size into_chunk * 8 in
-            let to_mod_z = Expr.int_z Z.(one lsl chunk_size_bits) in
-            App (fun e -> Expr.BinOp (e, IMod, to_mod_z))
-        | I128, U128 | I64, U64 | I32, U32 | I16, U16 | I8, U8 ->
-            let chunk_size_bits = Chunk.size into_chunk * 8 in
-            let two_power_size = Z.(one lsl chunk_size_bits) in
-            let imax = Expr.int_z Z.((two_power_size asr 1) - one) in
-            let two_power_size = Expr.int_z two_power_size in
-            Proc
-              ( Constants.Cast_functions.unsign_int_same_size,
-                [ imax; two_power_size ] )
-        | U8, I8 | U16, I16 | U32, I32 | U64, I64 | U128, I128 -> Nop
-        | ( (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128),
-            (F32 | F64) ) -> App (fun e -> Expr.UnOp (IntToNum, e))
-        | ( (F32 | F64),
-            (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) ) ->
-            App (fun e -> Expr.UnOp (NumToInt, e))
-        | _ -> Unhandled)
-  in
-  match cast_with with
-  | Proc (function_name, additional_params) ->
-      let function_name = Expr.Lit (String function_name) in
-      let e = Val_repr.as_value ~msg:"TypeCast operand" e in
-      let temp = Ctx.fresh_v ctx in
-      let call = Cmd.call temp function_name (e :: additional_params) in
-      Cs.return ~app:[ call ] (Val_repr.ByValue (PVar temp))
-  | App f ->
-      let e = Val_repr.as_value ~msg:"TypeCast operand" e in
-      Cs.return (Val_repr.ByValue (f e))
-  | Nop -> Cs.return e
-  | Unhandled ->
-      let cmd = Helpers.assert_unhandled ~feature:(Cast (from, into)) [] in
-      Cs.return ~app:[ cmd ] (Val_repr.dummy ~ctx into)
+            | (U8 | I8), (U16 | U32 | U64 | U128 | I16 | I32 | I64 | I128)
+            | (U16 | I16), (U32 | U64 | U128 | I32 | I64 | I128)
+            | (U32 | I32), (U64 | U128 | I64 | I128)
+            | (U64 | I64), (U128 | I128) -> Nop
+            | U128, (U64 | U32 | U16 | U8)
+            | U64, (U32 | U16 | U8)
+            | U32, (U16 | U8)
+            | U16, U8 ->
+                let chunk_size_bits = Chunk.size into_chunk * 8 in
+                let to_mod_z = Expr.int_z Z.(one lsl chunk_size_bits) in
+                App (fun e -> Expr.BinOp (e, IMod, to_mod_z))
+            | I128, U128 | I64, U64 | I32, U32 | I16, U16 | I8, U8 ->
+                let chunk_size_bits = Chunk.size into_chunk * 8 in
+                let two_power_size = Z.(one lsl chunk_size_bits) in
+                let imax = Expr.int_z Z.((two_power_size asr 1) - one) in
+                let two_power_size = Expr.int_z two_power_size in
+                Proc
+                  ( Constants.Cast_functions.unsign_int_same_size,
+                    [ imax; two_power_size ] )
+            | U8, I8 | U16, I16 | U32, I32 | U64, I64 | U128, I128 -> Nop
+            | ( (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128),
+                (F32 | F64) ) -> App (fun e -> Expr.UnOp (IntToNum, e))
+            | ( (F32 | F64),
+                (U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) ) ->
+                App (fun e -> Expr.UnOp (NumToInt, e))
+            | _ -> Unhandled)
+      in
+      match cast_with with
+      | Proc (function_name, additional_params) ->
+          let function_name = Expr.Lit (String function_name) in
+          let e = Val_repr.as_value ~msg:"TypeCast operand" e in
+          let temp = Ctx.fresh_v ctx in
+          let call = Cmd.call temp function_name (e :: additional_params) in
+          Cs.return ~app:[ call ] (Val_repr.ByValue (PVar temp))
+      | App f ->
+          let e = Val_repr.as_value ~msg:"TypeCast operand" e in
+          Cs.return (Val_repr.ByValue (f e))
+      | Nop -> Cs.return e
+      | Unhandled ->
+          let cmd = Helpers.assert_unhandled ~feature:(Cast (from, into)) [] in
+          Cs.return ~app:[ cmd ] (Val_repr.dummy ~ctx into))
 
 let by_value ?app t = Cs.return ?app (Val_repr.ByValue t)
 let by_copy ?app ptr type_ = Cs.return ?app (Val_repr.ByCopy { ptr; type_ })
@@ -1228,8 +1233,10 @@ and compile_expr
       by_value (Lit (Int z))
   | PointerConstant b ->
       let () = log_type "PointerConstant" in
-      let z = Z.of_int b in
-      by_value (Lit (Int z))
+      if b = 0 then by_value Constants.nullptr
+      else
+        let z = Z.of_int b in
+        by_value (Lit (Int z))
   | IntConstant z ->
       let () = log_type "IntConstant" in
       by_value (Lit (Int z))

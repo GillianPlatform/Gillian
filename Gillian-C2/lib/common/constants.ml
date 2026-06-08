@@ -1,3 +1,8 @@
+let nullptr =
+  let open Gil_syntax.Expr in
+  let open Gil_syntax.Literal in
+  Lit (LList [ Loc "$l_null"; Int Z.zero ])
+
 module Internal_functions = struct
   let malloc = "i__malloc"
   let calloc = "i__calloc"
