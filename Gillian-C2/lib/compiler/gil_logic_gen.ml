@@ -174,7 +174,7 @@ let convert_struct_field
               | Double | Float -> Some (Some NumberType, [])
               | Pointer _ ->
                   let is_ptr_asrt =
-                    Asrt.Pred (Internal_Predicates.is_ptr_opt, [ pvmember ])
+                    Asrt.Pred (Internal_Predicates.is_ptr, [ pvmember ])
                   in
                   Some (Some ListType, [ is_ptr_asrt ])
               | _ -> None

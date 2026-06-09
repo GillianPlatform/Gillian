@@ -116,7 +116,6 @@ module Internal_Predicates = struct
   let is_ptr_to_0 = i "is_ptr_to_0"
   let is_ptr = i "is_ptr"
   let is_ptr_to_0_opt = i "is_ptr_to_0_opt"
-  let is_ptr_opt = i "is_ptr_opt"
   let is_ptr_to_int_opt = i "is_ptr_to_int_opt"
   let is_ptr_to_float_opt = i "is_ptr_to_float_opt"
   let is_ptr_to_long_opt = i "is_ptr_to_long_opt"

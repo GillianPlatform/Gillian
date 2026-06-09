@@ -4,15 +4,6 @@ pred i__is_ptr (e: List):
   (e == {{ #loc, #ofs }}) * (0i i<=# #ofs) *
   types(#loc : Obj, #ofs : Int);
 
-pred i__maybe_nullptr (loc: Obj, ofs: Int):
-  (loc == $l_null) * (ofs == 0i),
-
-  (not (loc == $l_null));
-
-pred i__is_ptr_opt (e: List):
-  i__is_ptr(e) *
-  i__maybe_nullptr (l-nth(e, 0i), l-nth(e, 1i));
-
 pred i__ptr (+e: List, l: Obj, o: Int):
   (e == {{ l, o }}) * (0i i<=# o);
 
