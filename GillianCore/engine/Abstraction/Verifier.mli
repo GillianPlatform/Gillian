@@ -39,11 +39,11 @@ module type S = sig
     SourceFiles.t option ->
     unit Gillian_result.t
 
-  val verify_up_to_procs :
-    ?proc_name:string ->
+  val init_proc :
     init_data:SPState.init_data ->
     prog_t ->
-    SAInterpreter.result_t SAInterpreter.cont_func
+    string ->
+    SAInterpreter.result_t SAInterpreter.cont_func list
 
   val postprocess_files : SourceFiles.t option -> unit
 

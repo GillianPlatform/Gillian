@@ -43,11 +43,11 @@ module type S = sig
     SourceFiles.t option ->
     unit Gillian_result.t
 
-  val verify_up_to_procs :
-    ?proc_name:string ->
+  val init_proc :
     init_data:SPState.init_data ->
     prog_t ->
-    SAInterpreter.result_t SAInterpreter.cont_func
+    string ->
+    SAInterpreter.result_t SAInterpreter.cont_func list
 
   val postprocess_files : SourceFiles.t option -> unit
 
@@ -910,44 +910,29 @@ struct
     let ls = SS.diff ls !C.things_to_exclude in
     (ps, ls)
 
-  let verify_up_to_procs
-      ?(proc_name : string option)
-      ~(init_data : SPState.init_data)
-      (prog : prog_t) : SAInterpreter.result_t SAInterpreter.cont_func =
-    L.Phase.with_normal ~title:"Program verification" (fun () ->
-        (* Analyse all procedures and lemmas *)
-        let procs_to_verify =
-          SS.of_list (Prog.get_noninternal_proc_names prog)
-        in
-        let lemmas_to_verify =
-          SS.of_list (Prog.get_noninternal_lemma_names prog)
-        in
-        let procs_to_verify, lemmas_to_verify =
-          select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
-        in
-        let prog, _, proc_tests =
-          get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
-        in
-        (* TODO: Verify All procedures. Currently we only verify the first
+  let init_proc ~(init_data : SPState.init_data) (prog : prog_t) proc_name :
+      SAInterpreter.result_t SAInterpreter.cont_func list =
+    L.Phase.with_normal ~title:"Program verification" @@ fun () ->
+    (* Analyse all procedures and lemmas *)
+    let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+    let lemmas_to_verify = SS.of_list (Prog.get_noninternal_lemma_names prog) in
+    let procs_to_verify, lemmas_to_verify =
+      select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
+    in
+    let prog, _, proc_tests =
+      get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
+    in
+    (* TODO: Verify All procedures. Currently we only verify the first
                procedure (unless specified).
                Assume there is at least one procedure*)
-        let test =
-          match proc_name with
-          | Some proc_name -> (
-              match
-                proc_tests |> List.find_opt (fun test -> test.name = proc_name)
-              with
-              | Some test -> test
-              | None ->
-                  Fmt.failwith "Couldn't find test for proc '%s'!" proc_name)
-          | None -> (
-              match proc_tests with
-              | test :: _ -> test
-              | _ -> failwith "No tests found!")
-        in
-        SAInterpreter.init_evaluate_proc
-          (fun x -> x)
-          prog test.name test.params test.pre_state)
+    let tests = proc_tests |> List.filter (fun test -> test.name = proc_name) in
+    if List.is_empty tests then
+      Fmt.failwith "Couldn't find test for proc '%s'!" proc_name;
+    tests
+    |> List.map @@ fun test ->
+       SAInterpreter.init_evaluate_proc
+         (fun x -> x)
+         prog test.name test.params test.pre_state
 
   let postprocess_files source_files =
     let cur_source_files =

@@ -44,8 +44,8 @@ struct
         let procs_to_verify = !procs_to_verify in
         if not (procs_to_verify |> List.mem proc_name) then
           set_procs_to_verify (procs_to_verify @ [ proc_name ]));
-      Verification.verify_up_to_procs ~init_data:debug_state.init_data
-        ~proc_name debug_state.prog
+      Verification.init_proc ~init_data:debug_state.init_data debug_state.prog
+        proc_name
 
     module Match = struct
       open Verification.SMatcher.Logging
