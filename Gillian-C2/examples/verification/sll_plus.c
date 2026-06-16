@@ -173,7 +173,9 @@ SLL *listCopy(SLL *x) {
 }
 
 /*@ spec listConcat(x, y) {
-  requires: list(#x, #alpha) * (x == #x) * list(#y, #beta) * (y == #y) * i__is_int((len #alpha) + (len #beta))
+  requires: list(#x, #alpha) * (x == #x)
+          * list(#y, #beta) * (y == #y)
+          * i__is_int((len #alpha) + (len #beta))
   ensures:  list(ret, #alpha @ #beta)
 } */
 List *listConcat(List *x, List *y) {
@@ -185,10 +187,20 @@ List *listConcat(List *x, List *y) {
             free(y);
             return x;
         } else {
+            __GILLIAN(
+              "assert [[bind #ah, #at, #bh, #xh, #xt, #yh, #yt]]"
+                "(#alpha == #ah @ [ #at ])"
+                "* (#beta == #bh @ [ #bt ])"
+                "* (#x -m> struct list { #xsz; #xh; #xt })"
+                "* (#y -m> struct list { #ysz; #yh; #yt })"
+            );
+            __GILLIAN("unfold sll(#xt, [ #at ])");
             x->tail->next = y->head;
             x->tail = y->tail;
             free(y);
-            // __GILLIAN("apply lseg_concat(#h1, #h2, #t2, ");
+            __GILLIAN("apply sllSegAppend(#xh, #xt, #ah, #at, #yh)");
+            __GILLIAN("apply sllSegConcat(#xh, #yh, #yt, #alpha, #bh)");
+            __GILLIAN("fold list(#x, #alpha @ #beta)");
             return x;
         }
     }
