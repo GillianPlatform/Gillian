@@ -336,8 +336,13 @@ struct
             let depth_change =
               assert ((List.hd cs).pid = exec_data.cmd_report.proc_name);
               let prev_depth = List.length prev_callers in
-              let new_depth = List.length cs - 2 in
-              (* FIXME: Minus 2 to account for harness *)
+              let ofs =
+                if !Config.current_exec_mode = Exec_mode.Verification then 1
+                else
+                  (* FIXME: Minus 2 to account for harness *)
+                  2
+              in
+              let new_depth = List.length cs - ofs in
               new_depth - prev_depth
             in
             match depth_change with
