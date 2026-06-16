@@ -820,7 +820,11 @@ let rec lvalue_as_access ~ctx ~pvar_map ~read (lvalue : GExpr.t) :
 
 and compile_call
     ~ctx
-    ~(b : ?nest_kind:C2_annot.nest_kind -> string Cmd.t -> Body_item.t)
+    ~(b :
+       ?display:string ->
+       ?nest_kind:C2_annot.nest_kind ->
+       string Cmd.t ->
+       Body_item.t)
     ~(pvar_map : (string * string) list)
     (func : GExpr.t)
     (args : GExpr.t list) =
@@ -946,7 +950,9 @@ and compile_call
         match Gil_logic_gen.trans_lcmd ~ctx ~pvar_map lcmd with
         | `Normal gil_lcmds ->
             if Kutils.Exec_mode.is_concrete_exec ctx.exec_mode then []
-            else gil_lcmds |> List.map @@ fun lcmd -> b (Cmd.Logic lcmd)
+            else
+              gil_lcmds
+              |> List.map @@ fun lcmd -> b ~display:string_lcmd (Cmd.Logic lcmd)
         | `Invariant _ -> Error.user_error "Invariants not supported yet"
       in
       by_value ~app:cmds (Expr.Lit Null)
@@ -1296,7 +1302,7 @@ and compile_expr
       compile_op_assign ~ctx ~pvar_map ~annot:b ~lhs ~rhs ~op |> Cs.set_end
   | EFunctionCall { func; args } ->
       let () = log_type "EFunctionCall" in
-      let b ?nest_kind cmd = b_pre ?nest_kind cmd in
+      let b ?display ?nest_kind cmd = b_pre ?display ?nest_kind cmd in
       compile_call ~ctx ~pvar_map ~b func args |> Cs.set_end
   | If { cond; then_; else_ } ->
       let () = log_type "If" in
@@ -1674,7 +1680,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
   | SFunctionCall { lhs; func; args } ->
       let () = log_kind "SFunctionCall" in
       let v, pre1 =
-        let b ?nest_kind cmd = b_pre ?nest_kind cmd in
+        let b ?display ?nest_kind cmd = b_pre ?display ?nest_kind cmd in
         compile_call ~ctx ~pvar_map ~b func args
       in
       let c =
