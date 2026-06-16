@@ -364,8 +364,20 @@ struct
                   (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
                   callers)
 
+      (** Returns whether this function would be called compositionally *)
+      let is_fcall_using_spec fn (prog : (annot, int) Prog.t) =
+        let open Gillian.Utils in
+        (match !Config.current_exec_mode with
+        | Exec_mode.Verification | Exec_mode.BiAbduction -> true
+        | Exec_mode.Concrete | Exec_mode.Symbolic -> false)
+        &&
+        match Hashtbl.find_opt prog.procs fn with
+        | Some proc -> Option.is_some proc.proc_spec
+        | None -> false
+
       let update_funcall_kind
-          ~(prog : Program.t)
+          ~(tl_ast : Program.t)
+          ~(prog : (annot, int) Prog.t)
           ~(exec_data : exec_data)
           ~annot
           (partial : partial_data) =
@@ -382,9 +394,10 @@ struct
           | ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
           | _ -> None
         in
+        let> () = if is_fcall_using_spec pid prog then None else Some () in
         let kind =
           if
-            Hashset.mem Program.(prog.unevaluated_funcs) pid
+            Hashset.mem Program.(tl_ast.unevaluated_funcs) pid
             || List.mem pid Constants.Internal_functions.names
           then Unevaluated_funcall
           else Evaluated_funcall
@@ -472,7 +485,7 @@ struct
         Ext_list.add (id, (kind, case)) all_ids;
         (kind, case)
 
-      let f ~prog ~prev_id exec_data partial =
+      let f ~tl_ast ~prog ~prev_id exec_data partial =
         let { id; cmd_report; matches; errors; _ } = exec_data in
         let annot = CmdReport.(cmd_report.annot) in
         let** is_end = get_is_end annot in
@@ -486,7 +499,7 @@ struct
             partial
         in
         let** () = update_canonical_data ~id ~annot ~exec_data partial in
-        let () = update_funcall_kind ~prog ~exec_data ~annot partial in
+        let () = update_funcall_kind ~tl_ast ~prog ~exec_data ~annot partial in
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
@@ -507,7 +520,7 @@ struct
           let++ prev = get_prev () in
           init_partial ~prev
 
-    let handle ~prog ~(partials : t) ~get_prev ~prev_id exec_data =
+    let handle ~tl_ast ~prog ~(partials : t) ~get_prev ~prev_id exec_data =
       DL.log (fun m ->
           let report = exec_data.cmd_report in
           let cmd = CmdReport.(report.cmd) in
@@ -518,7 +531,7 @@ struct
             "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
       let** partial = find_or_init ~partials ~get_prev prev_id in
       Hashtbl.replace partials exec_data.id partial;
-      let** result = update ~prog ~prev_id exec_data partial in
+      let** result = update ~tl_ast ~prog ~prev_id exec_data partial in
       let () =
         match result with
         | Finished f ->
@@ -834,7 +847,7 @@ struct
 
     let f ~state ?prev_id ?gil_case (exec_data : exec_data) =
       let annot = CmdReport.(exec_data.cmd_report.annot) in
-      let { partial_cmds = partials; tl_ast = prog; _ } = state in
+      let { partial_cmds = partials; tl_ast; prog; _ } = state in
       match annot.cmd_kind with
       | Unknown ->
           let json () =
@@ -849,7 +862,8 @@ struct
       | Normal _ | Internal | Return | Hidden -> (
           let get_prev = get_prev ~state ~gil_case ~prev_id in
           let partial_result =
-            Partial_cmds.handle ~prog ~get_prev ~partials ~prev_id exec_data
+            Partial_cmds.handle ~tl_ast ~prog ~get_prev ~partials ~prev_id
+              exec_data
           in
           match partial_result with
           | Ok (Finished finished) ->
