@@ -1158,8 +1158,13 @@ struct
 
   let parse_and_compile_files ~entrypoint files =
     let () = Kconfig.harness := Some entrypoint in
+    let proc_name =
+      match !Config.current_exec_mode with
+      | Exec_mode.Verification -> entrypoint
+      | _ -> Constants.CBMC_names.start
+    in
     C2ParserAndCompiler.parse_and_compile_files files
-    |> Result.map (fun r -> (r, Constants.CBMC_names.start))
+    |> Result.map (fun r -> (r, proc_name))
 
   let pp_expr _ = Gil_syntax.Expr.pp
   let pp_asrt _ = Gil_syntax.Asrt.pp_atom
