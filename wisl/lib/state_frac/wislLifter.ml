@@ -277,7 +277,7 @@ struct
             match prev_kind with
             | IfElseKind | WhileLoopKind -> (
                 match gil_case with
-                | Some (Gil_branch_case.GuardedGoto b) -> Ok (IfElse b)
+                | Some (Gil_branch_case.GuardedGoto b, _) -> Ok (IfElse b)
                 | _ -> Error "IfElseKind expects a GuardedGoto gil case"))
         | Some _, _ ->
             Error "HORROR - branch kind is set with pre-existing case!"
@@ -753,8 +753,20 @@ struct
       let annot = CmdReport.(cmd_report.annot) in
       match annot.stmt_kind with
       | LoopPrefix ->
-          (match exec_data.cmd_report.cmd with
-          | Cmd.GuardedGoto _ -> (id, Some (Gil_branch_case.GuardedGoto true))
+          (match exec_data.next_kind with
+          | Many nexts ->
+              List.fold_left
+                (fun acc ((case, case_ix), ()) ->
+                  match (acc, case) with
+                  | Some _, Gil_branch_case.GuardedGoto true ->
+                      failwith
+                        "WislLifter.handle_loop_prefix: I don't know how to \
+                         handle multiple true cases!"
+                  | None, Gil_branch_case.GuardedGoto true ->
+                      Some (id, Some (case, case_ix))
+                  | _ -> acc)
+                None nexts
+              |> Option.get
           | _ -> (id, None))
           |> Option.some
       | _ -> None

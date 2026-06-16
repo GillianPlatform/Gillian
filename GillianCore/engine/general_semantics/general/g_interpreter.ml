@@ -779,7 +779,7 @@ struct
 
           let new_cs = if ix = 0 then cs else Call_stack.copy cs in
           let branch_case =
-            if has_branched then Some (SpecExec (fl, ix)) else None
+            if has_branched then Some (SpecExec fl, ix) else None
           in
 
           make_confcont ~state:ret_state ~callstack:new_cs
@@ -1074,7 +1074,7 @@ struct
                        let r_e = Expr.EList (List.map Val.to_expr r_vs) in
                        let r_v = eval_expr r_e in
                        let r_state' = update_store r_state x r_v in
-                       let branch_case = LAction (ix + 1) in
+                       let branch_case = (LAction, ix + 1) in
                        make_confcont ~state:r_state'
                          ~callstack:(Call_stack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
@@ -1084,7 +1084,7 @@ struct
               let b_counter, branch_case =
                 match rest_rets with
                 | [] -> (b_counter, None)
-                | _ -> (b_counter + 1, Some (LAction 0))
+                | _ -> (b_counter + 1, Some (LAction, 0))
               in
               make_confcont ~state:state'' ~callstack:cs
                 ~invariant_frames:iframes ?branch_case ~prev_idx:i ~loop_ids
@@ -1127,7 +1127,8 @@ struct
                     List.mapi
                       (fun ix state ->
                         let branch_case =
-                          if num_states > 1 then Some (LActionFail ix) else None
+                          if num_states > 1 then Some (LActionFail, ix)
+                          else None
                         in
                         let cs = if ix = 0 then cs else Call_stack.copy cs in
                         make_confcont ~state ~callstack:cs
@@ -1221,7 +1222,7 @@ struct
               successes
               |> List.mapi (fun ix state ->
                      let branch_case =
-                       if has_branched then Some (LCmd ix) else None
+                       if has_branched then Some (LCmd, ix) else None
                      in
                      make_confcont ~state ~callstack:cs
                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
@@ -1300,8 +1301,8 @@ struct
                 ( List.map (fun x -> (x, j)) (State.assume state vt),
                   List.map (fun x -> (x, k)) (State.assume state' vf) )
         in
-        let sp_t = List.map (fun t -> (t, true)) sp_t in
-        let sp_f = List.map (fun f -> (f, false)) sp_f in
+        let sp_t = List.mapi (fun i t -> (t, true, i)) sp_t in
+        let sp_f = List.mapi (fun i f -> (f, false, i)) sp_f in
         let sp = sp_t @ sp_f in
 
         let b_counter =
@@ -1309,11 +1310,13 @@ struct
           else b_counter
         in
         List.mapi
-          (fun j ((state, next), case) ->
+          (fun j ((state, next), case, case_ix) ->
             make_confcont ~state
               ~callstack:(if j = 0 then cs else Call_stack.copy cs)
               ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
-              ~branch_count:b_counter ~branch_case:(GuardedGoto case) ())
+              ~branch_count:b_counter
+              ~branch_case:(GuardedGoto case, case_ix)
+              ())
           sp
 
       let eval_phi_assignment lxarr eval_state =

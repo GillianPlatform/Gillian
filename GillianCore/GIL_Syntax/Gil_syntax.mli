@@ -896,13 +896,15 @@ module Branch_case : sig
       {i Note: most of these haven't yet been properly reasoned about, so they
          won't be very informative.} *)
 
-  type t =
+  type t' =
     | GuardedGoto of bool  (** Effectively if/else; either true or false case *)
-    | LCmd of int  (** Logical command *)
-    | SpecExec of Flag.t * int  (** Spec execution *)
-    | LAction of int  (** Logical action *)
-    | LActionFail of int  (** {i Failed} logical action*)
+    | LCmd  (** Logical command *)
+    | SpecExec of Flag.t  (** Spec execution *)
+    | LAction  (** Logical action *)
+    | LActionFail  (** {i Failed} logical action*)
   [@@deriving yojson, show]
+
+  type t = t' * int [@@deriving yojson, show]
 
   (** A list of branch cases describes the path of execution.
 

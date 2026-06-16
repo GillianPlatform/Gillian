@@ -289,7 +289,7 @@ struct
             match prev_kind with
             | If_else_kind | For_loop_kind | While_loop_kind -> (
                 match gil_case with
-                | Some (Gil_branch_case.GuardedGoto b) ->
+                | Some (Gil_branch_case.GuardedGoto b, _) ->
                     Ok (bool_kind_to_case prev_kind b)
                 | _ -> Error "If_else_kind expects a GuardedGoto gil case"))
         | Some _, _ ->
