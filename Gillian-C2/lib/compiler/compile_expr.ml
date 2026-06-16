@@ -1500,7 +1500,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
   match stmt.body with
   | Skip ->
       let () = log_kind "Skip" in
-      (void [ b ~cmd_kind:(Normal true) Skip ], pvar_map)
+      (void [ b ~cmd_kind:Hidden Skip ], pvar_map)
   | Block ss ->
       let () = log_kind "Block" in
       (compile_statement_list ~ctx ~pvar_map ss, pvar_map)
