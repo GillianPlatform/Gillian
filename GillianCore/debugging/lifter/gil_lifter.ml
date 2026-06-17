@@ -271,7 +271,7 @@ functor
         (* Program variables *)
         let var_groups =
           let pvars = get_store_vars store in
-          (Scopes.pvars, pvars) :: var_groups
+          (Scopes.pvars, Some pvars) :: var_groups
         in
 
         (* Heap *)
@@ -280,7 +280,7 @@ functor
           | Some f ->
               let new_groups =
                 f memory variables new_var_ref
-                |> List.map @@ fun scope -> (scope, [])
+                |> List.map @@ fun scope -> (scope, None)
               in
               new_groups @ var_groups
           | None ->
@@ -291,7 +291,7 @@ functor
                     ();
                 ]
               in
-              (Scopes.heap, heap_vars) :: var_groups
+              (Scopes.heap, Some heap_vars) :: var_groups
         in
 
         (* Predicates *)
@@ -299,7 +299,7 @@ functor
           match preds with
           | Some preds ->
               let pred_vars = get_pred_vars preds in
-              (Scopes.preds, pred_vars) :: var_groups
+              (Scopes.preds, Some pred_vars) :: var_groups
           | None -> var_groups
         in
 
@@ -308,7 +308,7 @@ functor
           match pfs with
           | Some pfs ->
               let pfs_vars = get_pure_formulae_vars pfs in
-              (Scopes.pfs, pfs_vars) :: var_groups
+              (Scopes.pfs, Some pfs_vars) :: var_groups
           | None -> var_groups
         in
 
@@ -317,14 +317,18 @@ functor
           match types with
           | Some types ->
               let type_vars = get_type_env_vars types in
-              (Scopes.types, type_vars) :: var_groups
+              (Scopes.types, Some type_vars) :: var_groups
           | None -> var_groups
         in
 
         let scopes =
           var_groups
           |> List.rev_map @@ fun (scope, vars) ->
-             let () = Hashtbl.replace variables Variable.(scope.id) vars in
+             let () =
+               match vars with
+               | Some vars -> Hashtbl.replace variables Variable.(scope.id) vars
+               | None -> ()
+             in
              scope
         in
         (scopes, variables)

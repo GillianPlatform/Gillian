@@ -3,7 +3,7 @@
 (* TODO: this should contain a variable list *)
 
 (** Describes a variable scope (e.g. store, heap, pure formulae) *)
-type scope = { name : string; id : int }
+type scope = { name : string; id : int } [@@deriving yojson]
 
 (** A variable *)
 type t = {
@@ -12,10 +12,10 @@ type t = {
   type_ : string option;
   var_ref : int; [@default 0]
 }
-[@@deriving make]
+[@@deriving make, yojson]
 
 (** A map of scope IDs to variables *)
-type ts = (int, t list) Hashtbl.t
+type ts = (int, t list) Hashtbl.t [@@deriving yojson]
 
 let create_leaf (name : string) (value : string) ?(type_ = None) () : t =
   { name; value; type_; var_ref = 0 }
