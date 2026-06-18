@@ -2672,28 +2672,29 @@ let relate_llen
         fmt "Relate llen aux: %a: %a, %a" Expr.pp e Expr.pp (Cint.to_expr llen)
           Fmt.(brackets (list ~sep:semi Expr.pp))
           lcat);
-    Option.map
-      (fun (les, is_concrete, exp) ->
+    Option.bind (relate_llen_loop llen [] lcat) (fun (les, is_concrete, exp) ->
         match (is_concrete, exp) with
         | true, Expr.Lit (Int n) ->
-            let new_vars = List.init (Z.to_int n) (fun _ -> LVar.alloc ()) in
-            let new_lvars = List.map (fun x -> Expr.LVar x) new_vars in
-            let new_lvars =
-              match new_lvars with
-              | [] -> []
-              | _ -> [ Expr.EList new_lvars ]
-            in
-            let pf = Expr.BinOp (e, Equal, NOp (LstCat, les @ new_lvars)) in
-            L.verbose (fun fmt -> fmt "Constructed equality: %a" Expr.pp pf);
-            (pf, Containers.SS.of_list new_vars)
+            if not (Z.fits_int n) then None
+            else
+              let new_vars = List.init (Z.to_int n) (fun _ -> LVar.alloc ()) in
+              let new_lvars = List.map (fun x -> Expr.LVar x) new_vars in
+              let new_lvars =
+                match new_lvars with
+                | [] -> []
+                | _ -> [ Expr.EList new_lvars ]
+              in
+              let pf = Expr.BinOp (e, Equal, NOp (LstCat, les @ new_lvars)) in
+              L.verbose (fun fmt -> fmt "Constructed equality: %a" Expr.pp pf);
+              Some (pf, Containers.SS.of_list new_vars)
         | false, exp ->
             let rest_var = LVar.alloc () in
             let rest = Expr.LVar rest_var in
             let pfeq = Expr.BinOp (e, Equal, NOp (LstCat, les @ [ rest ])) in
             let pflen = Expr.BinOp (UnOp (LstLen, rest), Equal, exp) in
-            (Expr.BinOp (pfeq, And, pflen), Containers.SS.singleton rest_var)
+            Some
+              (Expr.BinOp (pfeq, And, pflen), Containers.SS.singleton rest_var)
         | _ -> failwith "Impossible by construction")
-      (relate_llen_loop llen [] lcat)
   in
 
   L.tmi (fun fmt ->
