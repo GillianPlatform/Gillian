@@ -2787,6 +2787,7 @@ let reduce_assertion_loop
     | Pred (name, les) -> [ Pred (name, List.map fe les) ]
     (* Pure assertions *)
     | Pure (Lit (Bool true)) -> []
+    | Pure (BinOp (f1, BinOp.And, f2)) -> [ Pure f1; Pure f2 ]
     | Pure f -> [ Pure (reduce_lexpr ~matching ~pfs ~gamma f) ]
     (* Types *)
     | Types lvt -> (
