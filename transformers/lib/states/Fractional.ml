@@ -69,7 +69,7 @@ module Frac_with_wildcard : FracA_S = struct
   let subtract left right =
     let open DR.Syntax in
     match (left, right) with
-    | Wildcard, Wildcard -> DR.ok None
+    | Wildcard, Wildcard -> DR.ok (Some Wildcard)
     | Wildcard, Q _ | Q _, Wildcard -> DR.error NotEnoughPermission
     | Q left, Q right ->
         let++ q = Classic_fracA.subtract left right in
@@ -130,21 +130,24 @@ module Make (FracA : FracA_S) = struct
           (action_to_str a) pp s (Fmt.Dump.list Expr.pp) args
 
   let consume core_pred s args =
-    let open Expr.Infix in
+    let open DR.Syntax in
     match (core_pred, s, args) with
     | Frac, Some (v, q), [ q' ] ->
-        if%sat q == q' then DR.ok (None, [ v ])
-        else
-          DR.ok ~learned:[ q' >. _0; q -. q' >. _0 ] (Some (v, q -. q'), [ v ])
+        let q' = FracA.of_expr q' in
+        let++ new_q = FracA.subtract q q' in
+        let new_state = Option.map (fun new_q -> (v, new_q)) new_q in
+        (new_state, [ v ])
     | Frac, None, _ -> DR.error MissingState
     | Frac, _, _ -> failwith "Invalid Agree consume"
 
   let produce core_pred s args =
     let open Expr.Infix in
+    let open Delayed.Syntax in
     match (core_pred, s, args) with
-    | Frac, None, [ q'; v' ] -> Delayed.return (Some (v', q'))
+    | Frac, None, [ q'; v' ] -> Delayed.return (Some (v', FracA.of_expr q'))
     | Frac, Some (v, q), [ q'; v' ] ->
-        Delayed.return ~learned:[ v == v'; q +. q' <=. _1 ] (Some (v, q +. q'))
+        let* new_q = FracA.add q (FracA.of_expr q') in
+        Delayed.return ~learned:[ v == v' ] (Some (v, new_q))
     | Frac, _, _ -> failwith "Invalid Frac produce"
 
   let substitution_in_place subst s =
@@ -195,7 +198,7 @@ module Make (FracA : FracA_S) = struct
     | Some (v, q) -> [ (Frac, [ FracA.to_expr q ], [ v ]) ]
 
   let assertions_others _ = []
-  let get_recovery_tactic _ _ = Recovery_tactic.none
+  let get_recovery_tactic _ = Recovery_tactic.none
 
   let can_fix = function
     | _ -> false
