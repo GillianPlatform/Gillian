@@ -18,10 +18,8 @@ let rec_pred_name_of_struct struct_name =
 let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_pred ^ "opt_rec_struct_" ^ struct_name
 
-let fresh_lvar ?(fname = "") () =
-  let pre = "_lvar_i_" in
-  Generators.gen_str ~fname pre
-
+let lvar_pre = Utils.Names.lvar_prefix ^ "c_"
+let fresh_lvar ?(fname = "") () = Generators.gen_str ~fname lvar_pre
 let location_of_symbol s = Prefix.location ^ s
 
 let rec split3_expr_comp = function
