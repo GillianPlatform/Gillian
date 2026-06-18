@@ -1311,11 +1311,24 @@ module Make (State : SState.S) :
                 List.fold_left
                   (fun discharges (u, out) ->
                     let open Syntaxes.Result in
-                    let* discharges = discharges in
+                    let* discharges in
                     (* Perform the substitution in the out *)
                     let* out =
                       SVal.SESubst.subst_in_expr_opt subst out
                       |> Result_utils.of_option ~none:()
+                    in
+                    (* Special case: learning len x when we know x *)
+                    let discharges =
+                      match u with
+                      | Expr.UnOp (LstLen, u') -> (
+                          match SVal.SESubst.get subst u' with
+                          | None -> discharges
+                          | Some out' ->
+                              let new_discharges =
+                                Expr.BinOp (out, Equal, UnOp (LstLen, out'))
+                              in
+                              new_discharges :: discharges)
+                      | _ -> discharges
                     in
                     (* And add to e-subst *)
                     match SVal.SESubst.get subst u with
