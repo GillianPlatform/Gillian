@@ -1596,11 +1596,9 @@ module Make (State : SState.S) :
       (mp : MP.t)
       (match_kind : match_kind) :
       (t * SVal.SESubst.t * post_res, err_t) Res_list.t =
-    let astate_i = copy_astate astate in
-    let subst_i = SVal.SESubst.copy subst in
     let can_fix errs = List.exists State.can_fix errs in
 
-    let rec handle_ret ?prev_id ~fuel ret =
+    let rec handle_ret ?prev_id ~fuel astate_i subst_i ret =
       L.set_previous ~force_none:true prev_id;
       match ret with
       | Ok successes ->
@@ -1657,7 +1655,7 @@ module Make (State : SState.S) :
                   let new_ret =
                     match_mp ?prev_id ([ (astate, subst'', mp) ], [])
                   in
-                  handle_ret ?prev_id ~fuel:(fuel - 1) new_ret))
+                  handle_ret ?prev_id ~fuel:(fuel - 1) astate subst'' new_ret))
       | Error errors ->
           L.verbose (fun fmt -> fmt "Matcher.match: Failure");
           Res_list.just_errors errors
@@ -1666,7 +1664,7 @@ module Make (State : SState.S) :
       { astate = AstateRec.from astate; subst; mp; match_kind }
       (fun _ ->
         let ret = match_mp ([ (astate, subst, mp) ], []) in
-        handle_ret ~fuel:10 ret)
+        handle_ret ~fuel:10 astate subst ret)
 
   and fold
       ?(in_matching = false)
