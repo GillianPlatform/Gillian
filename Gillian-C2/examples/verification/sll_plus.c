@@ -33,15 +33,15 @@ pred list_ht_inner(+h, +t, alpha) {
   (alpha == #beta @ [ #last ])
 }
 
-pred list_ht(+x, h, t, alpha) {
-    (x -m> struct list { #size; #h; #t }) *
+pred list_ht(+h, +t, +size, alpha) {
     (h == #h) * (t == #t) *
-    (#size == (len alpha)) *
-    list_ht_inner(h, t, alpha)
+    list_ht_inner(h, t, alpha) *
+    (size == len alpha)
 }
 
 pred list(+x, alpha) {
-    list_ht(x, #h, #t, alpha)
+    (x -m> struct list { #size; #h; #t }) *
+    list_ht(#h, #t, #size, alpha)
 }
 
 lemma segToSLL(p, alpha) {
@@ -197,6 +197,7 @@ List *listConcat(List *x, List *y) {
             __GILLIAN("unfold sll(#xt, [ #at ])");
             x->tail->next = y->head;
             x->tail = y->tail;
+            x->size = x->size + y->size;
             free(y);
             __GILLIAN("apply sllSegAppend(#xh, #xt, #ah, #at, #yh)");
             __GILLIAN("apply sllSegConcat(#xh, #yh, #yt, #alpha, #bh)");
