@@ -149,7 +149,7 @@ let parse_symtab_into_goto json =
       Kutils.Gillian_result.operation_error
         "For now, Gillian-C2 can only run on archi64"
   in
-  Kconfig.machine_model := machine;
+  Kconfig.set_machine_model machine;
   Logging.normal ~severity:Warning (fun m ->
       m
         "Filtering every cprover_specific symbol!! Need to remove that in the \
@@ -295,8 +295,8 @@ let parse_and_compile_files files =
   let ctx =
     Ctx.make
       ~exec_mode:!Kutils.Config.current_exec_mode
-      ~machine:!Kconfig.machine_model ~prog:goto_prog ~harness:!Kconfig.harness
-      ()
+      ~machine:(Kconfig.get_machine_model ())
+      ~prog:goto_prog ~harness:!Kconfig.harness ()
   in
   let+ gil_lprog =
     match source_path with

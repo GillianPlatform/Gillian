@@ -1,7 +1,7 @@
 %{
   open C2_lprog
 
-  let machine = !Kconfig.machine_model
+  let machine = Kconfig.get_machine_model ()
   let int_chunk = Machine_model.int_chunk machine
   let long_chunk = Machine_model.long_chunk machine
   let double_chunk = Machine_model.double_chunk machine

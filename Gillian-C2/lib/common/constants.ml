@@ -154,6 +154,5 @@ module Internal_Predicates = struct
 
   (* Architecture constants *)
   let archi_usize_bounds = i "archi_usize_bounds"
-  let ptr_chunk = i "ptr_chunk"
   let ptr_size = i "ptr_size"
 end

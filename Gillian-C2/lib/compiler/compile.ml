@@ -84,9 +84,9 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
           v_init_cmds @ store_value
     in
     let drom_perm_cmd =
-      let drom_perm = Mem_interface.(str_ac (AMem DropPerm)) in
+      let drop_perm = Mem_interface.(str_ac (AMem DropPerm)) in
       let perm_string = Expr.Lit (String (Perm.to_string Writable)) in
-      b @@ Cmd.LAction ("u", drom_perm, [ loc; Expr.zero_i; size; perm_string ])
+      b @@ Cmd.LAction ("u", drop_perm, [ loc; Expr.zero_i; size; perm_string ])
     in
     let symexpr = Expr.Lit (String gv.symbol) in
     let set_symbol_cmd =
@@ -390,12 +390,6 @@ module Machine_procs = struct
     in
     mk_expr_proc archi_usize_bounds expr
 
-  let ptr_chunk ptr_width =
-    let expr =
-      Chunk.int_type_to_string ~signed:false ~size:ptr_width |> Expr.string
-    in
-    mk_expr_proc ptr_chunk expr
-
   let ptr_size ptr_width =
     let expr = Expr.int (ptr_width / 8) in
     mk_expr_proc ptr_size expr
@@ -404,7 +398,6 @@ module Machine_procs = struct
     let ptr_width = ctx.machine.pointer_width in
     gil_prog
     |> add_proc (archi_usize_bounds ptr_width)
-    |> add_proc (ptr_chunk ptr_width)
     |> add_proc (ptr_size ptr_width)
 end
 
