@@ -1332,6 +1332,7 @@ let prod_simple_mem_val ~mem_val t low high perm =
 let cons_hole =
   cons_simple_mem_val ~expected_mem_val:(function
     | Poisoned Totally -> true
+    | Zeros -> true
     | _ -> false)
 
 let prod_hole = prod_simple_mem_val ~mem_val:(Poisoned Totally)
