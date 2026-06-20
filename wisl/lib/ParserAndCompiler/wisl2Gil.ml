@@ -392,12 +392,14 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Fold (pname, params, None)) )
-  | Unfold (pname, lel) ->
-      let gvars, lasrts, params = list_split_3 (List.map compile_lexpr lel) in
+  | Unfold { pred; params; bindings } ->
+      let gvars, lasrts, params =
+        list_split_3 (List.map compile_lexpr params)
+      in
       let existentials = List.concat gvars in
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
-        LCmd.SL (SLCmd.Unfold (pname, params, None, false)) )
+        LCmd.SL (SLCmd.Unfold (pred, params, bindings, false)) )
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
       let lgvars, lasrts, lparams =
         list_split_3 (List.map compile_lexpr largs)

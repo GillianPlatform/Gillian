@@ -54,7 +54,7 @@ rule read =
   | "proof"  { PROOF (curr lexbuf) }
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
-  | "bind" { EXIST (curr lexbuf) }
+  | "bind" { BIND (curr lexbuf) }
   | "spec" { SPEC (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
