@@ -261,6 +261,9 @@ jobs:
           - image: wisl
             packages: wisl
             no_cbmc: 1
+          - image: gillian-lab
+            packages: "wisl gillian-c2"
+            no_cbmc: ""
           - image: gillian
             packages: "wisl gillian-c gillian-js gillian-c2"
             no_cbmc: ""
