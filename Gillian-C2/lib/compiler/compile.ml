@@ -28,8 +28,8 @@ open Compile_expr
 
 let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
   let b =
-    let loc = Body_item.compile_location fn.location in
-    Body_item.make ~loc
+    let loc = Option.map Body_item.compile_location fn.location in
+    Body_item.make ?loc
   in
   let symbol = Expr.string fn.symbol in
 
@@ -47,8 +47,8 @@ let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
    Do not call fresh_v or fresh_lv inside *)
 let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
   let b =
-    let loc = Body_item.compile_location gv.location in
-    Body_item.make ~loc
+    let loc = Option.map Body_item.compile_location gv.location in
+    Body_item.make ?loc
   in
   (* If the value is a ZST, we don't even put it in the global environment.
      I'm not sure if that is the correct behaviour. *)
@@ -200,7 +200,7 @@ let get_missing_function_body (func : Program.Func.t) =
 
 let compile_function ?map_body ~ctx (func : Program.Func.t) :
     (C2_annot.t, string) Proc.t =
-  let f_loc = Body_item.compile_location func.location in
+  let f_loc = Option.map Body_item.compile_location func.location in
   let is_internal, body =
     (* If the function has no body, it's assumed to be just non-det *)
     match func.body with
@@ -229,7 +229,7 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
   let free_locals = compile_free_locals ~cmd_kind:Hidden ctx in
   (* We add a return undef in case the function has no return *)
   let b ?(cmd_kind = C2_annot.Hidden) =
-    Body_item.make_hloc ~loc:func.location ~cmd_kind
+    Body_item.make_hloc ?loc:func.location ~cmd_kind
   in
   let return_undef =
     b (Assignment (Kutils.Names.return_variable, Lit Undefined))
@@ -259,10 +259,13 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
     if Ctx.representable_in_store ctx func.return_type then identifiers
     else Constants.Gillian_C2_names.return_by_copy_name :: identifiers
   in
+  let proc_source_path =
+    Option.map (fun f_loc -> f_loc.Utils.Location.loc_source) f_loc
+  in
   Proc.
     {
       proc_name = func.symbol;
-      proc_source_path = Some f_loc.loc_source;
+      proc_source_path;
       proc_internal = false;
       proc_params;
       proc_body;

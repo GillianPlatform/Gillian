@@ -18,7 +18,7 @@ module Global_var = struct
     type_ : Type.t;
     symbol : string;
     value : Expr.t option;
-    location : Location.t;
+    location : Location.t option;
   }
   [@@deriving to_yojson]
 end
@@ -30,7 +30,7 @@ module Func = struct
         (** If the body is empty, it means that the function is not defined, and
             it should return nondet *)
     return_type : Type.t;
-    location : Location.t;
+    location : Location.t option;
     symbol : string;
     internal : bool;
     param_map : (string * string) list;
@@ -95,12 +95,17 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
          (* A bit hacky, not sure which should be kept and which shouldn't... *)
          if should_be_filtered name then ()
          else
+           let () = Logging.tmi (fun m -> m "Processing symbol %s" name) in
            let () =
              if name <> sym.base_name then
                Hashtbl.add env.base_names name sym.base_name
            in
            let () = add_struct_tag env.struct_tags sym in
-           let location = Location.of_yojson sym.location in
+           let location =
+             match sym.location with
+             | `Assoc [] -> None
+             | _ -> Some (Location.of_yojson sym.location)
+           in
            let type_ = Type.of_irep ~machine sym.type_ in
            let value = SymbolValue.of_irep ~machine ~type_ sym.value in
            if sym.is_type then Hashtbl.add env.types name type_

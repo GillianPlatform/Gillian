@@ -67,7 +67,7 @@ end
 module Local = struct
   open Goto_lib
 
-  type t = { symbol : string; type_ : Type.t; location : Location.t }
+  type t = { symbol : string; type_ : Type.t; location : Location.t option }
   [@@deriving to_yojson]
 
   (** Returns the locals Hashtbl and the in_memory hashset *)

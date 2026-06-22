@@ -465,10 +465,10 @@ let rec assume_type ~ctx (type_ : GType.t) (expr : Expr.t) : unit Cs.with_cmds =
       assume_type ~ctx ty expr
   | _ -> Error.code_error "Unreachable: assume_type for non-scalar"
 
-let rec nondet_expr ~ctx ~loc ~type_ ~display () : Val_repr.t Cs.with_body =
-  let b = Body_item.make_hloc ~loc in
+let rec nondet_expr ~ctx ?loc ~type_ ~display () : Val_repr.t Cs.with_body =
+  let b = Body_item.make_hloc ?loc in
   let open Cs.Syntax in
-  let nondet_expr = nondet_expr ~ctx ~loc ~display in
+  let nondet_expr = nondet_expr ~ctx ?loc ~display in
   let is_concrete_exec =
     let open Gillian.Utils in
     Exec_mode.is_concrete_exec !Config.current_exec_mode
@@ -685,7 +685,8 @@ let rec lvalue_as_access ~ctx ~pvar_map ~read (lvalue : GExpr.t) :
   if Ctx.is_zst_access ctx lvalue.type_ then Cs.return ZST
   else
     let open Cs.Syntax in
-    let b = Body_item.make ~loc:(Body_item.compile_location lvalue.location) in
+    let loc = Option.map Body_item.compile_location lvalue.location in
+    let b = Body_item.make ?loc in
     let as_access = lvalue_as_access ~ctx ~pvar_map ~read in
     match lvalue.value with
     | Struct _ | Array _ | StringConstant _ ->
@@ -1168,7 +1169,7 @@ and compile_address_of ~ctx ~pvar_map ~b (expr : GExpr.t) x =
       let display = Fmt.str "%a" (PP.expr ~ctx) expr in
       (* FIXME: we can't model alignment yet *)
       let* ptr =
-        nondet_expr ~ctx ~loc:expr.location ~type_:(CInteger I_size_t) ~display
+        nondet_expr ~ctx ?loc:expr.location ~type_:(CInteger I_size_t) ~display
           ()
       in
       let ptr = Val_repr.as_value ~msg:"Nondet I_size_t for ZST pointer" ptr in
@@ -1202,11 +1203,11 @@ and compile_expr
     (expr : GExpr.t) : Val_repr.t Cs.with_body =
   let open Cs.Syntax in
   let compile_expr = compile_expr ~ctx ~pvar_map in
-  let loc = Body_item.compile_location expr.location in
+  let loc = Option.map Body_item.compile_location expr.location in
   let default_display = Fmt.str "%a" (PP.expr ~ctx) expr in
   let b_pre ?display ?(cmd_kind = C2_annot.Normal false) =
     let display = Option.value ~default:default_display display in
-    Body_item.make ~loc ~display ~cmd_kind
+    Body_item.make ?loc ~display ~cmd_kind
   in
   let b = b_pre ?branch_kind:None ?nest_kind:None ?cmd_kind:None in
   let unhandled feature =
@@ -1217,7 +1218,8 @@ and compile_expr
   let log_type t =
     Debugger_log.to_file
       (Fmt.str "COMPILING %s EXPR  (%s)  [%a]" t default_display
-         Goto_lib.Location.pp_short expr.location)
+         (Fmt.option ~none:(Fmt.any "?") Goto_lib.Location.pp_short)
+         expr.location)
   in
   match expr.value with
   | Symbol _ | Dereference _ | Index _ | Member _ ->
@@ -1286,7 +1288,7 @@ and compile_expr
       compile_selfop ~ctx ~pvar_map ~annot:b op e |> Cs.set_end
   | Nondet ->
       let () = log_type "Nondet" in
-      nondet_expr ~ctx ~loc:expr.location ~type_:expr.type_
+      nondet_expr ~ctx ?loc:expr.location ~type_:expr.type_
         ~display:default_display ()
       |> Cs.set_end
   | TypeCast to_cast ->
@@ -1484,10 +1486,10 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
     compile_statement ~ctx ~pvar_map
   in
   let compile_expr_c = compile_expr ~ctx ~pvar_map in
-  let loc = Body_item.compile_location stmt.stmt_location in
+  let loc = Option.map Body_item.compile_location stmt.stmt_location in
   let default_display = Fmt.str "%a" (PP.stmt ~ctx) stmt in
   let b_pre ?(cmd_kind = C2_annot.Normal false) ?(display = default_display) =
-    Body_item.make ~loc ~display ~cmd_kind
+    Body_item.make ?loc ~display ~cmd_kind
   in
   let b = b_pre ?nest_kind:None in
   let add_annot x = List.map b x in
@@ -1500,7 +1502,8 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in
   let log_kind kind =
     Debugger_log.to_file
-      (Fmt.str "COMPILING %s STMT [%a]" kind Goto_lib.Location.pp_short
+      (Fmt.str "COMPILING %s STMT [%a]" kind
+         (Fmt.option Goto_lib.Location.pp_short ~none:(Fmt.any "?"))
          stmt.stmt_location)
   in
   match stmt.body with
@@ -1728,7 +1731,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
             in
             let comparison_calls =
               List.map
-                (Body_item.make_hloc ~loc:guard.location)
+                (Body_item.make_hloc ?loc:guard.location)
                 comparison_calls
             in
             let (_, block), _ = compile_statement ~ctx ~pvar_map case.sw_body in

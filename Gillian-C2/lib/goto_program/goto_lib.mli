@@ -195,7 +195,7 @@ module rec Expr : sig
     | Nondet
     | EUnhandled of Id.t * string
 
-  and t = { value : value; type_ : Type.t; location : Location.t }
+  and t = { value : value; type_ : Type.t; location : Location.t option }
   [@@deriving show]
 
   val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
@@ -236,7 +236,12 @@ and Stmt : sig
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
-  and t = { stmt_location : Location.t; body : body; comment : string option }
+
+  and t = {
+    stmt_location : Location.t option;
+    body : body;
+    comment : string option;
+  }
 
   val pp : t Fmt.t
 
@@ -257,7 +262,7 @@ module Program : sig
       type_ : Type.t;
       symbol : string;
       value : Expr.t option;
-      location : Location.t;
+      location : Location.t option;
     }
     [@@deriving to_yojson]
   end
@@ -267,7 +272,7 @@ module Program : sig
       params : Param.t list;
       body : Stmt.t option;
       return_type : Type.t;
-      location : Location.t;
+      location : Location.t option;
       symbol : string;
       internal : bool;
       param_map : (string * string) list;
