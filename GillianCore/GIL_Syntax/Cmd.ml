@@ -58,7 +58,7 @@ let pvars (cmd : 'label t) : SS.t =
   | Apply (x, e, _) -> SS.add x (Expr.pvars e)
   | Arguments x -> SS.singleton x
   | PhiAssignment phis -> fold (List.map (fun (_, es) -> pvars_es es) phis)
-  | ReturnNormal | ReturnError -> SS.singleton "ret"
+  | ReturnNormal | ReturnError -> SS.singleton Names.return_variable
   | Fail (_, es) -> pvars_es es
 
 let lvars (cmd : 'label t) : SS.t =

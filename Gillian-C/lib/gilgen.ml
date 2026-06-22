@@ -801,7 +801,9 @@ let trans_function
     | [ (a, b, c) ] ->
         [
           (a, b, c);
-          (Annot.make_basic (), None, Assignment ("ret", Expr.zero_i));
+          ( Annot.make_basic (),
+            None,
+            Assignment (Utils.Names.return_variable, Expr.zero_i) );
           (Annot.make_basic (), None, ReturnNormal);
         ]
     | a :: b -> a :: add_return b

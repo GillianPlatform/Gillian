@@ -88,7 +88,8 @@
 (package
  (name gillian-c2)
  (sites
-  (share runtime))
+  (share runtime)
+  (share c_includes))
  (synopsis "Gillian instantiation for C based on CBMC as front-end")
  (depends
   (gillian

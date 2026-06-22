@@ -136,7 +136,7 @@ jobs:
       - *SETUP_Z3
       - name: install CBMC
         run: |
-          curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb
+          curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-6.9.0/ubuntu-24.04-cbmc-6.9.0-Linux.deb
           sudo dpkg -i cbmc.deb
           rm cbmc.deb
       - *DOWNLOAD_ARTIFACT
@@ -261,6 +261,9 @@ jobs:
           - image: wisl
             packages: wisl
             no_cbmc: 1
+          - image: gillian-lab
+            packages: "wisl gillian-c2"
+            no_cbmc: ""
           - image: gillian
             packages: "wisl gillian-c gillian-js gillian-c2"
             no_cbmc: ""

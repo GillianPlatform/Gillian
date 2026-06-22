@@ -202,6 +202,7 @@ let rec learn_expr
   (* Nothing is learned if the program or logical variable is already known *)
   | (PVar _ | LVar _ | ALoc _ | UnOp (LstLen, _)) when top_level || KB.mem e kb
     -> []
+  | UnOp (LstLen, e') when KB.mem e' kb -> []
   (* Otherwise, we do learn the program or logical variable *)
   | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, _) -> [ (e, base_expr) ]
   (* Unary minuses are invertible *)

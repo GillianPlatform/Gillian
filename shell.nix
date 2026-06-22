@@ -5,6 +5,7 @@ pkgs.mkShell rec {
     opam
     gnumake
     z3
+    cbmc
   ];
   shellHook = ''
     make githooks > /dev/null

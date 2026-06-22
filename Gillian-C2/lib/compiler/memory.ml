@@ -22,8 +22,7 @@ let rec chunk_for_type ~(ctx : Ctx.t) (t : GType.t) : Chunk.t option =
     | Enum _ -> chunk_for_type ~ctx (Signedbv { width = 32 })
     | Float -> Some F32
     | Double -> Some F64
-    | Pointer _ ->
-        Chunk.of_int_type ~signed:false ~size:ctx.machine.pointer_width
+    | Pointer _ -> Some Ptr
     | StructTag t | EnumTag t -> chunk_for_type ~ctx (Ctx.tag_lookup ctx t)
     | Struct { components; _ } ->
         Option.bind (Ctx.one_representable_field ctx components) (fun (_, ty) ->
@@ -81,8 +80,8 @@ let dealloc_local ~ctx ~cmd_kind (l : Ctx.Local.t) : Body_item.t =
     Cmd.LAction
       (var, free, [ Expr.list_nth (Expr.PVar l.symbol) 0; Expr.zero_i; size ])
   in
-  let loc = Body_item.compile_location l.location in
-  Body_item.make ~loc ~cmd_kind cmd
+  let loc = Option.map Body_item.compile_location l.location in
+  Body_item.make ?loc ~cmd_kind cmd
 
 (** Loads a value into the given variable. If no variable is given, one is
     created. In any case, the variable containing the value, as well as the load

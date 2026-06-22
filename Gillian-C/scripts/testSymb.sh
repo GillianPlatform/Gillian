@@ -1,8 +1,14 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
-WPST="time gillian-c wpst"
+if [[ "${GITHUB_ACTIONS}" ]]; then
+	GILLIAN_C="gillian-c"
+else
+  GILLIAN_C="dune exec -- gillian-c"
+fi
+
+WPST="time $GILLIAN_C wpst"
 
 # TODO (Alexis): Make incremental analysis thread-safe to allow the use of --parallel
 echo "--- testing SLL ---"

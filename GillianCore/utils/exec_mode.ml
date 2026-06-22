@@ -3,6 +3,7 @@
     Gillian's execution modes *)
 
 type t = Concrete | Verification | Symbolic | BiAbduction
+[@@deriving to_yojson]
 
 let is_concrete_exec = function
   | Concrete -> true

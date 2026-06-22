@@ -2,7 +2,11 @@ open VisitorUtils
 
 type tt =
   | Fold of string * WLExpr.t list
-  | Unfold of string * WLExpr.t list
+  | Unfold of {
+      pred : string;
+      params : WLExpr.t list;
+      bindings : (string * string) list option;
+    }
   | Package of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
   | ApplyLem of string * WLExpr.t list * string list
   | LogicIf of WLExpr.t * t list * t list
@@ -40,7 +44,7 @@ let rec get_by_id id lcmd =
   let lassert_getter = WLAssert.get_by_id id in
   let aux lcmdp =
     match get lcmdp with
-    | Fold (_, lel) | Unfold (_, lel) | ApplyLem (_, lel, _) ->
+    | Fold (_, lel) | Unfold { params = lel; _ } | ApplyLem (_, lel, _) ->
         lexpr_list_visitor lel
     | Package { lhs = _, lel1; rhs = _, lel2 } ->
         lexpr_list_visitor lel1 |>> (lexpr_list_visitor, lel2)
@@ -57,36 +61,38 @@ let pp fmt lcmd =
     match binds with
     | [] -> ()
     | _ ->
-        Format.fprintf fmt "{bind: %a}"
+        Fmt.pf fmt "{bind: %a}"
           (WPrettyUtils.pp_list Format.pp_print_string)
           binds
   in
   let pp_variant fmt variant =
     match variant with
     | None -> ()
-    | Some variant -> Format.fprintf fmt "variant: %a" WLExpr.pp variant
+    | Some variant -> Fmt.pf fmt "variant: %a" WLExpr.pp variant
   in
   match get lcmd with
   | Fold (pname, wlel) ->
-      Format.fprintf fmt "fold %s(%a)" pname
-        (WPrettyUtils.pp_list WLExpr.pp)
-        wlel
-  | Unfold (pname, wlel) ->
-      Format.fprintf fmt "unfold %s(%a)" pname
-        (WPrettyUtils.pp_list WLExpr.pp)
-        wlel
+      Fmt.pf fmt "fold %s(%a)" pname (WPrettyUtils.pp_list WLExpr.pp) wlel
+  | Unfold { pred; params; bindings } -> (
+      let () =
+        Fmt.pf fmt "unfold %s(%a)" pred (WPrettyUtils.pp_list WLExpr.pp) params
+      in
+      match bindings with
+      | None -> ()
+      | Some bindings ->
+          Fmt.pf fmt " [[bind %a]]"
+            Fmt.(list ~sep:comma (pair ~sep:(any ":@ ") string string))
+            bindings)
   | ApplyLem (lname, wlel, _) ->
-      Format.fprintf fmt "apply %s(%a)" lname
-        (WPrettyUtils.pp_list WLExpr.pp)
-        wlel
+      Fmt.pf fmt "apply %s(%a)" lname (WPrettyUtils.pp_list WLExpr.pp) wlel
   | Assert (asrt, binds) ->
-      Format.fprintf fmt "assert %a %a" pp_binds binds WLAssert.pp asrt
+      Fmt.pf fmt "assert %a %a" pp_binds binds WLAssert.pp asrt
   | Invariant (asrt, binds, variant) ->
-      Format.fprintf fmt "invariant %a%a%a" pp_binds binds WLAssert.pp asrt
-        pp_variant variant
-  | LogicIf (e, _, _) -> Format.fprintf fmt "if (%a)" WLExpr.pp e
+      Fmt.pf fmt "invariant %a%a%a" pp_binds binds WLAssert.pp asrt pp_variant
+        variant
+  | LogicIf (e, _, _) -> Fmt.pf fmt "if (%a)" WLExpr.pp e
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
-      Format.fprintf fmt "package (%s(%a) -* %s(%a))" lname
+      Fmt.pf fmt "package (%s(%a) -* %s(%a))" lname
         (WPrettyUtils.pp_list WLExpr.pp)
         largs rname
         (WPrettyUtils.pp_list WLExpr.pp)
@@ -101,7 +107,7 @@ let rec substitution subst { wlcnode; wlcid; wlcloc } =
   let wlcnode =
     match wlcnode with
     | Fold (pname, les) -> Fold (pname, List.map fe les)
-    | Unfold (pname, les) -> Unfold (pname, List.map fe les)
+    | Unfold u -> Unfold { u with params = List.map fe u.params }
     | Package { lhs = lname, largs; rhs = rname, rargs } ->
         Package
           { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }

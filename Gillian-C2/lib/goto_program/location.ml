@@ -8,7 +8,7 @@ type t = {
   col : int option;
   comment : string option;
 }
-[@@deriving show { with_path = false }]
+[@@deriving to_yojson, show { with_path = false }]
 
 let pp_short fmt { source; line; col; _ } =
   match (source, line) with
@@ -42,6 +42,17 @@ let of_irep (irep : Irep.t) : t =
           let comment = Option.map Irep.as_just_string (irep $? Comment) in
           make ~source ?line ?col ?comment irep.unique_id)
   | _ -> Gerror.unexpected ~irep "wrong Irep location"
+
+let of_yojson json =
+  let open Kutils in
+  let ( $ ) x y = J.( $ ) x (Id.to_string y) in
+  let ( $? ) (x, y) f = J.( $? ) (x, Id.to_string y) f in
+  let source = J.to_string (json $ File) in
+  let line = (json, Line) $? J.string_to_int in
+  let col = (json, Column) $? J.string_to_int in
+  let comment = (json, Comment) $? J.to_string in
+  let origin_id = Irep.fresh_id () in
+  make ~source ?line ?col ?comment origin_id
 
 let sloc_in_irep irep =
   let open Irep.Infix in

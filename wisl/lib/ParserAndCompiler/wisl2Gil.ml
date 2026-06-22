@@ -112,12 +112,13 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
   let open WExpr in
   match get expr with
   | Val v -> ([], Expr.Lit (compile_val v))
-  | Var "ret" ->
+  | Var x when x = Utils.Names.return_variable ->
       failwith
         (Format.asprintf
-           "ret (at location %s) is the special name used for the return\n\
+           "%s (at location %s) is the special name used for the return\n\
            \                            value in the logic. It cannot be used \
             as a variable name"
+           x
            (CodeLoc.str (get_loc expr)))
   | Var x -> ([], Expr.PVar x)
   | BinOp (e1, WBinOp.LSTCONS, e2) ->
@@ -391,12 +392,14 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Fold (pname, params, None)) )
-  | Unfold (pname, lel) ->
-      let gvars, lasrts, params = list_split_3 (List.map compile_lexpr lel) in
+  | Unfold { pred; params; bindings } ->
+      let gvars, lasrts, params =
+        list_split_3 (List.map compile_lexpr params)
+      in
       let existentials = List.concat gvars in
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
-        LCmd.SL (SLCmd.Unfold (pname, params, None, false)) )
+        LCmd.SL (SLCmd.Unfold (pred, params, bindings, false)) )
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
       let lgvars, lasrts, lparams =
         list_split_3 (List.map compile_lexpr largs)
@@ -507,7 +510,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
       WLAssert.make
         (LPure
            (WLExpr.make
-              (LBinOp (make_var_lexpr "ret", EQUAL, ret_list))
+              (LBinOp
+                 (make_var_lexpr Utils.Names.return_variable, EQUAL, ret_list))
               while_loc))
         while_loc
     in
