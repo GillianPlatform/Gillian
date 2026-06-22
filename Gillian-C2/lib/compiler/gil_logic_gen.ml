@@ -672,7 +672,22 @@ let add_trans_pred ~ctx ~pvar_map filepath ann cl_pred =
 let add_trans_abs_pred filepath ann cl_pred =
   { ann with preds = trans_abs_pred ~filepath cl_pred :: ann.preds }
 
-let trans_sspec ~ctx ~pvar_map sspecs =
+let get_param_typasrt param =
+  let open Constants.Internal_Predicates in
+  let pred =
+    match param.Param.type_ with
+    | CInteger I_bool -> Some is_bool
+    | CInteger I_char -> Some is_char
+    | CInteger I_int -> Some is_int
+    | CInteger I_size_t -> Some is_size_t
+    | CInteger I_ssize_t -> Some is_ssize_t
+    | _ -> None
+  in
+  match (pred, param.identifier) with
+  | Some pred, Some id -> Some (Asrt.Pred (pred, [ PVar id ]))
+  | _ -> None
+
+let trans_sspec ~ctx ~pvar_map ~params sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
   let tap, spa =
     match spec_annot with
@@ -681,10 +696,11 @@ let trans_sspec ~ctx ~pvar_map sspecs =
         let a, (label, exs) = trans_asrt_annot spa in
         (a, Some (label, exs))
   in
+  let typ_asrt = List.filter_map get_param_typasrt params in
   let ta = trans_asrt ~ctx ~pvar_map in
   Spec.
     {
-      ss_pre = (tap @ ta pre, None);
+      ss_pre = (tap @ typ_asrt @ ta pre, None);
       ss_posts = List.map (fun post -> (ta post, None)) posts;
       (* FIXME: bring in variant *)
       ss_variant = None;
@@ -727,17 +743,16 @@ let trans_lemma ~ctx ~pvar_map ~filepath lemma =
 
 let trans_spec ~ctx ?(only_spec = false) cl_spec =
   let CSpec.{ fname; params; sspecs } = cl_spec in
-  let pvar_map =
-    let f = Hashtbl.find ctx.Ctx.prog.funs fname in
-    f.param_map
-  in
+  let fn = Hashtbl.find ctx.Ctx.prog.funs fname in
+  let pvar_map = fn.param_map in
   let spec_params = List.map (fun p -> List.assoc p pvar_map) params in
   let result =
     Spec.
       {
         spec_name = fname;
         spec_params;
-        spec_sspecs = List.map (trans_sspec ~ctx ~pvar_map) sspecs;
+        spec_sspecs =
+          List.map (trans_sspec ~ctx ~pvar_map ~params:fn.params) sspecs;
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
