@@ -5,50 +5,50 @@ typedef struct ln {
     struct ln *next;
 } SLL;
 
-/*@ pred list(+p, alpha) {
+/*@ pred sll(+p, alpha) {
   (p -m> struct ln { #head; #tail } * (alpha == #head::#beta)) *
-  list(#tail, #beta) *
+  sll(#tail, #beta) *
   i__is_int(len alpha);
   (p == NULL) * (alpha == nil)
 }
 
-pred listSeg(+p, +q, alpha) {
+pred lseg(+p, +q, alpha) {
     ( p == q ) * (alpha == nil);
 
     (p -m> struct ln { #head; #tail } * (alpha == #head::#beta)) *
-    listSeg(#tail, q, #beta) * i__is_int(len alpha)
+    lseg(#tail, q, #beta) * i__is_int(len alpha)
 }
 
-lemma lsegToList(p, alpha) {
-    hypothesis: listSeg(#p, NULL, #alpha)
-    conclusions: list(#p, #alpha)
+lemma lseg_to_list(p, alpha) {
+    hypothesis: lseg(#p, NULL, #alpha)
+    conclusions: sll(#p, #alpha)
     proof:
-      unfold listSeg(#p, NULL, #alpha) [[bind #head: #head,
+      unfold lseg(#p, NULL, #alpha) [[bind #head: #head,
                                            #tail: #tail,
                                            #beta: #beta]];
       if (!(#p = NULL)) {
-        apply lsegToList(#tail, #beta);
-        fold list(#p, #alpha)
+        apply lseg_to_list(#tail, #beta);
+        fold sll(#p, #alpha)
     }
 }
 
-lemma listSegAppend(p, q, alpha, a, end) {
-    hypothesis: listSeg(#p, #q, #alpha) * (#q -m> struct ln { #a; #end }) * i__is_int(len (#alpha @ [#a]))
-    conclusions: listSeg(#p, #end, #alpha @ [#a])
+lemma lseg_append(p, q, alpha, a, end) {
+    hypothesis: lseg(#p, #q, #alpha) * (#q -m> struct ln { #a; #end }) * i__is_int(len (#alpha @ [#a]))
+    conclusions: lseg(#p, #end, #alpha @ [#a])
     proof:
-      unfold listSeg(#p, #q, #alpha)[[bind #head: #head,
+      unfold lseg(#p, #q, #alpha)[[bind #head: #head,
                                            #tail: #tail,
                                            #beta: #beta]];
       if (!(#p = #q)) {
-        apply listSegAppend(#tail, #q, #beta, #a, #end);
-        fold listSeg(#p, #end, #alpha @ [#a])
+        apply lseg_append(#tail, #q, #beta, #a, #end);
+        fold lseg(#p, #end, #alpha @ [#a])
       }
 }
 */
 
 /*@ spec listAppend(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * i__is_int(#v) * i__is_int((len #alpha) + 1)
-  ensures:  list(ret, #alpha @ [ #v ])
+  requires: (x == #x) * sll(#x, #alpha) * (v == #v) * i__is_int(#v) * i__is_int((len #alpha) + 1)
+  ensures:  sll(ret, #alpha @ [ #v ])
 } */
 SLL *listAppend(SLL *x, int v) {
     if (x == NULL) {
@@ -58,9 +58,9 @@ SLL *listAppend(SLL *x, int v) {
         return el;
     } else {
         SLL *tailp = listAppend(x->next, v);
-        __GILLIAN("assert [[bind #t]] list(tailp, #t)");
-        __GILLIAN("unfold list(tailp, #t)");
-        __GILLIAN("fold list(tailp, #t)");
+        __GILLIAN("assert [[bind #t]] sll(tailp, #t)");
+        __GILLIAN("unfold sll(tailp, #t)");
+        __GILLIAN("fold sll(tailp, #t)");
         x->next = tailp;
         return x;
     };
@@ -70,32 +70,32 @@ SLL *listAppend(SLL *x, int v) {
   requires: (x -m> struct ln { #head; NULL }) *
             (x == #v) *
             (z == #z) *
-            list(#z, #alpha) *
+            sll(#z, #alpha) *
             i__is_int((len #alpha) + 1)
-  ensures: list(ret, #head::#alpha)
+  ensures: sll(ret, #head::#alpha)
 } */
 SLL *listPrepend(SLL *x, SLL *z) {
-    __GILLIAN("unfold list(#z, #alpha)");
+    __GILLIAN("unfold sll(#z, #alpha)");
     x->next = z;
     return x;
 }
 
 /*@ spec listPrependV(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * i__is_int(#v) * i__is_int((len #alpha) + 1)
-  ensures: list(ret, #v::#alpha)
+  requires: (x == #x) * sll(#x, #alpha) * (v == #v) * i__is_int(#v) * i__is_int((len #alpha) + 1)
+  ensures: sll(ret, #v::#alpha)
 }
 */
 SLL* listPrependV(SLL *x, int v) {
   SLL *el = malloc(sizeof(SLL));
   el->data = v;
-  __GILLIAN("unfold list(#x, #alpha)");
+  __GILLIAN("unfold sll(#x, #alpha)");
   el->next = x;
   return el;
 }
 
 /*@ spec listLength(x) {
-  requires: list(#x, #alpha) * (x == #x)
-  ensures:  list(#x, #alpha) * (ret == int(#r)) * (#r == len #alpha)
+  requires: sll(#x, #alpha) * (x == #x)
+  ensures:  sll(#x, #alpha) * (ret == int(#r)) * (#r == len #alpha)
 } */
 int listLength(SLL *x) {
     if (x == NULL) {
@@ -106,7 +106,7 @@ int listLength(SLL *x) {
 }
 
 /*@ spec listDispose(x) {
-  requires: list(#x, #alpha) * (x == #x)
+  requires: sll(#x, #alpha) * (x == #x)
   ensures:  emp
 } */
 void listDispose(SLL *x) {
@@ -120,8 +120,8 @@ void listDispose(SLL *x) {
 }
 
 /*@ spec listCopy(x) {
-  requires: list(#x, #alpha) * (x == #x)
-  ensures:  list(ret, #alpha) * list(#x, #alpha)
+  requires: sll(#x, #alpha) * (x == #x)
+  ensures:  sll(ret, #alpha) * sll(#x, #alpha)
 } */
 SLL *listCopy(SLL *x) {
     SLL *r;
@@ -135,8 +135,8 @@ SLL *listCopy(SLL *x) {
 }
 
 /*@ spec listConcat(x, y) {
-  requires: list(#x, #alpha) * (x == #x) * list(#y, #beta) * (y == #y) * i__is_int((len #alpha) + (len #beta))
-  ensures:  list(ret, #alpha @ #beta)
+  requires: sll(#x, #alpha) * (x == #x) * sll(#y, #beta) * (y == #y) * i__is_int((len #alpha) + (len #beta))
+  ensures:  sll(ret, #alpha @ #beta)
 } */
 SLL *listConcat(SLL *x, SLL *y) {
     SLL *r;
@@ -144,9 +144,9 @@ SLL *listConcat(SLL *x, SLL *y) {
         r = y;
     } else {
         SLL *c = listConcat(x->next, y);
-        __GILLIAN("assert [[bind #gamma]] list(c, #gamma)");
-        __GILLIAN("unfold list(c, #gamma)");
-        __GILLIAN("fold list(c, #gamma)");
+        __GILLIAN("assert [[bind #gamma]] sll(c, #gamma)");
+        __GILLIAN("unfold sll(c, #gamma)");
+        __GILLIAN("fold sll(c, #gamma)");
         x->next = c;
         r = x;
     };
