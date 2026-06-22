@@ -19,8 +19,8 @@ $VERIFY verification/dll.c
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
-echo "--- verifying CC_SLL ---"
-$VERIFY verification/cc_sll.c
+echo "--- verifying CC SLL ---"
+$VERIFY verification/cc_slist.c
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
