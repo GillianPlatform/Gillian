@@ -55,13 +55,34 @@ module Error = struct
         let len = List.length es in
         Fmt.pf fmt "%d analysis failure%s!" len (if len > 1 then "s" else "")
     | true, CompilationError { msg; _ }
-    | _, CompilationError { msg; loc = None; _ } ->
+    | false, CompilationError { msg; loc = None; _ } ->
         Fmt.pf fmt "Error during compilation.\n%s" msg
-    | false, CompilationError { msg; loc; _ } ->
-        Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc
-          msg
+    | false, CompilationError { msg; loc; additional_data } ->
+        let () =
+          Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc
+            msg
+        in
+        let () =
+          match additional_data with
+          | Some j -> Fmt.pf fmt "\n%a" (Yojson.Safe.pretty_print ?std:None) j
+          | None -> ()
+        in
+        ()
     | _, OperationError o -> Fmt.pf fmt "%s" o
-    | _, InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
+    | true, InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
+    | false, InternalError { msg; backtrace; additional_data } ->
+        let () = Fmt.pf fmt "Internal error!\n%s" msg in
+        let () =
+          match additional_data with
+          | Some j -> Fmt.pf fmt "\n%a" (Yojson.Safe.pretty_print ?std:None) j
+          | None -> ()
+        in
+        let () =
+          match backtrace with
+          | Some b -> Fmt.pf fmt "\n%s" b
+          | None -> ()
+        in
+        ()
 
   let show' ?brief = Fmt.to_to_string (pp' ?brief)
   let pp = pp' ~brief:false
