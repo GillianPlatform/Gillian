@@ -195,7 +195,11 @@ functor
       let _ = consume_cmd prev_id branch_case exec_data state in
       ()
 
-    let get_matches_at_id id state = (get_exn state.map id).data.matches
+    let get_matches_at_id id state =
+      match get state.map id with
+      | Some node -> node.data.matches
+      | None -> []
+
     let path_of_id id state = (get_exn state.map id).data.branch_path
 
     let cases_at_id id state =

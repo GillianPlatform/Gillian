@@ -141,11 +141,10 @@ struct
       let open Annot in
       let open Branch_case in
       let- () =
-        match (nest_kind, ends) with
-        | Some (Fun_call _), [ (Unknown, bdata) ] ->
-            if is_unevaluated_funcall then None
-            else Some (Ok [ (Func_exit_placeholder, bdata) ])
-        | Some (Fun_call _), _ ->
+        match (is_unevaluated_funcall, nest_kind, ends) with
+        | false, Some (Fun_call _), [ (Unknown, bdata) ] ->
+            Some (Ok [ (Func_exit_placeholder, bdata) ])
+        | false, Some (Fun_call _), _ ->
             Some (Error "Unexpected branching in cmd with Fun_call nest")
         | _ -> None
       in
@@ -892,7 +891,12 @@ struct
     init_or_handle ~state ~prev_id ?gil_case exec_data
 
   let dump = to_yojson
-  let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
+
+  let get_matches_at_id id { map; _ } =
+    match get map id with
+    | Some node -> node.data.matches
+    | None -> []
+
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
   let previous_step id { map; _ } =

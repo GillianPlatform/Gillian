@@ -844,7 +844,12 @@ struct
   end
 
   let init_or_handle = Init_or_handle.f
-  let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
+
+  let get_matches_at_id id { map; _ } =
+    match get map id with
+    | Some node -> node.data.matches
+    | None -> []
+
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
   let previous_step id { map; _ } =
