@@ -209,9 +209,6 @@ struct
       let add_node state ?id (node : Map_node.t) =
         let id = Option.value id ~default:node.id in
         let { all_nodes; changed_nodes; _ } = state.debug_state in
-        DL.log (fun m ->
-            let s = if Hashtbl.mem all_nodes id then "updating" else "adding" in
-            m ~json:[ ("node", Map_node.to_yojson node) ] "%s node %s" s id);
         let () = Hashtbl.replace all_nodes id node in
         let () = Hashset.add changed_nodes id in
         ()
