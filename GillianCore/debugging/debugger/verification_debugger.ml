@@ -40,10 +40,6 @@ struct
 
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
-      Config.Verification.(
-        let procs_to_verify = !procs_to_verify in
-        if not (procs_to_verify |> List.mem proc_name) then
-          set_procs_to_verify (procs_to_verify @ [ proc_name ]));
       Verification.init_proc ~init_data:debug_state.init_data debug_state.prog
         proc_name
 

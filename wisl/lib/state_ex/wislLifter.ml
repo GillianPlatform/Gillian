@@ -88,7 +88,7 @@ struct
     matches : Match_map.matching list;
     errors : string list;
     submap : id submap;
-    loc : string * int;
+    loc : (string * int) option;
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
@@ -112,7 +112,7 @@ struct
       display : string;
       stack_info : id list * stack_direction option;
       is_loop_end : bool;
-      loc : string * int;
+      loc : (string * int) option;
     }
     [@@deriving to_yojson]
 
@@ -157,7 +157,7 @@ struct
       submap : id submap;
       callers : id list;
       stack_direction : stack_direction option;
-      loc : string * int;
+      loc : (string * int) option;
       has_return : bool;
     }
     [@@deriving yojson]
@@ -209,25 +209,62 @@ struct
     let is_loop_end ~is_loop_func ~proc_name exec_data =
       is_loop_func && get_fun_call_name exec_data = Some proc_name
 
+    let make_canonical_data_if_error
+        ~(canonical_data : canonical_cmd_data option)
+        ~ends
+        ~errors
+        ~all_ids
+        ~prev : (canonical_cmd_data * (case * branch_data) list) option =
+      let/ () = canonical_data |> Option.map (fun c -> (c, ends)) in
+      match errors with
+      | [] -> None
+      | _ ->
+          let _, _, callers = Option.get prev in
+          let stack_info = (callers, None) in
+          let c : canonical_cmd_data =
+            {
+              id = all_ids |> List.rev |> List.hd;
+              display = "<error>";
+              stack_info;
+              is_loop_end = false;
+              loc = None;
+            }
+          in
+          Some (c, [])
+
     let finish ~exec_data partial =
-      let ({ prev; all_ids; ends; nest_kind; matches; errors; has_return; _ }
+      let ({
+             prev;
+             all_ids;
+             ends;
+             nest_kind;
+             matches;
+             errors;
+             has_return;
+             canonical_data;
+             _;
+           }
             : partial_data) =
         partial
+      in
+      let errors = errors |> Ext_list.to_list in
+      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
+      let ends = Ext_list.to_list ends in
+      let canonical_data =
+        make_canonical_data_if_error ~canonical_data ~ends ~errors ~all_ids
+          ~prev
       in
       let prev =
         let+ id, branch, _ = prev in
         (id, branch)
       in
-      let** { id; display; stack_info; loc; is_loop_end } =
-        partial.canonical_data
-        |> Option.to_result
-             ~none:"Trying to finish partial with no canonical data!"
+      let** { id; display; stack_info; loc; is_loop_end }, ends =
+        Option.to_result
+          ~none:"Trying to finish partial with no canonical data!"
+          canonical_data
       in
       let callers, stack_direction = stack_info in
-      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
       let matches = matches |> Ext_list.to_list in
-      let errors = errors |> Ext_list.to_list in
-      let ends = Ext_list.to_list ends in
       let submap =
         match nest_kind with
         | Some (LoopBody p) -> Proc p
@@ -354,10 +391,12 @@ struct
             in
             let** stack_info = get_stack_info ~partial exec_data in
             let loc =
-              annot.origin_loc |> Option.get
-              |> Debugger_utils.location_to_display_location
+              Option.map
+                (fun loc ->
+                  let loc = Debugger_utils.location_to_display_location loc in
+                  (loc.loc_source, loc.loc_start.pos_line))
+                annot.origin_loc
             in
-            let loc = (loc.loc_source, loc.loc_start.pos_line) in
             partial.canonical_data <-
               Some { id; display; stack_info; is_loop_end; loc };
             Ok ()
@@ -844,7 +883,12 @@ struct
   end
 
   let init_or_handle = Init_or_handle.f
-  let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
+
+  let get_matches_at_id id { map; _ } =
+    match get map id with
+    | Some node -> node.data.matches
+    | None -> []
+
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
   let previous_step id { map; _ } =
@@ -1053,12 +1097,14 @@ struct
     | Either.Right (id, case) -> request_next state id case
 
   let is_breakpoint ~start ~current =
-    let file, line = current.data.loc in
-    let- () =
-      let file', line' = start.data.loc in
-      if file = file' && line = line' then Some false else None
-    in
-    Effect.perform (IsBreakpoint (file, [ line ]))
+    match current.data.loc with
+    | None -> false
+    | Some (file, line) ->
+        let- () =
+          let* file', line' = start.data.loc in
+          if file = file' && line = line' then Some false else None
+        in
+        Effect.perform (IsBreakpoint (file, [ line ]))
 
   let step_all ~start state id case =
     let cmd = get_exn state.map id in
