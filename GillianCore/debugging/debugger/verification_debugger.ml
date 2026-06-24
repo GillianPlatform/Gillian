@@ -137,17 +137,17 @@ struct
             let open L.Logging_constants.Content_type in
             let open Verification.SMatcher.Logging in
             let open Verification.SState in
-            let astate =
+            let astate, subst =
               if type_ = assertion then
                 let report =
                   of_yojson_string AssertionReport.of_yojson content
                 in
-                report.astate
+                (report.astate, Some report.subst)
               else if type_ = match_recovery then
                 let report =
                   of_yojson_string MatchRecoveryReport.of_yojson content
                 in
-                report.astate
+                (report.astate, None)
               else
                 Fmt.failwith "get_astate: report %a has unexpected type %s"
                   L.Report_id.pp id type_
@@ -157,7 +157,9 @@ struct
             let pfs = get_pfs astate.state in
             let types = get_typ_env astate.state in
             let preds = astate.preds in
-            let astate = make_astate ~store ~memory ~pfs ~types ~preds () in
+            let astate =
+              make_astate ~store ~memory ~pfs ~types ~preds ?subst ()
+            in
             Some (id, astate)
         | [] -> None
       in

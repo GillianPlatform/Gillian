@@ -583,35 +583,6 @@ struct
         Map_update_event_body.Current_steps.make ~primary:(Some p)
           ~secondary:(Some s) ()
 
-      let get_substs _ = []
-      (* let get_substs state = *)
-      (*   state.procs |> Hashtbl.to_seq *)
-      (*   |> Seq.map (fun (proc_name, proc) -> *)
-      (*          let+ substs = *)
-      (*            let* assertion_id, match_id = *)
-      (*              List_utils.hd_opt proc.selected_match_steps *)
-      (*            in *)
-      (*            let* match_ = *)
-      (*              Hashtbl.find_opt state.debug_state.matches match_id *)
-      (*            in *)
-      (*            let* node = Hashtbl.find_opt match_.nodes assertion_id in *)
-      (*            let* substs = *)
-      (*              match node with *)
-      (*              | Match_map.Assertion data, _, _ -> Some data.substitutions *)
-      (*              | _ -> None *)
-      (*            in *)
-      (*            let substs' = *)
-      (*              substs *)
-      (*              |> List.map @@ fun Match_map.{ assert_id; subst = a, b } -> *)
-      (*                 `List *)
-      (*                   [ `String (show_id assert_id); `String a; `String b ] *)
-      (*            in *)
-      (*            Some substs' *)
-      (*          in *)
-      (*          (show_proc_id proc_name, `List substs)) *)
-      (*   |> Seq.filter_map (fun x -> x) *)
-      (*   |> List.of_seq *)
-
       let get_status state =
         let rec aux acc proc_name =
           let acc = SS.add proc_name acc in
@@ -643,13 +614,12 @@ struct
         (finished, has_errors)
 
       let get_map_ext state : Yojson.Safe.t =
-        let substs = [ ("substs", `Assoc (get_substs state)) ] in
         let status =
           let finished, has_errors = get_status state in
           let status = `List [ `Bool finished; `Bool has_errors ] in
           [ ("status", status) ]
         in
-        `Assoc (substs @ status)
+        `Assoc status
 
       let get_map_update state =
         let nodes = get_changed_nodes ~clear:true state in
