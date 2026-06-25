@@ -23,9 +23,9 @@ module Block = struct
 
   let empty = Allocated { data = SFVL.empty; bound = None }
 
-  let is_empty t =
+  let is_empty ?(freed_is_empty = false) t =
     match t with
-    | Freed -> false
+    | Freed -> freed_is_empty
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
   let substitution ~partial subst block =
@@ -356,7 +356,8 @@ let to_seq heap =
          | Block.Freed -> (loc, None)
          | Allocated { data; bound } -> (loc, Some (data, bound)))
 
-let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
+let is_empty ?freed_is_empty t =
+  Hashtbl.to_seq_values t |> Seq.for_all (Block.is_empty ?freed_is_empty)
 
 (***** Clean-up *****)
 
