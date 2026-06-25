@@ -16,7 +16,7 @@ val init : unit -> t
 val alloc : t -> int -> string
 val dispose : t -> string -> (unit, err) Delayed_result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
-val is_empty : t -> bool
+val is_empty : ?freed_is_empty:bool -> t -> bool
 
 val get_cell :
   t -> string -> Expr.t -> (string * Expr.t * Expr.t, err) Delayed_result.t

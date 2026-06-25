@@ -1372,33 +1372,32 @@ struct
       open Variable
 
       let pvars = { id = 1; name = "Program store" }
-      let heap = { id = 2; name = "Heap" }
-      let preds = { id = 3; name = "Predicates" }
-      let pfs = { id = 4; name = "Pure formulae" }
-      let types = { id = 5; name = "Types" }
-      let axioms = { id = 6; name = "Axioms" }
-      let all = [ pvars; heap; pfs; types; preds; axioms ]
+      let subst = { id = 2; name = "Substitutions" }
+      let heap = { id = 3; name = "Heap" }
+      let preds = { id = 4; name = "Predicates" }
+      let pfs = { id = 5; name = "Pure formulae" }
+      let types = { id = 6; name = "Types" }
+      let axioms = { id = 7; name = "Axioms" }
+      let all = [ pvars; subst; heap; pfs; types; preds; axioms ]
     end
 
     let get_store_vars store =
       List.filter_map
         (fun (var, (value : Gil_syntax.Expr.t)) ->
-          if Str.string_match (Str.regexp "gvar") var 0 then None
-          else
-            let match_offset lst loc =
-              match lst with
-              | [ Expr.Lit (Int offset) ] ->
-                  Fmt.str "-> (%s, %d)" loc (Z.to_int offset)
-              | [ offset ] -> Fmt.str "-> (%s, %a)" loc pp_expr offset
-              | _ -> Fmt.to_to_string pp_expr value
-            in
-            let value =
-              match value with
-              | Expr.EList (Lit (Loc loc) :: rest)
-              | Expr.EList (LVar loc :: rest) -> match_offset rest loc
-              | _ -> Fmt.to_to_string pp_expr value
-            in
-            Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
+          let match_offset lst loc =
+            match lst with
+            | [ Expr.Lit (Int offset) ] ->
+                Fmt.str "> (%s, %d)" loc (Z.to_int offset)
+            | [ offset ] -> Fmt.str "> (%s, %a)" loc pp_expr offset
+            | _ -> Fmt.to_to_string pp_expr value
+          in
+          let value =
+            match value with
+            | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
+              -> match_offset rest loc
+            | _ -> Fmt.to_to_string pp_expr value
+          in
+          Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
         store
       |> List.sort Stdlib.compare
 
@@ -1463,15 +1462,14 @@ struct
       let pfs_vars, axiom_vars =
         pfs |> PFS.to_list
         |> List.partition_map (fun formula ->
-               let var = Variable.make ~name:"" in
                match pr_list_axiom formula with
                | None ->
                    let value = Fmt.to_to_string pp_expr formula in
-                   Left (var ~value ())
-               | Some value -> Right (var ~value ()))
+                   Left (Variable.make ~value ())
+               | Some value -> Right (Variable.make ~value ()))
       in
-      let pfs_vars = List.sort Stdlib.compare pfs_vars in
-      let axiom_vars = List.sort Stdlib.compare axiom_vars in
+      let pfs_vars = List.sort Variable.compare_value pfs_vars in
+      let axiom_vars = List.sort Variable.compare_value axiom_vars in
       (pfs_vars, axiom_vars)
 
     let get_pred_vars preds =
@@ -1515,10 +1513,18 @@ struct
                else if value = Type.ObjectType then "Block identifier"
                else Type.str value
              in
-             Variable.{ name; value; type_ = None; var_ref = 0 })
-      |> List.sort Variable.(fun v w -> Stdlib.compare v.name w.name)
+             Variable.make ~name ~value ())
+      |> List.sort Variable.compare_name
 
-    let f _ { store; memory; pfs; types; preds } _ =
+    let get_subst_vars subst : Variable.t list =
+      subst |> SVal.SESubst.to_list
+      |> List.map (fun (a, b) ->
+             let name = Fmt.to_to_string pp_expr a in
+             let value = Fmt.to_to_string pp_expr b in
+             Variable.make ~name ~value ())
+      |> List.sort Variable.compare_name
+
+    let f _ { store; memory; pfs; types; preds; subst } _ =
       let variables = Hashtbl.create 0 in
       (* Scopes and var refs share IDs; they can't clash *)
       let new_var_ref =
@@ -1533,6 +1539,15 @@ struct
       let var_groups =
         let pvars = get_store_vars store in
         (Scopes.pvars, pvars) :: var_groups
+      in
+
+      (* Subst *)
+      let var_groups =
+        match subst with
+        | Some subst ->
+            let subst_vars = get_subst_vars subst in
+            (Scopes.subst, subst_vars) :: var_groups
+        | None -> var_groups
       in
 
       (* Heap *)

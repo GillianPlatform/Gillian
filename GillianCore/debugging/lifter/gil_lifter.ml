@@ -221,46 +221,56 @@ functor
 
       module Scopes = struct
         let pvars = { id = 1; name = "Store" }
-        let heap = { id = 2; name = "Memory" }
-        let preds = { id = 3; name = "Predicates" }
-        let pfs = { id = 4; name = "Pure formulae" }
-        let types = { id = 5; name = "Types" }
-        let all = [ pvars; heap; preds; pfs; types ]
+        let subst = { id = 2; name = "Substitutions" }
+        let heap = { id = 3; name = "Memory" }
+        let preds = { id = 4; name = "Predicates" }
+        let pfs = { id = 5; name = "Pure formulae" }
+        let types = { id = 6; name = "Types" }
+        let all = [ pvars; subst; heap; preds; pfs; types ]
       end
+
+      let expr_to_string = Fmt.to_to_string (Fmt.hbox Expr.pp)
 
       let get_store_vars store =
         store
-        |> List.map (fun (var, value) : Variable.t ->
-               let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-               { name = var; value; type_ = None; var_ref = 0 })
-        |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+        |> List.map (fun (name, value) : Variable.t ->
+               let value = expr_to_string value in
+               make ~name ~value ())
+        |> List.sort compare_name
 
       let get_type_env_vars (types : Type_env.t) : Variable.t list =
         Type_env.to_list types
-        |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
         |> List.map (fun (name, value) ->
                let value = Type.str value in
-               { name; value; type_ = None; var_ref = 0 })
-        |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+               make ~name ~value ())
+        |> List.sort compare_name
 
       let get_pred_vars (preds : Preds.t) : Variable.t list =
         preds |> Preds.to_list
         |> List.map (fun pred ->
                let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
-               { name = ""; value; type_ = None; var_ref = 0 })
-        |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+               make ~value ())
+        |> List.sort (fun v w -> String.compare v.value w.value)
 
       let get_pure_formulae_vars (pfs : PFS.t) : Variable.t list =
         pfs |> PFS.to_list
         |> List.map (fun formula ->
-               let value = Fmt.to_to_string (Fmt.hbox Expr.pp) formula in
-               { name = ""; value; type_ = None; var_ref = 0 })
-        |> List.sort (fun v w -> Stdlib.compare v.value w.value)
+               let value = expr_to_string formula in
+               make ~value ())
+        |> List.sort compare_value
+
+      let get_subst_vars (subst : SVal.SESubst.t) : Variable.t list =
+        subst |> SVal.SESubst.to_list
+        |> List.map (fun (a, b) ->
+               let name = expr_to_string a in
+               let value = expr_to_string b in
+               make ~name ~value ())
+        |> List.sort compare_name
 
       let get_variables'
           ?add_heap_variables
           _
-          { store; memory; pfs; types; preds }
+          { store; memory; pfs; types; preds; subst }
           _ =
         let variables = Hashtbl.create 0 in
         (* Scopes and var refs share IDs; they can't clash *)
@@ -276,6 +286,15 @@ functor
         let var_groups =
           let pvars = get_store_vars store in
           (Scopes.pvars, Some pvars) :: var_groups
+        in
+
+        (* Subst *)
+        let var_groups =
+          match subst with
+          | Some subst ->
+              let subst_vars = get_subst_vars subst in
+              (Scopes.subst, Some subst_vars) :: var_groups
+          | None -> var_groups
         in
 
         (* Heap *)

@@ -215,6 +215,6 @@ let can_fix = function
   | _ -> false
 
 let get_failing_constraint _ = Expr.true_
-let sure_is_nonempty t = not (WislSHeap.is_empty t)
+let sure_is_nonempty t = not (WislSHeap.is_empty ~freed_is_empty:true t)
 let split_further _ _ _ _ = None
 let execute_action = execute_action ?alloc_if_missing:None

@@ -319,7 +319,7 @@ struct
       { id = 3; name = "Predicates" };
     ]
 
-  let get_variables _ { store; memory; pfs; types; preds } _ =
+  let get_variables _ { store; memory; pfs; types; preds; _ } _ =
     let open Gil_lifter in
     let open Variable in
     let variables = Hashtbl.create 0 in

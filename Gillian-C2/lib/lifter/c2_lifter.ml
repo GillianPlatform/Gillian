@@ -135,16 +135,16 @@ struct
     [@@deriving yojson]
 
     let ends_to_cases
-        ~is_unevaluated_funcall
+        ~is_evaluated_funcall
         ~nest_kind
         (ends : (Branch_case.case * branch_data) list) =
       let open Annot in
       let open Branch_case in
       let- () =
-        match (is_unevaluated_funcall, nest_kind, ends) with
-        | false, Some (Fun_call _), [ (Unknown, bdata) ] ->
+        match (is_evaluated_funcall, nest_kind, ends) with
+        | true, Some (Fun_call _), [ (Unknown, bdata) ] ->
             Some (Ok [ (Func_exit_placeholder, bdata) ])
-        | false, Some (Fun_call _), _ ->
+        | true, Some (Fun_call _), _ ->
             Some (Error "Unexpected branching in cmd with Fun_call nest")
         | _ -> None
       in
@@ -226,12 +226,12 @@ struct
       in
       let matches = Ext_list.to_list matches in
       let++ next_kind =
-        let is_unevaluated_funcall =
+        let is_evaluated_funcall =
           match funcall_kind with
-          | Some Unevaluated_funcall -> true
+          | Some Evaluated_funcall -> true
           | _ -> false
         in
-        let++ cases = ends_to_cases ~is_unevaluated_funcall ~nest_kind ends in
+        let++ cases = ends_to_cases ~is_evaluated_funcall ~nest_kind ends in
         match cases with
         | [] -> Zero
         | [ (Case (Unknown, _), _) ] ->
