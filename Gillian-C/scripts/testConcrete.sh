@@ -1,3 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-gillian-c bulk-exec concrete
+if [[ "${GITHUB_ACTIONS}" ]]; then
+	GILLIAN_C="gillian-c"
+else
+  GILLIAN_C="dune exec -- gillian-c"
+fi
+
+$GILLIAN_C bulk-exec concrete

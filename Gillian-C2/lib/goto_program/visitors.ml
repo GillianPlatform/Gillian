@@ -101,7 +101,7 @@ class ['a] iter =
       | EUnhandled _ -> ()
 
     method visit_expr ~(ctx : 'a) (e : Expr.t) =
-      self#visit_location ~ctx e.location;
+      Option.iter (self#visit_location ~ctx) e.location;
       self#visit_expr_value ~ctx ~type_:e.type_ e.value;
       self#visit_type ~ctx e.type_
 
@@ -147,7 +147,7 @@ class ['a] iter =
       | Goto _ | Skip | SUnhandled _ | Break | Continue -> ()
 
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
-      self#visit_location ~ctx stmt.stmt_location;
+      Option.iter (self#visit_location ~ctx) stmt.stmt_location;
       self#visit_stmt_body ~ctx stmt.body
   end
 
@@ -356,7 +356,7 @@ class ['a] map =
 
     method visit_expr ~(ctx : 'a) (e : Expr.t) =
       let new_value = self#visit_expr_value ~ctx ~type_:e.type_ e.value in
-      let new_location = self#visit_location ~ctx e.location in
+      let new_location = Option.map (self#visit_location ~ctx) e.location in
       let new_type = self#visit_type ~ctx e.type_ in
 
       if
@@ -472,7 +472,9 @@ class ['a] map =
 
     method visit_stmt ~(ctx : 'a) (stmt : Stmt.t) =
       let new_body = self#visit_stmt_body ~ctx stmt.body in
-      let new_location = self#visit_location ~ctx stmt.stmt_location in
+      let new_location =
+        Option.map (self#visit_location ~ctx) stmt.stmt_location
+      in
       if new_body == stmt.body && new_location == stmt.stmt_location then stmt
       else
         {

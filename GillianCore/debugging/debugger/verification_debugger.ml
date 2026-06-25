@@ -40,12 +40,8 @@ struct
 
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
-      Config.Verification.(
-        let procs_to_verify = !procs_to_verify in
-        if not (procs_to_verify |> List.mem proc_name) then
-          set_procs_to_verify (procs_to_verify @ [ proc_name ]));
-      Verification.verify_up_to_procs ~init_data:debug_state.init_data
-        ~proc_name debug_state.prog
+      Verification.init_proc ~init_data:debug_state.init_data debug_state.prog
+        proc_name
 
     module Match = struct
       open Verification.SMatcher.Logging
@@ -141,17 +137,17 @@ struct
             let open L.Logging_constants.Content_type in
             let open Verification.SMatcher.Logging in
             let open Verification.SState in
-            let astate =
+            let astate, subst =
               if type_ = assertion then
                 let report =
                   of_yojson_string AssertionReport.of_yojson content
                 in
-                report.astate
+                (report.astate, Some report.subst)
               else if type_ = match_recovery then
                 let report =
                   of_yojson_string MatchRecoveryReport.of_yojson content
                 in
-                report.astate
+                (report.astate, None)
               else
                 Fmt.failwith "get_astate: report %a has unexpected type %s"
                   L.Report_id.pp id type_
@@ -161,7 +157,9 @@ struct
             let pfs = get_pfs astate.state in
             let types = get_typ_env astate.state in
             let preds = astate.preds in
-            let astate = make_astate ~store ~memory ~pfs ~types ~preds () in
+            let astate =
+              make_astate ~store ~memory ~pfs ~types ~preds ?subst ()
+            in
             Some (id, astate)
         | [] -> None
       in

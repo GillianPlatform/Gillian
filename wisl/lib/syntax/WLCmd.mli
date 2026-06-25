@@ -1,6 +1,10 @@
 type tt =
   | Fold of string * WLExpr.t list
-  | Unfold of string * WLExpr.t list
+  | Unfold of {
+      pred : string;
+      params : WLExpr.t list;
+      bindings : (string * string) list option;
+    }
   | Package of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
   | ApplyLem of string * WLExpr.t list * string list
       (** apply \{exists: ...\} ... *)

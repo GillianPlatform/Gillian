@@ -36,13 +36,9 @@ module Make
   module Run = struct
     open ResultsDir
     open ChangeTracker
+    open Syntaxes.Result
 
-    let counter_example res =
-      let error_state, errors =
-        match res with
-        | Exec_res.RFail { error_state; errors; _ } -> (error_state, errors)
-        | _ -> failwith "Expected failure"
-      in
+    let counter_example Exec_res.{ error_state; errors; _ } =
       let f =
         errors
         |> List.find_map (function
@@ -57,7 +53,35 @@ module Make
       let subst = SState.sat_check_f error_state fs in
       subst
 
-    let run_main prog init_data =
+    let print_json_results all_results =
+      if !Config.json_ui then (
+        Fmt.pr "===JSON RESULTS===\n@?";
+        let state_to_yojson _ = `Null in
+        let json_results =
+          List.map
+            (Engine.Exec_res.to_yojson state_to_yojson
+               S_interpreter.state_vt_to_yojson S_interpreter.err_t_to_yojson)
+            all_results
+        in
+        Fmt.pr "%a" (Yojson.Safe.pretty_print ~std:false) (`List json_results))
+
+    let mk_failure e =
+      let counter_example = counter_example e in
+      let msg =
+        Fmt.str
+          "Here's a counterexample: %a@\n\
+           @?Here's an example of a final error state: %a@\n\
+           @?"
+          (Fmt.option
+             ~none:(Fmt.any "Couldn't produce counterexample")
+             SVal.SESubst.pp)
+          counter_example
+          (Exec_res.pp_rfail SState.pp S_interpreter.pp_err_t)
+          e
+      in
+      Gillian_result.analysis_failure ~in_target:e.proc ?loc:e.loc msg
+
+    let run_main prog init_data : unit Gillian_result.t =
       let all_results =
         let open Syntaxes.List in
         let+ result_before_leak_check =
@@ -70,53 +94,26 @@ module Make
           S_interpreter.check_leaks result_before_leak_check
         else result_before_leak_check
       in
-      if !Config.json_ui then (
-        Fmt.pr "===JSON RESULTS===\n@?";
-        let state_to_yojson _ = `Null in
-        let json_results =
-          List.map
-            (Engine.Exec_res.to_yojson state_to_yojson
-               S_interpreter.state_vt_to_yojson S_interpreter.err_t_to_yojson)
-            all_results
-        in
-        Fmt.pr "%a" (Yojson.Safe.pretty_print ~std:false) (`List json_results));
-      let success =
-        List.for_all
-          (function
-            | Exec_res.RSucc _ -> true
-            | _ -> false)
+      Printf.printf "Total time (Compilation + Symbolic testing): %fs\n"
+        (Sys.time () -. !start_time);
+      print_json_results all_results;
+      let first_error =
+        List.find_map
+          Exec_res.(
+            function
+            | RSucc _ -> None
+            | RFail f -> Some f)
           all_results
       in
-      let total_time = Sys.time () -. !start_time in
-      Printf.printf "Total time (Compilation + Symbolic testing): %fs\n"
-        total_time;
-      if success then
-        let () = Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!" in
-        exit 0
-      else
-        let () =
-          Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occurred!"
-        in
-        let first_error =
-          List.find
-            (function
-              | Exec_res.RFail _ -> true
-              | _ -> false)
-            all_results
-        in
-        let counter_example = counter_example first_error in
-        Fmt.pr "Here's a counterexample: %a@\n@?"
-          (Fmt.option
-             ~none:(Fmt.any "Couldn't produce counterexample")
-             SVal.SESubst.pp)
-          counter_example;
-        let () =
-          Fmt.pr "Here's an example of final error state: %a@\n@?"
-            (Exec_res.pp SState.pp S_interpreter.pp_state_vt
-               S_interpreter.pp_err_t)
-            first_error
-        in
-        exit 1
+      match first_error with
+      | None ->
+          let () = Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!" in
+          Ok ()
+      | Some e ->
+          let () =
+            Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors occurred!"
+          in
+          mk_failure e
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
@@ -136,19 +133,22 @@ module Make
           (proc_changes.changed_procs @ proc_changes.new_procs
          @ proc_changes.dependent_procs)
       in
-      if SS.mem !Config.entry_point changed_procs then
-        let () = run_main prog init_data in
-        let cur_call_graph = S_interpreter.call_graph in
-        let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-        write_symbolic_results cur_source_files cur_call_graph ~diff
-      else write_symbolic_results cur_source_files prev_call_graph ~diff:""
+      let+ call_graph, diff =
+        if SS.mem !Config.entry_point changed_procs then
+          let+ () = run_main prog init_data in
+          let cur_call_graph = S_interpreter.call_graph in
+          let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
+          (cur_call_graph, diff)
+        else Ok (prev_call_graph, "")
+      in
+      write_symbolic_results cur_source_files call_graph ~diff
 
     let rerun_all source_files prog init_data =
       (* Always re-run program *)
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let () = run_main prog init_data in
+      let+ () = run_main prog init_data in
       let call_graph = S_interpreter.call_graph in
       write_symbolic_results cur_source_files call_graph ~diff:""
 
@@ -209,7 +209,7 @@ module Make
         ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
     in
     let () = L.normal (fun m -> m "*** Stage 2: Transforming the program.\n") in
-    let+ prog =
+    let* prog =
       Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
     let () =

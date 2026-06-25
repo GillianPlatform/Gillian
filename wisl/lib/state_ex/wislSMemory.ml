@@ -19,21 +19,16 @@ let init () = WislSHeap.init ()
 let get_init_data _ = ()
 let clear _ = WislSHeap.init ()
 
-let resolve_loc loc =
+let resolve_loc ?(alloc_if_missing = false) loc =
   let* loc_opt = Delayed.resolve_loc loc in
-  match loc_opt with
-  | None -> error (WislSHeap.InvalidLocation loc)
-  | Some loc -> ok loc
-
-let resolve_loc_or_alloc loc =
-  let* resolved_loc_opt = Delayed.resolve_loc loc in
-  (* If we can't find the location, we create a new location and we
+  match (loc_opt, alloc_if_missing) with
+  | Some loc, _ -> ok loc
+  | None, false -> error (WislSHeap.InvalidLocation loc)
+  | None, true ->
+      (* If we can't find the location, we create a new location and we
        add to the path condition that it is equal to the given loc *)
-  match resolved_loc_opt with
-  | Some loc_name -> Delayed.return loc_name
-  | None ->
       let al = ALoc.alloc () in
-      Delayed.return ~learned:[ BinOp (ALoc al, Equal, loc) ] al
+      ok ~learned:[ BinOp (ALoc al, Equal, loc) ] al
 
 let get_cell heap (loc : vt) (offset : vt) =
   let** loc = resolve_loc loc in
@@ -41,9 +36,9 @@ let get_cell heap (loc : vt) (offset : vt) =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc; ofs; value ])
 
-let set_cell heap (loc : vt) (offset : vt) (value : vt) =
-  let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.set_cell heap loc offset value in
+let set_cell ~alloc_if_missing heap (loc : vt) (offset : vt) (value : vt) =
+  let** loc = resolve_loc ~alloc_if_missing loc in
+  let++ () = WislSHeap.set_cell ~alloc_if_missing heap loc offset value in
   (heap, [])
 
 let rem_cell heap (loc : vt) (offset : vt) =
@@ -58,9 +53,9 @@ let get_bound heap loc =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc; b ])
 
-let set_bound heap (loc : vt) (bound : int) =
-  let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.set_bound heap loc bound in
+let set_bound ~alloc_if_missing heap (loc : vt) (bound : int) =
+  let** loc = resolve_loc ~alloc_if_missing loc in
+  let++ () = WislSHeap.set_bound ~alloc_if_missing heap loc bound in
   (heap, [])
 
 let rem_bound heap loc =
@@ -74,10 +69,10 @@ let get_freed heap loc =
   let loc = Expr.loc_from_loc_name loc in
   (heap, [ loc ])
 
-let set_freed heap (loc : vt) =
-  let* loc = resolve_loc_or_alloc loc in
-  let+ () = WislSHeap.set_freed heap loc in
-  Ok (heap, [])
+let set_freed ~alloc_if_missing heap (loc : vt) =
+  let** loc = resolve_loc ~alloc_if_missing loc in
+  let++ () = WislSHeap.set_freed ~alloc_if_missing heap loc in
+  (heap, [])
 
 let rem_freed heap loc =
   let** loc = resolve_loc loc in
@@ -93,17 +88,23 @@ let dispose heap loc =
   let++ () = WislSHeap.dispose heap loc in
   (heap, [])
 
-let execute_action ~action_name heap (args : vt list) =
+let execute_action
+    ?(alloc_if_missing = false)
+    ~action_name
+    heap
+    (args : vt list) =
   let action = WislLActions.ac_from_str action_name in
   match (action, args) with
   | (Load | GetCell), [ loc; ofs ] -> get_cell heap loc ofs
-  | (Store | SetCell), [ loc; ofs; value ] -> set_cell heap loc ofs value
+  | (Store | SetCell), [ loc; ofs; value ] ->
+      set_cell ~alloc_if_missing heap loc ofs value
   | RemCell, [ loc; ofs ] -> rem_cell heap loc ofs
   | GetBound, [ loc ] -> get_bound heap loc
-  | SetBound, [ loc; Lit (Int b) ] -> set_bound heap loc (Z.to_int b)
+  | SetBound, [ loc; Lit (Int b) ] ->
+      set_bound ~alloc_if_missing heap loc (Z.to_int b)
   | RemBound, [ loc ] -> rem_bound heap loc
   | GetFreed, [ loc ] -> get_freed heap loc
-  | SetFreed, [ loc ] -> set_freed heap loc
+  | SetFreed, [ loc ] -> set_freed ~alloc_if_missing heap loc
   | RemFreed, [ loc ] -> rem_freed heap loc
   | Alloc, [ Lit (Int size) ] when Z.geq size Z.one ->
       alloc heap (Z.to_int size)
@@ -146,7 +147,9 @@ let produce ~core_pred heap args =
     | Error _ -> Delayed.return ()
     | Ok _ -> vanish ()
   in
-  let* set_res = execute_action ~action_name:setter heap args in
+  let* set_res =
+    execute_action ~alloc_if_missing:true ~action_name:setter heap args
+  in
   match set_res with
   | Error _ ->
       (* It's ok for failing producers to vanish, no unsoundness *)
@@ -212,5 +215,6 @@ let can_fix = function
   | _ -> false
 
 let get_failing_constraint _ = Expr.true_
-let sure_is_nonempty t = not (WislSHeap.is_empty t)
+let sure_is_nonempty t = not (WislSHeap.is_empty ~freed_is_empty:true t)
 let split_further _ _ _ _ = None
+let execute_action = execute_action ?alloc_if_missing:None

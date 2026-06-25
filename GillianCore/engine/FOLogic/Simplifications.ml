@@ -998,7 +998,7 @@ let simplify_implication
 let admissible_assertion (a : Asrt.t) : bool =
   L.(
     tmi (fun m ->
-        m "-----------\nAdmissible?\n----------\n%s"
+        m "-----------\nAdmissible?\n-----------\n%s"
           ((Fmt.to_to_string Asrt.full_pp) a)));
 
   let pfs = PFS.init () in
@@ -1021,7 +1021,7 @@ let admissible_assertion (a : Asrt.t) : bool =
     List.iter separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
     let res = not (PFS.mem pfs Expr.false_) in
-    L.tmi (fun m -> m "Admissible? %b" res);
+    L.tmi (fun m -> m "Admissible? %b\n" res);
     res
   with e ->
     L.tmi (fun m ->

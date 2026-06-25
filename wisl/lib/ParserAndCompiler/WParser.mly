@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE PAR
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE BIND FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF CONFIG
 %token <CodeLoc.t> SPEC
 
@@ -118,6 +118,8 @@
 %type <WLExpr.t>                         with_variant_def
 %type <WLCmd.t list>                     proof_def
 %type <(string * WType.t option) * bool> pred_param_ins
+%type <(string * string) list>           unfold_bindings
+%type <string * string>                  unfold_binding
 %type <CodeLoc.t * string list>          bindings_with_loc
 %type <WLExpr.t>                         logic_expression
 %type <WBinOp.t>                         logic_binop
@@ -519,9 +521,9 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = UNFOLD; lpr = IDENTIFIER;
-      LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
-    { let (_, pr) = lpr in
-      let bare_lcmd = WLCmd.Unfold (pr, params) in
+      LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE; bindings = option(unfold_bindings)
+    { let (_, pred) = lpr in
+      let bare_lcmd = WLCmd.Unfold { pred; params; bindings } in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = APPLY; lbopt = option(bindings_with_loc); lname = IDENTIFIER; LBRACE;
@@ -555,8 +557,16 @@ logic_command:
       let bare_lcmd = WLCmd.Invariant (a, b, variant) in
       WLCmd.make bare_lcmd loc }
 
+unfold_bindings:
+  | LCBRACE; BIND; binds = separated_list(COMMA, unfold_binding); RCBRACE;
+    { binds }
+
+unfold_binding:
+  | a = LVAR; COLON; b = LVAR { (snd a, snd b) }
+  | a = LVAR { (snd a, snd a) }
+
 bindings_with_loc:
-  | lstart = LCBRACE; EXIST; COLON; lvll = separated_list(COMMA, lvar_or_pvar); lend = RCBRACE;
+  | lstart = LCBRACE; BIND; COLON; lvll = separated_list(COMMA, lvar_or_pvar); lend = RCBRACE;
     { let (_, lvl) = List.split lvll in
       let loc = CodeLoc.merge lstart lend in
       (loc, lvl) }

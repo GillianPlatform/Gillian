@@ -260,3 +260,7 @@ let[@tail_mod_cons] rec drop n = function
   | [] -> []
   | l when n = 0 -> l
   | _ :: r -> drop (n - 1) r
+
+let get_single = function
+  | [ x ] -> Some x
+  | _ -> None

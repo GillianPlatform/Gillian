@@ -5,6 +5,7 @@ open WislConstants.Prefix
 open WislConstants.InternalProcs
 open WislConstants.InternalPreds
 open Gillian.Gil_syntax
+open Gillian.Utils.Generators
 module SS = Gillian.Utils.Containers.SS
 
 (* Some utility functions *)
@@ -84,7 +85,6 @@ let rec compile_val v =
 
 let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
     (WAnnot.t * string option * string Cmd.t) list * Expr.t =
-  let gen_str = Generators.gen_str fname in
   let compile_expr = compile_expr ~fname ~is_loop_prefix in
   let expr_of_string s = Expr.Lit (Literal.String s) in
   let expr_fname_of_binop b =
@@ -112,12 +112,13 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
   let open WExpr in
   match get expr with
   | Val v -> ([], Expr.Lit (compile_val v))
-  | Var "ret" ->
+  | Var x when x = Utils.Names.return_variable ->
       failwith
         (Format.asprintf
-           "ret (at location %s) is the special name used for the return\n\
+           "%s (at location %s) is the special name used for the return\n\
            \                            value in the logic. It cannot be used \
             as a variable name"
+           x
            (CodeLoc.str (get_loc expr)))
   | Var x -> ([], Expr.PVar x)
   | BinOp (e1, WBinOp.LSTCONS, e2) ->
@@ -132,7 +133,7 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       (cmdl1 @ cmdl2, expr)
   | BinOp (e1, b, e2) when is_internal_func b ->
       (* Operator corresponds to pointer arithmetics *)
-      let call_var = gen_str gvar in
+      let call_var = fresh_pvar () in
       let internal_func = expr_fname_of_binop b in
       let cmdl1, comp_expr1 = compile_expr e1 in
       let cmdl2, comp_expr2 = compile_expr e2 in
@@ -169,7 +170,6 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
     the string list contains the name of the variables that are generated. They are existentials. *)
 let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     string list * Asrt.t * Expr.t =
-  let gen_str = Generators.gen_str fname in
   let compile_lexpr = compile_lexpr ~fname in
   let expr_pname_of_binop b =
     WBinOp.(
@@ -199,7 +199,7 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     | LVar x -> ([], [], Expr.LVar x)
     | LBinOp (e1, b, e2) when is_internal_pred b ->
         (* Operator corresponds to pointer arithmetics *)
-        let lout = gen_str sgvar in
+        let lout = Utils.Generators.fresh_lvar () in
         let internal_pred = expr_pname_of_binop b in
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
@@ -256,7 +256,6 @@ let compile_lexpr_perm ?fname lexpr =
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lassert = compile_lassert ~fname in
-  let gen_str = Generators.gen_str fname in
   let compile_lexpr = compile_lexpr ~fname in
   let gil_add e k =
     (* builds GIL expression that is e + k *)
@@ -288,10 +287,10 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           ([], [], (l, bo), expr_offset)
       | None ->
           let exs1, la1, e1 = compile_lexpr le1 in
-          let loc = gen_str sgvar in
+          let loc = fresh_lvar () in
           let offset, expr_offset =
             if not block then
-              let offset = gen_str sgvar in
+              let offset = fresh_lvar () in
               (Some offset, Expr.LVar offset)
             else (None, Expr.zero_i)
           in
@@ -391,12 +390,14 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Fold (pname, params, None)) )
-  | Unfold (pname, lel) ->
-      let gvars, lasrts, params = list_split_3 (List.map compile_lexpr lel) in
+  | Unfold { pred; params; bindings } ->
+      let gvars, lasrts, params =
+        list_split_3 (List.map compile_lexpr params)
+      in
       let existentials = List.concat gvars in
       let to_assert = List.concat lasrts in
       ( build_assert existentials to_assert,
-        LCmd.SL (SLCmd.Unfold (pname, params, None, false)) )
+        LCmd.SL (SLCmd.Unfold (pred, params, bindings, false)) )
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
       let lgvars, lasrts, lparams =
         list_split_3 (List.map compile_lexpr largs)
@@ -507,7 +508,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
       WLAssert.make
         (LPure
            (WLExpr.make
-              (LBinOp (make_var_lexpr "ret", EQUAL, ret_list))
+              (LBinOp
+                 (make_var_lexpr Utils.Names.return_variable, EQUAL, ret_list))
               while_loc))
         while_loc
     in
@@ -566,7 +568,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant ~loop_body_of =
         loop_body_of;
       }
   in
-  let retv = gen_str gvar in
+  let retv = fresh_pvar () in
   let call_cmd =
     Cmd.call retv (Lit (String loop_fname))
       (List.map (fun x -> Expr.PVar x) vars)
@@ -734,7 +736,7 @@ let rec compile_stmt_list
             ctnlab,
             faillab )
       in
-      let g_var = gen_str gvar in
+      let g_var = fresh_pvar () in
       let failcmd = Cmd.Fail ("InvalidBlockPointer", [ comp_e ]) in
       let cmd = Cmd.LAction (g_var, dispose, [ nth comp_e 0 ]) in
       let comp_rest, new_functions = compile_list rest in
@@ -758,7 +760,7 @@ let rec compile_stmt_list
         WAnnot.make_multi ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
           ()
       in
-      let v_get = gen_str gvar in
+      let v_get = fresh_pvar () in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let checkptrcmd =
         Cmd.GuardedGoto
@@ -791,13 +793,13 @@ let rec compile_stmt_list
           x := v_get[2];
       *)
   (* Property Update *)
-  | { snode = Update (e1, e2); sloc; _ } :: rest ->
+  | { snode = Update (e1, e2); sid; sloc } :: rest ->
       let set_annot =
-        WAnnot.make_basic ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
-      let v_set = gen_str gvar in
+      let v_set = fresh_pvar () in
       let setcmd =
         Cmd.LAction (v_set, store, [ nth comp_e1 0; nth comp_e1 1; comp_e2 ])
       in

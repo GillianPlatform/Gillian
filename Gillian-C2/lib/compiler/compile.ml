@@ -28,8 +28,8 @@ open Compile_expr
 
 let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
   let b =
-    let loc = Body_item.compile_location fn.location in
-    Body_item.make ~loc
+    let loc = Option.map Body_item.compile_location fn.location in
+    Body_item.make ?loc
   in
   let symbol = Expr.string fn.symbol in
 
@@ -47,8 +47,8 @@ let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
    Do not call fresh_v or fresh_lv inside *)
 let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
   let b =
-    let loc = Body_item.compile_location gv.location in
-    Body_item.make ~loc
+    let loc = Option.map Body_item.compile_location gv.location in
+    Body_item.make ?loc
   in
   (* If the value is a ZST, we don't even put it in the global environment.
      I'm not sure if that is the correct behaviour. *)
@@ -71,7 +71,7 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
       match gv.value with
       | None -> []
       | Some e ->
-          let v, v_init_cmds = compile_expr ~ctx e in
+          let v, v_init_cmds = compile_expr ~ctx ~pvar_map:[] e in
           let dst = Expr.EList [ loc; Expr.zero_i ] in
           let store_value =
             match v with
@@ -84,9 +84,9 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
           v_init_cmds @ store_value
     in
     let drom_perm_cmd =
-      let drom_perm = Mem_interface.(str_ac (AMem DropPerm)) in
+      let drop_perm = Mem_interface.(str_ac (AMem DropPerm)) in
       let perm_string = Expr.Lit (String (Perm.to_string Writable)) in
-      b @@ Cmd.LAction ("u", drom_perm, [ loc; Expr.zero_i; size; perm_string ])
+      b @@ Cmd.LAction ("u", drop_perm, [ loc; Expr.zero_i; size; perm_string ])
     in
     let symexpr = Expr.Lit (String gv.symbol) in
     let set_symbol_cmd =
@@ -200,7 +200,7 @@ let get_missing_function_body (func : Program.Func.t) =
 
 let compile_function ?map_body ~ctx (func : Program.Func.t) :
     (C2_annot.t, string) Proc.t =
-  let f_loc = Body_item.compile_location func.location in
+  let f_loc = Option.map Body_item.compile_location func.location in
   let is_internal, body =
     (* If the function has no body, it's assumed to be just non-det *)
     match func.body with
@@ -229,7 +229,7 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
   let free_locals = compile_free_locals ~cmd_kind:Hidden ctx in
   (* We add a return undef in case the function has no return *)
   let b ?(cmd_kind = C2_annot.Hidden) =
-    Body_item.make_hloc ~loc:func.location ~cmd_kind
+    Body_item.make_hloc ?loc:func.location ~cmd_kind
   in
   let return_undef =
     b (Assignment (Kutils.Names.return_variable, Lit Undefined))
@@ -241,7 +241,8 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
       (free_locals @ [ b ~cmd_kind:Return ReturnNormal ])
   in
   let alloc_params = compile_alloc_params ~ctx proc_params |> List.map b in
-  let _, comp_body = compile_statement ~ctx body in
+  let pvar_map = func.param_map in
+  let (_, comp_body), _ = compile_statement ~ctx ~pvar_map body in
   let proc_body = alloc_params @ comp_body @ [ return_undef ] @ return_block in
   let proc_body =
     if is_internal then List.map (Body_item.with_cmd_kind Internal) proc_body
@@ -258,10 +259,13 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
     if Ctx.representable_in_store ctx func.return_type then identifiers
     else Constants.Gillian_C2_names.return_by_copy_name :: identifiers
   in
+  let proc_source_path =
+    Option.map (fun f_loc -> f_loc.Utils.Location.loc_source) f_loc
+  in
   Proc.
     {
       proc_name = func.symbol;
-      proc_source_path = Some f_loc.loc_source;
+      proc_source_path;
       proc_internal = false;
       proc_params;
       proc_body;
@@ -340,6 +344,7 @@ module Start_for_harness = struct
       body;
       location = harness.location;
       internal = true;
+      param_map = [];
     }
 
   let f ~ctx (harness : Program.Func.t) =
@@ -352,6 +357,52 @@ module Start_for_harness = struct
 end
 
 let start_for_harness = Start_for_harness.f
+
+module Machine_procs = struct
+  open Constants.Internal_Predicates
+
+  let add_proc = Fun.flip Prog.add_proc
+
+  let mk_expr_proc proc_name expr =
+    let proc_body =
+      let annot = C2_annot.make ~cmd_kind:Internal () in
+      Cmd.
+        [|
+          (annot, None, Assignment (Utils.Names.return_variable, expr));
+          (annot, None, ReturnNormal);
+        |]
+    in
+    Proc.
+      {
+        proc_name;
+        proc_source_path = None;
+        proc_internal = true;
+        proc_body;
+        proc_params = [];
+        proc_spec = None;
+        proc_aliases = [];
+        proc_calls = [];
+        proc_display_name = None;
+        proc_hidden = true;
+      }
+
+  let archi_usize_bounds ptr_width =
+    let expr =
+      let max = Expr.int_z Z.(of_int 2 ** ptr_width) in
+      Expr.(list [ zero_i; max ])
+    in
+    mk_expr_proc archi_usize_bounds expr
+
+  let ptr_size ptr_width =
+    let expr = Expr.int (ptr_width / 8) in
+    mk_expr_proc ptr_size expr
+
+  let add (ctx : Ctx.t) gil_prog =
+    let ptr_width = ctx.machine.pointer_width in
+    gil_prog
+    |> add_proc (archi_usize_bounds ptr_width)
+    |> add_proc (ptr_size ptr_width)
+end
 
 let compile (context : Ctx.t) : (C2_annot.t, string) Prog.t =
   let program = context.prog in
@@ -384,8 +435,6 @@ let compile (context : Ctx.t) : (C2_annot.t, string) Prog.t =
         gil_prog)
       context.harness
   in
-  assert (Machine_model.equal context.machine Machine_model.archi64);
-  let imports =
-    Imports.imports Arch64 !Gillian.Utils.Config.current_exec_mode
-  in
+  let gil_prog = Machine_procs.add context gil_prog in
+  let imports = Imports.imports !Gillian.Utils.Config.current_exec_mode in
   { gil_prog with imports }

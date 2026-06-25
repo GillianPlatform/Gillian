@@ -1,5 +1,39 @@
-type t = U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | I128 | F32 | F64
+type t =
+  | U8
+  | U16
+  | U32
+  | U64
+  | U128
+  | I8
+  | I16
+  | I32
+  | I64
+  | I128
+  | F32
+  | F64
+  | Ptr
 [@@deriving eq, yojson]
+
+let of_int_type ~signed ~size =
+  match (size, signed) with
+  | 8, true -> Some I8
+  | 8, false -> Some U8
+  | 16, true -> Some I16
+  | 16, false -> Some U16
+  | 32, true -> Some I32
+  | 32, false -> Some U32
+  | 64, true -> Some I64
+  | 64, false -> Some U64
+  | 128, true -> Some I128
+  | 128, false -> Some U128
+  | _ -> None
+
+open struct
+  let ptr_chunk = ref U64
+end
+
+let set_ptr_width size =
+  ptr_chunk := Option.get (of_int_type ~signed:false ~size)
 
 type components =
   | Float of { bit_width : int }
@@ -18,6 +52,7 @@ let to_string = function
   | I128 -> "i128"
   | F32 -> "f32"
   | F64 -> "f64"
+  | Ptr -> "ptr"
 
 let of_string = function
   | "u8" -> U8
@@ -32,9 +67,10 @@ let of_string = function
   | "i128" -> I128
   | "f32" -> F32
   | "f64" -> F64
-  | _ -> failwith "invalid chunk"
+  | "ptr" -> Ptr
+  | s -> Fmt.failwith "invalid chunk '%s'" s
 
-let bounds =
+let rec bounds =
   let open Z in
   function
   | U8 -> Some (zero, (one lsl 8) - one)
@@ -48,37 +84,31 @@ let bounds =
   | I64 -> Some (neg (one lsl 63), (one lsl 63) - one)
   | I128 -> Some (neg (one lsl 127), (one lsl 127) - one)
   | F32 | F64 -> None
+  | Ptr -> bounds !ptr_chunk
 
-let size = function
+let rec size = function
   | U8 | I8 -> 1
   | U16 | I16 -> 2
   | U32 | I32 | F32 -> 4
   | U64 | I64 | F64 -> 8
   | U128 | I128 -> 16
+  | Ptr -> size !ptr_chunk
 
-let align = function
+let rec align = function
   | U8 | I8 -> 1
   | U16 | I16 -> 2
   | U32 | I32 | F32 -> 4
   | U64 | I64 | F64 -> 8
   | U128 | I128 -> 16
+  | Ptr -> align !ptr_chunk
 
-let of_int_type ~signed ~size =
-  match (size, signed) with
-  | 8, true -> Some I8
-  | 8, false -> Some U8
-  | 16, true -> Some I16
-  | 16, false -> Some U16
-  | 32, true -> Some I32
-  | 32, false -> Some U32
-  | 64, true -> Some I64
-  | 64, false -> Some U64
-  | 128, true -> Some I128
-  | 128, false -> Some U128
+let of_float_type ~size =
+  match size with
+  | 32 -> Some F32
+  | 64 -> Some F64
   | _ -> None
 
-let to_components chunk =
-  match chunk with
+let rec to_components = function
   | U8 -> Int { bit_width = 8; signed = false }
   | U16 -> Int { bit_width = 16; signed = false }
   | U32 -> Int { bit_width = 32; signed = false }
@@ -91,9 +121,9 @@ let to_components chunk =
   | I128 -> Int { bit_width = 128; signed = true }
   | F32 -> Float { bit_width = 32 }
   | F64 -> Float { bit_width = 64 }
+  | Ptr -> to_components !ptr_chunk
 
-let int_chunk_to_signed_and_size chunk =
-  match chunk with
+let rec int_chunk_to_signed_and_size = function
   | U8 -> (false, 1)
   | U16 -> (false, 2)
   | U32 -> (false, 4)
@@ -105,7 +135,13 @@ let int_chunk_to_signed_and_size chunk =
   | I64 -> (true, 8)
   | I128 -> (true, 16)
   | F32 | F64 -> failwith "int_chunk_to_signed_and_size: not an int chunk"
+  | Ptr -> int_chunk_to_signed_and_size !ptr_chunk
 
 let is_int = function
-  | U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | I128 -> true
+  | U8 | U16 | U32 | U64 | U128 | I8 | I16 | I32 | I64 | I128 | Ptr -> true
   | F32 | F64 -> false
+
+let int_type_to_string ~signed ~size =
+  match of_int_type ~signed ~size with
+  | None -> failwith "int_type_to_expr: invalid int type"
+  | Some c -> to_string c

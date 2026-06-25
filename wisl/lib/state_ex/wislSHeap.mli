@@ -16,18 +16,31 @@ val init : unit -> t
 val alloc : t -> int -> string
 val dispose : t -> string -> (unit, err) Delayed_result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
-val is_empty : t -> bool
+val is_empty : ?freed_is_empty:bool -> t -> bool
 
 val get_cell :
   t -> string -> Expr.t -> (string * Expr.t * Expr.t, err) Delayed_result.t
 
-val set_cell : t -> string -> Expr.t -> Expr.t -> (unit, err) Delayed_result.t
+val set_cell :
+  alloc_if_missing:bool ->
+  t ->
+  string ->
+  Expr.t ->
+  Expr.t ->
+  (unit, err) Delayed_result.t
+
 val rem_cell : t -> string -> Expr.t -> (unit, err) Delayed_result.t
 val get_bound : t -> string -> (int, err) Delayed_result.t
-val set_bound : t -> string -> int -> (unit, err) Delayed_result.t
+
+val set_bound :
+  alloc_if_missing:bool -> t -> string -> int -> (unit, err) Delayed_result.t
+
 val rem_bound : t -> string -> (unit, err) Delayed_result.t
 val get_freed : t -> string -> (unit, err) Delayed_result.t
-val set_freed : t -> string -> unit Delayed.t
+
+val set_freed :
+  alloc_if_missing:bool -> t -> string -> (unit, err) Delayed_result.t
+
 val rem_freed : t -> string -> (unit, err) Delayed_result.t
 val pp : t Fmt.t
 val copy : t -> t

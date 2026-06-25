@@ -626,11 +626,8 @@ module Tree = struct
     in
     Delayed.return result
 
-  let frame_range
-      (t : t)
-      ~(replace_node : t -> (t, err) DR.t)
-      ~rebuild_parent
-      (range : Range.t) : (t * t, err) DR.t =
+  let frame_range (t : t) ~replace_node ~rebuild_parent (range : Range.t) :
+      (t * t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
     let rec extract (t : t) (range : Range.t) : (t * t option) Delayed.t =
@@ -831,11 +828,11 @@ module Tree = struct
     (* let+ () = SVArr.learn_chunk ~chunk ~size array in *)
     t
 
-  let get_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
+  let cons_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
       (SVal.t * Perm.t option * t, err) DR.t =
     let open DR.Syntax in
-    let replace_node x = DR.ok x in
-    let rebuild_parent = with_children in
+    let replace_node x = remove_node x in
+    let rebuild_parent = of_children in
     let range = Range.of_low_and_chunk low chunk in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
     let node = framed.node in
@@ -852,10 +849,7 @@ module Tree = struct
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
-    let replace_node _ =
-      let leaf = sval_leaf ~low ~chunk ~value:sval ~perm in
-      DR.ok leaf
-    in
+    let replace_node _ = DR.ok (sval_leaf ~low ~chunk ~value:sval ~perm) in
     let rebuild_parent = of_children in
     let range = Range.of_low_and_chunk low chunk in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
@@ -1093,8 +1087,7 @@ let is_empty t =
   match t with
   | Freed -> false
   | Tree { bounds; root } ->
-      Option.is_none bounds
-      && Option.fold ~none:true ~some:(fun root -> Tree.is_empty root) root
+      Option.is_none bounds && Option.fold ~none:true ~some:Tree.is_empty root
 
 let freed = Freed
 
@@ -1174,11 +1167,6 @@ let prod_bounds t bounds =
   | Freed -> Error UseAfterFree
   | Tree x -> Ok (Tree { x with bounds = Some bounds })
 
-let rem_bounds t =
-  match t with
-  | Freed -> Error UseAfterFree
-  | Tree x -> Ok (Tree { x with bounds = None })
-
 let with_root_opt t root =
   match t with
   | Freed -> Error UseAfterFree
@@ -1229,30 +1217,33 @@ let free t low high =
 let cons_single t low chunk =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
-  let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
-    let** root = DR.of_result (get_root t) in
-    match root with
-    | None -> DR.error MissingResource
-    | Some root ->
-        let** value, perm, root_framed = Tree.get_single root low chunk in
-        let++ wroot = DR.of_result (with_root t root_framed) in
-        (value, perm, wroot)
-  else DR.error BufferOverrun
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        let** root = DR.of_result (get_root t) in
+        match root with
+        | None -> DR.error MissingResource
+        | Some root ->
+            let** value, perm, root_framed = Tree.cons_single root low chunk in
+            let++ wroot = DR.of_result (with_root t root_framed) in
+            (value, perm, wroot)
+      else DR.error BufferOverrun
 
 let prod_single t low chunk sval perm =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
-  let** root = DR.of_result (get_root t) in
-  let root = Option.value root ~default:(Tree.create_root range) in
-  let** root_set = Tree.prod_single root low chunk sval perm in
-  let** bounds = DR.of_result (get_bounds t) in
-  let learned =
-    match bounds with
-    | None -> []
-    | Some bounds -> [ Range.is_inside range bounds ]
-  in
-  DR.of_result ~learned (with_root t root_set)
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { root; bounds } ->
+      let root = Option.value root ~default:(Tree.create_root range) in
+      let** root_set = Tree.prod_single root low chunk sval perm in
+      let learned =
+        match bounds with
+        | None -> []
+        | Some bounds -> [ Range.is_inside range bounds ]
+      in
+      DR.of_result ~learned (with_root t root_set)
 
 let get_array t low size chunk =
   let open DR.Syntax in
@@ -1341,6 +1332,7 @@ let prod_simple_mem_val ~mem_val t low high perm =
 let cons_hole =
   cons_simple_mem_val ~expected_mem_val:(function
     | Poisoned Totally -> true
+    | Zeros -> true
     | _ -> false)
 
 let prod_hole = prod_simple_mem_val ~mem_val:(Poisoned Totally)

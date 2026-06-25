@@ -33,8 +33,11 @@ struct
   type tl_ast = PC.tl_ast
 
   type 'ext base_proc_state = {
+    proc_name : string;
+    ix : int;
+    root_created : bool ref;
+    mutable root_linked : bool; [@default false]
     mutable cont_func : result_t cont_func_f option;
-    mutable breakpoints : breakpoints; [@default Hashtbl.create 0]
     mutable cur_report_id : L.Report_id.t option;
     (* TODO: The below fields only depend on the
             cur_report_id and could be refactored to use this *)
@@ -43,8 +46,6 @@ struct
         [@default None]
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
-    mutable proc_name : string;
-    mutable root_created : bool; [@default false]
     mutable selected_match_steps : (L.Report_id.t * L.Report_id.t) list;
         [@default []]
     lifter_state : Lifter.t;
@@ -53,6 +54,14 @@ struct
     unfinished_nodes : L.Report_id.t Hashset.t; [@default Hashset.empty ()]
     submap_procs : string Hashset.t; [@default Hashset.empty ()]
     ext : 'ext;
+  }
+  [@@deriving make]
+
+  type 'ext base_proc = {
+    proc_name : string;
+    states : 'ext base_proc_state array; [@main]
+    root_created : bool ref;
+    mutable last_active : int; [@default 0]
   }
   [@@deriving make]
 
@@ -65,19 +74,22 @@ struct
     report_state_base : L.Report_state.t;
     init_data : ID.t;
     proc_names : string list;
-    mutable cur_proc_name : string;
+    mutable cur_proc : string * int;
     all_nodes : (string, Sedap_types.Map_node.t) Hashtbl.t;
         [@default Hashtbl.create 0]
     changed_nodes : string Hashset.t; [@default Hashset.empty ()]
     roots : (string, string) Hashtbl.t; [@default Hashtbl.create 0]
     matches : (L.Report_id.t, Match_map.t) Hashtbl.t;
         [@default Hashtbl.create 0]
+    mutable breakpoints : breakpoints; [@default Hashtbl.create 0]
+    id_assoc : (L.Report_id.t, string * int) Hashtbl.t;
+        [@default Hashtbl.create 0]
     ext : 'ext;
   }
   [@@deriving make]
 
-  type ('proc_state, 'debug_state) state = {
-    procs : (string, 'proc_state) Hashtbl.t;
+  type ('proc, 'debug_state) state = {
+    procs : (string, 'proc) Hashtbl.t;
     debug_state : 'debug_state;
   }
 
@@ -105,7 +117,9 @@ struct
       debug_state_ext base_debug_state -> unit base_proc_state -> proc_state_ext
 
     val launch_proc :
-      proc_name:string -> debug_state_ext base_debug_state -> result_t cont_func
+      proc_name:string ->
+      debug_state_ext base_debug_state ->
+      result_t cont_func list
 
     module Match : sig
       val match_final_cmd :
@@ -140,9 +154,10 @@ struct
 
     type nonrec breakpoints = breakpoints
     type nonrec tl_ast = tl_ast
+    type proc = proc_state_ext base_proc
     type proc_state = proc_state_ext base_proc_state
     type debug_state = debug_state_ext base_debug_state
-    type t = (proc_state, debug_state) state
+    type t = (proc, debug_state) state
 
     let get_root_proc_name_of_id id =
       let content, type_ =
@@ -156,24 +171,28 @@ struct
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       (List_utils.last cmd.callstack |> Option.get).pid
 
-    let get_proc_state ?cmd_id ?(activate_report_state = true) (state : t) =
+    let get_proc_state_of_id id state : proc_state * proc =
+      (let* name, ix = Hashtbl.find_opt state.debug_state.id_assoc id in
+       let+ proc = Hashtbl.find_opt state.procs name in
+       (proc.states.(ix), proc))
+      |> Option_utils.or_else (fun () ->
+             Fmt.failwith "Couldn't get report for %a" L.Report_id.pp id)
+
+    let get_proc_state ?cmd_id ?(activate_report_state = true) state =
       let { debug_state; procs } = state in
-      let proc_name =
+      let proc_state, proc =
         match cmd_id with
-        | Some cmd_id ->
-            let proc_name = get_root_proc_name_of_id cmd_id in
-            proc_name
-        | None -> debug_state.cur_proc_name
+        | Some cmd_id -> get_proc_state_of_id cmd_id state
+        | None ->
+            let proc_name, proc_ix = state.debug_state.cur_proc in
+            let proc = Hashtbl.find procs proc_name in
+            (proc.states.(proc_ix), proc)
       in
-      match Hashtbl.find_opt procs proc_name with
-      | None ->
-          Gillian_result.internal_error
-            ("get_proc_state: couldn't find proc " ^ proc_name)
-      | Some proc_state ->
-          debug_state.cur_proc_name <- proc_state.proc_name;
-          if activate_report_state then
-            L.Report_state.activate proc_state.report_state;
-          Ok proc_state
+      proc.last_active <- proc_state.ix;
+      debug_state.cur_proc <- (proc_state.proc_name, proc_state.ix);
+      if activate_report_state then
+        L.Report_state.activate proc_state.report_state;
+      Ok proc_state
 
     let get_proc_state_exn ?cmd_id ?(activate_report_state = true) dbg =
       match get_proc_state ?cmd_id ~activate_report_state dbg with
@@ -379,9 +398,9 @@ struct
         | Some proc -> Proc.(proc.proc_hidden)
         | None -> true
 
-      let add_root proc_name ?first_id state =
+      let add_root proc_name state =
         let id = show_proc_id proc_name in
-        let next = Map_node_next.Single { id = Option.map show_id first_id } in
+        let next = Map_node_next.Single { id = None } in
         let proc =
           match Hashtbl.find_opt state.debug_state.prog.procs proc_name with
           | Some p -> p
@@ -403,6 +422,33 @@ struct
         in
         Map_node.make ~id ~next ~options () |> add_node state
 
+      let blank_case ?(branch_label = "") id : Map_node_next.Cases.t =
+        { branch_case = `Null; branch_label; id }
+
+      let pre_unfold_case ix id =
+        let branch_label = Fmt.str "Pre-unfold %d" ix in
+        blank_case ~branch_label id
+
+      let link_root proc_name id state =
+        let open Map_node_next in
+        let id = Some id in
+        let root =
+          Hashtbl.find state.debug_state.all_nodes (show_proc_id proc_name)
+        in
+        let next =
+          match root.next with
+          | Final | Single { id = None } -> Single { id }
+          | Single { id = id' } ->
+              let cases = [ pre_unfold_case 0 id'; pre_unfold_case 1 id ] in
+              Branch { cases }
+          | Branch { cases } ->
+              let ix = List.length cases in
+              let cases = cases @ [ pre_unfold_case ix id ] in
+              Branch { cases }
+        in
+        let root' = { root with next } in
+        add_node state root'
+
       let convert_node proc_state state (node : Exec_map.Packaged.node) =
         let id = show_id node.data.id in
         let aliases = node.data.all_ids |> List.map show_id in
@@ -421,7 +467,7 @@ struct
                   if
                     match Hashtbl.find_opt state.procs p with
                     | None -> true
-                    | Some proc_state -> not proc_state.root_created
+                    | Some proc -> not !(proc.root_created)
                   then
                     (* Make a fake root so we have something to step from *)
                     add_root p state
@@ -470,14 +516,19 @@ struct
         in
         proc_state.has_errors <- proc_state.has_errors || node.data.errors <> []
 
-      let add_changed_node id node proc_state state =
-        let () =
-          if not proc_state.root_created then
-            let () = add_root proc_state.proc_name ~first_id:id state in
-            proc_state.root_created <- true
-        in
+      let add_changed_node id node (proc_state : proc_state) state =
         match node with
         | Some node ->
+            let () =
+              if not !(proc_state.root_created) then
+                let () = add_root proc_state.proc_name state in
+                proc_state.root_created := true
+            in
+            let () =
+              if not proc_state.root_linked then
+                let () = link_root proc_state.proc_name (show_id id) state in
+                proc_state.root_linked <- true
+            in
             let () = update_status id node proc_state in
             convert_node proc_state state node
         | None -> Hashtbl.remove_all state.debug_state.all_nodes (show_id id)
@@ -512,7 +563,8 @@ struct
       let get_current_steps state : Map_update_event_body.Current_steps.t =
         let p, s =
           Hashtbl.fold
-            (fun _ proc_state (p, s) ->
+            (fun _ proc (p, s) ->
+              let proc_state = proc.states.(proc.last_active) in
               let match_steps =
                 proc_state.selected_match_steps
                 |> List.map (fun (id, _) -> show_id id)
@@ -531,53 +583,30 @@ struct
         Map_update_event_body.Current_steps.make ~primary:(Some p)
           ~secondary:(Some s) ()
 
-      let get_substs state =
-        state.procs |> Hashtbl.to_seq
-        |> Seq.map (fun (proc_name, proc) ->
-               let+ substs =
-                 let* assertion_id, match_id =
-                   List_utils.hd_opt proc.selected_match_steps
-                 in
-                 let* match_ =
-                   Hashtbl.find_opt state.debug_state.matches match_id
-                 in
-                 let* node = Hashtbl.find_opt match_.nodes assertion_id in
-                 let* substs =
-                   match node with
-                   | Match_map.Assertion data, _, _ -> Some data.substitutions
-                   | _ -> None
-                 in
-                 let substs' =
-                   substs
-                   |> List.map @@ fun Match_map.{ assert_id; subst = a, b } ->
-                      `List
-                        [ `String (show_id assert_id); `String a; `String b ]
-                 in
-                 Some substs'
-               in
-               (show_proc_id proc_name, `List substs))
-        |> Seq.filter_map (fun x -> x)
-        |> List.of_seq
-
       let get_status state =
         let rec aux acc proc_name =
           let acc = SS.add proc_name acc in
           match Hashtbl.find_opt state.procs proc_name with
           | None -> (false, false, acc)
-          | Some proc_state ->
-              let finished = Hashset.length proc_state.unfinished_nodes = 0 in
-              let has_errors = proc_state.has_errors in
-              let subprocs = proc_state.submap_procs |> Hashset.to_seq in
-              Seq.fold_left
-                (fun (finished, has_errors, acc) proc_name ->
-                  if SS.mem proc_name acc then (finished, has_errors, acc)
-                  else
-                    let finished', has_errors', acc = aux acc proc_name in
-                    let finished = finished && finished' in
-                    let has_errors = has_errors || has_errors' in
-                    (finished, has_errors, acc))
-                (finished, has_errors, acc)
-                subprocs
+          | Some proc ->
+              Array.fold_left
+                (fun (finished, has_errors, acc) proc_state ->
+                  let finished =
+                    finished && Hashset.length proc_state.unfinished_nodes = 0
+                  in
+                  let has_errors = has_errors || proc_state.has_errors in
+                  let subprocs = proc_state.submap_procs |> Hashset.to_seq in
+                  Seq.fold_left
+                    (fun (finished, has_errors, acc) proc_name ->
+                      if SS.mem proc_name acc then (finished, has_errors, acc)
+                      else
+                        let finished', has_errors', acc = aux acc proc_name in
+                        let finished = finished && finished' in
+                        let has_errors = has_errors || has_errors' in
+                        (finished, has_errors, acc))
+                    (finished, has_errors, acc)
+                    subprocs)
+                (true, false, acc) proc.states
         in
         let finished, has_errors, _ =
           aux SS.empty state.debug_state.main_proc_name
@@ -585,13 +614,12 @@ struct
         (finished, has_errors)
 
       let get_map_ext state : Yojson.Safe.t =
-        let substs = [ ("substs", `Assoc (get_substs state)) ] in
         let status =
           let finished, has_errors = get_status state in
           let status = `List [ `Bool finished; `Bool has_errors ] in
           [ ("status", status) ]
         in
-        `Assoc (substs @ status)
+        `Assoc status
 
       let get_map_update state =
         let nodes = get_changed_nodes ~clear:true state in
@@ -612,14 +640,18 @@ struct
         lifter_state : Yojson.Safe.t; [@key "lifterState"]
         current_cmd_id : L.Report_id.t; [@key "currentCmdId"]
         matches : Match_map.matching list;
+      }
+      [@@deriving yojson]
+
+      type debug_proc_view = {
         proc_name : string; [@key "procName"]
+        states : debug_proc_state_view list;
       }
       [@@deriving yojson]
 
       let procs_to_yosjon procs : Yojson.Safe.t =
         let procs =
-          procs
-          |> List.map (fun (k, v) -> (k, debug_proc_state_view_to_yojson v))
+          procs |> List.map (fun (k, v) -> (k, debug_proc_view_to_yojson v))
         in
         `Assoc procs
 
@@ -627,15 +659,15 @@ struct
         let procs =
           json |> Yojson.Safe.Util.to_assoc
           |> List_utils.map_results (fun (k, v) ->
-                 let++ v' = debug_proc_state_view_of_yojson v in
+                 let++ v' = debug_proc_view_of_yojson v in
                  (k, v'))
         in
         procs
 
       type debug_state_view = {
         main_proc_name : string; [@key "mainProc"]
-        current_proc_name : string; [@key "currentProc"]
-        procs : (string * debug_proc_state_view) list;
+        current_proc : string * int; [@key "currentProc"]
+        procs : (string * debug_proc_view) list;
             [@to_yojson procs_to_yosjon] [@of_yojson procs_of_yojson]
       }
       [@@deriving yojson]
@@ -643,20 +675,26 @@ struct
       let dump_state ({ debug_state; procs } : t) : Yojson.Safe.t =
         let procs =
           Hashtbl.fold
-            (fun proc_name state acc ->
-              let current_cmd_id = Option.get state.cur_report_id in
-              let matches =
-                state.lifter_state |> Lifter.get_matches_at_id current_cmd_id
+            (fun proc_name (proc : proc) acc ->
+              let states =
+                proc.states |> Array.to_list
+                |> List.map @@ fun proc_state ->
+                   let current_cmd_id = Option.get proc_state.cur_report_id in
+                   let matches =
+                     proc_state.lifter_state
+                     |> Lifter.get_matches_at_id current_cmd_id
+                   in
+                   let lifter_state = Lifter.dump proc_state.lifter_state in
+                   { lifter_state; current_cmd_id; matches }
               in
-              let lifter_state = Lifter.dump state.lifter_state in
-              let proc = { lifter_state; current_cmd_id; matches; proc_name } in
+              let proc = { proc_name; states } in
               (proc_name, proc) :: acc)
             procs []
         in
         debug_state_view_to_yojson
           {
             main_proc_name = debug_state.main_proc_name;
-            current_proc_name = debug_state.cur_proc_name;
+            current_proc = debug_state.cur_proc;
             procs;
           }
 
@@ -967,6 +1005,8 @@ struct
         let id, path, new_branch_cases, cont_func =
           find_or_exec_next id case path cont_func
         in
+        Hashtbl.replace debug_state.id_assoc id
+          (proc_state.proc_name, proc_state.ix);
         let continue_kind, content = get_report_and_check_type id in
         let exec_data, cont_func =
           match continue_kind with
@@ -1015,7 +1055,7 @@ struct
             in
             continue k step_result
         | effect IsBreakpoint (file, lines), k ->
-            is_breakpoint ~file ~lines proc_state |> continue k
+            is_breakpoint ~file ~lines state.debug_state |> continue k
         | effect Node_updated (id, node), k ->
             let () = Inspect.add_changed_node id node proc_state state in
             continue k ()
@@ -1070,7 +1110,7 @@ struct
         lifter_call_with_id ~interaction:Continue_back state
           Lifter.continue_back
 
-      let jump id (state : t) =
+      let jump id state =
         let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
         let** proc_state = get_proc_state ~cmd_id state in
         let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
@@ -1097,8 +1137,8 @@ struct
         | Some _ -> internal_error "HORROR: Initial report is not a proc_init!"
 
       (* For the initial step, we should always get a blank Continue *)
-      let get_cont_func proc_name debug_state =
-        match Debugger_impl.launch_proc ~proc_name debug_state with
+      let get_cont_func :
+          result_t cont_func -> result_t cont_func_f Gillian_result.t = function
         | Continue
             { report_id; branch_path = []; new_branch_cases = []; cont_func } ->
             let++ () = check_init_report report_id in
@@ -1106,6 +1146,10 @@ struct
         | _ ->
             Gillian_result.internal_error
               "HORROR: Unexpected conf from initial cont!"
+
+      let get_cont_funcs proc_name debug_state =
+        Debugger_impl.launch_proc ~proc_name debug_state
+        |> List_utils.map_results get_cont_func
 
       let init_lifter proc_name debug_state =
         let { proc_names; tl_ast; prog; _ } = debug_state in
@@ -1115,23 +1159,36 @@ struct
         let { debug_state; _ } = state in
         let report_state = L.Report_state.clone debug_state.report_state_base in
         report_state
-        |> L.Report_state.with_state (fun () ->
-               let** cont_func = get_cont_func entrypoint debug_state in
-               let lifter_state, init_lifter' =
-                 init_lifter proc_name debug_state
-               in
-               let proc_state =
-                 let make ext =
-                   make_base_proc_state ~proc_name ~cont_func ~lifter_state
-                     ~report_state ~ext ()
-                 in
-                 let ext = Debugger_impl.init_proc debug_state (make ()) in
-                 make ext
-               in
-               let** stop_reason =
-                 Step.lifter_call init_lifter' proc_state state
-               in
-               Ok (proc_state, stop_reason))
+        |> L.Report_state.with_state @@ fun () ->
+           let** cont_funcs = get_cont_funcs entrypoint debug_state in
+           let count = ref 0 in
+           let root_created = ref false in
+           let** proc_states =
+             cont_funcs
+             |> List_utils.map_results @@ fun cont_func ->
+                let ix =
+                  let ix = !count in
+                  incr count;
+                  ix
+                in
+                let lifter_state, init_lifter' =
+                  init_lifter proc_name debug_state
+                in
+                let proc_state =
+                  let make ext =
+                    make_base_proc_state ~proc_name ~ix ~cont_func ~lifter_state
+                      ~report_state ~root_created ~ext ()
+                  in
+                  let ext = Debugger_impl.init_proc debug_state (make ()) in
+                  make ext
+                in
+                let** _ = Step.lifter_call init_lifter' proc_state state in
+                Ok proc_state
+           in
+           let proc =
+             make_base_proc ~proc_name ~root_created (Array.of_list proc_states)
+           in
+           Ok (proc, Step)
     end
 
     let launch_proc = Launch_proc.f
@@ -1161,7 +1218,7 @@ struct
           let make ext =
             make_base_debug_state ~source_file:file_name ?source_files ~prog
               ?tl_ast ~main_proc_name:proc_name ~report_state_base ~init_data
-              ~proc_names ~cur_proc_name:proc_name ~ext ()
+              ~proc_names ~cur_proc:(proc_name, 0) ~ext ()
           in
           let ext = Debugger_impl.init (make ()) in
           make ext
@@ -1180,10 +1237,10 @@ struct
         in
         let proc_name = debug_state.main_proc_name in
         let state = make_state debug_state in
-        let++ main_proc_state, _ = launch_proc proc_name ~entrypoint state in
-        main_proc_state.report_state |> L.Report_state.activate;
-        Hashtbl.add state.procs proc_name main_proc_state;
-        Hashtbl.add state.procs entrypoint main_proc_state;
+        let++ main_proc, _ = launch_proc proc_name ~entrypoint state in
+        L.Report_state.activate main_proc.states.(0).report_state;
+        Hashtbl.add state.procs proc_name main_proc;
+        Hashtbl.add state.procs entrypoint main_proc;
         state
     end
 
@@ -1191,11 +1248,11 @@ struct
 
     let start_proc proc_name state =
       let { debug_state; procs } = state in
-      let++ proc_state, stop_reason =
+      let++ proc_states, stop_reason =
         launch_proc proc_name ~entrypoint:proc_name state
       in
-      Hashtbl.add procs proc_name proc_state;
-      debug_state.cur_proc_name <- proc_name;
+      Hashtbl.add procs proc_name proc_states;
+      debug_state.cur_proc <- (proc_name, 0);
       stop_reason
 
     let terminate state =
@@ -1222,7 +1279,7 @@ struct
 
     let get_scopes state = fst (get_scopes_and_variables state)
 
-    let get_variables (var_ref : int) (state : t) : Variable.t list =
+    let get_variables (var_ref : int) state : Variable.t list =
       let variables = snd (get_scopes_and_variables state) in
       match Hashtbl.find_opt variables var_ref with
       | None -> []
@@ -1244,13 +1301,12 @@ struct
           | _ -> non_mem_exception_info)
       | _ -> non_mem_exception_info
 
-    let set_breakpoints source bp_list dbg =
-      let state = dbg |> get_proc_state_exn in
+    let set_breakpoints source bp_list state =
       match source with
       (* We can't set the breakpoints if we do not know the source file *)
       | None -> ()
       | Some source ->
           let bp_set = Breakpoints.of_list bp_list in
-          Hashtbl.replace state.breakpoints source bp_set
+          Hashtbl.replace state.debug_state.breakpoints source bp_set
   end
 end

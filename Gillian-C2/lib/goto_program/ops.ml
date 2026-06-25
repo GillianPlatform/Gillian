@@ -33,12 +33,12 @@ module Binary = struct
     | Ror
     | Shl
     | Xor
-  [@@deriving show { with_path = false }]
+  [@@deriving yojson, show { with_path = false }]
 end
 
 module Self = struct
   type t = Postdecrement | Postincrement | Predecrement | Preincrement
-  [@@deriving show { with_path = false }]
+  [@@deriving yojson, show { with_path = false }]
 
   let pp_pre fmt t =
     let f = Fmt.pf fmt in
@@ -70,7 +70,7 @@ module Unary = struct
     | CountTrailingZeros of { allow_zero : bool }  (** `__builtin_cttz(self)` *)
     | CountLeadingZeros of { allow_zero : bool }  (** `__builtin_ctlz(self)` *)
     | UnaryMinus  (** `-self` *)
-  [@@deriving show { with_path = false }]
+  [@@deriving yojson, show { with_path = false }]
 
   let pp_display fmt t =
     let f = Fmt.pf fmt in

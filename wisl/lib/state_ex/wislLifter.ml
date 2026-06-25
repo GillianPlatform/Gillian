@@ -88,7 +88,7 @@ struct
     matches : Match_map.matching list;
     errors : string list;
     submap : id submap;
-    loc : string * int;
+    loc : (string * int) option;
     prev : (id * Branch_case.t option) option;
     callers : id list;
     func_return_label : (string * int) option;
@@ -112,7 +112,7 @@ struct
       display : string;
       stack_info : id list * stack_direction option;
       is_loop_end : bool;
-      loc : string * int;
+      loc : (string * int) option;
     }
     [@@deriving to_yojson]
 
@@ -157,7 +157,7 @@ struct
       submap : id submap;
       callers : id list;
       stack_direction : stack_direction option;
-      loc : string * int;
+      loc : (string * int) option;
       has_return : bool;
     }
     [@@deriving yojson]
@@ -209,25 +209,62 @@ struct
     let is_loop_end ~is_loop_func ~proc_name exec_data =
       is_loop_func && get_fun_call_name exec_data = Some proc_name
 
+    let make_canonical_data_if_error
+        ~(canonical_data : canonical_cmd_data option)
+        ~ends
+        ~errors
+        ~all_ids
+        ~prev : (canonical_cmd_data * (case * branch_data) list) option =
+      let/ () = canonical_data |> Option.map (fun c -> (c, ends)) in
+      match errors with
+      | [] -> None
+      | _ ->
+          let _, _, callers = Option.get prev in
+          let stack_info = (callers, None) in
+          let c : canonical_cmd_data =
+            {
+              id = all_ids |> List.rev |> List.hd;
+              display = "<error>";
+              stack_info;
+              is_loop_end = false;
+              loc = None;
+            }
+          in
+          Some (c, [])
+
     let finish ~exec_data partial =
-      let ({ prev; all_ids; ends; nest_kind; matches; errors; has_return; _ }
+      let ({
+             prev;
+             all_ids;
+             ends;
+             nest_kind;
+             matches;
+             errors;
+             has_return;
+             canonical_data;
+             _;
+           }
             : partial_data) =
         partial
+      in
+      let errors = errors |> Ext_list.to_list in
+      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
+      let ends = Ext_list.to_list ends in
+      let canonical_data =
+        make_canonical_data_if_error ~canonical_data ~ends ~errors ~all_ids
+          ~prev
       in
       let prev =
         let+ id, branch, _ = prev in
         (id, branch)
       in
-      let** { id; display; stack_info; loc; is_loop_end } =
-        partial.canonical_data
-        |> Option.to_result
-             ~none:"Trying to finish partial with no canonical data!"
+      let** { id; display; stack_info; loc; is_loop_end }, ends =
+        Option.to_result
+          ~none:"Trying to finish partial with no canonical data!"
+          canonical_data
       in
       let callers, stack_direction = stack_info in
-      let all_ids = all_ids |> Ext_list.to_list |> List.map fst in
       let matches = matches |> Ext_list.to_list in
-      let errors = errors |> Ext_list.to_list in
-      let ends = Ext_list.to_list ends in
       let submap =
         match nest_kind with
         | Some (LoopBody p) -> Proc p
@@ -277,7 +314,7 @@ struct
             match prev_kind with
             | IfElseKind | WhileLoopKind -> (
                 match gil_case with
-                | Some (Gil_branch_case.GuardedGoto b) -> Ok (IfElse b)
+                | Some (Gil_branch_case.GuardedGoto b, _) -> Ok (IfElse b)
                 | _ -> Error "IfElseKind expects a GuardedGoto gil case"))
         | Some _, _ ->
             Error "HORROR - branch kind is set with pre-existing case!"
@@ -354,10 +391,12 @@ struct
             in
             let** stack_info = get_stack_info ~partial exec_data in
             let loc =
-              annot.origin_loc |> Option.get
-              |> Debugger_utils.location_to_display_location
+              Option.map
+                (fun loc ->
+                  let loc = Debugger_utils.location_to_display_location loc in
+                  (loc.loc_source, loc.loc_start.pos_line))
+                annot.origin_loc
             in
-            let loc = (loc.loc_source, loc.loc_start.pos_line) in
             partial.canonical_data <-
               Some { id; display; stack_info; is_loop_end; loc };
             Ok ()
@@ -753,8 +792,20 @@ struct
       let annot = CmdReport.(cmd_report.annot) in
       match annot.stmt_kind with
       | LoopPrefix ->
-          (match exec_data.cmd_report.cmd with
-          | Cmd.GuardedGoto _ -> (id, Some (Gil_branch_case.GuardedGoto true))
+          (match exec_data.next_kind with
+          | Many nexts ->
+              List.fold_left
+                (fun acc ((case, case_ix), ()) ->
+                  match (acc, case) with
+                  | Some _, Gil_branch_case.GuardedGoto true ->
+                      failwith
+                        "WislLifter.handle_loop_prefix: I don't know how to \
+                         handle multiple true cases!"
+                  | None, Gil_branch_case.GuardedGoto true ->
+                      Some (id, Some (case, case_ix))
+                  | _ -> acc)
+                None nexts
+              |> Option.get
           | _ -> (id, None))
           |> Option.some
       | _ -> None
@@ -832,7 +883,12 @@ struct
   end
 
   let init_or_handle = Init_or_handle.f
-  let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
+
+  let get_matches_at_id id { map; _ } =
+    match get map id with
+    | Some node -> node.data.matches
+    | None -> []
+
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
   let previous_step id { map; _ } =
@@ -1041,12 +1097,14 @@ struct
     | Either.Right (id, case) -> request_next state id case
 
   let is_breakpoint ~start ~current =
-    let file, line = current.data.loc in
-    let- () =
-      let file', line' = start.data.loc in
-      if file = file' && line = line' then Some false else None
-    in
-    Effect.perform (IsBreakpoint (file, [ line ]))
+    match current.data.loc with
+    | None -> false
+    | Some (file, line) ->
+        let- () =
+          let* file', line' = start.data.loc in
+          if file = file' && line = line' then Some false else None
+        in
+        Effect.perform (IsBreakpoint (file, [ line ]))
 
   let step_all ~start state id case =
     let cmd = get_exn state.map id in
@@ -1314,33 +1372,32 @@ struct
       open Variable
 
       let pvars = { id = 1; name = "Program store" }
-      let heap = { id = 2; name = "Heap" }
-      let preds = { id = 3; name = "Predicates" }
-      let pfs = { id = 4; name = "Pure formulae" }
-      let types = { id = 5; name = "Types" }
-      let axioms = { id = 6; name = "Axioms" }
-      let all = [ pvars; heap; pfs; types; preds; axioms ]
+      let subst = { id = 2; name = "Substitutions" }
+      let heap = { id = 3; name = "Heap" }
+      let preds = { id = 4; name = "Predicates" }
+      let pfs = { id = 5; name = "Pure formulae" }
+      let types = { id = 6; name = "Types" }
+      let axioms = { id = 7; name = "Axioms" }
+      let all = [ pvars; subst; heap; pfs; types; preds; axioms ]
     end
 
     let get_store_vars store =
       List.filter_map
         (fun (var, (value : Gil_syntax.Expr.t)) ->
-          if Str.string_match (Str.regexp "gvar") var 0 then None
-          else
-            let match_offset lst loc =
-              match lst with
-              | [ Expr.Lit (Int offset) ] ->
-                  Fmt.str "-> (%s, %d)" loc (Z.to_int offset)
-              | [ offset ] -> Fmt.str "-> (%s, %a)" loc pp_expr offset
-              | _ -> Fmt.to_to_string pp_expr value
-            in
-            let value =
-              match value with
-              | Expr.EList (Lit (Loc loc) :: rest)
-              | Expr.EList (LVar loc :: rest) -> match_offset rest loc
-              | _ -> Fmt.to_to_string pp_expr value
-            in
-            Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
+          let match_offset lst loc =
+            match lst with
+            | [ Expr.Lit (Int offset) ] ->
+                Fmt.str "> (%s, %d)" loc (Z.to_int offset)
+            | [ offset ] -> Fmt.str "> (%s, %a)" loc pp_expr offset
+            | _ -> Fmt.to_to_string pp_expr value
+          in
+          let value =
+            match value with
+            | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
+              -> match_offset rest loc
+            | _ -> Fmt.to_to_string pp_expr value
+          in
+          Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
         store
       |> List.sort Stdlib.compare
 
@@ -1405,15 +1462,14 @@ struct
       let pfs_vars, axiom_vars =
         pfs |> PFS.to_list
         |> List.partition_map (fun formula ->
-               let var = Variable.make ~name:"" in
                match pr_list_axiom formula with
                | None ->
                    let value = Fmt.to_to_string pp_expr formula in
-                   Left (var ~value ())
-               | Some value -> Right (var ~value ()))
+                   Left (Variable.make ~value ())
+               | Some value -> Right (Variable.make ~value ()))
       in
-      let pfs_vars = List.sort Stdlib.compare pfs_vars in
-      let axiom_vars = List.sort Stdlib.compare axiom_vars in
+      let pfs_vars = List.sort Variable.compare_value pfs_vars in
+      let axiom_vars = List.sort Variable.compare_value axiom_vars in
       (pfs_vars, axiom_vars)
 
     let get_pred_vars preds =
@@ -1457,10 +1513,18 @@ struct
                else if value = Type.ObjectType then "Block identifier"
                else Type.str value
              in
-             Variable.{ name; value; type_ = None; var_ref = 0 })
-      |> List.sort Variable.(fun v w -> Stdlib.compare v.name w.name)
+             Variable.make ~name ~value ())
+      |> List.sort Variable.compare_name
 
-    let f _ { store; memory; pfs; types; preds } _ =
+    let get_subst_vars subst : Variable.t list =
+      subst |> SVal.SESubst.to_list
+      |> List.map (fun (a, b) ->
+             let name = Fmt.to_to_string pp_expr a in
+             let value = Fmt.to_to_string pp_expr b in
+             Variable.make ~name ~value ())
+      |> List.sort Variable.compare_name
+
+    let f _ { store; memory; pfs; types; preds; subst } _ =
       let variables = Hashtbl.create 0 in
       (* Scopes and var refs share IDs; they can't clash *)
       let new_var_ref =
@@ -1475,6 +1539,15 @@ struct
       let var_groups =
         let pvars = get_store_vars store in
         (Scopes.pvars, pvars) :: var_groups
+      in
+
+      (* Subst *)
+      let var_groups =
+        match subst with
+        | Some subst ->
+            let subst_vars = get_subst_vars subst in
+            (Scopes.subst, subst_vars) :: var_groups
+        | None -> var_groups
       in
 
       (* Heap *)

@@ -135,17 +135,16 @@ struct
     [@@deriving yojson]
 
     let ends_to_cases
-        ~is_unevaluated_funcall
+        ~is_evaluated_funcall
         ~nest_kind
         (ends : (Branch_case.case * branch_data) list) =
       let open Annot in
       let open Branch_case in
       let- () =
-        match (nest_kind, ends) with
-        | Some (Fun_call _), [ (Unknown, bdata) ] ->
-            if is_unevaluated_funcall then None
-            else Some (Ok [ (Func_exit_placeholder, bdata) ])
-        | Some (Fun_call _), _ ->
+        match (is_evaluated_funcall, nest_kind, ends) with
+        | true, Some (Fun_call _), [ (Unknown, bdata) ] ->
+            Some (Ok [ (Func_exit_placeholder, bdata) ])
+        | true, Some (Fun_call _), _ ->
             Some (Error "Unexpected branching in cmd with Fun_call nest")
         | _ -> None
       in
@@ -227,12 +226,12 @@ struct
       in
       let matches = Ext_list.to_list matches in
       let++ next_kind =
-        let is_unevaluated_funcall =
+        let is_evaluated_funcall =
           match funcall_kind with
-          | Some Unevaluated_funcall -> true
+          | Some Evaluated_funcall -> true
           | _ -> false
         in
-        let++ cases = ends_to_cases ~is_unevaluated_funcall ~nest_kind ends in
+        let++ cases = ends_to_cases ~is_evaluated_funcall ~nest_kind ends in
         match cases with
         | [] -> Zero
         | [ (Case (Unknown, _), _) ] ->
@@ -289,7 +288,7 @@ struct
             match prev_kind with
             | If_else_kind | For_loop_kind | While_loop_kind -> (
                 match gil_case with
-                | Some (Gil_branch_case.GuardedGoto b) ->
+                | Some (Gil_branch_case.GuardedGoto b, _) ->
                     Ok (bool_kind_to_case prev_kind b)
                 | _ -> Error "If_else_kind expects a GuardedGoto gil case"))
         | Some _, _ ->
@@ -336,8 +335,13 @@ struct
             let depth_change =
               assert ((List.hd cs).pid = exec_data.cmd_report.proc_name);
               let prev_depth = List.length prev_callers in
-              let new_depth = List.length cs - 2 in
-              (* FIXME: Minus 2 to account for harness *)
+              let ofs =
+                if !Config.current_exec_mode = Exec_mode.Verification then 1
+                else
+                  (* FIXME: Minus 2 to account for harness *)
+                  2
+              in
+              let new_depth = List.length cs - ofs in
               new_depth - prev_depth
             in
             match depth_change with
@@ -359,8 +363,20 @@ struct
                   (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
                   callers)
 
+      (** Returns whether this function would be called compositionally *)
+      let is_fcall_using_spec fn (prog : (annot, int) Prog.t) =
+        let open Gillian.Utils in
+        (match !Config.current_exec_mode with
+        | Exec_mode.Verification | Exec_mode.BiAbduction -> true
+        | Exec_mode.Concrete | Exec_mode.Symbolic -> false)
+        &&
+        match Hashtbl.find_opt prog.procs fn with
+        | Some proc -> Option.is_some proc.proc_spec
+        | None -> false
+
       let update_funcall_kind
-          ~(prog : Program.t)
+          ~(tl_ast : Program.t)
+          ~(prog : (annot, int) Prog.t)
           ~(exec_data : exec_data)
           ~annot
           (partial : partial_data) =
@@ -377,9 +393,10 @@ struct
           | ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
           | _ -> None
         in
+        let> () = if is_fcall_using_spec pid prog then None else Some () in
         let kind =
           if
-            Hashset.mem Program.(prog.unevaluated_funcs) pid
+            Hashset.mem Program.(tl_ast.unevaluated_funcs) pid
             || List.mem pid Constants.Internal_functions.names
           then Unevaluated_funcall
           else Evaluated_funcall
@@ -467,7 +484,7 @@ struct
         Ext_list.add (id, (kind, case)) all_ids;
         (kind, case)
 
-      let f ~prog ~prev_id exec_data partial =
+      let f ~tl_ast ~prog ~prev_id exec_data partial =
         let { id; cmd_report; matches; errors; _ } = exec_data in
         let annot = CmdReport.(cmd_report.annot) in
         let** is_end = get_is_end annot in
@@ -481,7 +498,7 @@ struct
             partial
         in
         let** () = update_canonical_data ~id ~annot ~exec_data partial in
-        let () = update_funcall_kind ~prog ~exec_data ~annot partial in
+        let () = update_funcall_kind ~tl_ast ~prog ~exec_data ~annot partial in
 
         (* Finish or continue *)
         match Stack.pop_opt partial.unexplored_paths with
@@ -502,7 +519,7 @@ struct
           let++ prev = get_prev () in
           init_partial ~prev
 
-    let handle ~prog ~(partials : t) ~get_prev ~prev_id exec_data =
+    let handle ~tl_ast ~prog ~(partials : t) ~get_prev ~prev_id exec_data =
       DL.log (fun m ->
           let report = exec_data.cmd_report in
           let cmd = CmdReport.(report.cmd) in
@@ -513,7 +530,7 @@ struct
             "HANDLING %a" Gil_syntax.Cmd.pp_indexed cmd);
       let** partial = find_or_init ~partials ~get_prev prev_id in
       Hashtbl.replace partials exec_data.id partial;
-      let** result = update ~prog ~prev_id exec_data partial in
+      let** result = update ~tl_ast ~prog ~prev_id exec_data partial in
       let () =
         match result with
         | Finished f ->
@@ -829,7 +846,7 @@ struct
 
     let f ~state ?prev_id ?gil_case (exec_data : exec_data) =
       let annot = CmdReport.(exec_data.cmd_report.annot) in
-      let { partial_cmds = partials; tl_ast = prog; _ } = state in
+      let { partial_cmds = partials; tl_ast; prog; _ } = state in
       match annot.cmd_kind with
       | Unknown ->
           let json () =
@@ -844,7 +861,8 @@ struct
       | Normal _ | Internal | Return | Hidden -> (
           let get_prev = get_prev ~state ~gil_case ~prev_id in
           let partial_result =
-            Partial_cmds.handle ~prog ~get_prev ~partials ~prev_id exec_data
+            Partial_cmds.handle ~tl_ast ~prog ~get_prev ~partials ~prev_id
+              exec_data
           in
           match partial_result with
           | Ok (Finished finished) ->
@@ -873,7 +891,12 @@ struct
     init_or_handle ~state ~prev_id ?gil_case exec_data
 
   let dump = to_yojson
-  let get_matches_at_id id { map; _ } = (get_exn map id).data.matches
+
+  let get_matches_at_id id { map; _ } =
+    match get map id with
+    | Some node -> node.data.matches
+    | None -> []
+
   let path_of_id id { gil_state; _ } = Gil_lifter.path_of_id id gil_state
 
   let previous_step id { map; _ } =
@@ -1158,8 +1181,13 @@ struct
 
   let parse_and_compile_files ~entrypoint files =
     let () = Kconfig.harness := Some entrypoint in
+    let proc_name =
+      match !Config.current_exec_mode with
+      | Exec_mode.Verification -> entrypoint
+      | _ -> Constants.CBMC_names.start
+    in
     C2ParserAndCompiler.parse_and_compile_files files
-    |> Result.map (fun r -> (r, Constants.CBMC_names.start))
+    |> Result.map (fun r -> (r, proc_name))
 
   let pp_expr _ = Gil_syntax.Expr.pp
   let pp_asrt _ = Gil_syntax.Asrt.pp_atom

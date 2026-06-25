@@ -55,6 +55,17 @@ proc i__has_cur_perm(b, o, perm) {
       return
 };
 
+proc i__zero_if_nullptr(v) {
+        goto [ (typeOf v) = Int ] i p;
+     i: ret := v;
+        return;
+     p: goto [ (l-nth(v, 0i) = $l_null) and (l-nth(v, 1i) = 0i) ] nul nnul;
+   nul: ret := 0i;
+        return;
+  nnul: ret := v;
+        return
+};
+
 proc i__valid_pointer(b, o) {
       ret := "i__has_cur_perm"(b, o, "Nonempty");
       return

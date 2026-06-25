@@ -91,6 +91,10 @@ module Mem = struct
     | Some t -> Delayed.return t
     | None -> Delayed.return SHeapTree.empty
 
+  let update_loc loc tree map =
+    if SHeapTree.is_empty tree then SMap.remove loc map
+    else SMap.add loc tree map
+
   let alloc (map : t) low high : t * string =
     let loc = ALoc.alloc () in
     let tree = SHeapTree.alloc low high in
@@ -165,7 +169,7 @@ module Mem = struct
     let++ sval, perm, new_tree =
       map_lift_err loc_name (SHeapTree.cons_single tree ofs chunk)
     in
-    (SMap.add loc_name new_tree map, sval, perm)
+    (update_loc loc_name new_tree map, sval, perm)
 
   let prod_single map loc ofs chunk sval perm =
     let open DR.Syntax in
@@ -278,7 +282,7 @@ module Mem = struct
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
-    let** loc_name = resolve_loc_result loc in
+    let* loc_name = resolve_or_create_loc_name loc in
     let* tree = get_or_create_tree map loc_name in
     let++ tree_set =
       map_lift_err loc_name (DR.of_result (SHeapTree.prod_bounds tree bounds))

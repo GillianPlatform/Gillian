@@ -6,7 +6,7 @@ RUN opam exec -- dune install $packages --relocatable --prefix ./_dist
 RUN sudo mv _dist /
 
 FROM ubuntu:noble AS install
-ADD https://github.com/diffblue/cbmc/releases/download/cbmc-5.14.3/cbmc-5.14.3-Linux.deb cbmc.deb
+ADD https://github.com/diffblue/cbmc/releases/download/cbmc-6.9.0/ubuntu-24.04-cbmc-6.9.0-Linux.deb cbmc.deb
 ARG no_cbmc=
 RUN apt update \
     && apt install -y rsync z3 libsqlite3-0 $([ $no_cbmc ] || echo './cbmc.deb') \

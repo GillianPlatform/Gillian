@@ -1,6 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-VERIFY="time gillian-c verify"
+if [[ "${GITHUB_ACTIONS}" ]]; then
+	GILLIAN_C="gillian-c"
+else
+  GILLIAN_C="dune exec -- gillian-c"
+fi
+
+VERIFY="time $GILLIAN_C verify"
 
 echo "--- verifying SLL ---"
 $VERIFY verification/sll.c -l disabled
