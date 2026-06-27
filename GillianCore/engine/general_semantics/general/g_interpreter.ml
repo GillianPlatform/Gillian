@@ -862,11 +862,14 @@ struct
             symb_exec_proc ())
           else
             let spec_name = spec.data.spec_name in
+            let b_counter =
+              eval_state.b_counter + if List.is_empty successes then 0 else 1
+            in
             let success_confs =
               successes
               |> List.mapi (fun ix (ret_state, fl) ->
-                     process_ret pid j eval_state ix ret_state fl
-                       (eval_state.b_counter + 1) true spec_name)
+                     process_ret pid j eval_state ix ret_state fl b_counter true
+                       spec_name)
             in
             let error_confs =
               match errors with
