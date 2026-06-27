@@ -3,6 +3,7 @@ type t = Typedefs__.param = {
   identifier : string option;
   base_name : string option;
 }
+[@@deriving to_yojson]
 
 let pp fmt t = Typedefs__.pp_param fmt t
 let of_irep ~machine irep = Type.param_of_irep ~machine irep

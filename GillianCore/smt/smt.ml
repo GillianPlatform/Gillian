@@ -684,7 +684,10 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   | LstRev -> Axiomatised_operations.lrev <| get_list le >- ListType
   | NumToInt -> get_num le |> real_to_int >- IntType
   | IntToNum -> get_int le |> int_to_real >- NumberType
-  | IsInt -> encode_equality (get_num le |> real_to_int |> int_to_real >- NumberType) le
+  | IsInt ->
+      encode_equality
+        (get_num le |> real_to_int |> int_to_real >- NumberType)
+        le
   | BitwiseNot
   | M_isNaN
   | M_abs

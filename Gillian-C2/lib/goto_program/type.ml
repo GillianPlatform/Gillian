@@ -20,6 +20,7 @@ type t = Typedefs__.type_ =
   | Constructor
   | Empty
   | Vector of { type_ : t; size : int }
+[@@deriving to_yojson]
 
 let show t = Typedefs__.show_type_ t
 

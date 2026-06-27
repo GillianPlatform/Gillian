@@ -1,3 +1,5 @@
+open Gillian.Utils.Prelude
+
 module Gerror : sig
   exception Unexpected_irep of Irep.t option * string
   exception Code_error of Irep.t option * string
@@ -80,7 +82,7 @@ module Location : sig
     col : int option;
     comment : string option;
   }
-  [@@deriving show]
+  [@@deriving to_yojson, show]
 
   val pp_short : t Fmt.t
   val of_irep : Irep.t -> t
@@ -88,7 +90,7 @@ end
 
 module IntType : sig
   type t = I_bool | I_char | I_int | I_size_t | I_ssize_t
-  [@@deriving show, eq]
+  [@@deriving to_yojson, show, eq]
 
   module Bv_encoding : sig
     type int_type = t
@@ -142,7 +144,7 @@ and Type : sig
     | Constructor
     | Empty
     | Vector of { type_ : t; size : int }
-  [@@deriving show, eq]
+  [@@deriving to_yojson, show, eq]
 
   val show_simple : t -> string
 
@@ -193,7 +195,7 @@ module rec Expr : sig
     | Nondet
     | EUnhandled of Id.t * string
 
-  and t = { value : value; type_ : Type.t; location : Location.t }
+  and t = { value : value; type_ : Type.t; location : Location.t option }
   [@@deriving show]
 
   val pp_custom : pp:t Fmt.t -> ?pp_type:Type.t Fmt.t -> t Fmt.t
@@ -234,7 +236,12 @@ and Stmt : sig
     | SUnhandled of Id.t
 
   and switch_case = { case : Expr.t; sw_body : t }
-  and t = { stmt_location : Location.t; body : body; comment : string option }
+
+  and t = {
+    stmt_location : Location.t option;
+    body : body;
+    comment : string option;
+  }
 
   val pp : t Fmt.t
 
@@ -255,8 +262,9 @@ module Program : sig
       type_ : Type.t;
       symbol : string;
       value : Expr.t option;
-      location : Location.t;
+      location : Location.t option;
     }
+    [@@deriving to_yojson]
   end
 
   module Func : sig
@@ -264,10 +272,12 @@ module Program : sig
       params : Param.t list;
       body : Stmt.t option;
       return_type : Type.t;
-      location : Location.t;
+      location : Location.t option;
       symbol : string;
       internal : bool;
+      param_map : (string * string) list;
     }
+    [@@deriving to_yojson]
   end
 
   type t = {
@@ -277,8 +287,9 @@ module Program : sig
     constrs : (string, unit) Hashtbl.t;
     base_names : (string, string) Hashtbl.t;
     struct_tags : (string, string) Hashtbl.t;
-    unevaluated_funcs : string Gillian.Utils.Prelude.Hashset.t;
+    unevaluated_funcs : string Hashset.t;
   }
+  [@@deriving to_yojson]
 
   val of_symtab : machine:Machine_model.t -> Symtab.t -> t
   val fold_functions : (string -> Func.t -> 'a -> 'a) -> t -> 'a -> 'a

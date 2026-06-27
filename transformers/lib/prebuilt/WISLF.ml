@@ -1,14 +1,15 @@
 open Utils
 open Gil_syntax
 module Delayed = Gillian.Monadic.Delayed
+module Frac_used = Fractional.Frac_with_wildcard
 
 (* Make the default value null *)
 module FractionalNull = struct
-  include Fractional
+  include Fractional.Make (Frac_used)
 
   let instantiate = function
-    | [] -> (Some (Expr.Lit Null, Expr.num 1.0), [])
-    | [ v ] -> (Some (v, Expr.num 1.0), [])
+    | [] -> (Some (Expr.Lit Null, Frac_used._1), [])
+    | [ v ] -> (Some (v, Frac_used._1), [])
     | _ -> failwith "FractionalNull: instantiate: too many arguments"
 end
 

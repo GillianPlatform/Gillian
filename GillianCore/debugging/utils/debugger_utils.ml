@@ -40,6 +40,7 @@ type 'memory astate = {
   pfs : PFS.t option;
   types : Type_env.t option;
   preds : Preds.t option;
+  subst : SVal.SESubst.t option;
 }
 [@@deriving make]
 

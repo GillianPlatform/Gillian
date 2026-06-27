@@ -59,7 +59,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     | None -> DR.ok (S2.empty ())
     | S1 _ -> DR.error MismatchedState
 
-  let execute_action action s args =
+  let[@inline] execute_action action s args =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match action with
@@ -78,7 +78,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', v) -> Ok (S2 s2', v)
         | Error e -> Error (E2 e))
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match pred with
@@ -97,7 +97,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', outs) -> Ok (S2 s2', outs)
         | Error e -> Error (E2 e))
 
-  let produce pred s args =
+  let[@inline] produce pred s args =
     let open Delayed.Syntax in
     let open MyUtils.Syntax in
     match pred with

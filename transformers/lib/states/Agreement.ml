@@ -31,19 +31,19 @@ let pred_to_str = function
 let list_preds () = [ (Ag, [], [ "value" ]) ]
 let empty () : t = None
 
-let execute_action action s args =
+let[@inline] execute_action action s args =
   match (action, s, args) with
   | Load, None, _ -> DR.error MissingState
   | Load, Some v, [] -> DR.ok (Some v, [ v ])
   | Load, _, _ -> failwith "Invalid Load action"
 
-let consume core_pred s args =
+let[@inline] consume core_pred s args =
   match (core_pred, s, args) with
   | Ag, Some v, [] -> DR.ok (Some v, [ v ])
   | Ag, None, _ -> DR.error MissingState
   | Ag, _, _ -> failwith "Invalid Agree consume"
 
-let produce core_pred s args =
+let[@inline] produce core_pred s args =
   let open Expr.Infix in
   match (core_pred, s, args) with
   | Ag, None, [ v' ] -> Delayed.return (Some v')

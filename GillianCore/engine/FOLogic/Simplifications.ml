@@ -682,19 +682,24 @@ let simplify_pfs_and_gamma
                         if t <> tv then stop_explain "Type mismatch"
                         else `Filter)
                 (* Int breakdown *)
-                | Lit (Num n), BinOp (l, FPlus, BinOp (Lit (Num 256.), FTimes, r))
-                  when
-                    PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, l)) &&
-                    PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, r)) &&
-                    PFS.mem pfs (BinOp (l, FLessThan, Lit (Num 256.))) &&
-                    PFS.mem pfs (BinOp (r, FLessThan, Lit (Num 256.)))
-                    ->
-                  let n = int_of_float n in
-                  let eq_l = Expr.BinOp (l, Equal, Lit (Num (float_of_int (n mod 256)))) in
-                  let eq_r = Expr.BinOp (r, Equal, Lit (Num (float_of_int (n / 256)))) in
-                  L.verbose (fun fmt -> fmt "Breakdown:\n\tn : %d\n\tl : %a\n\tr : %a" n Expr.pp eq_l Expr.pp eq_r);
-                  extend_with eq_l;
-                  `Replace eq_r
+                | ( Lit (Num n),
+                    BinOp (l, FPlus, BinOp (Lit (Num 256.), FTimes, r)) )
+                  when PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, l))
+                       && PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, r))
+                       && PFS.mem pfs (BinOp (l, FLessThan, Lit (Num 256.)))
+                       && PFS.mem pfs (BinOp (r, FLessThan, Lit (Num 256.))) ->
+                    let n = int_of_float n in
+                    let eq_l =
+                      Expr.BinOp (l, Equal, Lit (Num (float_of_int (n mod 256))))
+                    in
+                    let eq_r =
+                      Expr.BinOp (r, Equal, Lit (Num (float_of_int (n / 256))))
+                    in
+                    L.verbose (fun fmt ->
+                        fmt "Breakdown:\n\tn : %d\n\tl : %a\n\tr : %a" n Expr.pp
+                          eq_l Expr.pp eq_r);
+                    extend_with eq_l;
+                    `Replace eq_r
                 | _, _ -> `Replace whole))
         (* All other cases *)
         | _ -> `Replace whole
@@ -907,7 +912,7 @@ let simplify_pfs_and_gamma
                     (BinOp
                        ( Expr.zero_i,
                          ILessThanEqual,
-                         UnOp (LstLen, Expr.from_var_name v) ));
+                         UnOp (LstLen, Expr.from_var_name v) ))
               | _ -> ());
 
           analyse_list_structure lpfs;
@@ -1012,7 +1017,7 @@ let simplify_implication
 let admissible_assertion (a : Asrt.t) : bool =
   L.(
     tmi (fun m ->
-        m "-----------\nAdmissible?\n----------\n%s"
+        m "-----------\nAdmissible?\n-----------\n%s"
           ((Fmt.to_to_string Asrt.full_pp) a)));
 
   let pfs = PFS.init () in
@@ -1035,7 +1040,7 @@ let admissible_assertion (a : Asrt.t) : bool =
     List.iter separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
     let res = not (PFS.mem pfs Expr.false_) in
-    L.tmi (fun m -> m "Admissible? %b" res);
+    L.tmi (fun m -> m "Admissible? %b\n" res);
     res
   with e ->
     L.tmi (fun m ->

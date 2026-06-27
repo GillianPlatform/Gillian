@@ -23,9 +23,9 @@ module Block = struct
 
   let empty = Allocated { data = SFVL.empty; bound = None }
 
-  let is_empty t =
+  let is_empty ?(freed_is_empty = false) t =
     match t with
-    | Freed -> false
+    | Freed -> freed_is_empty
     | Allocated { data; bound } -> SFVL.is_empty data && Option.is_none bound
 
   let substitution ~partial subst block =
@@ -168,14 +168,16 @@ let get_cell heap loc ofs =
             | Some (o, v) -> ok (loc, o, v)
             | None -> error (MissingResource (Cell, loc, Some ofs))))
 
-let set_cell heap loc_name ofs v =
-  match Hashtbl.find_opt heap loc_name with
+let set_cell ~alloc_if_missing heap loc ofs v =
+  match Hashtbl.find_opt heap loc with
   | None ->
-      let data = SFVL.add ofs v SFVL.empty in
-      let bound = None in
-      let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
-      ok ()
-  | Some Block.Freed -> error (UseAfterFree loc_name)
+      if alloc_if_missing then
+        let data = SFVL.add ofs v SFVL.empty in
+        let bound = None in
+        let () = Hashtbl.replace heap loc (Allocated { data; bound }) in
+        ok ()
+      else error (MissingResource (Cell, loc, Some ofs))
+  | Some Block.Freed -> error (UseAfterFree loc)
   | Some (Allocated { data; bound }) ->
       let** () =
         match bound with
@@ -183,12 +185,12 @@ let set_cell heap loc_name ofs v =
         | Some n ->
             let n = Expr.int n in
             let open Expr.Infix in
-            if%sat n <= ofs then error (UseAfterFree loc_name) else ok ()
+            if%sat n <= ofs then error (UseAfterFree loc) else ok ()
       in
       let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
       let equality_test = Solver.is_equal ~matching ~pfs ~gamma in
       let data = SFVL.add_with_test ~equality_test ofs v data in
-      let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
+      let () = Hashtbl.replace heap loc (Allocated { data; bound }) in
       ok ()
 
 let rem_cell heap loc offset =
@@ -210,8 +212,13 @@ let get_bound heap loc =
       error (MissingResource (Bound, loc, None))
   | Some (Allocated { bound = Some bound; _ }) -> ok bound
 
-let set_bound heap loc bound =
-  let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
+let set_bound ~alloc_if_missing heap loc bound =
+  let** prev =
+    match (Hashtbl.find_opt heap loc, alloc_if_missing) with
+    | Some b, _ -> ok b
+    | None, true -> ok Block.empty
+    | None, false -> error (MissingResource (Cell, loc, None))
+  in
   match prev with
   | Freed -> error (UseAfterFree loc)
   | Allocated { data; _ } ->
@@ -235,9 +242,12 @@ let get_freed heap loc =
   | Some _ -> error MemoryLeak
   | None -> error (MissingResource (Freed, loc, None))
 
-let set_freed heap loc =
-  set_freed_with_logging heap loc;
-  Delayed.return ()
+let set_freed ~alloc_if_missing heap loc =
+  match (Hashtbl.find_opt heap loc, alloc_if_missing) with
+  | Some _, _ | None, true ->
+      set_freed_with_logging heap loc;
+      ok ()
+  | None, false -> error (MissingResource (Cell, loc, None))
 
 let rem_freed heap loc =
   match Hashtbl.find_opt heap loc with
@@ -346,7 +356,8 @@ let to_seq heap =
          | Block.Freed -> (loc, None)
          | Allocated { data; bound } -> (loc, Some (data, bound)))
 
-let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
+let is_empty ?freed_is_empty t =
+  Hashtbl.to_seq_values t |> Seq.for_all (Block.is_empty ?freed_is_empty)
 
 (***** Clean-up *****)
 

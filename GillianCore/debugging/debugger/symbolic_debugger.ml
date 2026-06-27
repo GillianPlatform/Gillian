@@ -26,10 +26,13 @@ struct
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
       let prog = MP.init_prog debug_state.prog in
-      Verification.SAInterpreter.init_evaluate_proc
-        (fun x -> x)
-        prog proc_name []
-        (State.init debug_state.init_data)
+      let cont_func =
+        Verification.SAInterpreter.init_evaluate_proc
+          (fun x -> x)
+          prog proc_name []
+          (State.init debug_state.init_data)
+      in
+      [ cont_func ]
 
     module Match = struct
       let match_final_cmd _ ~proc_name:_ _ _ = []

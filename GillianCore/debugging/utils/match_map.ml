@@ -83,12 +83,20 @@ functor
       in
       { id; fold; assertion; substitutions }
 
-    let get_next id : (L.Report_id.t * string * string) list * bool option =
-      let nexts = L.Log_queryer.get_next_reports id in
+    let get_next ?(children = false) id :
+        (L.Report_id.t * string * string) list * bool option =
+      let nexts =
+        L.Log_queryer.(
+          if children then get_children_of ~roots_only:true
+          else get_next_reports)
+          id
+      in
       let () =
         if List.is_empty nexts then
           let msg =
-            Fmt.str "Match_map: couldn't find nexts of %a" L.Report_id.pp id
+            Fmt.str "Match_map: couldn't find %s of %a"
+              (if children then "children" else "nexts")
+              L.Report_id.pp id
           in
           raise (Gillian_result.Exc.internal_error msg)
       in
@@ -150,14 +158,17 @@ functor
         let report = of_yojson_string MatchReport.of_yojson content in
         report.match_kind
       in
-      let roots = L.Log_queryer.get_children_of ~roots_only:true match_id in
       let nodes = Hashtbl.create 1 in
       let roots, result =
-        List.fold_left
-          (fun (roots, r) (id, type_, content) ->
-            let r' = build_map ~pp_asrt ~nodes id type_ content in
-            (id :: roots, r || r'))
-          ([], false) roots
+        match get_next ~children:true match_id with
+        | roots, None ->
+            List.fold_left
+              (fun (roots, r) (id, type_, content) ->
+                let r' = build_map ~pp_asrt ~nodes id type_ content in
+                (id :: roots, r || r'))
+              ([], false) roots
+        | [], Some result -> ([], result)
+        | _ :: _, Some _ -> failwith "Match_map: got result and nexts!"
       in
       let result = if result then Success else Failure in
       { kind; roots; nodes; result }

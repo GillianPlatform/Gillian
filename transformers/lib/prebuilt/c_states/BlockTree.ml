@@ -1504,7 +1504,7 @@ module M = struct
     in
     { bounds; root }
 
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (a, args) with
@@ -1537,7 +1537,7 @@ module M = struct
           Fmt.Dump.(list Expr.pp)
           args
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (pred, ins) with
@@ -1576,7 +1576,7 @@ module M = struct
         (s', [ bounds_e ])
     | _, _ -> failwith "Invalid consume call"
 
-  let produce pred s insouts =
+  let[@inline] produce pred s insouts =
     let open Delayed.Syntax in
     let filter_errors dr =
       Delayed.bind dr (fun res ->
