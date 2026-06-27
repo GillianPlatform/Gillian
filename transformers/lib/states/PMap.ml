@@ -46,6 +46,7 @@ module type PMapImpl = sig
 
   type t [@@deriving yojson]
 
+  val find_opt_unsafe : t -> Expr.t -> Entry.t option
   val mode : index_mode
 
   (** Creates a new address, for allocating new state. Only used in static mode
@@ -98,7 +99,7 @@ end
 module type PMapType = sig
   include OpenPMapType
 
-  val domain_add : Expr.t -> t -> t
+  val domain_add : Expr.t -> t -> t Delayed.t
 end
 
 module Make
@@ -174,14 +175,12 @@ struct
 
   let domain_add k ((h, d) : t) =
     match d with
-    | None -> (h, d)
-    | Some (Expr.ESet d) -> (h, Some (Expr.ESet (k :: d)))
-    | Some _ ->
-        (* Currently we only support "concrete" domain sets (ie. using Expr.ESet, instead of
-           as logical variables). To add support to "symbolic" domain sets one would need
-           to make this function return a Expr.t Delayed.t, adding to the PC that the key is in
-           the set. *)
-        failwith "Invalid index set; expected a set"
+    | None -> Delayed.return (h, d)
+    | Some (Expr.ESet d) -> Delayed.return (h, Some (Expr.ESet (k :: d)))
+    | Some d ->
+        let open Delayed.Syntax in
+        let+ d' = Delayed.reduce (NOp (SetUnion, [ d; ESet [ k ] ])) in
+        (h, Some d')
 
   let[@inline] get ((h, d) as s) idx =
     let open Delayed.Syntax in
@@ -204,7 +203,7 @@ struct
               | Dynamic ->
                   let ss, _ = S.instantiate I.default_instantiation in
                   let h' = I.set ~idx:idx' ~idx':idx ss h in
-                  let s' = (h', Some d) |> domain_add idx' in
+                  let* s' = domain_add idx' (h', Some d) in
                   DR.ok (s', idx', ss)))
 
   let set ~idx ~idx' entry ((h, d) : t) = (I.set ~idx ~idx' entry h, d)
@@ -234,7 +233,8 @@ struct
           failwith "Alloc not allowed using dynamic indexing";
         let* idx = I.make_fresh () in
         let ss, v = S.instantiate args in
-        let s' = set ~idx ~idx':idx ss s |> domain_add idx in
+        let s' = set ~idx ~idx':idx ss s in
+        let* s' = domain_add idx s' in
         DR.ok (s', idx :: v)
     | GetDomainSet, [] -> (
         match s with
@@ -373,9 +373,14 @@ struct
   let assertions_others (h, _) =
     I.fold (fun _ s acc -> S.assertions_others s @ acc) h []
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (_, idx, e) ->
-        Gillian.General.Recovery_tactic.merge (S.get_recovery_tactic e)
+        let sub_recover =
+          match I.find_opt_unsafe (fst st) idx with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
+        Gillian.General.Recovery_tactic.merge sub_recover
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
     | NotAllocated idx | InvalidIndexValue idx ->
         Gillian.General.Recovery_tactic.try_unfold [ idx ]
@@ -541,9 +546,14 @@ struct
   let assertions_others h =
     I.fold (fun _ s acc -> S.assertions_others s @ acc) h []
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (_, idx, e) ->
-        Gillian.General.Recovery_tactic.merge (S.get_recovery_tactic e)
+        let sub_recover =
+          match I.find_opt_unsafe st idx with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
+        Gillian.General.Recovery_tactic.merge sub_recover
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
     | InvalidIndexValue idx ->
         Gillian.General.Recovery_tactic.try_unfold [ idx ]
@@ -644,6 +654,7 @@ struct
 
   type t = S.t ExpMap.t [@@deriving yojson]
 
+  let find_opt_unsafe h idx = ExpMap.find_opt idx h
   let mode = I.mode
   let make_fresh = I.make_fresh
   let default_instantiation = I.default_instantiation
@@ -683,6 +694,11 @@ struct
   module Entry = S
 
   type t = S.t ExpMap.t * S.t ExpMap.t [@@deriving yojson]
+
+  let find_opt_unsafe (h1, h2) idx =
+    match ExpMap.find_opt idx h1 with
+    | Some v -> Some v
+    | None -> ExpMap.find_opt idx h2
 
   let mode = I.mode
   let make_fresh = I.make_fresh
@@ -758,7 +774,17 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
   module SMap = MyUtils.SMap
   module Entry = S
 
-  type t = S.t MyUtils.SMap.t [@@deriving yojson]
+  type t = S.t SMap.t [@@deriving yojson]
+
+  let find_opt_unsafe h idx =
+    let open Utils.Syntaxes.Option in
+    let* loc =
+      match idx with
+      | Expr.Lit (Loc loc) -> Some loc
+      | Expr.ALoc loc -> Some loc
+      | _ -> None
+    in
+    SMap.find_opt loc h
 
   let mode : index_mode = Static
   let make_fresh () = ALoc.alloc () |> Expr.loc_from_loc_name |> Delayed.return

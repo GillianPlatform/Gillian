@@ -89,6 +89,9 @@ module Frac_with_wildcard : FracA_S = struct
     | Q q -> Classic_fracA.is_1 q
 end
 
+let assertions_others _ = []
+let get_recovery_tactic _ _ = Recovery_tactic.none
+
 module Make (FracA : FracA_S) = struct
   (** Value * Fraction *)
   type t = (Expr.t * FracA.t) option [@@deriving show, yojson]
@@ -198,7 +201,7 @@ module Make (FracA : FracA_S) = struct
     | Some (v, q) -> [ (Frac, [ FracA.to_expr q ], [ v ]) ]
 
   let assertions_others _ = []
-  let get_recovery_tactic _ = Recovery_tactic.none
+  let get_recovery_tactic _ _ = Recovery_tactic.none
 
   let can_fix = function
     | _ -> false

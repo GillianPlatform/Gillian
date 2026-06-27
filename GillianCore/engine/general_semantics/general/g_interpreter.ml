@@ -850,30 +850,17 @@ struct
           in
           L.verbose (fun fmt ->
               fmt "Run_spec returned %d Results" (List.length ret));
-          if ret = [] then
-            if spec.data.spec_incomplete then (
-              L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
-              symb_exec_proc ())
-            else
-              [
-                eval_state_to_err ~error_state:state
-                  ~errors:
-                    [
-                      EState
-                        (EOther
-                           (Fmt.str "Unable to use specification of function %s"
-                              spec.data.spec_name));
-                    ]
-                  eval_state;
-              ]
+          let successes, errors =
+            List.partition_map
+              (function
+                | Ok x -> Left x
+                | Error x -> Right (Exec_err.EState x))
+              ret
+          in
+          if errors != [] && spec.data.spec_incomplete then (
+            L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
+            symb_exec_proc ())
           else
-            let successes, errors =
-              List.partition_map
-                (function
-                  | Ok x -> Left x
-                  | Error x -> Right (Exec_err.EState x))
-                ret
-            in
             let spec_name = spec.data.spec_name in
             let success_confs =
               successes

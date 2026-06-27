@@ -46,7 +46,7 @@ module DeleteActionAddition (S : MyMonadicSMemory) :
   let[@inline] execute_action Delete _ _ = Delayed.return (Ok (S.empty (), []))
   let can_fix () = false
   let get_fixes () = []
-  let get_recovery_tactic () = Gillian.General.Recovery_tactic.none
+  let get_recovery_tactic _ () = Gillian.General.Recovery_tactic.none
 end
 
 (* the "Props" predicate considers its out an in, so it must be removed
@@ -115,6 +115,7 @@ end
 module PatchDomainsetObject (S : sig
   include MyMonadicSMemory
 
+  val get_nonos : t -> Expr.t list
   val is_not_nono : t -> Expr.t -> bool
 end) =
   Injector
@@ -123,15 +124,21 @@ end) =
 
       let post_execute_action a (s, args, rets) =
         match (a, rets) with
-        | "get_domainset", [ (Expr.Lit (LList _) as dom) ]
-        | "get_domainset", [ (Expr.EList _ as dom) ] ->
-            let dom =
-              (match dom with
-              | Expr.Lit (LList lits) -> List.map Expr.lit lits
-              | Expr.EList lits -> lits
-              | _ -> failwith "Unexpected domainset type")
-              |> List.filter (S.is_not_nono s)
-              |> Expr.list
+        | "get_domainset", [ dom ] ->
+            let open Delayed.Syntax in
+            let* dom =
+              match dom with
+              | Expr.Lit (LList lits) ->
+                  List.map Expr.lit lits
+                  |> List.filter (S.is_not_nono s)
+                  |> Expr.list |> Delayed.return
+              | Expr.EList lits ->
+                  lits
+                  |> List.filter (S.is_not_nono s)
+                  |> Expr.list |> Delayed.return
+              | dom ->
+                  let nonos = Expr.ESet (S.get_nonos s) in
+                  Delayed.reduce (BinOp (dom, SetDiff, nonos))
             in
             Delayed.return (s, args, [ dom ])
         | _ -> Delayed.return (s, args, rets)
@@ -151,6 +158,8 @@ module BaseMemoryContent (S : MyMonadicSMemory) = struct
     PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S))) (Agreement)
 
   include ActionAdder (DeleteActionAddition (S)) (S)
+
+  let get_metadata (_, s2) = s2
 end
 
 (* Override pretty printing, implement `is_not_nono` *)
@@ -169,6 +178,14 @@ module ObjectBase = struct
         (hbox (parens (pair ~sep:(any " :") Expr.pp Exclusive.pp)))
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
+
+  let get_nonos (h, _) =
+    ExpMap.fold
+      (fun _ v acc ->
+        match v with
+        | Some (Expr.Lit Nono) -> Expr.Lit Nono :: acc
+        | _ -> acc)
+      h []
 
   let is_not_nono (h, _) idx =
     match ExpMap.find_opt idx h with
@@ -193,6 +210,17 @@ module SplitObjectBase = struct
         (hbox (parens (pair ~sep:(any " :") Expr.pp Exclusive.pp)))
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
+
+  let get_nonos (((ch, sh), _) : t) =
+    let nonos_from_map m =
+      ExpMap.fold
+        (fun _ v acc ->
+          match v with
+          | Some (Expr.Lit Nono) -> Expr.Lit Nono :: acc
+          | _ -> acc)
+        m []
+    in
+    nonos_from_map ch @ nonos_from_map sh
 
   let is_not_nono ((ch, sh), _) idx =
     match ExpMap.find_opt idx ch with
@@ -220,7 +248,12 @@ module PatchedBasePMap (S : MyMonadicSMemory) :
 end
 
 (* Patch map pretty-printing for nicer diffs *)
-module PatchedALocPMap (S : MyMonadicSMemory) = struct
+module PatchedALocPMap (S : sig
+  include MyMonadicSMemory
+
+  val get_metadata : t -> Expr.t option
+end) =
+struct
   include OpenALocPMap (S)
 
   let pp ft (h : t) =
@@ -231,6 +264,39 @@ module PatchedALocPMap (S : MyMonadicSMemory) = struct
     in
     let pp_one ft (loc, fv_pairs) = pf ft "@[%s |-> %a@]" loc S.pp fv_pairs in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
+
+  let get_recovery_tactic s e =
+    let current_recovery =
+      (* We use the regular recovery tactic of the map *)
+      get_recovery_tactic s e
+    in
+    match current_recovery.try_unfold with
+    | Some l ->
+        let alocs =
+          List.filter
+            (function
+              | Expr.ALoc _ | Lit (Loc _) -> true
+              | _ -> false)
+            l
+        in
+        if List.is_empty alocs then
+          (* Saves us some iterations *)
+          current_recovery
+        else
+          let locs_to_add =
+            States.MyUtils.SMap.fold
+              (fun key obj acc ->
+                match S.get_metadata obj with
+                | Some e when List.exists (Expr.equal e) alocs -> key :: acc
+                | _ -> acc)
+              s []
+          in
+          let expr_to_add = List.map Expr.loc_from_loc_name locs_to_add in
+          let try_unfold =
+            Some (List.sort_uniq Expr.compare (expr_to_add @ l))
+          in
+          { current_recovery with try_unfold }
+    | None -> current_recovery
 end
 
 (* When allocating, two params are given:
@@ -260,6 +326,7 @@ module PatchAlloc (Map : OpenPMapType) = struct
         let ss, v = Map.Entry.instantiate [ v ] in
         let s' = set ~idx ~idx':idx ss s in
         Delayed_result.ok (s', idx :: v)
+    | "alloc", _ -> failwith "Invalid arguments for alloc"
     | _ -> execute_action a s args
 end
 

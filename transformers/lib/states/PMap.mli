@@ -8,6 +8,7 @@ module type PMapImpl = sig
 
   type t [@@deriving yojson]
 
+  val find_opt_unsafe : t -> Expr.t -> Entry.t option
   val mode : index_mode
   val make_fresh : unit -> Expr.t Delayed.t
   val default_instantiation : Expr.t list
@@ -32,7 +33,7 @@ end
 module type PMapType = sig
   include OpenPMapType
 
-  val domain_add : Expr.t -> t -> t
+  val domain_add : Expr.t -> t -> t Delayed.t
 end
 
 module Make

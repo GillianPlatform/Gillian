@@ -15,7 +15,9 @@ module type ActionAddition = sig
 
   val can_fix : err_t -> bool
   val get_fixes : err_t -> string MyAsrt.t list list
-  val get_recovery_tactic : err_t -> Expr.t Gillian.General.Recovery_tactic.t
+
+  val get_recovery_tactic :
+    t -> err_t -> Expr.t Gillian.General.Recovery_tactic.t
 end
 
 module Make (A : ActionAddition) (S : MyMonadicSMemory.S with type t = A.t) =
@@ -69,7 +71,7 @@ struct
            @@ MyAsrt.map_cp (fun (p, i, o) ->
                   (S.pred_from_str p |> Option.get, i, o))
 
-  let get_recovery_tactic = function
-    | BaseErr e -> S.get_recovery_tactic e
-    | AddedErr e -> A.get_recovery_tactic e
+  let get_recovery_tactic s = function
+    | BaseErr e -> S.get_recovery_tactic s e
+    | AddedErr e -> A.get_recovery_tactic s e
 end

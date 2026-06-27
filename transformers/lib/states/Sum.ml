@@ -179,10 +179,10 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     | S2 s2 -> S2.assertions_others s2
     | None -> []
 
-  let get_recovery_tactic e =
-    match e with
-    | E1 e1 -> S1.get_recovery_tactic e1
-    | E2 e2 -> S2.get_recovery_tactic e2
+  let get_recovery_tactic st e =
+    match (st, e) with
+    | S1 s1, E1 e1 -> S1.get_recovery_tactic s1 e1
+    | S2 s2, E2 e2 -> S2.get_recovery_tactic s2 e2
     | _ -> failwith "get_recovery_tactic: mismatched arguments"
 
   let can_fix = function
