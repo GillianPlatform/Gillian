@@ -52,7 +52,6 @@ module Make (SMemory : SMemory.S) :
   }
   [@@deriving yojson]
 
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = SMemory.init_data
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
@@ -411,7 +410,9 @@ module Make (SMemory : SMemory.S) :
 
       let states =
         match memories with
-        | [] -> failwith "Impossible: memory substitution returned []"
+        | [] ->
+            L.normal (fun m -> m "Memory substitution vanished");
+            []
         | [ (mem, lpfs, lgamma) ] ->
             let () = Expr.Set.iter (PFS.extend pfs) lpfs in
             let () =
@@ -526,11 +527,14 @@ module Make (SMemory : SMemory.S) :
 
   let run_spec
       (_ : MP.spec)
-      (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) =
+      (_ : (string * (string * vt) list) option)
+      (_ : t) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
+
+  let run_par_spec _ _ =
+    failwith "ERROR: run_par_spec called for non-abstract execution"
 
   let unfolding_vals (_ : t) (fs : Expr.t list) : vt list =
     let map to_str to_expr =
@@ -633,7 +637,9 @@ module Make (SMemory : SMemory.S) :
     | _ ->
         L.verbose (fun m -> m "Unsupported location MAKESState: %a" Expr.pp loc);
         raise
-          (Internal_State_Error ([ EType (loc, None, Type.ObjectType) ], state))
+          (Internal_State_Error
+             ( [ EOther (Fmt.str "Couldn't get location of %a" Expr.pp loc) ],
+               state ))
 
   let fresh_loc ?(loc : vt option) (state : t) : vt =
     match loc with
@@ -700,22 +706,18 @@ module Make (SMemory : SMemory.S) :
                 (Fmt.list ~sep:(Fmt.any "@\n") pp_fix)
                 result);
           result
-      | EAsrt (_, _, fixes) ->
-          let result =
-            (List.map
-               (List.map (function
-                 | Asrt.Pure _ as fix -> fix
-                 | _ ->
-                     raise
-                       (Exceptions.Impossible
-                          "Non-pure fix for an assertion failure"))))
-              fixes
+      | EAsrt (_, pf) ->
+          let pf = Reduction.reduce_lexpr pf in
+          let fix =
+            match pf with
+            | Expr.Lit (Bool _) -> []
+            | _ -> [ [ Asrt.Pure pf ] ]
           in
           L.verbose (fun m ->
               m "@[<v 2>Memory: Fixes found:@\n%a@]"
                 (Fmt.list ~sep:(Fmt.any "@\n") pp_fix)
-                result);
-          result
+                fix);
+          fix
       | _ -> raise (Failure "DEATH: get_fixes: error cannot be fixed.")
     in
 

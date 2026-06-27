@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+source ./githooks/common
+
+for hook in $hooksNames; do
+  hook="$destination/$hook"
+  echo "Cleaning $hook"
+  rm $hook
+done

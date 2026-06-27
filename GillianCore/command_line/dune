@@ -6,6 +6,7 @@
   fmt.tty
   gil_syntax
   utils
+  usage_logs
   engine
   bulk
   logging
@@ -13,7 +14,6 @@
   incrementalAnalysis
   debug_adapter
   memtrace
-  lsp
   linol
   linol-lwt)
  (preprocess

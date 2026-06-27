@@ -1,4 +1,5 @@
-(** Strips results from an other-imports mapping, raising an exception in the [Error] case *)
+(** Strips results from an other-imports mapping, raising an exception in the
+    [Error] case *)
 let convert_other_imports oi =
   List.map
     (fun (ext, f) ->

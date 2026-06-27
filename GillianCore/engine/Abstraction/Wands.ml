@@ -15,8 +15,8 @@ type query = {
 let query_ins_outs query = (query.largs @ query.r_ins, query.r_outs)
 
 (** The in-parameters of a magic wand of the form [P(_) -* Q(_)] are:
-               - all the parameters of P
-               - the in parameters of Q *)
+    - all the parameters of P
+    - the in parameters of Q *)
 let make_query ~pred_defs ~subst wand =
   let { lhs = lname, largs; rhs = rname, rargs } = wand in
   let largs = List.map subst largs in

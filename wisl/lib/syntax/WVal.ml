@@ -1,10 +1,17 @@
-type t = Bool of bool | Int of int | Str of string | Null | VList of t list
+type t =
+  | Bool of bool
+  | Int of int
+  | Float of float
+  | Str of string
+  | Null
+  | VList of t list
 
 let rec pp fmt v =
   match v with
   | Bool true -> Format.fprintf fmt "@[%s@]" "true"
   | Bool false -> Format.fprintf fmt "@[%s@]" "false"
   | Int n -> Format.fprintf fmt "@[%i@]" n
+  | Float x -> Format.fprintf fmt "@[%f@]" x
   | Str s -> Format.fprintf fmt "@[\"%s\"@]" s
   | Null -> Format.fprintf fmt "@[%s@]" "null"
   | VList l ->

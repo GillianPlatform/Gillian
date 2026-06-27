@@ -22,8 +22,7 @@ let rec chunk_for_type ~(ctx : Ctx.t) (t : GType.t) : Chunk.t option =
     | Enum _ -> chunk_for_type ~ctx (Signedbv { width = 32 })
     | Float -> Some F32
     | Double -> Some F64
-    | Pointer _ ->
-        Chunk.of_int_type ~signed:false ~size:ctx.machine.pointer_width
+    | Pointer _ -> Some Ptr
     | StructTag t | EnumTag t -> chunk_for_type ~ctx (Ctx.tag_lookup ctx t)
     | Struct { components; _ } ->
         Option.bind (Ctx.one_representable_field ctx components) (fun (_, ty) ->
@@ -44,8 +43,8 @@ let ptr_offset ~ctx ~ty p e =
   let sty = Expr.int (Ctx.size_of ctx ty) in
   ptr_add_e p (Expr.Infix.( * ) e sty)
 
-(** Allocates the memory with the right size, and
-   returns a location expression, addressing the block *)
+(** Allocates the memory with the right size, and returns a location expression,
+    addressing the block *)
 let alloc ~loc_var ~size : Expr.t * string Cmd.t =
   if size == 0 then Fmt.failwith "OK ALLOCATING SOMETHING OF SIZE ZERO!";
   let alloc = Interface.(str_ac (AMem Alloc)) in
@@ -53,9 +52,8 @@ let alloc ~loc_var ~size : Expr.t * string Cmd.t =
   let loc = Expr.list_nth (PVar loc_var) 0 in
   (loc, cmd)
 
-(** Allocates the memory with the right size, and
-   returns a pointer expression pointing to the
-   beginning of the allocated block. *)
+(** Allocates the memory with the right size, and returns a pointer expression
+    pointing to the beginning of the allocated block. *)
 let alloc_ptr ~ctx ty : Expr.t * string Cmd.t =
   let size = Ctx.size_of ctx ty in
   let loc, cmd = alloc ~loc_var:(Ctx.fresh_v ctx) ~size in
@@ -82,15 +80,13 @@ let dealloc_local ~ctx ~cmd_kind (l : Ctx.Local.t) : Body_item.t =
     Cmd.LAction
       (var, free, [ Expr.list_nth (Expr.PVar l.symbol) 0; Expr.zero_i; size ])
   in
-  let loc = Body_item.compile_location l.location in
-  Body_item.make ~loc ~cmd_kind cmd
+  let loc = Option.map Body_item.compile_location l.location in
+  Body_item.make ?loc ~cmd_kind cmd
 
-(** Loads a value into the given variable.
-    If no variable is given, one is created.
-    In any case, the variable containing the value, as well as
-    the load command is returned.
-    If a variable is given, the returned variable
-    is always equal to it *)
+(** Loads a value into the given variable. If no variable is given, one is
+    created. In any case, the variable containing the value, as well as the load
+    command is returned. If a variable is given, the returned variable is always
+    equal to it *)
 let load_scalar ~ctx ?var (e : Expr.t) (t : GType.t) : string Cs.with_cmds =
   match chunk_for_type ~ctx t with
   | None ->
@@ -103,9 +99,7 @@ let load_scalar ~ctx ?var (e : Expr.t) (t : GType.t) : string Cs.with_cmds =
         | None -> Ctx.fresh_v ctx
       in
       let loadv = Constants.Internal_functions.loadv in
-      let load_cmd =
-        Cmd.Call (var, Lit (String loadv), [ chunk; e ], None, None)
-      in
+      let load_cmd = Cmd.call var (Lit (String loadv)) [ chunk; e ] in
       (var, [ load_cmd ])
 
 let store_scalar ~ctx ?var (p : Expr.t) (v : Expr.t) (t : GType.t) :
@@ -121,9 +115,7 @@ let store_scalar ~ctx ?var (p : Expr.t) (v : Expr.t) (t : GType.t) :
         | None -> Ctx.fresh_v ctx
       in
       let storev = Constants.Internal_functions.storev in
-      let store_cmd =
-        Cmd.Call (var, Lit (String storev), [ chunk; p; v ], None, None)
-      in
+      let store_cmd = Cmd.call var (Lit (String storev)) [ chunk; p; v ] in
       store_cmd
 
 let memcpy ~ctx ~(type_ : GType.t) ~(dst : Expr.t) ~(src : Expr.t) =
@@ -131,12 +123,7 @@ let memcpy ~ctx ~(type_ : GType.t) ~(dst : Expr.t) ~(src : Expr.t) =
   let size = Ctx.size_of ctx type_ in
   let memcpy = Constants.Internal_functions.ef_memcpy in
   (* TODO: emit a signal that alignment check is not performed correctly *)
-  Cmd.Call
-    ( temp,
-      Lit (String memcpy),
-      [ Expr.int size; Expr.zero_i; dst; src ],
-      None,
-      None )
+  Cmd.call temp (Lit (String memcpy)) [ Expr.int size; Expr.zero_i; dst; src ]
 
 let poison ~ctx ~(dst : Expr.t) byte_width =
   let temp = Ctx.fresh_v ctx in
@@ -195,6 +182,6 @@ let object_size ~ctx ~ptr_ty ptr : Expr.t Cs.with_cmds =
   | Pointer _ ->
       let temp = Ctx.fresh_v ctx in
       let fct = Constants.Unop_functions.object_size in
-      let call = Cmd.Call (temp, Lit (String fct), [ ptr ], None, None) in
+      let call = Cmd.call temp (Lit (String fct)) [ ptr ] in
       Cs.return ~app:[ call ] (Expr.PVar temp)
   | _ -> Error.unexpected "ObjectSize of something that is not a pointer"

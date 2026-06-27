@@ -14,7 +14,7 @@ lemma lseg_to_list(x, alpha) {
   hypothesis: (x == #x) * (alpha == #alpha) * lseg(#x, null, #alpha)
   conclusion: list(#x, #alpha)
   proof: unfold lseg(#x, null, #alpha);
-         if (#x = null) {
+         if (#x == null) {
            fold list(#x, #alpha)
          } else {
            assert {exists: #next, #beta} (#x + 1 -> #next) * lseg(#next, null, #beta);
@@ -34,7 +34,7 @@ lemma lseg_append(x, y, alpha, a, z) {
   
 
   proof: unfold lseg(#x, #y, #alpha);
-         if (#alpha = []) {
+         if (#alpha == []) {
            fold lseg(#x, #z, #alpha @ [#a])
          } else {
            assert {exists: #next, #beta} (#x + 1 -> #next) * lseg(#next, #y, #beta);

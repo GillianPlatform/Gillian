@@ -50,7 +50,7 @@ type var = string
 
 type annotation_type =
   | Import  (** Import a JSIL or GIL file *)
-  | TopRequires  (** Precondition of global  *)
+  | TopRequires  (** Precondition of global *)
   | TopEnsures  (** Normal postcondition of global *)
   | TopEnsuresErr  (** Error postcondition of global *)
   | Requires  (** Precondition of function *)
@@ -63,7 +63,8 @@ type annotation_type =
   | Invariant  (** Invariant *)
   | Lemma  (** Lemma *)
   | Tactic
-      (** General tactic: fold, unfold, recursive unfold, assert, flash, callspec, and many more to come... *)
+      (** General tactic: fold, unfold, recursive unfold, assert, flash,
+          callspec, and many more to come... *)
   | BiAbduce  (** Bi-abduction indicator *)
   | Call  (** Function call with substitution *)
   | JSIL_only  (** Function called in JSIL only *)

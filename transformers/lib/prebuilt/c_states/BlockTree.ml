@@ -3,7 +3,7 @@ open Monadic
 module Subst = Gillian.Symbolic.Subst
 module DR = Delayed_result
 module DO = Delayed_option
-module SS = Utils.Containers.SS
+module SS = Gillian.Utils.Containers.SS
 module CoreP = Constr.Core
 module MyAsrt = States.MyAsrt
 
@@ -1504,7 +1504,7 @@ module M = struct
     in
     { bounds; root }
 
-  let execute_action a s args =
+  let[@inline] execute_action a s args =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (a, args) with
@@ -1537,7 +1537,7 @@ module M = struct
           Fmt.Dump.(list Expr.pp)
           args
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (pred, ins) with
@@ -1576,7 +1576,7 @@ module M = struct
         (s', [ bounds_e ])
     | _, _ -> failwith "Invalid consume call"
 
-  let produce pred s insouts =
+  let[@inline] produce pred s insouts =
     let open Delayed.Syntax in
     let filter_errors dr =
       Delayed.bind dr (fun res ->
@@ -1655,7 +1655,7 @@ module M = struct
     let svarr_subst = SVal.SVArray.subst ~le_subst in
     substitution ~le_subst ~sval_subst ~svarr_subst s |> Delayed.return
 
-  let get_recovery_tactic _ = Gillian.General.Recovery_tactic.none
+  let get_recovery_tactic _ _ = Gillian.General.Recovery_tactic.none
 
   let instantiate = function
     | [ low; high ] ->

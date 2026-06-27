@@ -1,6 +1,6 @@
 (** @canonical Gillian.Utils.Prelude
-  
-  Most-used helper functions, [Stdlib] extensions *)
+
+    Most-used helper functions, [Stdlib] extensions *)
 
 (** [Option] pretty-printer *)
 let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
@@ -12,11 +12,11 @@ let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
 let of_yojson_string of_yojson s =
   s |> Yojson.Safe.from_string |> of_yojson |> Result.get_ok
 
-(** Extension of Hashtbl with functions to serialize to and deserialize
-  from yojson, along with some other helpers
-  
-  A Hashtbl is a represented as a list of key-value pairs,
-  where a key-value pair is list of two elements*)
+(** Extension of Hashtbl with functions to serialize to and deserialize from
+    yojson, along with some other helpers
+
+    A Hashtbl is a represented as a list of key-value pairs, where a key-value
+    pair is list of two elements*)
 module Hashtbl = struct
   include Hashtbl
 
@@ -79,7 +79,7 @@ module Hashtbl = struct
           | `List [ k_yojson; v_yojson ] ->
               Result.bind (key_of_yojson k_yojson) (fun k ->
                   val_of_yojson v_yojson |> Result.map (fun v -> (k, v)))
-          | _ -> Error "hashtbl_of_yojson: tuple list needed"
+          | _ -> Error "Hashtbl.of_yojson: tuple list needed"
         in
         let hashtbl = create 0 in
         List.fold_left
@@ -90,7 +90,7 @@ module Hashtbl = struct
                        let () = add hashtbl k v in
                        hashtbl)))
           (Ok hashtbl) lst
-    | _ -> Error "hashtbl_of_yojson: list needed"
+    | _ -> Error "Hashtbl.of_yojson: list needed"
 
   let to_yojson
       (key_to_yojson : 'a -> Yojson.Safe.t)
@@ -104,9 +104,9 @@ module Hashtbl = struct
 end
 
 (** Extension of Map with functions to serialize to and deserialize from yojson
-  
-  A Map is a represented as a list of key-value pairs, where a
-  key-value pair is list of two elements *)
+
+    A Map is a represented as a list of key-value pairs, where a key-value pair
+    is list of two elements *)
 module Map = struct
   module type OrderedType = sig
     type t [@@deriving yojson]
@@ -190,11 +190,32 @@ module Hashset = struct
 
   (** Gives a sequence of all items in the set *)
   let to_seq (h : 'a t) : 'a Seq.t = Hashtbl.to_seq_keys h
+
+  let of_yojson
+      (elem_of_yojson : Yojson.Safe.t -> ('a, string) result)
+      (yojson : Yojson.Safe.t) : ('a t, string) result =
+    match yojson with
+    | `List lst ->
+        let hashset = empty () in
+        List.fold_left
+          (fun hashtbl kv_yojson ->
+            Result.bind hashtbl (fun hashset ->
+                elem_of_yojson kv_yojson
+                |> Result.map (fun e ->
+                       let () = add hashset e in
+                       hashset)))
+          (Ok hashset) lst
+    | _ -> Error "Hashset.of_yojson: list needed"
+
+  let to_yojson (elem_to_yojson : 'a -> Yojson.Safe.t) (hashset : 'a t) :
+      Yojson.Safe.t =
+    `List (hashset |> to_seq |> Seq.map elem_to_yojson |> List.of_seq)
 end
 
-(** Extension of Stack with functions to serialize to and deserialize from yojson
-  
-  A Stack is a last-in-first-out collection of elements *)
+(** Extension of Stack with functions to serialize to and deserialize from
+    yojson
+
+    A Stack is a last-in-first-out collection of elements *)
 module Stack = struct
   include Stack
 
@@ -231,3 +252,8 @@ let map_fst f (a, b) = (f a, b)
 let map_snd f (a, b) = (a, f b)
 let concat_map_fst f (a, b) = List.map (fun a' -> (a', b)) (f a)
 let concat_map_snd f (a, b) = List.map (fun b' -> (a, b')) (f b)
+
+let set_with_reset r x =
+  let prev = !r in
+  let () = r := x in
+  fun () -> r := prev

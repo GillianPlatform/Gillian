@@ -20,3 +20,5 @@ val get_by_id : int -> t -> [> `None | `WLExpr of t ]
 val pp : Format.formatter -> t -> unit
 val str : t -> string
 val substitution : (string, tt) Hashtbl.t -> t -> t
+val not : t -> t
+val as_bool_fml : ?codeloc:CodeLoc.t -> t -> t

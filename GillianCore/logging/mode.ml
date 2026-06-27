@@ -15,7 +15,7 @@ let enabled () = !logging_mode <> Disabled
 (** Sets the logging mode *)
 let set_mode mode = logging_mode := mode
 
-(** Pretty print function for logging mode type  *)
+(** Pretty print function for logging mode type *)
 let pp fmt = function
   | Disabled -> Fmt.string fmt "disabled"
   | Enabled Normal -> Fmt.string fmt "normal"

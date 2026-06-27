@@ -6,9 +6,8 @@ module L = Logging
 module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Abductor : Abductor.S
-                  with type init_data = ID.t
-                   and type annot = PC.Annot.t)
+    (Abductor :
+      Abductor.S with type init_data = ID.t and type annot = PC.Annot.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -117,14 +116,12 @@ struct
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.@\n") in
     let () = Config.unfolding := false in
     let prog = LogicPreprocessing.preprocess prog true in
-    match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed."
-    | Ok prog' ->
-        let () =
-          Abductor.test_prog ~init_data ~call_graph prog' incremental
-            source_files_opt
-        in
-        if should_emit_specs then emit_specs e_prog prog' file
+    let prog' = MP.init_prog prog in
+    let () =
+      Abductor.test_prog ~init_data ~call_graph prog' incremental
+        source_files_opt
+    in
+    if should_emit_specs then emit_specs e_prog prog' file
 
   let act
       files
@@ -151,7 +148,7 @@ struct
       process_files files already_compiled outfile_opt should_emit_specs
         incremental
     in
-    let () = if !Config.stats then Statistics.print_statistics () in
+    let () = if !Config.stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 

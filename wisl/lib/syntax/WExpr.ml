@@ -37,7 +37,7 @@ let rec pp fmt e =
         ~empty:(format_of_string "@[nil@]")
         pp fmt el
   | BinOp (e1, b, e2) ->
-      Format.fprintf fmt "@[%a@ %a@ %a@]" pp e1 WBinOp.pp b pp e2
-  | UnOp (u, e) -> Format.fprintf fmt "@[%a@ %a@]" WUnOp.pp u pp e
+      Format.fprintf fmt "@[(%a@ %a@ %a)@]" pp e1 WBinOp.pp b pp e2
+  | UnOp (u, e) -> Format.fprintf fmt "@[%a%a@]" WUnOp.pp u pp e
 
 let str = Format.asprintf "%a" pp

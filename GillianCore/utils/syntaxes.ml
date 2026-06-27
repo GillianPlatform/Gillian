@@ -1,6 +1,6 @@
 (** @canonical Gillian.Utils.Syntaxes
 
-  Syntax-extending helper functions for [Result] and [Option] *)
+    Syntax-extending helper functions for [Result] and [Option] *)
 
 (** @canonical Gillian.Utils.Syntaxes.Result *)
 module Result = struct

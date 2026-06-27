@@ -1309,9 +1309,10 @@ let non_covered_tests =
   non_strict_tests @ tests_for_unimplemented_features
   @ tests_using_unimplemented_features @ es6_tests
 
-(** These are the tests that we fail to pass because of unicode strings.
-    We do not filter them when reporting our results, but we do filter them in CI because
-    we are expecting them to fail and do not intend to fix them for now. *)
+(** These are the tests that we fail to pass because of unicode strings. We do
+    not filter them when reporting our results, but we do filter them in CI
+    because we are expecting them to fail and do not intend to fix them for now.
+*)
 let failing_tests =
   [
     "language/future-reserved-words/";

@@ -20,7 +20,7 @@ lemma dlsegl_append_right {
 
   proof:
     unfold dlsegl(x, v, z, w, alpha, llen);
-    if (alpha = nil) {
+    if (alpha == nil) {
       fold dlsegl(y, y, v, v, [], 0);
       fold dlsegl(x, y, v, w, a :: alpha, 1 + llen)
     } else {
@@ -40,7 +40,7 @@ lemma dlsegr_append_left {
 
   proof:
     unfold dlsegr(z, y, v, x, alpha, llen);
-    if (#alpha = nil) {
+    if (#alpha == nil) {
       fold dlsegr(x, x, w, w, [], 0);
       fold dlsegr(x, y, v, w, a :: alpha, 1 + llen)
     } else {
@@ -60,7 +60,7 @@ lemma dlseg_l_to_r {
 
   proof:
     unfold dlsegl(x, y, v, w, alpha, llen);
-    if (alpha = nil) {
+    if (alpha == nil) {
       fold dlsegr(x, y, v, w, alpha, llen)
     } else {
       assert {bind: #a, #z, #beta, #_llen} (x -> #a, #z, w) * dlsegl(#z, y, v, x, #beta, #_llen);
@@ -79,7 +79,7 @@ lemma dlseg_r_to_l {
 
   proof:
     unfold dlsegr(x, y, v, w, alpha, llen);
-    if (alpha = nil) {
+    if (alpha == nil) {
       fold dlsegl(x, y, v, w, alpha, llen)
     } else {
       assert {bind: #a, #z, #beta, #_llen} (v -> #a, y, #z) * dlsegr(x, v, #z, w, #beta, #_llen);
@@ -114,11 +114,11 @@ lemma dlseg_concat {
   dlist(#x_a, #v_a, #alpha, #llena) * dlist(#x_b, #v_b, #beta, #llenb) }
 function concat(x_a, v_a, x_b, v_b) {
   r := new(2);
-  if (x_a = null) {
+  if (x_a == null) {
     [r] := x_b;
     [r+1] := v_b
   } else {
-    if (x_b = null) {
+    if (x_b == null) {
       [r] := x_a;
       [r+1] := v_a
     } else {

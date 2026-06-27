@@ -1,6 +1,6 @@
 (** Configuration for the framework
 
-  This mostly consists of modifiable flags and hardcoded values *)
+    This mostly consists of modifiable flags and hardcoded values *)
 
 (** {2 Global config} *)
 
@@ -11,6 +11,17 @@ let results_dir, set_result_dir =
   ((fun () -> !rd), fun r -> rd := r)
 
 let file_content_overrides : (string, string) Hashtbl.t = Hashtbl.create 0
+
+let with_lexbuf file f =
+  match Hashtbl.find_opt file_content_overrides file with
+  | Some content -> Lexing.from_string content |> f
+  | None ->
+      let inx = open_in file in
+      let lexbuf = Lexing.from_channel inx in
+      let x = f lexbuf in
+      let () = close_in inx in
+      x
+
 let entry_point = ref "main"
 let json_ui = ref false
 let ci = ref false
@@ -35,7 +46,7 @@ let medium_tbl_size = 0
 let big_tbl_size = 0
 
 (** {2 Bi-abduction config}
-  These values seem to never be modified *)
+    These values seem to never be modified *)
 
 let specs_to_stdout = ref false
 
@@ -71,8 +82,8 @@ let dump_smt = ref false
 
 (** {2 Bulk testing} *)
 
-(** If activated, at the end of bulk execution or bulk wpst, and only with the Rely runner,
-    a list of all failures will be printed in [stdout] *)
+(** If activated, at the end of bulk execution or bulk wpst, and only with the
+    Rely runner, a list of all failures will be printed in [stdout] *)
 let bulk_print_all_failures = ref true
 
 (** {2 Runtime settings} *)
@@ -97,6 +108,7 @@ module Verification = struct
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
   let things_to_verify = ref All
+  let things_to_exclude = ref Containers.SS.empty
 
   let set_procs_to_verify = function
     | [] -> ()
@@ -110,3 +122,20 @@ module Verification = struct
         lemmas_to_verify := a;
         things_to_verify := Specific
 end
+
+(** {2 Resetting}
+    With the addition of in-file config statements, we want to be able to
+    "reset" the config when analysis is run multiple times in one "instance",
+    i.e. the LSP. *)
+let reset_config_f = ref None
+
+let reset_config () =
+  match !reset_config_f with
+  | Some f ->
+      reset_config_f := None;
+      f ()
+  | None -> ()
+
+let usage_logs = ref false
+let usage_logs_file = ref "./gillian_usage_log.jsonl"
+let usage_logs_git_ref = ref "HEAD"

@@ -22,6 +22,7 @@ module Make
          and type annot = PC.Annot.t
          and type init_data = ID.t
          and type pc_err = PC.err) : sig
-  (** Parses command-line arguments and starts the requested Gillian execution *)
+  (** Parses command-line arguments and starts the requested Gillian execution
+  *)
   val main : unit -> unit
 end

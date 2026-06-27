@@ -2,18 +2,17 @@ open JSLogicCommon
 open Jsil_syntax
 
 type t =
-  | Fold of JSAsrt.t * (string * (string * JSExpr.t) list) option
-      (** Fold          *)
+  | Fold of JSAsrt.t * (string * (string * JSExpr.t) list) option  (** Fold *)
   | Unfold of JSAsrt.t * (string * string) list option  (** Single Unfold *)
   | GUnfold of string  (** Global unfold *)
-  | Flash of JSAsrt.t  (** Unfold/fold   *)
-  | If of JSExpr.t * t list * t list  (** If-then-else  *)
+  | Flash of JSAsrt.t  (** Unfold/fold *)
+  | If of JSExpr.t * t list * t list  (** If-then-else *)
   | Branch of JSAsrt.pt (* Branching *)
-  | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
-  | Macro of string * JSExpr.t list  (** Macro         *)
-  | Assert of (JSAsrt.t * string list)  (** Assert        *)
+  | ApplyLemma of string * JSExpr.t list  (** Lemma *)
+  | Macro of string * JSExpr.t list  (** Macro *)
+  | Assert of (JSAsrt.t * string list)  (** Assert *)
   | Assume of JSAsrt.pt  (** Assume *)
-  | Invariant of (JSAsrt.t * string list)  (** Invariant     *)
+  | Invariant of (JSAsrt.t * string list)  (** Invariant *)
   | UseSubst of string * (string * JSExpr.t) list
 
 let rec js2jsil

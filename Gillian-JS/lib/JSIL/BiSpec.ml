@@ -1,8 +1,8 @@
 (** {b Single JSIL specifications}. *)
 type t = {
-  name : string;  (** Procedure/spec name               *)
-  params : string list;  (** Procedure/spec parameters         *)
-  pre : Asrt.t;  (** Precondition                      *)
+  name : string;  (** Procedure/spec name *)
+  params : string list;  (** Procedure/spec parameters *)
+  pre : Asrt.t;  (** Precondition *)
   normalised : bool;  (** If the spec is already normalised *)
 }
 

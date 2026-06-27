@@ -165,7 +165,7 @@ module Make (Annot : Annot.S) = struct
       let rec find fname paths =
         match paths with
         | [] ->
-            Fmt.failwith "Cannot resolve \"%s\", looked in %a and ." fname
+            Fmt.failwith "Cannot resolve \"%s\", looked in %a." fname
               Fmt.(list ~sep:(any ", ") string)
               runtime_paths
         | path :: rest ->
@@ -287,7 +287,8 @@ module Make (Annot : Annot.S) = struct
     in
     let procs, predecessors =
       Hashtbl.fold
-        (fun (_ : string) (proc : (annot, string) Proc.t) (procs, predecessors) ->
+        (fun (_ : string) (proc : (annot, string) Proc.t) (procs, predecessors)
+           ->
           let proc, new_predecessors = proc_of_ext_proc proc in
           (proc :: procs, new_predecessors @ predecessors))
         ext_program.procs ([], [])

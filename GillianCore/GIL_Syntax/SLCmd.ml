@@ -1,5 +1,5 @@
 (***************************************************************)
-(** Separation Logic Commmands                                **)
+(** Separation Logic Commmands **)
 
 (***************************************************************)
 
@@ -10,15 +10,14 @@ type unfold_info = (string * string) list [@@deriving yojson]
 
 (** {b GIL Separation Logic commands}. *)
 type t = TypeDef__.slcmd =
-  | Fold of string * Expr.t list * folding_info option  (** Fold             *)
-  | Unfold of string * Expr.t list * unfold_info option * bool
-      (** Unfold           *)
+  | Fold of string * Expr.t list * folding_info option  (** Fold *)
+  | Unfold of string * Expr.t list * unfold_info option * bool  (** Unfold *)
   | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
       (** Magic wand packaging *)
-  | GUnfold of string  (** Global Unfold    *)
-  | ApplyLem of string * Expr.t list * string list  (** Apply lemma      *)
-  | SepAssert of Asrt.t * string list  (** Assert           *)
-  | Invariant of Asrt.t * string list  (** Invariant        *)
+  | GUnfold of string  (** Global Unfold *)
+  | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
+  | SepAssert of Asrt.t * string list  (** Assert *)
+  | Invariant of Asrt.t * string list  (** Invariant *)
   | Consume of
       Asrt.t
       * string list (* Consumes an assertion. Warning, not frame-preserving *)

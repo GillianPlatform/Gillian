@@ -447,8 +447,8 @@ module Type_lexpr = struct
   (** This function returns a triple [(t_opt, b, fs)] where
       - [t_opt] is the type of [le] if we can find one
       - [b] indicates if the thing is typable
-      - [fs] indicates the constraints that must be satisfied for [le] to be typable
-  *)
+      - [fs] indicates the constraints that must be satisfied for [le] to be
+        typable *)
   and f (gamma : Type_env.t) (le : Expr.t) : Type.t option * bool =
     let typable_list = typable_list gamma in
 

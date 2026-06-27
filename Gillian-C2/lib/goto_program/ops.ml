@@ -33,12 +33,12 @@ module Binary = struct
     | Ror
     | Shl
     | Xor
-  [@@deriving show { with_path = false }]
+  [@@deriving yojson, show { with_path = false }]
 end
 
 module Self = struct
   type t = Postdecrement | Postincrement | Predecrement | Preincrement
-  [@@deriving show { with_path = false }]
+  [@@deriving yojson, show { with_path = false }]
 
   let pp_pre fmt t =
     let f = Fmt.pf fmt in
@@ -57,21 +57,20 @@ end
 
 module Unary = struct
   type t =
-    | Bitnot  (**  `~self` *)
-    | BitReverse  (**  `__builtin_bitreverse<n>(self)` *)
-    | Bswap  (**  `__builtin_bswap<n>(self)` *)
-    | IsDynamicObject  (**  `__CPROVER_DYNAMIC_OBJECT(self)` *)
-    | IsFinite  (**  `isfinite(self)` *)
-    | Not  (**  `!self` *)
-    | ObjectSize  (**  `__CPROVER_OBJECT_SIZE(self)` *)
-    | PointerObject  (**  `__CPROVER_POINTER_OBJECT(self)` *)
-    | PointerOffset  (**  `__CPROVER_POINTER_OFFSET(self)` *)
-    | Popcount  (**  `__builtin_p opcount(self)` *)
-    | CountTrailingZeros of { allow_zero : bool }
-        (**  `__builtin_cttz(self)` *)
-    | CountLeadingZeros of { allow_zero : bool }  (**  `__builtin_ctlz(self)` *)
-    | UnaryMinus  (**  `-self` *)
-  [@@deriving show { with_path = false }]
+    | Bitnot  (** `~self` *)
+    | BitReverse  (** `__builtin_bitreverse<n>(self)` *)
+    | Bswap  (** `__builtin_bswap<n>(self)` *)
+    | IsDynamicObject  (** `__CPROVER_DYNAMIC_OBJECT(self)` *)
+    | IsFinite  (** `isfinite(self)` *)
+    | Not  (** `!self` *)
+    | ObjectSize  (** `__CPROVER_OBJECT_SIZE(self)` *)
+    | PointerObject  (** `__CPROVER_POINTER_OBJECT(self)` *)
+    | PointerOffset  (** `__CPROVER_POINTER_OFFSET(self)` *)
+    | Popcount  (** `__builtin_p opcount(self)` *)
+    | CountTrailingZeros of { allow_zero : bool }  (** `__builtin_cttz(self)` *)
+    | CountLeadingZeros of { allow_zero : bool }  (** `__builtin_ctlz(self)` *)
+    | UnaryMinus  (** `-self` *)
+  [@@deriving yojson, show { with_path = false }]
 
   let pp_display fmt t =
     let f = Fmt.pf fmt in

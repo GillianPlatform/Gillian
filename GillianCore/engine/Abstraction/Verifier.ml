@@ -14,6 +14,9 @@ module type S = sig
        and type heap_t = heap_t
        and type m_err_t = m_err
 
+  module SState :
+    SState.S with type t = SPState.state_t and type heap_t = heap_t
+
   module SAInterpreter :
     G_interpreter.S
       with type vt = Expr.t
@@ -24,7 +27,7 @@ module type S = sig
        and type state_err_t = SPState.err_t
        and type annot = annot
 
-  module SMatcher : Matcher.S
+  module SMatcher : Matcher.S with type state_t = SPState.state_t
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -40,11 +43,11 @@ module type S = sig
     SourceFiles.t option ->
     unit Gillian_result.t
 
-  val verify_up_to_procs :
-    ?proc_name:string ->
+  val init_proc :
     init_data:SPState.init_data ->
     prog_t ->
-    SAInterpreter.result_t SAInterpreter.cont_func
+    string ->
+    SAInterpreter.result_t SAInterpreter.cont_func list
 
   val postprocess_files : SourceFiles.t option -> unit
 
@@ -57,18 +60,21 @@ module type S = sig
 end
 
 module Make
-    (SState : SState.S
-                with type vt = SVal.M.t
-                 and type st = SVal.SESubst.t
-                 and type store_t = SStore.t)
-    (SPState : PState.S
-                 with type state_t = SState.t
-                  and type init_data = SState.init_data)
+    (SState :
+      SState.S
+        with type vt = SVal.M.t
+         and type st = SVal.SESubst.t
+         and type store_t = SStore.t)
+    (SPState :
+      PState.S
+        with type state_t = SState.t
+         and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) =
 struct
   module L = Logging
   module SSubst = SVal.SESubst
+  module SState = SState
   module SPState = SPState
 
   module SAInterpreter =
@@ -82,11 +88,15 @@ struct
   type m_err = SPState.m_err_t
   type annot = PC.Annot.t
 
-  module SMatcher = Matcher.Make (SState)
+  module SMatcher = SPState.SMatcher
 
   let print_success_or_failure success =
-    if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
-    else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n";
+    (if success then Fmt.(pr "%a" (styled `Green string) "Success\n")
+     else Fmt.(pr "%a" (styled `Red string) "Failure\n"));
+    Format.print_flush ()
+
+  let print_vanish () =
+    Fmt.(pr "%a" (styled `Yellow string) "Vanished\n");
     Format.print_flush ()
 
   let yojson_of_expr_set set =
@@ -129,7 +139,6 @@ struct
       (id : int)
       (pre : Asrt.t located)
       (posts : Asrt.t located list)
-      (variant : Expr.t option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) :
@@ -228,13 +237,24 @@ struct
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_mp with
         | Error _ ->
-            let msg =
-              Printf.sprintf "Warning: testify failed for %s. Cause: post_mp \n"
-                name
+            let exc =
+              let msg =
+                Fmt.str
+                  "Failed to create matching plan for post-condition of %s" name
+              in
+              let loc =
+                List.fold_left
+                  (fun acc (_, loc) ->
+                    match (acc, loc) with
+                    | Some l, Some l' -> Some (Location.merge l l')
+                    | Some l, None | None, Some l -> Some l
+                    | None, None -> None)
+                  None posts
+              in
+              Gillian_result.Exc.analysis_failure ?loc ~is_preprocessing:true
+                msg
             in
-            Printf.printf "%s" msg;
-            L.verbose (fun m -> m "%s" msg);
-            (None, None)
+            raise exc
         | Ok post_mp ->
             let pre' = SPState.to_assertions ss_pre in
             let ss_pre =
@@ -268,6 +288,7 @@ struct
             in
             (Some test, Some ((pre', snd pre), posts))
     in
+    Gillian_result.with_target func_or_lemma_name @@ fun () ->
     try
       (* Step 1 - normalise the precondition *)
       match
@@ -276,27 +297,19 @@ struct
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
-          let variants = Hashtbl.create 1 in
-          let () = Hashtbl.add variants func_or_lemma_name variant in
-          let normalised_assertions =
-            List.map
-              (fun (state, subst) ->
-                (SPState.set_variants state (Hashtbl.copy variants), subst))
-              normalised_assertions
-          in
           let result =
             List.mapi test_of_normalised_state normalised_assertions
           in
           result
     with Failure msg ->
-      let new_msg =
-        Printf.sprintf
-          "WARNING: testify failed for %s. Cause: normalisation with msg: %s.\n"
-          name msg
+      let msg =
+        Fmt.str "Preprocessing %s failed during normalisation\n%s" name msg
       in
-      Printf.printf "%s" new_msg;
-      L.normal (fun m -> m "%s" new_msg);
-      [ (None, None) ]
+      let loc = snd pre in
+      let exc =
+        Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg
+      in
+      raise exc
 
   let testify_sspec
       ~init_data
@@ -310,7 +323,7 @@ struct
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
       testify ~init_data spec_name preds pred_ins name params id sspec.ss_pre
-        sspec.ss_posts sspec.ss_variant (Some sspec.ss_flag)
+        sspec.ss_posts (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -383,11 +396,10 @@ struct
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
-        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
+        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant = _ } ->
           let to_verify = Option.is_some lemma.lemma_proof in
           testify ~init_data lemma.lemma_name preds pred_ins lemma.lemma_name
-            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant None
-            None to_verify)
+            lemma.lemma_params 0 lemma_hyp lemma_concs None None to_verify)
         lemma.lemma_specs
     in
     let tests, specs =
@@ -423,36 +435,48 @@ struct
     in
     (tests, { lemma with lemma_specs = specs })
 
-  let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
+  let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) :
+      bool option =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
     let _, states = SPState.simplify state in
-    assert (List.length states = 1);
-    let state = List.hd states in
+    match states with
+    | [] ->
+        L.normal (fun m -> m "Analysis result: vanished during simplification");
+        None
+    | _ :: _ :: _ -> failwith "Simplification branched???"
+    | [ state ] -> (
+        let subst = SSubst.copy subst in
 
-    let subst = SSubst.copy subst in
+        (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
+        List.iter
+          (fun x ->
+            if not (SSubst.mem subst (LVar x)) then
+              SSubst.add subst (LVar x) (LVar x))
+          (SS.elements (SPState.get_spec_vars state));
 
-    (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
-    List.iter
-      (fun x ->
-        if not (SSubst.mem subst (LVar x)) then
-          SSubst.add subst (LVar x) (LVar x))
-      (SS.elements (SPState.get_spec_vars state));
+        L.verbose (fun m ->
+            m "Analyse result: About to match one postcondition of %s. post: %a"
+              test.name MP.pp test.post_mp);
 
-    L.verbose (fun m ->
-        m "Analyse result: About to match one postcondition of %s. post: %a"
-          test.name MP.pp test.post_mp);
-    let matching_result =
-      SPState.matches state subst test.post_mp (Postcondition test.name)
-    in
-    L.normal (fun m ->
-        m "Analysis result: Postcondition %a"
-          (fun ft b ->
-            Fmt.string ft
-            @@ if b then "matched successfully" else "not matchable")
-          matching_result);
-    VerificationResults.set_result global_results test.name test.id
-      matching_result;
-    matching_result
+        match
+          SPState.matches state subst test.post_mp (Postcondition test.name)
+        with
+        | None ->
+            let () =
+              L.normal (fun m ->
+                  m "Analysis result: vanished during post match")
+            in
+            None
+        | Some matching_result ->
+            L.normal (fun m ->
+                m "Analysis result: Postcondition %a"
+                  (fun ft b ->
+                    Fmt.string ft
+                    @@ if b then "matched successfully" else "not matchable")
+                  matching_result);
+            VerificationResults.set_result global_results test.name test.id
+              matching_result;
+            Some matching_result)
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
@@ -464,6 +488,44 @@ struct
     in
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
+
+  let analyse_final_state test final_state :
+      (unit, Gillian_result.Error.analysis_failure) result =
+    let subst = make_post_subst test final_state in
+    match analyse_result subst test final_state with
+    | None ->
+        let () =
+          L.normal (fun m ->
+              m "(VACUOUS) VERIFICATION SUCCESS: Spec %s %a vanished\n"
+                test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id)
+        in
+        let () = Fmt.pr "v @?" in
+        Ok ()
+    | Some true ->
+        let () =
+          L.normal (fun m ->
+              m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id)
+        in
+        let () = Fmt.pr "s @?" in
+        Ok ()
+    | Some false ->
+        let msg = "Couldn't satisfy postcondition" in
+        let () =
+          L.normal (fun m ->
+              m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id msg)
+        in
+        let () = Fmt.pr "f @?" in
+        let e =
+          Gillian_result.Error.make_analysis_failure ?loc:test.post_loc msg
+        in
+        Error e
 
   let analyse_proc_result test flag ?parent_id result : unit Gillian_result.t =
     match (result : SAInterpreter.result_t) with
@@ -486,10 +548,10 @@ struct
           errors
           |> List.map @@ fun e ->
              let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
-             Gillian_result.Error.{ msg; loc }
+             Gillian_result.Error.make_analysis_failure ?loc msg
         in
-        Gillian_result.analysis_failures errors
-    | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } ->
+        Error (Gillian_result.Error.AnalysisFailures errors)
+    | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } -> (
         if Some fl <> test.flag then (
           let msg =
             Fmt.str "Terminated with flag %s instead of %s" (Flag.str fl)
@@ -500,7 +562,8 @@ struct
                 (Fmt.Dump.pair Fmt.int Fmt.int)
                 test.id msg);
           Fmt.pr "f @?";
-          Gillian_result.analysis_failures [ { msg; loc } ])
+          let e = Gillian_result.Error.make_analysis_failures ?loc msg in
+          Error e)
         else
           let parent_id =
             match parent_id with
@@ -517,87 +580,50 @@ struct
             SStore.filter_map_inplace store (fun x v ->
                 if x = Names.return_variable then Some v else None)
           in
-          let subst = make_post_subst test final_state in
-          if analyse_result subst test final_state then
-            let () =
-              L.normal (fun m ->
-                  m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                    test.name
-                    (Fmt.Dump.pair Fmt.int Fmt.int)
-                    test.id)
-            in
-            let () = Fmt.pr "s @?" in
-            Ok ()
-          else
-            let msg = "Postcondition not matchable" in
-            let () =
-              L.normal (fun m ->
-                  m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
-                    (Fmt.Dump.pair Fmt.int Fmt.int)
-                    test.id msg)
-            in
-            let () = Fmt.pr "f @?" in
-            Gillian_result.analysis_failures [ { msg; loc = test.post_loc } ]
+          match analyse_final_state test final_state with
+          | Ok () -> Ok ()
+          | Error e -> Error (Gillian_result.Error.AnalysisFailures [ e ]))
 
   let analyse_proc_results
       (test : t)
       (flag : Flag.t)
       (rets : SAInterpreter.result_t list) : unit Gillian_result.t =
     if rets = [] then (
-      L.(
-        normal (fun m ->
-            m "ERROR: Function %s evaluates to 0 results." test.name));
-      exit 1);
-    let result =
-      List.fold_left
-        (fun acc ret ->
-          let res = analyse_proc_result test flag ret in
-          Gillian_result.merge acc res)
-        (Ok ()) rets
-    in
-    print_success_or_failure (Result.is_ok result);
-    result
+      print_vanish ();
+      Ok ())
+    else
+      let result =
+        List.fold_left
+          (fun acc ret ->
+            let res = analyse_proc_result test flag ret in
+            Gillian_result.merge acc res)
+          (Ok ()) rets
+      in
+      print_success_or_failure (Result.is_ok result);
+      result
 
   let analyse_lemma_results (test : t) (rets : SPState.t list) :
       unit Gillian_result.t =
-    let open Syntaxes.Result in
-    let* () =
-      if rets = [] then
-        Gillian_result.internal_error "Lemma evaluates to 0 results."
-      else Ok ()
-    in
-    let errors =
-      rets
-      |> List.filter_map @@ fun final_state ->
-         let empty_store = SStore.init [] in
-         let final_state = SPState.set_store final_state empty_store in
-         let subst = make_post_subst test final_state in
-         if analyse_result subst test final_state then
-           let () =
-             L.normal (fun m ->
-                 m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                   test.name
-                   (Fmt.Dump.pair Fmt.int Fmt.int)
-                   test.id)
-           in
-           None
-         else
-           let msg = "Postcondition not matchable" in
-           let () =
-             L.normal (fun m ->
-                 m "VERIFICATION FAILURE in spec %s %a: %s\n" test.name
-                   (Fmt.Dump.pair Fmt.int Fmt.int)
-                   test.id msg)
-           in
-           Some Gillian_result.Error.{ msg; loc = test.post_loc }
-    in
-    let result =
-      match errors with
-      | [] -> Ok ()
-      | _ -> Gillian_result.analysis_failures errors
-    in
-    print_success_or_failure (Result.is_ok result);
-    result
+    if rets = [] then (
+      print_vanish ();
+      Ok ())
+    else
+      let errors =
+        rets
+        |> List.filter_map @@ fun final_state ->
+           let empty_store = SStore.init [] in
+           let final_state = SPState.set_store final_state empty_store in
+           match analyse_final_state test final_state with
+           | Ok () -> None
+           | Error e -> Some e
+      in
+      let result =
+        match errors with
+        | [] -> Ok ()
+        | _ -> Error (Gillian_result.Error.AnalysisFailures errors)
+      in
+      print_success_or_failure (Result.is_ok result);
+      result
 
   (* FIXME: This function name is very bad! *)
   let verify_up_to_procs (prog : annot MP.prog) (test : t) : annot MP.prog =
@@ -605,13 +631,14 @@ struct
     match test.flag with
     | Some _ ->
         let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
-        L.tmi (fun fmt -> fmt "%s" msg);
+        L.normal (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s@?" msg;
         (* Reset coverage for every procedure in verification *)
         { prog with coverage = Hashtbl.create 1 }
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
   let verify (prog : annot MP.prog) (test : t) : unit Gillian_result.t =
+    Gillian_result.with_target test.name @@ fun () ->
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -637,7 +664,7 @@ struct
             else Ok () (* It's already correct *)
         | Some proof -> (
             let msg = "Verifying lemma " ^ test.name ^ "... " in
-            L.tmi (fun fmt -> fmt "%s" msg);
+            L.normal (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
             let lemma_evaluation_results =
               SAInterpreter.evaluate_lcmds prog proof state
@@ -650,10 +677,10 @@ struct
                   errors
                   |> List.map @@ fun e ->
                      let msg = Fmt.str "%a" SPState.pp_err e in
-                     Gillian_result.Error.{ msg; loc = None }
+                     Gillian_result.Error.make_analysis_failure msg
                 in
                 print_success_or_failure false;
-                Gillian_result.analysis_failures errors))
+                Error (Gillian_result.Error.AnalysisFailures errors)))
 
   let pred_extracting_visitor =
     object
@@ -740,11 +767,14 @@ struct
       (lnames_to_verify : SS.t) : annot MP.prog * t list * t list =
     let ipreds = MP.init_preds prog.preds in
     match ipreds with
-    | Error e ->
-        Fmt.pr "Creation of matching plans for predicates failed with:\n%a\n@?"
-          MP.pp_err e;
-        Fmt.failwith "Creation of matching plans for predicates failed."
-    | Ok preds -> (
+    | Error (e, loc) ->
+        let msg =
+          Fmt.str "Creation of matching plans for predicates failed:@\n %a@\n@?"
+            MP.pp_err_ e
+        in
+        raise
+          (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg)
+    | Ok preds ->
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
@@ -821,22 +851,14 @@ struct
 
         (* STEP 4: Create matching plans for specs and predicates *)
         (* Printf.printf "Creating matching plans: %f\n" (cur_time -. start_time); *)
-        match MP.init_prog ~preds_tbl:preds prog with
-        | Error e ->
-            Fmt.failwith "Creation of matching plans failed:@\n %a@\n@?"
-              MP.pp_err e
-        | Ok prog' ->
-            (* STEP 5: Determine static dependencies and add to call graph *)
-            List.iter
-              (fun test -> record_proc_dependencies test.name prog')
-              tests;
-            List.iter
-              (fun test -> record_lemma_dependencies test.name prog')
-              tests';
-            Hashtbl.iter
-              (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
-              prog'.preds;
-            (prog', tests', tests))
+        let prog' = MP.init_prog ~preds_tbl:preds prog in
+        (* STEP 5: Determine static dependencies and add to call graph *)
+        List.iter (fun test -> record_proc_dependencies test.name prog') tests;
+        List.iter (fun test -> record_lemma_dependencies test.name prog') tests';
+        Hashtbl.iter
+          (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
+          prog'.preds;
+        (prog', tests', tests)
 
   let verify_procs
       ~(init_data : SPState.init_data)
@@ -874,54 +896,43 @@ struct
     result
 
   let select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify =
-    match !Config.Verification.things_to_verify with
-    | All -> (procs_to_verify, lemmas_to_verify)
-    | ProcsOnly -> (procs_to_verify, SS.empty)
-    | LemmasOnly -> (SS.empty, lemmas_to_verify)
-    | Specific ->
-        ( SS.inter procs_to_verify
-            (SS.of_list !Config.Verification.procs_to_verify),
-          SS.inter lemmas_to_verify
-            (SS.of_list !Config.Verification.lemmas_to_verify) )
+    let module C = Config.Verification in
+    let ps, ls =
+      match !C.things_to_verify with
+      | All -> (procs_to_verify, lemmas_to_verify)
+      | ProcsOnly -> (procs_to_verify, SS.empty)
+      | LemmasOnly -> (SS.empty, lemmas_to_verify)
+      | Specific ->
+          ( SS.inter procs_to_verify (SS.of_list !C.procs_to_verify),
+            SS.inter lemmas_to_verify (SS.of_list !C.lemmas_to_verify) )
+    in
+    let ps = SS.diff ps !C.things_to_exclude in
+    let ls = SS.diff ls !C.things_to_exclude in
+    (ps, ls)
 
-  let verify_up_to_procs
-      ?(proc_name : string option)
-      ~(init_data : SPState.init_data)
-      (prog : prog_t) : SAInterpreter.result_t SAInterpreter.cont_func =
-    L.Phase.with_normal ~title:"Program verification" (fun () ->
-        (* Analyse all procedures and lemmas *)
-        let procs_to_verify =
-          SS.of_list (Prog.get_noninternal_proc_names prog)
-        in
-        let lemmas_to_verify =
-          SS.of_list (Prog.get_noninternal_lemma_names prog)
-        in
-        let procs_to_verify, lemmas_to_verify =
-          select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
-        in
-        let prog, _, proc_tests =
-          get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
-        in
-        (* TODO: Verify All procedures. Currently we only verify the first
+  let init_proc ~(init_data : SPState.init_data) (prog : prog_t) proc_name :
+      SAInterpreter.result_t SAInterpreter.cont_func list =
+    L.Phase.with_normal ~title:"Program verification" @@ fun () ->
+    (* Analyse all procedures and lemmas *)
+    let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+    let lemmas_to_verify = SS.of_list (Prog.get_noninternal_lemma_names prog) in
+    let procs_to_verify, lemmas_to_verify =
+      select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
+    in
+    let prog, _, proc_tests =
+      get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
+    in
+    (* TODO: Verify All procedures. Currently we only verify the first
                procedure (unless specified).
                Assume there is at least one procedure*)
-        let test =
-          match proc_name with
-          | Some proc_name -> (
-              match
-                proc_tests |> List.find_opt (fun test -> test.name = proc_name)
-              with
-              | Some test -> test
-              | None ->
-                  Fmt.failwith "Couldn't find test for proc '%s'!" proc_name)
-          | None -> (
-              match proc_tests with
-              | test :: _ -> test
-              | _ -> failwith "No tests found!")
-        in
-        SAInterpreter.init_evaluate_proc
-          (fun x -> x)
-          prog test.name test.params test.pre_state)
+    let tests = proc_tests |> List.filter (fun test -> test.name = proc_name) in
+    if List.is_empty tests then
+      Fmt.failwith "Couldn't find test for proc '%s'!" proc_name;
+    tests
+    |> List.map @@ fun test ->
+       SAInterpreter.init_evaluate_proc
+         (fun x -> x)
+         prog test.name test.params test.pre_state
 
   let postprocess_files source_files =
     let cur_source_files =

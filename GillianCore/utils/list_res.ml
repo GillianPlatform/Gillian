@@ -1,6 +1,6 @@
-(** This module implements what could be called the "verification" monad.
-   Each step may branch, but if any branch fails, then the entirety of the
-   process fails. *)
+(** This module implements what could be called the "verification" monad. Each
+    step may branch, but if any branch fails, then the entirety of the process
+    fails. *)
 type ('a, 'b) t = ('a list, 'b list) result
 
 let pp ~ok ~err =

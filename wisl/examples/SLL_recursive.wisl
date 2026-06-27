@@ -5,7 +5,7 @@ predicate list(+x, alpha) {
 
 { (x == #x) * list(#x, #alpha) }
 function llen(x) {
-    if (x = null) {
+    if (x == null) {
         n := 0
     } else {
         t := [x+1];
@@ -18,7 +18,7 @@ function llen(x) {
 
 { (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
 function concat(x, y) {
-    if (x = null) {
+    if (x == null) {
         r := y
     } else {
         t := [x+1];
@@ -33,7 +33,7 @@ function concat(x, y) {
 
 // { list(#x, #alpha) * (v == #v) }
 // function append(x, v) {
-//     if (x = null) {
+//     if (x == null) {
 //         y := new(2);
 //         [y] := v
 //     } else {
@@ -48,7 +48,7 @@ function concat(x, y) {
 
 // { list(x, #alpha) * (x == #x) }
 // function copy(x) {
-//     if (x = null) {
+//     if (x == null) {
 //         ch := null
 //     } else {
 //         v := [x];
@@ -64,7 +64,7 @@ function concat(x, y) {
 
 // { list(x, #alpha) }
 // function dispose_list(x) {
-//     if (x = null) {
+//     if (x == null) {
 //         skip
 //     } else {
 //         tail := [x+1];

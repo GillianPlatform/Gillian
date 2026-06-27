@@ -7,7 +7,7 @@ let unfolded_preds : (string, Pred.t) Hashtbl.t = Hashtbl.create small_tbl_size
 (*
  *  Auto-Unfolding Non-recursive Predicates in Assertions
  * 	-----------------------------------------------------
- * *)
+ *)
 let rec auto_unfold
     ?(unfold_rec_predicates = false)
     ?loc
@@ -41,11 +41,21 @@ let rec auto_unfold
                     instead of %i"
                    name (List.length args) (List.length params)
                in
-               raise (Gillian_result.Exc.verification_failure ?loc msg)
+               raise
+                 (Gillian_result.Exc.analysis_failure ~is_preprocessing:true
+                    ?loc msg)
            in
            let subst = SVal.SSubst.init combined in
            let defs = List.map (fun (_, def) -> def) pred.pred_definitions in
-           List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
+           let asrts =
+             List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
+           in
+           L.tmi (fun m ->
+               m "%a ->\n%a" Asrt.pp_atom
+                 (Asrt.Pred (name, args))
+                 (Fmt.list ~sep:(Fmt.any "\n;\n") Asrt.pp)
+                 asrts);
+           asrts
        | Pred (name, args) as asrt -> (
            try
              L.tmi (fun fmt -> fmt "AutoUnfold: %a : %s" Asrt.pp_atom asrt name);
@@ -274,6 +284,9 @@ let unfold_spec
       concat_map_fst (auto_unfold preds rec_info) sspec.ss_pre
     in
     L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec.spec_name);
+    L.tmi (fun fmt ->
+        fmt "@[<hov 2>Testing admissibility for assertions:@.%a@]"
+          (Fmt.list Asrt.pp) (List.map fst pres));
     let pres =
       List.filter
         (fun (pre, _) -> Simplifications.admissible_assertion pre)
@@ -491,7 +504,8 @@ let explicit_param_types
         | Ok pred -> pred
         | Error msg ->
             raise
-              (Gillian_result.Exc.verification_failure ?loc:pred.pred_loc msg)
+              (Gillian_result.Exc.analysis_failure ~is_preprocessing:true
+                 ?loc:pred.pred_loc msg)
       in
       (* Join the new predicate definition with all previous for the same predicate (if any) *)
       try

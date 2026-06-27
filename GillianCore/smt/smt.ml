@@ -15,15 +15,57 @@ let z3_config =
     ("timeout", "30000");
   ]
 
-let solver = new_solver z3
-let cmd s = ack_command solver s
-let () = z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+let () = Sys.(set_signal sigpipe Signal_ignore)
 
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
 let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
+
+let solver =
+  ref
+    {
+      command = (fun _ -> failwith "Uninitialized solver");
+      stop = (fun () -> failwith "Uninitialized solver");
+      force_stop = (fun () -> failwith "Uninitialized solver");
+      config = z3;
+      raw_command = (fun _ -> failwith "Uninitialized solver");
+    }
+
+let cmd s = ack_command !solver s
+
+let rec init_solver () =
+  let z3 = new_solver z3 in
+  let command = protected_command z3 in
+  let () = solver := { z3 with command } in
+  (* Config, initial decls *)
+  let () =
+    z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
+  in
+  let decls = List.rev !init_decls in
+  let () = decls |> List.iter cmd in
+  let () = cmd (push 1) in
+  ()
+
+and protected_command solver s =
+  let open Sexplib in
+  let open Gillian_result.Exc in
+  let res =
+    try
+      let r = solver.command s in
+      (* Perform a "heartbeat" after each command so we know ASAP if the solver died *)
+      match solver.raw_command "(echo \"gillian\")" with
+      | Sexp.Atom "gillian" -> Ok r
+      | s -> Fmt.error "SMT heartbeat gave unexpected result: %a" Sexp.pp_hum s
+    with Sys_error s -> Fmt.error "Error when calling SMT solver: %s" s
+  in
+  match res with
+  | Ok r -> r
+  | Error msg ->
+      Logging.normal (fun m -> m "%s" msg);
+      init_solver ();
+      raise (internal_error msg)
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -389,9 +431,9 @@ module Encoding = struct
 
   let simply_wrapped = make ~kind:Simple_wrapped
 
-  (** Takes a value either natively encoded or simply wrapped
-    and returns a value simply wrapped.
-    Careful: do not use wrap with a a set, as they cannot be simply wrapped *)
+  (** Takes a value either natively encoded or simply wrapped and returns a
+      value simply wrapped. Careful: do not use wrap with a a set, as they
+      cannot be simply wrapped *)
   let simple_wrap { expr; kind; _ } =
     let open Lit_operations in
     match kind with
@@ -642,7 +684,10 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   | LstRev -> Axiomatised_operations.lrev <| get_list le >- ListType
   | NumToInt -> get_num le |> real_to_int >- IntType
   | IntToNum -> get_int le |> int_to_real >- NumberType
-  | IsInt -> num_divisible (get_num le) 1 >- BooleanType
+  | IsInt ->
+      encode_equality
+        (get_num le |> real_to_int |> int_to_real >- NumberType)
+        le
   | BitwiseNot
   | M_isNaN
   | M_abs
@@ -941,7 +986,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () = List.iter cmd !builtin_funcs in
   let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");
-  let result = check solver in
+  let result = check !solver in
   L.verbose (fun m ->
       let r =
         match result with
@@ -965,7 +1010,7 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
           raise
             Gillian_result.Exc.(
               internal_error ~additional_data "SMT returned unknown")
-    | Sat -> Some (get_model solver)
+    | Sat -> Some (get_model !solver)
     | Unsat -> None
   in
   ret
@@ -1010,7 +1055,7 @@ let lift_model
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
   let () = reset_solver () in
-  let model_eval = (model_eval' solver model).eval [] in
+  let model_eval = (model_eval' !solver model).eval [] in
 
   let get_val x =
     try
@@ -1066,7 +1111,4 @@ let lift_model
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
 
-let () =
-  let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
-  cmd (push 1)
+let () = init_solver ()

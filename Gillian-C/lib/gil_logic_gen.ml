@@ -23,7 +23,7 @@ let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "opt_rec_struct_" ^ struct_name
 
 let fresh_lvar ?(fname = "") () =
-  let pre = "_lvar_i_" in
+  let pre = Utils.Names.lvar_prefix ^ "i_" in
   Generators.gen_str ~fname pre
 
 let rec split3_expr_comp = function
@@ -141,7 +141,7 @@ let assert_of_member cenv members id typ =
         List.init arg_number (fun k ->
             Expr.LVar ("i__" ^ field_name ^ "_" ^ string_of_int k))
       in
-      let list_is_components = pvmember #== (Expr.list args_without_ins) in
+      let list_is_components = pvmember#==(Expr.list args_without_ins) in
       let ofs = Expr.Infix.(pvofs + fo) in
       let args = pvloc :: ofs :: args_without_ins in
       let pred_call = Asrt.Pred (pred_name, args) in
@@ -341,8 +341,8 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
       let ptr = Expr.EList [ Lit (Loc loc); Expr.zero_i ] in
       ([], [], ptr)
 
-(** Returns assertions that are necessary to define the expression,
-      the created variable for binding when necessary, and the used expression *)
+(** Returns assertions that are necessary to define the expression, the created
+    variable for binding when necessary, and the used expression *)
 let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
   match e with
   | CExpr.SExpr se -> ([], [], trans_simpl_expr se)
@@ -773,6 +773,7 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_variant = None;
       lemma_specs;
       lemma_proof;
+      lemma_location = None;
     }
 
 let trans_spec ~ann ?(only_spec = false) cl_spec =
@@ -786,6 +787,7 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
+        spec_location = None;
       }
   in
   let _ =
@@ -908,7 +910,7 @@ let generate_bispec clight_prog fname ident f =
   let true_params = List.map true_name params in
   let clight_fun = get_clight_fun clight_prog ident in
   let cligh_params = clight_fun.Clight.fn_params in
-  let mk_lvar x = Expr.LVar ("" ^ x) in
+  let mk_lvar x = Expr.LVar (Utils.Names.lvar_prefix ^ x) in
   let lvars = List.map mk_lvar true_params in
   let equalities =
     List.map

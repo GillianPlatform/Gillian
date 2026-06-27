@@ -11,7 +11,7 @@ let counter = ref 0
 let pvar_counter = ref 0
 
 let fresh_bi_lvar () =
-  let v = "#bi_var_" ^ string_of_int !counter in
+  let v = Utils.Names.lvar_prefix_bi ^ string_of_int !counter in
   counter := !counter + 1;
   v
 
@@ -425,7 +425,7 @@ let bi_post_parse_cmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
         LabCmd.LCall
           ( x_r,
             Lit (String JS2JSIL_Helpers.isNativeErrorName),
-            [ PVar "ret" ],
+            [ PVar Utils.Names.return_variable ],
             None,
             None )
       in

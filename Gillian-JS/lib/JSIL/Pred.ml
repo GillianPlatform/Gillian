@@ -5,15 +5,15 @@ module Expr = Gillian.Gil_syntax.Expr
 
 (** {b JSIL logic predicate}. *)
 type t = {
-  name : string;  (** Name of the predicate  *)
-  num_params : int;  (** Number of parameters   *)
-  params : (string * Type.t option) list;  (** Actual parameters      *)
-  ins : int list;  (** Ins                    *)
+  name : string;  (** Name of the predicate *)
+  num_params : int;  (** Number of parameters *)
+  params : (string * Type.t option) list;  (** Actual parameters *)
+  ins : int list;  (** Ins *)
   definitions : ((string * string list) option * Asrt.t) list;
-      (** Predicate definitions  *)
+      (** Predicate definitions *)
   facts : Expr.t list;  (** Facts about the predicate *)
-  pure : bool;  (** Is the predicate pure  *)
-  abstract : bool;  (** Is the predicate abstract  *)
+  pure : bool;  (** Is the predicate pure *)
+  abstract : bool;  (** Is the predicate abstract *)
   nounfold : bool;  (** Should the predicate be unfolded? *)
   normalised : bool;  (** If the predicate has been previously normalised *)
 }

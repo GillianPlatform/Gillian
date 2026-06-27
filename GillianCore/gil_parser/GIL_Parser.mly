@@ -174,6 +174,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token RETURN
 %token THROW
 %token EXTERN
+%token PAR
 (* Logic variables *)
 %token <string> LVAR
 (* Logical expressions *)
@@ -653,6 +654,8 @@ gproc_target:
         proc_spec;
         proc_aliases = [];
         proc_calls = [];
+        proc_display_name = None;
+        proc_hidden = false;
       }
   }
 ;
@@ -676,6 +679,14 @@ gcmd_with_annot:
       let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
+
+gcmd_call:
+  | v=VAR; DEFEQ; e=expr_target;
+    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+    {
+      ({ var_name = v; fun_name = e; args = es; bindings = subst }, oi)
+    }
+
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)
@@ -693,10 +704,20 @@ gcmd_target:
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { Cmd.GuardedGoto (e, i, j) }
 (* x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble] *)
-  | v=VAR; DEFEQ; e=expr_target;
-    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+  | call=gcmd_call
     {
-      Cmd.Call (v, e, es, oi, subst)
+      let call, oi = call in
+      Cmd.Call (call, oi)
+    }
+(* par [x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble]; ...] *)
+  | PAR; LBRACKET; calls=separated_list(SCOLON, gcmd_call); RBRACKET
+    {
+      let calls = List.map (fun (call, oi) ->
+          if Option.is_some oi then failwith "Par call doesn't support error label";
+          call
+        ) calls
+      in
+      Cmd.Par calls
     }
 (* x := e(e1, ..., en) with j *)
   | v=VAR; DEFEQ; EXTERN; pname=VAR;
@@ -747,7 +768,8 @@ g_spec_target:
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
     let spec_incomplete = Option.is_some incomplete in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
+    let spec_location = Some (get_loc $startpos $endpos) in
+    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify; spec_location } in
     spec
   }
 ;
@@ -992,7 +1014,9 @@ g_pred_target:
 
 variant_target:
   VARIANT LBRACE; variant = expr_target; RBRACE
-  { variant }
+  {
+    Printf.eprintf "Warning: variants are not currently being used by Gillian, no termination is checked.\n";
+    variant }
 
 
 lemma_head_target:
@@ -1024,6 +1048,7 @@ g_lemma_target:
         lemmas_with_no_paths := SS.add lemma_name !lemmas_with_no_paths
     in
     let lemma_existentials = Option.value ~default:[] lemma_existentials in
+    let lemma_location = Some (get_loc $startpos $endpos) in
     let spec = Lemma.{
       lemma_hyp;
       lemma_concs;
@@ -1039,6 +1064,7 @@ g_lemma_target:
         lemma_variant;
         lemma_proof;
         lemma_existentials;
+        lemma_location;
       }
   }
 ;
@@ -1134,7 +1160,7 @@ type_env_pair_target:
 logic_variable_target:
   v = LVAR
   {
-    let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
+    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
     Expr.LVar v_imported }
 ;

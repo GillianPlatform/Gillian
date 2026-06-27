@@ -187,6 +187,13 @@ and lcmd =
   | FreshSVar of string
   | SL of slcmd
 
+and function_call = {
+  var_name : string;
+  fun_name : expr;
+  args : expr list;
+  bindings : bindings option;
+}
+
 and 'label cmd =
   | Skip
   | Assignment of string * expr
@@ -194,7 +201,8 @@ and 'label cmd =
   | Logic of lcmd
   | Goto of 'label
   | GuardedGoto of expr * 'label * 'label
-  | Call of string * expr * expr list * 'label option * bindings option
+  | Call of function_call * 'label option
+  | Par of function_call list
   | ECall of string * expr * expr list * 'label option
   | Apply of string * expr * 'label option
   | Arguments of string
@@ -237,6 +245,7 @@ and lemma = {
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
   lemma_existentials : string list;
+  lemma_location : location option;
 }
 
 and single_spec = {
@@ -255,6 +264,7 @@ and spec = {
   spec_normalised : bool;
   spec_incomplete : bool;
   spec_to_verify : bool;
+  spec_location : location option;
 }
 
 and bispec = {
@@ -279,10 +289,12 @@ and ('annot, 'label) proc = {
   proc_spec : spec option;
   proc_aliases : string list;
   proc_calls : string list;
+  proc_display_name : (string * string) option;
+  proc_hidden : bool;
 }
 [@@deriving
   visitors { variety = "reduce" },
-    visitors { variety = "endo" },
-    visitors { variety = "iter" },
-    yojson,
-    eq]
+  visitors { variety = "endo" },
+  visitors { variety = "iter" },
+  yojson,
+  eq]

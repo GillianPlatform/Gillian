@@ -18,6 +18,7 @@ type t = TypeDef__.spec = {
   spec_normalised : bool;  (** If the spec is already normalised *)
   spec_incomplete : bool;  (** If the spec is incomplete *)
   spec_to_verify : bool;  (** Should the spec be verified? *)
+  spec_location : Location.t option;
 }
 
 (** Creates a GIL specification given its components *)
@@ -36,7 +37,8 @@ let init
     (spec_sspecs : st list)
     (spec_normalised : bool)
     (spec_incomplete : bool)
-    (spec_to_verify : bool) : t =
+    (spec_to_verify : bool)
+    (spec_location : Location.t option) : t =
   {
     spec_name;
     spec_params;
@@ -44,6 +46,7 @@ let init
     spec_normalised;
     spec_incomplete;
     spec_to_verify;
+    spec_location;
   }
 
 let extend (spec : t) (sspecs : st list) : t =
@@ -80,7 +83,10 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
   let map_asrts (pred, loc) =
     match Pred.extend_asrt_pred_types preds pred with
     | Ok pred -> (pred, loc)
-    | Error msg -> raise (Gillian_result.Exc.verification_failure ?loc msg)
+    | Error msg ->
+        raise
+          (Gillian_result.Exc.analysis_failure ~in_target:spec.spec_name ?loc
+             msg)
   in
   let pt_sspec (sspec : st) : st =
     {

@@ -7,7 +7,8 @@ type nest_kind =
 (** How does this command map to a WISL statment? *)
 type stmt_kind =
   | Normal of bool
-      (** A command that makes up part of a WISL statement, and whether this is the last cmd of said statement *)
+      (** A command that makes up part of a WISL statement, and whether this is
+          the last cmd of said statement *)
   | Return of bool
       (** Same as [Normal], but specific to the return statement *)
   | Hidden  (** A command that doesn't map to a particular WISL statement *)

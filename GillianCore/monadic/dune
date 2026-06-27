@@ -3,5 +3,7 @@
  (public_name gillian.monadic)
  (flags -open Utils.Prelude)
  (libraries gil_syntax engine utils fmt logging smt)
+ (instrumentation
+  (backend landmarks --auto))
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson)))

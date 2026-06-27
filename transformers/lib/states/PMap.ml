@@ -42,69 +42,73 @@ module DO = Delayed_option
 type index_mode = Static | Dynamic
 
 module type PMapImpl = sig
-  type entry
+  module Entry : MyMonadicSMemory.S
+
   type t [@@deriving yojson]
 
+  val find_opt_unsafe : t -> Expr.t -> Entry.t option
   val mode : index_mode
 
-  (** Creates a new address, for allocating new state. Only used in static mode *)
+  (** Creates a new address, for allocating new state. Only used in static mode
+  *)
   val make_fresh : unit -> Expr.t Delayed.t
 
-  (** The arguments used when instantiating new state. Only used in dynamic mode *)
+  (** The arguments used when instantiating new state. Only used in dynamic mode
+  *)
   val default_instantiation : Expr.t list
 
   (* Note for the below two functions we use option Delayed rather than
      result Delayed, to avoid the headache of handling additional errors. *)
 
-  (** Validates the index, by returning possibly a new index (or that same index).
-      Returns None if the index is not valid. *)
+  (** Validates the index, by returning possibly a new index (or that same
+      index). Returns None if the index is not valid. *)
   val validate_index : Expr.t -> Expr.t option Delayed.t
 
-  (** Returns (symbolically) the state at the given index if it's found,
-      or None if no state is there, in which case an empty binding could be
-      created there instead. It's important this function doesn't return an empty
-      state (with MyMonadicSMemory.empty ()), but None, as the caller might need
-      to distinguish these situations (eg. checking a domain set).
+  (** Returns (symbolically) the state at the given index if it's found, or None
+      if no state is there, in which case an empty binding could be created
+      there instead. It's important this function doesn't return an empty state
+      (with MyMonadicSMemory.empty ()), but None, as the caller might need to
+      distinguish these situations (eg. checking a domain set).
 
-      This function should assume the index is valid (ie. it was returned by `validate_index`).
-      *)
-  val get : t -> Expr.t -> (Expr.t * entry) option Delayed.t
+      This function should assume the index is valid (ie. it was returned by
+      `validate_index`). *)
+  val get : t -> Expr.t -> (Expr.t * Entry.t) option Delayed.t
 
   (** Updates the entry with the given state; `idx` represents the previous
-      index of the state, in case a new index was found for it. In other words, after
-      this operation the map must store nothing at `idx`, and the new state at `idx'`.
-      `idx` and `idx'` can be equal, in which case the state is just added/updated. *)
-  val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
+      index of the state, in case a new index was found for it. In other words,
+      after this operation the map must store nothing at `idx`, and the new
+      state at `idx'`. `idx` and `idx'` can be equal, in which case the state is
+      just added/updated. *)
+  val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
 
   val empty : t
-  val fold : (Expr.t -> entry -> 'a -> 'a) -> t -> 'a -> 'a
-  val for_all : (entry -> bool) -> t -> bool
+  val fold : (Expr.t -> Entry.t -> 'a -> 'a) -> t -> 'a -> 'a
+  val for_all : (Entry.t -> bool) -> t -> bool
   val compose : t -> t -> t Delayed.t
   val substitution_in_place : Subst.t -> t -> t Delayed.t
 end
 
 module type OpenPMapType = sig
   include MyMonadicSMemory.S
+  module Entry : MyMonadicSMemory.S
 
-  type entry
-
-  val get : t -> Expr.t -> (t * Expr.t * entry, err_t) DR.t
-  val set : idx:Expr.t -> idx':Expr.t -> entry -> t -> t
+  val get : t -> Expr.t -> (t * Expr.t * Entry.t, err_t) DR.t
+  val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
 end
 
 module type PMapType = sig
   include OpenPMapType
 
-  val domain_add : Expr.t -> t -> t
+  val domain_add : Expr.t -> t -> t Delayed.t
 end
 
 module Make
-    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with type entry = S.t)
+    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with module Entry = S)
     (S : MyMonadicSMemory.S) =
 struct
   module I = I_Cons (S)
+  module Entry = S
 
-  type entry = S.t
   type t = I.t * Expr.t option [@@deriving yojson]
 
   let pp fmt ((h, d) : t) =
@@ -171,16 +175,14 @@ struct
 
   let domain_add k ((h, d) : t) =
     match d with
-    | None -> (h, d)
-    | Some (Expr.ESet d) -> (h, Some (Expr.ESet (k :: d)))
-    | Some _ ->
-        (* Currently we only support "concrete" domain sets (ie. using Expr.ESet, instead of
-           as logical variables). To add support to "symbolic" domain sets one would need
-           to make this function return a Expr.t Delayed.t, adding to the PC that the key is in
-           the set. *)
-        failwith "Invalid index set; expected a set"
+    | None -> Delayed.return (h, d)
+    | Some (Expr.ESet d) -> Delayed.return (h, Some (Expr.ESet (k :: d)))
+    | Some d ->
+        let open Delayed.Syntax in
+        let+ d' = Delayed.reduce (NOp (SetUnion, [ d; ESet [ k ] ])) in
+        (h, Some d')
 
-  let get ((h, d) as s) idx =
+  let[@inline] get ((h, d) as s) idx =
     let open Delayed.Syntax in
     let* idx_opt = I.validate_index idx in
     match idx_opt with
@@ -201,7 +203,7 @@ struct
               | Dynamic ->
                   let ss, _ = S.instantiate I.default_instantiation in
                   let h' = I.set ~idx:idx' ~idx':idx ss h in
-                  let s' = (h', Some d) |> domain_add idx' in
+                  let* s' = domain_add idx' (h', Some d) in
                   DR.ok (s', idx', ss)))
 
   let set ~idx ~idx' entry ((h, d) : t) = (I.set ~idx ~idx' entry h, d)
@@ -213,7 +215,7 @@ struct
 
   let empty () : t = (I.empty, None)
 
-  let execute_action action (s : t) args =
+  let[@inline] execute_action action (s : t) args =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (action, args) with
@@ -231,7 +233,8 @@ struct
           failwith "Alloc not allowed using dynamic indexing";
         let* idx = I.make_fresh () in
         let ss, v = S.instantiate args in
-        let s' = set ~idx ~idx':idx ss s |> domain_add idx in
+        let s' = set ~idx ~idx':idx ss s in
+        let* s' = domain_add idx s' in
         DR.ok (s', idx :: v)
     | GetDomainSet, [] -> (
         match s with
@@ -253,7 +256,7 @@ struct
         | _, None -> DR.error MissingDomainSet)
     | GetDomainSet, _ -> failwith "Invalid arguments for get_domainset"
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (pred, ins) with
@@ -271,7 +274,7 @@ struct
         | _, None -> DR.error MissingDomainSet)
     | DomainSet, _ -> failwith "Invalid number of ins for domainset"
 
-  let produce pred s args =
+  let[@inline] produce pred s args =
     let open Delayed.Syntax in
     let open MyUtils.Syntax in
     match (pred, args) with
@@ -370,9 +373,14 @@ struct
   let assertions_others (h, _) =
     I.fold (fun _ s acc -> S.assertions_others s @ acc) h []
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (_, idx, e) ->
-        Gillian.General.Recovery_tactic.merge (S.get_recovery_tactic e)
+        let sub_recover =
+          match I.find_opt_unsafe (fst st) idx with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
+        Gillian.General.Recovery_tactic.merge sub_recover
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
     | NotAllocated idx | InvalidIndexValue idx ->
         Gillian.General.Recovery_tactic.try_unfold [ idx ]
@@ -402,7 +410,7 @@ struct
 end
 
 module MakeOpen
-    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with type entry = S.t)
+    (I_Cons : functor (S : MyMonadicSMemory.S) -> PMapImpl with module Entry = S)
     (S : MyMonadicSMemory.S) =
 struct
   module I = I_Cons (S)
@@ -410,7 +418,8 @@ struct
   let () =
     if I.mode = Dynamic then failwith "Dynamic mode not supported for OpenPMap"
 
-  type entry = S.t
+  module Entry = S
+
   type t = I.t [@@deriving yojson]
 
   let pp fmt (h : t) =
@@ -449,7 +458,7 @@ struct
   let list_preds () =
     List.map (fun (p, ins, outs) -> (p, "index" :: ins, outs)) (S.list_preds ())
 
-  let get s idx =
+  let[@inline] get s idx =
     let open Delayed.Syntax in
     let* idx_opt = I.validate_index idx in
     match idx_opt with
@@ -462,14 +471,14 @@ struct
 
   let set = I.set
 
-  let lifting_err idx idx' v fn =
+  let[@inline] lifting_err idx idx' v fn =
     match v with
     | Ok v -> Ok (fn v)
     | Error e -> Error (SubError (idx, idx', e))
 
   let empty () : t = I.empty
 
-  let execute_action action (s : t) args =
+  let[@inline] execute_action action (s : t) args =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match (action, args) with
@@ -487,7 +496,7 @@ struct
         let s' = set ~idx ~idx':idx ss s in
         DR.ok (s', idx :: v)
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match ins with
@@ -500,7 +509,7 @@ struct
         let s' = set ~idx ~idx' ss' s in
         (s', v)
 
-  let produce pred s args =
+  let[@inline] produce pred s args =
     let open Delayed.Syntax in
     let open MyUtils.Syntax in
     match args with
@@ -537,9 +546,14 @@ struct
   let assertions_others h =
     I.fold (fun _ s acc -> S.assertions_others s @ acc) h []
 
-  let get_recovery_tactic = function
+  let get_recovery_tactic (st : t) = function
     | SubError (_, idx, e) ->
-        Gillian.General.Recovery_tactic.merge (S.get_recovery_tactic e)
+        let sub_recover =
+          match I.find_opt_unsafe st idx with
+          | Some codom -> S.get_recovery_tactic codom e
+          | None -> Gillian.General.Recovery_tactic.none
+        in
+        Gillian.General.Recovery_tactic.merge sub_recover
           (Gillian.General.Recovery_tactic.try_unfold [ idx ])
     | InvalidIndexValue idx ->
         Gillian.General.Recovery_tactic.try_unfold [ idx ]
@@ -556,26 +570,28 @@ struct
     | _ -> failwith "Called get_fixes on unfixable error"
 end
 
-(**
-  Type for the domain of a PMap.
-  Allows configuring it to either have static or dynamic indexing:
-  - Static: indexes are created by the state model on allocation (eg. the heap in C)
-  - Dynamic: indexes are given by the user on allocation (eg. objects in JS)
+(** Type for the domain of a PMap. Allows configuring it to either have static
+    or dynamic indexing:
+    - Static: indexes are created by the state model on allocation (eg. the heap
+      in C)
+    - Dynamic: indexes are given by the user on allocation (eg. objects in JS)
 
-  The user must provide the index on allocation in dynamic mode, and mustn't provide it in static mode.
-  is_valid_index must always be implemented, while make_fresh is only needed in static mode.
-*)
+    The user must provide the index on allocation in dynamic mode, and mustn't
+    provide it in static mode. is_valid_index must always be implemented, while
+    make_fresh is only needed in static mode. *)
 module type PMapIndex = sig
   val mode : index_mode
 
-  (** If the given expression is a valid index for the map.
-      Returns a possibly simplified index, and None if it's not valid.  *)
+  (** If the given expression is a valid index for the map. Returns a possibly
+      simplified index, and None if it's not valid. *)
   val is_valid_index : Expr.t -> Expr.t option Delayed.t
 
-  (** Creates a new address, for allocating new state. Only used in static mode *)
+  (** Creates a new address, for allocating new state. Only used in static mode
+  *)
   val make_fresh : unit -> Expr.t Delayed.t
 
-  (** The arguments used when instantiating new state. Only used in dynamic mode *)
+  (** The arguments used when instantiating new state. Only used in dynamic mode
+  *)
   val default_instantiation : Expr.t list
 end
 
@@ -625,17 +641,20 @@ module IntegerIndex : PMapIndex = struct
 end
 
 (** "Base" implementation of an open PMap, with no particular optimisation.
-    Takes as modules the backing ExpMap used (%sat or %ent), and the PMapIndex used for
-    validating and generating indices. Because this PMap is *open*, it is only compatible
-    with static indexing, as dynamic indexing requires a domain set to be sound. *)
+    Takes as modules the backing ExpMap used (%sat or %ent), and the PMapIndex
+    used for validating and generating indices. Because this PMap is *open*, it
+    is only compatible with static indexing, as dynamic indexing requires a
+    domain set to be sound. *)
 module MakeBaseImpl
     (ExpMap : MyUtils.SymExprMap)
     (I : PMapIndex)
     (S : MyMonadicSMemory.S) =
 struct
-  type entry = S.t
+  module Entry = S
+
   type t = S.t ExpMap.t [@@deriving yojson]
 
+  let find_opt_unsafe h idx = ExpMap.find_opt idx h
   let mode = I.mode
   let make_fresh = I.make_fresh
   let default_instantiation = I.default_instantiation
@@ -643,9 +662,9 @@ struct
   let fold = ExpMap.fold
   let for_all f = ExpMap.for_all (fun _ v -> f v)
   let validate_index = I.is_valid_index
-  let get idx h = ExpMap.sym_find_opt h idx
+  let[@inline] get idx h = ExpMap.sym_find_opt h idx
 
-  let set ~idx ~idx' s h =
+  let[@inline] set ~idx ~idx' s h =
     if S.is_empty s then ExpMap.remove idx h
     else if Expr.equal idx idx' then ExpMap.add idx s h
     else ExpMap.remove idx h |> ExpMap.add idx' s
@@ -672,8 +691,14 @@ module MakeSplitImpl
     (I : PMapIndex)
     (S : MyMonadicSMemory.S) =
 struct
-  type entry = S.t
+  module Entry = S
+
   type t = S.t ExpMap.t * S.t ExpMap.t [@@deriving yojson]
+
+  let find_opt_unsafe (h1, h2) idx =
+    match ExpMap.find_opt idx h1 with
+    | Some v -> Some v
+    | None -> ExpMap.find_opt idx h2
 
   let mode = I.mode
   let make_fresh = I.make_fresh
@@ -689,7 +714,7 @@ struct
 
   let validate_index = I.is_valid_index
 
-  let get (ch, sh) idx =
+  let[@inline] get (ch, sh) idx =
     let open Delayed.Syntax in
     (* This check might not be needed if we know idx' is not concrete *)
     match ExpMap.find_opt idx ch with
@@ -704,7 +729,7 @@ struct
             | Some (idx'', v) -> DO.some (idx'', v)
             | None -> DO.none ()))
 
-  let set ~idx ~idx' s (ch, sh) =
+  let[@inline] set ~idx ~idx' s (ch, sh) =
     (* remove from both (dont know where it was) *)
     let ch', sh' = (ExpMap.remove idx ch, ExpMap.remove idx sh) in
     if S.is_empty s then (ch', sh')
@@ -747,9 +772,19 @@ module SplitImplEnt = MakeSplitImpl (MyUtils.ExpMapEnt)
 (** Implementation of an open PMap with abstract locations. *)
 module ALocImpl (S : MyMonadicSMemory.S) = struct
   module SMap = MyUtils.SMap
+  module Entry = S
 
-  type entry = S.t
-  type t = S.t MyUtils.SMap.t [@@deriving yojson]
+  type t = S.t SMap.t [@@deriving yojson]
+
+  let find_opt_unsafe h idx =
+    let open Utils.Syntaxes.Option in
+    let* loc =
+      match idx with
+      | Expr.Lit (Loc loc) -> Some loc
+      | Expr.ALoc loc -> Some loc
+      | _ -> None
+    in
+    SMap.find_opt loc h
 
   let mode : index_mode = Static
   let make_fresh () = ALoc.alloc () |> Expr.loc_from_loc_name |> Delayed.return
@@ -758,7 +793,7 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
   let fold f = SMap.fold (fun k v acc -> f (Expr.loc_from_loc_name k) v acc)
   let for_all f = SMap.for_all (fun _ v -> f v)
 
-  let get_loc_fast = function
+  let[@inline] get_loc_fast = function
     | Expr.Lit (Loc loc) -> loc
     | Expr.ALoc loc -> loc
     | e ->
@@ -767,15 +802,16 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
            get_loc_fast: %a"
           Expr.pp e
 
-  let validate_index idx = DO.map (MyUtils.get_loc idx) Expr.loc_from_loc_name
+  let[@inline] validate_index idx =
+    DO.map (MyUtils.get_loc idx) Expr.loc_from_loc_name
 
-  let get h idx =
+  let[@inline] get h idx =
     let idx_s = get_loc_fast idx in
     match SMap.find_opt idx_s h with
     | Some v -> DO.some (idx, v)
     | None -> DO.none ()
 
-  let set ~idx:_ ~idx' s h =
+  let[@inline] set ~idx:_ ~idx' s h =
     let idx_s = get_loc_fast idx' in
     if S.is_empty s then SMap.remove idx_s h else SMap.add idx_s s h
 

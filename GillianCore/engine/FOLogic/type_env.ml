@@ -9,7 +9,7 @@ type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
 let as_hashtbl x = x
 
 (*************************************)
-(** Typing Environment Functions    **)
+(** Typing Environment Functions **)
 
 (*************************************)
 

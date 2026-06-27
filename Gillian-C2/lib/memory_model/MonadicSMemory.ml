@@ -91,6 +91,10 @@ module Mem = struct
     | Some t -> Delayed.return t
     | None -> Delayed.return SHeapTree.empty
 
+  let update_loc loc tree map =
+    if SHeapTree.is_empty tree then SMap.remove loc map
+    else SMap.add loc tree map
+
   let alloc (map : t) low high : t * string =
     let loc = ALoc.alloc () in
     let tree = SHeapTree.alloc low high in
@@ -165,7 +169,7 @@ module Mem = struct
     let++ sval, perm, new_tree =
       map_lift_err loc_name (SHeapTree.cons_single tree ofs chunk)
     in
-    (SMap.add loc_name new_tree map, sval, perm)
+    (update_loc loc_name new_tree map, sval, perm)
 
   let prod_single map loc ofs chunk sval perm =
     let open DR.Syntax in
@@ -278,7 +282,7 @@ module Mem = struct
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
-    let** loc_name = resolve_loc_result loc in
+    let* loc_name = resolve_or_create_loc_name loc in
     let* tree = get_or_create_tree map loc_name in
     let++ tree_set =
       map_lift_err loc_name (DR.of_result (SHeapTree.prod_bounds tree bounds))
@@ -945,13 +949,6 @@ module Lift = struct
   open Gillian.Debugger
   open Gillian.Debugger.Utils
 
-  let get_store_vars store =
-    store
-    |> List.map (fun (var, value) : Variable.t ->
-           let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           Variable.create_leaf var value ())
-    |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
-
   let make_node ~get_new_scope_id ~variables ~name ~value ?(children = []) () :
       Variable.t =
     let var_ref = get_new_scope_id () in
@@ -967,18 +964,12 @@ module Lift = struct
     in
     { name; value; var_ref; type_ }
 
-  let add_variables ~store ~memory ~is_gil_file:_ ~get_new_scope_id variables =
+  let add_heap_variables memory variables get_new_scope_id =
     let { mem; genv = _ } = memory in
-    (* Store first *)
-    let store_id = get_new_scope_id () in
-    let store_vars = get_store_vars store in
-    Hashtbl.replace variables store_id store_vars;
-    (* Then genv *)
     (* TODO: Print the global environment *)
     (* let genv_id = get_new_scope_id () in
        let genv_vars = GEnv.Lifting.get_vars genv in
        Hashtbl.replace variables genv_id genv_vars; *)
-    (* And finally heap*)
     let make_node = make_node ~get_new_scope_id ~variables in
     let heap_id = get_new_scope_id () in
     let heap_vars =
@@ -992,7 +983,6 @@ module Lift = struct
     Hashtbl.replace variables heap_id heap_vars;
     Variable.
       [
-        { id = store_id; name = "Store" };
         { id = heap_id; name = "Heap" }
         (* { id = genv_id; name = "Global Environment" }; *);
       ]

@@ -22,12 +22,12 @@ module Concrete : sig
   (** Finds a definition given its location name in the global environment *)
   val find_def : t -> string -> def
 
-  (** [set_symbol genv symbol locname ]
-      Returns a new global environment where the symbol [symbol] is associated with the location [locname] *)
+  (** [set_symbol genv symbol locname ] Returns a new global environment where
+      the symbol [symbol] is associated with the location [locname] *)
   val set_symbol : t -> string -> string -> t
 
-  (** [set_def genv locname def ]
-      Returns a new global environment where the block [locname] is associated with the global definition [def] *)
+  (** [set_def genv locname def ] Returns a new global environment where the
+      block [locname] is associated with the global definition [def] *)
   val set_def : t -> string -> def -> t
 
   (** Empty global environment *)
@@ -62,12 +62,12 @@ module Symbolic : sig
   (** Finds a definition given its location name in the global environment *)
   val find_def : t -> string -> def
 
-  (** [set_symbol genv symbol locname ]
-      Returns a new global environment where the symbol [symbol] is associated with the location [locname] *)
+  (** [set_symbol genv symbol locname ] Returns a new global environment where
+      the symbol [symbol] is associated with the location [locname] *)
   val set_symbol : t -> string -> Gil_syntax.Expr.t -> t Monadic.Delayed.t
 
-  (** [set_def genv locname def ]
-      Returns a new global environment where the block [locname] is associated with the global definition [def] *)
+  (** [set_def genv locname def ] Returns a new global environment where the
+      block [locname] is associated with the global definition [def] *)
   val set_def : t -> string -> def -> t Monadic.Delayed.t
 
   (** Empty global environment *)

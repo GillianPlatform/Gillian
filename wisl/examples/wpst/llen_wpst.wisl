@@ -1,5 +1,5 @@
 function llen(x) {
-    if (x = null) {
+    if (x == null) {
         n := 0
     } else {
         t := [x+1];
@@ -28,6 +28,6 @@ function main() {
   assume (x <= 3);
   l := build_list(x);
   size := llen(l);
-  assert (size = 2);
+  assert (size == 2);
   return null
 }

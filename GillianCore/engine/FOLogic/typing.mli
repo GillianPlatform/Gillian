@@ -4,7 +4,8 @@
 
 (** Given a typing environment and an expressions, returns a triple containing:
     - A type if we found a necessary type
-    - A boolean: true if the expression is typable, false if is definitely a type error
+    - A boolean: true if the expression is typable, false if is definitely a
+      type error
     - A list of corrections missing (not sure about that one ?) *)
 val type_lexpr : Type_env.t -> Expr.t -> Type.t option * bool
 

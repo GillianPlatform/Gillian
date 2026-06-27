@@ -70,7 +70,7 @@ struct
     in
     cmds
 
-  let main () =
+  let main' () =
     Memtrace.trace_if_requested ();
 
     let doc = "An analysis toolchain" in
@@ -107,4 +107,16 @@ struct
       |> split_cmds
     in
     exit (Cmd.eval (Cmd.group info cmds))
+
+  let main () =
+    let open Effect.Deep in
+    try main' () with
+    | effect Utils.Sys_error_during_logging (s, bt), k ->
+        let msg =
+          Fmt.str "!! ERROR DURING LOGGING: %s !!\nBacktrace:\n%s" s bt
+        in
+        Logging.print_to_all msg;
+        Debugger_log.log (fun m -> m "%s" msg);
+        continue k ()
+    | effect eff, k -> discontinue k (Effect.Unhandled eff)
 end

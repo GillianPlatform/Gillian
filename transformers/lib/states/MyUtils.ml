@@ -98,8 +98,8 @@ end) : SymExprMap = struct
     | Some (k, v) -> Ok (k, v)
     | None -> Error err
 
-  (** Symbolically composes a map with a list of entries, composing entries when they
-    are found to match. *)
+  (** Symbolically composes a map with a list of entries, composing entries when
+      they are found to match. *)
   let sym_compose
       (compose : 'a -> 'a -> 'a Delayed.t)
       (l : (Expr.t * 'a) list)
@@ -134,8 +134,9 @@ let pp_opt pp_v fmt = function
 
 let deep_map f = List.map @@ List.map f
 
-(** Faster than Delayed.resolve_loc, attempts to resolve a location. This may result in
-extending the path condition. Returns None if the input can definitely not be a location. *)
+(** Faster than Delayed.resolve_loc, attempts to resolve a location. This may
+    result in extending the path condition. Returns None if the input can
+    definitely not be a location. *)
 let get_loc =
   let open Delayed.Syntax in
   let open Delayed_option in

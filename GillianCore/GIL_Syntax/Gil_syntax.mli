@@ -133,7 +133,7 @@ module UnOp : sig
     | M_sqrt  (** Square root *)
     | M_tan  (** Tangent *)
     | ToStringOp  (** Converts a number (integer or float) to a string *)
-    | ToIntOp  (** Converts a float to an integer, Num -> Num !!  *)
+    | ToIntOp  (** Converts a float to an integer, Num -> Num !! *)
     | ToUint16Op
         (** Converts an integer to a 16-bit unsigned integer, Num -> Num !! *)
     | ToUint32Op
@@ -308,7 +308,7 @@ module Expr : sig
 
     (** {2: } *)
 
-    (** Comparison  *)
+    (** Comparison *)
 
     val ( < ) : t -> t -> t
     val ( > ) : t -> t -> t
@@ -351,12 +351,15 @@ module Expr : sig
   val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
 
   (** Pretty-printer *)
+  val pp_custom : pp:t Fmt.t -> t Fmt.t
+
   val pp : t Fmt.t
 
   (** Pretty-printer with constructors (will not parse) *)
   val full_pp : t Fmt.t
 
-  (** If the expression is a list (either an [EList _] of Lit (LList _)), returns the list of expressions. *)
+  (** If the expression is a list (either an [EList _] of Lit (LList _)),
+      returns the list of expressions. *)
   val to_list : t -> t list option
 
   (** [from_list] [EList] with the provided elements *)
@@ -377,10 +380,12 @@ module Expr : sig
   (** [locs e] returns all concrete and abstract locations in [e] *)
   val locs : t -> SS.t
 
-  (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
+  (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and
+      clocs) *)
   val vars : t -> SS.t
 
-  (** [push_in_negations e] pushes all negations in e "downwards", recursively *)
+  (** [push_in_negations e] pushes all negations in e "downwards", recursively
+  *)
   val push_in_negations : t -> t
 
   (** [negate e] negates the expression, recursively *)
@@ -392,36 +397,45 @@ module Expr : sig
   (** [substitutables e] returns all lvars and alocs *)
   val substitutables : t -> SS.t
 
-  (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc *)
+  (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc
+  *)
   val is_concrete : t -> bool
 
-  (** [all_literals lst] returns [true] iff all elements of the given list [lst] are literals *)
+  (** [all_literals lst] returns [true] iff all elements of the given list [lst]
+      are literals *)
   val all_literals : t list -> bool
 
   (** [from_lit_list lst] lifts a literal list to an expression list *)
   val from_lit_list : Literal.t -> t
 
-  (** [lists e] all sub-expressions of [e] of the form [Lit (LList lst)] and [EList lst] *)
+  (** [lists e] all sub-expressions of [e] of the form [Lit (LList lst)] and
+      [EList lst] *)
   val lists : t -> t list
 
-  (** [subst_clocs subst e] substitutes expressions of the form [Lit (Loc l)] with [subst l] in [e] *)
+  (** [subst_clocs subst e] substitutes expressions of the form [Lit (Loc l)]
+      with [subst l] in [e] *)
   val subst_clocs : (string -> t) -> t -> t
 
-  (** [from_var_name var] returns either an aloc, an lvar or a pvar if [var] name matches one of these types
-    (see {!Utils.Names.is_aloc_name}, {!Utils.Names.is_lvar_name} and {!Utils.Names.is_pvar_name}) *)
+  (** [from_var_name var] returns either an aloc, an lvar or a pvar if [var]
+      name matches one of these types (see {!Utils.Names.is_aloc_name},
+      {!Utils.Names.is_lvar_name} and {!Utils.Names.is_pvar_name}) *)
   val from_var_name : string -> t
 
-  (** [loc_from_loc_name loc] Has the same behaviour as [from_var_name] except that it returns either an [ALoc loc] or a [Lit (Loc loc)] *)
+  (** [loc_from_loc_name loc] Has the same behaviour as [from_var_name] except
+      that it returns either an [ALoc loc] or a [Lit (Loc loc)] *)
   val loc_from_loc_name : string -> t
 
-  (** [subst_expr_for_expr ~to_subst ~subst_with expr] substitutes every occurence of the expression [to_subst] with the expression [subst_with] in [expr] *)
+  (** [subst_expr_for_expr ~to_subst ~subst_with expr] substitutes every
+      occurence of the expression [to_subst] with the expression [subst_with] in
+      [expr] *)
   val subst_expr_for_expr : to_subst:t -> subst_with:t -> t -> t
 
   (** [base_elements e] returns the list containing all logical variables,
       abstract locations, and non-list literals in [e] *)
   val base_elements : t -> t list
 
-  (** [var_to_expr x] returns the expression representing the program/logical variable or abstract location [x] *)
+  (** [var_to_expr x] returns the expression representing the program/logical
+      variable or abstract location [x] *)
   val var_to_expr : string -> t
 
   (** [is_matchable x] returns whether or not the expression [e] is matchable *)
@@ -480,9 +494,8 @@ module Asrt : sig
   (** Check if [a] is a pure assertion *)
   val is_pure_asrt : atom -> bool
 
-  (** Eliminate Emp assertions.
-      Pure assertions are converted to a single formula.
-      This function expects its argument to be a PURE assertion. *)
+  (** Eliminate Emp assertions. Pure assertions are converted to a single
+      formula. This function expects its argument to be a PURE assertion. *)
   val make_pure : t -> Expr.t
 
   (** Pretty-printer *)
@@ -495,10 +508,12 @@ module Asrt : sig
 
   val pp_atom_full : Format.formatter -> atom -> unit
 
-  (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
+  (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)]
+      with [subst l] in [a] *)
   val subst_clocs : (string -> Expr.t) -> t -> t
 
-  (** [subst_expr_for_expr ~to_subst ~subst_with a] substitutes every occurence of the expression [to_subst] with the expression [subst_with] in [a] *)
+  (** [subst_expr_for_expr ~to_subst ~subst_with a] substitutes every occurence
+      of the expression [to_subst] with the expression [subst_with] in [a] *)
   val subst_expr_for_expr : to_subst:Expr.t -> subst_with:Expr.t -> t -> t
 
   (** Move pvars to lvars *)
@@ -564,6 +579,13 @@ module Cmd : sig
   (** Optional bindings for procedure calls *)
   type logic_bindings_t = string * (string * Expr.t) list
 
+  type function_call = {
+    var_name : string;
+    fun_name : Expr.t;
+    args : Expr.t list;
+    bindings : logic_bindings_t option;
+  }
+
   type 'label t =
     | Skip  (** Skip *)
     | Assignment of string * Expr.t  (** Variable Assignment *)
@@ -571,9 +593,8 @@ module Cmd : sig
     | Logic of LCmd.t  (** Logic commands *)
     | Goto of 'label  (** Unconditional goto *)
     | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
-    | Call of
-        string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
-        (** Procedure call *)
+    | Call of function_call * 'label option  (** Procedure call *)
+    | Par of function_call list  (** Parallel composition *)
     | ECall of string * Expr.t * Expr.t list * 'label option
         (** External Procedure call *)
     | Apply of string * Expr.t * 'label option
@@ -605,6 +626,14 @@ module Cmd : sig
 
   (** Location collector *)
   val locs : 'a t -> Containers.SS.t
+
+  val call :
+    ?bindings:logic_bindings_t ->
+    ?error:'label ->
+    string ->
+    Expr.t ->
+    Expr.t list ->
+    'label t
 end
 
 (** @canonical Gillian.Gil_syntax.Pred *)
@@ -625,7 +654,7 @@ module Pred : sig
     pred_facts : Expr.t list;  (** Facts that hold for every definition *)
     pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
     pred_pure : bool;  (** Is the predicate pure? *)
-    pred_abstract : bool;  (**  Is the predicate abstract? *)
+    pred_abstract : bool;  (** Is the predicate abstract? *)
     pred_nounfold : bool;  (** Should the predicate be unfolded? *)
     pred_normalised : bool;  (** Has the predicate been previously normalised? *)
   }
@@ -658,11 +687,11 @@ module Pred : sig
   val explicit_param_types : (string, t) Hashtbl.t -> t -> (t, string) result
 
   (** Combines a list of ins and a list of outs putting them in the right order
-    according to a given predicate. *)
+      according to a given predicate. *)
   val combine_ins_outs : t -> 'a list -> 'a list -> 'a list
 
-  (** [iter_ins_outs p f_ins f_outs (ins, outs)] will iterate, applying [f_ins] on the [ins] and
-    [f_outs] on the [outs], in the order specified *)
+  (** [iter_ins_outs p f_ins f_outs (ins, outs)] will iterate, applying [f_ins]
+      on the [ins] and [f_outs] on the [outs], in the order specified *)
   val iter_ins_outs :
     t -> ('a -> unit) -> ('b -> unit) -> 'a list * 'b list -> unit
 
@@ -678,16 +707,17 @@ module Pred : sig
   (** Retrieves a predicate definition by name *)
   val get : (string, t) Hashtbl.t -> string -> t
 
-  (** Given a guarded predicate, return the name of its close token.
-      Fails if the predicate isn't guarded. *)
+  (** Given a guarded predicate, return the name of its close token. Fails if
+      the predicate isn't guarded. *)
   val close_token_name : t -> string
 
-  (** Given a guarded predicate, return a "call" to its close token.
-      The arguments given are PVars with the same name as the ins of the predicate. *)
+  (** Given a guarded predicate, return a "call" to its close token. The
+      arguments given are PVars with the same name as the ins of the predicate.
+  *)
   val close_token_call : t -> Asrt.atom
 
-  (** Given a name, if it's a close_token name, returns the name of the corresponding predicate,
-   otherwise return None. *)
+  (** Given a name, if it's a close_token name, returns the name of the
+      corresponding predicate, otherwise return None. *)
   val pred_name_from_close_token_name : string -> string option
 end
 
@@ -710,6 +740,7 @@ module Lemma : sig
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
     lemma_existentials : string list; (* Existentials *)
+    lemma_location : Location.t option;
   }
 
   (** Pretty-printer *)
@@ -780,11 +811,13 @@ module Spec : sig
     spec_params : string list;  (** Procedure/spec parameters *)
     spec_sspecs : st list;  (** List of single specifications *)
     spec_normalised : bool;  (** If the spec is already normalised *)
-    spec_incomplete : bool;  (**  If the spec is incomplete *)
+    spec_incomplete : bool;  (** If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
+    spec_location : Location.t option;
   }
 
-  (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single specification with the given values *)
+  (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single
+      specification with the given values *)
   val s_init :
     ?ss_label:string * string list ->
     Asrt.t located ->
@@ -794,8 +827,17 @@ module Spec : sig
     bool ->
     st
 
-  (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
-  val init : string -> string list -> st list -> bool -> bool -> bool -> t
+  (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify]
+      creates a full specification with the given values *)
+  val init :
+    string ->
+    string list ->
+    st list ->
+    bool ->
+    bool ->
+    bool ->
+    Location.t option ->
+    t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
@@ -809,8 +851,9 @@ module Spec : sig
   (** Makes the types of parameters explicit in the assertions *)
   val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
 
-  (** @deprecated For legacy purposes, some functions use string sets instead of string list existentials.
-    This function allows for a smooth translation *)
+  (** @deprecated
+        For legacy purposes, some functions use string sets instead of string
+        list existentials. This function allows for a smooth translation *)
   val label_vars_to_set :
     ('a * Utils.Containers.SS.elt list) option ->
     ('a * Utils.Containers.SS.t) option
@@ -848,21 +891,25 @@ end
 module Branch_case : sig
   (** Reasons for a branch in execution.
 
-    These are used to reason about execution when using the debugger.
+      These are used to reason about execution when using the debugger.
 
-    {i Note: most of these haven't yet been properly reasoned about, so they won't be very informative. } *)
+      {i Note: most of these haven't yet been properly reasoned about, so they
+         won't be very informative.} *)
 
-  type t =
+  type t' =
     | GuardedGoto of bool  (** Effectively if/else; either true or false case *)
-    | LCmd of int  (** Logical command *)
-    | SpecExec of Flag.t * int  (** Spec execution *)
-    | LAction of int  (** Logical action *)
-    | LActionFail of int  (** {i Failed} logical action*)
+    | LCmd  (** Logical command *)
+    | SpecExec of Flag.t  (** Spec execution *)
+    | LAction  (** Logical action *)
+    | LActionFail  (** {i Failed} logical action*)
   [@@deriving yojson, show]
+
+  type t = t' * int [@@deriving yojson, show]
 
   (** A list of branch cases describes the path of execution.
 
-    Every termination of a symbolic execution is uniquely identified by its branch path. *)
+      Every termination of a symbolic execution is uniquely identified by its
+      branch path. *)
   type path = t list [@@deriving yojson, show]
 
   val pp_short : Format.formatter -> t -> unit
@@ -872,7 +919,7 @@ end
 module Annot : sig
   (** Annotations for GIL commands
 
-    This is parametric on the target language. *)
+      This is parametric on the target language. *)
 
   module type S = sig
     type t [@@deriving yojson]
@@ -898,10 +945,12 @@ end
 module Proc : sig
   (** Labeled GIL procedures
 
-    Every command is annotated with a label, and the gotos indicate to which label one should jump.
-    Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
-    Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
-    (starting from 0). *)
+      Every command is annotated with a label, and the gotos indicate to which
+      label one should jump. Labels can be of any type. However, we say
+      "labeled" when the labels are strings, and "indexed" when the labels are
+      integers. Most functions in Gillian that work with indexed procedures
+      assume for efficiency that the label of the i-th command is always Some i
+      (starting from 0). *)
 
   type ('annot, 'label) t = {
     proc_name : string;
@@ -912,13 +961,16 @@ module Proc : sig
     proc_spec : Spec.t option;
     proc_aliases : string list;
     proc_calls : string list;
+    proc_display_name : (string * string) option;
+    proc_hidden : bool;
   }
   [@@deriving yojson]
 
   (** Gets the parameters of the procedure *)
   val get_params : ('a, 'b) t -> string list
 
-  (** If the [show_labels] flag is true, the labels will be written before the command they correspond to *)
+  (** If the [show_labels] flag is true, the labels will be written before the
+      command they correspond to *)
   val pp :
     show_labels:bool ->
     pp_label:'a Fmt.t ->
@@ -934,8 +986,9 @@ module Proc : sig
   (** Print indexed *)
   val pp_indexed : Format.formatter -> ?pp_annot:'a Fmt.t -> ('a, int) t -> unit
 
-  (** Returns the indexed procedure for a labeled procedures where the labels can be of any type.
-    Equality of labels is decided by structural equality *)
+  (** Returns the indexed procedure for a labeled procedures where the labels
+      can be of any type. Equality of labels is decided by structural equality
+  *)
   val indexed_of_labeled : ('annot, string) t -> ('annot, int) t
 
   val check_proc_spec_correspondence :
@@ -953,7 +1006,7 @@ module Prog : sig
     preds : (string, Pred.t) Hashtbl.t;  (** Predicates *)
     only_specs : (string, Spec.t) Hashtbl.t;
         (** Specs without function definitions *)
-    procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Proceudes *)
+    procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Procedures *)
     macros : (string, Macro.t) Hashtbl.t;  (** Macros *)
     bi_specs : (string, BiSpec.t) Hashtbl.t;  (** Bi-abductive specs *)
     proc_names : string list;  (** Names of the procedures *)
@@ -975,7 +1028,8 @@ module Prog : sig
     unit ->
     ('annot, 'label) t
 
-  (** Initialises a labeled program (with empty predecessors, to be computed later) *)
+  (** Initialises a labeled program (with empty predecessors, to be computed
+      later) *)
   val make_labeled :
     procs:(string, ('annot, string) Proc.t) Hashtbl.t ->
     imports:(string * bool) list ->
@@ -988,7 +1042,8 @@ module Prog : sig
     unit ->
     ('annot, string) t
 
-  (** Initialises an indexed program (with empty proc_names and imports, useless for the rest) *)
+  (** Initialises an indexed program (with empty proc_names and imports, useless
+      for the rest) *)
   val make_indexed :
     procs:('annot, int) Proc.t list ->
     predecessors:(string * int * int * int) list ->
@@ -1139,14 +1194,7 @@ module Visitors : sig
          ; visit_Branch : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_Bug : 'c -> Flag.t -> Flag.t
          ; visit_Call :
-             'c ->
-             'f Cmd.t ->
-             string ->
-             Expr.t ->
-             Expr.t list ->
-             'f option ->
-             (string * (string * Expr.t) list) option ->
-             'f Cmd.t
+             'c -> 'f Cmd.t -> Cmd.function_call -> 'f option -> 'f Cmd.t
          ; visit_Car : 'c -> UnOp.t -> UnOp.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
          ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
@@ -1178,6 +1226,7 @@ module Visitors : sig
          ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
          ; visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
+         ; visit_function_call : 'c -> Cmd.function_call -> Cmd.function_call
          ; visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
          ; visit_Fold :
              'c ->
@@ -1268,6 +1317,7 @@ module Visitors : sig
          ; visit_NumberType : 'c -> Type.t -> Type.t
          ; visit_ObjectType : 'c -> Type.t -> Type.t
          ; visit_Or : 'c -> BinOp.t -> BinOp.t
+         ; visit_Par : 'c -> 'f Cmd.t -> Cmd.function_call list -> 'f Cmd.t
          ; visit_PVar : 'c -> Expr.t -> string -> Expr.t
          ; visit_PhiAssignment :
              'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
@@ -1395,14 +1445,7 @@ module Visitors : sig
     method visit_Bug : 'c -> Flag.t -> Flag.t
 
     method visit_Call :
-      'c ->
-      'f Cmd.t ->
-      string ->
-      Expr.t ->
-      Expr.t list ->
-      'f option ->
-      (string * (string * Expr.t) list) option ->
-      'f Cmd.t
+      'c -> 'f Cmd.t -> Cmd.function_call -> 'f option -> 'f Cmd.t
 
     method visit_Car : 'c -> UnOp.t -> UnOp.t
     method visit_Cdr : 'c -> UnOp.t -> UnOp.t
@@ -1431,6 +1474,7 @@ module Visitors : sig
     method visit_FPlus : 'c -> BinOp.t -> BinOp.t
     method visit_FTimes : 'c -> BinOp.t -> BinOp.t
     method visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
+    method visit_function_call : 'c -> Cmd.function_call -> Cmd.function_call
     method visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
 
     method visit_Fold :
@@ -1527,6 +1571,7 @@ module Visitors : sig
     method visit_NumberType : 'c -> Type.t -> Type.t
     method visit_ObjectType : 'c -> Type.t -> Type.t
     method visit_Or : 'c -> BinOp.t -> BinOp.t
+    method visit_Par : 'c -> 'f Cmd.t -> Cmd.function_call list -> 'f Cmd.t
     method visit_PVar : 'c -> Expr.t -> string -> Expr.t
 
     method visit_PhiAssignment :
@@ -1688,14 +1733,7 @@ module Visitors : sig
          ; visit_BooleanType : 'c -> 'f
          ; visit_Branch : 'c -> Expr.t -> 'f
          ; visit_Bug : 'c -> 'f
-         ; visit_Call :
-             'c ->
-             string ->
-             Expr.t ->
-             Expr.t list ->
-             'g option ->
-             (string * (string * Expr.t) list) option ->
-             'f
+         ; visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
          ; visit_Car : 'c -> 'f
          ; visit_Cdr : 'c -> 'f
          ; visit_Constant : 'c -> Constant.t -> 'f
@@ -1720,6 +1758,7 @@ module Visitors : sig
              (string * (string * Expr.t) list) option ->
              'f
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_function_call : 'c -> Cmd.function_call -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
@@ -1789,6 +1828,7 @@ module Visitors : sig
          ; visit_NumberType : 'c -> 'f
          ; visit_ObjectType : 'c -> 'f
          ; visit_Or : 'c -> 'f
+         ; visit_Par : 'c -> Cmd.function_call list -> 'f
          ; visit_PVar : 'c -> string -> 'f
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
          ; visit_Pi : 'c -> 'f
@@ -1907,16 +1947,7 @@ module Visitors : sig
     method visit_BooleanType : 'c -> 'f
     method visit_Branch : 'c -> Expr.t -> 'f
     method visit_Bug : 'c -> 'f
-
-    method visit_Call :
-      'c ->
-      string ->
-      Expr.t ->
-      Expr.t list ->
-      'g option ->
-      (string * (string * Expr.t) list) option ->
-      'f
-
+    method visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
     method visit_Car : 'c -> 'f
     method visit_Cdr : 'c -> 'f
     method visit_Constant : 'c -> Constant.t -> 'f
@@ -1945,6 +1976,7 @@ module Visitors : sig
       'f
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_function_call : 'c -> Cmd.function_call -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
@@ -2014,6 +2046,7 @@ module Visitors : sig
     method visit_NumberType : 'c -> 'f
     method visit_ObjectType : 'c -> 'f
     method visit_Or : 'c -> 'f
+    method visit_Par : 'c -> Cmd.function_call list -> 'f
     method visit_PVar : 'c -> string -> 'f
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
@@ -2132,14 +2165,7 @@ module Visitors : sig
          ; visit_BooleanType : 'c -> unit
          ; visit_Branch : 'c -> Expr.t -> unit
          ; visit_Bug : 'c -> unit
-         ; visit_Call :
-             'c ->
-             string ->
-             Expr.t ->
-             Expr.t list ->
-             'f option ->
-             Cmd.logic_bindings_t option ->
-             unit
+         ; visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
          ; visit_Car : 'c -> unit
          ; visit_Cdr : 'c -> unit
          ; visit_Constant : 'c -> Constant.t -> unit
@@ -2162,6 +2188,7 @@ module Visitors : sig
          ; visit_FPlus : 'c -> unit
          ; visit_FTimes : 'c -> unit
          ; visit_FUnaryMinus : 'c -> unit
+         ; visit_function_call : 'c -> Cmd.function_call -> unit
          ; visit_Fail : 'c -> string -> Expr.t list -> unit
          ; visit_Fold :
              'c ->
@@ -2240,6 +2267,7 @@ module Visitors : sig
          ; visit_NumberType : 'c -> unit
          ; visit_ObjectType : 'c -> unit
          ; visit_Or : 'c -> unit
+         ; visit_Par : 'c -> Cmd.function_call list -> unit
          ; visit_PVar : 'c -> string -> unit
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
@@ -2350,16 +2378,7 @@ module Visitors : sig
     method visit_BooleanType : 'c -> unit
     method visit_Branch : 'c -> Expr.t -> unit
     method visit_Bug : 'c -> unit
-
-    method visit_Call :
-      'c ->
-      string ->
-      Expr.t ->
-      Expr.t list ->
-      'f option ->
-      (string * (string * Expr.t) list) option ->
-      unit
-
+    method visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
     method visit_Car : 'c -> unit
     method visit_Cdr : 'c -> unit
     method visit_Constant : 'c -> Constant.t -> unit
@@ -2384,6 +2403,7 @@ module Visitors : sig
     method visit_FPlus : 'c -> unit
     method visit_FTimes : 'c -> unit
     method visit_FUnaryMinus : 'c -> unit
+    method visit_function_call : 'c -> Cmd.function_call -> unit
     method visit_Fail : 'c -> string -> Expr.t list -> unit
 
     method visit_Fold :
@@ -2466,6 +2486,7 @@ module Visitors : sig
     method visit_NumberType : 'c -> unit
     method visit_ObjectType : 'c -> unit
     method visit_Or : 'c -> unit
+    method visit_Par : 'c -> Cmd.function_call list -> unit
     method visit_PVar : 'c -> string -> unit
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit
@@ -2598,7 +2619,8 @@ module Visitors : sig
       method private plus : 'a list -> 'a list -> 'a list
     end
 
-    (** Same as list_monoid but uses [rev_append] as [plus]. Will break any order-conservation *)
+    (** Same as list_monoid but uses [rev_append] as [plus]. Will break any
+        order-conservation *)
     class non_ordered_list_monoid : object
       method private zero : 'b list
       method private plus : 'a list -> 'a list -> 'a list

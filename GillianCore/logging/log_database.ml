@@ -43,13 +43,12 @@ module Stmts = struct
        report WHERE id = (SELECT parent FROM report WHERE id = ?));"
 end
 
-let error fmt = Format.kasprintf (fun err -> raise (Error err)) fmt
 let is_enabled () = Option.is_some !db
 
 let get_db () =
   match !db with
   | None ->
-      error
+      failwith
         "Unable to get database. Ensure that Log_database.create_db has been \
          called."
   | Some db -> db
@@ -58,12 +57,13 @@ let check_result_code db ~log rc =
   match (rc : Sqlite3.Rc.t) with
   | OK | DONE | ROW -> ()
   | _ as err ->
-      error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
+      Fmt.failwith "%s: %s (%s)" log (Sqlite3.Rc.to_string err)
+        (Sqlite3.errmsg db)
 
 let exec db ~log ~stmt =
   let rc = Sqlite3.exec db stmt in
   try check_result_code db ~log rc
-  with Error err -> error "exec: %s (%s)" err (Sqlite3.errmsg db)
+  with Error err -> Fmt.failwith "exec: %s (%s)" err (Sqlite3.errmsg db)
 
 let zero_or_one_row db ~log ~stmt =
   match Sqlite3.step stmt with
@@ -71,13 +71,15 @@ let zero_or_one_row db ~log ~stmt =
       let row = Sqlite3.row_data stmt in
       match Sqlite3.step stmt with
       | DONE -> Some row
-      | ROW -> error "%s: expected zero or one row, got more than one row" log
+      | ROW ->
+          Fmt.failwith "%s: expected zero or one row, got more than one row" log
       | err ->
-          error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
-      )
+          Fmt.failwith "%s: %s (%s)" log (Sqlite3.Rc.to_string err)
+            (Sqlite3.errmsg db))
   | DONE -> None
   | err ->
-      error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
+      Fmt.failwith "%s: %s (%s)" log (Sqlite3.Rc.to_string err)
+        (Sqlite3.errmsg db)
 
 let create_report_table db =
   exec db ~log:"creating report table"
@@ -100,7 +102,7 @@ let close_db () =
   | None -> ()
   | Some db ->
       if not (Sqlite3.db_close db) then
-        error "closing: %s (%s)"
+        Fmt.failwith "closing: %s (%s)"
           (Sqlite3.errcode db |> Sqlite3.Rc.to_string)
           (Sqlite3.errmsg db)
 

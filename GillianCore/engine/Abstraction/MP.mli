@@ -4,9 +4,8 @@ type outs = (Expr.t * Expr.t) list
 
 val outs_pp : outs Fmt.t
 
-(** The [step] type represents a matching plan step,
-    consisting of an assertion together with the possible
-    learned outs *)
+(** The [step] type represents a matching plan step, consisting of an assertion
+    together with the possible learned outs *)
 type step = Asrt.atom * outs [@@deriving yojson]
 
 type label = string * SS.t [@@deriving yojson]
@@ -18,10 +17,13 @@ type t =
   | Choice of t * t
   | ConsumeStep of step * t
   | LabelStep of label * t
-      (** Labels provide additional existentials to be bound manually by the user *)
+      (** Labels provide additional existentials to be bound manually by the
+          user *)
   | Finished of post option
-      (** The optional assertion corresponds to some post-condition that may be produced after successfuly matching.
-          For example, a matching plan corresponding to a set of specifications will contain leaves that are respectively anntated with the corresponding post. *)
+      (** The optional assertion corresponds to some post-condition that may be
+          produced after successfuly matching. For example, a matching plan
+          corresponding to a set of specifications will contain leaves that are
+          respectively anntated with the corresponding post. *)
 [@@deriving yojson]
 
 type pred = { pred : Pred.t; def_mp : t; guard_mp : t option }
@@ -39,13 +41,15 @@ type 'annot prog = {
 
 type preds_tbl_t = (string, pred) Hashtbl.t
 
-type err =
+type err_ =
   | MPSpec of string * Asrt.t list
   | MPPred of string * Asrt.t list
   | MPLemma of string * Asrt.t list
   | MPAssert of Asrt.t * Asrt.t list
   | MPInvariant of Asrt.t * Asrt.t list
 [@@deriving show]
+
+type err = err_ Location.located [@@deriving show]
 
 module KB = Expr.Set
 
@@ -72,9 +76,7 @@ val init :
   (t, Asrt.t list) result
 
 val init_prog :
-  ?preds_tbl:(string, pred) Hashtbl.t ->
-  ('a, int) Prog.t ->
-  ('a prog, err) result
+  ?preds_tbl:(string, pred) Hashtbl.t -> ('a, int) Prog.t -> 'a prog
 
 val init_preds :
   (string, Pred.t) Hashtbl.t -> ((string, pred) Hashtbl.t, err) result

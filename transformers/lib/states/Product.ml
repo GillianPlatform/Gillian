@@ -47,7 +47,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
 
   let empty () : t = (S1.empty (), S2.empty ())
 
-  let execute_action action (s1, s2) args =
+  let[@inline] execute_action action (s1, s2) args =
     let open Delayed.Syntax in
     match action with
     | A1 action -> (
@@ -61,7 +61,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', v) -> Ok ((s1, s2'), v)
         | Error e -> Error (E2 e))
 
-  let consume pred (s1, s2) args =
+  let[@inline] consume pred (s1, s2) args =
     let open Delayed.Syntax in
     match pred with
     | P1 pred -> (
@@ -75,7 +75,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', v) -> Ok ((s1, s2'), v)
         | Error e -> Error (E2 e))
 
-  let produce pred (s1, s2) args =
+  let[@inline] produce pred (s1, s2) args =
     let open Delayed.Syntax in
     match pred with
     | P1 pred ->
@@ -124,9 +124,9 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
   let assertions_others (s1, s2) =
     S1.assertions_others s1 @ S2.assertions_others s2
 
-  let get_recovery_tactic = function
-    | E1 e -> S1.get_recovery_tactic e
-    | E2 e -> S2.get_recovery_tactic e
+  let get_recovery_tactic (s1, s2) = function
+    | E1 e -> S1.get_recovery_tactic s1 e
+    | E2 e -> S2.get_recovery_tactic s2 e
 
   let can_fix = function
     | E1 e -> S1.can_fix e

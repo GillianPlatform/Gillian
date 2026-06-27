@@ -427,8 +427,8 @@ let augment exp_list use_strict filename is_main : GJS_syntax.exp list =
   in
   [ module_init; cache_init; load ]
 
-(** Add the code which, among other things, provides the definiton of the
-    global [require] function. *)
+(** Add the code which, among other things, provides the definiton of the global
+    [require] function. *)
 let add_preamble exp_list : GJS_syntax.exp =
   let _, preamble_exp_list = unfold_prog (get_preamble ()) in
   SyntaxGenerator.mk_exp (Script (false, preamble_exp_list @ exp_list))

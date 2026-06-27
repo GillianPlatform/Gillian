@@ -1,8 +1,9 @@
 (** @canonical Gillian.General.ESubst
 
-  Interface for GIL Extended Substitutions (e-substitutions)
+    Interface for GIL Extended Substitutions (e-substitutions)
 
-  GIL e-substitutions are (mutable) mappings from GIL Variables to GIL Values. *)
+    GIL e-substitutions are (mutable) mappings from GIL Variables to GIL Values.
+*)
 
 (** @canonical Gillian.General.ESubst.S *)
 module type S = sig
@@ -12,7 +13,8 @@ module type S = sig
   (** Type of GIL e-substitutions *)
   type t [@@deriving yojson]
 
-  (** E-substitution constructor, with a list of bindings of the form (variable, value) *)
+  (** E-substitution constructor, with a list of bindings of the form (variable,
+      value) *)
   val init : (Expr.t * vt) list -> t
 
   val of_seq : (Expr.t * vt) Seq.t -> t
@@ -99,12 +101,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   (** Type of GIL substitutions, implemented as hashtables *)
   type t = (Expr.t, vt) Hashtbl.t [@@deriving yojson]
 
-  (**
-    Substitution constructor
+  (** Substitution constructor
 
-    @param vars_les Bindings of the form (variable, value)
-    @return Substitution with the given bindings
-  *)
+      @param vars_les Bindings of the form (variable, value)
+      @return Substitution with the given bindings *)
   let init (exprs_les : (Expr.t * vt) list) : t =
     let subst = Hashtbl.create Config.big_tbl_size in
     List.iter
@@ -125,13 +125,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
 
   let clear (subst : t) : unit = Hashtbl.clear subst
 
-  (**
-    Substitution domain
+  (** Substitution domain
 
-    @param subst Target substitution
-    @param filter_out Optional filtering function
-    @return Domain of the (filtered) substitution
-  *)
+      @param subst Target substitution
+      @param filter_out Optional filtering function
+      @return Domain of the (filtered) substitution *)
   let domain (subst : t) (filter_out : (Expr.t -> bool) option) : Expr.Set.t =
     let filter =
       match filter_out with
@@ -142,71 +140,59 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       (fun e _ ac -> if filter e then ac else Expr.Set.add e ac)
       subst Expr.Set.empty
 
-  (**
-    Substitution range
+  (** Substitution range
 
-    @param subst Target substitution
-    @return Range of the substitution
-  *)
+      @param subst Target substitution
+      @return Range of the substitution *)
   let range (subst : t) : vt list =
     Hashtbl.fold (fun _ e_val ac -> e_val :: ac) subst []
 
-  (**
-    Substitution lookup
+  (** Substitution lookup
 
-    @param subst Target substitution
-    @param x Target variable
-    @return Resulting (optional) value
-  *)
+      @param subst Target substitution
+      @param x Target variable
+      @return Resulting (optional) value *)
   let get (subst : t) (e : Expr.t) : vt option = Hashtbl.find_opt subst e
 
-  (**
-    Substitution incremental update
+  (** Substitution incremental update
 
-    @param subst Target substitution
-    @param e Target expression
-    @param v Target value
-  *)
+      @param subst Target substitution
+      @param e Target expression
+      @param v Target value *)
   let add (subst : t) (e : Expr.t) (v : vt) =
     let () = assert (Expr.is_matchable e) in
     Hashtbl.add subst e v
 
-  (**
-    Substitution update
+  (** Substitution update
 
-    @param subst Target substitution
-    @param e Target variable
-    @param v Target value
-  *)
+      @param subst Target substitution
+      @param e Target variable
+      @param v Target value *)
   let put (subst : t) (e : Expr.t) (v : vt) =
     let () = assert (Expr.is_matchable e) in
     Hashtbl.replace subst e v
 
-  (**
-    Substitution membership
+  (** Substitution membership
 
-    @param subst Target substitution
-    @param e Target variable
-    @return Returns true if the variable is in the domain of the substitution, and false otherwise
-  *)
+      @param subst Target substitution
+      @param e Target variable
+      @return
+        Returns true if the variable is in the domain of the substitution, and
+        false otherwise *)
   let mem (subst : t) (e : Expr.t) =
     let () = assert (Expr.is_matchable e) in
     Hashtbl.mem subst e
 
-  (**
-    Substitution copy
+  (** Substitution copy
 
-    @param subst Target store
-    @return Copy of the given substitution
-  *)
+      @param subst Target store
+      @return Copy of the given substitution *)
   let copy (subst : t) : t = Hashtbl.copy subst
 
-  (**
-    Substitution extension
+  (** Substitution extension
 
-    @param store Target substitution
-    @param extend
-  *)
+      @param store Target substitution
+      @param extend *)
   let extend (subst : t) (exprs_les : (Expr.t * vt) list) : unit =
     List.iter
       (fun (e, e_val) ->
@@ -214,39 +200,31 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         Hashtbl.replace subst e e_val)
       exprs_les
 
-  (**
-    Substitution iterator
+  (** Substitution iterator
 
-    @param subst Target substitution
-    @param f Iterator function
-  *)
+      @param subst Target substitution
+      @param f Iterator function *)
   let iter (subst : t) (f : Expr.t -> vt -> unit) : unit = Hashtbl.iter f subst
 
-  (**
-    Substitution fold
+  (** Substitution fold
 
-    @param subst Target substitution
-    @param f Fold function
-    @param ac Accumulator
-  *)
+      @param subst Target substitution
+      @param f Fold function
+      @param ac Accumulator *)
   let fold (subst : t) f ac = Hashtbl.fold f subst ac
 
-  (**
-    Substitution merge into left
+  (** Substitution merge into left
 
-    @param subst Target substitution
-    @param subst_ext Substitution extension
-  *)
+      @param subst Target substitution
+      @param subst_ext Substitution extension *)
   let merge_left (subst : t) (subst_ext : t) : unit =
     Hashtbl.iter (fun e e_val -> Hashtbl.replace subst e e_val) subst_ext
 
-  (**
-    Substitution filter
+  (** Substitution filter
 
-    @param subst Target substitution
-    @param filter Filtering function
-    @return The new, filtered substitution
-  *)
+      @param subst Target substitution
+      @param filter Filtering function
+      @return The new, filtered substitution *)
   let filter (subst : t) (filter : Expr.t -> vt -> bool) : t =
     let new_subst = copy subst in
     Hashtbl.filter_map_inplace
@@ -257,23 +235,19 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       new_subst;
     new_subst
 
-  (**
-    Substitution filter by variables
+  (** Substitution filter by variables
 
-    @param subst Target substitution
-    @param vars Variables to save
-    @return The new, filtered substitution
-  *)
+      @param subst Target substitution
+      @param vars Variables to save
+      @return The new, filtered substitution *)
   let projection (subst : t) (exprs : Expr.Set.t) : t =
     filter subst (fun e _ -> Expr.Set.mem e exprs)
 
-  (**
-    Substitution pretty_printer
+  (** Substitution pretty_printer
 
-    @param fmt Formatter
-    @param subst Target substitution
-    @return unit
-  *)
+      @param fmt Formatter
+      @param subst Target substitution
+      @return unit *)
   let pp fmt (subst : t) =
     let pp_pair fmt (e, e_val) =
       Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.pp e_val
@@ -306,26 +280,22 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     in
     Fmt.pf fmt "@[<hv 2>[ %a ]@]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
 
-  (**
-    Substitution full pretty_printer
+  (** Substitution full pretty_printer
 
-    @param fmt Formatter
-    @param subst Target substitution
-    @return unit
-  *)
+      @param fmt Formatter
+      @param subst Target substitution
+      @return unit *)
   let full_pp fmt (subst : t) =
     let pp_pair fmt (e, e_val) =
       Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.full_pp e_val
     in
     Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
 
-  (**
-    Substitution in-place filter
+  (** Substitution in-place filter
 
-    @param subst Target substitution
-    @param filter Filtering function
-    @return Filtered substitution
-  *)
+      @param subst Target substitution
+      @param filter Filtering function
+      @return Filtered substitution *)
   let filter_in_place (subst : t) (filter : Expr.t -> vt -> vt option) : unit =
     Hashtbl.filter_map_inplace filter subst
 
@@ -434,26 +404,26 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         if new_expr == e then this else ForAll (bt, new_expr)
     end
 
-  (**
-    Substitution inside an expression
+  (** Substitution inside an expression
 
-    @param subst Target substitution
-    @param le Target expression
-    @return Expression resulting from the substitution, with fresh locations created.
-  *)
+      @param subst Target substitution
+      @param le Target expression
+      @return
+        Expression resulting from the substitution, with fresh locations
+        created. *)
   let subst_in_expr (subst : t) ~(partial : bool) (le : Expr.t) : Expr.t =
     substitutor#init ~partial ~subst;
     let res = substitutor#visit_expr () le in
     substitutor#clear ();
     res
 
-  (**
-    Optional substitution inside an expression
+  (** Optional substitution inside an expression
 
-    @param subst Target substitution
-    @param le Target expression
-    @return Expression resulting from the substitution. No fresh locations are created.
-  *)
+      @param subst Target substitution
+      @param le Target expression
+      @return
+        Expression resulting from the substitution. No fresh locations are
+        created. *)
   let rec subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
     let f_before (le : Expr.t) =
       match (le : Expr.t) with

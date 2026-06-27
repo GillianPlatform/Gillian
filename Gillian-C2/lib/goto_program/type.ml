@@ -20,6 +20,7 @@ type t = Typedefs__.type_ =
   | Constructor
   | Empty
   | Vector of { type_ : t; size : int }
+[@@deriving to_yojson]
 
 let show t = Typedefs__.show_type_ t
 
@@ -53,10 +54,9 @@ let is_function = function
 
 open Irep.Infix
 
-(** This feels a bit hacky, maybe the constant-deserialization
-    should be factored out somewhere else,
-    and used both here and in [Expr]
-    For example, here, there are no check that it's of the right type *)
+(** This feels a bit hacky, maybe the constant-deserialization should be
+    factored out somewhere else, and used both here and in [Expr] For example,
+    here, there are no check that it's of the right type *)
 let size_of_irep irep =
   try
     irep $ Value |> Irep.as_just_bitpattern ~signed:false ~width:64 |> Z.to_int

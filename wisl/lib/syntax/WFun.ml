@@ -8,7 +8,7 @@ type t = {
   return_expr : WExpr.t;
   floc : CodeLoc.t;
   fid : int;
-  is_loop_body : bool;
+  loop_body_of : string option;
 }
 
 let get_id f = f.fid
@@ -16,8 +16,8 @@ let get_loc f = f.floc
 let get_name f = f.name
 let get_spec f = f.spec
 
-let add_spec f pre post variant loc =
-  let spec = WSpec.make pre post variant f.name f.params loc in
+let add_spec ?existentials f pre post variant loc =
+  let spec = WSpec.make ?existentials pre post variant f.name f.params loc in
   { f with spec = Some spec; floc = loc }
 
 let functions_called f = WStmt.functions_called_by_list f.body
@@ -52,7 +52,8 @@ let pp fmt f =
          %a;@,\
          @[<h 0>return@ %a@]@]@\n\
          }@\n\
-         @[{ %a }@]" WLAssert.pp (WSpec.get_pre spec) f.name
+         @[{ %a }@]"
+        WLAssert.pp (WSpec.get_pre spec) f.name
         (WPrettyUtils.pp_list Format.pp_print_string)
         f.params pp_list_stmt f.body WExpr.pp f.return_expr WLAssert.pp
         (WSpec.get_post spec)

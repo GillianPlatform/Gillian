@@ -1,6 +1,4 @@
-(**
-	GIL Constants
-*)
+(** GIL Constants *)
 
 type t = TypeDef__.constant =
   | Min_float  (** The smallest float *)

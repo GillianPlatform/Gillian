@@ -32,7 +32,8 @@ module Imports = struct
     exec : Exec_mode.t list;
   }
 
-  (** All imports, should not be used as such, imports should be selected using the [import] function *)
+  (** All imports, should not be used as such, imports should be selected using
+      the [import] function *)
   let all_imports =
     [
       (* Common *)

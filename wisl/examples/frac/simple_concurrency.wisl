@@ -1,0 +1,96 @@
+predicate is_zero(+x, y) {
+    (x == 0) * (y == 1);
+    (! (x == 0)) * (y == 0)
+}
+
+predicate is_int(+x: Int) {
+    emp
+}
+
+{ (x == #x) * (p == #p) * (#p f<= 1.0) * (#x -> (#p: #v)) * (#v: Int) }
+function read(x, p) {
+    n := [x];
+    if (n == 0) {
+        r := 1
+    } else {
+        r := 0
+    };
+    return r
+}
+{ is_zero(#v, ret) * (#x -> (#p: #v)) }
+
+{ (x == #x) * (v == #v) * (#x -> (1.0: #y))}
+function write(x, v) {
+    [x] := v;
+    return 0
+}
+{ (ret == 0) * (#x -> #v) }
+
+//should fail
+[spec SHOULD_FAIL_incorrect_write: #p]
+{ (x == #x) * (v == #v) * (#p f<= 1.0) * (#x -> (#p: #v))}
+function SHOULD_FAIL_incorrect_write(x, v) {
+    [x] := v;
+    return 0
+}
+{ (ret == 0) * (#x -> #v) }
+
+{ (x == #x) * (p == #p) * (w == #w) * is_int(#w) * is_int(#v) * (#p f<= 1.0) * (#x -> (#p: #v)) }
+function read_and_add(x, p, w) {
+    n := [x];
+    m := n + w;
+    return m
+}
+{ (#x -> (#p: #v)) * (ret == #v + #w) }
+
+{ emp }
+function conc_disjoint_reads() {
+    x := new(2);
+    [x] := 0;
+    [x + 1] := 0;
+    par {
+        fst := read(x, 0.5);
+        snd := read(x + 1, 0.5)
+    };
+    [x] := fst;
+    [x + 1] := snd;
+    return x
+}
+{ ret -> 1, 1 }
+
+{ emp }
+function conc_disjoint_writes() {
+    x := new(3);
+    par {
+        u := write(x, 1);
+        u := write(x + 1, 2);
+        u := write(x + 2, 3)
+    };
+    return x
+}
+{ ret -> 1, 2, 3 }
+
+{ (x == #x) * (#x -> #v) * is_int(#v) }
+function conc_reads_same_loc(x) {
+    y := new(2);
+    par {
+        fst := read_and_add(x, 0.5, 5);
+        snd := read_and_add(x, 0.5, 10)
+    };
+    [y] := fst;
+    [y + 1] := snd;
+    return y
+}
+{ (#x -> #v) * ret -> #v + 5, #v + 10}
+
+// should fail
+{ emp }
+function SHOULD_FAIL_conc_writes_same_loc() {
+    x := new(1);
+    par {
+        u := write(x, 2);
+        u := write(x, 3)
+    };
+    return x
+}
+{ ((ret == 2) \/ (ret == 3)) }

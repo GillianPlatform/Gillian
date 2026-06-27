@@ -6,7 +6,8 @@ module type S = sig
     init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
   }
 
-  (** Takes a path to a file and returns the parsed GIL program with its global environment. *)
+  (** Takes a path to a file and returns the parsed GIL program with its global
+      environment. *)
   val parse_eprog_from_file : string -> parsing_result Gillian_result.t
 
   (** Takes a string containing a GIL program and parses it. *)
@@ -14,8 +15,8 @@ module type S = sig
 
   (** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t],
       resolving the imports in the meantime. The parameter [other_imports] is an
-      association list that maps extensions to a parser and compiler. For example,
-      it is possible to import a JSIL file in a GIL program using
+      association list that maps extensions to a parser and compiler. For
+      example, it is possible to import a JSIL file in a GIL program using
       [import "file.jsil";]. In order to do so, the [other_imports] list should
       contain the tuple [("jsil", parse_and_compile_jsil_file)] where
       [parse_and_compile_jsil_file] is a function that takes a file path, parses

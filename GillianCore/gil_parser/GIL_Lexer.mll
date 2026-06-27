@@ -57,6 +57,7 @@
         "m_sin",         GIL_Parser.M_SIN;
         "m_sqrt",        GIL_Parser.M_SQRT;
         "m_tan",         GIL_Parser.M_TAN;
+        "is_int",        GIL_Parser.ISINT;
         "as_int",        GIL_Parser.NUMTOINT;
         "as_num",        GIL_Parser.INTTONUM;
         "num_to_string", GIL_Parser.TOSTRING;
@@ -84,6 +85,7 @@
         "return",       GIL_Parser.RETURN;
         "throw",        GIL_Parser.THROW;
         "extern",       GIL_Parser.EXTERN;
+        "par",          GIL_Parser.PAR;
 
         (* Logical expressions: most match with the program expressions *)
         "none", GIL_Parser.LNONE;
@@ -153,7 +155,7 @@ let int = '-'? digit+ 'i'
 
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
-let lvar2 = "_lvar_" (letter|digit|'_')*
+let lvar2 = "#lvar_" (letter|digit|'_')*
 let normalised_lvar = "##NORMALISED_LVAR" (letter|digit|'_'|'$')*
 let loc = "$l" (letter|digit|'_')*
 let aloc = "_$l_" (letter|digit|'_')*

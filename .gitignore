@@ -78,6 +78,7 @@ gillian_smt_queries
 *.deps
 *.i
 *.symtab.json
+gillian_usage_log.jsonl
 
 # Dependency graphs
 with-depgraph.esy.lock
@@ -102,3 +103,6 @@ _docs/sphinx
 
 # Memtraces
 *.ctf
+
+# Nix / direnv
+.direnv

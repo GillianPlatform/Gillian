@@ -1,5 +1,5 @@
-(** This module contains configuration for JaVerT. It is a list of flags that can be activated, or values that
-    are configurable. *)
+(** This module contains configuration for JaVerT. It is a list of flags that
+    can be activated, or values that are configurable. *)
 
 (** {2 Syntax} *)
 

@@ -1,0 +1,9 @@
+#internal
+
+pred i__is_ptr (e: List):
+  (e == {{ #loc, #ofs }}) * (0i i<=# #ofs) *
+  types(#loc : Obj, #ofs : Int);
+
+pred i__ptr (+e: List, l: Obj, o: Int):
+  (e == {{ l, o }}) * (0i i<=# o);
+

@@ -26,14 +26,18 @@ type t = TypeDef__.unop =
   | M_tan  (** Tangent *)
   (* Types *)
   | ToStringOp
-      (** Converts a number (integer or float) to a string - JS legacy operation *)
+      (** Converts a number (integer or float) to a string - JS legacy operation
+      *)
   | ToIntOp  (** Converts a float to an integer - JS legacy operation *)
   | ToUint16Op
-      (** Converts an integer to a 16-bit unsigned integer - JS legacy operation *)
+      (** Converts an integer to a 16-bit unsigned integer - JS legacy operation
+      *)
   | ToUint32Op
-      (** Converts an integer to a 32-bit unsigned integer - JS legacy operation *)
+      (** Converts an integer to a 32-bit unsigned integer - JS legacy operation
+      *)
   | ToInt32Op
-      (** Converts an integer to a 32-bit signed integer - JS legacy operation *)
+      (** Converts an integer to a 32-bit signed integer - JS legacy operation
+      *)
   | ToNumberOp  (** Converts a string to a number - JS legacy operation *)
   | TypeOf
   (* Lists *)

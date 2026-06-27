@@ -6,9 +6,8 @@ module L = Logging
 module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Verification : Verifier.S
-                      with type annot = PC.Annot.t
-                       and type SPState.init_data = ID.t)
+    (Verification :
+      Verifier.S with type annot = PC.Annot.t and type SPState.init_data = ID.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t)
     (Debug_adapter : Debug_adapter.S) : Console.S = struct
   module Common_args = Common_args.Make (PC)
@@ -47,6 +46,21 @@ module Make
   let manual =
     let doc = "Disable automatic folding and unfolding heuristics." in
     Arg.(value & flag & info [ "m"; "manual" ] ~doc)
+
+  let usage_logs =
+    let doc = "Write usage logs" in
+    Arg.(value & flag & info [ "usage-logs" ] ~doc)
+
+  let usage_logs_git_ref =
+    let doc = "Git ref against which files are compared for usage logs" in
+    Arg.(value & opt string "HEAD" & info [ "usage-logs-ref" ] ~doc)
+
+  let usage_logs_file =
+    let doc = "File to write usage logs to" in
+    Arg.(
+      value
+      & opt string "./gillian_usage_log.jsonl"
+      & info [ "usage-logs-file" ] ~doc)
 
   let parse_eprog files already_compiled =
     if not already_compiled then
@@ -118,6 +132,7 @@ module Make
       incremental
       procs_to_verify
       lemmas_to_verify
+      procs_only
       () =
     (* Attention: if you plan to add UX verification, you must be careful about predicates.
        In our current formalism, they must be stricly exact. *)
@@ -127,10 +142,15 @@ module Make
     let () = Config.current_exec_mode := Verification in
     let () = PC.initialize Verification in
     let () = Config.manual_proof := manual in
-    let () = Config.Verification.set_procs_to_verify procs_to_verify in
-    let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
+    let () =
+      match (procs_to_verify, lemmas_to_verify, procs_only) with
+      | [], [], true -> Config.Verification.things_to_verify := ProcsOnly
+      | _ ->
+          Config.Verification.set_procs_to_verify procs_to_verify;
+          Config.Verification.set_lemmas_to_verify lemmas_to_verify
+    in
     let r = verify files already_compiled outfile_opt no_unfold incremental in
-    let () = if stats then Statistics.print_statistics () in
+    let () = if stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 
@@ -139,7 +159,8 @@ module Make
   let verify_t =
     Term.(
       const verify_once $ files $ already_compiled $ output_gil $ no_unfold
-      $ stats $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg)
+      $ stats $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg
+      $ procs_only)
 
   let verify_info =
     let doc = "Verifies a file of the target language" in
@@ -166,16 +187,28 @@ module Make
       in
       Cmd.info cmd_name ~doc ~man
 
-    let start_debug_adapter procs_only manual () =
+    let start_debug_adapter
+        procs_only
+        manual
+        usage_logs
+        usage_logs_git_ref
+        usage_logs_file
+        () =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
       let () =
         if procs_only then Config.Verification.(things_to_verify := ProcsOnly)
       in
       Config.manual_proof := manual;
-      Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
+      Config.usage_logs := usage_logs;
+      Config.usage_logs_git_ref := usage_logs_git_ref;
+      Config.usage_logs_file := usage_logs_file;
+      Debug_adapter.start ()
 
     let debug_verify_t =
-      Common_args.use Term.(const start_debug_adapter $ procs_only $ manual)
+      Common_args.use
+        Term.(
+          const start_debug_adapter $ procs_only $ manual $ usage_logs
+          $ usage_logs_git_ref $ usage_logs_file)
 
     let debug_verify_cmd =
       Console.Debug (Cmd.v debug_verify_info debug_verify_t)
@@ -194,17 +227,30 @@ module Make
       in
       Cmd.info cmd_name ~doc ~man
 
-    let start_language_server procs_only manual () =
+    let start_language_server
+        procs_only
+        manual
+        usage_logs
+        usage_logs_git_ref
+        usage_logs_file
+        () =
       Config.current_exec_mode := Utils.Exec_mode.Verification;
       let () =
         if procs_only then Config.Verification.(things_to_verify := ProcsOnly)
       in
       Config.manual_proof := manual;
+      Config.usage_logs := usage_logs;
+      Config.usage_logs_git_ref := usage_logs_git_ref;
+      Config.usage_logs_file := usage_logs_file;
       let analyse file = verify [ file ] false None false false in
       Lsp_server.run analyse
 
     let lsp_verify_t =
-      Common_args.use Term.(const start_language_server $ procs_only $ manual)
+      Common_args.use
+        Term.(
+          const start_language_server
+          $ procs_only $ manual $ usage_logs $ usage_logs_git_ref
+          $ usage_logs_file)
 
     let lsp_verify_cmd = Console.Lsp (Cmd.v debug_verify_info lsp_verify_t)
   end

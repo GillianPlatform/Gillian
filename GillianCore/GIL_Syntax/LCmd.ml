@@ -3,12 +3,12 @@
 module SS = Containers.SS
 
 type t = TypeDef__.lcmd =
-  | If of Expr.t * t list * t list  (** If-then-else     *)
+  | If of Expr.t * t list * t list  (** If-then-else *)
   | Branch of Expr.t  (** branching on a FO formual *)
-  | Macro of string * Expr.t list  (** Macro            *)
-  | Assert of Expr.t  (** Assert           *)
-  | Assume of Expr.t  (** Assume           *)
-  | AssumeType of Expr.t * Type.t  (** Assume Type      *)
+  | Macro of string * Expr.t list  (** Macro *)
+  | Assert of Expr.t  (** Assert *)
+  | Assume of Expr.t  (** Assume *)
+  | AssumeType of Expr.t * Type.t  (** Assume Type *)
   | FreshSVar of string  (** x := fresh_svar() *)
   | SL of SLCmd.t
 [@@deriving yojson]

@@ -1,0 +1,11 @@
+predicate array(+x, alpha : List) {
+    (x == null) * (alpha == nil);
+    (x -> #s, #c, #b) * (#s <= #c) * (#c == len(#b)) * (#s == len(alpha)) * (#b == (alpha @ #beta))
+}
+
+{ (#x == x) * list(#x, #alpha) }
+function llen(x) {
+  n := [x+1];
+  return n
+}
+{ list(#x, #alpha) * (ret == len(#alpha)) }

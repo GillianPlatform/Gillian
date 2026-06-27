@@ -1,12 +1,11 @@
-(**
-    Interface for GIL Predicate States.
-    They are considered to be mutable.
-*)
+(** Interface for GIL Predicate States. They are considered to be mutable. *)
 module type S = sig
   include SState.S
 
   type state_t
   type abs_t = string * vt list
+
+  module SMatcher : Matcher.S with type state_t = state_t
 
   val make_p :
     preds:MP.preds_tbl_t ->
@@ -29,8 +28,7 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
-  val set_variants : t -> variants_t -> t
-  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
@@ -49,14 +47,12 @@ module Make (State : SState.S) :
   module SMatcher = Matcher.Make (State)
 
   type init_data = State.init_data
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type t = SMatcher.t = {
     state : State.t;
     preds : Preds.t;
     wands : Wands.t;
     pred_defs : MP.preds_tbl_t;
-    variants : variants_t;
   }
 
   type vt = Expr.t [@@deriving yojson, show]
@@ -81,24 +77,20 @@ module Make (State : SState.S) :
   type action_ret = (t * vt list, err_t) Res_list.t
 
   let init_with_pred_table pred_defs init_data =
-    let empty_variants : variants_t = Hashtbl.create 1 in
     {
       state = State.init init_data;
       preds = Preds.init [];
       wands = Wands.init [];
       pred_defs;
-      variants = empty_variants;
     }
 
   let init init_data =
     let empty_pred_defs : MP.preds_tbl_t = MP.init_pred_defs () in
-    let empty_variants : variants_t = Hashtbl.create 1 in
     {
       state = State.init init_data;
       preds = Preds.init [];
       wands = Wands.init [];
       pred_defs = empty_pred_defs;
-      variants = empty_variants;
     }
 
   let get_init_data astate = State.get_init_data astate.state
@@ -110,7 +102,6 @@ module Make (State : SState.S) :
       preds = Preds.copy astate.preds;
       wands = Wands.copy astate.wands;
       pred_defs = astate.pred_defs;
-      variants = Hashtbl.copy astate.variants;
     }
 
   let make_p
@@ -122,14 +113,7 @@ module Make (State : SState.S) :
       ~(spec_vars : SS.t)
       () : t =
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
-    let variants = Hashtbl.create 1 in
-    {
-      state;
-      preds = Preds.init [];
-      wands = Wands.init [];
-      pred_defs = preds;
-      variants;
-    }
+    { state; preds = Preds.init []; wands = Wands.init []; pred_defs = preds }
 
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
@@ -145,7 +129,7 @@ module Make (State : SState.S) :
     Preds.substitution_in_place subst astate.preds;
     Wands.substitution_in_place subst astate.wands;
     match states with
-    | [] -> failwith "Impossible: state substitution returned []"
+    | [] -> (subst, [])
     | [ state ] -> (subst, [ { astate with state } ])
     | states -> (subst, List.map (copy_with_state astate) states)
 
@@ -162,9 +146,6 @@ module Make (State : SState.S) :
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
   let set_wands astate wands = { astate with wands }
-
-  let set_variants (astate : t) (variants : variants_t) : t =
-    { astate with variants }
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in
@@ -214,34 +195,21 @@ module Make (State : SState.S) :
     State.get_type astate.state v
 
   let copy (astate : t) : t =
-    let { state; preds; wands; pred_defs; variants } = astate in
+    let { state; preds; wands; pred_defs } = astate in
     {
       state = State.copy state;
       preds = Preds.copy preds;
       wands = Wands.copy wands;
       pred_defs;
-      variants = Hashtbl.copy variants;
     }
 
   let simplify_val (astate : t) (v : Expr.t) : Expr.t =
     State.simplify_val astate.state v
 
-  let pp_variants : (string * Expr.t option) Fmt.t =
-    Fmt.pair ~sep:Fmt.comma Fmt.string (Fmt.option Expr.pp)
-
   let pp fmt (astate : t) : unit =
-    let { state; preds; wands; variants; _ } = astate in
-    Fmt.pf fmt
-      "%a@\n\
-       @[<v 2>PREDICATES:@\n\
-       %a@]@\n\
-       @[<v 2>WANDS:@\n\
-       %a@]@\n\
-       @[<v 2>VARIANTS:@\n\
-       %a@]@\n"
+    let { state; preds; wands; _ } = astate in
+    Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n@[<v 2>WANDS:@\n%a@]@\n"
       State.pp state Preds.pp preds Wands.pp wands
-      (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
-      variants
 
   let pp_by_need pvars lvars locs fmt astate : unit =
     let { state; preds; wands; _ } = astate in
@@ -271,28 +239,12 @@ module Make (State : SState.S) :
 
   let substitution_in_place ?(subst_all = false) (subst : st) (astate : t) :
       t list =
-    let { state; preds; wands; pred_defs; variants } = astate in
+    let { state; preds; wands; pred_defs } = astate in
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
-    let subst_variants = Hashtbl.create 1 in
-    let () =
-      Hashtbl.iter
-        (fun func variant ->
-          Hashtbl.add subst_variants func
-            (Option.map
-               (SVal.SESubst.subst_in_expr subst ~partial:true)
-               variant))
-        variants
-    in
     List.map
       (fun state ->
-        {
-          state;
-          preds = Preds.copy preds;
-          wands = Wands.copy wands;
-          variants = Hashtbl.copy subst_variants;
-          pred_defs;
-        })
+        { state; preds = Preds.copy preds; wands = Wands.copy wands; pred_defs })
       (State.substitution_in_place ~subst_all subst state)
 
   let update_store (state : t) (x : string option) (v : Expr.t) : t =
@@ -306,31 +258,35 @@ module Make (State : SState.S) :
 
   (* FIXME: This needs to change -> we need to return a matching ret type, so we can
       compose with bi-abduction at the spec level *)
-  let run_spec_aux
-      ?(existential_bindings : (string * vt) list option)
+  let rec run_spec_aux
+      ?(more_specs = [])
+      ?(existential_bindings : (string * vt) list = [])
       (name : string)
       (params : string list)
       (mp : MP.t)
-      (astate : t)
       (x : string option)
-      (args : vt list) : (t * Flag.t, SMatcher.err_t) Res_list.t =
+      (args : vt list)
+      (astate : t) : (t * Flag.t, SMatcher.err_t) Res_list.t =
+    let open Res_list.Syntax in
+    let open Syntaxes.List in
     L.verbose (fun m ->
-        m "INSIDE RUN spec of %s with the following MP:@\n%a@\n" name MP.pp mp);
+        m "INSIDE RUN spec of %s (%d more) with the following MP:@\n%a@\n" name
+          (List.length more_specs) MP.pp mp);
     let old_store = get_store astate in
-    let new_store =
-      try SStore.init (List.combine params args)
+    let** new_store =
+      try SStore.init (List.combine params args) |> Res_list.return
       with Invalid_argument _ ->
-        let message =
+        let msg =
           Fmt.str
             "Running spec of %s which takes %i parameters with the following \
              %i arguments : %a"
             name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
             args
         in
-        raise (Invalid_argument message)
+        Res_list.error_with (StateErr.EOther msg)
     in
+
     let astate' = set_store astate new_store in
-    let existential_bindings = Option.value ~default:[] existential_bindings in
     let existential_bindings =
       List.map (fun (x, v) -> (Expr.LVar x, v)) existential_bindings
     in
@@ -344,37 +300,50 @@ module Make (State : SState.S) :
         m "About to use the spec of %s with the following MP:@\n%a@\n" name
           MP.pp mp);
 
-    let open Res_list.Syntax in
-    let open Syntaxes.List in
     let res = SMatcher.match_ astate' subst mp (FunctionCall name) in
-    if List.find_opt Result.is_error res |> Option.is_some then
+    if List.exists Result.is_error res then
       L.normal (fun m ->
           m "WARNING: Failed to match against the precondition of procedure %s"
             name);
     let** frame_state, subst, posts = res in
+
     let fl, posts =
       match posts with
-      | Some (fl, posts) -> (fl, posts)
-      | None ->
-          let msg =
-            Printf.sprintf
-              "SYNTAX ERROR: Spec of %s does not have a postcondition" name
-          in
-          L.fail msg
+      | Some p -> p
+      | None -> Fmt.kstr L.fail "Spec of %s has no postcondition" name
     in
+
+    let** frame_state, frame_store =
+      match more_specs with
+      | [] -> Res_list.return (frame_state, old_store)
+      | (name, params, mp, x, args, existential_bindings) :: more_specs ->
+          let frame_state = set_store frame_state (SStore.copy old_store) in
+          let++ frame_state, _ =
+            run_spec_aux ~more_specs ?existential_bindings name params mp x args
+              frame_state
+          in
+          let frame_store = get_store frame_state in
+          let frame_state = set_store frame_state (SStore.copy new_store) in
+          (frame_state, frame_store)
+    in
+
     (* OK FOR DELAY ENTAILMENT *)
     let* final_state = SMatcher.produce_posts frame_state subst posts in
+
     let final_store = get_store final_state in
     let v_ret = SStore.get final_store Names.return_variable in
-    let final_state = set_store final_state (SStore.copy old_store) in
+    let final_state = set_store final_state (SStore.copy frame_store) in
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
-    let+ final_state = final_states in
-    let with_unfolded_concrete =
-      snd (Option.get (SMatcher.unfold_concrete_preds final_state))
-    in
-    Ok (with_unfolded_concrete, fl)
+    final_states
+    |> List.filter_map @@ fun final_state ->
+       match SMatcher.unfold_concrete_preds final_state with
+       | Some (_, with_unfolded_concrete) ->
+           Some (Ok (with_unfolded_concrete, fl))
+       | None ->
+           L.verbose (fun m -> m "WARNING: late unsat");
+           None
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
@@ -396,7 +365,7 @@ module Make (State : SState.S) :
     SVal.SESubst.init subst_lst
 
   let clear_resource (astate : t) =
-    let { state; preds; wands = _; pred_defs; variants } = astate in
+    let { state; preds; wands = _; pred_defs } = astate in
     let state = State.clear_resource state in
     let preds_list = Preds.to_list preds in
     List.iter
@@ -408,7 +377,7 @@ module Make (State : SState.S) :
           in
           ())
       preds_list;
-    { state; preds; wands = Wands.init []; pred_defs; variants }
+    { state; preds; wands = Wands.init []; pred_defs }
 
   let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
@@ -464,7 +433,8 @@ module Make (State : SState.S) :
       L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate));
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -624,25 +594,29 @@ module Make (State : SState.S) :
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
     let vars_to_forget = SS.inter state_lvars (SS.of_list lvar_binders) in
-    if vars_to_forget <> SS.empty then (
-      let oblivion_subst = fresh_subst vars_to_forget in
-      L.verbose (fun m ->
-          m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
-            vars_to_forget SVal.SESubst.pp oblivion_subst);
+    let astate =
+      if vars_to_forget <> SS.empty then (
+        let oblivion_subst = fresh_subst vars_to_forget in
+        L.verbose (fun m ->
+            m "Forget @[%a@] with subst: %a"
+              Fmt.(iter ~sep:comma SS.iter string)
+              vars_to_forget SVal.SESubst.pp oblivion_subst);
 
-      (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
-      let subst_in_place =
-        substitution_in_place ~subst_all:true oblivion_subst astate
-      in
-      assert (List.length subst_in_place = 1);
-      let astate = List.hd subst_in_place in
+        (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+        let subst_in_place =
+          substitution_in_place ~subst_all:true oblivion_subst astate
+        in
+        assert (List.length subst_in_place = 1);
+        let astate = List.hd subst_in_place in
 
-      L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate))
-    else ();
+        L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate);
+        astate)
+      else astate
+    in
     let mp =
       match mp with
-      | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+      | Error asrts ->
+          raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
       | Ok mp -> mp
     in
     let bindings =
@@ -664,6 +638,7 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let** new_state, subst', _ =
+      L.verbose (fun m -> m "State before matching:@\n@[%a@]\n" pp astate);
       let+ result = SMatcher.match_ astate subst mp Invariant in
       match result with
       | Ok state -> Ok state
@@ -780,7 +755,8 @@ module Make (State : SState.S) :
           let msg =
             Fmt.str
               "MATCH INVARIANT FAILURE: %a\n\
-               unable to produce variable bindings: %a." Asrt.pp a pp_err_t e
+               unable to produce variable bindings: %a."
+              Asrt.pp a pp_err_t e
           in
           L.print_to_all msg;
           Res_list.error_with e
@@ -816,15 +792,13 @@ module Make (State : SState.S) :
         List.map Result.ok states)
       (Res_list.return astate) frames
 
-  (**
-    Evaluation of logic commands
+  (** Evaluation of logic commands
 
-    @param prog GIL program
-    @param lcmd Logic command to be evaluated
-    @param state Current state
-    @param preds Current predicate set
-    @return List of states/predicate sets resulting from the evaluation
-  *)
+      @param prog GIL program
+      @param lcmd Logic command to be evaluated
+      @param state Current state
+      @param preds Current predicate set
+      @return List of states/predicate sets resulting from the evaluation *)
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (astate : t) :
       (t, err_t) Res_list.t =
     let eval_expr e =
@@ -966,7 +940,8 @@ module Make (State : SState.S) :
                 m "State after substitution:@\n@[%a@]\n" pp astate));
           let mp =
             match mp with
-            | Error asrts -> raise (Preprocessing_Error [ MPAssert (a, asrts) ])
+            | Error asrts ->
+                raise (Preprocessing_Error [ (MPAssert (a, asrts), None) ])
             | Ok mp -> mp
           in
           let bindings =
@@ -1084,7 +1059,7 @@ module Make (State : SState.S) :
           in
           let** astate, _ =
             run_spec_aux ~existential_bindings lname lemma.data.lemma_params
-              lemma.mp astate None v_args
+              lemma.mp None v_args astate
           in
           let astate = add_spec_vars astate (Var.Set.of_list binders) in
           let _, astates = simplify ~matching:true astate in
@@ -1098,31 +1073,53 @@ module Make (State : SState.S) :
 
   let run_spec
       (spec : MP.spec)
-      (astate : t)
       (x : string)
       (args : vt list)
-      (subst : (string * (string * vt) list) option) :
-      (t * Flag.t, err_t) Res_list.t =
-    match subst with
-    | None ->
-        run_spec_aux spec.data.spec_name spec.data.spec_params spec.mp astate
-          (Some x) args
-    | Some (_, subst_lst) ->
-        run_spec_aux ~existential_bindings:subst_lst spec.data.spec_name
-          spec.data.spec_params spec.mp astate (Some x) args
+      (subst : (string * (string * vt) list) option)
+      (astate : t) : (t * Flag.t, err_t) Res_list.t =
+    run_spec_aux ?existential_bindings:(Option.map snd subst)
+      spec.data.spec_name spec.data.spec_params spec.mp (Some x) args astate
+
+  let run_par_spec specs astate =
+    let specs =
+      List.map
+        (fun ((spec, x, args, subst) :
+               MP.spec * string * vt list * (string * (string * vt) list) option)
+           ->
+          ( spec.data.spec_name,
+            spec.data.spec_params,
+            spec.mp,
+            Some x,
+            args,
+            Option.map snd subst ))
+        specs
+    in
+    match specs with
+    | [] -> Res_list.return (astate, Flag.Normal)
+    | (a, b, c, d, e, f) :: more_specs ->
+        run_spec_aux ~more_specs ?existential_bindings:f a b c d e astate
 
   let matches
       (astate : t)
       (subst : st)
       (mp : MP.t)
-      (match_type : Matcher.match_kind) : bool =
+      (match_type : Matcher.match_kind) : bool option =
     if !Config.under_approximation then
       failwith
         "WE CAN'T CHECK IF SOMETHING FULLY MATCHES IN UNDER-APPROXIMATION MODE";
     let matching_results = SMatcher.match_ astate subst mp match_type in
-    let success = List.for_all Result.is_ok matching_results in
-    L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success);
-    success
+    match matching_results with
+    | [] ->
+        let () =
+          L.verbose (fun fmt -> fmt "PSTATE.matches: vacuously successful")
+        in
+        None
+    | _ ->
+        let success = List.for_all Result.is_ok matching_results in
+        let () =
+          L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success)
+        in
+        Some success
 
   let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
     State.unfolding_vals astate.state fs
@@ -1189,7 +1186,7 @@ module Make (State : SState.S) :
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
-    SMatcher.try_recovering astate tactic
+    SMatcher.try_recovering astate tactic |> Result.map fst
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
@@ -1207,34 +1204,30 @@ module Make (State : SState.S) :
     (* TODO: Deserialize other components of pstate *)
     let open Syntaxes.Result in
     let rec aux = function
-      | Some state, Some preds, Some variants, Some wands, [] ->
-          Ok { state; preds; pred_defs = MP.init_pred_defs (); variants; wands }
-      | None, preds, variants, wands, ("state", state_yojson) :: rest ->
+      | Some state, Some preds, Some wands, [] ->
+          Ok { state; preds; pred_defs = MP.init_pred_defs (); wands }
+      | None, preds, wands, ("state", state_yojson) :: rest ->
           let* state = State.of_yojson state_yojson in
-          aux (Some state, preds, variants, wands, rest)
-      | state, None, variants, wands, ("preds", preds_yojson) :: rest ->
+          aux (Some state, preds, wands, rest)
+      | state, None, wands, ("preds", preds_yojson) :: rest ->
           let* preds = Preds.of_yojson preds_yojson in
-          aux (state, Some preds, variants, wands, rest)
-      | state, preds, None, wands, ("variants", variants_yojson) :: rest ->
-          let* variants = variants_t_of_yojson variants_yojson in
-          aux (state, preds, Some variants, wands, rest)
-      | state, preds, variants, None, ("wands", variants_yojson) :: rest ->
-          let* wands = Wands.of_yojson variants_yojson in
-          aux (state, preds, variants, Some wands, rest)
+          aux (state, Some preds, wands, rest)
+      | state, preds, None, ("wands", wands_yojson) :: rest ->
+          let* wands = Wands.of_yojson wands_yojson in
+          aux (state, preds, Some wands, rest)
       | _ -> Error "Cannot parse yojson into PState"
     in
     match yojson with
-    | `Assoc sections -> aux (None, None, None, None, sections)
+    | `Assoc sections -> aux (None, None, None, sections)
     | _ -> Error "Cannot parse yojson into PState"
 
   let to_yojson pstate =
     (* TODO: Serialize other components of pstate *)
-    let { state; preds; wands; variants; _ } = pstate in
+    let { state; preds; wands; _ } = pstate in
     `Assoc
       [
         ("state", State.to_yojson state);
         ("preds", Preds.to_yojson preds);
         ("wands", Wands.to_yojson wands);
-        ("variants", variants_t_to_yojson variants);
       ]
 end

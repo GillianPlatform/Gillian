@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+possibleHooks="
+  applypatch-msg
+  pre-applypatch
+  post-applypatch
+  pre-commit
+  pre-merge-commit
+  prepare-commit-msg
+  commit-msg
+  post-commit
+  pre-rebase
+  post-checkout
+  post-merge
+  pre-push
+  pre-receive
+  update
+  post-receive
+  post-update
+  push-to-checkout
+  pre-auto-gc
+  post-rewrite
+  sendemail-validate
+  fsmonitor-watchman
+  p4-pre-submit
+  post-index-change
+"
+
+destination="$(git rev-parse --git-dir)/hooks"
+githooksFolder="$(pwd)/githooks"
+existing="$(ls "$githooksFolder" | sed -re 's/\..+$//')";
+hooksNames="$(
+  for hook in $possibleHooks; do
+    if (echo $existing | grep -w -q $hook 2>/dev/null); then
+      echo $hook
+    fi
+  done
+)"

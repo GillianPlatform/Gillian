@@ -21,18 +21,8 @@ let parse_with_error token lexbuf =
       compilation_error ~loc
         ("Syntax error: Unexpected token " ^ Lexing.lexeme lexbuf)
 
-let with_lexbuf file f =
-  match Hashtbl.find_opt Utils.Config.file_content_overrides file with
-  | Some content -> Lexing.from_string content |> f
-  | None ->
-      let inx = open_in file in
-      let lexbuf = Lexing.from_channel inx in
-      let x = f lexbuf in
-      let () = close_in inx in
-      x
-
 let parse_file file =
-  with_lexbuf file @@ fun lexbuf ->
+  Utils.Config.with_lexbuf file @@ fun lexbuf ->
   let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = file } in
   parse_with_error WParser.prog lexbuf
 
@@ -52,9 +42,11 @@ let create_compilation_result path prog wprog =
   }
 
 let parse_and_compile_files files =
+  let () = WUtils.Generators.reset () in
   let f files =
     let path = List.hd files in
-    let+ wprog = parse_file path in
+    let* wprog, configs = parse_file path in
+    let+ () = WConfigStmt.apply_all configs in
     create_compilation_result path (compile ~filepath:path wprog) wprog
   in
   Logging.Phase.with_normal ~title:"Program parsing and compilation" (fun () ->
@@ -64,5 +56,24 @@ let other_imports = []
 let initialize _ = ()
 let default_import_paths = Some Runtime_sites.Sites.runtime
 
-module TargetLangOptions =
-  Gillian.Command_line.ParserAndCompiler.Dummy.TargetLangOptions
+module TargetLangOptions = struct
+  open Cmdliner
+
+  type t = { loop_hack : bool }
+
+  let term =
+    let docs = Manpage.s_common_options in
+
+    let loop_hack =
+      let doc =
+        "Apply the loop invariant hack (see \
+         https://github.com/GillianPlatform/Gillian/issues/347)"
+      in
+      Arg.(value & flag & info [ "loop-hack" ] ~docs ~doc)
+    in
+
+    let opt loop_hack = { loop_hack } in
+    Term.(const opt $ loop_hack)
+
+  let apply { loop_hack } = WConfig.loop_hack := loop_hack
+end

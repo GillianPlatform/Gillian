@@ -6,7 +6,8 @@ module Types = struct
     error : 'err;  (** The memory error that needs to be lifted *)
     command : (int Cmd.t * 'annot) option;  (** The command where it happened *)
     tl_ast : 'ast option;
-        (** If the program was compiled from the target language, we keep the tl ast around *)
+        (** If the program was compiled from the target language, we keep the tl
+            ast around *)
   }
 
   type 'cmd_report executed_cmd_data = {
@@ -52,9 +53,9 @@ module type S = sig
         -> cmd_report executed_cmd_data Effect.t
 
   (** Given a proc name, a tl_ast, and the data from the first executed GIL
-    command, initialise the lifter's state and handle the first command.
+      command, initialise the lifter's state and handle the first command.
 
-    Returns [None] if lifting is unsupported (i.e. if [tl_ast] is [None]). *)
+      Returns [None] if lifting is unsupported (i.e. if [tl_ast] is [None]). *)
   val init :
     proc_name:string ->
     all_procs:string list ->
@@ -97,13 +98,14 @@ module type S = sig
   val memory_error_to_exception_info :
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
 
-  val add_variables :
-    store:(string * Expr.t) list ->
-    memory:memory ->
-    is_gil_file:bool ->
-    get_new_scope_id:(unit -> int) ->
-    Variable.ts ->
-    Variable.scope list
+  val pp_expr : t -> Expr.t Fmt.t
+  val pp_asrt : t -> Asrt.atom Fmt.t
+
+  val get_variables :
+    t ->
+    memory astate ->
+    Logging.Report_id.t ->
+    Variable.scope list * Variable.ts
 
   (* A proxy for ParserAndCompiler.parse_and_compile_files; this allows specifying an entrypoint function,
      and can receive a new entrypoint function to substitute it with.

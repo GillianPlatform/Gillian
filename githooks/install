@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+source ./githooks/common
+
+install () {
+  hook="$1"
+  dest="$destination/$hook"
+  org="$githooksFolder/$hook"
+  echo "$org -> $dest"
+  cp $org $dest
+  chmod 755 $dest
+}
+
+for hook in $hooksNames; do
+  install $hook
+done

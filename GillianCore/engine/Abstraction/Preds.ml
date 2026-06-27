@@ -82,7 +82,8 @@ let pop_all preds f =
 let remove_by_name (preds : t) (pname : string) : abs_t option =
   pop preds (fun (n, _) -> String.equal n pname)
 
-(** Find predicate_assertion via pname. Returns a list with all the pabs with name pname *)
+(** Find predicate_assertion via pname. Returns a list with all the pabs with
+    name pname *)
 let find_pabs_by_name (preds : t) (pname : string) : abs_t list =
   List.filter (fun (pn, _) -> pn = pname) !preds
 

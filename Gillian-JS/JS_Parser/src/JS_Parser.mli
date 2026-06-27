@@ -59,7 +59,7 @@ module Syntax : sig
 
   type annotation_type =
     | Import  (** Import a JSIL or GIL file *)
-    | TopRequires  (** Precondition of global  *)
+    | TopRequires  (** Precondition of global *)
     | TopEnsures  (** Normal postcondition of global *)
     | TopEnsuresErr  (** Error postcondition of global *)
     | Requires  (** Precondition of function *)
@@ -72,7 +72,8 @@ module Syntax : sig
     | Invariant
     | Lemma
     | Tactic
-        (** General tactic: fold, unfold, recursive unfold, assert, flash, callspec, and many more to come... *)
+        (** General tactic: fold, unfold, recursive unfold, assert, flash,
+            callspec, and many more to come... *)
     | BiAbduce  (** Bi-abduction indicator *)
     | Call  (** Function call with substitution *)
     | JSIL_only  (** Function called in JSIL only *)
@@ -171,10 +172,10 @@ module Error : sig
     | Overlapping_Syntax
         (** Something went wrong with the parser, some syntax is overlapping. *)
     | Unhandled_Statement of Loc.t
-        (** The statement at the given offset is not handled. Maybe because it 
+        (** The statement at the given offset is not handled. Maybe because it
             is not part of ES5. *)
     | Unhandled_Expression of Loc.t
-        (** The expression at the given offset is not handled. Maybe because it 
+        (** The expression at the given offset is not handled. Maybe because it
             is not part of ES5. *)
     | NotEcmaScript5 of string * Loc.t
         (** Something used in the script is not part of ES5. *)
@@ -191,13 +192,13 @@ module Error : sig
   exception ParserError of t
 end
 
-(** [parse_string_exn ~parse_annotations ~force_strict prog] parses the given 
-    string as a program. The string given should be the entire program. If 
-    [parse_annotations] is set to [false], any possible JS_Logic annotations
-    in the comments will not be parsed. It is [true] by default. If 
-    [force_strict] is true, the program has to be strict. It is [false] by
-    default. If there is an error during the parsing, an exception of type 
-    {!Error.ParserError} is raised. *)
+(** [parse_string_exn ~parse_annotations ~force_strict prog] parses the given
+    string as a program. The string given should be the entire program. If
+    [parse_annotations] is set to [false], any possible JS_Logic annotations in
+    the comments will not be parsed. It is [true] by default. If [force_strict]
+    is true, the program has to be strict. It is [false] by default. If there is
+    an error during the parsing, an exception of type {!Error.ParserError} is
+    raised. *)
 val parse_string_exn :
   ?parse_annotations:bool ->
   ?force_strict:bool ->
@@ -205,7 +206,7 @@ val parse_string_exn :
   string ->
   Syntax.exp
 
-(** Same as [parse_string_exn] except that it returns a result instead of 
+(** Same as [parse_string_exn] except that it returns a result instead of
     raising an error. *)
 val parse_string :
   ?parse_annotations:bool ->

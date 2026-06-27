@@ -16,8 +16,4 @@ val get_ins : t -> int list
 val get_by_id :
   int ->
   t ->
-  [> `None
-  | `WLAssert of WLAssert.t
-  | `WLExpr of WLExpr.t
-  | `WLFormula of WLFormula.t
-  | `WPred of t ]
+  [> `None | `WLAssert of WLAssert.t | `WLExpr of WLExpr.t | `WPred of t ]

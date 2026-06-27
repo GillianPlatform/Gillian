@@ -1,0 +1,61 @@
+predicate points_to_sub(+x, +a: Float, +b: Float) {
+    (a f>= b) * (#v == a f- b) * (x -> #v);
+    (a f< b) * (#v == b f- a) * (x -> #v)
+}
+
+{ (x == #x) * (y == #y) }
+function floating_addition(x, y) {
+    z := x f+ y;
+    return z
+}
+{ (ret == (#x f+ #y)) }
+
+{ (x == #x) * (y == #y) }
+function floating_subtraction(x, y) {
+    r := new(1);
+    if (x f< y) {
+        z := y f- x
+    } else {
+        z := x f- y
+    };
+    [r] := z;
+    return r
+}
+{ points_to_sub(ret, #x, #y) }
+
+{ (x == #x) * (y == #y) }
+function floating_multiplication(x, y) {
+    z := x f* y;
+    return z
+}
+{ (ret == (#x f* #y)) }
+
+{ (x == #x) * (y == #y) }
+function floating_division(x, y) {
+    z := x f/ y;
+    return z
+}
+{ (ret == (#x f/ #y)) }
+
+{ (x == #x) * (y == #y) }
+function floating_mod(x, y) {
+    z := x f% y;
+    return z
+}
+{ (ret == (#x f% #y)) }
+
+{ emp }
+function use_float_ops() {
+    x := 5.5;
+    y := 2.0;
+
+    r := new(5);
+    [r] := x f+ y;
+    [r + 1] := x f- y;
+    [r + 2] := x f* y;
+    [r + 3] := x f/ y;
+    [r + 4] := x f% y;
+
+    return r
+}
+{ (ret -> 7.5, 3.5, 11.0, 2.75, 1.5) }

@@ -1,8 +1,9 @@
 (** @canonical Gillian.Utils.Exec_mode
 
-  Gillian's execution modes *)
+    Gillian's execution modes *)
 
 type t = Concrete | Verification | Symbolic | BiAbduction
+[@@deriving to_yojson]
 
 let is_concrete_exec = function
   | Concrete -> true
@@ -20,7 +21,7 @@ let is_biabduction_exec = function
   | BiAbduction -> true
   | _ -> false
 
-(** {2 [Exec_mode]s that satisfy conditions }*)
+(** {2 [Exec_mode]s that satisfy conditions}*)
 
 (** All modes *)
 let all_exec = [ Concrete; Verification; Symbolic; BiAbduction ]
