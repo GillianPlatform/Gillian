@@ -1465,3 +1465,13 @@ proc i__toStringComputed (v) {
   rlab: return;
   elab: throw
 };
+
+(* ************************ *)
+(* Check for division by zero *)
+(* ************************ *)
+
+proc check_nonzero (x) {
+   goto [x = 0.] elab rlab;
+   rlab: ret := null; return;
+   elab: ret := null; throw
+};
