@@ -358,8 +358,8 @@ pred IElements(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
 
 (* A general element sequene is either a complete or an incomplete element sequence *)
 @nopath
-nounfold pred Elements(definition : Str, +buffer : List, +readPos : Num,
-                       +eCount : Num, +fCount : Num, eList : List,
+nounfold pred Elements(+buffer : List, +readPos : Num, +eCount : Num,
+                       +fCount : Num, definition : Str, eList : List,
                        esLength : Num) :
   (definition == "Complete") * CElements(buffer, readPos, eCount, fCount, eList, esLength),
   (definition == "Incomplete") * IElements(buffer, readPos, eCount, fCount, eList, esLength);
@@ -370,17 +370,17 @@ nounfold pred Elements(definition : Str, +buffer : List, +readPos : Num,
 lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, esLength1, eCount2, fList2, esLength2)
 [[
     CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1) *
-    Elements(#definition, #buffer, #readPos + #esLength1, #eCount2, #fCount, #fList2, #esLength2)
+    Elements(#buffer, #readPos + #esLength1, #eCount2, #fCount, #definition, #fList2, #esLength2)
 ]]
 [[
-    Elements(#definition, #buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
+    Elements(#buffer, #readPos, #eCount1 + #eCount2, #fCount, #definition, l+ (#fList1, #fList2), #esLength1 + #esLength2)
 ]]
 [*
     unfold CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1)
       [bind: (#fList := #element) and (#eLength := #eLength) and (#restElements := #restElements) and (#restESLength := #restLength)] ;
     if (0 < #eCount1) then {
         apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
-        unfold Elements(#definition, #buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength + #esLength2));
+        unfold Elements(#buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, #definition, l+ (#restElements, #fList2), (#restESLength + #esLength2));
         if (#definition == "Incomplete") then {
             fold IElements(#buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
         }
@@ -413,7 +413,7 @@ nounfold pred CRawEncryptedDataKeys(+buffer : List, +readPos : Num,
     (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) *
     (#rawEC == l-sub(buffer, as_int readPos, 2i)) *
     rawToUInt16(#rawEC, false, #keyCount) * (0 <# #keyCount) *
-    Elements("Complete", buffer, (readPos + 2), #keyCount, 3, EDKs, #EDKsLength) *
+    Elements(buffer, (readPos + 2), #keyCount, 3, "Complete", EDKs, #EDKsLength) *
     (EDKsLength == (#EDKsLength + 2));
 
 (* Incomplete serialised EDKs *)
@@ -425,12 +425,12 @@ nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num) :
   (* Enough data to read the number of EDKs, but not enough data to read the EDKs *)
   (is_int readPos) * (0 <=# readPos) * ((readPos + 2) <=# as_num (l-len buffer)) * (#rawEC == l-sub(buffer, as_int readPos, 2i)) *
     rawToUInt16(#rawEC, false, #keyCount) * (0 <# #keyCount) *
-    Elements("Incomplete", buffer, (readPos + 2), #keyCount, 3, #eList, #esLength);
+    Elements(buffer, (readPos + 2), #keyCount, 3, "Incomplete", #eList, #esLength);
   facts: (is_int readPos);
 
 (* Broken serialised EDKs *)
 @nopath
-nounfold pred BRawEncryptedDataKeys(errorMessage : Str, +buffer : List, +readPos : Num) :
+nounfold pred BRawEncryptedDataKeys(+buffer : List, +readPos : Num, errorMessage : Str) :
   (* Incorrect starting position *)
   (is_int readPos) * ((readPos <# 0) \/ (as_num (l-len buffer) <# readPos)) *
     (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
@@ -444,10 +444,10 @@ nounfold pred BRawEncryptedDataKeys(errorMessage : Str, +buffer : List, +readPos
 
 (* General serialised EDKs *)
 @nopath
-nounfold pred RawEncryptedDataKeys(definition : Str, +buffer : List, +readPos : Num, EDKs : List, EDKsLength : Num, errorMessage : Str) :
+nounfold pred RawEncryptedDataKeys(+buffer : List, +readPos : Num, definition : Str, EDKs : List, EDKsLength : Num, errorMessage : Str) :
   (definition == "Complete") * (errorMessage == "") * CRawEncryptedDataKeys(buffer, readPos, EDKs, EDKsLength),
   (definition == "Incomplete") * IRawEncryptedDataKeys(buffer, readPos) * (EDKs == {{  }}) * (EDKsLength == 0) * (errorMessage == ""),
-  (definition == "Broken") * BRawEncryptedDataKeys(errorMessage, buffer, readPos) * (EDKs == {{  }}) * (EDKsLength == 0);
+  (definition == "Broken") * BRawEncryptedDataKeys(buffer, readPos, errorMessage) * (EDKs == {{  }}) * (EDKsLength == 0);
 
 
 (******************************
@@ -474,19 +474,19 @@ nounfold pred CRawEncryptionContext(+buffer : List, ECKs : List) :
   ((l-len buffer) == 0i) * (ECKs == {{  }}),
   (#rawKC == l-sub(buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) * (0 <# #keyCount) *
-    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    Elements(buffer, 2, #keyCount, 2, "Complete", ECKs, #ECKsLength) *
     toUtf8PairMap(ECKs, #utf8ECKs) * FirstProj(ECKs, #ECKeys) *
     Unique(#ECKeys) * (as_int (2 + #ECKsLength) == (l-len buffer));
 
 (* Broken serialised encryption context *)
 @nopath
-nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List, ECKs:List) :
+nounfold pred BRawEncryptionContext(+buffer:List, errorMessage:Str, ECKs:List) :
     (* Not enough data provided *)
     (2i i<# (l-len buffer)) *
     (#rawKC == l-sub (buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) * (ECKs == {{ }}) *
-    Elements("Incomplete", buffer, 2, #keyCount, 2, #eList, #esLength) *
+    Elements(buffer, 2, #keyCount, 2, "Incomplete", #eList, #esLength) *
     (errorMessage == "decodeEncryptionContext: Underflow, not enough data."),
 
     (* Too much data provided *)
@@ -494,7 +494,7 @@ nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List, ECKs:List) :
     (#rawKC == l-sub (buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    Elements(buffer, 2, #keyCount, 2, "Complete", ECKs, #ECKsLength) *
     (! (as_int (#ECKsLength + 2) == l-len buffer)) *
     (errorMessage == "decodeEncryptionContext: Overflow, too much data."),
 
@@ -503,16 +503,16 @@ nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List, ECKs:List) :
     (#rawKC == l-sub (buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    Elements(buffer, 2, #keyCount, 2, "Complete", ECKs, #ECKsLength) *
     toUtf8PairMap(ECKs, #utf8ECKs) * FirstProj(ECKs, #ECKeys) * Duplicated({{ }}, #ECKeys) *
     (as_int (2 + #ECKsLength) == l-len buffer) *
     (errorMessage == "decodeEncryptionContext: Duplicate encryption context key value.");
 
 (* General serialised encryption context *)
 @nopath
-pred RawEncryptionContext(definition:Str, +buffer:List, ECKs:List, errorMessage:Str) :
+pred RawEncryptionContext(+buffer:List, definition:Str, ECKs:List, errorMessage:Str) :
   (definition == "Complete") * CRawEncryptionContext(buffer, ECKs) * (errorMessage == ""),
-  (definition == "Broken")   * BRawEncryptionContext(errorMessage, buffer, ECKs);
+  (definition == "Broken")   * BRawEncryptionContext(buffer, errorMessage, ECKs);
 
 
 (*****************************
@@ -598,7 +598,7 @@ nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
     ((l-len #EC) == as_int ECLength) *
     CRawEncryptionContext(#EC, ECKs) *
     (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, (22 + ECLength), EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, (22 + ECLength), "Complete", EDKs, #EDKsLength, _) *
     (as_int #EDKsLength == (l-len #edks)) * ((l-len #rawFrameLength) == 4i) *
     rawToUInt32(#rawFrameLength, false, frameLength) *
     (headerLength == ((((((22 + ECLength) + #EDKsLength) + 1) + 4) + 1) + 4)) *
@@ -656,7 +656,7 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len #EC == ECLength) *
     CRawEncryptionContext(#EC, ECKs) *
 
-    RawEncryptedDataKeys("Incomplete", rawHeaderData, 22 + ECLength, EDKs, _, errorMessage) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength, "Incomplete", EDKs, _, errorMessage) *
     (contentType == 0) * (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
     (* Not enough data to read the header IV and the authentication tag *)
@@ -678,7 +678,7 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     CRawEncryptionContext(#EC, ECKs) *
 
     (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, 22 + ECLength, EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength, "Complete", EDKs, #EDKsLength, _) *
     (#EDKsLength == l-len #edks) *
     (l-len #rawFrameLength == 4) *
     rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -732,7 +732,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == as_int ECLength) *
-    BRawEncryptionContext(errorMessage, #EC, ECKs) *
+    BRawEncryptionContext(#EC, errorMessage, ECKs) *
 
     (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
     (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -754,7 +754,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == as_int ECLength) *
     CRawEncryptionContext(#EC, ECKs) *
-    RawEncryptedDataKeys("Broken", rawHeaderData, 22 + ECLength, _, _, errorMessage) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength, "Broken", _, _, errorMessage) *
 
     (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
     (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -777,7 +777,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len #EC == as_int ECLength) *
     CRawEncryptionContext(#EC, ECKs) *
     (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, 22 + ECLength, EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength, "Complete", EDKs, #EDKsLength, _) *
     (#EDKsLength == as_num (l-len #edks)) *
     (l-len #rawReservedBytes == 4i) *
     rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
@@ -806,7 +806,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len #EC == as_int ECLength) *
     CRawEncryptionContext(#EC, ECKs) *
     (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, 22 + ECLength, EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength, "Complete", EDKs, #EDKsLength, _) *
     (#EDKsLength == as_num (l-len #edks)) *
     (headerLength == 22 + ECLength + #EDKsLength + 1 + 4 + 1 + 4) *
     (headerLength + #ivLength + (#tagLength / 8) <=# as_num (l-len rawHeaderData)) *
@@ -817,7 +817,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
 (* General serialised header *)
 @nopath
-nounfold pred Header(definition, +rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
+nounfold pred Header(+rawHeaderData, definition, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
     (* Complete header *)
     (definition == "Complete") *
     CHeader(rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *

@@ -1,6 +1,6 @@
-predicate lambda_term(+x, v, t1, t2, type: Int, +p: Float) {
-    (x -> (p: 0), (p: v), (p: t1)) * (type == 0) * (t2 == null) * lambda_term(t1, #v1, #t11, #t12, #type1, p);
-    (x -> (p: 1), (p: t1), (p: t2)) * (type == 1) * (v == 0) * lambda_term(t1, #v1, #t11, #t12, #type1, p) * lambda_term(t2, #v2, #t21, #t22, #type2, p);
+predicate lambda_term(+x, +p: Float, v, t1, t2, type: Int) {
+    (x -> (p: 0), (p: v), (p: t1)) * (type == 0) * (t2 == null) * lambda_term(t1, p, #v1, #t11, #t12, #type1);
+    (x -> (p: 1), (p: t1), (p: t2)) * (type == 1) * (v == 0) * lambda_term(t1, p, #v1, #t11, #t12, #type1) * lambda_term(t2, p, #v2, #t21, #t22, #type2);
     (x -> (p: 2), (p: v)) * (type == 2) * (t1 == null) * (t2 == null)
 }
 
@@ -11,36 +11,36 @@ predicate is_copy(+x, +y, +p1: Float, +p2: Float, v, t1, t2, type: Int) {
 }
 
 predicate substituted(+t_in, +t, +v, +p1: Float, +p2: Float, +pt: Float, +t_out) {
-    (t_in -> (p1: 0), (p1: v), (p1: #t)) * (t_out -> (p2: 0), (p2: v), (p2: #t2)) * is_copy(#t, #t2, p1, p2, #tv, #tt1, #tt2, #type1) * lambda_term(t, #w, #t11, #t12, #type2, pt);
+    (t_in -> (p1: 0), (p1: v), (p1: #t)) * (t_out -> (p2: 0), (p2: v), (p2: #t2)) * is_copy(#t, #t2, p1, p2, #tv, #tt1, #tt2, #type1) * lambda_term(t, pt, #w, #t11, #t12, #type2);
     (t_in -> (p1: 0), (p1: #v), (p1: #t)) * (! (#v == v)) * (t_out -> (p2: 0), (p2: #v), (p2: #t_out)) * substituted(#t, t, v, p1, p2, pt, #t_out);
     (t_in -> (p1: 1), (p1: #t1), (p1: #t2)) * (t_out -> (p2: 1), (p2: #t1_out), (p2: #t2_out)) * substituted(#t1, t, v, p1, p2, pt f/ 2.0, #t1_out) * substituted(#t2, t, v, p1, p2, pt f/ 2.0, #t2_out);
     (t_in -> (p1: 2), (p1: v)) * is_copy(t, t_out, pt, p2, #v, #t1, #t2, #type);
-    (t_in -> (p1: 2), (p1: #v)) * (! (v == #v)) * (t_out -> (p2: 2), (p2: #v)) * lambda_term(t, #w, #t1, #t2, #type, pt)
+    (t_in -> (p1: 2), (p1: #v)) * (! (v == #v)) * (t_out -> (p2: 2), (p2: #v)) * lambda_term(t, pt, #w, #t1, #t2, #type)
 }
 
 lemma split_lambda_term_permission {
     statement:
         forall x, v, t1, t2, type, p, p1, p2.
-            (p == p1 f+ p2) * (p1 f> 0.0) * (p2 f> 0.0) * lambda_term(x, v, t1, t2, type, p) |- lambda_term(x, v, t1, t2, type, p1) * lambda_term(x, v, t1, t2, type, p2)
+            (p == p1 f+ p2) * (p1 f> 0.0) * (p2 f> 0.0) * lambda_term(x, p, v, t1, t2, type) |- lambda_term(x, p1, v, t1, t2, type) * lambda_term(x, p2, v, t1, t2, type)
 
     proof:
-        unfold lambda_term(x, v, t1, t2, type, p);
+        unfold lambda_term(x, p, v, t1, t2, type);
         if (!(type == 2)) {
             if (type == 1) {
-                assert {bind: #v1, #t11, #t12, #type1, #v2, #t21, #t22, #type2} lambda_term(t1, #v1, #t11, #t12, #type1, p) * lambda_term(t2, #v2, #t21, #t22, #type2, p);
+                assert {bind: #v1, #t11, #t12, #type1, #v2, #t21, #t22, #type2} lambda_term(t1, p, #v1, #t11, #t12, #type1) * lambda_term(t2, p, #v2, #t21, #t22, #type2);
                 apply split_lambda_term_permission(t1, #v1, #t11, #t12, #type1, p, p1, p2);
                 apply split_lambda_term_permission(t2, #v2, #t21, #t22, #type2, p, p1, p2)
             } else {
-                assert {bind: #v1, #t11, #t12, #type1} lambda_term(t1, #v1, #t11, #t12, #type1, p);
+                assert {bind: #v1, #t11, #t12, #type1} lambda_term(t1, p, #v1, #t11, #t12, #type1);
                 apply split_lambda_term_permission(t1, #v1, #t11, #t12, #type1, p, p1, p2)
             };
-            fold lambda_term(x, v, t1, t2, type, p1);
-            fold lambda_term(x, v, t1, t2, type, p2)
+            fold lambda_term(x, p1, v, t1, t2, type);
+            fold lambda_term(x, p2, v, t1, t2, type)
         }
 }
 
 [spec copy_spec: #p]
-{ (x == #x) * lambda_term(#x, #v, #t1, #t2, #type, #p) }
+{ (x == #x) * lambda_term(#x, #p, #v, #t1, #t2, #type) }
 function copy(x) {
     type := [x];
     if (type == 2) {
@@ -72,7 +72,7 @@ function copy(x) {
 { is_copy(#x, ret, #p, 1.0, #v, #t1, #t2, #type) }
 
 [spec subst_spec: #px, #py]
-{ (x == #x) * (y == #y) * (v == #v) * lambda_term(#x, #vx, #tx1, #tx2, #type_x, #px) * lambda_term(#y, #vy, #ty1, #ty2, #type_y, #py) }
+{ (x == #x) * (y == #y) * (v == #v) * lambda_term(#x, #px, #vx, #tx1, #tx2, #type_x) * lambda_term(#y, #py, #vy, #ty1, #ty2, #type_y) }
 function subst(x, y, v) {
     type := [x];
     if (type == 2) {

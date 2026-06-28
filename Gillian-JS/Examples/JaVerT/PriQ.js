@@ -23,7 +23,7 @@
 		NodeList(#next, np, #pri, #len_nl) * (#pri <=# max_pri) *
 	    (0 <# length) * (length == #len_nl + 1);
 
-	@pred Queue(+pq, qp, +np, max_pri : Num, length : Num) :
+	@pred Queue(+pq, +np, qp, max_pri : Num, length : Num) :
 		JSObjWithProto(pq, qp) *
 		DataProp(pq, "_head",  #head) *
 		NodeList(#head, np, max_pri, length) *
@@ -48,7 +48,7 @@
 	@topensures (
 		scope(q : #q) * scope(r : #r) *
 		scope(PriorityQueue : #pq_lib) * PriorityQueueModule (#pq_lib, #np) *
-		Queue(#q, #pqp, #np, #pri_q, 1) *
+		Queue(#q, #np, #pqp, #pri_q, 1) *
 		(ret == #r) * JSObject(#r) * DataProp(#r, "pri", _) * DataProp(#r, "val", _)
 	)
 */
@@ -160,7 +160,7 @@ var PriorityQueue = (function () {
 	    )
 	    @post (
 	    	ObjectPrototype($lobj_proto) *
-	    	Queue(this, #pqp, #np, 0, 0) *
+	    	Queue(this, #np, #pqp, 0, 0) *
 	    	QueuePrototype(#pqp, #np, #qfs_sc) *
 	    	(ret == undefined)
 	    )
@@ -174,27 +174,27 @@ var PriorityQueue = (function () {
 
 			@pre (
 				(pri == #pri) * (0 <# #pri) * (val == #val) *
-				Queue(this, #pqp, #np, #pri_q, #length) *
+				Queue(this, #np, #pqp, #pri_q, #length) *
 				QueuePrototype(#pqp, #np, #qfs_sc) *
 				o_chains(enqueue: #qfs_sc, PQLib: $$scope) *
 				(#pri <=# #pri_q) * ObjectPrototype($lobj_proto)
 			)
 			@post (
 				(ret == undefined) *
-				Queue(this, #pqp, #np, #pri_q, #length + 1) *
+				Queue(this, #np, #pqp, #pri_q, #length + 1) *
 				QueuePrototype(#pqp, #np, #qfs_sc) * ObjectPrototype($lobj_proto)
 			)
 
 			@pre (
 				(pri == #pri) * (0 <# #pri) * (val == #val) *
-				Queue(this, #pqp, #np, #pri_q, #length) *
+				Queue(this, #np, #pqp, #pri_q, #length) *
 				QueuePrototype(#pqp, #np, #qfs_sc) *
 				o_chains(enqueue: #qfs_sc, PQLib: $$scope) *
 				(#pri_q <# #pri) * ObjectPrototype($lobj_proto)
 			)
 			@post (
 				(ret == undefined) *
-				Queue(this, #pqp, #np, #pri, #length + 1) *
+				Queue(this, #np, #pqp, #pri, #length + 1) *
 				QueuePrototype(#pqp, #np, #qfs_sc) * ObjectPrototype($lobj_proto)
 			)
 	*/
@@ -208,26 +208,26 @@ var PriorityQueue = (function () {
 		@id dequeue
 
      @pre (
-       Queue(this, #pqp, #np, #pri_q, #length) *
+       Queue(this, #np, #pqp, #pri_q, #length) *
        QueuePrototype(#pqp, #np, #qfs_sc) *
        o_chains(enqueue: #qfs_sc, dequeue: $$scope) *
        (0 <# #length)
      )
      @post (
-       Queue(this, #pqp, #np, #new_pri_q, #length - 1) *
+       Queue(this, #np, #pqp, #new_pri_q, #length - 1) *
        QueuePrototype(#pqp, #np, #qfs_sc) *
        (ret == #r) * JSObject(#r) *
        DataProp(#r, "pri", #pri_q) * DataProp(#r, "val", #some_val)
      )
 
 	@pre (
-       Queue(this, #pqp, #np, #pri_q, #length) * (#length == 0) *
+       Queue(this, #np, #pqp, #pri_q, #length) * (#length == 0) *
        QueuePrototype(#pqp, #np, #qfs_sc) *
        o_chains(enqueue: #qfs_sc, dequeue: $$scope) *
        GlobalObject() * BI_ErrorObject()
      )
      @posterr (
-       Queue(this, #pqp, #np, #pri_q, #length) *
+       Queue(this, #np, #pqp, #pri_q, #length) *
        QueuePrototype(#pqp, #np, #qfs_sc) *
        (ret == #e) * ErrorObjectWithMessage(#e, "Queue is empty") *
        GlobalObject() * BI_ErrorObject()

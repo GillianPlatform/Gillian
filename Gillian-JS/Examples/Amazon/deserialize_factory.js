@@ -45,7 +45,7 @@ function needs(condition, errorMessage) {
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       (#view == l-sub(#data, #viewOffset, #viewSize)) *
-      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      Elements(#view, #readPos, #eCount, #fCount, #definition, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals ()
@@ -54,7 +54,7 @@ function needs(condition, errorMessage) {
       (#definition == "Complete") *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      Elements(#view, #readPos, #eCount, #fCount, #definition, #eList, #esLength) *
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals () *
 
@@ -67,7 +67,7 @@ function needs(condition, errorMessage) {
       (#definition == "Incomplete") *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      Elements(#view, #readPos, #eCount, #fCount, #definition, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals () *
@@ -96,7 +96,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       JSInternals() *
 
       CElements(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
-      Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) *
+      Elements(#view, #outerLoopReadPos, #eLeft, #fCount, #definition, #remElsList, #remElsLength) *
       (#eList == l+ (#doneElsList, #remElsList)) *
       (#esLength == #doneElsLength + #remElsLength) *
       (#readPos + #doneElsLength == #outerLoopReadPos) *
@@ -104,7 +104,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       [bind : #doneEls, #outerLoopReadPos, #eLeft, #remElsList, #remElsLength, #doneElsList, #doneElsLength] */
   while (elementCount--) {
     /* @tactic
-        unfold Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+        unfold Elements(#view, #outerLoopReadPos, #eLeft, #fCount, #definition, #remElsList, #remElsLength);
         if (#definition = "Complete") then {
             unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #element) and (#eLength := #eLength)]
         } else {
@@ -141,7 +141,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         /* @tactic
             apply PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
             assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
-            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+            assert Elements(#view, #outerLoopReadPos, #eLeft, #fCount, #definition, #remElsList, #remElsLength);
             apply PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
         */
         return false
@@ -153,7 +153,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         /* @tactic
             apply PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
             assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
-            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+            assert Elements(#view, #outerLoopReadPos, #eLeft, #fCount, #definition, #remElsList, #remElsLength);
             apply PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
         */
         return false
@@ -177,7 +177,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
   }
 
   /* @tactic
-      unfold Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+      unfold Elements(#view, #outerLoopReadPos, #eLeft, #fCount, #definition, #remElsList, #remElsLength);
       if (#definition = "Complete") then {
           unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
       } else {
@@ -277,7 +277,7 @@ var toUtf8 = function (buffer) { };
          Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#EC == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Complete") *
-         RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
+         RawEncryptionContext(#EC, #definition, #ECKs, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -285,7 +285,7 @@ var toUtf8 = function (buffer) { };
          JSInternals()
 
     @post Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
-          RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
+          RawEncryptionContext(#EC, #definition, #ECKs, #errorMessage) *
 
           DecodedEncryptionContext(ret, #ECKs) *
 
@@ -298,7 +298,7 @@ var toUtf8 = function (buffer) { };
          Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#EC == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
-         RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
+         RawEncryptionContext(#EC, #definition, #ECKs, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -307,7 +307,7 @@ var toUtf8 = function (buffer) { };
 
     @posterr
           Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
-          RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
+          RawEncryptionContext(#EC, #definition, #ECKs, #errorMessage) *
 
           ErrorObjectWithMessage(ret, #errorMessage) *
 
@@ -321,7 +321,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
       if (#definition = "Complete") then {
         unfold CRawEncryptionContext(#EC, #ECKs)
       } else {
-        unfold BRawEncryptionContext(#errorMessage, #EC, #ECKs)
+        unfold BRawEncryptionContext(#EC, #errorMessage, #ECKs)
       }
    */
 
@@ -362,9 +362,9 @@ function decodeEncryptionContext(encodedEncryptionContext) {
     @tactic
         assert (
             (#EC == l+ ({{ #b0, #b1 }}, #rest)) *
-            Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest)
+            Elements(#EC, 2, ((256 * #b0) + #b1), 2, "Complete", #ECKs, l-len #rest)
         ) [bind: #b0, #b1, #rest];
-        unfold Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
+        unfold Elements(#EC, 2, ((256 * #b0) + #b1), 2, "Complete", #ECKs, l-len #rest);
         assert (
             scope(pairsCount: #pairsCount) * (#pairsCount == l-len #ECKs) *
             scope(elements: #elements) * ArrayOfArraysOfUInt8Arrays(#elements, #ECKs) *
@@ -384,8 +384,8 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
         scope(count: #count) * (#count <=# #pairsCount) *
         ArrayStructure(#elements, #pairsCount) *
-        ArrayOfArraysOfUInt8ArraysContents(#elements, #done, 0, #count) *
-        ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) *
+        ArrayOfArraysOfUInt8ArraysContents(#elements, 0, #count, #done) *
+        ArrayOfArraysOfUInt8ArraysContents(#elements, #count, #pairsCount - #count, #left) *
         (#ECKs == l+ (#done, #left)) *
         FirstProj(#done, #doneRProps) * Unique(#doneRProps) *
         FirstProj(#left, #leftRProps) * UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps) *
@@ -398,7 +398,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             unfold ArrayStructure(#elements, #pairsCount);
             unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
             unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
-            unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) [bind: (#ECK := #elementContents) and (#rest_left := #rest)];
+            unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #count, #pairsCount - #count, #left) [bind: (#ECK := #elementContents) and (#rest_left := #rest)];
             apply CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
             assert (#ECK == {{ #new_prop, #new_value }})
     */
@@ -461,7 +461,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
   /*
     @tactic
-        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
+        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #count, #pairsCount - #count, #left);
         apply toUtf8PairMapInjective(#ECKs, #utf8ECKs, #done, #utf8Done);
         if (#definition = "Broken") then {
             unfold FirstProj(#left, #leftRProps);
@@ -489,7 +489,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
-         RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
+         RawEncryptedDataKeys(#view, #startPos, #definition, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
@@ -498,7 +498,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
     @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
+          RawEncryptedDataKeys(#view, #startPos, #definition, #EDKs, #EDKsLength, #errorMessage) *
 
           (#definition == "Complete") *
           JSObject(ret) *
@@ -513,7 +513,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
+          RawEncryptedDataKeys(#view, #startPos, #definition, #EDKs, #EDKsLength, #errorMessage) *
 
           (#definition == "Incomplete") * (ret == false) *
 
@@ -526,14 +526,14 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
-         RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
+         RawEncryptedDataKeys(#view, #startPos, #definition, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
 
     @posterr
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
-          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
+          RawEncryptedDataKeys(#view, #startPos, #definition, #EDKs, #EDKsLength, #errorMessage) *
 
           ErrorObjectWithMessage(ret, #errorMessage) *
 
@@ -542,14 +542,14 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 */
 function deserializeEncryptedDataKeys(buffer, startPos) {
   /* @tactic
-      unfold RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage);
+      unfold RawEncryptedDataKeys(#view, #startPos, #definition, #EDKs, #EDKsLength, #errorMessage);
       if (#definition = "Complete") then {
         unfold CRawEncryptedDataKeys(#view, #startPos, #EDKs, #EDKsLength)
       } else {
           if (#definition = "Incomplete") then {
             unfold IRawEncryptedDataKeys(#view, #startPos)
           } else {
-            unfold BRawEncryptedDataKeys(#errorMessage, #view, #startPos)
+            unfold BRawEncryptedDataKeys(#view, #startPos, #errorMessage)
           }
       } */
 
@@ -674,8 +674,8 @@ var SdkSuite = function (suiteId) { };
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
-         Header(#definition,
-                #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
+         Header(#view,
+                #definition, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                 #errorMessage) *
@@ -690,14 +690,14 @@ var SdkSuite = function (suiteId) { };
          JSInternals ()
 
     @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
-          Header(#definition,
-                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
+          Header(#view,
+                 #definition, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                  #errorMessage) *
 
           (#definition == "Complete") *
-          HeaderInfo(ret, #version, #type, #suiteId, #messageId, #ECKs, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
+          HeaderInfo(ret, #ECKs, #version, #type, #suiteId, #messageId, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
           (#rawHeaderData == l-sub(#view, 0, #headerLength)) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
@@ -710,8 +710,8 @@ var SdkSuite = function (suiteId) { };
           JSInternals();
 
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
-          Header(#definition,
-                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
+          Header(#view,
+                 #definition, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                  #errorMessage) *
@@ -731,8 +731,8 @@ var SdkSuite = function (suiteId) { };
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
          (#definition == "Broken") *
-         Header(#definition,
-                #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
+         Header(#view,
+                #definition, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                 #errorMessage) *
@@ -748,8 +748,8 @@ var SdkSuite = function (suiteId) { };
 
     @posterr
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
-          Header(#definition,
-                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
+          Header(#view,
+                 #definition, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                  #errorMessage) *
@@ -778,7 +778,7 @@ function deserializeMessageHeader(messageBuffer) {
     messageBuffer.byteLength
   )
 
-  /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
+  /* @tactic unfold Header(#view, #definition, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
   /* @tactic
       if (#definition = "Complete") then {
         unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)

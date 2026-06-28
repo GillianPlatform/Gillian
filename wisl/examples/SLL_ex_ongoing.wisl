@@ -230,7 +230,7 @@ function SLL_allocate_node(v){
 //
 
 // General pre-condition
-predicate SLL_prepend_pre(def, +x, xs, vs, n) {
+predicate SLL_prepend_pre(+x, def, xs, vs, n) {
     (def == 0) * SLL_addrs_incl(x, xs) * (vs == []) * (n == 0);
     (def == 2) * SLL_vals(x, vs) * (xs == []) * (n == 0);
     (def == 3) * SLL_incl(x, xs, vs) * (n == 0);
@@ -246,7 +246,7 @@ predicate SLL_prepend_post(+def, +x, +xs, +k, +vs, +n, +retval) {
 }
 
 // Specified algorithm
-{ (x == #x) * (k == #k) * SLL_prepend_pre(#def, #x, #xs, #vs, #n) }
+{ (x == #x) * (k == #k) * SLL_prepend_pre(#x, #def, #xs, #vs, #n) }
 function SLL_prepend(x, k){
     z := SLL_allocate_node(k);
     [z + 1] := x;
@@ -259,7 +259,7 @@ function SLL_prepend(x, k){
 //
 
 // General pre-condition
-predicate SLL_length_pre(def, +x, var : Int) {
+predicate SLL_length_pre(+x, def, var : Int) {
     (def == 0) * SLL_addrs_incl(x, #xs) * (var == len #xs);
     (def == 1) * SLL_addrs_excl(x, #xs) * (var == len #xs);
     (def == 2) * SLL_vals(x, #vs) * (var == len #vs);
@@ -279,7 +279,7 @@ predicate SLL_length_post(+def, +x, +retval) {
 }
 
 // Specified algorithm
-{ (x == #x) * SLL_length_pre(#def, #x, #var) } with variant: #var
+{ (x == #x) * SLL_length_pre(#x, #def, #var) } with variant: #var
 function SLL_length(x) {
   if (x == null){
     n := 0
@@ -319,7 +319,7 @@ function SLL_length_iter(x) {
 //
 
 // General pre-condition
-predicate SLL_concat_pre(def, +x, +y, xx, xy, vx, vy, nx, ny, var : Int) {
+predicate SLL_concat_pre(+x, +y, def, xx, xy, vx, vy, nx, ny, var : Int) {
     (def == 0) * SLL_addrs_incl(x, xx) * SLL_addrs_incl(y, xy) * (vx == []) * (vy == []) * (nx == 0) * (ny == 0) * (var == len xx);
     (def == 2) * SLL_vals(x, vx) * SLL_vals(y, vy) * (xx == []) * (xy == []) * (nx == 0) * (ny == 0) * (var == len vx);
     (def == 3) * SLL_incl(x, xx, vx) * SLL_incl(y, xy, vy) * (nx == 0) * (ny == 0) * (var == len vx);
@@ -335,7 +335,7 @@ predicate SLL_concat_post(+def, +x, +y, +xx, +xy, +vx, +vy, +nx, +ny, +retval) {
 }
 
 // Specified algorithm
-{(x == #x) * (y == #y) * SLL_concat_pre(#def, #x, #y, #xx, #xy, #vx, #vy, #nx, #ny, #var) } with variant: #var
+{(x == #x) * (y == #y) * SLL_concat_pre(#x, #y, #def, #xx, #xy, #vx, #vy, #nx, #ny, #var) } with variant: #var
 function SLL_concat(x, y) {
   if (x == null){
     x := y
@@ -382,7 +382,7 @@ function SLL_concat_iter(x, y){
 //
 
 // General pre-condition
-predicate SLL_reverse_pre(def, +x, xs, vs, n, var) {
+predicate SLL_reverse_pre(+x, def, xs, vs, n, var) {
     (def == 0) * SLL_addrs_incl(x, xs) * (vs == []) * (n == 0) * (var == len xs);
     (def == 2) * SLL_vals(x, vs) * (xs == []) * (n == 0) * (var == len vs);
     (def == 3) * SLL_incl(x, xs, vs) * (n == 0) * (var == len xs);
@@ -398,7 +398,7 @@ predicate SLL_reverse_post(+def, +x, +xs, +vs, +n, +retval) {
 }
 
 // Specified algorithm
-{ (x == #x) * SLL_reverse_pre(#def, #x, #xs, #vs, #n, #var) } with variant: #var
+{ (x == #x) * SLL_reverse_pre(#x, #def, #xs, #vs, #n, #var) } with variant: #var
 function SLL_reverse(x){
   if (x != null) {
     t := [x + 1];
@@ -417,7 +417,7 @@ function SLL_reverse(x){
 //
 
 // General pre-condition
-predicate SLL_member_pre(def, +x, vs, var : Int) {
+predicate SLL_member_pre(+x, def, vs, var : Int) {
     (def == 2) * SLL_vals(x, vs) * (var == len vs);
     (def == 3) * SLL_incl(x, #xs, vs) * (var == len vs);
     (def == 4) * SLL_excl(x, #xs, vs) * (var == len vs)
@@ -430,7 +430,7 @@ predicate nounfold SLL_member_post(+def, +x, +vs) {
 }
 
 // Specified algorithm
-{ (x == #x) * (k == #k) * SLL_member_pre(#def, #x, #vs, #var) * list_member(#vs, #k, #r) } with variant: #var
+{ (x == #x) * (k == #k) * SLL_member_pre(#x, #def, #vs, #var) * list_member(#vs, #k, #r) } with variant: #var
 function SLL_member(x, k){
   found := false;
   if (x == null){
@@ -488,7 +488,7 @@ function SLL_member_iter(x, k) {
 //
 
 // General pre-condition
-predicate SLL_free_pre(def, +x, xs, var : Int) {
+predicate SLL_free_pre(+x, def, xs, var : Int) {
     (def == 0) * SLL_addrs_incl(x, xs) * (var == len xs);
     (def == 1) * SLL_addrs_excl(x, xs) * (var == len xs);
     (def == 3) * SLL_incl(x, xs, #vs) * (var == len xs);
@@ -504,7 +504,7 @@ predicate SLL_free_post(+def, +x, +xs) {
 }
 
 // Specified algorithm
-{ (x == #x) * SLL_free_pre(#def, #x, #xs, #var) } with variant: #var
+{ (x == #x) * SLL_free_pre(#x, #def, #xs, #var) } with variant: #var
 function SLL_free(x){
   if (x == null) {
     skip

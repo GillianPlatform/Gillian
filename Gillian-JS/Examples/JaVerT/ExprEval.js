@@ -153,7 +153,7 @@ function evalBinop (op, l1, l2) {
   @pred ExpressionStruct(+e:Obj, cat:Str) :
     JSObject(e) * DataProp(e, "type", "expr") * DataProp(e, "category", cat);
 
-  @pred ExpressionWithValue(+e:Obj, v, +bindings:Set, +vars:Set) :
+  @pred ExpressionWithValue(+e:Obj, +bindings:Set, +vars:Set, v) :
     ExpressionStruct(e, "lit") * DataProp(e, "val", v) * types(v : Num),
     ExpressionStruct(e, "lit") * DataProp(e, "val", v) * types(v : Bool),
 
@@ -161,21 +161,21 @@ function evalBinop (op, l1, l2) {
       ValidKey(#var_name) * ({{ #var_name, #v }} --e-- bindings) * (#var_name --e-- vars) * ValidVal(#v),
 
     ExpressionStruct(e, "unop") * DataProp(e, "op",  "-") * DataProp(e, "arg", #arg) *
-      ExpressionWithValue(#arg, #varg, bindings, vars) * types(#varg : Num) * (v == -#varg),
+      ExpressionWithValue(#arg, bindings, vars, #varg) * types(#varg : Num) * (v == -#varg),
     ExpressionStruct(e, "unop") * DataProp(e, "op",  "not") * DataProp(e, "arg", #arg) *
-      ExpressionWithValue(#arg, #varg, bindings, vars) * types(#varg : Bool) * (v == not #varg),
+      ExpressionWithValue(#arg, bindings, vars, #varg) * types(#varg : Bool) * (v == not #varg),
 
     ExpressionStruct(e, "binop") * DataProp(e, "op",  "+") * DataProp(e, "left", #left) * DataProp(e, "right", #right) *
-      ExpressionWithValue(#left, #vleft, bindings, vars) * ExpressionWithValue(#right, #vright, bindings, vars) *
+      ExpressionWithValue(#left, bindings, vars, #vleft) * ExpressionWithValue(#right, bindings, vars, #vright) *
       types(#vleft : Num) * types(#vright : Num) * (v == #vleft + #vright),
     ExpressionStruct(e, "binop") * DataProp(e, "op",  "-") * DataProp(e, "left", #left) * DataProp(e, "right", #right) *
-      ExpressionWithValue(#left, #vleft, bindings, vars) * ExpressionWithValue(#right, #vright, bindings, vars) *
+      ExpressionWithValue(#left, bindings, vars, #vleft) * ExpressionWithValue(#right, bindings, vars, #vright) *
       types(#vleft : Num) * types(#vright : Num) * (v == #vleft - #vright),
     ExpressionStruct(e, "binop") * DataProp(e, "op",  "and") * DataProp(e, "left", #left) * DataProp(e, "right", #right) *
-      ExpressionWithValue(#left, #vleft, bindings, vars) * ExpressionWithValue(#right, #vright, bindings, vars) *
+      ExpressionWithValue(#left, bindings, vars, #vleft) * ExpressionWithValue(#right, bindings, vars, #vright) *
       types(#vleft : Bool) * types(#vright : Bool) * (v == #vleft and #vright),
     ExpressionStruct(e, "binop") * DataProp(e, "op",  "or") * DataProp(e, "left", #left) * DataProp(e, "right", #right) *
-      ExpressionWithValue(#left, #vleft, bindings, vars) * ExpressionWithValue(#right, #vright, bindings, vars) *
+      ExpressionWithValue(#left, bindings, vars, #vleft) * ExpressionWithValue(#right, bindings, vars, #vright) *
       types(#vleft : Bool) * types(#vright : Bool) * (v == #vleft or #vright);
 */
 
@@ -186,14 +186,14 @@ function evalBinop (op, l1, l2) {
         scope(evalExpr  : #evalExpr)  * JSFunctionObject(#evalExpr,  "evalExpr",  _, _, _) *
         scope(evalUnop  : #evalUnop)  * JSFunctionObject(#evalUnop,  "evalUnop",  _, _, _) *
         scope(evalBinop : #evalBinop) * JSFunctionObject(#evalBinop, "evalBinop", _, _, _) *
-        ((store == #store) * (e == #e) * ExpressionWithValue(#e, #v, #bnds, #vars)) *
+        ((store == #store) * (e == #e) * ExpressionWithValue(#e, #bnds, #vars, #v)) *
         Map(#store, #mp, #bnds, #vars) * MapProto(#mp)
 
   @post (GlobalObject() * ObjectPrototype($lobj_proto) *
         scope(evalExpr : #evalExpr) * JSFunctionObject(#evalExpr, "evalExpr", _, _, _) *
         scope(evalUnop : #evalUnop) * JSFunctionObject(#evalUnop, "evalUnop", _, _, _) *
         scope(evalBinop : #evalBinop) * JSFunctionObject(#evalBinop, "evalBinop", _, _, _) *
-        ExpressionWithValue(#e, #v, #bnds, #vars) * (ret == #v) *
+        ExpressionWithValue(#e, #bnds, #vars, #v) * (ret == #v) *
         Map(#store, #mp, #bnds, #vars) * MapProto(#mp))
 */
 function evalExpr (store, e) {

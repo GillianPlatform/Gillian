@@ -78,7 +78,7 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
             (0 <# #aad_len) *
             (not (#buffer == NULL)) *
             (#definition == `Broken`) * (#errorMessage == `decodeEncryptionContext: Overflow, too much data.`) *
-            BRawEncryptionContext(#errorMessage, #buffer_content, #ECKs) *
+            BRawEncryptionContext(#buffer_content, #errorMessage, #ECKs) *
             any_aws_last_error()
 
         ensures:
@@ -104,7 +104,7 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
             (not (#buffer == NULL)) *
             (#definition == `Broken`) *
             (not (#errorMessage == `decodeEncryptionContext: Overflow, too much data.`)) *
-            BRawEncryptionContext(#errorMessage, #buffer_content, #ECKs) *
+            BRawEncryptionContext(#buffer_content, #errorMessage, #ECKs) *
             any_aws_last_error()
 
         ensures:
@@ -137,8 +137,8 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         return aws_raise_error(AWS_CRYPTOSDK_ERR_BAD_CIPHERTEXT);
 
     GILLIAN("assert [[bind #l_ec, #elem_count]] (elem_count == [#l_ec, 2]) * ARRAY(ptr(#l_ec, 0), int16, 1, [ #elem_count ]) ");
-    GILLIAN("assert [[bind #elementsDef, #elements, #esLength]] Elements(#elementsDef, #buffer_content, 2, #elem_count, 2, #elements, #esLength)");
-    GILLIAN("unfold Elements(#elementsDef, #buffer_content, 2, #elem_count, 2, #ECKS, #esLength)");
+    GILLIAN("assert [[bind #elementsDef, #elements, #esLength]] Elements(#buffer_content, 2, #elem_count, 2, #elementsDef, #elements, #esLength)");
+    GILLIAN("unfold Elements(#buffer_content, 2, #elem_count, 2, #elementsDef, #ECKS, #esLength)");
     GILLIAN("assert [[bind #lengthPtr]] (length == [#l, 2]) * (#lengthPtr == ptr(#l, 0))");
     GILLIAN(
         "assert [[bind #l_res_1, #l_res, #l_k_cursor, #l_v_cursor]] \
@@ -176,7 +176,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             // They are unique, so they can be put safely in the hashtable
             // The UTF8 condition is necessary for the hashtable strings to work
             // That information is required for the hash_table_put to work
-            "Elements(#elementsDef, #buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restEsLength) * \
+            "Elements(#buffer_content, 2 + #consumedLength, #togo, 2, #elementsDef, #restElements, #restEsLength) * \
             FirstProj(#elements, #keys) * \
             FirstProj(#consumedElements, #consumedKeys) * \
             FirstProj(#restElements, #restKeys) * \
@@ -201,7 +201,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             (was_created == [#l_wc, 4]) * ARRAY(ptr(#l_wc, 0), int, 1, [#wc_trash])");
     for (uint16_t i = 0; i < elem_count; i++) {
         uint16_t length;
-        GILLIAN("unfold Elements(#elementsDef, #buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restEsLength)");
+        GILLIAN("unfold Elements(#buffer_content, 2 + #consumedLength, #togo, 2, #elementsDef, #restElements, #restEsLength)");
         GILLIAN(
             "if (#elementsDef = `Complete`) {"
             "  unfold CElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength)"
@@ -307,7 +307,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
     }
 
     GILLIAN("assert #togo == 0");
-    GILLIAN("unfold Elements(#elementsDef, #buffer_content, (2 + #consumedLength), #togo, 2, #restElements, #restEsLength)");
+    GILLIAN("unfold Elements(#buffer_content, (2 + #consumedLength), #togo, 2, #elementsDef, #restElements, #restEsLength)");
     GILLIAN("unfold CElements(#buffer_content, (2 + #consumedLength), #togo, 2, #restElements, #restEsLength)");
 
     GILLIAN(

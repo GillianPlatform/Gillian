@@ -34,7 +34,7 @@ pred FrozenArrayStructure(a:Obj, arrayLength:Num) :
  **** Array of Uint8Arrays  ****
  *******************************)
 
-pred ArrayOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+pred ArrayOfUInt8ArraysContents(+a:Obj, +start:Num, +contentsLength:Num, contents:List) :
     (contentsLength == 0) * (contents == {{ }}),
 
     (contentsLength == l-len contents) *
@@ -46,17 +46,17 @@ pred ArrayOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLeng
     Uint8Array (#ui8a, #ab, 0, #viewSize) *
     ArrayBuffer(#ab, #element) *
     (#viewSize == l-len #element) *
-    ArrayOfUInt8ArraysContents(a, #rest, #rest_start, #rest_length);
+    ArrayOfUInt8ArraysContents(a, #rest_start, #rest_length, #rest);
 
     facts: (contentsLength == l-len contents);
 
 pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
     ArrayStructure(a, arrayLength) *
-    ArrayOfUInt8ArraysContents(a, contents, 0, arrayLength);
+    ArrayOfUInt8ArraysContents(a, 0, arrayLength, contents);
 
 (* ----------------------------------------------------------------------------------- *)
 
-pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, +start:Num, +contentsLength:Num, contents:List) :
     (contentsLength == 0) * (contents == {{ }}),
 
     (contentsLength == l-len contents) *
@@ -66,22 +66,22 @@ pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +cont
     DataProp(a, #index, #aui8a) *
     ArrayOfUInt8Arrays (#aui8a, #elementContents, _) *
     (#rest_start == start + 1) *
-    ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start, #rest_length);
+    ArrayOfArraysOfUInt8ArraysContents(a, #rest_start, #rest_length, #rest);
 
     facts: (contentsLength == l-len contents);
 
 pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List) :
     ArrayStructure(a, l-len contents) *
-    ArrayOfArraysOfUInt8ArraysContents(a, contents, 0, l-len contents);
+    ArrayOfArraysOfUInt8ArraysContents(a, 0, l-len contents, contents);
 
 lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLength)
 [[
-    ArrayOfArraysOfUInt8ArraysContents(#a, #contents, #start, #contentsLength) *
+    ArrayOfArraysOfUInt8ArraysContents(#a, #start, #contentsLength, #contents) *
     DataProp(#a, num_to_string (#start + #contentsLength), #aui8a) *
     ArrayOfUInt8Arrays (#aui8a, #elementContents, #elementLength)
 ]]
 [[
-    ArrayOfArraysOfUInt8ArraysContents(#a, l+ (#contents, {{ #elementContents }}), #start, #contentsLength + 1)
+    ArrayOfArraysOfUInt8ArraysContents(#a, #start, #contentsLength + 1, l+ (#contents, {{ #elementContents }}))
 ]]
 
 
