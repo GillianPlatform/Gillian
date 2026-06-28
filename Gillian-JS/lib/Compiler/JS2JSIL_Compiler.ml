@@ -416,26 +416,28 @@ let translate_multiplicative_binop x1 x2 x1_v x2_v aop err =
      [Infinity], [-Infinity] or [NaN] and never raises an exception. The
      [check_nonzero] guard that turns it into an error is therefore only
      emitted when the user opts in via the [--forbid-div-by-zero] flag. *)
-  let nonzero_err, nonzero_cmd =
+  let nonzero_cmds, nonzero_errs =
     match aop with
     | (JS_Parser.Syntax.Div | JS_Parser.Syntax.Mod)
       when !Javert_utils.Js_config.forbid_div_by_zero ->
-        make_check_nonzero_call (PVar x2_n) err
-    | _ -> ("", LBasic Skip)
+        let nonzero_err, nonzero_cmd =
+          make_check_nonzero_call (PVar x2_n) err
+        in
+        (* x2_n_n := "check_nonzero"(x2_n) with err *)
+        ([ (None, nonzero_cmd) ], [ nonzero_err ])
+    | _ -> ([], [])
   in
 
   let new_cmds =
     [
       (None, cmd_tn_x1);
       (*  x1_n := i__toNumber (x1_v) with err  *)
-      (None, cmd_tn_x2);
-      (*  x2_n := i__toNumber (x2_v) with err  *)
-      (None, nonzero_cmd);
-      (* x2_n_n := "check_nonzero"(x_2_n) with elab; *)
-      (None, cmd_ass_xr) (*  x_r := x1_n * x2_n                   *);
+      (None, cmd_tn_x2) (*  x2_n := i__toNumber (x2_v) with err  *);
     ]
+    @ nonzero_cmds
+    @ [ (None, cmd_ass_xr) (*  x_r := x1_n * x2_n  *) ]
   in
-  let new_errs = [ x1_n; x2_n; nonzero_err ] in
+  let new_errs = [ x1_n; x2_n ] @ nonzero_errs in
   (new_cmds, new_errs, x_r)
 
 let translate_binop_plus x1 x2 x1_v x2_v err =
