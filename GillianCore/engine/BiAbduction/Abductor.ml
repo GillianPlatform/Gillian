@@ -303,13 +303,13 @@ struct
           in
           L.verbose (fun m -> m "Running bi-abduction on %s\n" test.name);
           Fmt.pr "Testing %s... @?" test.name;
-          let start_time = Sys.time () in
+          let start_time = Unix.gettimeofday () in
           let rets =
             run_test
               (process_sym_exec_result prog test.name test.params test.state)
               prog test
           in
-          let end_time = Sys.time () in
+          let end_time = Unix.gettimeofday () in
           let stats =
             get_stats test.name (fun () ->
                 match Hashtbl.find_opt prog.prog.procs test.name with
@@ -352,7 +352,7 @@ struct
           String.compare name1 name2)
     in
 
-    Fmt.pr "Ok 3 - %f@." (Sys.time ());
+    Fmt.pr "Ok 3 - %f@." (Unix.gettimeofday ());
     if !Config.specs_to_stdout then (
       let bug_specs_txt =
         Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"

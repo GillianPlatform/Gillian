@@ -18,7 +18,7 @@ module Make
   module Common_args = Common_args.Make (PC)
   open Common_args
 
-  let start_time = ref (Sys.time ())
+  let start_time = ref (Unix.gettimeofday ())
 
   let json_ui =
     let doc = "Output some of the UI in JSON." in
@@ -95,7 +95,7 @@ module Make
         else result_before_leak_check
       in
       Printf.printf "Total time (Compilation + Symbolic testing): %fs\n"
-        (Sys.time () -. !start_time);
+        (Unix.gettimeofday () -. !start_time);
       print_json_results all_results;
       let first_error =
         List.find_map
@@ -194,7 +194,7 @@ module Make
       (e_prog, init_data, None)
 
   let process_files files already_compiled outfile_opt incremental =
-    let t = Sys.time () in
+    let t = Unix.gettimeofday () in
     let* e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled
     in
@@ -215,7 +215,7 @@ module Make
     let () =
       L.normal (fun m -> m "\n*** Stage 2: DONE transforming the program.\n")
     in
-    Printf.printf "Compilation time: %fs\n" (Sys.time () -. t);
+    Printf.printf "Compilation time: %fs\n" (Unix.gettimeofday () -. t);
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
     let prog' = MP.init_prog prog in
     run prog' init_data incremental source_files_opt
