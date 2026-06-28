@@ -185,7 +185,8 @@ let set_cell ~alloc_if_missing heap loc ofs v =
         | Some n ->
             let n = Expr.int n in
             let open Expr.Infix in
-            if%sat n <= ofs then error (UseAfterFree loc) else ok ()
+            if%sat n <= ofs then error (OutOfBounds (bound, loc, ofs))
+            else ok ()
       in
       let* { pfs; gamma; matching } = Delayed.leak_pc_copy () in
       let equality_test = Solver.is_equal ~matching ~pfs ~gamma in
