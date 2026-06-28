@@ -386,7 +386,6 @@ struct
             Fmt.(list ~sep:(any "@\n") (MP.pp_spec ~preds:prog.preds))
             (sort_specs succ_specs)));
 
-
     (* This is a hack to not count auxiliary functions that are bi-abduced *)
     let len_succ = List.length succ_specs in
     let auxiliaries =

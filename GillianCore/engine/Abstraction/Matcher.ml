@@ -592,8 +592,7 @@ module Make (State : SState.S) :
             (Some state) les
         in
         match state' with
-        | None ->
-            other_state_err "Produce Simple Assertion: Cannot produce types"
+        | None -> []
         | Some _ -> [ Ok { state; preds; wands; pred_defs } ])
     | Pred (pname, les) ->
         L.verbose (fun fmt -> fmt "Predicate assertion.");
@@ -655,13 +654,13 @@ module Make (State : SState.S) :
                     formula")
               opt_res
         | None ->
-            let v = subst_in_expr subst le in
-            L.verbose (fun m ->
-                m
-                  "UNHAPPY. update_store inside produce assertions with prog \
-                   variable: %s!!!\n"
-                  x);
-            Res_list.return (update_store astate x v))
+            if x = Names.return_variable then
+              let v = subst_in_expr subst le in
+              Res_list.return (update_store astate x v)
+            else
+              other_state_err
+                ("Produce Simple Assertion: Trying to produce un-substituted \
+                  PVar " ^ x))
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         let f' = SVal.SESubst.subst_in_expr subst ~partial:false f in
@@ -827,7 +826,7 @@ module Make (State : SState.S) :
     in
     L.verbose (fun m ->
         m
-          "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a]. \
+          "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a@]. \
            Args: @[<h>%a@]"
           pname
           Fmt.(list ~sep:comma Expr.pp)
@@ -862,6 +861,8 @@ module Make (State : SState.S) :
               m "Going to produce %d definitions with subst@\n%a"
                 (List.length (first_def :: rest_defs))
                 SVal.SESubst.pp subst_i);
+          L.tmi (fun m ->
+              m "%a" Fmt.(list ~sep:(any "\n;\n") Asrt.pp) definitions);
           let state' = State.add_spec_vars state new_spec_vars in
           let astate = { state = state'; preds; wands; pred_defs } in
           let rest_results =
@@ -1310,11 +1311,24 @@ module Make (State : SState.S) :
                 List.fold_left
                   (fun discharges (u, out) ->
                     let open Syntaxes.Result in
-                    let* discharges = discharges in
+                    let* discharges in
                     (* Perform the substitution in the out *)
                     let* out =
                       SVal.SESubst.subst_in_expr_opt subst out
                       |> Result_utils.of_option ~none:()
+                    in
+                    (* Special case: learning len x when we know x *)
+                    let discharges =
+                      match u with
+                      | Expr.UnOp (LstLen, u') -> (
+                          match SVal.SESubst.get subst u' with
+                          | None -> discharges
+                          | Some out' ->
+                              let new_discharges =
+                                Expr.BinOp (out, Equal, UnOp (LstLen, out'))
+                              in
+                              new_discharges :: discharges)
+                      | _ -> discharges
                     in
                     (* And add to e-subst *)
                     match SVal.SESubst.get subst u with

@@ -65,6 +65,7 @@ module SVal = struct
         make Expr.zero_i
     | F32 -> make (Lit (Num 0.))
     | F64 -> make (Lit (Num 0.))
+    | Ptr -> make Constants.nullptr
 
   let any_of_chunk (chunk : Chunk.t) : t Delayed.t =
     let make value = make ~chunk ~value in
@@ -85,6 +86,26 @@ module SVal = struct
       | F32 | F64 ->
           let learned_types = [ (lvar, Type.NumberType) ] in
           let learned = [] in
+          (learned_types, learned)
+      | Ptr ->
+          let lvar_block = LVar.alloc () in
+          let lvar_block_e = Expr.LVar lvar_block in
+          let lvar_offset = LVar.alloc () in
+          let lvar_offset_e = Expr.LVar lvar_offset in
+          let learned_types =
+            [
+              (lvar, Type.ListType);
+              (lvar_block, Type.ObjectType);
+              (lvar_offset, Type.IntType);
+            ]
+          in
+          let learned =
+            Expr.
+              [
+                BinOp
+                  (lvar_e, BinOp.Equal, EList [ lvar_block_e; lvar_offset_e ]);
+              ]
+          in
           (learned_types, learned)
     in
     Delayed.return ~learned_types ~learned (make lvar_e)

@@ -25,6 +25,14 @@ module type S = sig
   val get_type_env_vars : Type_env.t -> Variable.t list
   val get_pred_vars : Preds.t -> Variable.t list
   val get_pure_formulae_vars : PFS.t -> Variable.t list
+
+  val get_variables' :
+    ?add_heap_variables:
+      (memory -> Variable.ts -> (unit -> int) -> Variable.scope list) ->
+    t ->
+    memory astate ->
+    Logging.Report_id.t ->
+    Variable.scope list * Variable.ts
 end
 
 module type Make = functor

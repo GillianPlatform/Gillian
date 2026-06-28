@@ -90,7 +90,7 @@ module Make (Mem : MyMonadicSMemory.S) :
 
   (* Error handling *)
 
-  let get_recovery_tactic = Mem.get_recovery_tactic
+  let get_recovery_tactic { state; _ } = Mem.get_recovery_tactic state
   let can_fix e = Mem.can_fix e
 
   (* The rest of the functions remain unimplemented as Bi_abd makes no sense being an input to other transformers. *)

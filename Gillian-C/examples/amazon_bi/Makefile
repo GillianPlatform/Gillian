@@ -1,5 +1,5 @@
 ifdef GITHUB_ACTIONS
-	ACT=opam exec -- gillian-c act
+	ACT=gillian-c act
 else
 	ACT=dune exec -- gillian-c act
 endif

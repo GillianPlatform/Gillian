@@ -1,4 +1,5 @@
 module L = Logging
+module Gillian_result = Utils.Gillian_result
 
 let file_name = "./gillian-debugger.log"
 let rpc_ref : Debug_rpc.t option ref = ref None
@@ -129,23 +130,30 @@ let try' ~name f x =
       let err_json = err_json backtrace in
       let json = err_json @ json in
       log_async (fun m -> m ~json "[Error] %s" e);%lwt
-      raise (Failure e)
+      Lwt.reraise (Failure e)
   | (Failure e | Invalid_argument e) as err ->
       let backtrace = Printexc.get_backtrace () in
       let err_json = err_json backtrace in
       log_async (fun m -> m ~json:err_json "[Error] %s" e);%lwt
-      raise err
-  | Not_found ->
+      Lwt.reraise err
+  | Effect.Unhandled _ as err ->
       let backtrace = Printexc.get_backtrace () in
       let err_json = err_json backtrace in
-      log_async (fun m -> m ~json:err_json "[Error] Not found");%lwt
-      raise Not_found
-  | Effect.Unhandled _ as e ->
+      let s = Printexc.to_string err in
+      log_async (fun m -> m ~json:err_json "[Error] Unhandled effect\n%s" s);%lwt
+      Lwt.reraise err
+  | Gillian_result.Exc.Gillian_error e as err ->
       let backtrace = Printexc.get_backtrace () in
       let err_json = err_json backtrace in
-      let s = Printexc.to_string e in
+      log_async (fun m ->
+          m ~json:err_json "[Error] %a" Gillian_result.Error.pp e);%lwt
+      Lwt.reraise err
+  | err ->
+      let backtrace = Printexc.get_backtrace () in
+      let err_json = err_json backtrace in
+      let s = Printexc.to_string err in
       log_async (fun m -> m ~json:err_json "[Error] Unhandled exception\n%s" s);%lwt
-      raise e
+      Lwt.reraise err
 
 let set_rpc_command_handler rpc ?name ?(catchall = true) module_ f =
   let f x = if catchall then try' ~name f x else f x in

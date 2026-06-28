@@ -639,20 +639,24 @@ struct
       | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
 
     and eval_lcmds
+        ?(top = false)
         (prog : annot MP.prog)
         (lcmds : LCmd.t list)
         ?(annot : annot option = None)
         (state : State.t) : (State.t, state_err_t) Res_list.t =
       let open Res_list.Syntax in
       match lcmds with
-      | [] -> Res_list.return state
+      | [] ->
+          if top then
+            L.verbose (fun m -> m "LCMDs done with state:\n%a" pp_state_t state);
+          Res_list.return state
       | lcmd :: rest_lcmds ->
           let** new_state = eval_lcmd prog lcmd ?annot state in
-          eval_lcmds prog rest_lcmds ~annot new_state
+          eval_lcmds ~top prog rest_lcmds ~annot new_state
   end
 
   let evaluate_lcmd = Evaluate_lcmd.eval_lcmd
-  let evaluate_lcmds = Evaluate_lcmd.eval_lcmds
+  let evaluate_lcmds = Evaluate_lcmd.eval_lcmds ~top:true
 
   (** Evaluation of commands
 
@@ -776,7 +780,7 @@ struct
 
           let new_cs = if ix = 0 then cs else Call_stack.copy cs in
           let branch_case =
-            if has_branched then Some (SpecExec (fl, ix)) else None
+            if has_branched then Some (SpecExec fl, ix) else None
           in
 
           make_confcont ~state:ret_state ~callstack:new_cs
@@ -847,36 +851,26 @@ struct
           in
           L.verbose (fun fmt ->
               fmt "Run_spec returned %d Results" (List.length ret));
-          if ret = [] then
-            if spec.data.spec_incomplete then (
-              L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
-              symb_exec_proc ())
-            else
-              [
-                eval_state_to_err ~error_state:state
-                  ~errors:
-                    [
-                      EState
-                        (EOther
-                           (Fmt.str "Unable to use specification of function %s"
-                              spec.data.spec_name));
-                    ]
-                  eval_state;
-              ]
+          let successes, errors =
+            List.partition_map
+              (function
+                | Ok x -> Left x
+                | Error x -> Right (Exec_err.EState x))
+              ret
+          in
+          if errors != [] && spec.data.spec_incomplete then (
+            L.normal (fun fmt -> fmt "Proceeding with symbolic execution.");
+            symb_exec_proc ())
           else
-            let successes, errors =
-              List.partition_map
-                (function
-                  | Ok x -> Left x
-                  | Error x -> Right (Exec_err.EState x))
-                ret
-            in
             let spec_name = spec.data.spec_name in
+            let b_counter =
+              eval_state.b_counter + if List.is_empty successes then 0 else 1
+            in
             let success_confs =
               successes
               |> List.mapi (fun ix (ret_state, fl) ->
-                     process_ret pid j eval_state ix ret_state fl
-                       (eval_state.b_counter + 1) true spec_name)
+                     process_ret pid j eval_state ix ret_state fl b_counter true
+                       spec_name)
             in
             let error_confs =
               match errors with
@@ -1071,7 +1065,7 @@ struct
                        let r_e = Expr.EList (List.map Val.to_expr r_vs) in
                        let r_v = eval_expr r_e in
                        let r_state' = update_store r_state x r_v in
-                       let branch_case = LAction (ix + 1) in
+                       let branch_case = (LAction, ix + 1) in
                        make_confcont ~state:r_state'
                          ~callstack:(Call_stack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
@@ -1081,7 +1075,7 @@ struct
               let b_counter, branch_case =
                 match rest_rets with
                 | [] -> (b_counter, None)
-                | _ -> (b_counter + 1, Some (LAction 0))
+                | _ -> (b_counter + 1, Some (LAction, 0))
               in
               make_confcont ~state:state'' ~callstack:cs
                 ~invariant_frames:iframes ?branch_case ~prev_idx:i ~loop_ids
@@ -1124,7 +1118,8 @@ struct
                     List.mapi
                       (fun ix state ->
                         let branch_case =
-                          if num_states > 1 then Some (LActionFail ix) else None
+                          if num_states > 1 then Some (LActionFail, ix)
+                          else None
                         in
                         let cs = if ix = 0 then cs else Call_stack.copy cs in
                         make_confcont ~state ~callstack:cs
@@ -1218,7 +1213,7 @@ struct
               successes
               |> List.mapi (fun ix state ->
                      let branch_case =
-                       if has_branched then Some (LCmd ix) else None
+                       if has_branched then Some (LCmd, ix) else None
                      in
                      make_confcont ~state ~callstack:cs
                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
@@ -1297,8 +1292,8 @@ struct
                 ( List.map (fun x -> (x, j)) (State.assume state vt),
                   List.map (fun x -> (x, k)) (State.assume state' vf) )
         in
-        let sp_t = List.map (fun t -> (t, true)) sp_t in
-        let sp_f = List.map (fun f -> (f, false)) sp_f in
+        let sp_t = List.mapi (fun i t -> (t, true, i)) sp_t in
+        let sp_f = List.mapi (fun i f -> (f, false, i)) sp_f in
         let sp = sp_t @ sp_f in
 
         let b_counter =
@@ -1306,11 +1301,13 @@ struct
           else b_counter
         in
         List.mapi
-          (fun j ((state, next), case) ->
+          (fun j ((state, next), case, case_ix) ->
             make_confcont ~state
               ~callstack:(if j = 0 then cs else Call_stack.copy cs)
               ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
-              ~branch_count:b_counter ~branch_case:(GuardedGoto case) ())
+              ~branch_count:b_counter
+              ~branch_case:(GuardedGoto case, case_ix)
+              ())
           sp
 
       let eval_phi_assignment lxarr eval_state =
@@ -1869,16 +1866,9 @@ struct
       selector : conf_selector option;
     }
 
-    let log_confcont parent_id_ref is_first = function
+    let log_cmd_result = function
       | ConfCont
-          {
-            state;
-            callstack;
-            next_idx = proc_body_index;
-            branch_case;
-            prev_cmd_report_id;
-            _;
-          } ->
+          { state; callstack; next_idx = proc_body_index; branch_case; _ } ->
           let cmd_step : CmdResult.t =
             {
               callstack;
@@ -1888,35 +1878,29 @@ struct
               branch_case;
             }
           in
-          (* if is_first then (
-             prev_cmd_report_id
-             |> Option.iter (fun prev_report_id ->
-                    L.Parent.release !parent_id_ref;
-                    L.Parent.set prev_report_id;
-                    parent_id_ref := Some prev_report_id);
-             DL.log (fun m ->
-                 m
-                   ~json:[ ("conf", CmdResult.to_yojson cmd_step) ]
-                   "Debugger.evaluate_cmd_step: New ConfCont")); *)
-          ignore (parent_id_ref, is_first, prev_cmd_report_id);
-          CmdResult.log_result cmd_step |> ignore;
-          Some cmd_step
-      | _ -> None
+          let _ = CmdResult.log_result cmd_step in
+          ()
+      | ConfErr { callstack; proc_idx; error_state; errors; _ } ->
+          let _ =
+            CmdResult.log_result
+              {
+                callstack;
+                proc_body_index = proc_idx;
+                state = Some error_state;
+                errors;
+                branch_case = None;
+              }
+          in
+          ()
+      | _ -> ()
 
-    let continue_or_pause
-        ?(new_confs = false)
-        rest_confs
-        cont_func
-        eval_step_state =
+    let continue_or_pause ?(new_confs = false) confs cont_func eval_step_state =
       let { parent_id_ref; branch_path; _ } = eval_step_state in
-      match rest_confs with
+      let () = if new_confs then List.iter log_cmd_result confs in
+      match confs with
       | ConfCont { branch_path; _ } :: _ ->
-          rest_confs
-          |> List.iteri (fun i conf ->
-                 log_confcont parent_id_ref (i = 0) conf |> ignore);
           let new_branch_cases =
-            if new_confs then
-              rest_confs |> List.filter_map CConf.get_branch_case
+            if new_confs then List.filter_map CConf.get_branch_case confs
             else []
           in
           Continue

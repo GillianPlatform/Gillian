@@ -4,12 +4,6 @@ module Prefix : sig
   (** This module contains the prefix for different kind of strings that are
       generated during compilation *)
 
-  (** Prefix for generated variables *)
-  val gvar : string
-
-  (** Prefix for generated symbolic variables *)
-  val sgvar : string
-
   (** Prefix for loop invariant labels *)
   val loopinv_lab : string
 

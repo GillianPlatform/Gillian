@@ -48,7 +48,7 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
-  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
@@ -303,18 +303,23 @@ module Make (State : SState.S) :
       (x : string option)
       (args : vt list)
       (astate : t) : (t * Flag.t, SMatcher.err_t) Res_list.t =
+    let open Res_list.Syntax in
+    let open Syntaxes.List in
     L.verbose (fun m ->
         m "INSIDE RUN spec of %s (%d more) with the following MP:@\n%a@\n" name
           (List.length more_specs) MP.pp mp);
     let old_store = get_store astate in
-    let new_store =
-      try SStore.init (List.combine params args)
+    let** new_store =
+      try SStore.init (List.combine params args) |> Res_list.return
       with Invalid_argument _ ->
-        Fmt.failwith
-          "Running spec of %s which takes %i parameters with the following %i \
-           arguments : %a"
-          name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
-          args
+        let msg =
+          Fmt.str
+            "Running spec of %s which takes %i parameters with the following \
+             %i arguments : %a"
+            name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
+            args
+        in
+        Res_list.error_with (StateErr.EOther msg)
     in
 
     let astate' = set_store astate new_store in
@@ -331,8 +336,6 @@ module Make (State : SState.S) :
         m "About to use the spec of %s with the following MP:@\n%a@\n" name
           MP.pp mp);
 
-    let open Res_list.Syntax in
-    let open Syntaxes.List in
     let res = SMatcher.match_ astate' subst mp (FunctionCall name) in
     if List.exists Result.is_error res then
       L.normal (fun m ->
@@ -369,10 +372,14 @@ module Make (State : SState.S) :
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
-    let+ final_state = final_states in
-    match SMatcher.unfold_concrete_preds final_state with
-    | Some (_, with_unfolded_concrete) -> Ok (with_unfolded_concrete, fl)
-    | None -> raise (Internal_State_Error ([], final_state))
+    final_states
+    |> List.filter_map @@ fun final_state ->
+       match SMatcher.unfold_concrete_preds final_state with
+       | Some (_, with_unfolded_concrete) ->
+           Some (Ok (with_unfolded_concrete, fl))
+       | None ->
+           L.verbose (fun m -> m "WARNING: late unsat");
+           None
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
@@ -623,22 +630,25 @@ module Make (State : SState.S) :
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
     let vars_to_forget = SS.inter state_lvars (SS.of_list lvar_binders) in
-    if vars_to_forget <> SS.empty then (
-      let oblivion_subst = fresh_subst vars_to_forget in
-      L.verbose (fun m ->
-          m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
-            vars_to_forget SVal.SESubst.pp oblivion_subst);
+    let astate =
+      if vars_to_forget <> SS.empty then (
+        let oblivion_subst = fresh_subst vars_to_forget in
+        L.verbose (fun m ->
+            m "Forget @[%a@] with subst: %a"
+              Fmt.(iter ~sep:comma SS.iter string)
+              vars_to_forget SVal.SESubst.pp oblivion_subst);
 
-      (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
-      let subst_in_place =
-        substitution_in_place ~subst_all:true oblivion_subst astate
-      in
-      assert (List.length subst_in_place = 1);
-      let astate = List.hd subst_in_place in
+        (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+        let subst_in_place =
+          substitution_in_place ~subst_all:true oblivion_subst astate
+        in
+        assert (List.length subst_in_place = 1);
+        let astate = List.hd subst_in_place in
 
-      L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate))
-    else ();
+        L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate);
+        astate)
+      else astate
+    in
     let mp =
       match mp with
       | Error asrts ->
@@ -664,6 +674,7 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let** new_state, subst', _ =
+      L.verbose (fun m -> m "State before matching:@\n@[%a@]\n" pp astate);
       let+ result = SMatcher.match_ astate subst mp Invariant in
       match result with
       | Ok state -> Ok state
@@ -1128,16 +1139,23 @@ module Make (State : SState.S) :
       (astate : t)
       (subst : st)
       (mp : MP.t)
-      (match_type : Matcher.match_kind) : bool =
+      (match_type : Matcher.match_kind) : bool option =
     if !Config.under_approximation then
       failwith
         "WE CAN'T CHECK IF SOMETHING FULLY MATCHES IN UNDER-APPROXIMATION MODE";
     let matching_results = SMatcher.match_ astate subst mp match_type in
-    let success = List.for_all Result.is_ok matching_results in
-    L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success);
-    if List.is_empty matching_results then
-      L.verbose (fun fmt -> fmt "PSTATE.matches: vacuously successful");
-    success
+    match matching_results with
+    | [] ->
+        let () =
+          L.verbose (fun fmt -> fmt "PSTATE.matches: vacuously successful")
+        in
+        None
+    | _ ->
+        let success = List.for_all Result.is_ok matching_results in
+        let () =
+          L.verbose (fun fmt -> fmt "PSTATE.matches: Success: %b" success)
+        in
+        Some success
 
   let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
     State.unfolding_vals astate.state fs

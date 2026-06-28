@@ -1,7 +1,7 @@
 type t = {
   type_ : Irep.t;
   value : Irep.t;
-  location : Irep.t;
+  location : Yojson.Safe.t;
   name : string;
   module_ : string;
   base_name : string;
@@ -31,7 +31,7 @@ let of_yojson json =
   let ( $$ ) x y = x $ Id.to_string y in
   let type_ = Irep.of_yojson (json $$ Type) in
   let value = Irep.of_yojson (json $$ Value) in
-  let location = Irep.of_yojson (json $ "location") in
+  let location = json $ "location" in
   let name = J.to_string (json $$ Name) in
   let module_ = J.to_string (json $$ Module) in
   let base_name = J.to_string (json $ "baseName") in

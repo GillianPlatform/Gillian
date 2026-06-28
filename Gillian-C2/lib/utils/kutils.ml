@@ -6,15 +6,27 @@ module J = struct
   exception Parse_error of Yojson.Safe.t * string
 
   let ( $ ) x y = member y x
+
+  let ( $? ) (x, y) f =
+    match member y x with
+    | `Null -> None
+    | j -> Some (f j)
+
   let parse_error j msg = raise (Parse_error (j, msg))
 
   let catch_type_error (f : 'a -> 'b) : 'a -> 'b =
    fun x -> try f x with Type_error (s, j) -> parse_error j s
 
+  let string_to_int j =
+    match int_of_string_opt (to_string j) with
+    | Some i -> i
+    | None -> parse_error j "Expected int string"
+
   let to_string = catch_type_error to_string
   let to_bool = catch_type_error to_bool
   let to_list = catch_type_error to_list
   let to_assoc = catch_type_error to_assoc
+  let string_to_int = catch_type_error string_to_int
 end
 
 let z_of_hex s =

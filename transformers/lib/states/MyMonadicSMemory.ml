@@ -70,7 +70,7 @@ module type S = sig
 
   (** The recovery tactic to attempt to resolve an error, by eg. unfolding
       predicates *)
-  val get_recovery_tactic : err_t -> Expr.t Recovery_tactic.t
+  val get_recovery_tactic : t -> err_t -> Expr.t Recovery_tactic.t
 
   (** The set of logical variables in the state *)
   val lvars : t -> Containers.SS.t
@@ -151,19 +151,22 @@ module Make (Mem : S) (ID : ID) :
 
   (* Wrap action / consume / produce with a nice type *)
 
-  let execute_action ~(action_name : string) (state : t) (args : vt list) :
-      action_ret Delayed.t =
+  let[@inline] execute_action
+      ~(action_name : string)
+      (state : t)
+      (args : vt list) : action_ret Delayed.t =
     match action_from_str action_name with
     | Some action -> execute_action action state args
     | None -> failwith ("Action not found: " ^ action_name)
 
-  let consume ~(core_pred : string) (state : t) (args : vt list) :
+  let[@inline] consume ~(core_pred : string) (state : t) (args : vt list) :
       action_ret Delayed.t =
     match pred_from_str core_pred with
     | Some pred -> consume pred state args
     | None -> failwith ("Predicate not found: " ^ core_pred)
 
-  let produce ~(core_pred : string) (state : t) (args : vt list) : t Delayed.t =
+  let[@inline] produce ~(core_pred : string) (state : t) (args : vt list) :
+      t Delayed.t =
     match pred_from_str core_pred with
     | Some pred -> produce pred state args
     | None -> failwith ("Predicate not found: " ^ core_pred)
@@ -183,6 +186,5 @@ module Make (Mem : S) (ID : ID) :
   (* Override methods to keep implementations light *)
   let clear _ = empty ()
   let pp_err = pp_err_t
-  let get_recovery_tactic _ = get_recovery_tactic
   let pp_by_need _ = pp
 end

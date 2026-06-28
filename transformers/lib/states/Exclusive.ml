@@ -33,7 +33,7 @@ let pred_to_str = function
 let list_preds () = [ (Ex, [], [ "value" ]) ]
 let empty () : t = None
 
-let execute_action action s args =
+let[@inline] execute_action action s args =
   match (action, s, args) with
   | _, None, _ -> DR.error MissingState
   | Load, Some v, [] -> DR.ok (Some v, [ v ])
@@ -42,13 +42,13 @@ let execute_action action s args =
       Fmt.failwith "Invalid action %s with state %a and args %a"
         (action_to_str a) pp s (Fmt.Dump.list Expr.pp) args
 
-let consume core_pred s args =
+let[@inline] consume core_pred s args =
   match (core_pred, s, args) with
   | Ex, Some v, [] -> DR.ok (None, [ v ])
   | Ex, None, _ -> DR.error MissingState
   | Ex, _, _ -> failwith "Invalid PointsTo consume"
 
-let produce core_pred s args =
+let[@inline] produce core_pred s args =
   match (core_pred, s, args) with
   | Ex, None, [ v ] -> Delayed.return (Some v)
   | Ex, Some _, _ -> Delayed.vanish ()
@@ -91,7 +91,7 @@ let assertions = function
   | Some v -> [ (Ex, [], [ v ]) ]
 
 let assertions_others _ = []
-let get_recovery_tactic _ = Recovery_tactic.none
+let get_recovery_tactic _ _ = Recovery_tactic.none
 let can_fix MissingState = true
 
 let get_fixes MissingState =

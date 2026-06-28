@@ -1,4 +1,4 @@
-module Hashset = Utils.Prelude.Hashset
+open Utils.Prelude
 
 let should_be_filtered = function
   (* The next 4 names contain arrays of size infinity.
@@ -18,8 +18,9 @@ module Global_var = struct
     type_ : Type.t;
     symbol : string;
     value : Expr.t option;
-    location : Location.t;
+    location : Location.t option;
   }
+  [@@deriving to_yojson]
 end
 
 module Func = struct
@@ -29,10 +30,12 @@ module Func = struct
         (** If the body is empty, it means that the function is not defined, and
             it should return nondet *)
     return_type : Type.t;
-    location : Location.t;
+    location : Location.t option;
     symbol : string;
     internal : bool;
+    param_map : (string * string) list;
   }
+  [@@deriving to_yojson]
 end
 
 type t = {
@@ -44,6 +47,7 @@ type t = {
   struct_tags : (string, string) Hashtbl.t;
   unevaluated_funcs : string Hashset.t;
 }
+[@@deriving to_yojson]
 
 let add_struct_tag struct_tags (sym : Irep_lib.Symbol.t) =
   let open Irep_lib.Irep.Infix in
@@ -67,6 +71,13 @@ let add_struct_tag struct_tags (sym : Irep_lib.Symbol.t) =
    Hashtbl.add struct_tags id typedef)
   |> ignore
 
+let mk_pvar_map params =
+  params
+  |> List.filter_map @@ fun Param.{ base_name; identifier; _ } ->
+     match (base_name, identifier) with
+     | Some b, Some i -> Some (b, i)
+     | _ -> None
+
 let of_symtab ~machine (symtab : Symtab.t) : t =
   let env =
     {
@@ -84,12 +95,17 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
          (* A bit hacky, not sure which should be kept and which shouldn't... *)
          if should_be_filtered name then ()
          else
+           let () = Logging.tmi (fun m -> m "Processing symbol %s" name) in
            let () =
              if name <> sym.base_name then
                Hashtbl.add env.base_names name sym.base_name
            in
            let () = add_struct_tag env.struct_tags sym in
-           let location = Location.of_irep sym.location in
+           let location =
+             match sym.location with
+             | `Assoc [] -> None
+             | _ -> Some (Location.of_yojson sym.location)
+           in
            let type_ = Type.of_irep ~machine sym.type_ in
            let value = SymbolValue.of_irep ~machine ~type_ sym.value in
            if sym.is_type then Hashtbl.add env.types name type_
@@ -108,6 +124,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
                    | Expr _ ->
                        Gerror.unexpected "function body is not a statment"
                  in
+                 let param_map = mk_pvar_map params in
                  let func =
                    Func.
                      {
@@ -117,6 +134,7 @@ let of_symtab ~machine (symtab : Symtab.t) : t =
                        location;
                        body;
                        internal = false;
+                       param_map;
                      }
                  in
                  let () =

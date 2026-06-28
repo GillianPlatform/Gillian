@@ -11,6 +11,17 @@ let results_dir, set_result_dir =
   ((fun () -> !rd), fun r -> rd := r)
 
 let file_content_overrides : (string, string) Hashtbl.t = Hashtbl.create 0
+
+let with_lexbuf file f =
+  match Hashtbl.find_opt file_content_overrides file with
+  | Some content -> Lexing.from_string content |> f
+  | None ->
+      let inx = open_in file in
+      let lexbuf = Lexing.from_channel inx in
+      let x = f lexbuf in
+      let () = close_in inx in
+      x
+
 let entry_point = ref "main"
 let json_ui = ref false
 let ci = ref false

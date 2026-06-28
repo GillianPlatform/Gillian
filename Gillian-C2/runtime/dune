@@ -3,8 +3,6 @@
   (site
    (gillian-c2 runtime)))
  (files
-  archi32_constants.gil
-  archi64_constants.gil
   global_environment_common.gil
   internal_binops.gil
   internal_unops.gil
@@ -13,5 +11,6 @@
   internals.gil
   internals_act.gil
   rust_allocation_internals.gil
-  string.gil)
+  string.gil
+  logic_common.gil)
  (package gillian-c2))
