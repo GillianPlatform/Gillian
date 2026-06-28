@@ -1,0 +1,4 @@
+(library
+ (name transformers_abductor)
+ (public_name transformers.abductor)
+ (libraries gillian states))

@@ -253,3 +253,27 @@ let add_macro (prog : ('a, 'b) t) (macro : Macro.t) : ('a, 'b) t =
 let add_bispec (prog : ('a, 'b) t) (bi_spec : BiSpec.t) : ('a, 'b) t =
   Hashtbl.add prog.bi_specs bi_spec.bispec_name bi_spec;
   prog
+
+let make_callgraph (prog : ('a, 'b) t) =
+  let fcalls =
+    Hashtbl.fold
+      (fun _ proc acc ->
+        Proc.(proc.proc_name, proc.proc_aliases, proc.proc_calls) :: acc)
+      prog.procs []
+  in
+  let call_graph = Call_graph.make () in
+  let fnames = Hashtbl.create (List.length fcalls * 2) in
+  fcalls
+  |> List.iter (fun (sym, aliases, _) ->
+         Call_graph.add_proc call_graph sym;
+         Hashtbl.add fnames sym sym;
+         aliases |> List.iter (fun alias -> Hashtbl.add fnames alias sym));
+  fcalls
+  |> List.iter (fun (caller, _, callees) ->
+         callees
+         |> List.iter (fun callee ->
+                match Hashtbl.find_opt fnames callee with
+                | Some callee ->
+                    Call_graph.add_proc_call call_graph caller callee
+                | None -> ()));
+  call_graph

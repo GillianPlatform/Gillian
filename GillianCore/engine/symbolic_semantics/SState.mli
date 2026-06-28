@@ -13,6 +13,14 @@ module type S = sig
     spec_vars:SS.t ->
     t
 
+  val make_s_from_heap :
+    heap:heap_t ->
+    store:store_t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    spec_vars:SS.t ->
+    t
+
   val init : init_data -> t
   val get_init_data : t -> init_data
   val clear_resource : t -> t

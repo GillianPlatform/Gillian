@@ -98,7 +98,7 @@ module Make (FracA : FracA_S) = struct
 
   type err_t = err [@@deriving show, yojson]
   type action = Load | Store
-  type pred = Frac
+  type pred = Frac [@@deriving yojson]
 
   let action_from_str = function
     | "load" -> Some Load

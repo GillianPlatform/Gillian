@@ -20,6 +20,7 @@ val if_sure : Expr.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
 val branch_entailment : (Expr.t * (unit -> 'a t)) list -> 'a t
 val leak_pc_copy : unit -> Engine.Gpc.t t
 val branch_on : Expr.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
+val assume_types : (Expr.t * Type.t) list -> unit t
 
 module Syntax : sig
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t

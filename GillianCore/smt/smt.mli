@@ -1,6 +1,7 @@
 open Gil_syntax
 
 exception SMT_unknown
+exception SMT_error of string
 
 val exec_sat : Expr.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
 val is_sat : Expr.Set.t -> (string, Type.t) Hashtbl.t -> bool
