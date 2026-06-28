@@ -3,7 +3,12 @@ open Cmdliner
 let burn_jsil = ref false
 
 module TargetLangOptions = struct
-  type t = { jsil : bool; harness : bool; burn_jsil : bool }
+  type t = {
+    jsil : bool;
+    harness : bool;
+    burn_jsil : bool;
+    forbid_div_by_zero : bool;
+  }
 
   let term =
     let docs = Manpage.s_common_options in
@@ -13,13 +18,24 @@ module TargetLangOptions = struct
     let harness = Arg.(value & flag & info [ "harness" ] ~docs ~doc) in
     let doc = "If you want to write the intermediate JSIL file" in
     let burn_jsil = Arg.(value & flag & info [ "burn-jsil" ] ~docs ~doc) in
-    let f jsil harness burn_jsil = { jsil; harness; burn_jsil } in
-    Term.(const f $ jsil $ harness $ burn_jsil)
+    let doc =
+      "Treat division and modulo by zero as a runtime error. Division by zero \
+       is well-defined in JavaScript (it yields Infinity/NaN); this flag makes \
+       it raise an error instead, which is useful for bug-finding."
+    in
+    let forbid_div_by_zero =
+      Arg.(value & flag & info [ "forbid-div-by-zero" ] ~docs ~doc)
+    in
+    let f jsil harness burn_jsil forbid_div_by_zero =
+      { jsil; harness; burn_jsil; forbid_div_by_zero }
+    in
+    Term.(const f $ jsil $ harness $ burn_jsil $ forbid_div_by_zero)
 
-  let apply { jsil; harness; burn_jsil = conf_burn_jsil } =
+  let apply { jsil; harness; burn_jsil = conf_burn_jsil; forbid_div_by_zero } =
     burn_jsil := conf_burn_jsil;
     Javert_utils.Js_config.js := not jsil;
-    Javert_utils.Js_config.js2jsil_harnessing := harness
+    Javert_utils.Js_config.js2jsil_harnessing := harness;
+    Javert_utils.Js_config.forbid_div_by_zero := forbid_div_by_zero
 end
 
 type init_data = unit

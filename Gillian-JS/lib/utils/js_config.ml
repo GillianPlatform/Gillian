@@ -13,6 +13,12 @@ let js2jsil_line_numbers = ref false
 let js2jsil_sep_procs = ref false
 let unfolding = ref true
 
+(** When set, compile division and modulo by zero to a runtime error. Division
+    by zero is well-defined in JavaScript (it yields [Infinity]/[NaN]), so this
+    is off by default and only enabled via [--forbid-div-by-zero] for
+    bug-finding. *)
+let forbid_div_by_zero = ref false
+
 (** {2 Legacy config that is still used} *)
 
 let cosette = ref false
