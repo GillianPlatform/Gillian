@@ -1,6 +1,6 @@
 predicate tree(+t) {
     (t == null);
-    (t -b-> #v, #left, #right) * tree(#left) * tree(#right)
+    (t -b> #v, #left, #right) * tree(#left) * tree(#right)
 }
 
 { (x == #x) * tree(#x) }
@@ -10,7 +10,7 @@ function tree_dispose(x) {
     z := [x+2];
     u := tree_dispose(y);
     u := tree_dispose(z);
-    delete(x)
+    free(x)
   } else {
     skip
   };

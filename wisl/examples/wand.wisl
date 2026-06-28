@@ -31,27 +31,27 @@ predicate xpt(+x) {
 
 
 predicate leq_five(+x) {
-  x <=# 5
+  (x <= 5)
 }
 
 predicate eq_five(+x) {
-  x == 5
+  (x == 5)
 }
 
 predicate leq_six(+x) {
-  x <=# 6
+  (x <= 6)
 }
 
 lemma pure_wand {
   statement:
-    forall x. (5 <=# x) |- (leq_five(x) -* eq_five(x))
+    forall x. (5 <= x) |- (leq_five(x) -* eq_five(x))
   proof:
     package (leq_five(x) -* eq_five(x))
 }
 
 lemma pure_wand_fail {
   statement:
-    forall x. (5 <=# x) |- (leq_six(x) -* eq_five(x))
+    forall x. (5 <= x) |- (leq_six(x) -* eq_five(x))
   proof:
     package (leq_six(x) -* eq_five(x))
 }

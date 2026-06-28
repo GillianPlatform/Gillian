@@ -34,3 +34,22 @@ printf "\n\n"
 echo "--- testing BST ---"
 $WPST symbolic/bst.c -l disabled
 printf "\n\n"
+
+echo "--- testing globalvar ---"
+$WPST symbolic/globalvar.c -l disabled
+printf "\n\n"
+
+echo "--- testing unstructured ---"
+$WPST symbolic/unstructured.c -l disabled
+printf "\n\n"
+
+# Expected-failure test: array_oob.c contains an out-of-bounds bug that
+# symbolic testing must catch, so a zero exit code here is itself a failure.
+echo "--- testing array_oob (expect failure: out-of-bounds bug) ---"
+if $WPST symbolic/bug_examples/array_oob.c -l disabled; then
+  echo "ERROR: expected array_oob.c to fail, but it succeeded"
+  exit 1
+else
+  echo "(failed as expected)"
+fi
+printf "\n\n"

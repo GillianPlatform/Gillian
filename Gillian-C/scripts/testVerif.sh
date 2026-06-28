@@ -23,3 +23,15 @@ printf "\n\n"
 echo "--- verifying sort ---"
 $VERIFY verification/sort.c -l disabled
 printf "\n\n"
+
+echo "--- verifying vector ---"
+$VERIFY verification/vector.c -l disabled
+printf "\n\n"
+
+echo "--- verifying array ---"
+$VERIFY verification/array.c -l disabled
+printf "\n\n"
+
+echo "--- verifying batch ---"
+$VERIFY verification/batch.c -l disabled
+printf "\n\n"
