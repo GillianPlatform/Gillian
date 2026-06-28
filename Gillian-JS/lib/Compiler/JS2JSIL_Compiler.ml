@@ -412,9 +412,14 @@ let translate_multiplicative_binop x1 x2 x1_v x2_v aop err =
     LBasic (Assignment (x_r, BinOp (PVar x1_n, jsil_aop, PVar x2_n)))
   in
 
+  (* In JavaScript, division (and modulo) by zero is well-defined: it yields
+     [Infinity], [-Infinity] or [NaN] and never raises an exception. The
+     [check_nonzero] guard that turns it into an error is therefore only
+     emitted when the user opts in via the [--forbid-div-by-zero] flag. *)
   let nonzero_err, nonzero_cmd =
     match aop with
-    | JS_Parser.Syntax.Div | JS_Parser.Syntax.Mod ->
+    | (JS_Parser.Syntax.Div | JS_Parser.Syntax.Mod)
+      when !Javert_utils.Js_config.forbid_div_by_zero ->
         make_check_nonzero_call (PVar x2_n) err
     | _ -> ("", LBasic Skip)
   in
