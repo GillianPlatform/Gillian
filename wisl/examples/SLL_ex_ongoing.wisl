@@ -57,7 +57,7 @@ predicate SLL_len(+x, n : Int) {
 // With length
 predicate SLLseg_len(+x, y, n : Int) {
   (x == y) * (n == 0);
-  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n)
+  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 < n)
 }
 
 // With values
@@ -146,7 +146,7 @@ lemma SLLseg_vals_to_SLL_vals {
 lemma SLLseg_len_append_lr {
   statement:
     forall x.
-      SLLseg_len(#x, #y, #n) * (#y -b> #v, #z) |- SLLseg_len(#x, #z, #n + 1) * (0 <=# #n)
+      SLLseg_len(#x, #y, #n) * (#y -b> #v, #z) |- SLLseg_len(#x, #z, #n + 1) * (0 <= #n)
 
   variant: #n
 
@@ -163,7 +163,7 @@ lemma SLLseg_len_append_lr {
 lemma SLLseg_len_append_rl {
   statement:
     forall x.
-      SLLseg_len(#x, #z, #n + 1) * (0 <=# #n) |- SLLseg_len(#x, #y, #n) * (#y -b> #v, #z)
+      SLLseg_len(#x, #z, #n + 1) * (0 <= #n) |- SLLseg_len(#x, #y, #n) * (#y -b> #v, #z)
 
   variant: #n
 
@@ -461,7 +461,7 @@ function SLL_member_iter(x, k) {
            list_member(#beta, k, found) * list_member(#gamma, k, #rg)
      with variant: (len #gamma) ]] ;
   while ((found == false) && (next != null)) {
-    [[ assert found == false ]];
+    [[ assert (found == false) ]];
     [[ assert {bind: #v} next -> #v ]];
     v := [ next ];
     found := (v == k);

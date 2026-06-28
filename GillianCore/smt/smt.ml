@@ -607,7 +607,9 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | FPlus -> num_add (get_num p1) (get_num p2) >- NumberType
   | FMinus -> num_sub (get_num p1) (get_num p2) >- NumberType
   | FTimes -> num_mul (get_num p1) (get_num p2) >- NumberType
-  | FDiv -> num_div (get_num p1) (get_num p2) >- NumberType
+  (* Numbers are encoded as reals, so float division must use SMT-LIB real
+     division ["/" *)
+  | FDiv -> app_ "/" [ get_num p1; get_num p2 ] >- NumberType
   | FLessThan -> num_lt (get_num p1) (get_num p2) >- BooleanType
   | FLessThanEqual -> num_leq (get_num p1) (get_num p2) >- BooleanType
   | Equal -> encode_equality p1 p2

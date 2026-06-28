@@ -888,7 +888,8 @@ let is_builtin_func func_name =
   List.mem func_name builtins
 
 let is_gil_func func_name exec_mode =
-  Exec_mode.is_symbolic_exec exec_mode
+  (Exec_mode.is_symbolic_exec exec_mode
+  || Exec_mode.is_verification_exec exec_mode)
   && (String.equal func_name Builtin_Functions.assume_f
      || String.equal func_name Builtin_Functions.assert_f)
 

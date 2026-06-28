@@ -52,7 +52,7 @@ lemma list_member_concat {
 }
 
 // 00. Allocating an SLL node with the given value
-{ v == #v }
+{ (v == #v) }
 function SLL_allocate_node(v){
   t := new(2);
   [t] := v;
@@ -146,7 +146,7 @@ function SLL_length(x) {
   };
   return n
 }
-{ ret == len(#vs) }
+{ (ret == len(#vs)) }
 
 // 07. Reversing a given SLL
 { (x == #x) *  SLL(#x, #vs) }
@@ -296,7 +296,7 @@ function SLL_append_iter(x, k){
           SLLseg(head, prev, #vs1) * (prev -b> #v, next) * SLL(next,  #vs2) *
            (#vx == #vs1 @ (#v :: #vs2)) ]];
     while(next != null){
-      [[ assert {bind: #prev} prev == #prev ]];
+      [[ assert {bind: #prev} (prev == #prev) ]];
       prev := next;
       next := [next + 1];
       [[ apply SLLseg_append(head,  #vs1, #v, prev) ]]
@@ -324,7 +324,7 @@ function SLL_append_node_iter(x, y){
           SLLseg(head, prev, #vs1) * (prev -b> #v, next) * SLL(next,  #vs2) *
            (#vx == #vs1 @ (#v :: #vs2)) ]];
     while(next != null){
-      [[ assert {bind: #prev} prev == #prev ]];
+      [[ assert {bind: #prev} (prev == #prev) ]];
       prev := next;
       next := [next + 1];
       [[ apply SLLseg_append(head,  #vs1, #v, prev) ]]
@@ -352,7 +352,7 @@ function SLL_concat_iter(x, y){
           SLLseg(head, prev, #vs1) * (prev -b> #v, next) * SLL(next,  #vs2) *
            (#vx == #vs1 @ (#v :: #vs2)) ]];
     while (next != null) {
-        [[ assert {bind: #prev} prev == #prev ]];
+        [[ assert {bind: #prev} (prev == #prev) ]];
         prev := next;
         next := [next + 1];
         [[ apply SLLseg_append(head,  #vs1, #v, prev) ]]
@@ -413,7 +413,7 @@ function SLL_length_iter(x) {
       SLLseg(x, y,  #nvx) * SLL(y, #nvy) *
          (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
   while (y != null) {
-    [[ assert {bind: #y} y == #y ]];
+    [[ assert {bind: #y} (y == #y) ]];
     [[ assert {bind: #v, #z} #y -b> #v, #z ]];
     y := [y+1];
     n := n+1;
@@ -451,8 +451,8 @@ function SLL_member_iter(x, k) {
          (#alpha == (#beta @ #gamma)) * (#r == (found || #rg)) *
            list_member(#beta, k, found) * list_member(#gamma, k, #rg) ]];
   while ((found == false) && (next != null)){
-    [[ assert found == false ]];
-    [[ assert {bind: #next} next == #next ]];
+    [[ assert (found == false) ]];
+    [[ assert {bind: #next} (next == #next) ]];
     [[ assert {bind: #v, #z} #next -b> #v, #z ]];
     v := [next];
     found := (v == k);
