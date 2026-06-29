@@ -204,7 +204,7 @@ module CAssert = struct
         constr : CConstructor.t;
         typ : points_to_type;
       }
-    | Pred of string * CExpr.t list
+    | Pred of string * CExpr.t list * CExpr.t list
     | Emp
 
   let rec pp fmt a =
@@ -229,7 +229,9 @@ module CAssert = struct
         in
         Format.fprintf fmt "(%a -%s> %a)" CExpr.pp ptr (string_of_typ typ)
           CConstructor.pp constr
-    | Pred (s, el) -> Format.fprintf fmt "%s(%a)" s (pp_list CExpr.pp) el
+    | Pred (s, ins, outs) ->
+        Format.fprintf fmt "%s(%a; %a)" s (pp_list CExpr.pp) ins
+          (pp_list CExpr.pp) outs
     | Emp -> Format.fprintf fmt "emp"
 end
 

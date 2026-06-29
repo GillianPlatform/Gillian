@@ -8,11 +8,11 @@ pred sll(x; vs: List) :
     (* non-empty list *)
     (x == #h) * (vs == l+ ({{ #v }}, #vs)) *
     <ex>(#h; #v) * <ex>(#h i+ 1i; #next) *
-    sll(#next, #vs);
+    sll(#next; #vs);
 
 spec alloc_node(v)
     [[ v == #v ]]
-    [[ sll(ret, {{ #v }}) ]]
+    [[ sll(ret; {{ #v }}) ]]
     normal
 proc alloc_node(v) {
     c1 := [alloc]();
@@ -26,8 +26,8 @@ proc alloc_node(v) {
 };
 
 spec append(h, v)
-    [[ (h == #h) * (v == #v) * sll(#h, #vs) ]]
-    [[ (ret == #h2) * sll(#h2, l+ (#vs, {{ #v }})) ]]
+    [[ (h == #h) * (v == #v) * sll(#h; #vs) ]]
+    [[ (ret == #h2) * sll(#h2; l+ (#vs, {{ #v }})) ]]
     normal
 proc append(h, v) {
     goto [h = null] then0 else0;
@@ -48,8 +48,8 @@ end:
 };
 
 spec prepend(h, v)
-    [[ (h == #h) * (v == #v) * sll(#h, #vs) ]]
-    [[ (ret == #h2) * sll(#h2, l+ ({{ #v }}, #vs)) ]]
+    [[ (h == #h) * (v == #v) * sll(#h; #vs) ]]
+    [[ (ret == #h2) * sll(#h2; l+ ({{ #v }}, #vs)) ]]
     normal
 proc prepend(h, v) {
     ret := "alloc_node"(v);
@@ -58,8 +58,8 @@ proc prepend(h, v) {
 };
 
 spec length(h)
-    [[ (h == #h) * sll(#h, #vs) ]]
-    [[ (ret == (l-len #vs)) * sll(#h, #vs) ]]
+    [[ (h == #h) * sll(#h; #vs) ]]
+    [[ (ret == (l-len #vs)) * sll(#h; #vs) ]]
     normal
 proc length(h) {
     goto [h = null] then0 else0;
@@ -80,8 +80,8 @@ end:
 };
 
 spec concat(h1, h2)
-    [[ (h1 == #h1) * (h2 == #h2) * sll(#h1, #vs1) * sll(#h2, #vs2) ]]
-    [[ (ret == #h3) * sll(#h3, l+ (#vs1, #vs2)) ]]
+    [[ (h1 == #h1) * (h2 == #h2) * sll(#h1; #vs1) * sll(#h2; #vs2) ]]
+    [[ (ret == #h3) * sll(#h3; l+ (#vs1, #vs2)) ]]
     normal
 proc concat(h1, h2) {
     goto [h1 = null] then0 else0;
@@ -103,12 +103,12 @@ end:
 
 pred sll_member(vs : List, v; r : Bool) :
     (vs == {{  }}) * (r == false), (* empty list *)
-    (vs == l+ ({{  v  }}, #vs2)) *   (r == true) * sll_member(#vs2, v, #etc), (* found a match *)
-    (vs == l+ ({{ #v2 }}, #vs2)) * (!(v == #v2)) * sll_member(#vs2, v, r); (* no match yet *)
+    (vs == l+ ({{  v  }}, #vs2)) *   (r == true) * sll_member(#vs2, v; #etc), (* found a match *)
+    (vs == l+ ({{ #v2 }}, #vs2)) * (!(v == #v2)) * sll_member(#vs2, v; r); (* no match yet *)
 
 spec member(h, v)
-    [[ (h == #h) * (v == #v) * sll(#h, #vs) * sll_member(#vs, #v, #r) ]]
-    [[ (ret == #r) * sll(#h, #vs) * sll_member(#vs, #v, #r) ]]
+    [[ (h == #h) * (v == #v) * sll(#h; #vs) * sll_member(#vs, #v; #r) ]]
+    [[ (ret == #r) * sll(#h; #vs) * sll_member(#vs, #v; #r) ]]
     normal
 proc member(h, v) {
     goto [h = null] then0 else0;
@@ -152,7 +152,7 @@ end:
 
 
 spec free_list(h)
-     [[ (h == #h) * sll(#h, #vs) ]]
+     [[ (h == #h) * sll(#h; #vs) ]]
     [[ (ret == null) ]]
     normal
 proc free_list(h) {

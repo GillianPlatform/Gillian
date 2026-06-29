@@ -36,11 +36,11 @@
 
     lemma optBytesConcat(lptr, llength, rptr, rlength) {
         hypothesis:
-            optBytes(#lptr, #llength, #lcont) * optBytes(#rptr, #rlength, #rcont) *
+            optBytes(#lptr, #llength; #lcont) * optBytes(#rptr, #rlength; #rcont) *
             (#rptr == #lptr p+ #llength)
 
         conclusions:
-            optBytes(#lptr, #llength + #rlength, #lcont @ #rcont)
+            optBytes(#lptr, #llength + #rlength; #lcont @ #rcont)
 
         proof:
             unfold optBytes(#lptr, #llength, #lcont);

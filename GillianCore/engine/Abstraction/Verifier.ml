@@ -683,7 +683,7 @@ struct
     object
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.ss_monoid
-      method! visit_Pred _ pred_name _ = SS.singleton pred_name
+      method! visit_Pred _ pred_name _ _ = SS.singleton pred_name
       method! visit_Fold _ pred_name _ _ = SS.singleton pred_name
       method! visit_Unfold _ pred_name _ _ _ = SS.singleton pred_name
       method! visit_GUnfold _ pred_name = SS.singleton pred_name

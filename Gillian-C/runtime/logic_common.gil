@@ -51,19 +51,19 @@ pred i__ptr (e: List; l: Obj, o: Int):
 (* arrays *)
 
 pred i__zeros_ptr_size(ptr: List, size: Int;):
-  i__ptr(ptr, #l, #o) *
+  i__ptr(ptr; #l, #o) *
   <mem_zeros>(#l, #o, #o i+ size; "Freeable");
 
 pred i__undefs_ptr_size(ptr: List, size: Int;):
-  i__ptr(ptr, #l, #o) *
+  i__ptr(ptr; #l, #o) *
   <mem_hole>(#l, #o, #o i+ size; "Freeable");
 
 pred i__array_ptr(ptr: List, size: Int, chk: Str; content: List):
-  i__ptr(ptr, #l, #o) * (size == l-len content) * (0i i<=# size) *
+  i__ptr(ptr; #l, #o) * (size == l-len content) * (0i i<=# size) *
   <mem_array>(#l, #o, size, chk; content, "Freeable");
 
 (* Pointer arithmetic *)
 
 pred i__ptr_add(ptr: List, to_add:Int; res: List):
-  i__ptr(ptr, #l, #o) *
+  i__ptr(ptr; #l, #o) *
   (res == {{ #l, #o i+ to_add }});

@@ -225,7 +225,12 @@ let substitution_in_place (subst : st) (preds : t) : unit =
   let pred_substitution subst (s, vs) = (s, List.map (subst_in_val subst) vs) in
   preds := List.map (pred_substitution subst) !preds
 
-let to_assertions (preds : t) : Asrt.atom list =
+let to_assertions
+    ~(split_ins_outs : string -> vt list -> vt list * vt list)
+    (preds : t) : Asrt.atom list =
   let preds = to_list preds in
-  let pred_to_assert (n, args) = Asrt.Pred (n, args) in
+  let pred_to_assert (n, args) =
+    let ins, outs = split_ins_outs n args in
+    Asrt.Pred (n, ins, outs)
+  in
   List.sort Asrt.compare (List.map pred_to_assert preds)

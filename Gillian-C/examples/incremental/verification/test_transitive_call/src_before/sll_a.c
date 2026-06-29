@@ -1,8 +1,8 @@
 #include "sll.h"
 
 /*@ spec listPrependV(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * (#v == int(#z))
-  ensures: list(ret, #v::#alpha)
+  requires: (x == #x) * list(#x; #alpha) * (v == #v) * (#v == int(#z))
+  ensures: list(ret; #v::#alpha)
 }
 */
 SLL* listPrependV(SLL *x, int v) {

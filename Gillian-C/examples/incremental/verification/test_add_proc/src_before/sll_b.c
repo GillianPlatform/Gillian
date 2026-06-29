@@ -1,7 +1,7 @@
 #include "sll.h"
 
 /*@ spec listDispose(x) {
-  requires: list(#x, #alpha) * (x == #x)
+  requires: list(#x; #alpha) * (x == #x)
   ensures:  emp
 } */
 void listDispose(SLL *x) {

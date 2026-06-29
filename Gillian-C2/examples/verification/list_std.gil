@@ -9,24 +9,24 @@ pred ptr(p: List; l: Obj, o: Int):
   (p == {{ l, o }});
 
 pred dll_ptr(p; head, tail, length):
-     ptr(p, #l, #o) *
+     ptr(p; #l, #o) *
           <mem_single>(#l, #o, "u64"; head, "Freeable") *
           <mem_single>(#l, #o i+ 8i, "u64"; tail, "Freeable") *
           <mem_single>(#l, #o i+ 16i, "u64"; length, "Freeable");
 
 pred DLL_segl(head, next, tail, prev; content: List):
      (head == next) * (tail == prev) * (content == nil),
-     ptr(head, #l, #o) *
+     ptr(head; #l, #o) *
           <mem_single>(#l, #o, "u64"; #u, "Freeable") *
           <mem_single>(#l, #o i+ 8i, "u64"; #v, "Freeable") *
           <mem_single>(#l, #o i+ 16i, "u32"; #e, "Freeable") *
           (content == (l+({{ #e }}, #contentp))) *
-          DLL_segl(#u, next, tail, head, #contentp);
+          DLL_segl(#u, next, tail, head; #contentp);
 
 pred DLL(dll; content, len):
-     dll_ptr(dll, #head, #tail, len) *
+     dll_ptr(dll; #head, #tail, len) *
      (len == l-len(content)) *
-     DLL_segl(#head, 0i, #tail, 0i, content);
+     DLL_segl(#head, 0i, #tail, 0i; content);
      facts: (l-len(content) == len);
       
 proc as_ptr(var_1__self) {
@@ -193,16 +193,16 @@ proc node_new(i___ret, var_1__element) {
 };
 
 pred Box_NewNode(node; v):
-     ptr(node, #l, #o) *
+     ptr(node; #l, #o) *
           <mem_single>(#l, #o, "u64"; 0i, "Freeable") *
           <mem_single>(#l, #o i+ 8i, "u64"; 0i, "Freeable") *
           <mem_single>(#l, #o i+ 16i, "u32"; v, "Freeable");
 
 spec push_front_node(var_1__self, var_2__node)
   [[ (var_1__self == #self) * (var_2__node == #node) *
-     DLL(#self, #content, #size) * Box_NewNode(#node, #v) *
+     DLL(#self; #content, #size) * Box_NewNode(#node; #v) *
      (0i i<=# #size) * (#size i<# 18446744073709551615i) ]]
-  [[ DLL(#self, l+({{ #v }}, #content), #size i+ 1i) ]]
+  [[ DLL(#self; l+({{ #v }}, #content), #size i+ 1i) ]]
   normal
 
 proc push_front_node(var_1__self, var_2__node) {
@@ -321,10 +321,10 @@ proc push_front_node(var_1__self, var_2__node) {
 
 spec push_front(var_1__self, var_2__elt)
      [[ (var_1__self == #self) * (var_2__elt == #elt) *
-          DLL(#self, #content, #size) * is_u32(#elt) *
+          DLL(#self; #content, #size) * is_u32(#elt;) *
           (0i i<=# #size) * (#size i<# 18446744073709551615i) ]]
      (* Adding 1 to the size does not overflow *)
-     [[ DLL(#self, l+({{ #elt }}, #content), #size i+ 1i) ]]
+     [[ DLL(#self; l+({{ #elt }}, #content), #size i+ 1i) ]]
      normal
 
 proc push_front(var_1__self, var_2__elt) {

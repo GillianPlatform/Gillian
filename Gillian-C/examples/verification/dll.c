@@ -9,10 +9,10 @@ typedef struct dln {
 /*@ pred DLL(x; alpha) {
   (x == NULL) * (alpha == nil);
   (x -m> struct dln {#val; #prev; #next}) *
-  DLL(#next, #beta) * (alpha == #val :: #beta) *
+  DLL(#next; #beta) * (alpha == #val :: #beta) *
   (not (#prev == NULL)) * (not (#next == NULL));
   (x -m> struct dln {#val; NULL; #next}) *
-  DLL(#next, #beta) * (alpha == #val :: #beta) *
+  DLL(#next; #beta) * (alpha == #val :: #beta) *
   (not (#next == NULL));
   (x -m> struct dln {#val; NULL; NULL}) * (alpha == [ #val ]);
   (x -m> struct dln {#val; #prev; NULL}) * (alpha == [ #val ]) *
@@ -21,7 +21,7 @@ typedef struct dln {
 
 /*@ spec makeNode(x) {
   requires: (#x == int(#z)) * (#x == x)
-  ensures:  DLL(ret, [#x])
+  ensures:  DLL(ret; [#x])
 } */
 DLL *makeNode(int x) {
     DLL *r = malloc(sizeof(DLL));
@@ -32,8 +32,8 @@ DLL *makeNode(int x) {
 }
 
 /*@ spec listConcat(x, y) {
-  requires: (x == #x) * (y == #y) * DLL(#x, #alpha) * DLL(#y, #beta)
-  ensures:  DLL(ret, #alpha @ #beta)
+  requires: (x == #x) * (y == #y) * DLL(#x; #alpha) * DLL(#y; #beta)
+  ensures:  DLL(ret; #alpha @ #beta)
 } */
 DLL *listConcat(DLL *x, DLL *y) {
     if (y == NULL) {
@@ -44,7 +44,7 @@ DLL *listConcat(DLL *x, DLL *y) {
         } else {
             __builtin_annot(
                 "assert [[bind #vx, #px, #nx, #gamma]] "
-                "(x -m> struct dln {#vx; #px; #nx}) * DLL(#nx, #gamma) * "
+                "(x -m> struct dln {#vx; #px; #nx}) * DLL(#nx; #gamma) * "
                 "(#alpha == #h :: #gamma)");
             __builtin_annot("unfold DLL(#nx, #gamma)");
             if (x->next == NULL) {
@@ -62,8 +62,8 @@ DLL *listConcat(DLL *x, DLL *y) {
 }
 
 /*@ spec listPrepend(x, v) {
-  requires: (x == #x) * (v == #v) * DLL(#x, #alpha) * (#v == int(#z))
-  ensures:  DLL(ret, #v :: #alpha)
+  requires: (x == #x) * (v == #v) * DLL(#x; #alpha) * (#v == int(#z))
+  ensures:  DLL(ret; #v :: #alpha)
 } */
 DLL *listPrepend(DLL *x, int v) {
     DLL *node_v = makeNode(v);
@@ -78,14 +78,14 @@ DLL *listPrepend(DLL *x, int v) {
 }
 
 /*@ spec listAppend(x, v) {
-  requires: (x == #x) * (v == #v) * DLL(#x, #alpha) * (#v == int(#z))
-  ensures:  DLL(ret, #alpha @ [ #v ])
+  requires: (x == #x) * (v == #v) * DLL(#x; #alpha) * (#v == int(#z))
+  ensures:  DLL(ret; #alpha @ [ #v ])
 } */
 DLL *listAppend(DLL *x, int v) { return listConcat(x, makeNode(v)); }
 
 /*@ spec listCopy(x) {
-  requires: (x == #x) * DLL(#x, #alpha)
-  ensures:  DLL(#x, #alpha) * DLL(ret, #alpha)
+  requires: (x == #x) * DLL(#x; #alpha)
+  ensures:  DLL(#x; #alpha) * DLL(ret; #alpha)
 } */
 DLL *listCopy(DLL *x) {
     if (x == NULL) {

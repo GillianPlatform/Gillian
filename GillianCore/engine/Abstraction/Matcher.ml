@@ -594,8 +594,9 @@ module Make (State : SState.S) :
         match state' with
         | None -> []
         | Some _ -> [ Ok { state; preds; wands; pred_defs } ])
-    | Pred (pname, les) ->
+    | Pred (pname, ins, outs) ->
         L.verbose (fun fmt -> fmt "Predicate assertion.");
+        let les = ins @ outs in
         let vs = List.map (subst_in_expr subst) les in
         let pred_def = Hashtbl.find pred_defs pname in
         let++ { state; preds; wands; pred_defs } =
@@ -1261,18 +1262,17 @@ module Make (State : SState.S) :
                     let error = StateErr.EAsrt ([], fail_pf) in
                     Res_list.error_with error
                 | Vanish -> Res_list.vanish)
-          | Pred (pname, les) ->
+          | Pred (pname, ins, outs) ->
+              let les = ins @ outs in
               L.verbose (fun m -> m "Matching predicate assertion");
               (* Perform substitution in all predicate parameters *)
               L.verbose (fun fmt ->
                   fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
               L.verbose (fun fmt -> fmt "SUBST:\n%a" SVal.SESubst.pp subst);
               let vs = List.map (subst_in_expr_opt astate subst) les in
-              (* Get the ins of the predicate *)
-              let pred = MP.get_pred_def pred_defs pname in
-              let pred_def = pred.pred in
-              let vs_ins = Pred.in_args pred_def vs in
-              let les_outs = Pred.out_args pred_def les in
+              (* The in/out split is carried by the assertion's syntax. *)
+              let vs_ins = List.map (subst_in_expr_opt astate subst) ins in
+              let les_outs = outs in
               (* All of which must have survived substitution *)
               let failure = List.exists (fun x -> x = None) vs_ins in
               if failure then (
@@ -1854,7 +1854,12 @@ module Make (State : SState.S) :
 
     let get_defs (pred : Pred.t) largs =
       if pred.pred_abstract || Option.is_some pred.pred_guard then
-        [ [ Asrt.Pred (pred.pred_name, largs) ] ]
+        [
+          [
+            Asrt.Pred
+              (pred.pred_name, Pred.in_args pred largs, Pred.out_args pred largs);
+          ];
+        ]
       else
         let unfolded_pred =
           Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
@@ -1942,7 +1947,7 @@ module Make (State : SState.S) :
         split_answer option =
       let open Syntaxes.Option in
       match (step, errs) with
-      | (Pred (name, args), _), _ ->
+      | (Pred (name, ins, outs), _), _ ->
           let MP.{ pred; def_mp; _ } = MP.get_pred_def astate.pred_defs name in
           let* () =
             if pred.pred_abstract || Option.is_some pred.pred_guard then None
@@ -1951,8 +1956,9 @@ module Make (State : SState.S) :
           let in_params =
             Pred.in_params pred |> List.map (fun x -> Expr.PVar x)
           in
+          (* The in/out split is carried by the assertion's syntax. *)
           let in_args =
-            Pred.in_args pred args
+            ins
             |> List.map (SVal.SESubst.subst_in_expr_opt subst)
             |> List.map Option.get
           in
@@ -1960,7 +1966,7 @@ module Make (State : SState.S) :
             List.combine in_params in_args |> SVal.SESubst.init
           in
           let out_params = Pred.out_params pred in
-          let out_args = Pred.out_args pred args in
+          let out_args = outs in
           Some
             {
               mp = def_mp;

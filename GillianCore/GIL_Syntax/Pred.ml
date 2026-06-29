@@ -167,7 +167,8 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
 let extend_asrt_pred_types (preds : (string, t) Hashtbl.t) (a : Asrt.t) :
     (Asrt.t, string) result =
   let f : Asrt.atom -> (Asrt.t, string) result = function
-    | Asrt.Pred (name, les) as a ->
+    | Asrt.Pred (name, ins, outs) as a ->
+        let les = ins @ outs in
         let* pred =
           match Hashtbl.find_opt preds name with
           | Some pred -> Ok pred
@@ -280,7 +281,8 @@ let close_token_call (pred : t) : Asrt.atom =
   let args =
     in_args pred pred.pred_params |> List.map (fun (x, _t) -> Expr.PVar x)
   in
-  Asrt.Pred (name, args)
+  (* The close token is an all-ins predicate. *)
+  Asrt.Pred (name, args, [])
 
 (* Given a name, if it's a close_token name, returns the name of the corresponding predicate,
    otherwise return None. *)

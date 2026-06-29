@@ -28,16 +28,16 @@ pred valid_array(ar; content) {
   (ar -> struct Array { #buffer; long(#capacity); long(#size) }) *
   (0 <# #capacity) *
   (#size <=# #capacity) *
-  OARRAY(#buffer, #size, content) *
-  OUNINIT(#buffer p+ (#size * 4), (#capacity - #size) * 4) *
+  OARRAY(#buffer, #size; content) *
+  OUNINIT(#buffer p+ (#size * 4), (#capacity - #size) * 4;) *
   MALLOCED(#buffer, #capacity * 4)
 }
 */
 
 /*@ spec push(ar, value) {
   requires: (ar == #ar) * (value == int(#value)) *
-            valid_array(#ar, #content)
-  ensures:  valid_array(#ar, #content @ [#value])
+            valid_array(#ar; #content)
+  ensures:  valid_array(#ar; #content @ [#value])
 }*/
 void push(Array *ar, int value) {
     if (ar->size == ar->capacity) {
@@ -54,8 +54,8 @@ void push(Array *ar, int value) {
 
 /* spec remove(ar, index) {
   requires: (ar == #ar) * (index == long(#index)) *
-            valid_array(#ar, #content) * (0 <=# #index) * (#index <# (len #content))
-  ensures:  valid_array(#ar, lsub(#content, 0, #index) @ lsub(#content, #index + 1, (len #content) - #index - 1))
+            valid_array(#ar; #content) * (0 <=# #index) * (#index <# (len #content))
+  ensures:  valid_array(#ar; lsub(#content, 0, #index) @ lsub(#content, #index + 1, (len #content) - #index - 1))
 }
 */
 void remove(Array *ar, size_t index) {

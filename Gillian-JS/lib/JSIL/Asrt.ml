@@ -7,7 +7,7 @@ type t =
   | Star of t * t  (** Separating conjunction *)
   | PointsTo of Expr.t * Expr.t * Expr.t  (** Heap cell assertion *)
   | MetaData of Expr.t * Expr.t  (** MetaData *)
-  | Pred of string * Expr.t list  (** Predicates *)
+  | Pred of string * Expr.t list * Expr.t list  (** Predicates *)
   | EmptyFields of Expr.t * Expr.t  (** emptyFields assertion *)
   | Pure of Expr.t  (** Pure formula *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion *)
@@ -53,8 +53,9 @@ let rec pp fmt (a : t) : unit =
       Fmt.pf fmt "((%a, %a) -> %a)" Expr.pp e1 Expr.pp e2 Expr.pp e3
   | Emp -> Fmt.string fmt "emp"
   (* x(y1, ..., yn) *)
-  | Pred (name, params) ->
-      Fmt.pf fmt "%s(%a)" name (Fmt.list ~sep:(Fmt.any ", ") Expr.pp) params
+  | Pred (name, ins, outs) ->
+      let pp_e_l = Fmt.list ~sep:(Fmt.any ", ") Expr.pp in
+      Fmt.pf fmt "%s(%a; %a)" name pp_e_l ins pp_e_l outs
   (* types(e1:t1, ..., en:tn) *)
   | Types type_list ->
       let pp_pair =

@@ -813,8 +813,8 @@ top_level_g_assertion_target:
   a = g_assertion_target; EOF { a }
 
 predicate_call:
-  name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
-  { (name, params) }
+  name = proc_name; LBRACE; ins = separated_list(COMMA, expr_target); SCOLON; outs = separated_list(COMMA, expr_target); RBRACE
+  { (name, ins, outs) }
 
 g_assertion_target:
 (* (pure) /\ (pure) *)
@@ -828,7 +828,8 @@ g_assertion_target:
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { left_ass @ right_ass } %prec separating_conjunction
   | lhs = predicate_call; WAND; rhs = predicate_call
-    { [ Asrt.Wand {lhs; rhs } ] }
+    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
+      [ Asrt.Wand {lhs = (ln, li @ lo); rhs = (rn, ri @ ro) } ] }
 (* <CorePred>(es; es) *)
   | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
     { [ Asrt.CorePred (v, es1, es2) ] }
@@ -838,8 +839,8 @@ g_assertion_target:
 (* x(e1, ..., en) *)
   | pcall = predicate_call
     {
-      let (name, params) = pcall in
-      [ Asrt.Pred (name, params) ]
+      let (name, ins, outs) = pcall in
+      [ Asrt.Pred (name, ins, outs) ]
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
@@ -878,7 +879,8 @@ g_logic_cmd_target:
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
-    { LCmd.SL (Package { lhs; rhs })}
+    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
+      LCmd.SL (Package { lhs = (ln, li @ lo); rhs = (rn, ri @ ro) })}
 
 (* unfold_all x *)
   | UNFOLDALL; name = proc_name

@@ -5,7 +5,7 @@ type tt =
   | LEmp
   | LStar of t * t
   | LWand of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
-  | LPred of string * WLExpr.t list
+  | LPred of string * WLExpr.t list * WLExpr.t list
   | LPointsTo of WLExpr.t * (WLExpr.t option * WLExpr.t) list
   | LBlockPointsTo of WLExpr.t * (WLExpr.t option * WLExpr.t) list
   | LType of WLExpr.t * WType.t
@@ -49,7 +49,7 @@ let rec get_vars_and_lvars asrt =
   | LEmp -> (SS.empty, SS.empty)
   | LStar (a1, a2) ->
       double_union (get_vars_and_lvars a1) (get_vars_and_lvars a2)
-  | LPred (_, lel) -> from_wlexpr_list lel
+  | LPred (_, ins, outs) -> from_wlexpr_list (ins @ outs)
   | LPointsTo (el, lel) -> resolve_points_to el lel
   | LBlockPointsTo (el, lel) -> resolve_points_to el lel
   | LPure lf -> WLExpr.get_vars_and_lvars lf
@@ -72,7 +72,7 @@ let rec get_by_id id la =
   let aux lap =
     match get lap with
     | LStar (la1, la2) -> getter la1 |>> (getter, la2)
-    | LPred (_, lel) -> lexpr_list_visitor lel
+    | LPred (_, ins, outs) -> lexpr_list_visitor (ins @ outs)
     | LPointsTo (le1, lle2) -> resolve_points_to le1 lle2
     | LBlockPointsTo (le1, lle2) -> resolve_points_to le1 lle2
     | LPure lf -> lform_getter lf
@@ -92,7 +92,8 @@ let rec pp fmt asser =
   match get asser with
   | LEmp -> Format.pp_print_string fmt "emp"
   | LStar (a1, a2) -> Fmt.pf fmt "@[(%a) * (%a)@]" pp a1 pp a2
-  | LPred (pname, lel) -> Fmt.pf fmt "@[%s(%a)@]" pname pp_params lel
+  | LPred (pname, ins, outs) ->
+      Fmt.pf fmt "@[%s(%a; %a)@]" pname pp_params ins pp_params outs
   | LWand { lhs = lname, largs; rhs = rname, rargs } ->
       Fmt.pf fmt "@[%s(%a) -* %s(%a)]" lname pp_params largs rname pp_params
         rargs
@@ -117,7 +118,7 @@ let rec substitution (subst : (string, WLExpr.tt) Hashtbl.t) (a : t) : t =
     match wlanode with
     | LEmp -> LEmp
     | LStar (a1, a2) -> LStar (f a1, f a2)
-    | LPred (name, le) -> LPred (name, List.map fe le)
+    | LPred (name, ins, outs) -> LPred (name, List.map fe ins, List.map fe outs)
     | LWand { lhs = lname, largs; rhs = rname, rargs } ->
         LWand
           { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }

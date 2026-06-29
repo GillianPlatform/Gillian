@@ -571,14 +571,14 @@ lvar_or_pvar:
   | lx = LVAR { lx }
 
 wand:
-  | lname = IDENTIFIER; LBRACE; largs = separated_list(COMMA, logic_expression); RBRACE;
+  | lname = IDENTIFIER; LBRACE; lins = separated_list(COMMA, logic_expression); SEMICOLON; louts = separated_list(COMMA, logic_expression); RBRACE;
     WAND;
-    rname = IDENTIFIER; LBRACE; rargs = separated_list(COMMA, logic_expression); lend = RBRACE
+    rname = IDENTIFIER; LBRACE; rins = separated_list(COMMA, logic_expression); SEMICOLON; routs = separated_list(COMMA, logic_expression); lend = RBRACE
     {
       let (lstart, lname) = lname in
       let (_, rname) = rname in
       let loc = CodeLoc.merge lstart lend in
-      ((lname, largs), (rname, rargs), loc)
+      ((lname, lins @ louts), (rname, rins @ routs), loc)
     }
 
 logic_expression_with_permission:
@@ -595,9 +595,9 @@ logic_assertion:
   | wand = wand
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
-  | lpr = IDENTIFIER; LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
+  | lpr = IDENTIFIER; LBRACE; ins = separated_list(COMMA, logic_expression); SEMICOLON; outs = separated_list(COMMA, logic_expression); lend = RBRACE
     { let (lstart, pr) = lpr in
-      let bare_assert = WLAssert.LPred (pr, params) in
+      let bare_assert = WLAssert.LPred (pr, ins, outs) in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
   | loc = EMP

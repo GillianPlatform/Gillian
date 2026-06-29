@@ -29,12 +29,12 @@ lemma DestructList(lst)
 @nopath
 pure pred FirstProj(lst : List; fProj : List) : (lst == {{  }}) *
   (fProj == {{  }}), (lst == l+ ({{ {{ #fst, #lvar_js_7 }} }}, #rest)) *
-  FirstProj(#rest, #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
+  FirstProj(#rest; #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
 
 (* FirstProj is a function *)
 lemma FirstProjFunction(lst1, proj1, lst2, proj2)
 [[
-    FirstProj(#lst1, #proj1) * FirstProj(#lst2, #proj2) * (#lst1 == #lst2)
+    FirstProj(#lst1; #proj1) * FirstProj(#lst2; #proj2) * (#lst1 == #lst2)
 ]]
 [[
     (#proj1 == #proj2)
@@ -50,16 +50,16 @@ lemma FirstProjFunction(lst1, proj1, lst2, proj2)
 (* Adding a pair to a first projection *)
 lemma FirstProjAppendPair(lst, fProj, prop, value)
 [[
-    FirstProj(#lst, #fProj)
+    FirstProj(#lst; #fProj)
 ]]
 [[
-    FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}), l+ (#fProj, {{ #prop }}))
+    FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}); l+ (#fProj, {{ #prop }}))
 ]]
 [*
     unfold FirstProj(#lst, #fProj);
     if (!(#lst == {{ }})) then {
         sep_assert ((#lst == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs))) [bind: #fProp, #fValue, #restPVPairs];
-        sep_assert (FirstProj(#restPVPairs, #restProj)) [bind: #restProj];
+        sep_assert (FirstProj(#restPVPairs; #restProj)) [bind: #restProj];
         apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value)
     }
 *]
@@ -67,8 +67,8 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
 (* First projection goes through concatenation *)
 lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
 [[
-    (#PVPairs == l+ (#prefix, #suffix)) * FirstProj(#PVPairs, #props) *
-    FirstProj(#prefix, #preProps) * FirstProj(#suffix, #sufProps)
+    (#PVPairs == l+ (#prefix, #suffix)) * FirstProj(#PVPairs; #props) *
+    FirstProj(#prefix; #preProps) * FirstProj(#suffix; #sufProps)
 ]]
 [[
     (#props == l+ (#preProps, #sufProps))
@@ -88,12 +88,12 @@ lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
 (* Compatibility of first projection and toUtf8 *)
 lemma FirstProjToUtf8MapPairCompat(PVPairs)
 [[
-    FirstProj(#PVPairs, #props) *
-    toUtf8PairMap(#PVPairs, #utf8PVPairs) *
-    FirstProj(#utf8PVPairs, #utf8Props)
+    FirstProj(#PVPairs; #props) *
+    toUtf8PairMap(#PVPairs; #utf8PVPairs) *
+    FirstProj(#utf8PVPairs; #utf8Props)
 ]]
 [[
-    toUtf8Map(#props, #utf8Props)
+    toUtf8Map(#props; #utf8Props)
 ]]
 [*
     unfold FirstProj(#PVPairs, #props);
@@ -117,12 +117,12 @@ lemma FirstProjToUtf8MapPairCompat(PVPairs)
 pure pred ListToSet(lst : List; set : Set) :
   (lst == {{  }}) * (set == -{  }-),
   (lst == l+ ({{ #e }}, #restLst)) *
-    ListToSet(#restLst, #restSet) * (set == -u- (#restSet, -{ #e }-));
+    ListToSet(#restLst; #restSet) * (set == -u- (#restSet, -{ #e }-));
 
 (* ListToSet is a function *)
 lemma ListToSetFunction(lst1, set1, lst2, set2)
 [[
-    ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * (#lst1 == #lst2)
+    ListToSet(#lst1; #set1) * ListToSet(#lst2; #set2) * (#lst1 == #lst2)
 ]]
 [[
     (#set1 == #set2)
@@ -138,7 +138,7 @@ lemma ListToSetFunction(lst1, set1, lst2, set2)
 (* ListToSet concat-union compatibility *)
 lemma ListToSetUnion(lst1, lst2)
 [[
-    ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * ListToSet(l+ (#lst1, #lst2), #uset)
+    ListToSet(#lst1; #set1) * ListToSet(#lst2; #set2) * ListToSet(l+ (#lst1, #lst2); #uset)
 ]]
 [[
     (#uset == -u- (#set1, #set2))
@@ -160,7 +160,7 @@ lemma ProduceListToSet(lst)
     types(lst: List)
 ]]
 [[
-    ListToSet(#lst, #set)
+    ListToSet(#lst; #set)
 ]]
 [*
     apply DestructList(#lst);
@@ -173,16 +173,16 @@ lemma ProduceListToSet(lst)
 (* Adding an element in list-to-set conversion *)
 lemma ListToSetAddElement(lst, set, element)
 [[
-    ListToSet(#lst, #set)
+    ListToSet(#lst; #set)
 ]]
 [[
-    ListToSet(l+ (#lst, {{ #element }}), -u- (#set, -{ #element }-))
+    ListToSet(l+ (#lst, {{ #element }}); -u- (#set, -{ #element }-))
 ]]
 [*
     unfold ListToSet(#lst, #set);
     if (!(#lst == {{ }})) then {
         sep_assert ((#lst == l+ ({{ #fProp }}, #restLst))) [bind: #fProp, #restLst];
-        sep_assert (ListToSet(#restLst, #restSet)) [bind: #restSet];
+        sep_assert (ListToSet(#restLst; #restSet)) [bind: #restSet];
         apply ListToSetAddElement(#restLst, #restSet, #element)
     }
 *]
@@ -191,7 +191,7 @@ lemma ListToSetAddElement(lst, set, element)
 lemma HeadInSet(lst)
 [[
     (#lst == l+ ({{ #hd }}, #tl)) *
-    ListToSet(#lst, #set)
+    ListToSet(#lst; #set)
 ]]
 [[
     (#hd --e-- #set)
@@ -201,11 +201,11 @@ lemma HeadInSet(lst)
 (* toUtf8 mapping and list membership, positive *)
 lemma InListToUtf8(prop, props)
 [[
-    ListToSet(#props, #propsSet) *
+    ListToSet(#props; #propsSet) *
     (#prop --e-- #propsSet) *
-    toUtf8(#prop, #utf8Prop) *
-    toUtf8Map(#props, #utf8Props) *
-    ListToSet(#utf8Props, #utf8PropsSet)
+    toUtf8(#prop; #utf8Prop) *
+    toUtf8Map(#props; #utf8Props) *
+    ListToSet(#utf8Props; #utf8PropsSet)
 ]]
 [[
     (#utf8Prop --e-- #utf8PropsSet)
@@ -215,7 +215,7 @@ lemma InListToUtf8(prop, props)
     if (!(#props == {{ }})) then {
         sep_assert ((#props == l+ ({{ #fstProp }}, #rest))) [bind: #rest];
         unfold toUtf8Map(#props, #utf8Props);
-        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_assert (toUtf8(#fstProp; #utf8FstProp)) [bind: #utf8FstProp];
         sep_assert ((#utf8Props == l+ ({{ #utf8FstProp }}, #restUtf8))) [bind: #restUtf8];
         unfold ListToSet(#utf8Props, #utf8PropsSet);
         if (#prop == #fstProp) then {
@@ -230,11 +230,11 @@ lemma InListToUtf8(prop, props)
 (* toUtf8 mapping and list membership, negative *)
 lemma NotInListToUtf8(prop, props)
 [[
-    ListToSet(#props, #propsSet) *
+    ListToSet(#props; #propsSet) *
     (! (#prop --e-- #propsSet)) *
-    toUtf8(#prop, #utf8Prop) *
-    toUtf8Map(#props, #utf8Props) *
-    ListToSet(#utf8Props, #utf8PropsSet)
+    toUtf8(#prop; #utf8Prop) *
+    toUtf8Map(#props; #utf8Props) *
+    ListToSet(#utf8Props; #utf8PropsSet)
 ]]
 [[
     (! (#utf8Prop --e-- #utf8PropsSet))
@@ -246,7 +246,7 @@ lemma NotInListToUtf8(prop, props)
 
     if (!(#props == {{ }})) then {
         sep_assert ((#props == l+ ({{ #fstProp }}, #rest))) [bind: #rest];
-        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_assert (toUtf8(#fstProp; #utf8FstProp)) [bind: #utf8FstProp];
         apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
         apply NotInListToUtf8(#prop, #rest)
     }
@@ -263,15 +263,15 @@ lemma NotInListToUtf8(prop, props)
 @nopath
 pure pred Unique(l : List;) :
   (l == {{  }}),
-  (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest, #setRest) *
-    (! (#fst --e-- #setRest)) * Unique(#rest);
+  (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest; #setRest) *
+    (! (#fst --e-- #setRest)) * Unique(#rest;);
 
 (* In a unique list split into a left and a right sublist,
    no element from the right is on the left *)
 lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 [[
-    (#props == l+ (#prefix, #suffix)) * Unique(#props) *
-    ListToSet(#prefix, #setPrefix) * ListToSet(#suffix, #setSuffix) *
+    (#props == l+ (#prefix, #suffix)) * Unique(#props;) *
+    ListToSet(#prefix; #setPrefix) * ListToSet(#suffix; #setSuffix) *
     (#prop --e-- #setSuffix)
 ]]
 [[
@@ -295,11 +295,11 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 (* Appending an element to a unique list *)
 lemma UniqueAppendElement(lst, element)
 [[
-    Unique(#lst) * ListToSet(#lst, #set) *
+    Unique(#lst;) * ListToSet(#lst; #set) *
     (! (#element --e-- #set))
 ]]
 [[
-    Unique(l+ (#lst, {{ #element }}))
+    Unique(l+ (#lst, {{ #element }});)
 ]]
 [*
     unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest1 := #setRest)];
@@ -324,11 +324,11 @@ lemma UniqueAppendElement(lst, element)
 pure pred Duplicated(prefix:List, suffix:List;) :
     (* Either the head is duplicated *)
     (suffix == l+ ({{ #fst }}, #rest)) *
-    ListToSet(prefix, #preSet) *
+    ListToSet(prefix; #preSet) *
     (#fst --e-- #preSet),
 
     (* Or the duplication is in the tail *)
     (suffix == l+ ({{ #fst }}, #rest)) *
-    ListToSet(prefix, #preSet) *
+    ListToSet(prefix; #preSet) *
     (! (#fst --e-- #preSet)) *
-    Duplicated(l+ (prefix, {{ #fst }}), #rest);
+    Duplicated(l+ (prefix, {{ #fst }}), #rest;);

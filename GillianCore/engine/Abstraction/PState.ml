@@ -267,9 +267,13 @@ module Make (State : SState.S) :
     |> SS.union (Wands.get_lvars wands)
 
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
-    let { state; preds; wands; _ } = astate in
+    let { state; preds; wands; pred_defs; _ } = astate in
     let s_asrts = State.to_assertions ?to_keep state in
-    let p_asrts = Preds.to_assertions preds in
+    let split_ins_outs name args =
+      let pred = (MP.get_pred_def pred_defs name).pred in
+      (Pred.in_args pred args, Pred.out_args pred args)
+    in
+    let p_asrts = Preds.to_assertions ~split_ins_outs preds in
     let w_asrts = Wands.to_assertions wands in
     List.sort Asrt.compare (p_asrts @ s_asrts @ w_asrts)
 

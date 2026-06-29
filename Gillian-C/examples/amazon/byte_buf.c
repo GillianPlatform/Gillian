@@ -24,10 +24,10 @@
 
     lemma valid_aws_byte_cursor_ptr_facts(cur, length, buffer, alpha) {
         hypothesis:
-            valid_aws_byte_cursor_ptr(#cur, #length, #buffer, #alpha)
+            valid_aws_byte_cursor_ptr(#cur; #length, #buffer, #alpha)
 
         conclusions:
-            valid_aws_byte_cursor_ptr(#cur, #length, #buffer, #alpha) *
+            valid_aws_byte_cursor_ptr(#cur; #length, #buffer, #alpha) *
             (#length == len #alpha) * (#length <=# 2147483647)
 
         proof:
@@ -55,12 +55,12 @@
 
     pred valid_aws_byte_buf_fields(fields; length, capacity, buffer, allocator, content) {
         (fields == [ long(length), buffer, long(capacity), allocator ]) *
-        valid_aws_byte_buf(length, capacity, buffer, allocator, content)
+        valid_aws_byte_buf(length, capacity, buffer, allocator; content)
     }
 
     pred empty_aws_byte_buf_fields(fields;) {
         (fields ==  [ long(length), buffer, long(capacity), allocator ]) *
-        empty_aws_byte_buf(length, capacity, buffer, allocator)
+        empty_aws_byte_buf(length, capacity, buffer, allocator;)
     }
 
     pred empty_aws_byte_buf_ptr(buf;) {
@@ -70,7 +70,7 @@
             long(#capacity);
             #allocator
         }) *
-        empty_aws_byte_buf(#length, #capacity, #buffer, #allocator)
+        empty_aws_byte_buf(#length, #capacity, #buffer, #allocator;)
     }
 
     pred nounfold valid_aws_byte_buf_ptr(buf; length, capacity, buffer, allocator, content) {
@@ -80,7 +80,7 @@
             long(capacity);
             allocator
         }) *
-        valid_aws_byte_buf(length, capacity, buffer, allocator, content)
+        valid_aws_byte_buf(length, capacity, buffer, allocator; content)
     }
 */
 
@@ -92,11 +92,11 @@
             (buf == #buf) * (allocator == #allocator) *
             (capacity == long(#capacity)) *
             (0 <=# #capacity) *
-            empty_aws_byte_buf_ptr(#buf) * default_allocator(#allocator)
+            empty_aws_byte_buf_ptr(#buf;) * default_allocator(#allocator;)
 
         ensures:
-            valid_aws_byte_buf_ptr(#buf, 0, #capacity, #buffer, #allocator, []) *
-            default_allocator(#allocator) *
+            valid_aws_byte_buf_ptr(#buf; 0, #capacity, #buffer, #allocator, []) *
+            default_allocator(#allocator;) *
             (ret == int(0))
     }
 */
@@ -125,21 +125,21 @@ int aws_byte_buf_init(struct aws_byte_buf *buf, struct aws_allocator *allocator,
     spec aws_byte_buf_clean_up(buf) {
         requires:
             (buf == #buf) *
-            valid_aws_byte_buf_ptr(#buf, #length, #capacity, #buffer, #allocator, #content) *
-            default_allocator(#allocator)
+            valid_aws_byte_buf_ptr(#buf; #length, #capacity, #buffer, #allocator, #content) *
+            default_allocator(#allocator;)
 
         ensures:
-            empty_aws_byte_buf_ptr(#buf) *
-            default_allocator(#allocator)
+            empty_aws_byte_buf_ptr(#buf;) *
+            default_allocator(#allocator;)
 
     OR
 
         requires:
             (buf == #buf) *
-            valid_aws_byte_buf_ptr(#buf, #length, #capacity, #buffer, NULL, #content)
+            valid_aws_byte_buf_ptr(#buf; #length, #capacity, #buffer, NULL, #content)
 
         ensures:
-            empty_aws_byte_buf_ptr(#buf)
+            empty_aws_byte_buf_ptr(#buf;)
     }
 */
 void aws_byte_buf_clean_up(struct aws_byte_buf *buf) {
@@ -186,17 +186,17 @@ void aws_byte_buf_clean_up(struct aws_byte_buf *buf) {
         requires:
             (_res == #res) * (cursor == #cursor) * (length == long(#length)) *
             (0 <=# #length) * ARRAY(#res, long, 2, #trash) *
-            valid_aws_byte_cursor_ptr(#cursor, #cur_len, #buffer, #content) *
+            valid_aws_byte_cursor_ptr(#cursor; #cur_len, #buffer, #content) *
             ((0 <# #length) || (not (#buffer == NULL)))
 
         ensures:
-            invalid_read(#length, #cur_len) *
-            valid_aws_byte_cursor_ptr(#res, 0, NULL, nil) *
-            valid_aws_byte_cursor_ptr(#cursor, #cur_len, #buffer, #content);
+            invalid_read(#length, #cur_len;) *
+            valid_aws_byte_cursor_ptr(#res; 0, NULL, nil) *
+            valid_aws_byte_cursor_ptr(#cursor; #cur_len, #buffer, #content);
 
-            valid_read(#length, #cur_len) *
-            valid_aws_byte_cursor_ptr(#res, #length, #buffer, #data) *
-            valid_aws_byte_cursor_ptr(#cursor, #rest_len, #buffer p+ #length, #rest) *
+            valid_read(#length, #cur_len;) *
+            valid_aws_byte_cursor_ptr(#res; #length, #buffer, #data) *
+            valid_aws_byte_cursor_ptr(#cursor; #rest_len, #buffer p+ #length, #rest) *
             (#length == len #data) *
             (#content == #data @ #rest) *
             (#rest_len == (#cur_len - #length))
@@ -228,19 +228,19 @@ aws_byte_cursor_advance(struct aws_byte_cursor *const cursor,
     spec aws_byte_cursor_read(cur, dest, length) {
         requires:
             (cur == #cur) * (dest == #dest) * (length == long(#length)) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#dest, #length, #trash)
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#dest, #length; #trash)
 
         ensures:
             (#length == 0) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#dest, 0, []) * (#trash == []) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#dest, 0; []) * (#trash == []) *
             (ret == TRUE);
 
             (0 <# #length) *
-            valid_read(#length, #cur_length) *
+            valid_read(#length, #cur_length;) *
             ARRAY(#buffer, char, #length, #data) *
-            valid_aws_byte_cursor_ptr(#cur, len #rest, #buffer p+ #length, #rest) *
+            valid_aws_byte_cursor_ptr(#cur; len #rest, #buffer p+ #length, #rest) *
             ARRAY(#dest, char, #length, #data) *
             (#length == len #data) *
             (#content == #data @ #rest) *
@@ -248,9 +248,9 @@ aws_byte_cursor_advance(struct aws_byte_cursor *const cursor,
             (ret == TRUE);
 
             (0 <# #length) *
-            invalid_read(#length, #cur_length) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#dest, #length, #trash) *
+            invalid_read(#length, #cur_length;) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#dest, #length; #trash) *
             (ret == FALSE)
     }
 */
@@ -286,21 +286,21 @@ bool aws_byte_cursor_read(struct aws_byte_cursor *cur, void *dest,
     spec aws_byte_cursor_read_u8(cur, var) {
         requires:
             (cur == #cur) * (var == #var) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#var, 1, #trash)
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#var, 1; #trash)
 
         ensures:
-            invalid_read(1, #cur_length) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#var, 1, #trash) *
+            invalid_read(1, #cur_length;) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#var, 1; #trash) *
             (ret == FALSE);
 
-            valid_read(1, #cur_length) *
+            valid_read(1, #cur_length;) *
             (#content == [ #u ] @ #rest) *
             ARRAY(#buffer, char, 1, [ #u ]) *
-            valid_aws_byte_cursor_ptr(#cur, len #rest, #buffer p+ 1, #rest) *
+            valid_aws_byte_cursor_ptr(#cur; len #rest, #buffer p+ 1, #rest) *
             ARRAY(#var, char, 1, [ #u ]) *
-            isByte(#u) *
+            isByte(#u;) *
             (ret == TRUE)
     }
 */
@@ -324,21 +324,21 @@ bool aws_byte_cursor_read_u8(struct aws_byte_cursor *cur, uint8_t *var) {
     spec aws_byte_cursor_read_be16(cur, var) {
         requires:
             (cur == #cur) * (var == #var) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#var, 2, #trash)
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#var, 2; #trash)
 
         ensures:
-            invalid_read(2, #cur_length) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#var, 2, #trash) *
+            invalid_read(2, #cur_length;) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#var, 2; #trash) *
             (ret == FALSE);
 
-            valid_read(2, #cur_length) *
+            valid_read(2, #cur_length;) *
             (#content == [ #b0, #b1 ] @ #rest) *
             ARRAY(#buffer, char, 2, [ #b0, #b1 ]) *
-            valid_aws_byte_cursor_ptr(#cur, len #rest, #buffer p+ 2, #rest) *
+            valid_aws_byte_cursor_ptr(#cur; len #rest, #buffer p+ 2, #rest) *
             (#read_value == (#b0 * 256) + #b1) *
-            isByte(#b0) * isByte(#b1) *
+            isByte(#b0;) * isByte(#b1;) *
             ARRAY(#var, int16, 1, [ #read_value ]) *
             (ret == TRUE)
     }
@@ -368,22 +368,22 @@ bool aws_byte_cursor_read_be16(struct aws_byte_cursor *cur, uint16_t *var) {
     spec aws_byte_cursor_read_be32(cur, var) {
         requires:
             (cur == #cur) * (var == #var) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#var, 4, #trash)
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#var, 4; #trash)
 
         ensures:
-            invalid_read(4, #cur_length) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
-            writable_memory(#var, 4, #trash) *
+            invalid_read(4, #cur_length;) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #buffer, #content) *
+            writable_memory(#var, 4; #trash) *
             (ret == FALSE);
 
-            valid_read(4, #cur_length) *
+            valid_read(4, #cur_length;) *
             (#content == [ #b0, #b1, #b2, #b3 ] @ #rest) *
             ARRAY(#buffer, char, 4, [ #b0, #b1, #b2, #b3 ]) *
             (#rest_len == #cur_length - 4) *
-            valid_aws_byte_cursor_ptr(#cur, #rest_len, #buffer p+ 4, #rest) *
+            valid_aws_byte_cursor_ptr(#cur; #rest_len, #buffer p+ 4, #rest) *
             (#read_value == (#b0 * 16777216) + (#b1 * 65536) + (#b2 * 256) + #b3) *
-            isByte(#b0) * isByte(#b1) * isByte(#b2) * isByte(#b3) *
+            isByte(#b0;) * isByte(#b1;) * isByte(#b2;) * isByte(#b3;) *
             (#var -> int(#read_value)) * (ret == TRUE)
     }
 */
@@ -411,29 +411,29 @@ bool aws_byte_cursor_read_be32(struct aws_byte_cursor *cur, uint32_t *var) {
     spec aws_byte_cursor_read_and_fill_buffer(cur, dest) {
         requires:
             (cur == #cur) * (dest == #dest) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #cur_buffer, #cur_content) *
-            valid_aws_byte_buf_ptr(#dest, #dest_length, #dest_capacity, #dest_buffer, #dest_alloc, #dest_content)
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #cur_buffer, #cur_content) *
+            valid_aws_byte_buf_ptr(#dest; #dest_length, #dest_capacity, #dest_buffer, #dest_alloc, #dest_content)
 
         ensures:
             (#dest_capacity == 0) *
-            valid_aws_byte_buf_ptr(#dest, 0, 0, NULL, #dest_alloc, []) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #cur_buffer, #cur_content) *
+            valid_aws_byte_buf_ptr(#dest; 0, 0, NULL, #dest_alloc, []) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #cur_buffer, #cur_content) *
             (ret == TRUE);
 
             (0 <# #dest_capacity) *
-            valid_read(#dest_capacity, #cur_length) *
+            valid_read(#dest_capacity, #cur_length;) *
             (#cur_content == #consumed @ #rest) *
             (len #consumed == #dest_capacity) *
             (len #rest == #cur_length - #dest_capacity) *
-            valid_aws_byte_buf_ptr(#dest, #dest_capacity, #dest_capacity, #dest_buffer, #dest_alloc, #consumed) *
-            valid_aws_byte_cursor_ptr(#cur, len #rest, #cur_buffer p+ #dest_capacity, #rest) *
+            valid_aws_byte_buf_ptr(#dest; #dest_capacity, #dest_capacity, #dest_buffer, #dest_alloc, #consumed) *
+            valid_aws_byte_cursor_ptr(#cur; len #rest, #cur_buffer p+ #dest_capacity, #rest) *
             ARRAY(#cur_buffer, char, #dest_capacity, #consumed) *
             (ret == TRUE);
 
             (0 <# #dest_capacity) *
-            invalid_read(#dest_capacity, #cur_length) *
-            valid_aws_byte_cursor_ptr(#cur, #cur_length, #cur_buffer, #cur_content) *
-            valid_aws_byte_buf_ptr(#dest, #dest_length, #dest_capacity, #dest_buffer, #dest_alloc, #dest_content) *
+            invalid_read(#dest_capacity, #cur_length;) *
+            valid_aws_byte_cursor_ptr(#cur; #cur_length, #cur_buffer, #cur_content) *
+            valid_aws_byte_buf_ptr(#dest; #dest_length, #dest_capacity, #dest_buffer, #dest_alloc, #dest_content) *
             (ret == FALSE)
 
     }

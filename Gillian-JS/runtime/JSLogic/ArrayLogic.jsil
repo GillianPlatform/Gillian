@@ -42,17 +42,17 @@ pred ArrayOfUInt8ArraysContents(a:Obj, start:Num, contentsLength:Num; contents:L
     (contents == #element :: #rest) *
     (#rest_start == start + 1) *
     (#rest_length == contentsLength - 1) *
-    DataProp(a, #index, #ui8a) *
-    Uint8Array (#ui8a, #ab, 0, #viewSize) *
-    ArrayBuffer(#ab, #element) *
+    DataProp(a, #index; #ui8a) *
+    Uint8Array (#ui8a; #ab, 0, #viewSize) *
+    ArrayBuffer(#ab; #element) *
     (#viewSize == l-len #element) *
-    ArrayOfUInt8ArraysContents(a, #rest_start, #rest_length, #rest);
+    ArrayOfUInt8ArraysContents(a, #rest_start, #rest_length; #rest);
 
     facts: (contentsLength == l-len contents);
 
 pred ArrayOfUInt8Arrays (a:Obj; contents:List, arrayLength:Num) :
-    ArrayStructure(a, arrayLength) *
-    ArrayOfUInt8ArraysContents(a, 0, arrayLength, contents);
+    ArrayStructure(a, arrayLength;) *
+    ArrayOfUInt8ArraysContents(a, 0, arrayLength; contents);
 
 (* ----------------------------------------------------------------------------------- *)
 
@@ -63,25 +63,25 @@ pred ArrayOfArraysOfUInt8ArraysContents(a:Obj, start:Num, contentsLength:Num; co
     (#index == num_to_string start) *
     (contents == #elementContents :: #rest) *
     (#rest_length == contentsLength - 1) *
-    DataProp(a, #index, #aui8a) *
-    ArrayOfUInt8Arrays (#aui8a, #elementContents, _) *
+    DataProp(a, #index; #aui8a) *
+    ArrayOfUInt8Arrays (#aui8a; #elementContents, _) *
     (#rest_start == start + 1) *
-    ArrayOfArraysOfUInt8ArraysContents(a, #rest_start, #rest_length, #rest);
+    ArrayOfArraysOfUInt8ArraysContents(a, #rest_start, #rest_length; #rest);
 
     facts: (contentsLength == l-len contents);
 
 pred ArrayOfArraysOfUInt8Arrays (a:Obj; contents:List) :
-    ArrayStructure(a, l-len contents) *
-    ArrayOfArraysOfUInt8ArraysContents(a, 0, l-len contents, contents);
+    ArrayStructure(a, l-len contents;) *
+    ArrayOfArraysOfUInt8ArraysContents(a, 0, l-len contents; contents);
 
 lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLength)
 [[
-    ArrayOfArraysOfUInt8ArraysContents(#a, #start, #contentsLength, #contents) *
-    DataProp(#a, num_to_string (#start + #contentsLength), #aui8a) *
-    ArrayOfUInt8Arrays (#aui8a, #elementContents, #elementLength)
+    ArrayOfArraysOfUInt8ArraysContents(#a, #start, #contentsLength; #contents) *
+    DataProp(#a, num_to_string (#start + #contentsLength); #aui8a) *
+    ArrayOfUInt8Arrays (#aui8a; #elementContents, #elementLength)
 ]]
 [[
-    ArrayOfArraysOfUInt8ArraysContents(#a, #start, #contentsLength + 1, l+ (#contents, {{ #elementContents }}))
+    ArrayOfArraysOfUInt8ArraysContents(#a, #start, #contentsLength + 1; l+ (#contents, {{ #elementContents }}))
 ]]
 
 
@@ -90,15 +90,15 @@ lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLengt
  **************************)
 
 nounfold pred ArrayPrototype (proto;) :
-  JSObjWithProto (proto, $lobj_proto) *
+  JSObjWithProto (proto; $lobj_proto) *
   empty_fields (proto : -{ "push", "map" }-) *
 
   ((proto, "push") -> {{ "d", $lap_push, true, false, true }}) * (* Array.prototype.push  *)
   ((proto, "map")  -> {{ "d", $lap_map,  true, false, true }}) * (* Array.prototype.map   *)
 
-  JSBIFunction($lap_push, "AP_push", 1) * (* Actual push function *)
+  JSBIFunction($lap_push; "AP_push", 1) * (* Actual push function *)
     empty_fields($lap_push : -{ "length" }-) *
-  JSBIFunction($lap_map, "AP_map", 1) *  (* Actual map function *)
+  JSBIFunction($lap_map; "AP_map", 1) *  (* Actual map function *)
     empty_fields($lap_map : -{ "length" }-);
 
 (*******************************************************************
@@ -107,16 +107,16 @@ nounfold pred ArrayPrototype (proto;) :
 
 axiomatic spec AP_push (xsc, vthis, element)
     [[ (vthis == #vthis) * (element == #ui8a) *
-       Uint8Array (#ui8a, #ab, 0, #viewSize) *
-       ArrayBuffer(#ab, #element) *
+       Uint8Array (#ui8a; #ab, 0, #viewSize) *
+       ArrayBuffer(#ab; #element) *
        (#viewSize == l-len #element) *
-       ArrayOfUInt8Arrays(#vthis, #contents, #arraylength) ]]
-    [[ ArrayOfUInt8Arrays(#vthis, l+ (#contents, {{ #element }}), #arraylength + 1) * (ret == undefined) ]]
+       ArrayOfUInt8Arrays(#vthis; #contents, #arraylength) ]]
+    [[ ArrayOfUInt8Arrays(#vthis; l+ (#contents, {{ #element }}), #arraylength + 1) * (ret == undefined) ]]
     normal;
 
     [[ (vthis == #vthis) * (element == #aui8a) *
-       ArrayOfUInt8Arrays (#aui8a, #aContents, _) *
-       ArrayOfArraysOfUInt8Arrays(#vthis, #contents) ]]
-    [[ ArrayOfArraysOfUInt8Arrays(#vthis, l+ (#contents, {{ #aContents }})) * (ret == undefined) ]]
+       ArrayOfUInt8Arrays (#aui8a; #aContents, _) *
+       ArrayOfArraysOfUInt8Arrays(#vthis; #contents) ]]
+    [[ ArrayOfArraysOfUInt8Arrays(#vthis; l+ (#contents, {{ #aContents }})) * (ret == undefined) ]]
     normal
 

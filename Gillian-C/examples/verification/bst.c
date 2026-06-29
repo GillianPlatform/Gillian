@@ -13,20 +13,20 @@ typedef struct bstn {
 
   x -m> struct bstn { int(#val); #left; #right } *
   (not (#left == NULL)) * (not (#right == NULL)) *
-  BST(#right, #KR) * BST(#left, #KL) *
+  BST(#right; #KR) * BST(#left; #KL) *
   (forall #z : Int. (#z --e-- #KL) => (#z <# #val)) *
   (forall #z : Int. (#z --e-- #KR) => (#val <# #z)) *
   (K == -u- (#KL, -{ #val }-, #KR));
 
   x -m> struct bstn { int(#val); NULL; #right } *
   (not (#right == NULL)) *
-  BST(#right, #KR) *
+  BST(#right; #KR) *
   (forall #z : Int. #z --e-- #KR => #val <# #z) *
   (K == -u- (-{ #val }-, #KR));
 
   x -m> struct bstn { int(#val); #left; NULL } *
   (not (#left == NULL)) *
-  BST(#left, #KL) *
+  BST(#left; #KL) *
   (forall #z : Int. #z --e-- #KL => #z <# #val) *
   (K == -u- (-{ #val }-, #KL));
 
@@ -36,7 +36,7 @@ typedef struct bstn {
 
 /*@ spec makeNode(v) {
   requires: (v == #v) * (#v == int(#vv))
-  ensures:  BST(ret, -{ #vv }-)
+  ensures:  BST(ret; -{ #vv }-)
 }*/
 BST *makeNode(int v) {
     BST *new_node = malloc(sizeof(BST));
@@ -47,8 +47,8 @@ BST *makeNode(int v) {
 }
 
 /*@ spec insert(v, t) {
-  requires: (v == int(#vv)) * (t == #t) * BST(#t, #K)
-  ensures:  BST(ret, -u- (#K, -{ #vv }-))
+  requires: (v == int(#vv)) * (t == #t) * BST(#t; #K)
+  ensures:  BST(ret; -u- (#K, -{ #vv }-))
 }*/
 BST *insert(int v, BST *t) {
     BST *tmp;
@@ -68,9 +68,9 @@ BST *insert(int v, BST *t) {
 }
 
 /*@ spec find(v, t) {
-  requires: (v == int(#vv)) * (t == #t) * BST(#t, #K)
-  ensures:  BST(#t, #K) * (#vv --e-- #K) * (ret == TRUE);
-            BST(#t, #K) * (not (#vv --e-- #K)) * (ret == FALSE)
+  requires: (v == int(#vv)) * (t == #t) * BST(#t; #K)
+  ensures:  BST(#t; #K) * (#vv --e-- #K) * (ret == TRUE);
+            BST(#t; #K) * (not (#vv --e-- #K)) * (ret == FALSE)
 } */
 int find(int v, BST *t) {
     if (t == NULL) {
@@ -85,8 +85,8 @@ int find(int v, BST *t) {
 }
 
 /*@ spec find_min(t) {
-  requires: (t == #t) * BST(#t, #K) * (not (#t == NULL))
-  ensures:  BST(#t, #K) * (ret == int(#r)) * (#r --e-- #K) *
+  requires: (t == #t) * BST(#t; #K) * (not (#t == NULL))
+  ensures:  BST(#t; #K) * (ret == int(#r)) * (#r --e-- #K) *
             (forall #x : Int. (#x --e-- #K) => (#r <=# #x))
 } */
 int find_min(BST *t) {
@@ -102,8 +102,8 @@ int find_min(BST *t) {
 }
 
 /* spec remove(v, t) {
-  requires: (v == int(#v)) * (t == #t) * BST(#t, #K)
-  ensures:  (ret == #t_new) * BST(#t_new, #K_new) * (#K_new == #K -d- -{ #v }-)
+  requires: (v == int(#v)) * (t == #t) * BST(#t; #K)
+  ensures:  (ret == #t_new) * BST(#t_new; #K_new) * (#K_new == #K -d- -{ #v }-)
 } */
 BST *remove(int v, BST *t) {
     BST *ret_node;

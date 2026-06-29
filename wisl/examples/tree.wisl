@@ -1,9 +1,9 @@
 predicate tree(t;) {
     (t == null);
-    (t -b> #v, #left, #right) * tree(#left) * tree(#right)
+    (t -b> #v, #left, #right) * tree(#left;) * tree(#right;)
 }
 
-{ (x == #x) * tree(#x) }
+{ (x == #x) * tree(#x;) }
 function tree_dispose(x) {
   if (x != null) {
     y := [x+1];

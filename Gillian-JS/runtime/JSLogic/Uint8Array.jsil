@@ -32,7 +32,7 @@ nounfold pred Uint8Array (ar:Obj; buffer:Obj, byteOffset:Num, arrayLength:Num) :
  *******************************)
 
 nounfold pred Uint8ArrayPrototype (proto;) :
-  JSObjWithProto (proto, $lobj_proto) *
+  JSObjWithProto (proto; $lobj_proto) *
   empty_fields (proto : -{ "buffer", "byteLength", "byteOffset", "constructor", "slice" }-) *
 
   ((proto, "buffer")      -> {{ "a", $lui8ar_buffer,     undefined, false, true }}) * (* Uint8Array.prototype.buffer      *)
@@ -41,16 +41,16 @@ nounfold pred Uint8ArrayPrototype (proto;) :
   ((proto, "constructor") -> {{ "d", $lui8ar, true, false, true }}) *                 (* Uint8Array.prototype.constructor *)
   ((proto, "slice")       -> {{ "d", $lui8ar_slice, true, false, true }}) *           (* Uint8Array.prototype.slice       *)
 
-  JSBIFunction($lui8ar_buffer, "UI8ARP_buffer", 0) * (* Actual buffer function *)
+  JSBIFunction($lui8ar_buffer; "UI8ARP_buffer", 0) * (* Actual buffer function *)
   empty_fields($lui8ar_buffer : -{ "length" }-) *
 
-  JSBIFunction($lui8ar_byteLength, "UI8ARP_byteLength", 0) * (* Actual byteLength function *)
+  JSBIFunction($lui8ar_byteLength; "UI8ARP_byteLength", 0) * (* Actual byteLength function *)
   empty_fields($lui8ar_byteLength : -{ "length" }-) *
 
-  JSBIFunction($lui8ar_byteOffset, "UI8ARP_byteOffset", 0) * (* Actual byteOffset function *)
+  JSBIFunction($lui8ar_byteOffset; "UI8ARP_byteOffset", 0) * (* Actual byteOffset function *)
   empty_fields($lui8ar_byteOffset : -{ "length" }-) *
 
-  JSBIFunction($lui8ar_slice, "UI8ARP_slice", 2) * (* Actual slice function *)
+  JSBIFunction($lui8ar_slice; "UI8ARP_slice", 2) * (* Actual slice function *)
   empty_fields($lui8ar_slice : -{ "length" }-);
 
 (**********************************************************************
@@ -58,26 +58,26 @@ nounfold pred Uint8ArrayPrototype (proto;) :
  **********************************************************************)
 
 axiomatic spec UI8ARP_buffer (xsc, vthis)
-    [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
-    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #buffer) ]]
+    [[ (vthis == #vthis) * Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) ]]
+    [[ Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) * (ret == #buffer) ]]
     normal
 
 axiomatic spec UI8ARP_byteLength (xsc, vthis)
-    [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
-    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #arrayLength) ]]
+    [[ (vthis == #vthis) * Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) ]]
+    [[ Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) * (ret == #arrayLength) ]]
     normal
 
 axiomatic spec UI8ARP_byteOffset (xsc, vthis)
-    [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
-    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #byteOffset) ]]
+    [[ (vthis == #vthis) * Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) ]]
+    [[ Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) * (ret == #byteOffset) ]]
     normal
 
 axiomatic spec UI8ARP_slice (xsc, vthis, start, end)
     [[ (vthis == #vthis) *
-       Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer, #data) *
+       Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer; #data) *
        (0 <=# start) * (0 <=# end) * (end <=# #arrayLength) *
        (#view == l-sub(#data, #byteOffset, #arrayLength)) ]]
-    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer, #data) *
-       Uint8Array(ret, #sBuffer, #sByteOffset, #sArrayLength) * ArrayBuffer(#sBuffer, #sData) *
+    [[ Uint8Array(#vthis; #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer; #data) *
+       Uint8Array(ret; #sBuffer, #sByteOffset, #sArrayLength) * ArrayBuffer(#sBuffer; #sData) *
        (#sByteOffset == 0) * (#sArrayLength == end - start) * (#sData == l-sub (#view, start, end - start)) ]]
     normal

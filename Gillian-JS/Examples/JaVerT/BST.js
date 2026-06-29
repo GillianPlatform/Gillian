@@ -6,13 +6,13 @@
 		types (o : Null);
 
 	@pred Node(n : Obj; val : Num, left, right) :
-		JSObject(n) *
-		DataProp(n, "value", val) * DataProp(n, "left",  left) * DataProp(n, "right", right);
+		JSObject(n;) *
+		DataProp(n, "value"; val) * DataProp(n, "left";  left) * DataProp(n, "right"; right);
 
 	@pred BST(n; K : Set) :
 		(n == null) * (K == -{ }-),
 
-		Node(n, #val, #left, #right) * BST(#left, #KL) * BST(#right, #KR) *
+		Node(n; #val, #left, #right) * BST(#left; #KL) * BST(#right; #KR) *
 		(K == -u- (#KL, -{ #val }-, #KR)) *
 		(forall #x : Num. ((! (#x --e-- #KL)) \/ (#x <# #val))) *
 		(forall #x : Num. ((! (#x --e-- #KR)) \/ (#val <# #x))) *
@@ -26,7 +26,7 @@
 		(v == #v) * types (#v : Num)
 
 	@post
-		Node(ret, #v, null, null)
+		Node(ret; #v, null, null)
 */
 function make_node(v)
 {
@@ -43,16 +43,16 @@ function make_node(v)
 
     @pre
         (v == #v) * (t == #t) *
-		GlobalObject() * ObjectPrototype($lobj_proto) *
-		BST(#t, #K) * types (#v : Num) *
-		scope(make_node : #makeNode) * JSFunctionObject(#makeNode, "makeNode", _, _, _) *
-		scope(insert : #insert) * JSFunctionObject(#insert, "insert", _, _, _)
+		GlobalObject(;) * ObjectPrototype($lobj_proto;) *
+		BST(#t; #K) * types (#v : Num) *
+		scope(make_node : #makeNode) * JSFunctionObject(#makeNode; "makeNode", _, _, _) *
+		scope(insert : #insert) * JSFunctionObject(#insert; "insert", _, _, _)
 
 	@post
-		GlobalObject() * ObjectPrototype($lobj_proto) *
-		BST(ret, -u- (#K, -{ #v }-)) * types (ret : Obj) *
-		scope(make_node : #makeNode) * JSFunctionObject(#makeNode, "makeNode", _, _, _) *
-		scope(insert : #insert) * JSFunctionObject(#insert, "insert", _, _, _)
+		GlobalObject(;) * ObjectPrototype($lobj_proto;) *
+		BST(ret; -u- (#K, -{ #v }-)) * types (ret : Obj) *
+		scope(make_node : #makeNode) * JSFunctionObject(#makeNode; "makeNode", _, _, _) *
+		scope(insert : #insert) * JSFunctionObject(#insert; "insert", _, _, _)
 */
 function insert(v, t)
 {
@@ -74,14 +74,14 @@ function insert(v, t)
 	@id find
 
 	@pre
-		(t == #t) * BST(#t, #K) * (v == #v) * types (#v : Num) *
-		scope(find : #find) * JSFunctionObject(#find, "find", _, _, _) *
-		GlobalObject() * ObjectPrototype($lobj_proto)
+		(t == #t) * BST(#t; #K) * (v == #v) * types (#v : Num) *
+		scope(find : #find) * JSFunctionObject(#find; "find", _, _, _) *
+		GlobalObject(;) * ObjectPrototype($lobj_proto;)
 
 	@post
-		BST(#t, #K) * (ret == (#v -e- #K)) *
-		scope(find : #find) * JSFunctionObject(#find, "find", _, _, _) *
-		GlobalObject() * ObjectPrototype($lobj_proto)
+		BST(#t; #K) * (ret == (#v -e- #K)) *
+		scope(find : #find) * JSFunctionObject(#find; "find", _, _, _) *
+		GlobalObject(;) * ObjectPrototype($lobj_proto;)
 */
 function find (v, t)
 {
@@ -105,15 +105,15 @@ function find (v, t)
 	@id findMin
 
 	@pre
-		GlobalObject() * ObjectPrototype($lobj_proto) *
-		(t == #t) * BST(#t, #K) * types(#t : Obj) *
-		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
+		GlobalObject(;) * ObjectPrototype($lobj_proto;) *
+		(t == #t) * BST(#t; #K) * types(#t : Obj) *
+		scope(find_min : #findMin) * JSFunctionObject(#findMin; "findMin", _, _, _)
 
 	@post
-		GlobalObject() * ObjectPrototype($lobj_proto) *
-		BST(#t, #K) * (ret --e-- #K) * types(ret : Num) *
+		GlobalObject(;) * ObjectPrototype($lobj_proto;) *
+		BST(#t; #K) * (ret --e-- #K) * types(ret : Num) *
 		(forall #x : Num. ((! (#x --e-- #K)) \/ (ret <=# #x))) *
-		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
+		scope(find_min : #findMin) * JSFunctionObject(#findMin; "findMin", _, _, _)
 */
 function find_min(t)
 {
@@ -131,17 +131,17 @@ function find_min(t)
 	@id remove
 
 	@pre
-		GlobalObject() * ObjectPrototype($lobj_proto) *
-		(t == #t) * BST(#t, #K) *
+		GlobalObject(;) * ObjectPrototype($lobj_proto;) *
+		(t == #t) * BST(#t; #K) *
 		(v == #v) * types (#v : Num) *
-		scope(remove : #remove) * JSFunctionObject(#remove, "remove", _, _, _) *
-		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
+		scope(remove : #remove) * JSFunctionObject(#remove; "remove", _, _, _) *
+		scope(find_min : #findMin) * JSFunctionObject(#findMin; "findMin", _, _, _)
 
 	@post
-		GlobalObject() * ObjectPrototype($lobj_proto) *
-		BST(ret, #K_new) * (#K_new == #K -d- -{ #v }-) * NullableObject(ret) *
-		scope(remove : #remove) * JSFunctionObject(#remove, "remove", _, _, _) *
-		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
+		GlobalObject(;) * ObjectPrototype($lobj_proto;) *
+		BST(ret; #K_new) * (#K_new == #K -d- -{ #v }-) * NullableObject(ret;) *
+		scope(remove : #remove) * JSFunctionObject(#remove; "remove", _, _, _) *
+		scope(find_min : #findMin) * JSFunctionObject(#findMin; "findMin", _, _, _)
 */
 function remove(v, t)
 {

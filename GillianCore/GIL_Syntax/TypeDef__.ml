@@ -155,7 +155,7 @@ and expr =
 
 and assertion_atom =
   | Emp
-  | Pred of string * expr list
+  | Pred of string * expr list * expr list
   | Pure of expr
   | Types of (expr * typ) list
   | CorePred of string * expr list * expr list

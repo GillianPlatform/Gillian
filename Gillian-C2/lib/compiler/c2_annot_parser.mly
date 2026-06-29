@@ -374,8 +374,8 @@ assertion:
     { CAssert.Undefs (ptr, size)}
   | MALLOCED; LBRACE; ptr = expression; COMMA; ofs = expression; RBRACE
     { CAssert.Malloced(ptr, ofs) }
-  | pname = IDENTIFIER; LBRACE; el = separated_list(COMMA, expression); RBRACE
-    { CAssert.Pred (pname, el) }
+  | pname = IDENTIFIER; LBRACE; ins = separated_list(COMMA, expression); SCOLON; outs = separated_list(COMMA, expression); RBRACE
+    { CAssert.Pred (pname, ins, outs) }
 
 formula:
   | LBRACE; formula; RBRACE { $2 }

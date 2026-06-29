@@ -9,15 +9,15 @@ typedef struct ln {
 pred list(p; alpha) {
   p -m> struct ln { #head; #tail } *
     (alpha == #head::#beta) *
-    list(#tail,#beta) *
+    list(#tail;#beta) *
     i__is_int(len alpha);
   (p == NULL) * (alpha == nil)
 }
 */
 
 /*@ spec listLength(x) {
-  requires: list(#x, #alpha) * (x == #x)
-  ensures:  list(#x, #alpha) * (ret == int(#r)) * (#r == len #alpha)
+  requires: list(#x; #alpha) * (x == #x)
+  ensures:  list(#x; #alpha) * (ret == int(#r)) * (#r == len #alpha)
 } */
 int listLength(SLL *x) {
     if (x == NULL) {

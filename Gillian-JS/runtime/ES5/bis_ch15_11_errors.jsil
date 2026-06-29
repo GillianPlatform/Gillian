@@ -51,12 +51,12 @@ proc TypeError_call (xsc, vthis, v) {
 spec TypeError (v)
     (** 1 **)
     [[ v == undefined ]]
-    [[ TypeError(ret) * empty_fields(ret : -{ }-) ]]
+    [[ TypeError(ret;) * empty_fields(ret : -{ }-) ]]
     normal;
 
     (** 2 **)
     [[ (v == #v) * types(#v:Str) ]]
-    [[ TypeErrorWithMessage(ret, #v) * empty_fields(ret : -{ "message" }-) ]]
+    [[ TypeErrorWithMessage(ret; #v) * empty_fields(ret : -{ "message" }-) ]]
     normal
 
 proc TypeError (v) {

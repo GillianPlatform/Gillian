@@ -21,6 +21,6 @@ abstract pure nounfold pred toUtf8(rawData : List; utf8Data : Str);
 pure pred toUtf8PairMap(data : List; utf8Data : List) : (data == {{  }}) *
   (utf8Data == {{  }}),
   (data == l+ ({{ {{ #prop, #value }} }}, #rest)) *
-    toUtf8(#prop, #utf8Prop) * toUtf8(#value, #utf8Value) *
-    toUtf8PairMap(#rest, #utf8Rest) *
+    toUtf8(#prop; #utf8Prop) * toUtf8(#value; #utf8Value) *
+    toUtf8PairMap(#rest; #utf8Rest) *
     (utf8Data == l+ ({{ {{ #utf8Prop, #utf8Value }} }}, #utf8Rest));

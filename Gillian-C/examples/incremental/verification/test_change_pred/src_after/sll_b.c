@@ -2,7 +2,7 @@
 
 /*@ pred list(p; alpha) {
   (p -m> struct ln { #head; #tail } * (alpha == #head::#beta)) *
-  list(#tail,#beta);
+  list(#tail;#beta);
   (p == NULL) * (alpha == nil) * (1 == 1)
 }
 
@@ -10,7 +10,7 @@ pred listSeg(p, q; alpha) {
     ( p == q ) * (alpha == nil);
 
     (p -m> struct ln { #head; #tail } * (alpha == #head::#beta)) *
-    listSeg(#tail, q, #beta)
+    listSeg(#tail, q; #beta)
 }
 */
 

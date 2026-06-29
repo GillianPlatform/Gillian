@@ -529,16 +529,9 @@ let ins_outs_assertion
   | Emp -> []
   | Pure form -> ins_outs_formula kb form
   | CorePred (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
-  | Pred (p_name, args) ->
-      let p_ins = get_pred_ins p_name in
-      let _, lie, loe =
-        List.fold_left
-          (fun (i, lie, loe) arg ->
-            if List.mem i p_ins then (i + 1, lie @ [ arg ], loe)
-            else (i + 1, lie, loe @ [ arg ]))
-          (0, [], []) args
-      in
-      ins_and_outs_from_lists kb lie loe
+  | Pred (_p_name, ins, outs) ->
+      (* The in/out split is carried by the assertion's syntax (the [;]). *)
+      ins_and_outs_from_lists kb ins outs
   (* The types assertion has no outs and requires all ins *)
   | Types [ (e, _) ] ->
       let ins = simple_ins_expr e in
@@ -939,15 +932,17 @@ let pp_asrt
     (fmt : Format.formatter)
     (a : Asrt.t) =
   let pp_atom_asrt fmt = function
-    | Asrt.Pred (name, args) -> (
+    | Asrt.Pred (name, ins, outs) -> (
+        let args = ins @ outs in
         match preds_printer with
         | Some pp_pred -> (Fmt.hbox pp_pred) fmt (name, args)
         | None -> (
             try
               let pred = get_pred_def preds name in
+              (* The in/out split is carried by the assertion itself. *)
               let out_params = Pred.out_params pred.pred in
-              let out_args = Pred.out_args pred.pred args in
-              let in_args = Pred.in_args pred.pred args in
+              let out_args = outs in
+              let in_args = ins in
               let out_params_args = List.combine out_params out_args in
               let pp_out_params_args fmt (x, e) =
                 Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e

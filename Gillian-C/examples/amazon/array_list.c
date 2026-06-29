@@ -20,15 +20,15 @@
     pred edk_array_list_content_pref(data, size, alloc; content) {
         (size == 0) * (content == []);
         (0 <=# (size - 96)) *
-        valid_aws_cryptosdk_edk_ptr(data, alloc, #edk) *
+        valid_aws_cryptosdk_edk_ptr(data; alloc, #edk) *
         (content == #edk :: #rest) *
         (#next == data p+ 96) *
-        edk_array_list_content_pref(#next, size - 96, alloc, #rest)
+        edk_array_list_content_pref(#next, size - 96, alloc; #rest)
     }
 
     lemma array_list_content_pref_is_array(data, size, alloc) {
         hypothesis:
-            edk_array_list_content_pref(#data, #size, #alloc, #content) * (0 <# #size)
+            edk_array_list_content_pref(#data, #size, #alloc; #content) * (0 <# #size)
 
         conclusions:
             ARRAY(#data, char, #size, #something)
@@ -50,18 +50,18 @@
 
     pred edk_array_list_data_content(data, prefix_size, total_size, alloc; content) {
         (0 <# prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
-        edk_array_list_content_pref(data, prefix_size, alloc, content) *
+        edk_array_list_content_pref(data, prefix_size, alloc; content) *
         (prefix_size == (96 * (len content))) *
-        optPadding(data p+ prefix_size, #rest_size) *
+        optPadding(data p+ prefix_size, #rest_size;) *
         (#rest_size == (total_size - prefix_size));
 
         (0 == prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
-        optPadding(data, total_size) * (content == [])
+        optPadding(data, total_size;) * (content == [])
     }
 
     lemma edk_array_list_data_is_freeable(data, prefix_size, total_size, alloc) {
         hypothesis:
-            edk_array_list_data_content(#data, #prefix_size, #total_size, #alloc, #content)
+            edk_array_list_data_content(#data, #prefix_size, #total_size, #alloc; #content)
 
         conclusions:
             MARRAY(#data, char, #total_size, #whatever)
@@ -79,29 +79,29 @@
         (data == NULL) * (content == []);
 
         (item_size == 96) * (0 <=# length) * (0 <# current_size) *
-        aws_mul_u64_checked(item_size, length, #required_size) *
+        aws_mul_u64_checked(item_size, length; #required_size) *
         (#required_size <=# current_size) *
         (not (data == NULL)) *
-        edk_array_list_data_content(data, #required_size, current_size, alloc, content) *
+        edk_array_list_data_content(data, #required_size, current_size, alloc; content) *
         (length == len content)
     }
 
     pred valid_edk_array_list_fields(fields; alloc, content) {
         (fields == [ alloc, long(#current_size), long(#length), long(#item_size), #data ]) *
-        valid_edk_array_list(#current_size, #length, #item_size, #data, alloc, content)
+        valid_edk_array_list(#current_size, #length, #item_size, #data, alloc; content)
     }
 
     pred empty_edk_array_list_fields(fields; alloc) {
-        valid_edk_array_list_fields(fields, alloc, [])
+        valid_edk_array_list_fields(fields; alloc, [])
     }
 
     pred nounfold valid_edk_array_list_ptr(list; alloc, content) {
         (list -> struct aws_array_list { alloc; long(#current_size); long(#length); long(#item_size); #data}) *
-        valid_edk_array_list(#current_size, #length, #item_size, #data, alloc, content)
+        valid_edk_array_list(#current_size, #length, #item_size, #data, alloc; content)
     }
 
     pred empty_edk_array_list_ptr(list; alloc) {
-        valid_edk_array_list_ptr(list, alloc, [])
+        valid_edk_array_list_ptr(list; alloc, [])
     }
 */
 
@@ -161,17 +161,17 @@ axiomatic spec aws_array_list_ensure_capacity(list, index) {
               long(#item_size); #data
             }) *
             valid_edk_array_list(#current_size, #length, #item_size,
-                                 #data, #alloc, #content) *
+                                 #data, #alloc; #content) *
             (#item_size <=# 65535) * (#index <=# 65534) *
-            default_allocator(#alloc)
+            default_allocator(#alloc;)
   ensures:  (((#index + 1) * #item_size) <=# #new_size) *
             (#list -> struct aws_array_list {
               #alloc; long(#new_size); long(#length);
               long(#item_size); #new_data
             }) *
             valid_edk_array_list(#new_size, #length, #item_size,
-                                 #new_data, #alloc, #content) *
-            default_allocator(#alloc) *
+                                 #new_data, #alloc; #content) *
+            default_allocator(#alloc;) *
             (ret == int(0))
 }
 */
@@ -221,7 +221,7 @@ int aws_array_list_ensure_capacity(struct aws_array_list *list, size_t index) {
 
         GILLIAN(
             "if (! (#length = 0)) { "
-            "   assert [[bind #x]] valid_aws_cryptosdk_edk_ptr(#data, #alloc, #x); "
+            "   assert [[bind #x]] valid_aws_cryptosdk_edk_ptr(#data; #alloc, #x); "
             "   branch (#length == 1);"
             "   unfold valid_aws_cryptosdk_edk_ptr(#data, #alloc, #x) "
             "}");
@@ -252,22 +252,22 @@ size_t aws_array_list_length(const struct aws_array_list *list) {
     requires: (list == #list) * (index == long(#index)) *
               (val == #val) * (0 <=# #index) *
               (#index <=# (len #content)) *
-              valid_edk_array_list_ptr(#list, #alloc, #content) *
-              valid_aws_cryptosdk_edk_ptr(#val, #alloc, #edk) *
-              (#index <=# 65534) * default_allocator(#alloc)
+              valid_edk_array_list_ptr(#list; #alloc, #content) *
+              valid_aws_cryptosdk_edk_ptr(#val; #alloc, #edk) *
+              (#index <=# 65534) * default_allocator(#alloc;)
     ensures:
               (#length == len #content) * (#index <# #length) *
               (#new_content == #fp @ [ #edk ] @ #sp) *
               (#fp == lsub(#content, 0, #index - 1)) *
               (#sp == lsub(#content, #index + 1, (len #content) - #index - 1 )) *
-              valid_edk_array_list_ptr(#list, #alloc, #new_content) *
-              valid_aws_cryptosdk_edk_ptr(#val, #alloc, #edk) *
-              default_allocator(#alloc) * (ret == int(0));
+              valid_edk_array_list_ptr(#list; #alloc, #new_content) *
+              valid_aws_cryptosdk_edk_ptr(#val; #alloc, #edk) *
+              default_allocator(#alloc;) * (ret == int(0));
 
               (#index == (len #content)) *
-              valid_edk_array_list_ptr(#list, #alloc, #content @ [ #edk ]) *
-              valid_aws_cryptosdk_edk_ptr(#val, #alloc, #edk) *
-              default_allocator(#alloc) * (ret == int(0))
+              valid_edk_array_list_ptr(#list; #alloc, #content @ [ #edk ]) *
+              valid_aws_cryptosdk_edk_ptr(#val; #alloc, #edk) *
+              default_allocator(#alloc;) * (ret == int(0))
 } */
 int aws_array_list_set_at(struct aws_array_list *list, const void *val,
                           size_t index) {
@@ -300,14 +300,14 @@ int aws_array_list_set_at(struct aws_array_list *list, const void *val,
 /*@
 axiomatic spec aws_array_list_push_back(list, val) {
     requires: (list == #list) * (val == #val) *
-              valid_edk_array_list_ptr(#list, #alloc, #content) *
-              default_allocator(#alloc) *
-              valid_aws_cryptosdk_edk_ptr(#val, #alloc, #edk) *
+              valid_edk_array_list_ptr(#list; #alloc, #content) *
+              default_allocator(#alloc;) *
+              valid_aws_cryptosdk_edk_ptr(#val; #alloc, #edk) *
               ((len #content) <=# 65534)
 
     ensures: (list == #list) * (val == #val) *
-             valid_edk_array_list_ptr(#list, #alloc, #content @ [#edk]) *
-             default_allocator(#alloc) *
+             valid_edk_array_list_ptr(#list; #alloc, #content @ [#edk]) *
+             default_allocator(#alloc;) *
              ARRAY(#val, long, 12, #trash) *
              (ret == int(0))
 }

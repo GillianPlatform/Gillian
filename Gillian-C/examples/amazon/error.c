@@ -20,11 +20,11 @@ static int tl_last_error = 0;
     }
 
     pred aws_last_error_is_SHORT_BUF(;) {
-        aws_last_error_is(3)
+        aws_last_error_is(3;)
     }
 
     pred aws_last_error_is_BAD_CIPHERTEXT(;) {
-        aws_last_error_is(8192)
+        aws_last_error_is(8192;)
     }
 */
 

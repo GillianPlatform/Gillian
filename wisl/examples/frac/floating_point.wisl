@@ -21,7 +21,7 @@ function floating_subtraction(x, y) {
     [r] := z;
     return r
 }
-{ points_to_sub(ret, #x, #y) }
+{ points_to_sub(ret, #x, #y;) }
 
 { (x == #x) * (y == #y) }
 function floating_multiplication(x, y) {

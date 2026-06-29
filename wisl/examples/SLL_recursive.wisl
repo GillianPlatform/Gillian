@@ -1,9 +1,9 @@
 predicate list(x; alpha) {
     (x == null) * (alpha == nil);
-    (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
+    (x -> #v, #z) * list(#z; #beta) * (alpha == #v::#beta)
 }
 
-{ (x == #x) * list(#x, #alpha) }
+{ (x == #x) * list(#x; #alpha) }
 function llen(x) {
     if (x == null) {
         n := 0
@@ -14,9 +14,9 @@ function llen(x) {
     };
     return n
 }
-{ list(#x, #alpha) * (ret == len(#alpha)) }
+{ list(#x; #alpha) * (ret == len(#alpha)) }
 
-{ (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
+{ (x == #x) * (y == #y) * list(#x; #alpha) * list(#y; #beta) }
 function concat(x, y) {
     if (x == null) {
         r := y
@@ -28,10 +28,10 @@ function concat(x, y) {
     };
     return r
 }
-{ list(ret, #alpha @ #beta) }
+{ list(ret; #alpha @ #beta) }
 
 
-// { list(#x, #alpha) * (v == #v) }
+// { list(#x; #alpha) * (v == #v) }
 // function append(x, v) {
 //     if (x == null) {
 //         y := new(2);
@@ -44,9 +44,9 @@ function concat(x, y) {
 //     };
 //     return y
 // }
-// { list(ret, #alpha@[#v]) }
+// { list(ret; #alpha@[#v]) }
 
-// { list(x, #alpha) * (x == #x) }
+// { list(x; #alpha) * (x == #x) }
 // function copy(x) {
 //     if (x == null) {
 //         ch := null
@@ -60,9 +60,9 @@ function concat(x, y) {
 //     };
 //     return ch
 // }
-// { list(#x, #alpha) * list(ret, #alpha) }
+// { list(#x; #alpha) * list(ret; #alpha) }
 
-// { list(x, #alpha) }
+// { list(x; #alpha) }
 // function dispose_list(x) {
 //     if (x == null) {
 //         skip

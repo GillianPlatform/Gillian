@@ -496,9 +496,8 @@ assertion_target:
   | LMETADATA; LBRACE; eo = expr_target; COMMA; em = expr_target; RBRACE
     { Asrt.MetaData (eo, em) }
   | LEMP; { Asrt.Emp }
-  | name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
-    { (* validate_pred_assertion (name, params); *)
-      Asrt.Pred (name, params) }
+  | name = VAR; LBRACE; ins = separated_list(COMMA, expr_target); SCOLON; outs = separated_list(COMMA, expr_target); RBRACE
+    { Asrt.Pred (name, ins, outs) }
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
     { Asrt.Types type_pairs }
   | EMPTYFIELDS; LBRACE; le=expr_target; COLON; domain=expr_target; RBRACE
@@ -1067,11 +1066,8 @@ js_assertion_target:
   | SCHAIN; LBRACE; fid=VAR; COLON; le=js_lexpr_target; RBRACE
     { JSAsrt.SChain (fid, le) }
 (* x(e1, ..., en) *)
-  | name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
-    {
-      (* validate_pred_assertion (name, params); *)
-      JSAsrt.Pred (name, params)
-    }
+  | name = VAR; LBRACE; ins = separated_list(COMMA, js_lexpr_target); SCOLON; outs = separated_list(COMMA, js_lexpr_target); RBRACE
+    { JSAsrt.Pred (name, ins, outs) }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, js_type_env_pair_target); RBRACE
     { JSAsrt.Types type_pairs }
