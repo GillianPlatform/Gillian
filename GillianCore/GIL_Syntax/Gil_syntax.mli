@@ -448,7 +448,6 @@ module Asrt : sig
 
   type atom =
     | Emp  (** Empty heap *)
-    | Pred of string * Expr.t list * Expr.t list  (** Predicates *)
     | Pure of Expr.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
@@ -457,6 +456,21 @@ module Asrt : sig
   [@@deriving yojson, eq]
 
   type t = atom list [@@deriving yojson, eq]
+
+  (** Prefix encoding a user-defined predicate as a {!CorePred} name. Set once;
+      never hardcode it elsewhere. *)
+  val user_pred_prefix : string
+
+  (** [user_pred_name p] is the core-predicate name encoding user predicate [p].
+  *)
+  val user_pred_name : string -> string
+
+  (** [as_user_pred_name s] is [Some p] when [s] encodes the user predicate [p],
+      and [None] when [s] is a genuine core predicate. *)
+  val as_user_pred_name : string -> string option
+
+  (** [pred name ins outs] builds a user-predicate assertion atom. *)
+  val pred : string -> Expr.t list -> Expr.t list -> atom
 
   (** Comparison of assertions *)
   val compare : atom -> atom -> int
@@ -1330,13 +1344,6 @@ module Visitors : sig
          ; visit_PhiAssignment :
              'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
          ; visit_Pi : 'c -> Constant.t -> Constant.t
-         ; visit_Pred :
-             'c ->
-             Asrt.atom ->
-             string ->
-             Expr.t list ->
-             Expr.t list ->
-             Asrt.atom
          ; visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
          ; visit_Random : 'c -> Constant.t -> Constant.t
          ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1592,10 +1599,6 @@ module Visitors : sig
       'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
 
     method visit_Pi : 'c -> Constant.t -> Constant.t
-
-    method visit_Pred :
-      'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
-
     method visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
     method visit_Random : 'c -> Constant.t -> Constant.t
     method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1851,7 +1854,6 @@ module Visitors : sig
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
-         ; visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Pure : 'c -> Expr.t -> 'f
          ; visit_Random : 'c -> 'f
          ; visit_ReturnError : 'c -> 'f
@@ -2069,7 +2071,6 @@ module Visitors : sig
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
-    method visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Pure : 'c -> Expr.t -> 'f
     method visit_Random : 'c -> 'f
     method visit_ReturnError : 'c -> 'f
@@ -2288,7 +2289,6 @@ module Visitors : sig
          ; visit_PVar : 'c -> string -> unit
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
-         ; visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_Pure : 'c -> Expr.t -> unit
          ; visit_Random : 'c -> unit
          ; visit_ReturnError : 'c -> unit
@@ -2507,7 +2507,6 @@ module Visitors : sig
     method visit_PVar : 'c -> string -> unit
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit
-    method visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> unit
     method visit_Pure : 'c -> Expr.t -> unit
     method visit_Random : 'c -> unit
     method visit_ReturnError : 'c -> unit

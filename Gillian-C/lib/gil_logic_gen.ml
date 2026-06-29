@@ -144,7 +144,7 @@ let assert_of_member cenv members id typ =
       let list_is_components = pvmember#==(Expr.list args_without_ins) in
       let ofs = Expr.Infix.(pvofs + fo) in
       (* Struct predicates have the location and offset as their two ins. *)
-      let pred_call = Asrt.Pred (pred_name, [ pvloc; ofs ], args_without_ins) in
+      let pred_call = Asrt.pred pred_name [ pvloc; ofs ] args_without_ins in
       [ list_is_components; pred_call ]
   | Tarray (ty, n, _) ->
       let n = ValueTranslation.int_of_z n in
@@ -166,13 +166,12 @@ let assert_of_member cenv members id typ =
         let open Internal_Predicates in
         let open VTypes in
         match typ with
-        | Tint _ ->
-            (mk int_type lvval, Asrt.Pred (int_get, [ pvmember ], [ lvval ]))
+        | Tint _ -> (mk int_type lvval, Asrt.pred int_get [ pvmember ] [ lvval ])
         | Tlong _ ->
-            (mk long_type lvval, Asrt.Pred (long_get, [ pvmember ], [ lvval ]))
+            (mk long_type lvval, Asrt.pred long_get [ pvmember ] [ lvval ])
         | Tfloat _ ->
-            (mk float_type lvval, Asrt.Pred (float_get, [ pvmember ], [ lvval ]))
-        | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ], []))
+            (mk float_type lvval, Asrt.pred float_get [ pvmember ] [ lvval ])
+        | Tpointer _ -> (pvmember, Asrt.pred is_ptr_opt [ pvmember ] [])
         | _ ->
             failwith
               (Printf.sprintf "unhandled struct field type for now : %s"
@@ -449,9 +448,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   let tloc = types ObjectType in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
-  let ptr_call p l o =
-    Asrt.Pred (Internal_Predicates.ptr_get, [ p ], [ l; o ])
-  in
+  let ptr_call p l o = Asrt.pred Internal_Predicates.ptr_get [ p ] [ l; o ] in
   let sz = function
     | CSVal.Sint _ -> 4
     | Slong _ -> 8
@@ -548,7 +545,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         split3_expr_comp (List.map trans_expr el)
       in
       let pr =
-        Asrt.Pred (struct_pred, [ locv; ofsv ], params_fields) :: more_asrt
+        Asrt.pred struct_pred [ locv; ofsv ] params_fields :: more_asrt
       in
       pr @ to_assert @ [ malloc_chunk siz ]
 
@@ -590,7 +587,7 @@ let rec trans_asrt ~fname ~ann asrt =
     | Pred (p, c_ins, c_outs) ->
         let ap_in, _, g_ins = split3_expr_comp (List.map trans_expr c_ins) in
         let ap_out, _, g_outs = split3_expr_comp (List.map trans_expr c_outs) in
-        Pred (p, g_ins, g_outs) :: (ap_in @ ap_out)
+        Asrt.pred p g_ins g_outs :: (ap_in @ ap_out)
     | Emp -> [ Asrt.Emp ]
     | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
   in
@@ -876,17 +873,17 @@ let bounds signedness bit_size =
   (Expr.int_z min, Expr.int_z max)
 
 let predicate_from_triple (e, csmt, ct) =
-  let pred pname = Asrt.Pred (pname, [ e ], []) in
+  let pred pname = Asrt.pred pname [ e ] [] in
   let open Internal_Predicates in
   match (csmt, ct) with
   | _, Ctypes.Tpointer (Tfunction _, _) -> pred is_ptr_to_0
   | _, Ctypes.Tpointer _ -> pred is_ptr_opt
   | AST.Tint, Tint (size, signedness, _) ->
       let min, max = bounds signedness (bit_size size) in
-      Asrt.Pred (Internal_Predicates.is_bounded_int, [ e; min; max ], [])
+      Asrt.pred Internal_Predicates.is_bounded_int [ e; min; max ] []
   | AST.Tlong, Tlong (signedness, _) ->
       let min, max = bounds signedness 64 in
-      Asrt.Pred (Internal_Predicates.is_bounded_long, [ e; min; max ], [])
+      Asrt.pred Internal_Predicates.is_bounded_long [ e; min; max ] []
   | AST.Tsingle, _ -> pred is_single
   | AST.Tfloat, _ -> pred is_float
   | _ ->

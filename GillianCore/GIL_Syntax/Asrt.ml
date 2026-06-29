@@ -1,7 +1,6 @@
 (** {b GIL logic assertions}. *)
 type atom = TypeDef__.assertion_atom =
   | Emp  (** Empty heap *)
-  | Pred of string * Expr.t list * Expr.t list  (** Predicates *)
   | Pure of Expr.t  (** Pure formula *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion *)
   | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
@@ -15,6 +14,28 @@ let atom_to_yojson = TypeDef__.assertion_atom_to_yojson
 let atom_of_yojson = TypeDef__.assertion_atom_of_yojson
 let to_yojson = TypeDef__.assertion_to_yojson
 let of_yojson = TypeDef__.assertion_of_yojson
+
+(* User-defined predicates no longer have their own assertion variant: they are
+   encoded as {!CorePred}s whose name is the user predicate name prefixed with
+   [user_pred_prefix]. The prefix is defined {b once}, here. *)
+let user_pred_prefix = "GILLIAN_USER_PRED__"
+
+(** [user_pred_name p] is the core-predicate name that encodes the user-defined
+    predicate [p]. *)
+let user_pred_name (name : string) : string = user_pred_prefix ^ name
+
+(** [as_user_pred_name s] returns [Some p] when the core-predicate name [s]
+    encodes a user-defined predicate [p] (i.e. [s = user_pred_name p]), and
+    [None] when [s] is a genuine core predicate. *)
+let as_user_pred_name (name : string) : string option =
+  let n = String.length user_pred_prefix in
+  if String.length name >= n && String.sub name 0 n = user_pred_prefix then
+    Some (String.sub name n (String.length name - n))
+  else None
+
+(** Builds a user-predicate assertion (a {!CorePred} with the encoded name). *)
+let pred (name : string) (ins : Expr.t list) (outs : Expr.t list) : atom =
+  CorePred (user_pred_name name, ins, outs)
 
 let compare x y =
   let cmp = Stdlib.compare in
@@ -55,8 +76,8 @@ let prioritise (a1 : atom) (a2 : atom) =
   | Types [ (e, _) ], Types [ (e', _) ] -> lloc_aloc_pvar_lvar e e'
   | Types _, _ -> -1
   | _, Types _ -> 1
-  | Pred _, _ -> 1
-  | _, Pred _ -> -1
+  | CorePred (n1, _, _), _ when Option.is_some (as_user_pred_name n1) -> 1
+  | _, CorePred (n2, _, _) when Option.is_some (as_user_pred_name n2) -> -1
   | _, _ -> Stdlib.compare a1 a2
 
 module MyAssertion = struct
@@ -71,7 +92,6 @@ module Set = Set.Make (MyAssertion)
 let map (f_e : Expr.t -> Expr.t) : t -> t =
   List.map (function
     | Emp -> Emp
-    | Pred (s, ins, outs) -> Pred (s, List.map f_e ins, List.map f_e outs)
     | Pure form -> Pure (f_e form)
     | Types lt -> Types (List.map (fun (exp, typ) -> (f_e exp, typ)) lt)
     | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2)
@@ -104,7 +124,11 @@ let pred_names : t -> string list =
     object
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.non_ordered_list_monoid
-      method! visit_Pred () name _ _ = [ name ]
+
+      method! visit_CorePred () name _ _ =
+        match as_user_pred_name name with
+        | Some pred_name -> [ pred_name ]
+        | None -> []
     end
   in
   collector#visit_assertion ()
@@ -117,7 +141,7 @@ let pure_asrts : t -> Expr.t list =
 
 (* Check if --a-- is a pure assertion *)
 let is_pure_asrt : atom -> bool = function
-  | Pred _ | CorePred _ | Wand _ -> false
+  | CorePred _ | Wand _ -> false
   | _ -> true
 
 (* Eliminate Emp assertions.
@@ -135,17 +159,20 @@ let make_pure (a : t) : Expr.t =
 let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
   function
   | Emp -> Fmt.string fmt "emp"
-  | Pred (name, ins, outs) ->
-      let name = Pp_utils.maybe_quote_ident name in
-      let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
-      Fmt.pf fmt "@[<h>%s(%a; %a)@]" name pp_e_l ins pp_e_l outs
   | Types tls ->
       let pp_tl f (e, t) = Fmt.pf f "%a : %s" e_pp e (Type.str t) in
       Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls
   | Pure f -> e_pp fmt f
-  | CorePred (a, ins, outs) ->
+  | CorePred (a, ins, outs) -> (
       let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
-      Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
+      match as_user_pred_name a with
+      | Some pred_name ->
+          (* A user-defined predicate: printed [name(ins; outs)]. *)
+          let pred_name = Pp_utils.maybe_quote_ident pred_name in
+          Fmt.pf fmt "@[<h>%s(%a; %a)@]" pred_name pp_e_l ins pp_e_l outs
+      | None ->
+          (* A genuine core predicate: printed [<name>(ins; outs)]. *)
+          Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs)
   | Wand { lhs = lname, largs; rhs = rname, rargs } ->
       let lname = Pp_utils.maybe_quote_ident lname in
       let rname = Pp_utils.maybe_quote_ident rname in

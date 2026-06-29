@@ -83,7 +83,8 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | MetaData (e1, e2) -> [ Asrt_utils.metadata ~loc:(fe e1) ~metadata:(fe e2) ]
   | EmptyFields (e1, e2) ->
       [ Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2) ]
-  | Pred (pn, ins, outs) -> [ Pred (pn, List.map fe ins, List.map fe outs) ]
+  | Pred (pn, ins, outs) ->
+      [ GAsrt.pred pn (List.map fe ins) (List.map fe outs) ]
   | Pure f -> [ Pure (jsil2gil_expr f) ]
   | Types vts -> [ Types (List.map (fun (v, t) -> (fe v, t)) vts) ]
 

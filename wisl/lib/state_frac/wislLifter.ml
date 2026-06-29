@@ -1296,23 +1296,26 @@ struct
     let open Asrt in
     function
     | Emp -> Fmt.pf ft "emp"
-    | Pred (name, ins, outs) ->
-        Fmt.pf ft "%s(%a; %a)" name (pp_comma_sep pp_expr) ins
-          (pp_comma_sep pp_expr) outs
     | Types tls ->
         let pp_tl ft (e, t) = Fmt.pf ft "%a : %s" pp_expr e (Type.str t) in
         Fmt.pf ft "%a" (pp_comma_sep pp_tl) tls
     | Pure e -> Fmt.pf ft "%a" pp_expr e
     | CorePred (a, ins, outs) -> (
-        match (WislLActions.ga_from_str a, ins, outs) with
-        | Some Cell, [ loc; offset ], [ value ] ->
-            Fmt.pf ft "[%a, %a] -> %a" pp_expr loc pp_expr offset pp_expr value
-        | Some Bound, [ loc ], [ bound ] ->
-            Fmt.pf ft "%a has bound %a" pp_expr loc pp_expr bound
-        | Some Freed, [ loc ], [] -> Fmt.pf ft "%a is freed" pp_expr loc
-        | _ ->
-            Fmt.pf ft "%s(%a, %a)" a (pp_comma_sep pp_expr) ins
-              (pp_comma_sep pp_expr) outs)
+        match Asrt.as_user_pred_name a with
+        | Some name ->
+            Fmt.pf ft "%s(%a; %a)" name (pp_comma_sep pp_expr) ins
+              (pp_comma_sep pp_expr) outs
+        | None -> (
+            match (WislLActions.ga_from_str a, ins, outs) with
+            | Some Cell, [ loc; offset ], [ value ] ->
+                Fmt.pf ft "[%a, %a] -> %a" pp_expr loc pp_expr offset pp_expr
+                  value
+            | Some Bound, [ loc ], [ bound ] ->
+                Fmt.pf ft "%a has bound %a" pp_expr loc pp_expr bound
+            | Some Freed, [ loc ], [] -> Fmt.pf ft "%a is freed" pp_expr loc
+            | _ ->
+                Fmt.pf ft "%s(%a, %a)" a (pp_comma_sep pp_expr) ins
+                  (pp_comma_sep pp_expr) outs))
     | Wand { lhs = lname, largs; rhs = rname, rargs } ->
         Fmt.pf ft "%s(%a) -* %s(%a)" lname (pp_comma_sep pp_expr) largs rname
           (pp_comma_sep pp_expr) rargs

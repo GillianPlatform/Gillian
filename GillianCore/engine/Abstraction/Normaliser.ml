@@ -492,14 +492,16 @@ module Make (SPState : PState.S) = struct
     List.fold_left
       (fun (core_asrts, pure, types, preds, wands) (a : Asrt.atom) ->
         match a with
-        | CorePred (a, es1, es2) ->
-            ((a, es1, es2) :: core_asrts, pure, types, preds, wands)
+        | CorePred (cp_name, es1, es2) -> (
+            match Asrt.as_user_pred_name cp_name with
+            | Some name ->
+                (core_asrts, pure, types, (name, es1 @ es2) :: preds, wands)
+            | None ->
+                ((cp_name, es1, es2) :: core_asrts, pure, types, preds, wands))
         | Wand { lhs; rhs } ->
             (core_asrts, pure, types, preds, Wands.{ lhs; rhs } :: wands)
         | Emp -> (core_asrts, pure, types, preds, wands)
         | Types lst -> (core_asrts, pure, lst @ types, preds, wands)
-        | Pred (name, ins, outs) ->
-            (core_asrts, pure, types, (name, ins @ outs) :: preds, wands)
         | Pure f -> (core_asrts, f :: pure, types, preds, wands))
       ([], [], [], [], []) a
 

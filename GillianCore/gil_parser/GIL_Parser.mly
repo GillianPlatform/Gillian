@@ -844,7 +844,7 @@ g_assertion_target:
   | pcall = predicate_call
     {
       let (name, ins, outs) = pcall in
-      [ Asrt.Pred (name, ins, outs) ]
+      [ Asrt.pred name ins outs ]
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE

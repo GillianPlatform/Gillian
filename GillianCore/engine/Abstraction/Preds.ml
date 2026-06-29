@@ -231,6 +231,6 @@ let to_assertions
   let preds = to_list preds in
   let pred_to_assert (n, args) =
     let ins, outs = split_ins_outs n args in
-    Asrt.Pred (n, ins, outs)
+    Asrt.pred n ins outs
   in
   List.sort Asrt.compare (List.map pred_to_assert preds)

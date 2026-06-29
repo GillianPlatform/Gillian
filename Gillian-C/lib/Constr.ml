@@ -42,8 +42,8 @@ module Others = struct
   (* The in/out split below must match the runtime predicate definitions, since
      the engine trusts the split carried by the assertion. All-ins predicates
      use [pred]; predicates with out-parameters spell out [ins] and [outs]. *)
-  let pred name ins outs = Asrt.Pred (name, ins, outs)
-  let pred_in name ins = Asrt.Pred (name, ins, [])
+  let pred name ins outs = Asrt.pred name ins outs
+  let pred_in name ins = Asrt.pred name ins []
 
   (* [i__malloced] is, unfortunately, declared with a different in/out split
      depending on the architecture: [(p; bytes)] in 64-bit, [(p, bytes;)] in

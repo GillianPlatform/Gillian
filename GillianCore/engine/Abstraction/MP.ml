@@ -529,9 +529,6 @@ let ins_outs_assertion
   | Emp -> []
   | Pure form -> ins_outs_formula kb form
   | CorePred (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
-  | Pred (_p_name, ins, outs) ->
-      (* The in/out split is carried by the assertion's syntax (the [;]). *)
-      ins_and_outs_from_lists kb ins outs
   (* The types assertion has no outs and requires all ins *)
   | Types [ (e, _) ] ->
       let ins = simple_ins_expr e in
@@ -553,7 +550,7 @@ let simplify_asrts ?(sorted = true) a =
     match a with
     | Pure (Lit (Bool true)) | Emp -> []
     | Pure (BinOp (f1, And, f2)) -> aux (Pure f1) @ aux (Pure f2)
-    | Pure _ | Pred _ | CorePred _ | Wand _ -> [ a ]
+    | Pure _ | CorePred _ | Wand _ -> [ a ]
     | Types _ -> (
         let a = Reduction.reduce_assertion [ a ] in
         match a with
@@ -932,7 +929,9 @@ let pp_asrt
     (fmt : Format.formatter)
     (a : Asrt.t) =
   let pp_atom_asrt fmt = function
-    | Asrt.Pred (name, ins, outs) -> (
+    | Asrt.CorePred (cp_name, ins, outs)
+      when Option.is_some (Asrt.as_user_pred_name cp_name) -> (
+        let name = Option.get (Asrt.as_user_pred_name cp_name) in
         let args = ins @ outs in
         match preds_printer with
         | Some pp_pred -> (Fmt.hbox pp_pred) fmt (name, args)

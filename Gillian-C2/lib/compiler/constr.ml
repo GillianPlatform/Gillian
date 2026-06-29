@@ -36,8 +36,8 @@ module Others = struct
 
   (* The in/out split must match the runtime predicate definitions, since the
      engine trusts the split carried by the assertion. *)
-  let pred name ins outs = Asrt.Pred (name, ins, outs)
-  let pred_in name ins = Asrt.Pred (name, ins, [])
+  let pred name ins outs = Asrt.pred name ins outs
+  let pred_in name ins = Asrt.pred name ins []
 
   let malloced_abst ~ptr ~total_size =
     pred Internal_Predicates.malloced [ ptr ] [ total_size ]
