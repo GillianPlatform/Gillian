@@ -10,7 +10,7 @@ pred list(p; alpha) {
   p -m> struct ln { #head; #tail } *
     (alpha == #head::#beta) *
     list(#tail;#beta) *
-    i__is_int(len alpha);
+    i__is_int(len alpha;);
   (p == NULL) * (alpha == nil)
 }
 */

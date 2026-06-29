@@ -10,7 +10,7 @@ pred sll(p; alpha) {
   (p -m> struct ln { #head; #tail }) *
   (alpha == #head::#beta) *
   sll(#tail; #beta) *
-  i__is_size_t(len alpha);
+  i__is_size_t(len alpha;);
 
   (p == NULL) * (alpha == [])
 }
@@ -19,7 +19,7 @@ pred lseg(p, q; alpha) {
     (p -m> struct ln { #head; #tail }) *
     (alpha == #head::#beta) *
     lseg(#tail, q; #beta) *
-    i__is_size_t(len alpha);
+    i__is_size_t(len alpha;);
 
     (p == q) * (alpha == [])
 }
@@ -39,7 +39,7 @@ lemma lseg_to_list(p, alpha) {
 
 lemma lseg_append(p, q, alpha, a, end) {
     hypothesis: lseg(#p, #q; #alpha)
-                * (#q -m> struct ln { #a; #end }) * i__is_size_t(1 + len #alpha)
+                * (#q -m> struct ln { #a; #end }) * i__is_size_t(1 + len #alpha;)
     conclusions: lseg(#p, #end; #alpha @ [#a])
     proof:
       unfold lseg(#p, #q, #alpha)[[bind #head: #head,
@@ -53,7 +53,7 @@ lemma lseg_append(p, q, alpha, a, end) {
 */
 
 /*@ spec listAppend(x, v) {
-  requires: (x == #x) * sll(#x; #alpha) * (v == #v) * i__is_size_t(1 + len #alpha)
+  requires: (x == #x) * sll(#x; #alpha) * (v == #v) * i__is_size_t(1 + len #alpha;)
   ensures:  sll(ret; #alpha @ [ #v ])
 } */
 SLL* listAppend(SLL *x, int v) {
@@ -74,7 +74,7 @@ SLL* listAppend(SLL *x, int v) {
             (x == #v) *
             (z == #z) *
             sll(#z; #alpha) *
-            i__is_size_t(1 + len #alpha)
+            i__is_size_t(1 + len #alpha;)
   ensures: sll(ret; #head::#alpha)
 } */
 SLL* listPrepend(SLL *x, SLL *z) {
@@ -83,7 +83,7 @@ SLL* listPrepend(SLL *x, SLL *z) {
 }
 
 /*@ spec listPrependV(x, v) {
-  requires: (x == #x) * sll(#x; #alpha) * (v == #v) * i__is_size_t(1 + len #alpha)
+  requires: (x == #x) * sll(#x; #alpha) * (v == #v) * i__is_size_t(1 + len #alpha;)
   ensures: sll(ret; #v::#alpha)
 }
 */
@@ -136,7 +136,7 @@ SLL* listCopy(SLL *x) {
 }
 
 /*@ spec listConcat(x, y) {
-  requires: sll(#x; #alpha) * (x == #x) * sll(#y; #beta) * (y == #y) * i__is_size_t((len #alpha) + (len #beta))
+  requires: sll(#x; #alpha) * (x == #x) * sll(#y; #beta) * (y == #y) * i__is_size_t((len #alpha) + (len #beta);)
   ensures:  sll(ret; #alpha @ #beta)
 } */
 SLL* listConcat(SLL *x, SLL *y) {

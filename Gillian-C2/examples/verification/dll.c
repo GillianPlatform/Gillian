@@ -14,7 +14,7 @@ pred DLL(x; alpha) {
   DLL(#next; #beta) *
   (alpha == #val :: #beta) *
   (not (#next == NULL)) *
-  i__is_size_t(len alpha);
+  i__is_size_t(len alpha;);
 
   (x -m> struct dln {#val; #prev; NULL}) *
   (alpha == [ #val ])
@@ -35,7 +35,7 @@ DLL* makeNode(int x) {
 
 /*@ spec listConcat(x, y) {
   requires: (x == #x) * (y == #y) * DLL(#x; #alpha) * DLL(#y; #beta) *
-            i__is_size_t((len #alpha) + (len #beta))
+            i__is_size_t((len #alpha) + (len #beta);)
   ensures:  DLL(ret; #alpha @ #beta)
 } */
 DLL* listConcat(DLL *x, DLL *y) {
@@ -65,7 +65,7 @@ DLL* listConcat(DLL *x, DLL *y) {
 }
 
 /*@ spec listPrepend(x, v) {
-  requires: (x == #x) * (v == #v) * DLL(#x; #alpha) * i__is_size_t(1 + len #alpha)
+  requires: (x == #x) * (v == #v) * DLL(#x; #alpha) * i__is_size_t(1 + len #alpha;)
   ensures:  DLL(ret; #v :: #alpha)
 } */
 DLL* listPrepend(DLL *x, int v) {
@@ -81,7 +81,7 @@ DLL* listPrepend(DLL *x, int v) {
 }
 
 /*@ spec listAppend(x, v) {
-  requires: (x == #x) * (v == #v) * DLL(#x; #alpha) * i__is_size_t(1 + len #alpha)
+  requires: (x == #x) * (v == #v) * DLL(#x; #alpha) * i__is_size_t(1 + len #alpha;)
   ensures:  DLL(ret; #alpha @ [ #v ])
 } */
 DLL* listAppend(DLL *x, int v) { return listConcat(x, makeNode(v)); }
