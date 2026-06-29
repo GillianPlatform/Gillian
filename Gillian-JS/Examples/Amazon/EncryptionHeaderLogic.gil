@@ -14,7 +14,7 @@
     ----------------||----|----|---- ... ----||----------------
                 readPos
 *)
-pred Field(+buffer : List, +readPos : Num, field : List, length : Num) :
+pred Field(buffer : List, readPos : Num; field : List, length : Num) :
   (0 <=# readPos) * (is_int readPos) *
     (#rawFL == l-sub(buffer, as_int readPos, 2i)) *
     rawToUInt16(#rawFL, false, #fLength) *
@@ -43,7 +43,7 @@ pred Field(+buffer : List, +readPos : Num, field : List, length : Num) :
                 readPos
 *)
 @nopath
-pred CElement(+buffer : List, +readPos : Num, +fCount : Num, element : List, length : Num) :
+pred CElement(buffer : List, readPos : Num, fCount : Num; element : List, length : Num) :
   (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) *
     (fCount == 0) * (element == {{  }}) * (length == 0),
   (0 <# fCount) * Field(buffer, readPos, #field, #fLength) *
@@ -128,7 +128,7 @@ lemma AppendFieldCC(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
     ----------------||-------| ... |-------||----------------
                  readPos
 *)
-pred CElements(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
+pred CElements(buffer : List, readPos : Num, eCount : Num, fCount : Num;
                elements : List, length : Num) :
   (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) * (eCount == 0) *
   (0 <# fCount) * (elements == {{  }}) * (length == 0),
@@ -232,7 +232,7 @@ lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, ele
                 readPos
 *)
 @nopath
-pred IElement(+buffer : List, +readPos : Num, +fCount : Num, fList : List, eLength : Num) :
+pred IElement(buffer : List, readPos : Num, fCount : Num; fList : List, eLength : Num) :
   (* Base case: not enough data to read length of next field *)
   (0 <=# readPos) * (0 <# fCount) * (readPos <=# as_num (l-len buffer)) *
     (as_num (l-len buffer) <# (readPos + 2)) * (fList == {{  }}) *
@@ -329,7 +329,7 @@ lemma PrependCElementI(buffer, readPos, fCount1, fList1, eLength1, fCount2, fLis
                 readPos
 *)
 @nopath
-pred IElements(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
+pred IElements(buffer : List, readPos : Num, eCount : Num, fCount : Num;
                eList : List, esLength : Num) :
   (* Base case: single incomplete element *)
   (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) * (0 <# eCount) * (0 <# fCount) *
@@ -358,8 +358,8 @@ pred IElements(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
 
 (* A general element sequene is either a complete or an incomplete element sequence *)
 @nopath
-nounfold pred Elements(+buffer : List, +readPos : Num, +eCount : Num,
-                       +fCount : Num, definition : Str, eList : List,
+nounfold pred Elements(buffer : List, readPos : Num, eCount : Num,
+                       fCount : Num; definition : Str, eList : List,
                        esLength : Num) :
   (definition == "Complete") * CElements(buffer, readPos, eCount, fCount, eList, esLength),
   (definition == "Incomplete") * IElements(buffer, readPos, eCount, fCount, eList, esLength);
@@ -408,7 +408,7 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
 
 (* Complete serialised EDKs *)
 @nopath
-nounfold pred CRawEncryptedDataKeys(+buffer : List, +readPos : Num,
+nounfold pred CRawEncryptedDataKeys(buffer : List, readPos : Num;
                                     EDKs : List, EDKsLength : Num) :
     (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) *
     (#rawEC == l-sub(buffer, as_int readPos, 2i)) *
@@ -418,7 +418,7 @@ nounfold pred CRawEncryptedDataKeys(+buffer : List, +readPos : Num,
 
 (* Incomplete serialised EDKs *)
 @nopath
-nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num) :
+nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num;) :
   (* Not enough data to read the number of EDKs *)
   (is_int readPos) * (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) * (as_num (l-len buffer) <# (readPos + 2)),
 
@@ -430,7 +430,7 @@ nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num) :
 
 (* Broken serialised EDKs *)
 @nopath
-nounfold pred BRawEncryptedDataKeys(+buffer : List, +readPos : Num, errorMessage : Str) :
+nounfold pred BRawEncryptedDataKeys(buffer : List, readPos : Num; errorMessage : Str) :
   (* Incorrect starting position *)
   (is_int readPos) * ((readPos <# 0) \/ (as_num (l-len buffer) <# readPos)) *
     (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
@@ -444,7 +444,7 @@ nounfold pred BRawEncryptedDataKeys(+buffer : List, +readPos : Num, errorMessage
 
 (* General serialised EDKs *)
 @nopath
-nounfold pred RawEncryptedDataKeys(+buffer : List, +readPos : Num, definition : Str, EDKs : List, EDKsLength : Num, errorMessage : Str) :
+nounfold pred RawEncryptedDataKeys(buffer : List, readPos : Num; definition : Str, EDKs : List, EDKsLength : Num, errorMessage : Str) :
   (definition == "Complete") * (errorMessage == "") * CRawEncryptedDataKeys(buffer, readPos, EDKs, EDKsLength),
   (definition == "Incomplete") * IRawEncryptedDataKeys(buffer, readPos) * (EDKs == {{  }}) * (EDKsLength == 0) * (errorMessage == ""),
   (definition == "Broken") * BRawEncryptedDataKeys(buffer, readPos, errorMessage) * (EDKs == {{  }}) * (EDKsLength == 0);
@@ -470,7 +470,7 @@ nounfold pred RawEncryptedDataKeys(+buffer : List, +readPos : Num, definition : 
 
 (* Complete serialised encryption context *)
 @nopath
-nounfold pred CRawEncryptionContext(+buffer : List, ECKs : List) :
+nounfold pred CRawEncryptionContext(buffer : List; ECKs : List) :
   ((l-len buffer) == 0i) * (ECKs == {{  }}),
   (#rawKC == l-sub(buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) * (0 <# #keyCount) *
@@ -480,7 +480,7 @@ nounfold pred CRawEncryptionContext(+buffer : List, ECKs : List) :
 
 (* Broken serialised encryption context *)
 @nopath
-nounfold pred BRawEncryptionContext(+buffer:List, errorMessage:Str, ECKs:List) :
+nounfold pred BRawEncryptionContext(buffer:List; errorMessage:Str, ECKs:List) :
     (* Not enough data provided *)
     (2i i<# (l-len buffer)) *
     (#rawKC == l-sub (buffer, 0i, 2i)) *
@@ -510,7 +510,7 @@ nounfold pred BRawEncryptionContext(+buffer:List, errorMessage:Str, ECKs:List) :
 
 (* General serialised encryption context *)
 @nopath
-pred RawEncryptionContext(+buffer:List, definition:Str, ECKs:List, errorMessage:Str) :
+pred RawEncryptionContext(buffer:List; definition:Str, ECKs:List, errorMessage:Str) :
   (definition == "Complete") * CRawEncryptionContext(buffer, ECKs) * (errorMessage == ""),
   (definition == "Broken")   * BRawEncryptionContext(buffer, errorMessage, ECKs);
 
@@ -526,7 +526,7 @@ pred RawEncryptionContext(+buffer:List, definition:Str, ECKs:List, errorMessage:
 
 (* Correctly formed algorithm suite *)
 @nopath
-pred CAlgorithmSuite(+numId, stringId, ivLength, tagLength) :
+pred CAlgorithmSuite(numId; stringId, ivLength, tagLength) :
   (numId == 20) * (stringId == "ALG_AES128_GCM_IV12_TAG16") *
     (ivLength == 12) * (tagLength == 128),
   (numId == 70) * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) *
@@ -534,13 +534,13 @@ pred CAlgorithmSuite(+numId, stringId, ivLength, tagLength) :
 
 (* Broken algorithm suite *)
 @nopath
-pred BAlgorithmSuite(+numId, errorMessage) :
+pred BAlgorithmSuite(numId; errorMessage) :
   (! (numId == 20)) * (! (numId == 70)) *
   (errorMessage == "Malformed Header: Unsupported algorithm suite.");
 
 (* The object that holds information about allowed algorithm suites *)
 @nopath
-pred AlgorithmSuiteIdentifierObject(o) :
+pred AlgorithmSuiteIdentifierObject(o;) :
     JSObject(o) *
     DataProp(o, "20",  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20) *
     DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70) *
@@ -551,7 +551,7 @@ pred AlgorithmSuiteIdentifierObject(o) :
     TODO: This object is more complex than presented here.
  *)
 @nopath
-pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
+pred AlgorithmSuiteObject(aso: Obj; ivLength: Num, tagLength: Num) :
     JSObject(aso) *
     readOnlyProperty(aso, "ivLength",  ivLength) *
     readOnlyProperty(aso, "tagLength", tagLength);
@@ -567,12 +567,12 @@ pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
 
 (* The correct version and type *)
 @nopath
-pred CVersionAndType(version, type) :
+pred CVersionAndType(version, type;) :
   (version == 1) * (type == 128);
 
 (* Broken version and type *)
 @nopath
-pred BVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
+pred BVersionAndType(version:Num, type:Num; errorMessage:Str) :
     (version == 65) * (type == 89) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
     (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header: Unsupported version and/or type.");
 
@@ -581,7 +581,7 @@ pred BVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
 
 (* Serialised complete header *)
 @nopath
-nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
+nounfold pred CHeader(rawHeaderData; part_one, version, type, suiteId,
                       messageId, ECLength, part_two, ECKs, part_three, EDKs,
                       contentType, headerIvLength, frameLength, headerLength,
                       headerIv, headerAuthTag) :
@@ -609,7 +609,7 @@ nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
 
 (* Serialised incomplete header *)
 @nopath
-nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, ECLength,
+nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
     (* Not enough data to read first part *)
@@ -689,7 +689,7 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
 (* Broken serialised header *)
 @nopath
-nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, ECLength,
+nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
     (* Incorrect version and/or type *)
@@ -817,7 +817,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
 (* General serialised header *)
 @nopath
-nounfold pred Header(+rawHeaderData, definition, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
+nounfold pred Header(rawHeaderData; definition, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
     (* Complete header *)
     (definition == "Complete") *
     CHeader(rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *

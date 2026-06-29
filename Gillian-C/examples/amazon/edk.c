@@ -4,7 +4,7 @@ void __for_edk_struct_to_appear(struct aws_cryptosdk_edk edk) { (void)edk; }
 
 // Predicates describing pointers to valid and empty EDKs
 /*@
-    pred nounfold valid_aws_cryptosdk_edk_ptr(+edk, alloc, edk_content) {
+    pred nounfold valid_aws_cryptosdk_edk_ptr(edk; alloc, edk_content) {
         (edk -> struct aws_cryptosdk_edk {
             #provider_id;
             #provider_info;
@@ -16,7 +16,7 @@ void __for_edk_struct_to_appear(struct aws_cryptosdk_edk edk) { (void)edk; }
         (edk_content == [#prov_id_content, #prov_info_content, #ct_content])
     }
 
-    pred nounfold empty_aws_cryptosdk_edk_ptr(+edk) {
+    pred nounfold empty_aws_cryptosdk_edk_ptr(edk;) {
         (edk -> struct aws_cryptosdk_edk {
             #provider_id;
             #provider_info;

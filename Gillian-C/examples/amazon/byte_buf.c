@@ -13,7 +13,7 @@
 // A valid byte cursor is a structure that contains { len; ptr },
 // where ptr points to an array of size len (and types uint8_t)
 /*@
-    pred nounfold valid_aws_byte_cursor_ptr(+cur, length, buffer: List, alpha) {
+    pred nounfold valid_aws_byte_cursor_ptr(cur; length, buffer: List, alpha) {
         (cur -> struct aws_byte_cursor { long(0); buffer }) *
         (length == 0) * (alpha == nil);
 
@@ -37,7 +37,7 @@
 
 // Valid byte buffers
 /*@
-    pred valid_aws_byte_buf(+length, +capacity, +buffer, +allocator, content) {
+    pred valid_aws_byte_buf(length, capacity, buffer, allocator; content) {
         (length == 0) * (capacity == 0) * (buffer == NULL) * (content == []);
 
         (0 <# capacity) * (length <=# capacity) * (0 <=# length) *
@@ -48,22 +48,22 @@
         (not (allocator == NULL))
     }
 
-    pred empty_aws_byte_buf(+length, +capacity, +buffer, +allocator) {
+    pred empty_aws_byte_buf(length, capacity, buffer, allocator;) {
         (length == 0) * (capacity == 0) * (buffer == NULL) *
         (allocator == NULL)
     }
 
-    pred valid_aws_byte_buf_fields(+fields, length, capacity, buffer, allocator, content) {
+    pred valid_aws_byte_buf_fields(fields; length, capacity, buffer, allocator, content) {
         (fields == [ long(length), buffer, long(capacity), allocator ]) *
         valid_aws_byte_buf(length, capacity, buffer, allocator, content)
     }
 
-    pred empty_aws_byte_buf_fields(+fields) {
+    pred empty_aws_byte_buf_fields(fields;) {
         (fields ==  [ long(length), buffer, long(capacity), allocator ]) *
         empty_aws_byte_buf(length, capacity, buffer, allocator)
     }
 
-    pred empty_aws_byte_buf_ptr(+buf) {
+    pred empty_aws_byte_buf_ptr(buf;) {
         (buf -> struct aws_byte_buf {
             long(#length);
             #buffer;
@@ -73,7 +73,7 @@
         empty_aws_byte_buf(#length, #capacity, #buffer, #allocator)
     }
 
-    pred nounfold valid_aws_byte_buf_ptr(+buf, length, capacity, buffer, allocator, content) {
+    pred nounfold valid_aws_byte_buf_ptr(buf; length, capacity, buffer, allocator, content) {
         (buf -> struct aws_byte_buf {
             long(length);
             buffer;
@@ -156,13 +156,13 @@ void aws_byte_buf_clean_up(struct aws_byte_buf *buf) {
 // Predicates describing what it means for a byte
 // buffer read to be valid or invalid
 /*@
-    pure pred valid_read(read_len, cursor_len) {
+    pure pred valid_read(read_len, cursor_len;) {
         (read_len <=# cursor_len) *
         (read_len <=# 2147483647) *
         (cursor_len <=# 2147483647)
     }
 
-    pure pred invalid_read(read_len, cursor_len) {
+    pure pred invalid_read(read_len, cursor_len;) {
         cursor_len <# read_len;
         2147483647 <# read_len;
         2147483647 <# cursor_len

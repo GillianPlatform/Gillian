@@ -1034,7 +1034,7 @@ module Make (State : SState.S) :
     (* we attempt to consume the pred as-is from our state. *)
     match
       Preds.consume_pred ~maintain:pred_pure preds pname vs
-        (Containers.SI.of_list pred_def.pred_ins)
+        (Containers.SI.of_list (Pred.ins_indexes pred_def))
         (State.equals state)
     with
     | Some (_, vs) -> (
@@ -1905,7 +1905,8 @@ module Make (State : SState.S) :
     let make_pred_ins_table pred_tbl =
       let tbl = Hashtbl.create (Hashtbl.length pred_tbl) in
       Hashtbl.iter
-        (fun pname pred -> Hashtbl.add tbl pname pred.MP.pred.pred_ins)
+        (fun pname pred ->
+          Hashtbl.add tbl pname (Pred.ins_indexes pred.MP.pred))
         pred_tbl;
       tbl
 

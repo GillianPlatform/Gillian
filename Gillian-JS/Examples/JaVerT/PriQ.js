@@ -1,14 +1,14 @@
 "use strict";
 
 /**
-	@pred Node(+n, pri:Num, val, next, np:Obj) :
+	@pred Node(n; pri:Num, val, next, np:Obj) :
 		JSObjWithProto(n, np)     *
 		DataProp(n, "pri",  pri)  * (0 <# pri) *
 		DataProp(n, "val",  val)  *
 		DataProp(n, "next", next) *
 		((n, "insert") -> none);
 
-	@pred NodePrototype(np:Obj) :
+	@pred NodePrototype(np:Obj;) :
 		JSObject(np) *
 		DataProp(np, "insert", #insert_loc) *
 		JSFunctionObject(#insert_loc, "np_insert", _, _, _) *
@@ -16,28 +16,28 @@
 		((np, "val") -> none) *
 		((np, "next") -> none);
 
-	@pred NodeList(+nl, +np:Obj, max_pri:Num, length:Num) :
+	@pred NodeList(nl, np:Obj; max_pri:Num, length:Num) :
 		(nl == null) * (max_pri == 0) * (length == 0),
 
 		Node(nl, max_pri, #val, #next, np) * (0 <# max_pri) *
 		NodeList(#next, np, #pri, #len_nl) * (#pri <=# max_pri) *
 	    (0 <# length) * (length == #len_nl + 1);
 
-	@pred Queue(+pq, +np, qp, max_pri : Num, length : Num) :
+	@pred Queue(pq, np; qp, max_pri : Num, length : Num) :
 		JSObjWithProto(pq, qp) *
 		DataProp(pq, "_head",  #head) *
 		NodeList(#head, np, max_pri, length) *
 		((pq, "enqueue") -> none) *
 		((pq, "dequeue") -> none);
 
-	@pred QueuePrototype(+qp, np, qfs_sc):
+	@pred QueuePrototype(qp; np, qfs_sc):
 		JSObject(qp) *
 		DataProp(qp, "enqueue", #enqueue_loc) * JSFunctionObject(#enqueue_loc, "enqueue", qfs_sc, _, _) *
 		DataProp(qp, "dequeue", #dequeue_loc) * JSFunctionObject(#dequeue_loc, "dequeue", qfs_sc, _, _) *
 		((qp, "_head") -> none) *
 		sc_scope(enqueue, Node : #n, qfs_sc) * JSFunctionObject(#n, "Node", #node_sc, _, np) * NodePrototype(np);
 
-	@pred PriorityQueueModule(pq, np) :
+	@pred PriorityQueueModule(pq, np;) :
 	  JSFunctionObject(pq, "PriorityQueue", #pq_sc, _, #pqp) *
 	  QueuePrototype(#pqp, np, #qfs_sc) *
 	  o_chains(PriorityQueue: #pq_sc, enqueue: #qfs_sc);

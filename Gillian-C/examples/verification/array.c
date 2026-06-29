@@ -12,19 +12,19 @@ typedef struct Array {
 
 // The following should be in the Gillian-C stdlib
 /*@
-pred OARRAY(+p, +size, content) {
+pred OARRAY(p, size; content) {
   (size == 0) * (content == nil);
   (0 <# size)  * ARRAY(p, int, size, content) * ((len content) == size)
 }
 
-pred OUNINIT(+p, +size) {
+pred OUNINIT(p, size;) {
   (size == 0);
   (0 <# size) * UNDEFS(p, size)
 }
 */
 
 /*@
-pred valid_array(+ar, content) {
+pred valid_array(ar; content) {
   (ar -> struct Array { #buffer; long(#capacity); long(#size) }) *
   (0 <# #capacity) *
   (#size <=# #capacity) *

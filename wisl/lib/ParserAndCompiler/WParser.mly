@@ -117,7 +117,7 @@
 %type <WLExpr.t>                         variant_def
 %type <WLExpr.t>                         with_variant_def
 %type <WLCmd.t list>                     proof_def
-%type <(string * WType.t option) * bool> pred_param_ins
+%type <string * WType.t option>          pred_param
 %type <(string * string) list>           unfold_bindings
 %type <string * string>                  unfold_binding
 %type <CodeLoc.t * string list>          bindings_with_loc
@@ -475,20 +475,16 @@ proof_def:
     { pr }
 
 predicate:
-  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
+  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, pred_param); SEMICOLON;
+    outs = separated_list(COMMA, pred_param);
+    RBRACE; LCBRACE;
     pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
-      let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
-      (* ins looks like [true, false, true] *)
-      let ins = List.mapi (fun i is_in -> if is_in then Some i else None) ins in
-      (* ins looks like [Some 0, None, Some 2] *)
-      let ins = List.filter Option.is_some ins in
-      (* ins looks like [Some 0, Some 2] *)
-      let ins = List.map Option.get ins in
-      (* ins looks like [0, 2] *)
-  		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
-      (* if ins is empty then everything is an in *)
+      let pred_params = ins @ outs in
+      (* In-parameters are the first [List.length ins] parameters *)
+      let pred_ins = List.mapi (fun i _ -> i) ins in
       let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
       let pred_id = Generators.gen_id () in
@@ -502,11 +498,10 @@ predicate:
         pred_id;
       } }
 
-pred_param_ins:
-  | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
+pred_param:
+  | lx = IDENTIFIER; ty = option(preceded(COLON, type_target))
     { let (_, x) = lx in
-      let isin = Option.is_some inp in
-      ((x, Option.map fst $3), isin) }
+      (x, Option.map fst ty) }
 
 
 logic_command:

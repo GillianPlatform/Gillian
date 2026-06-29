@@ -14,7 +14,7 @@
     ----------------||----|----|---- ... ----||----------------
                 readPos
 *)
-pred Field(+buffer : List, +readPos : Int, field : List, length : Int) :
+pred Field(buffer : List, readPos : Int; field : List, length : Int) :
     (0i i<=# readPos) * (#rawFL == l-sub(buffer, readPos, 2i)) *
     rawToUInt16(#rawFL, false, #fieldLength) *
     (field == l-sub(buffer, (readPos i+ 2i), #fieldLength)) *
@@ -64,7 +64,7 @@ pred Field(+buffer : List, +readPos : Int, field : List, length : Int) :
                 readPos
 *)
 @nopath
-pred IElement(+buffer : List, +readPos : Int, +fCount : Int, fList : List, eLength : Int) :
+pred IElement(buffer : List, readPos : Int, fCount : Int; fList : List, eLength : Int) :
   (* Base case: not enough data to read length of next field *)
   (0i i<=# readPos) * (0i i<# fCount) * (readPos i<=# (l-len buffer)) *
     ((l-len buffer) i<# (readPos i+ 2i)) * (fList == {{  }}) *
@@ -123,7 +123,7 @@ pred IElement(+buffer : List, +readPos : Int, +fCount : Int, fList : List, eLeng
                 readPos
 *)
 @nopath
-pred IElements(+buffer : List, +readPos : Int, +eCount : Int, +fCount : Int,
+pred IElements(buffer : List, readPos : Int, eCount : Int, fCount : Int;
                eList : List, esLength : Int) :
   (* Base case: single incomplete element *)
   (0i i<=# readPos) * (readPos i<=# (l-len buffer)) * (0i i<# eCount) * (0i i<# fCount) *
@@ -159,7 +159,7 @@ pred IElements(+buffer : List, +readPos : Int, +eCount : Int, +fCount : Int,
                 readPos
 *)
 @nopath
-pred CElement(+buffer : List, +readPos : Int, +fCount : Int, element : List, length : Int) :
+pred CElement(buffer : List, readPos : Int, fCount : Int; element : List, length : Int) :
   (0i i<=# readPos) * (readPos i<=# (l-len buffer)) *
     (fCount == 0i) * (element == {{  }}) * (length == 0i),
   (0i i<# fCount) * Field(buffer, readPos, #field, #fLength) * ((typeOf #field) == List) *
@@ -193,7 +193,7 @@ pred CElement(+buffer : List, +readPos : Int, +fCount : Int, element : List, len
     ----------------||-------| ... |-------||----------------
                  readPos
 *)
-pred CElements(+buffer : List, +readPos : Int, +eCount : Int, +fCount : Int,
+pred CElements(buffer : List, readPos : Int, eCount : Int, fCount : Int;
                elements : List, length : Int) :
   (0i i<=# readPos) * (readPos i<=# (l-len buffer)) * (eCount == 0i) *
     (0i i<# fCount) * (elements == {{  }}) * (length == 0i),
@@ -236,7 +236,7 @@ lemma IElementsShift(buffer, readPos, eCount, fCount, shift)
       IElements(#rBuffer, #readPos i- #shift, #eCount, #fCount, #eList, #esLength) ]]
 
 
-nounfold pred Element(+buffer : List, +readPos : Int, +fCount : Int,
+nounfold pred Element(buffer : List, readPos : Int, fCount : Int;
                       definition : Str, fList : List, eLength : Int) :
   (definition == "Complete") *
     CElement(buffer, readPos, fCount, fList, eLength),
@@ -255,8 +255,8 @@ nounfold pred Element(+buffer : List, +readPos : Int, +fCount : Int,
 
 (* A general element sequene is either a complete or an incomplete element sequence *)
 @nopath
-nounfold pred Elements(+buffer : List, +readPos : Int, +eCount : Int,
-                       +fCount : Int, definition : Str, eList : List,
+nounfold pred Elements(buffer : List, readPos : Int, eCount : Int,
+                       fCount : Int; definition : Str, eList : List,
                        esLength : Int) :
   (definition == "Complete") * CElements(buffer, readPos, eCount, fCount, eList, esLength),
   (definition == "Incomplete") * IElements(buffer, readPos, eCount, fCount, eList, esLength);
@@ -289,7 +289,7 @@ lemma ElementsShift(buffer, readPos, eCount, fCount, shift)
 
 (* Complete serialised EDKs *)
 @nopath
-nounfold pred CRawEncryptedDataKeys(+buffer : List, +readPos : Int,
+nounfold pred CRawEncryptedDataKeys(buffer : List, readPos : Int;
                                     EDKs : List, EDKsLength : Int) :
     (0i i<=# readPos) * (readPos i<=# (l-len buffer)) *
     (#rawEC == l-sub(buffer, readPos, 2i)) *
@@ -300,7 +300,7 @@ nounfold pred CRawEncryptedDataKeys(+buffer : List, +readPos : Int,
 
 (* Incomplete serialised EDKs *)
 @nopath
-nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Int) :
+nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Int;) :
   (* Not enough data to read the number of EDKs *)
   (0i i<=# readPos) * (readPos i<=# (l-len buffer)) * ((l-len buffer) i<# (readPos i+ 2i)),
 
@@ -311,7 +311,7 @@ nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Int) :
 
 (* Broken serialised EDKs *)
 @nopath
-nounfold pred BRawEncryptedDataKeys(+buffer : List, +readPos : Int, errorMessage : Str, EDKs : List, EDKsLength : Int) :
+nounfold pred BRawEncryptedDataKeys(buffer : List, readPos : Int; errorMessage : Str, EDKs : List, EDKsLength : Int) :
     (* Incorrect starting position *)
     ((readPos i<# 0i) \/ ((l-len buffer) i<# readPos)) *
     (errorMessage == "deserializeMessageHeader: startPos out of bounds.") *
@@ -325,7 +325,7 @@ nounfold pred BRawEncryptedDataKeys(+buffer : List, +readPos : Int, errorMessage
 
 (* General serialised EDKs *)
 @nopath
-nounfold pred RawEncryptedDataKeys(+buffer : List, +readPos : Int, definition : Str, EDKs : List, EDKsLength : Int, errorMessage : Str) :
+nounfold pred RawEncryptedDataKeys(buffer : List, readPos : Int; definition : Str, EDKs : List, EDKsLength : Int, errorMessage : Str) :
   (definition == "Complete")   * (errorMessage == "") * CRawEncryptedDataKeys(buffer, readPos, EDKs, EDKsLength),
   (definition == "Incomplete") * (errorMessage == "") * IRawEncryptedDataKeys(buffer, readPos) * (EDKs == {{  }}) * (EDKsLength == 0i),
   (definition == "Broken") * BRawEncryptedDataKeys(buffer, readPos, errorMessage, EDKs, EDKsLength);
@@ -351,7 +351,7 @@ nounfold pred RawEncryptedDataKeys(+buffer : List, +readPos : Int, definition : 
 
 (* Complete serialised encryption context *)
 @nopath
-nounfold pred CRawEncryptionContext(+buffer : List, ECKs : List) :
+nounfold pred CRawEncryptionContext(buffer : List; ECKs : List) :
   (* ((l-len buffer) == 0i) * (ECKs == {{  }}), *)
   (0i i<# l-len buffer) * (#rawKC == l-sub(buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) * (0i i<# #keyCount) *
@@ -360,7 +360,7 @@ nounfold pred CRawEncryptionContext(+buffer : List, ECKs : List) :
     Unique(#ECKeys) * ((2i i+ #ECKsLength) == (l-len buffer));
 
 (* Broken serialised encryption context *)
-pure nounfold pred BRawEncryptionContext(+buffer:List, errorMessage:Str, ECKs:List) :
+pure nounfold pred BRawEncryptionContext(buffer:List; errorMessage:Str, ECKs:List) :
     (* Not enough data provided *)
     (buffer == l+ ({{ #kc0, #kc1 }}, #rest)) *
     rawToUInt16({{ #kc0, #kc1 }}, false, #keyCount) *
@@ -397,7 +397,7 @@ pure nounfold pred BRawEncryptionContext(+buffer:List, errorMessage:Str, ECKs:Li
 
 (* General serialised encryption context *)
 @nopath
-pure nounfold pred RawEncryptionContext(+buffer:List, definition:Str, ECKs:List, errorMessage:Str) :
+pure nounfold pred RawEncryptionContext(buffer:List; definition:Str, ECKs:List, errorMessage:Str) :
   (definition == "Complete") * CRawEncryptionContext(buffer, ECKs) * (errorMessage == ""),
   (definition == "Broken")   * BRawEncryptionContext(buffer, errorMessage, ECKs);
 
@@ -412,7 +412,7 @@ pure nounfold pred RawEncryptionContext(+buffer:List, definition:Str, ECKs:List,
 
 (* Correctly formed algorithm suite *)
 @nopath
-nounfold pred CAlgorithmSuite(+numId, stringId, ivLength, tagLength) :
+nounfold pred CAlgorithmSuite(numId; stringId, ivLength, tagLength) :
   (numId == 20i)   * (stringId == "ALG_AES128_GCM_IV12_TAG16_NO_KDF")                 * (ivLength == 12i) * (tagLength == 16i),
   (numId == 70i)   * (stringId == "ALG_AES192_GCM_IV12_TAG16_NO_KDF")                 * (ivLength == 12i) * (tagLength == 16i),
   (numId == 120i)  * (stringId == "ALG_AES256_GCM_IV12_TAG16_NO_KDF")                 * (ivLength == 12i) * (tagLength == 16i),
@@ -429,7 +429,7 @@ facts: (ivLength == 12i) and (tagLength == 16i);
 
 (* Broken algorithm suite *)
 @nopath
-pred BAlgorithmSuite(+numId, errorMessage) :
+pred BAlgorithmSuite(numId; errorMessage) :
   (! (numId == 20i)) * (! (numId == 70i)) * (! (numId == 120i)) * (! (numId == 276i)) * (! (numId == 326i)) * (! (numId == 376i)) *
   (! (numId == 532i)) * (! (numId == 838i)) * (! (numId == 888i)) * (! (numId == 1144i)) * (! (numId == 1400i)) *
   (errorMessage == "Malformed Header: Unsupported algorithm suite.");
@@ -445,19 +445,19 @@ pred BAlgorithmSuite(+numId, errorMessage) :
 
 (* Correctly formed algorithm suite *)
 @nopath
-pred CContentType(+contentType: Int) :
+pred CContentType(contentType: Int;) :
   (contentType == 1i) \/ (contentType == 2i);
 
 (* Broken algorithm suite *)
 @nopath
-pred BContentType(+contentType) :
+pred BContentType(contentType;) :
   (! (contentType == 1i)) * (! (contentType == 2i));
 
 (* If type is NONFRAMED (i.e. = 1i), frame_len has to be 0i, otherwise, if type is FRAMED (i.e = 2i), frame_len has to be > 0i *)
-pred CompatibleContentTypeAndFrameLength(+contentType: Int, +frameLength: Int):
+pred CompatibleContentTypeAndFrameLength(contentType: Int, frameLength: Int;):
   ((contentType == 1i) /\ (frameLength == 0i)) \/ ((contentType == 2i) /\ (0i i<# frameLength));
 
-pred IncompatibleContentTypeAndFrameLength(+contentType, +frameLength):
+pred IncompatibleContentTypeAndFrameLength(contentType, frameLength;):
   ((contentType == 1i) /\ (0i i<# frameLength)) \/ ((contentType == 2i) /\ (frameLength == 0i));
 
 
@@ -472,18 +472,18 @@ pred IncompatibleContentTypeAndFrameLength(+contentType, +frameLength):
 
 (* The correct version and type *)
 @nopath
-pred CVersionAndType(version, type) :
+pred CVersionAndType(version, type;) :
   (version == 1i) * (type == 128i);
 
 (* Broken version and type *)
-nounfold pred BVersionAndType(+version:Int, +type:Int, errorMessage:Str) :
+nounfold pred BVersionAndType(version:Int, type:Int; errorMessage:Str) :
     (version == 65i) * (type == 89i) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
     (! (version == 1i) \/ ! (type == 128i)) * (! (version == 65i) \/ ! (type == 89i)) * (errorMessage == "Malformed Header: Unsupported version and/or type.");
 
 
 
 (* Broken serialised header *)
-nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, ECLength,
+nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, ECDef, edkDef, errorMessage) :
     (* Incorrect version and/or type *)
@@ -657,7 +657,7 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
 
 (* Serialised incomplete header *)
-nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, ECLength,
+nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, edkDef) :
 
@@ -681,7 +681,7 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
 (* Serialised complete header *)
 @nopath
-nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
+nounfold pred CHeader(rawHeaderData; part_one, version, type, suiteId,
                       messageId, ECLength, part_two, ECKs, part_three, EDKs,
                       contentType, headerIvLength, frameLength, headerLength,
                       headerIv, headerAuthTag, edkDef) :
@@ -714,7 +714,7 @@ nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
 
 
 (* General serialised header *)
-nounfold pred Header(+rawHeaderData, definition, part_one, version, type,
+nounfold pred Header(rawHeaderData; definition, part_one, version, type,
                      suiteId, messageId, ECLength, part_two, ECKs,
                      part_three, EDKs, contentType, headerIvLength,
                      frameLength, headerLength, headerIv, headerAuthTag, edkDef,

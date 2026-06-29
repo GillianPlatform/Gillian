@@ -7,7 +7,9 @@ type t = TypeDef__.pred = {
   pred_internal : bool;
   pred_num_params : int;  (** Number of parameters *)
   pred_params : (string * Type.t option) list;  (** Actual parameters *)
-  pred_ins : int list;  (** List of which parameters are ins, by index *)
+  ins_number : int;
+      (** Number of in-parameters: the first [ins_number] parameters are ins,
+          and the remaining ones are outs *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions *)
   pred_facts : Expr.t list;  (** Facts that hold for every definition *)
@@ -26,65 +28,49 @@ let init (preds : t list) : (string, t) Hashtbl.t =
     preds;
   pred_def_tbl
 
+(** The list of in-parameter indices, i.e. [[0; 1; ...; ins_number - 1]]. Since
+    in-parameters are always the leading parameters, this is fully determined by
+    [ins_number]. *)
+let ins_indexes (pred : t) : int list = List.init pred.ins_number Fun.id
+
 let ins_and_outs (pred : t) : SI.t * SI.t =
-  let ins_set = SI.of_list pred.pred_ins in
-  let _, outs =
-    List.fold_left
-      (fun (i, lst) (_, _) ->
-        if SI.mem i ins_set then (i + 1, lst) else (i + 1, i :: lst))
-      (0, []) pred.pred_params
+  let total = List.length pred.pred_params in
+  let ins_set = SI.of_list (List.init pred.ins_number Fun.id) in
+  let outs_set =
+    SI.of_list
+      (List.init (total - pred.ins_number) (fun i -> i + pred.ins_number))
   in
-  let outs_set = SI.of_list outs in
   (ins_set, outs_set)
 
 let in_params (pred : t) : string list =
-  let ins_set = SI.of_list pred.pred_ins in
-  let _, ins =
-    List.fold_left
-      (fun (i, ins) (x, _) ->
-        if SI.mem i ins_set then (i + 1, x :: ins) else (i + 1, ins))
-      (0, []) pred.pred_params
-  in
-  List.rev ins
+  List.filteri (fun i _ -> i < pred.ins_number) pred.pred_params |> List.map fst
 
 let in_args (pred : t) (args : 'a list) : 'a list =
-  let ins_set = SI.of_list pred.pred_ins in
-  let _, in_args =
-    List.fold_left
-      (fun (i, ins) x ->
-        if SI.mem i ins_set then (i + 1, x :: ins) else (i + 1, ins))
-      (0, []) args
-  in
-  List.rev in_args
+  List.filteri (fun i _ -> i < pred.ins_number) args
 
 let out_params (pred : t) : string list =
-  let ins_set = SI.of_list pred.pred_ins in
-  let _, outs =
-    List.fold_left
-      (fun (i, outs) (x, _) ->
-        if SI.mem i ins_set then (i + 1, outs) else (i + 1, x :: outs))
-      (0, []) pred.pred_params
-  in
-  List.rev outs
+  List.filteri (fun i _ -> i >= pred.ins_number) pred.pred_params
+  |> List.map fst
 
 let out_args (pred : t) (args : 'a list) : 'a list =
-  let ins_set = SI.of_list pred.pred_ins in
-  let _, out_args =
-    List.fold_left
-      (fun (i, outs) x ->
-        if SI.mem i ins_set then (i + 1, outs) else (i + 1, x :: outs))
-      (0, []) args
-  in
-  List.rev out_args
+  List.filteri (fun i _ -> i >= pred.ins_number) args
 
 let pp fmt pred =
-  let show_ins = List.length pred.pred_ins != List.length pred.pred_params in
-  let pp_param fmt' (i, (p, topt)) =
+  let pp_param fmt' (p, topt) =
     let pp_t fmt'' t = Fmt.pf fmt'' " : %s" (Type.str t) in
-    let () = if show_ins && List.mem i pred.pred_ins then Fmt.string fmt' "+" in
     Fmt.pf fmt' "%s%a" p (Fmt.option pp_t) topt
   in
-  let pp_params = Fmt.iter_bindings ~sep:Fmt.comma List.iteri pp_param in
+  (* Prints the parameters as [(in1, ..., ink; out1, ..., outm)], with the
+     in-parameters and out-parameters separated by a semicolon. *)
+  let pp_params fmt' params =
+    let ins = List.filteri (fun i _ -> i < pred.ins_number) params in
+    let outs = List.filteri (fun i _ -> i >= pred.ins_number) params in
+    let pp_out_block fmt'' = function
+      | [] -> ()
+      | outs -> Fmt.pf fmt'' " %a" Fmt.(list ~sep:comma pp_param) outs
+    in
+    Fmt.pf fmt' "%a;%a" Fmt.(list ~sep:comma pp_param) ins pp_out_block outs
+  in
   let pp_id_exs fmt' (id, exs) =
     if List.length exs > 0 then
       Fmt.pf fmt' "[%s: %a] " id (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) exs
@@ -249,46 +235,18 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) :
       pred_facts = pred.pred_facts @ new_facts;
     }
 
-let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
-  let in_indexes = SI.of_list pred.pred_ins in
-  let max_index = List.length pred.pred_params in
-
-  let rec loop ins outs all cur_index =
-    if cur_index = max_index then all
-    else if SI.mem cur_index in_indexes then
-      match ins with
-      | [] -> raise (Failure "DEATH. combine_ins_outs")
-      | hd :: tl -> loop tl outs (hd :: all) (cur_index + 1)
-    else
-      match outs with
-      | [] -> raise (Failure "DEATH. combine_ins_outs")
-      | hd :: tl -> loop ins tl (hd :: all) (cur_index + 1)
-  in
-  List.rev (loop ins outs [] 0)
+(* In-parameters always come before out-parameters, so combining is just
+   concatenation. *)
+let combine_ins_outs (_pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
+  ins @ outs
 
 let iter_ins_outs
-    (pred : t)
+    (_pred : t)
     (fins : 'a -> unit)
     (fouts : 'b -> unit)
     ((ins, outs) : 'a list * 'b list) : unit =
-  let in_indexes = SI.of_list pred.pred_ins in
-  let max_index = List.length pred.pred_params in
-  let rec loop ins outs cur_index =
-    if cur_index = max_index then ()
-    else if SI.mem cur_index in_indexes then (
-      match ins with
-      | [] -> raise (Failure "DEATH. iter_ins_outs")
-      | hd :: tl ->
-          fins hd;
-          loop tl outs (cur_index + 1))
-    else
-      match outs with
-      | [] -> raise (Failure "DEATH. iter_ins_outs")
-      | hd :: tl ->
-          fouts hd;
-          loop ins tl (cur_index + 1)
-  in
-  loop ins outs 0
+  List.iter fins ins;
+  List.iter fouts outs
 
 let pp_ins_outs (pred : t) pp_in pp_out =
   let pp_iter2 iter pp_a pp_b ppf v =

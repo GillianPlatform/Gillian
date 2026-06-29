@@ -346,23 +346,23 @@ assertion_id_target:
 ;
 
 pred_param_target:
-  (* Program variable with in-parameter status and optional type *)
-  | in_param = option(FPLUS); v = VAR; t = option(preceded(COLON, type_target))
-    { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
-      (v, t), in_param }
+  (* Program variable with optional type *)
+  | v = VAR; t = option(preceded(COLON, type_target))
+    { (v, t) }
 ;
 
+(* Predicate parameters: in-parameters and out-parameters, separated by a
+   semicolon. E.g. [(in1, in2; out1, out2)], [(in1, in2;)] for all-ins,
+   [(;out1, out2)] for all-outs. *)
 pred_head_target:
-  name = proc_name; LBRACE; params = separated_list(COMMA, pred_param_target); RBRACE;
-  { (* Register the predicate declaration in the syntax checker *)
+  name = proc_name; LBRACE;
+    ins = separated_list(COMMA, pred_param_target); SCOLON;
+    outs = separated_list(COMMA, pred_param_target);
+  RBRACE;
+  { let params = ins @ outs in
     let num_params = List.length params in
-    let params, ins = List.split params in
-    let param_names, _ = List.split params in
-    let ins = List.map Option.get (List.filter (fun x -> x <> None) (List.mapi (fun i is_in -> if is_in then Some i else None) ins)) in
-    let ins = if (List.length ins > 0) then ins else (List.mapi (fun i _ -> i) param_names) in
-    (* register_predicate name num_params; *)
-    (* enter_predicate params; *)
-    (name, num_params, params, ins)
+    let ins_number = List.length ins in
+    (name, num_params, params, ins_number)
   }
 ;
 
@@ -975,7 +975,7 @@ g_pred_target:
     let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
     let pred_nounfold = pred_abstract || Option.is_some nounfold in
-    let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let (pred_name, pred_num_params, pred_params, ins_number) = pred_head in
     let pred_definitions = Option.value ~default:[] pred_definitions in
     let () = if (pred_abstract <> (pred_definitions = [])) then
       raise (Failure (Format.asprintf "Malformed predicate %s: either abstract with definition or non-abstract without definition." pred_name))
@@ -1000,7 +1000,7 @@ g_pred_target:
         pred_internal = Option.is_some internal;
         pred_num_params;
         pred_params;
-        pred_ins;
+        ins_number;
         pred_definitions;
         pred_facts;
         pred_guard;

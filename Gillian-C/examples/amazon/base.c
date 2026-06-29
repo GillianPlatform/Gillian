@@ -14,22 +14,22 @@
     Our predicate describes the valid case.
 */
 /*@
-    pred aws_add_u64_checked(+a, +b, out) {
+    pred aws_add_u64_checked(a, b; out) {
         (out == (a + b)) *
         (out <# 4611686018427387903)
     }
 
-    pred aws_mul_u64_checked(+a, +b, out) {
+    pred aws_mul_u64_checked(a, b; out) {
         (out == (a * b)) *
         (out <# 4611686018427387903)
     }
 
-    pred nounfold writable_memory(+pointer, +length, content) {
+    pred nounfold writable_memory(pointer, length; content) {
         (length == 0) * (content == []);
         (0 <# length) * ARRAY(pointer, char, length, content)
     }
 
-    pred nounfold optBytes(+bytes, +length, content) {
+    pred nounfold optBytes(bytes, length; content) {
         (length == 0) * (content == nil);
         (0 <# length) * ARRAY(bytes, char, length, content)
     }

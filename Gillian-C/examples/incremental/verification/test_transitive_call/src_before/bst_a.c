@@ -1,6 +1,6 @@
 #include "bst.h"
 
-/*@ pred BST(+x, K) {
+/*@ pred BST(x; K) {
   (x == NULL) * (K == -{ }-);
 
   x -m> struct bstn { int(#val); #left; #right } *

@@ -7,14 +7,14 @@
  ****************************************)
 
 (* Interpretation: one byte as an unsigned 8-bit integer *)
-pure pred rawToUInt8(+bytes:List, x:Num) :
+pure pred rawToUInt8(bytes:List; x:Num) :
     (bytes == {{ #b0 }}) * (x == #b0) *
     (0 <=# #b0) * (#b0 <# 256.) *
     (is_int #b0);
 
 (* Interpretation: two bytes as an unsigned 16-bit integer *)
 @nopath
-pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, x:Num) :
+pure pred rawToUInt16(bytes:List, littleEndian:Bool; x:Num) :
     (littleEndian == false) *
       (bytes == {{ #b0, #b1 }}) *
       (0. <=# #b0) * (#b0 <# 256.) *
@@ -33,7 +33,7 @@ pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, x:Num) :
 
 (* Interpretation: four bytes as an unsigned 32-bit integer *)
 @nopath
-pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, x:Num) :
+pure pred rawToUInt32(bytes:List, littleEndian:Bool; x:Num) :
     (littleEndian == false) *
       (bytes == {{ #b0, #b1, #b2, #b3 }}) *
       (0. <=# #b0) * (#b0 <# 256.) *

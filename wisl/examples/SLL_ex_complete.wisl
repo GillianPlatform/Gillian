@@ -1,7 +1,7 @@
 //
 // Standard over-approximating SLL predicate with contents
 //
-predicate SLL(+x, vs) {
+predicate SLL(x; vs) {
   // Empty SLL
   (x == null) * (vs == []);
   // One SLL node and the rest
@@ -12,7 +12,7 @@ predicate SLL(+x, vs) {
 //
 // Pure predicate for list membership
 //
-predicate list_member(+vs, +v, r : Bool){
+predicate list_member(vs, v; r : Bool){
   (vs == []) * (r == false);
   (vs == v :: #rest) * (r == true) * list_member(#rest, v, #mem);
   (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
@@ -224,7 +224,7 @@ function SLL_free(x){
 //
 // Standard over-approximating SLL segment predicate with contents
 //
-predicate SLLseg(+x, y, vs) {
+predicate SLLseg(x; y, vs) {
   (x == y) * (vs == []);
   (x -b> #v, #next) * SLLseg(#next, y, #vs) * (vs == #v :: #vs)
 }

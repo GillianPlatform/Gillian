@@ -8,7 +8,7 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
 
 // A predicate that allows us to connect JS and C error messages
 /*@
-    pred nounfold ECErrorCodeOfJSErrorMessage(errorMessage) {
+    pred nounfold ECErrorCodeOfJSErrorMessage(errorMessage;) {
         (errorMessage == `decodeEncryptionContext: Underflow, not enough data.`) * aws_last_error_is_SHORT_BUF();
         (errorMessage == `decodeEncryptionContext: Not enough data to read key count.`) * aws_last_error_is_SHORT_BUF();
         (errorMessage == `decodeEncryptionContext: Key Count is 0.`) * aws_last_error_is_BAD_CIPHERTEXT();
@@ -18,11 +18,11 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
 
 // Auxiliary predicates for capturing the loop invariant of the EC deserialisation
 /*@
-    pred enc_ctx_complete_case_equality(+ECKs, +elements, +restElements, +consumedElements, +keys, +consumedKeys, +restKeys) {
+    pred enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys;) {
         (ECKS == elements) * (keys == consumedKeys @ restKeys)
     }
 
-    pred nounfold enc_ctx_deser_invariant_cases(+definition, +elementsDef, +aad_len, +esLength, +restEsLength, +restLength, +ECKs, +elements, +consumedElements, +restElements, +keys, +consumedKeys, +restKeys, errorMessage) {
+    pred nounfold enc_ctx_deser_invariant_cases(definition, elementsDef, aad_len, esLength, restEsLength, restLength, ECKs, elements, consumedElements, restElements, keys, consumedKeys, restKeys; errorMessage) {
         (definition == `Complete`) * (elementsDef == `Complete`) *
         (aad_len == 2 + esLength) *
         enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) *

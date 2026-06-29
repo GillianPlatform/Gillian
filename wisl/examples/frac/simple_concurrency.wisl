@@ -1,9 +1,9 @@
-predicate is_zero(+x, y) {
+predicate is_zero(x; y) {
     (x == 0) * (y == 1);
     (! (x == 0)) * (y == 0)
 }
 
-predicate is_int(+x: Int) {
+predicate is_int(x: Int;) {
     emp
 }
 

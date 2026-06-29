@@ -1,4 +1,4 @@
-predicate tree(+t) {
+predicate tree(t;) {
     (t == null);
     (t -b> #v, #left, #right) * tree(#left) * tree(#right)
 }

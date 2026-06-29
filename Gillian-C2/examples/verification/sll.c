@@ -6,7 +6,7 @@ typedef struct ln {
 } SLL;
 
 /*@
-pred sll(+p, alpha) {
+pred sll(p; alpha) {
   (p -m> struct ln { #head; #tail }) *
   (alpha == #head::#beta) *
   sll(#tail, #beta) *
@@ -15,7 +15,7 @@ pred sll(+p, alpha) {
   (p == NULL) * (alpha == [])
 }
 
-pred lseg(+p, +q, alpha) {
+pred lseg(p, q; alpha) {
     (p -m> struct ln { #head; #tail }) *
     (alpha == #head::#beta) *
     lseg(#tail, q, #beta) *

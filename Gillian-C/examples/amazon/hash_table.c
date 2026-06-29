@@ -4,24 +4,24 @@
 /*@
     import `logic/hash_table_ax`;
 
-    pred valid_hash_table_fields(+fields, alloc, rawContents, contents) {
+    pred valid_hash_table_fields(fields; alloc, rawContents, contents) {
         (fields == [ #p_impl ]) * (not (#p_impl == NULL)) *
         toUtf8PairMap(rawContents, contents) *
         axiomatic_hash_table_in_memory(#p_impl, alloc, rawContents, contents)
     }
 
-    pred empty_hash_table_fields(+fields, alloc) {
+    pred empty_hash_table_fields(fields; alloc) {
         valid_hash_table_fields(fields, alloc, [], [])
     }
 
-    pred nounfold valid_hash_table_ptr(+hash, alloc, rawContents, contents) {
+    pred nounfold valid_hash_table_ptr(hash; alloc, rawContents, contents) {
         (hash -> struct aws_hash_table { #impl }) *
         (not (#impl == NULL)) *
         toUtf8PairMap(rawContents, contents) *
         axiomatic_hash_table_in_memory(#impl, alloc, rawContents, contents)
     }
 
-    pred empty_hash_table_ptr(+hash, alloc) {
+    pred empty_hash_table_ptr(hash; alloc) {
         valid_hash_table_ptr(hash, alloc, nil, nil)
     }
 */

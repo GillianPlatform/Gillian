@@ -1,4 +1,4 @@
-predicate list(+x, alpha) {
+predicate list(x; alpha) {
     (x == null) * (alpha == nil);
     (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
 }

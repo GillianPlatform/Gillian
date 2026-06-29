@@ -272,7 +272,7 @@ let create_pre_scope_pred
     name = pre_scope_prefix ^ fid;
     num_params = List.length p_args + 1;
     params;
-    ins = [ 0 ];
+    ins_number = 1;
     definitions = [ (None, Asrt.star (a_schain :: a_vars)) ];
     facts = [];
     pure = false;
@@ -310,7 +310,7 @@ let create_function_predicate
     name = pred_name;
     num_params = 1;
     params = [ ("x", None) ];
-    ins = [ 0 ];
+    ins_number = 1;
     definitions = [ (None, Asrt.star [ fo_asrt; proto_asrt ]) ];
     facts = [];
     pure = false;
@@ -324,7 +324,7 @@ let create_function_predicate
   name        : string;                                            (** Name of the predicate  *)
   num_params  : int;                                               (** Number of parameters   *)
   params      : (string * Type.t option) list;                     (** Actual parameters      *)
-  ins         : int list;                                          (** Ins                    *)
+  ins_number  : int;                                               (** Number of in-params    *)
   definitions : (((string * (string list)) option) * Asrt.t) list; (** Predicate definitions  *)
   pure        : bool;                                              (** Is the predicate pure  *)
   normalised  : bool;                                              (** If the predicate has been previously normalised *)
@@ -394,7 +394,7 @@ let create_post_scope_pred
     name = post_scope_prefix ^ fid;
     num_params = List.length params;
     params;
-    ins = [ 0; 1 ];
+    ins_number = 2;
     definitions =
       [ (None, Asrt.star (pre_scope_asrt :: (args_asrts @ er_asrts))) ];
     facts = [];

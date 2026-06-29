@@ -209,7 +209,8 @@ let convert_struct_param ~ctx ~offset ~struct_name = function
 
 let gen_pred_of_struct ctx ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
-  let pred_ins = [ 0; 1 ] in
+  (* The location and offset (the first two parameters) are the ins *)
+  let ins_number = 2 in
   let components =
     let struct_tag = "tag-" ^ struct_name in
     Ctx.resolve_struct_components ctx (Ctx.tag_lookup ctx struct_tag)
@@ -237,7 +238,7 @@ let gen_pred_of_struct ctx ann struct_name =
         pred_source_path = None;
         pred_loc = None;
         pred_internal = true;
-        pred_ins;
+        ins_number;
         pred_num_params;
         pred_params;
         pred_facts = [ (* FIXME: there are probably some facts to get *) ];
@@ -596,12 +597,8 @@ let trans_asrt_annot da =
 
 let trans_abs_pred ~filepath cl_pred =
   let CAbsPred.
-        {
-          name = pred_name;
-          params = pred_params;
-          ins = pred_ins;
-          pure = pred_pure;
-        } =
+        { name = pred_name; params = pred_params; ins_number; pure = pred_pure }
+      =
     cl_pred
   in
   let pred_num_params = List.length pred_params in
@@ -613,7 +610,7 @@ let trans_abs_pred ~filepath cl_pred =
       pred_internal = false;
       pred_num_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions = [];
       pred_facts = [];
       pred_guard = None;
@@ -630,7 +627,7 @@ let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
           name = pred_name;
           params = pred_params;
           definitions;
-          ins = pred_ins;
+          ins_number;
           no_unfold;
           pure = pred_pure;
         } =
@@ -655,7 +652,7 @@ let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
       pred_internal = false;
       pred_num_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions;
       (* FIXME: ADD SUPPORT FOR FACTS *)
       pred_facts = [];
@@ -787,11 +784,11 @@ let add_trans_lemma ~ctx ~pvar_map filepath ann cl_lemma =
 
 module Machine_preds = struct
   let mk_pred pred_name params def =
-    let ins = ref [] in
+    let ins_number = ref 0 in
     let pred_params =
       params
-      |> List.mapi (fun i (p, ty, is_in) ->
-             let () = if is_in then ins := i :: !ins in
+      |> List.map (fun (p, ty, is_in) ->
+             let () = if is_in then incr ins_number in
              (p, ty))
     in
     Pred.
@@ -802,7 +799,7 @@ module Machine_preds = struct
         pred_internal = true;
         pred_num_params = List.length params;
         pred_params;
-        pred_ins = List.rev !ins;
+        ins_number = !ins_number;
         pred_definitions = [ (None, def) ];
         pred_facts = [];
         pred_guard = None;

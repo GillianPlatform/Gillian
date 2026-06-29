@@ -648,7 +648,9 @@ module Pred : sig
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
-    pred_ins : int list;  (** Ins *)
+    ins_number : int;
+        (** Number of in-parameters: the first [ins_number] parameters are ins,
+            and the remaining ones are outs *)
     pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
     pred_facts : Expr.t list;  (** Facts that hold for every definition *)
@@ -661,6 +663,10 @@ module Pred : sig
 
   (** Populates a Hashtbl from the given predicate list *)
   val init : t list -> (string, t) Hashtbl.t
+
+  (** [ins_indexes p] is the list of in-parameter indices
+      [[0; ...; ins_number - 1]] *)
+  val ins_indexes : t -> int list
 
   (** Returns the sets of in- and out-parameters of a predicate *)
   val ins_and_outs : t -> Utils.Containers.SI.t * Utils.Containers.SI.t

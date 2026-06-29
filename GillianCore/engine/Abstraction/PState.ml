@@ -444,7 +444,7 @@ module Make (State : SState.S) :
     let pred_ins =
       Hashtbl.fold
         (fun name (pred : Pred.t) pred_ins ->
-          Hashtbl.add pred_ins name pred.pred_ins;
+          Hashtbl.add pred_ins name (Pred.ins_indexes pred);
           pred_ins)
         prog.prog.preds
         (Hashtbl.create Config.medium_tbl_size)
@@ -618,7 +618,7 @@ module Make (State : SState.S) :
     let pred_ins =
       Hashtbl.fold
         (fun name (pred : Pred.t) pred_ins ->
-          Hashtbl.add pred_ins name pred.pred_ins;
+          Hashtbl.add pred_ins name (Pred.ins_indexes pred);
           pred_ins)
         prog.prog.preds
         (Hashtbl.create Config.medium_tbl_size)
@@ -949,7 +949,7 @@ module Make (State : SState.S) :
           let pred_ins =
             Hashtbl.fold
               (fun name (pred : Pred.t) pred_ins ->
-                Hashtbl.add pred_ins name pred.pred_ins;
+                Hashtbl.add pred_ins name (Pred.ins_indexes pred);
                 pred_ins)
               prog.prog.preds
               (Hashtbl.create Config.medium_tbl_size)

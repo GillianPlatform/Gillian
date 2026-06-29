@@ -971,6 +971,8 @@ let compile_pred filepath pred =
       =
     pred
   in
+  (* WISL puts in-parameters first, so [ins_number] is their count *)
+  let ins_number = List.length pred_ins in
   let types = WTypeMap.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WTypeMap.type_of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
@@ -991,7 +993,7 @@ let compile_pred filepath pred =
       pred_internal = false;
       pred_num_params = List.length pred_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
       (* FIXME: ADD SUPPORT FOR FACTS, GUARD, ABSTRACT, PURE *)

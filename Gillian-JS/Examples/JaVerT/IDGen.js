@@ -1,7 +1,7 @@
 "use strict";
 
 /**
-@pred idGenerator(+ig, +sc_ig, c_val : Num, prefix : Str) :
+@pred idGenerator(ig, sc_ig; c_val : Num, prefix : Str) :
    JSObject(ig) * 
    DataProp(ig, "getId", #gni) * JSFunctionObject(#gni, "getId", #gni_sc, _, _) *
    DataProp(ig, "reset", #ri)  * JSFunctionObject(#ri, "reset", #ri_sc, _, _) *

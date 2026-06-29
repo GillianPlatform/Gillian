@@ -13,7 +13,7 @@
 *)
 
 @internal
-pred m_struct_aws_string_exposing_pointer(+ptr: List, allocator : List,
+pred m_struct_aws_string_exposing_pointer(ptr: List; allocator : List,
                           len : List, bytes : List) :
   i__ptr_to_0(ptr, #loc) *
   i__is_ptr_opt(allocator) *

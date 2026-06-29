@@ -1,4 +1,4 @@
-predicate points_to_sub(+x, +a: Float, +b: Float) {
+predicate points_to_sub(x, a: Float, b: Float;) {
     (a f>= b) * (#v == a f- b) * (x -> #v);
     (a f< b) * (#v == b f- a) * (x -> #v)
 }

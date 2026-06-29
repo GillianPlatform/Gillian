@@ -13,7 +13,7 @@ struct vector_s {
 typedef struct vector_s Vector;
 
 /*@
-    pred nounfold vector(+p, cap, alpha) {
+    pred nounfold vector(p; cap, alpha) {
         p -m> struct vector_s { long(0); long(0); NULL } *
         (cap == 0) * (alpha == nil);
     

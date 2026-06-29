@@ -775,7 +775,7 @@ struct
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
-              Hashtbl.add pred_ins name pred.pred.pred_ins;
+              Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
               pred_ins)
             preds
             (Hashtbl.create Config.medium_tbl_size)
@@ -1024,7 +1024,7 @@ struct
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : MP.pred) pred_ins ->
-            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
             pred_ins)
           preds
           (Hashtbl.create Config.medium_tbl_size)

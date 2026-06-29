@@ -14,11 +14,11 @@
     the raw bytes rawData to UTF-8 format
 *)
 @nopath
-abstract pure nounfold pred toUtf8(+rawData : List, utf8Data : Str);    
+abstract pure nounfold pred toUtf8(rawData : List; utf8Data : Str);    
     
 (* UTF-8 Mapping of lists of pairs *)
 @nopath
-pure pred toUtf8PairMap(+data : List, utf8Data : List) : (data == {{  }}) *
+pure pred toUtf8PairMap(data : List; utf8Data : List) : (data == {{  }}) *
   (utf8Data == {{  }}),
   (data == l+ ({{ {{ #prop, #value }} }}, #rest)) *
     toUtf8(#prop, #utf8Prop) * toUtf8(#value, #utf8Value) *

@@ -7,7 +7,7 @@ typedef struct dln {
 } DLL;
 
 /*@
-pred DLL(+x, alpha) {
+pred DLL(x; alpha) {
   (x == NULL) * (alpha == nil);
 
   (x -m> struct dln {#val; #prev; #next}) *

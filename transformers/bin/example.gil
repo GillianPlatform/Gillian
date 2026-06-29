@@ -2,7 +2,7 @@
    To verify this code, use the following transformer stack:
    OpenPMap (IntegerIndex) (Freeable (Exclusive)) *)
 
-pred sll(+x, vs: List) :
+pred sll(x; vs: List) :
     (* empty list *)
     (x == null) * (vs == {{  }}),
     (* non-empty list *)
@@ -101,7 +101,7 @@ end:
     return
 };
 
-pred sll_member(+vs : List, +v, r : Bool) :
+pred sll_member(vs : List, v; r : Bool) :
     (vs == {{  }}) * (r == false), (* empty list *)
     (vs == l+ ({{  v  }}, #vs2)) *   (r == true) * sll_member(#vs2, v, #etc), (* found a match *)
     (vs == l+ ({{ #v2 }}, #vs2)) * (!(v == #v2)) * sll_member(#vs2, v, r); (* no match yet *)

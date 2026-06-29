@@ -35,7 +35,7 @@ function needs(condition, errorMessage) {
 /**
     @id readElements
 
-    @pred nounfold innerLoopInvariantFacts(+definition, +remElsList, +view, +innerLoopReadPos, +fLeft, +remElList, +eLength, +remElsLength, +doneElLength, remElLength) :
+    @pred nounfold innerLoopInvariantFacts(definition, remElsList, view, innerLoopReadPos, fLeft, remElList, eLength, remElsLength, doneElLength; remElLength) :
       (definition == "Complete") * CElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength),
       (definition == "Incomplete") * (remElsList == {{ }}) * IElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (remElsLength == doneElLength + remElLength),
       (definition == "Incomplete") * (! (remElsList == {{ }})) * CElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength);
@@ -268,7 +268,7 @@ var toUtf8 = function (buffer) { };
 
 /**
 
-    @pred nounfold UniqueOrDuplicated(definition:Str, lst1:List, lst2:List, lst3:List) :
+    @pred nounfold UniqueOrDuplicated(definition:Str, lst1:List, lst2:List, lst3:List;) :
         (definition == "Complete") * Unique(lst1),
         (definition == "Broken") * Duplicated(lst2, lst3);
 

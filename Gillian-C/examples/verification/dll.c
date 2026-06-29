@@ -6,7 +6,7 @@ typedef struct dln {
     struct dln *next;
 } DLL;
 
-/*@ pred DLL(+x, alpha) {
+/*@ pred DLL(x; alpha) {
   (x == NULL) * (alpha == nil);
   (x -m> struct dln {#val; #prev; #next}) *
   DLL(#next, #beta) * (alpha == #val :: #beta) *

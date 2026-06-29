@@ -23,7 +23,7 @@
 
 // Optional value or null
 /*@
-pred or_NULL(+x, +x_opt) {
+pred or_NULL(x, x_opt;) {
     x_opt == x;
     x_opt == NULL
 }
@@ -31,7 +31,7 @@ pred or_NULL(+x, +x_opt) {
 
 // Any valid header
 /*@
-pred nounfold any_valid_aws_cryptosdk_hdr(+hdr, allocator) {
+pred nounfold any_valid_aws_cryptosdk_hdr(hdr; allocator) {
   (hdr -> struct aws_cryptosdk_hdr {
     allocator;
     #alg_id;
@@ -53,7 +53,7 @@ pred nounfold any_valid_aws_cryptosdk_hdr(+hdr, allocator) {
 
 // Empty header
 /*@
-pred nounfold empty_aws_cryptosdk_hdr(+hdr, allocator) {
+pred nounfold empty_aws_cryptosdk_hdr(hdr; allocator) {
   (hdr -> struct aws_cryptosdk_hdr {
     allocator;
     int(0);
@@ -75,7 +75,7 @@ pred nounfold empty_aws_cryptosdk_hdr(+hdr, allocator) {
 
 // Deserialised header
 /*@
-pred nounfold header_struct(+hdr, allocator, alg_id, message_id, enc_ctx_content, edk_content, frame_len, auth_len, iv, auth_tag) {
+pred nounfold header_struct(hdr; allocator, alg_id, message_id, enc_ctx_content, edk_content, frame_len, auth_len, iv, auth_tag) {
   (hdr -> struct aws_cryptosdk_hdr {
     allocator;
     int(alg_id);

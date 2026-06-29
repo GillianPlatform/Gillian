@@ -5,7 +5,7 @@ typedef struct ln {
   struct ln* next;
 } SLL;
 
-/*@ pred UList(+x, E) {
+/*@ pred UList(x; E) {
   (x == NULL) * (E == -{}-);
 
   (x -m> struct ln { int(#val); NULL }) * (E == -{ #val }-);
@@ -15,7 +15,7 @@ typedef struct ln {
   (E == -u-(-{ #val }-, #Ep))
 } */
 
-/*@ pred OUList(+x, E) {
+/*@ pred OUList(x; E) {
   (x == NULL) * (E == -{ }-);
 
   (x -m> struct ln { int(#val); NULL }) * (E == -{ #val }-);

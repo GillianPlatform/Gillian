@@ -1,10 +1,10 @@
 "use strict";
 
 /* 
-  @pred Node(+x:Obj, val, prev, next) : 
+  @pred Node(x:Obj; val, prev, next) : 
     JSObject(x) * DataProp(x, "val", val) * DataProp(x, "prev", prev) * DataProp(x, "next", next);
 
-  @pred DLL(+x, alpha:List) :
+  @pred DLL(x; alpha:List) :
     (x == null) * (alpha == {{ }}),
     Node(x, #val, #prev, #next) * DLL(#next, #beta) * (alpha == #val :: #beta);
 */

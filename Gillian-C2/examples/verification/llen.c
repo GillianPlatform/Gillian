@@ -6,7 +6,7 @@ typedef struct ln {
 } SLL;
 
 /*@
-pred list(+p, alpha) {
+pred list(p; alpha) {
   p -m> struct ln { #head; #tail } *
     (alpha == #head::#beta) *
     list(#tail,#beta) *

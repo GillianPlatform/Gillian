@@ -17,7 +17,7 @@
 // Various predicates for dealing with array lists of edks
 /*@
 
-    pred edk_array_list_content_pref(+data, +size, +alloc, content) {
+    pred edk_array_list_content_pref(data, size, alloc; content) {
         (size == 0) * (content == []);
         (0 <=# (size - 96)) *
         valid_aws_cryptosdk_edk_ptr(data, alloc, #edk) *
@@ -43,12 +43,12 @@
             }
     }
 
-    pred nounfold optPadding(+p, +sz) {
+    pred nounfold optPadding(p, sz;) {
         (sz == 0);
         (1 <=# sz) * ARRAY(p, char, sz, #fill)
     }
 
-    pred edk_array_list_data_content(+data, +prefix_size, +total_size, +alloc, content) {
+    pred edk_array_list_data_content(data, prefix_size, total_size, alloc; content) {
         (0 <# prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
         edk_array_list_content_pref(data, prefix_size, alloc, content) *
         (prefix_size == (96 * (len content))) *
@@ -74,7 +74,7 @@
             unfold optPadding(#data p+ #prefix_size, #total_size - #prefix_size)
     }
 
-    pred nounfold valid_edk_array_list(+current_size, +length, +item_size, +data, +alloc, content) {
+    pred nounfold valid_edk_array_list(current_size, length, item_size, data, alloc; content) {
         (current_size == 0) * (length == 0) * (item_size == 96) *
         (data == NULL) * (content == []);
 
@@ -86,21 +86,21 @@
         (length == len content)
     }
 
-    pred valid_edk_array_list_fields(+fields, alloc, content) {
+    pred valid_edk_array_list_fields(fields; alloc, content) {
         (fields == [ alloc, long(#current_size), long(#length), long(#item_size), #data ]) *
         valid_edk_array_list(#current_size, #length, #item_size, #data, alloc, content)
     }
 
-    pred empty_edk_array_list_fields(+fields, alloc) {
+    pred empty_edk_array_list_fields(fields; alloc) {
         valid_edk_array_list_fields(fields, alloc, [])
     }
 
-    pred nounfold valid_edk_array_list_ptr(+list, alloc, content) {
+    pred nounfold valid_edk_array_list_ptr(list; alloc, content) {
         (list -> struct aws_array_list { alloc; long(#current_size); long(#length); long(#item_size); #data}) *
         valid_edk_array_list(#current_size, #length, #item_size, #data, alloc, content)
     }
 
-    pred empty_edk_array_list_ptr(+list, alloc) {
+    pred empty_edk_array_list_ptr(list; alloc) {
         valid_edk_array_list_ptr(list, alloc, [])
     }
 */

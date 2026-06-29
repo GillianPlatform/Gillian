@@ -8,7 +8,7 @@
  * Resource: none
  *
  *)
-pred isInternalProperty (prop) :
+pred isInternalProperty (prop;) :
     types (prop : Str) * (! (prop == "")) * (s-nth (prop, 0) == "@");
 
 (*
@@ -17,7 +17,7 @@ pred isInternalProperty (prop) :
  * Resource: none
  *
  *)
-pred isNamedProperty (prop) :
+pred isNamedProperty (prop;) :
     types (prop : Str) * (! (prop == "")) * (! (s-nth (prop, 0) == "@"));
 
 (*
@@ -26,7 +26,7 @@ pred isNamedProperty (prop) :
  * Resource: none
  *
  *)
-pred DataDescriptor (d) :
+pred DataDescriptor (d;) :
     types (d : List, #dwrit : Bool, #denum : Bool, #dconf : Bool) *
     (! (#dval == empty)) * (d == {{ "d", #dval, #dwrit, #denum, #dconf }});
 
@@ -36,7 +36,7 @@ pred DataDescriptor (d) :
  * Resource: none
  *
  *)
-pred AccessorDescriptor (d) :
+pred AccessorDescriptor (d;) :
     types (d : List, #denum : Bool, #dconf : Bool) *
     (! (#dget == empty)) * (! (#dset == empty)) *
     (d == {{ "a", #dget, #dset, #denum, #dconf }});
@@ -47,7 +47,7 @@ pred AccessorDescriptor (d) :
  * Resource: none
  *
  *)
-pred Descriptor (d) :
+pred Descriptor (d;) :
     DataDescriptor (d),
     AccessorDescriptor (d);
 
@@ -57,7 +57,7 @@ pred Descriptor (d) :
  * Resource: none
  *
  *)
-pred GenericDescriptor (d) :
+pred GenericDescriptor (d;) :
     types (d : List) * (d == {{ "g", #genum, #gconf, #gval, #gwrit, #gget, #gset }});
 
 (*
@@ -66,22 +66,22 @@ pred GenericDescriptor (d) :
  * Resource: none
  *
  *)
-pred desc_val (d, v) :
+pred desc_val (d, v;) :
     types (d : List) * v == l-nth(d, 1);
 
-pred desc_writ (d, v) :
+pred desc_writ (d, v;) :
     types (d : List) * v == l-nth(d, 2);
 
-pred desc_get (d, v) :
+pred desc_get (d, v;) :
     types (d : List) * v == l-nth(d, 1);
 
-pred desc_set (d, v) :
+pred desc_set (d, v;) :
     types (d : List) * v == l-nth(d, 2);
 
-pred desc_enum (d, v) :
+pred desc_enum (d, v;) :
     types (d : List) * v == l-nth(d, 3);
 
-pred desc_conf (d, v) :
+pred desc_conf (d, v;) :
     types (d : List) * v == l-nth(d, 4);
 
 (*
@@ -92,10 +92,10 @@ pred desc_conf (d, v) :
  *
  * Note: We are not allowing accessor descriptors in the heap yet
  *)
-pred Cell_o (l, prop, none) :
+pred Cell_o (l, prop, none;) :
     types(l : Obj) * isNamedProperty(prop) * ((l, prop) -> none);
 
-pred Cell_o (l, prop, d) :
+pred Cell_o (l, prop, d;) :
     types(l : Obj) * isNamedProperty(prop) * ((l, prop) -> d) * Descriptor(d);
 
 (*
@@ -104,7 +104,7 @@ pred Cell_o (l, prop, d) :
  * Resource: none
  *
  *)
-pred IsStringIndex(S, prop, i) :
+pred IsStringIndex(S, prop, i;) :
     types(S : Str, prop : Str, i : Num) *
     (prop == num_to_string i) * (0 <=# i) * (i <# s-len S);
 
@@ -119,18 +119,18 @@ pred IsStringIndex(S, prop, i) :
  *       otherwise (l, "@primitiveValue") WILL NOT EXIST OR BE STUPID
  *
  *)
-pred Cell_s (l, prop, "none", none, pv) :
+pred Cell_s (l, prop, "none", none, pv;) :
      types (l : Obj, prop : Str, pv : Str) *
 	 Cell_o (l, prop, none) * ((l, "@primitiveValue") -> pv) *
      (#i == num_to_int (string_to_num prop)) * (! IsStringIndex(pv, prop, #i));
 
-pred Cell_s (l, prop, "SI", desc, pv) :
+pred Cell_s (l, prop, "SI", desc, pv;) :
      types(l : Obj, #prop : Str, desc : List, pv : Str, #i : Num, #v : Str) *
 	 (prop == #prop) * Cell_o (l, #prop, none) * ((l, "@primitiveValue") -> pv) *
      (desc == {{ "d", #v, false, true, false }}) *  (#v == s-nth(pv, #i)) *
 	 (#i == num_to_int (string_to_num #prop)) * IsStringIndex(pv, #prop, #i);
 
-pred Cell_s (l, prop, "NSI", desc, pv) :
+pred Cell_s (l, prop, "NSI", desc, pv;) :
 	 types (l : Obj, prop : Str, desc : List, pv : Str, #i : Num) *
 	 Cell_o (l, prop, desc) * ((l, "@primitiveValue") -> pv) *
 	 (#i == num_to_int (string_to_num prop)) * (! IsStringIndex(pv, prop, #i)) *
@@ -144,17 +144,17 @@ pred Cell_s (l, prop, "NSI", desc, pv) :
  *
  *)
 
-pred ErrorObject (l, pr) :
+pred ErrorObject (l, pr;) :
 	types (l : Obj, pr : Obj) *
 	((l, "@proto") -> pr) * ((l, "@class") -> "Error") * ((l, "@extensible") -> true) * empty_fields(l : "@proto", "@class", "@extensible");
 
-pred isTypeError(l) :
+pred isTypeError(l;) :
     ErrorObject (l, $lterr_proto);
 
-pred isSyntaxError(l) :
+pred isSyntaxError(l;) :
     ErrorObject (l, $lserr_proto);
 
-pred isReferenceError(l) :
+pred isReferenceError(l;) :
     ErrorObject (l, $lrferr_proto);
 
 (*
@@ -164,10 +164,10 @@ pred isReferenceError(l) :
  *      (l, "@class")
  *
  *)
-pred isClass (c, "Array")      : types (c : Str) * (c == "Array");
-pred isClass (c, "String")     : types (c : Str) * (c == "String");
-pred isClass (c, "Non-String") : types (c : Str) * (! (c == "String"));
-pred isClass (c, "Non-Array")  : types (c : Str) * (! (c == "Array"));
+pred isClass (c, "Array";)      : types (c : Str) * (c == "Array");
+pred isClass (c, "String";)     : types (c : Str) * (c == "String");
+pred isClass (c, "Non-String";) : types (c : Str) * (! (c == "String"));
+pred isClass (c, "Non-Array";)  : types (c : Str) * (! (c == "Array"));
 
 (*
  * The PI predicate
@@ -178,7 +178,7 @@ pred isClass (c, "Non-Array")  : types (c : Str) * (! (c == "Array"));
  *		(l, "@class")   via isClass
  *		(l, "@proto")	(l, "prop")
  *)
-pred Pi (l, prop, lcls, undefined, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, undefined, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, #cls : Str, lcls : List, ls : List, ltf : List, lpv : List) *
 	((l, "@proto") -> null) * ((l, "@class") -> #cls) *
 	isClass (#cls, "Non-String") * Cell_o (l, prop, none) *
@@ -189,7 +189,7 @@ pred Pi (l, prop, lcls, undefined, ls, ltf, lpv) :
  *		(l, "@class")   via isClass
  *		(l, "@proto")	(l, "prop")
  *)
-pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, d, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, #cls : Str, lcls : List, d : List, ls : List, ltf : List, lpv : List) *
 	((l, "@class") -> #cls) *
 	isClass (#cls, "Non-String") * Cell_o (l, prop, d) * (! (d == none)) *
@@ -203,7 +203,7 @@ pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
  *		Those five fields captured throughout the chain
  *)
 
-pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, d, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, lcls : List, ls : List, ltf : List, lpv : List) *
 	((l, "@class") -> #cls) * ((l, "@proto") -> #lp) *
 	isClass (#cls, "Non-String") * Cell_o (l, prop, none) *
@@ -221,7 +221,7 @@ pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
  *		(l, "@class")   via isClass
  *		(l, "@proto")	(l, "prop")		(l, "@primitiveValue")
  *)
-pred Pi (l, prop, lcls, undefined, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, undefined, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, #cls : Str, lcls : List, ls : List, ltf : List, lpv : List) *
 	((l, "@proto") -> null) * ((l, "@class") -> #cls) *
     isClass (#cls, "String") * Cell_s (l, prop, "none", none, #pv) *
@@ -232,7 +232,7 @@ pred Pi (l, prop, lcls, undefined, ls, ltf, lpv) :
  *		(l, "@class")   via isClass
  *		(l, "@proto")	(l, "prop")		(l, "@primitiveValue")
  *)
-pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, d, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, #cls : Str, lcls : List, d : List, ls : List, ltf : List, lpv : List) *
 	((l, "@class") -> #cls) *
 	isClass (#cls, "String") * Cell_s (l, prop, "SI", d, #pv) *
@@ -243,7 +243,7 @@ pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
  *		(l, "@class")   via isClass
  *		(l, "@proto")	(l, "prop")		(l, "@primitiveValue")
  *)
-pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, d, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, #cls : Str, lcls : List, d : List, ls : List, ltf : List, lpv : List) *
 	((l, "@class") -> #cls) *
 	isClass (#cls, "String") * Cell_s (l, prop, "NSI", d, #pv) *
@@ -256,7 +256,7 @@ pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
  *
  *		Those five fields captured throughout the chain
  *)
-pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
+pred Pi (l, prop, lcls, d, ls, ltf, lpv;) :
     types(l : Obj, prop : Str, lcls : List, ls : List, ltf : List, lpv : List) *
 	((l, "@class") -> #cls) * ((l, "@proto") -> #lp) *
 	isClass (#cls, "String") * Cell_s (l, prop, "none", none, #pv) *
@@ -364,7 +364,7 @@ proc create_object_with_call_construct (l, call, construct, len) {
 	rlab:	ret := l
 };
 
-pred function_object (l, xsc, call, construct, len, prototype) :
+pred function_object (l, xsc, call, construct, len, prototype;) :
 	types(l : Obj, xsc : List, call : Str, construct: Str, len : Num, prototype : Obj) *
 	((l, "@proto") -> $lfun_proto) * ((l, "@class") -> "Function") * ((l, "@extensible") -> true) *
 	((l, "@scope") -> xsc)  * ((l, "length") -> {{ "d", len, false, false, false }}) *
@@ -598,13 +598,13 @@ proc SyntaxError (v) {
    *** *** ***   INITIAL HEAP   *** *** ***
    **************************************** *)
 
-pred initialHeapPre () :
+pred initialHeapPre (;) :
     (($lg,      "@class") -> none) *
     (($lg, 	    "@proto") -> none) *
     (($lg, "@extensible") -> none) *
     empty_fields ( $lobj_proto : ) * empty_fields ($lfun_proto : ) * empty_fields ($lerr : ) * empty_fields ($lerr_proto : );
 
-pred initialHeapPost () :
+pred initialHeapPost (;) :
     (($lg,         "@class") -> "Object")   * (($lg,         "@proto") -> $lobj_proto) * (($lg,         "@extensible") -> true) * (($lg,         "Error") -> {{ "d", $lerr, true, false, true }}) *
 	(($lobj_proto, "@class") -> "Object")   * (($lobj_proto, "@proto") -> null)      * (($lobj_proto, "@extensible") -> true) * empty_fields ( $lobj_proto : "@class", "@proto", "@extensible" ) *
 	(($lfun_proto, "@class") -> "Function") * (($lfun_proto, "@proto") -> $lobj_proto) * (($lfun_proto, "@extensible") -> true) *

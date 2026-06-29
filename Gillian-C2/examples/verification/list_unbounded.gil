@@ -3,16 +3,16 @@ import "archi64_constants.gil", "internals.gil",
        "internal_binops.gil", "internal_stdlib.gil";
 
 
-pred Ptr(+p: List, l: Obj, o: Int):
+pred Ptr(p: List; l: Obj, o: Int):
   (p == {{ l, o }});
   
-pred is_ptr(+p: List):
+pred is_ptr(p: List;):
   (p == {{ #l, #o }}) * types(#l: Obj, #o: Int);
   
-pred is_u32(+v : Int):
+pred is_u32(v : Int;):
       (0i i<=# v) * (v i<=# 4294967295i);
 
-pred SLL(+p: List, sz: Int):
+pred SLL(p: List; sz: Int):
   (* First case is the Empty case *)
   Ptr(p, #l, #o) * (* p is a pointer *)
     (* Discriminant is zero *)

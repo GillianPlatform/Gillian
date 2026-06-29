@@ -8,7 +8,7 @@ import `../logic/StringStruct`;
 */
 
 /*@
-  pred valid_aws_string_ptr(+str, alloc, content) {
+  pred valid_aws_string_ptr(str; alloc, content) {
     m_struct_aws_string_exposing_pointer(str, alloc, long(#len), #bytes) *
     (0 <=# #len) *
     ARRAY(#bytes, char, #len + 1, #bytes_content) *
@@ -18,7 +18,7 @@ import `../logic/StringStruct`;
   }
 */
 
-/*@ pred nounfold optBytes(+bytes, +length, content) {
+/*@ pred nounfold optBytes(bytes, length; content) {
   (length == 0) * (content == nil);
   (0 <# length) * ARRAY(bytes, char, length, content)
 }

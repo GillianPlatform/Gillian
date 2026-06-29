@@ -11,11 +11,11 @@ typedef struct pqn {
     struct pqn *next;
 } PQN;
 
-/*@ pred Node(+x, pri, val, next) {
+/*@ pred Node(x; pri, val, next) {
   x -m> struct pqn { int(pri); int(val); next } * (0 <# pri)
 } */
 
-/*@ pred PriQ(+x, max_pri, max_val, length){
+/*@ pred PriQ(x; max_pri, max_val, length){
   (x == NULL) * (max_pri == 0) * (length == 0) * (max_val == NULL);
 
   Node(x, max_pri, max_val, #next) * (0 <# max_pri) * (not (#next == NULL)) *

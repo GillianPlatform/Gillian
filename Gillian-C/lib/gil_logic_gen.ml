@@ -199,7 +199,8 @@ let assert_of_hole (low, high) =
 
 let gen_pred_of_struct cenv ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
-  let pred_ins = [ 0; 1 ] in
+  (* The location and offset (the first two parameters) are the ins *)
+  let ins_number = 2 in
   let id = id_of_string struct_name in
   let comp_opt = Maps.PTree.get id cenv in
   let comp =
@@ -265,7 +266,7 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_source_path = None;
         pred_loc = None;
         pred_internal = true;
-        pred_ins;
+        ins_number;
         pred_num_params;
         pred_params;
         pred_facts = [ (* FIXME: there are probably some facts to get *) ];
@@ -647,12 +648,8 @@ let trans_asrt_annot da =
 
 let trans_abs_pred ~filepath cl_pred =
   let CAbsPred.
-        {
-          name = pred_name;
-          params = pred_params;
-          ins = pred_ins;
-          pure = pred_pure;
-        } =
+        { name = pred_name; params = pred_params; ins_number; pure = pred_pure }
+      =
     cl_pred
   in
   let pred_num_params = List.length pred_params in
@@ -664,7 +661,7 @@ let trans_abs_pred ~filepath cl_pred =
       pred_internal = false;
       pred_num_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions = [];
       pred_facts = [];
       pred_guard = None;
@@ -680,7 +677,7 @@ let trans_pred ~ann ~filepath cl_pred =
           name = pred_name;
           params = pred_params;
           definitions;
-          ins = pred_ins;
+          ins_number;
           no_unfold;
           pure = pred_pure;
         } =
@@ -705,7 +702,7 @@ let trans_pred ~ann ~filepath cl_pred =
       pred_internal = false;
       pred_num_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions;
       (* FIXME: ADD SUPPORT FOR FACTS *)
       pred_facts = [];

@@ -8,7 +8,7 @@ typedef struct bstn {
     struct bstn *right;
 } BST;
 
-/*@ pred BST(+x, K) {
+/*@ pred BST(x; K) {
   (x == NULL) * (K == -{ }-);
 
   x -m> struct bstn { int(#val); #left; #right } *

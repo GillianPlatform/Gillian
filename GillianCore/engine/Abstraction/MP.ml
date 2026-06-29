@@ -825,7 +825,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
   let pred_ins =
     Hashtbl.fold
       (fun name (pred : Pred.t) pred_ins ->
-        Hashtbl.add pred_ins name pred.pred_ins;
+        Hashtbl.add pred_ins name (Pred.ins_indexes pred);
         pred_ins)
       preds
       (Hashtbl.create Config.medium_tbl_size)
@@ -840,7 +840,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
                (fun i ->
                  let param, _ = List.nth pred.pred_params i in
                  Expr.PVar param)
-               pred.pred_ins)
+               (Pred.ins_indexes pred))
         in
 
         let defs =
@@ -892,7 +892,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : 'a prog =
     let pred_ins =
       Hashtbl.fold
         (fun name (pred : pred) pred_ins ->
-          Hashtbl.add pred_ins name pred.pred.pred_ins;
+          Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
           pred_ins)
         preds
         (Hashtbl.create Config.medium_tbl_size)
@@ -1018,7 +1018,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
   let pred_ins =
     Hashtbl.fold
       (fun name (pred : pred) pred_ins ->
-        Hashtbl.add pred_ins name pred.pred.pred_ins;
+        Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
         pred_ins)
       prog.preds
       (Hashtbl.create Config.medium_tbl_size)

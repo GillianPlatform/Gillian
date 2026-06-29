@@ -1,10 +1,10 @@
 
-predicate list(+x, alpha) {
+predicate list(x; alpha) {
     (x == null) * (alpha == nil);
     (x -> #a, #z) * (alpha == #a :: #beta) * list(#z, #beta)
 }
 
-predicate lseg(+x, +y, alpha) {
+predicate lseg(x, y; alpha) {
   (x == y) * (alpha == nil);
   (x -> #a, #z) * (alpha == #a :: #beta) * lseg(#z, y, #beta)
 }

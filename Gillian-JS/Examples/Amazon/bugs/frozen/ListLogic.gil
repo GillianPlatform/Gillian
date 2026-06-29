@@ -8,7 +8,7 @@
 
 (* First projection of a list of pairs *)
 @nopath
-pure pred FirstProj(+lst : List, fProj : List) : (lst == {{  }}) *
+pure pred FirstProj(lst : List; fProj : List) : (lst == {{  }}) *
   (fProj == {{  }}), (lst == l+ ({{ {{ #fst, #lvar_js_7 }} }}, #rest)) *
   FirstProj(#rest, #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
   
@@ -46,7 +46,7 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
  ********************************)
   
 @nopath
-pure pred Unique(l : List) :
+pure pred Unique(l : List;) :
   (l == {{  }}),
   (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest, #setRest) *
     (! (#fst --e-- #setRest)) * Unique(#rest);
@@ -61,7 +61,7 @@ pure pred Unique(l : List) :
 ******************************************)
 
 @nopath
-pure pred ListToSet(+lst : List, set : Set) :
+pure pred ListToSet(lst : List; set : Set) :
   (lst == {{  }}) * (set == -{  }-),
   (lst == l+ ({{ #e }}, #restLst)) *
     ListToSet(#restLst, #restSet) * (set == -u- (#restSet, -{ #e }-));

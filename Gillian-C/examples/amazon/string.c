@@ -9,7 +9,7 @@
 
 // valid pointer to an AWS string
 /*@
-    pred valid_aws_string_ptr(+str, alloc, rawContent, content) {
+    pred valid_aws_string_ptr(str; alloc, rawContent, content) {
         m_struct_aws_string_exposing_pointer(str, alloc, long(#len), #bytes) *
         (0 <=# #len) *
         ARRAY(#bytes, char, #len + 1, #bytes_content) *

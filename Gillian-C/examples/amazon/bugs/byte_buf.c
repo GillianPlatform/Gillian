@@ -2,19 +2,19 @@
 
 /*@
 
-pure pred invalid_read(read_len, cursor_len) {
+pure pred invalid_read(read_len, cursor_len;) {
   cursor_len <# read_len;
   2147483647 <# read_len;
   2147483647 <# cursor_len
 }
 
-pure pred valid_read(read_len, cursor_len) {
+pure pred valid_read(read_len, cursor_len;) {
   (read_len <=# cursor_len) *
   (read_len <=# 2147483647) *
   (cursor_len <=# 2147483647)
 }
 
-pred nounfold valid_aws_byte_cursor_ptr(+cur, length, buffer: List, alpha) {
+pred nounfold valid_aws_byte_cursor_ptr(cur; length, buffer: List, alpha) {
   (cur -> struct aws_byte_cursor { long(0); buffer }) *
   (length == 0) * (alpha == nil);
 

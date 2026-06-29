@@ -11,21 +11,21 @@ typedef struct cc_slist_s {
     SNode *tail;
 } CC_SList;
 
-/*@ pred sll(+p, alpha) {
+/*@ pred sll(p; alpha) {
   (p -m> struct snode_s { #head; #tail } * (alpha == #head::#beta)) *
   sll(#tail,#beta) *
   i__is_size_t(len alpha);
   (p == NULL) * (alpha == nil)
 }
 
-pred lseg(+p, +q, alpha) {
+pred lseg(p, q; alpha) {
     (p == q) * (alpha == nil);
 
     (p -m> struct snode_s { #head; #tail }) * (alpha == #head::#beta) *
     lseg(#tail, q, #beta) * i__is_size_t(len alpha)
 }
 
-pred cc_sll_ht(+h, +t, +size, alpha) {
+pred cc_sll_ht(h, t, size; alpha) {
     (h == NULL) * (t == NULL) * (size == 0) * (alpha == []);
 
     lseg(h, t, #beta) *
@@ -34,7 +34,7 @@ pred cc_sll_ht(+h, +t, +size, alpha) {
     (size == len alpha)
 }
 
-pred cc_sll(+x, alpha) {
+pred cc_sll(x; alpha) {
     (x -m> struct cc_slist_s { #size; #h; #t }) *
     cc_sll_ht(#h, #t, #size, alpha)
 }

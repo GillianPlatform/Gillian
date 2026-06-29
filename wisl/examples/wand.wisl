@@ -1,8 +1,8 @@
-predicate P(+x, y) {
+predicate P(x; y) {
   (x -> y) * (y -> x)
 }
 
-predicate Q(x) {
+predicate Q(x;) {
   x -> #k
 }
 
@@ -13,32 +13,32 @@ lemma should_fail {
     package (Q(x) -* P(x, y))
 }
 
-predicate R(+x, +y) {
+predicate R(x, y;) {
   (x -> #a, y) * (y -> #b, x)
 }
 
-predicate S(+x) {
+predicate S(x;) {
   x -> #a
 }
 
-predicate empty() {
+predicate empty(;) {
   emp
 }
 
-predicate xpt(+x) {
+predicate xpt(x;) {
   x -> #k
 }
 
 
-predicate leq_five(+x) {
+predicate leq_five(x;) {
   (x <= 5)
 }
 
-predicate eq_five(+x) {
+predicate eq_five(x;) {
   (x == 5)
 }
 
-predicate leq_six(+x) {
+predicate leq_six(x;) {
   (x <= 6)
 }
 

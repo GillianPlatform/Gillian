@@ -1,18 +1,18 @@
 /**
-    @pred Map (+m, mp, kvs, keys) :
+    @pred Map (m; mp, kvs, keys) :
       JSObjWithProto(m, mp) *
       DataProp(m, "_contents", #c) * JSObject(#c) *
       ((m, "get") -> none) * ((m, "put") -> none) * ((m, "validKey") -> none) *
       ((#c, "hasOwnProperty") -> none) * KVPairs(#c, kvs, keys) * empty_fields(#c : -u- (keys, -{ "hasOwnProperty" }-));
 
-    @pred KVPairs (+o, kvs : Set, keys : Set) :
+    @pred KVPairs (o; kvs : Set, keys : Set) :
       [def1]  (kvs == -{ }-) * (keys == -{ }-),
       [def2: #key]
               (kvs == -u- (-{ {{ #key, #value }} }-, #rkvs)) * (keys == -u- (-{ #key }-, #rkeys)) * (! (#key --e-- #rkeys)) *
               ValidKey(#key) * DataProp(o, #key, #value) * KVPairs(o, #rkvs, #rkeys) *
               types (#rkvs: Set, #rkeys: Set);
 
-    @pred MapProto(mp) :
+    @pred MapProto(mp;) :
       JSObject(mp) *
       DataProp(mp, "get", #get_loc) * JSFunctionObject(#get_loc, "mapGet", _, _, _) *
       DataProp(mp, "put", #put_loc) * JSFunctionObject(#put_loc, "mapPut", _, _, _) *
@@ -80,10 +80,10 @@
 */
 
 /**
-  @pred ValidKey(key) :
+  @pred ValidKey(key;) :
     types(key : Str) * (! (key == "hasOwnProperty"));
 
-  @pred InvalidKey(key) :
+  @pred InvalidKey(key;) :
     types (key : Undefined),
     types (key : Null),
     types (key : Bool),
@@ -146,14 +146,14 @@ function evalBinop (op, l1, l2) {
 }
 
 /*
-  @pred ValidVal(v) :
+  @pred ValidVal(v;) :
     types(v : Str),
     types(v : Bool);
 
-  @pred ExpressionStruct(+e:Obj, cat:Str) :
+  @pred ExpressionStruct(e:Obj; cat:Str) :
     JSObject(e) * DataProp(e, "type", "expr") * DataProp(e, "category", cat);
 
-  @pred ExpressionWithValue(+e:Obj, +bindings:Set, +vars:Set, v) :
+  @pred ExpressionWithValue(e:Obj, bindings:Set, vars:Set; v) :
     ExpressionStruct(e, "lit") * DataProp(e, "val", v) * types(v : Num),
     ExpressionStruct(e, "lit") * DataProp(e, "val", v) * types(v : Bool),
 

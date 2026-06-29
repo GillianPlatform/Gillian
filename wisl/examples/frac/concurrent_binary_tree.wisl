@@ -1,22 +1,22 @@
 // tree holds the list representation of a pre-order traveresal of a binary tree with root at x.
-predicate binary_tree(+x, +p: Float, tree) {
+predicate binary_tree(x, p: Float; tree) {
     (x == null) * (tree == nil);
     (x -> (p: #a), (p: #l), (p: #r)) * binary_tree(#l, p, #left) * binary_tree(#r, p, #right) * (tree == #a::(#left @ #right))
 }
 
-predicate tree_height(+x, +p: Float, h: Int) {
+predicate tree_height(x, p: Float; h: Int) {
     (x == null) * (h == 0);
     (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, p, #hl) * tree_height(#r, p, #hr) * (#hl >= #hr) * (h == #hl + 1);
     (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, p, #hl) * tree_height(#r, p, #hr) * (#hl < #hr) * (h == #hr + 1)
 }
 
-predicate list_member(+vs, +v, r : Bool){
+predicate list_member(vs, v; r : Bool){
   (vs == []) * (r == false);
   (vs == v :: #rest) * (r == true);
   (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
 }
 
-predicate replaced(+vs, +ws, +v, +w) {
+predicate replaced(vs, ws, v, w;) {
     (vs == []) * (ws == []);
     (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w);
     (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w)
@@ -52,11 +52,11 @@ lemma list_member_concat {
     }
 }
 
-predicate is_int(+a: Int) {
+predicate is_int(a: Int;) {
     emp
 }
 
-predicate max(+a:Int, +b:Int, c:Int) {
+predicate max(a:Int, b:Int; c:Int) {
     (a >= b) * (c == a);
     (a <  b) * (c == b)
 }

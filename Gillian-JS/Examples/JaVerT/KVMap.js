@@ -1,23 +1,23 @@
 "use strict";
 
 /*
-		@pred ValidKey(k) : 
+		@pred ValidKey(k;) : 
 				types(k : Str) * (! (k == "hasOwnProperty"));
 
-		@pred InvalidKey(ik) :
+		@pred InvalidKey(ik;) :
 				types (ik : Undefined),
 				types (ik : Null),
 				types (ik : Bool),
 				types (ik : Num),
 				types (ik : Str) * (ik == "hasOwnProperty");
 
-		@pred Map (+m, mp, kvs, keys) :
+		@pred Map (m; mp, kvs, keys) :
 				JSObjWithProto(m, mp) *
 				DataProp(m, "_contents", #c) * JSObject(#c) *
 				((m, "get") -> none) * ((m, "put") -> none) * ((m, "validKey") -> none) *
 				((#c, "hasOwnProperty") -> none) * KVPairs(#c, kvs, keys) * empty_fields(#c : -u- (keys, -{ "hasOwnProperty" }-));
 
-		@pred KVPairs (+o, kvs : Set, keys : Set) :
+		@pred KVPairs (o; kvs : Set, keys : Set) :
 		[def1] (kvs == -{ }-) * (keys == -{ }-),
 		[def2: #k, #v] 
 					 (kvs == -u- (-{ {{ #k, #v }} }-, #rkvs)) * (keys == -u- (-{ #k }-, #rkeys)) *
@@ -25,7 +25,7 @@
 					 ValidKey(#k) * DataProp(o, #k, #v) * KVPairs(o, #rkvs, #rkeys) *
 					 types (#rkvs: Set, #rkeys: Set);
 
-		@pred MapProto(mp) :
+		@pred MapProto(mp;) :
 				JSObject(mp) *
 				DataProp(mp, "get", #gl) * JSFunctionObject(#gl, "mapGet", _, _, _) *
 				DataProp(mp, "put", #pl) * JSFunctionObject(#pl, "mapPut", _, _, _) *

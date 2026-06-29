@@ -1,16 +1,16 @@
-predicate lambda_term(+x, +p: Float, v, t1, t2, type: Int) {
+predicate lambda_term(x, p: Float; v, t1, t2, type: Int) {
     (x -> (p: 0), (p: v), (p: t1)) * (type == 0) * (t2 == null) * lambda_term(t1, p, #v1, #t11, #t12, #type1);
     (x -> (p: 1), (p: t1), (p: t2)) * (type == 1) * (v == 0) * lambda_term(t1, p, #v1, #t11, #t12, #type1) * lambda_term(t2, p, #v2, #t21, #t22, #type2);
     (x -> (p: 2), (p: v)) * (type == 2) * (t1 == null) * (t2 == null)
 }
 
-predicate is_copy(+x, +y, +p1: Float, +p2: Float, v, t1, t2, type: Int) {
+predicate is_copy(x, y, p1: Float, p2: Float; v, t1, t2, type: Int) {
     (x -> (p1: 0), (p1: v), (p1: t1)) * (y -> (p2: 0), (p2: v), (p2: #t2)) * (type == 0) * (t2 == null) * is_copy(t1, #t2, p1, p2, #v, #t11, #t12, #type);
     (x -> (p1: 1), (p1: t1), (p1: t2)) * (y -> (p2: 1), (p2: #t21), (p2: #t22)) * (type == 1) * (v == 0) * is_copy(t1, #t21, p1, p2, #v1, #t11, #t12, #type1) * is_copy(t2, #t22, p1, p2, #v2, #t_21, #t_22, #type2);
     (x -> (p1: 2), (p1: v)) * (y -> (p2: 2), (p2: v)) * (type == 2) * (t1 == null) * (t2 == null)
 }
 
-predicate substituted(+t_in, +t, +v, +p1: Float, +p2: Float, +pt: Float, +t_out) {
+predicate substituted(t_in, t, v, p1: Float, p2: Float, pt: Float, t_out;) {
     (t_in -> (p1: 0), (p1: v), (p1: #t)) * (t_out -> (p2: 0), (p2: v), (p2: #t2)) * is_copy(#t, #t2, p1, p2, #tv, #tt1, #tt2, #type1) * lambda_term(t, pt, #w, #t11, #t12, #type2);
     (t_in -> (p1: 0), (p1: #v), (p1: #t)) * (! (#v == v)) * (t_out -> (p2: 0), (p2: #v), (p2: #t_out)) * substituted(#t, t, v, p1, p2, pt, #t_out);
     (t_in -> (p1: 1), (p1: #t1), (p1: #t2)) * (t_out -> (p2: 1), (p2: #t1_out), (p2: #t2_out)) * substituted(#t1, t, v, p1, p2, pt f/ 2.0, #t1_out) * substituted(#t2, t, v, p1, p2, pt f/ 2.0, #t2_out);

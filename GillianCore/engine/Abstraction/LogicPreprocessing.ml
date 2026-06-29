@@ -631,7 +631,6 @@ let add_closing_tokens preds =
       let pred_name = Pred.close_token_name pred in
       let pred_params = Pred.in_args pred pred.pred_params in
       let pred_num_params = List.length pred_params in
-      let pred_ins = List.init pred_num_params Fun.id in
       let close_token =
         Pred.
           {
@@ -641,7 +640,7 @@ let add_closing_tokens preds =
             pred_internal = false;
             pred_num_params;
             pred_params;
-            pred_ins;
+            ins_number = pred_num_params;
             pred_facts = [];
             pred_definitions = [];
             pred_guard = None;
