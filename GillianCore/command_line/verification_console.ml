@@ -86,7 +86,7 @@ module Make
 
   let verify files already_compiled outfile_opt no_unfold incremental =
     Gillian_result.try_ @@ fun () ->
-    Verification.start_time := Sys.time ();
+    Verification.start_time := Unix.gettimeofday ();
     Fmt.pr "Parsing and compiling...\n@?";
     let* e_prog, init_data, source_files_opt =
       parse_eprog files already_compiled

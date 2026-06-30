@@ -311,8 +311,8 @@ struct
             State.pp_by_need pvars lvars locs
       in
       ConfigReport.log state_printer
-        (ConfigReport.make ~proc_name ~proc_line:i ~time:(Sys.time ()) ~cmd
-           ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
+        (ConfigReport.make ~proc_name ~proc_line:i ~time:(Unix.gettimeofday ())
+           ~cmd ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
 
     let print_lconfiguration
         (lcmd : LCmd.t)
@@ -328,7 +328,8 @@ struct
              @\n\
              %a@\n\
              ------------------------------------------------------@]@\n"
-            (Sys.time ()) LCmd.pp lcmd Location.pp_log_opt loc State.pp state)
+            (Unix.gettimeofday ()) LCmd.pp lcmd Location.pp_log_opt loc State.pp
+            state)
 
     let pp_err = Exec_err.pp Val.pp State.pp_err
     let pp_single_result ft res = Exec_res.pp State.pp Val.pp pp_err ft res

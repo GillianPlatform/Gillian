@@ -16,7 +16,7 @@ let z3_config =
     ("proof", "false");
     ("unsat_core", "false");
     ("auto_config", "true");
-    ("timeout", "30000");
+    ("timeout", try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000");
   ]
 
 let () = Sys.(set_signal sigpipe Signal_ignore)
@@ -24,8 +24,60 @@ let () = Sys.(set_signal sigpipe Signal_ignore)
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
-let init_decls : sexp list ref = ref []
-let builtin_funcs : sexp list ref = ref []
+
+(** {2 Tracking the declarations a query depends on}
+
+    The solver is reset before every query (see [reset_solver]), so each query
+    must (re-)send the datatype and function declarations it relies on. At
+    encoding time, we keep track of the necessary dependencies of the assertion
+    being encoded through [Require_definition]. *)
+
+type definition = {
+  id : int;
+  decls : sexp list;  (** the SMT commands declaring this definition *)
+  depends_on : definition list;  (** definitions that must be emitted first *)
+}
+
+let make_definition =
+  let counter = ref 0 in
+  fun ?(depends_on = []) decls ->
+    incr counter;
+    { id = !counter; decls; depends_on }
+
+type _ Effect.t += Require_definition : definition -> unit Effect.t
+
+let require_definition d = Effect.perform (Require_definition d)
+
+(** Run [f], returning its result together with the set of definitions it
+    required (keyed by id), closed under the [depends_on] relation. *)
+let with_necessary_definitions (f : unit -> 'a) :
+    'a * (int, definition) Hashtbl.t =
+  let needed = Hashtbl.create 17 in
+  let rec add d =
+    if not (Hashtbl.mem needed d.id) then (
+      Hashtbl.replace needed d.id d;
+      List.iter add d.depends_on)
+  in
+  let result =
+    match f () with
+    | x -> x
+    | effect Require_definition d, k ->
+        add d;
+        Effect.Deep.continue k ()
+  in
+  (result, needed)
+
+(** Send each required definition through [emit], preceded by the definitions it
+    depends on (so declarations always come before their uses). *)
+let emit_definitions ~emit (needed : (int, definition) Hashtbl.t) =
+  let emitted = Hashtbl.create (Hashtbl.length needed) in
+  let rec go d =
+    if not (Hashtbl.mem emitted d.id) then (
+      Hashtbl.replace emitted d.id ();
+      List.iter go d.depends_on;
+      List.iter emit d.decls)
+  in
+  Hashtbl.iter (fun _ d -> go d) needed
 
 let solver =
   ref
@@ -38,18 +90,16 @@ let solver =
     }
 
 let cmd s = ack_command !solver s
+let reset = list [ atom "reset" ]
 
 let rec init_solver () =
   let z3 = new_solver z3 in
   let command = protected_command z3 in
   let () = solver := { z3 with command } in
-  (* Config, initial decls *)
+  (* Configuration *)
   let () =
     z3_config |> List.iter (fun (k, v) -> cmd (set_option (":" ^ k) v))
   in
-  let decls = List.rev !init_decls in
-  let () = decls |> List.iter cmd in
-  let () = cmd (push 1) in
   ()
 
 and protected_command solver s =
@@ -88,7 +138,8 @@ let sexps_to_yojson sexps =
 
 let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
 
-let encoding_cache : (Expr.Set.t, sexp list) Hashtbl.t =
+let encoding_cache :
+    (Expr.Set.t, sexp list * (int, definition) Hashtbl.t) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
 
 let sat_cache : (Expr.Set.t, sexp option) Hashtbl.t =
@@ -192,7 +243,15 @@ let declare_recognizer ~name ~constructor ~typ =
     t_bool
     (list [ atom "_"; atom "is"; atom constructor ] <| atom "x")
 
-let mk_datatype name type_params (variants : (module Variant.S) list) =
+(* Builds a datatype declaration together with its recognizers, and returns
+   both the type's atom and a {!definition} that can be required during
+   encoding. [depends_on] lists the datatypes this one refers to in its fields,
+   which must therefore be declared first. *)
+let mk_datatype
+    ?depends_on
+    name
+    type_params
+    (variants : (module Variant.S) list) =
   let constructors, recognizer_defs =
     variants
     |> List.map (fun v ->
@@ -206,13 +265,11 @@ let mk_datatype name type_params (variants : (module Variant.S) list) =
     |> List.split
   in
   let decl = declare_datatype name type_params constructors in
-  let () = init_decls := recognizer_defs @ (decl :: !init_decls) in
-  atom name
+  (atom name, make_definition ?depends_on (decl :: recognizer_defs))
 
-let mk_fun_decl name param_types result_type =
+let mk_fun_decl ?depends_on name param_types result_type =
   let decl = declare_fun name param_types result_type in
-  let () = builtin_funcs := decl :: !builtin_funcs in
-  atom name
+  (atom name, make_definition ?depends_on [ decl ])
 
 module Type_operations = struct
   open Variant
@@ -229,7 +286,7 @@ module Type_operations = struct
   module Type = (val nul "TypeType" : Nullary)
   module Set = (val nul "SetType" : Nullary)
 
-  let t_gil_type =
+  let t_gil_type, def_gil_type =
     mk_datatype "GIL_Type" []
       [
         (module Undefined : Variant.S);
@@ -248,6 +305,7 @@ module Type_operations = struct
 end
 
 let t_gil_type = Type_operations.t_gil_type
+let def_gil_type = Type_operations.def_gil_type
 
 module Lit_operations = struct
   open Variant
@@ -267,32 +325,37 @@ module Lit_operations = struct
   module List = (val un "List" "listValue" (t_seq t_gil_literal) : Unary)
   module None = (val nul "None" : Nullary)
 
-  let _ =
-    mk_datatype gil_literal_name []
-      [
-        (module Undefined : Variant.S);
-        (module Null : Variant.S);
-        (module Empty : Variant.S);
-        (module Bool : Variant.S);
-        (module Int : Variant.S);
-        (module Num : Variant.S);
-        (module String : Variant.S);
-        (module Loc : Variant.S);
-        (module Type : Variant.S);
-        (module List : Variant.S);
-        (module None : Variant.S);
-      ]
+  let def_gil_literal =
+    snd
+    @@ mk_datatype ~depends_on:[ def_gil_type ] gil_literal_name []
+         [
+           (module Undefined : Variant.S);
+           (module Null : Variant.S);
+           (module Empty : Variant.S);
+           (module Bool : Variant.S);
+           (module Int : Variant.S);
+           (module Num : Variant.S);
+           (module String : Variant.S);
+           (module Loc : Variant.S);
+           (module Type : Variant.S);
+           (module List : Variant.S);
+           (module None : Variant.S);
+         ]
 end
 
 let t_gil_literal = Lit_operations.t_gil_literal
+let def_gil_literal = Lit_operations.def_gil_literal
 let t_gil_literal_list = t_seq t_gil_literal
 let t_gil_literal_set = t_set t_gil_literal
 
-let seq_of ~typ = function
+let seq_of ~typ xs =
+  require_definition def_gil_literal;
+  match xs with
   | [] -> as_type (atom "seq.empty") typ
   | xs -> xs |> List.map seq_unit |> seq_concat
 
 let set_of xs =
+  require_definition def_gil_literal;
   let rec aux acc = function
     | [] -> acc
     | x :: xs -> aux (set_insert Z3 x acc) xs
@@ -307,22 +370,30 @@ module Ext_lit_operations = struct
 
   module Gil_set = (val un "Set" "setElem" t_gil_literal_set : Unary)
 
-  let t_gil_ext_literal =
-    mk_datatype "Extended_GIL_Literal" []
+  let t_gil_ext_literal, def_gil_ext_literal =
+    mk_datatype ~depends_on:[ def_gil_literal ] "Extended_GIL_Literal" []
       [ (module Gil_sing_elem : Variant.S); (module Gil_set : Variant.S) ]
 end
 
 module Axiomatised_operations = struct
-  let slen = mk_fun_decl "s-len" [ t_int ] t_real
-  let llen = mk_fun_decl "l-len" [ t_gil_literal_list ] t_int
-  let num2str = mk_fun_decl "num2str" [ t_real ] t_int
-  let str2num = mk_fun_decl "str2num" [ t_int ] t_real
-  let num2int = mk_fun_decl "num2int" [ t_real ] t_real
-  let snth = mk_fun_decl "s-nth" [ t_int; t_real ] t_int
-  let lrev = mk_fun_decl "l-rev" [ t_gil_literal_list ] t_gil_literal_list
+  let slen, def_slen = mk_fun_decl "s-len" [ t_int ] t_real
+
+  let llen, def_llen =
+    mk_fun_decl ~depends_on:[ def_gil_literal ] "l-len" [ t_gil_literal_list ]
+      t_int
+
+  let num2str, def_num2str = mk_fun_decl "num2str" [ t_real ] t_int
+  let str2num, def_str2num = mk_fun_decl "str2num" [ t_int ] t_real
+  let num2int, def_num2int = mk_fun_decl "num2int" [ t_real ] t_real
+  let snth, def_snth = mk_fun_decl "s-nth" [ t_int; t_real ] t_int
+
+  let lrev, def_lrev =
+    mk_fun_decl ~depends_on:[ def_gil_literal ] "l-rev" [ t_gil_literal_list ]
+      t_gil_literal_list
 end
 
 let t_gil_ext_literal = Ext_lit_operations.t_gil_ext_literal
+let def_gil_ext_literal = Ext_lit_operations.def_gil_ext_literal
 let str_codes = Hashtbl.create 1000
 let str_codes_inv = Hashtbl.create 1000
 let str_counter = ref 0
@@ -340,6 +411,7 @@ let encode_string s =
       code
 
 let encode_type (t : Type.t) =
+  require_definition def_gil_type;
   try
     match t with
     | UndefinedType -> Type_operations.Undefined.construct
@@ -367,12 +439,20 @@ module Encoding = struct
     let open Type in
     function
     | IntType | StringType | ObjectType -> t_int
-    | ListType -> t_gil_literal_list
+    | ListType ->
+        require_definition def_gil_literal;
+        t_gil_literal_list
     | BooleanType -> t_bool
     | NumberType -> t_real
-    | UndefinedType | NoneType | EmptyType | NullType -> t_gil_literal
-    | SetType -> t_gil_literal_set
-    | TypeType -> t_gil_type
+    | UndefinedType | NoneType | EmptyType | NullType ->
+        require_definition def_gil_literal;
+        t_gil_literal
+    | SetType ->
+        require_definition def_gil_literal;
+        t_gil_literal_set
+    | TypeType ->
+        require_definition def_gil_type;
+        t_gil_type
 
   type t = {
     consts : (string * sexp) Hashset.t; [@default Hashset.empty ()]
@@ -429,17 +509,23 @@ module Encoding = struct
        it should be already type checked *)
     match kind with
     | Native _ -> expr
-    | Simple_wrapped -> accessor expr
+    | Simple_wrapped ->
+        require_definition def_gil_literal;
+        accessor expr
     | Extended_wrapped ->
+        require_definition def_gil_ext_literal;
         accessor (Ext_lit_operations.Gil_sing_elem.access expr)
 
-  let simply_wrapped = make ~kind:Simple_wrapped
+  let simply_wrapped expr =
+    require_definition def_gil_literal;
+    make ~kind:Simple_wrapped expr
 
   (** Takes a value either natively encoded or simply wrapped and returns a
       value simply wrapped. Careful: do not use wrap with a a set, as they
       cannot be simply wrapped *)
   let simple_wrap { expr; kind; _ } =
     let open Lit_operations in
+    require_definition def_gil_literal;
     match kind with
     | Simple_wrapped -> expr
     | Native typ ->
@@ -460,6 +546,7 @@ module Encoding = struct
     | Extended_wrapped -> Ext_lit_operations.Gil_sing_elem.access expr
 
   let extend_wrap e =
+    require_definition def_gil_ext_literal;
     match e.kind with
     | Extended_wrapped -> e.expr
     | Native SetType -> Ext_lit_operations.Gil_set.construct (simple_wrap e)
@@ -472,14 +559,19 @@ module Encoding = struct
 
   let get_set { kind; expr; _ } =
     match kind with
-    | Native SetType -> expr
-    | Extended_wrapped -> Ext_lit_operations.Gil_set.access expr
+    | Native SetType ->
+        require_definition def_gil_literal;
+        expr
+    | Extended_wrapped ->
+        require_definition def_gil_ext_literal;
+        Ext_lit_operations.Gil_set.access expr
     | _ -> exceptf "wrong encoding of set"
 
   let get_string = get_native ~accessor:Lit_operations.String.access
 end
 
 let typeof_simple e =
+  require_definition def_gil_literal;
   let open Type in
   let guards =
     Lit_operations.
@@ -503,6 +595,7 @@ let typeof_simple e =
     guards
 
 let typeof_extended e =
+  require_definition def_gil_ext_literal;
   let open Ext_lit_operations in
   let guard = Gil_set.recognize e in
   let typeof_simple = e |> Gil_sing_elem.access |> typeof_simple in
@@ -551,10 +644,14 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
   let open Encoding in
   try
     match lit with
-    | Undefined -> undefined_encoding
-    | Null -> null_encoding
-    | Empty -> empty_encoding
-    | Nono -> none_encoding
+    | Undefined | Null | Empty | Nono -> (
+        (* These encode directly to GIL_Literal constructors. *)
+        require_definition def_gil_literal;
+        match lit with
+        | Undefined -> undefined_encoding
+        | Null -> null_encoding
+        | Empty -> empty_encoding
+        | _ -> none_encoding)
     | Bool b -> bool_k b >- BooleanType
     | Int i -> int_zk i >- IntType
     | Num n -> real_k (Q.of_float n) >- NumberType
@@ -562,6 +659,7 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
     | Loc l -> encode_string l >- ObjectType
     | Type t -> encode_type t >- TypeType
     | LList lits ->
+        require_definition def_gil_literal;
         let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
         list args >- ListType
     | Constant _ -> raise (Exceptions.Unsupported "Z3 encoding: constants")
@@ -630,6 +728,7 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
       let n = get_int p2 in
       RepeatCache.get x n
   | StrNth ->
+      require_definition Axiomatised_operations.def_snth;
       let str' = get_string p1 in
       let index' = get_num p2 in
       let res = Axiomatised_operations.snth $$ [ str'; index' ] in
@@ -671,14 +770,24 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       (* If we only use an LVar as an argument to llen, then encode it as an uninterpreted function. *)
       let enc =
         match e with
-        | Expr.LVar l when SS.mem l llen_lvars -> llen <| get_list le
+        | Expr.LVar l when SS.mem l llen_lvars ->
+            require_definition def_llen;
+            llen <| get_list le
         | _ -> seq_len (get_list le)
       in
       enc >- IntType
-  | StrLen -> slen <| get_string le >- NumberType
-  | ToStringOp -> Axiomatised_operations.num2str <| get_num le >- StringType
-  | ToNumberOp -> Axiomatised_operations.str2num <| get_string le >- NumberType
-  | ToIntOp -> Axiomatised_operations.num2int <| get_num le >- NumberType
+  | StrLen ->
+      require_definition def_slen;
+      slen <| get_string le >- NumberType
+  | ToStringOp ->
+      require_definition def_num2str;
+      Axiomatised_operations.num2str <| get_num le >- StringType
+  | ToNumberOp ->
+      require_definition def_str2num;
+      Axiomatised_operations.str2num <| get_string le >- NumberType
+  | ToIntOp ->
+      require_definition def_num2int;
+      Axiomatised_operations.num2int <| get_num le >- NumberType
   | Not -> bool_not (get_bool le) >- BooleanType
   | Cdr ->
       let list = get_list le in
@@ -686,7 +795,9 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   | Car -> seq_nth (get_list le) (int_k 0) |> simply_wrapped
   | TypeOf -> typeof_expression le >- TypeType
   | ToUint32Op -> get_num le |> real_to_int |> int_to_real >- NumberType
-  | LstRev -> Axiomatised_operations.lrev <| get_list le >- ListType
+  | LstRev ->
+      require_definition def_lrev;
+      Axiomatised_operations.lrev <| get_list le >- ListType
   | NumToInt -> get_num le |> real_to_int >- IntType
   | IntToNum -> get_int le |> int_to_real >- NumberType
   | IsInt ->
@@ -791,8 +902,12 @@ let rec encode_logical_expression
         match Hashtbl.find_opt gamma var with
         | Some typ -> (Native typ, native_sort_of_type typ)
         | None ->
-            if SS.mem var list_elem_vars then (Simple_wrapped, t_gil_literal)
-            else (Extended_wrapped, t_gil_ext_literal)
+            if SS.mem var list_elem_vars then (
+              require_definition def_gil_literal;
+              (Simple_wrapped, t_gil_literal))
+            else (
+              require_definition def_gil_ext_literal;
+              (Extended_wrapped, t_gil_ext_literal))
       in
       make_const ~typ kind var
   | ALoc var -> native_const ObjectType var
@@ -909,9 +1024,9 @@ let lvars_as_list_elements (assertions : Expr.Set.t) : SS.t =
       SS.union new_lvars acc)
     assertions SS.empty
 
-let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
+let encode_assertions_needs_handler (fs : Expr.Set.t) (gamma : typenv) :
+    sexp list =
   let open Encoding in
-  let- () = Hashtbl.find_opt encoding_cache fs in
   let llen_lvars = lvars_only_in_llen fs in
   let list_elem_vars = lvars_as_list_elements fs in
   let encoded =
@@ -928,9 +1043,21 @@ let encode_assertions (fs : Expr.Set.t) (gamma : typenv) : sexp list =
     let encoded_asrts = List.map (fun e -> e.expr) encoded in
     List.map assume (extra_asrts @ encoded_asrts)
   in
-  let encoded = consts @ asrts in
-  let () = Hashtbl.replace encoding_cache fs encoded in
-  encoded
+  consts @ asrts
+
+(* Returns the SMT commands for [fs] together with the set of prelude
+   definitions they depend on (collected via the [Require_definition] effect
+   while encoding). Both are cached, so the dependency set survives a cache
+   hit -- it cannot be recomputed from the encoded terms without re-encoding. *)
+let encode_assertions (fs : Expr.Set.t) (gamma : typenv) :
+    sexp list * (int, definition) Hashtbl.t =
+  let- () = Hashtbl.find_opt encoding_cache fs in
+  let result =
+    with_necessary_definitions @@ fun () ->
+    encode_assertions_needs_handler fs gamma
+  in
+  let () = Hashtbl.replace encoding_cache fs result in
+  result
 
 module Dump = struct
   let counter = ref 0
@@ -972,10 +1099,15 @@ module Dump = struct
           cmds)
 end
 
+(* We never use the solver incrementally: every query starts by fully
+   resetting it. Z3 keeps the options that were set with [set-option] across a
+   [(reset)], so there is nothing to re-send here. Working in this one-shot
+   mode is important for reliability: when used incrementally (push/pop) Z3 can
+   non-deterministically answer [unknown] on queries -- notably ones involving
+   the sequence theory -- that it decides immediately in a fresh context. *)
 let reset_solver () =
-  let () = cmd (pop 1) in
+  let () = cmd reset in
   let () = RepeatCache.clear () in
-  let () = cmd (push 1) in
   ()
 
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
@@ -986,9 +1118,9 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
           fs pp_typenv gamma)
   in
   let () = reset_solver () in
-  let encoded_assertions = encode_assertions fs gamma in
+  let encoded_assertions, necessary_definitions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
-  let () = List.iter cmd !builtin_funcs in
+  let () = emit_definitions ~emit:cmd necessary_definitions in
   let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");
   let result = check !solver in

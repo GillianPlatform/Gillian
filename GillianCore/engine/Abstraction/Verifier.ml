@@ -120,7 +120,7 @@ struct
       |> List.map (fun (name, test) -> `List [ `String name; to_yojson test ]))
 
   let global_results = VerificationResults.make ()
-  let start_time = ref 0.
+  let start_time = ref (Unix.gettimeofday ())
 
   let reset () =
     VerificationResults.reset global_results;
@@ -867,7 +867,7 @@ struct
       get_tests_to_verify ~init_data prog pnames_to_verify lnames_to_verify
     in
     (* STEP 6: Run the symbolic tests *)
-    let cur_time = Sys.time () in
+    let cur_time = Unix.gettimeofday () in
     Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
     let result =
       let rec aux = function
@@ -879,7 +879,7 @@ struct
       in
       aux (tests' @ tests, Ok ())
     in
-    let end_time = Sys.time () in
+    let end_time = Unix.gettimeofday () in
     let cur_verified = SS.union pnames_to_verify lnames_to_verify in
     let success =
       Result.is_ok result && check_previously_verified prev_results cur_verified
