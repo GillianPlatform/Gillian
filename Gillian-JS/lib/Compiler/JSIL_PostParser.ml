@@ -182,15 +182,17 @@ let scope_info_to_assertion
                 let fun_obj_asrt =
                   Asrt.Pred
                     ( "JSFunctionObject",
+                      [ x_val ],
                       [
-                        x_val;
                         Lit (String proc_x.name);
                         proc_x_sc;
                         Lit (Num (float_of_int (List.length proc_x.params)));
                         proc_x_prototype;
                       ] )
                 in
-                let proto_asrt = Asrt.Pred ("JSObject", [ proc_x_prototype ]) in
+                let proto_asrt =
+                  Asrt.Pred ("JSObject", [ proc_x_prototype ], [])
+                in
                 [ fun_obj_asrt; proto_asrt; a_xval ]
           else if SS.mem x args then
             let x_val : Expr.t = LVar (Names.make_svar_name x) in
@@ -205,7 +207,7 @@ let scope_info_to_assertion
   let this_asrt = make_this_assertion () in
 
   if fid <> JS2JSIL_Helpers.main_fid then
-    let init_heap_asrt : Asrt.t = Pred (heap_asrt_name, []) in
+    let init_heap_asrt : Asrt.t = Pred (heap_asrt_name, [], []) in
     Asrt.star
       (glob_constraints @ (this_asrt :: init_heap_asrt :: a_schain :: a_vars))
   else Asrt.star (glob_constraints @ (this_asrt :: a_schain :: a_vars))
@@ -248,15 +250,17 @@ let create_pre_scope_pred
                 let fun_obj_asrt =
                   Asrt.Pred
                     ( "JSFunctionObject",
+                      [ PVar x ],
                       [
-                        PVar x;
                         Lit (String proc_x.name);
                         proc_x_sc;
                         Lit (Num (float_of_int (List.length proc_x.params)));
                         proc_x_prototype;
                       ] )
                 in
-                let proto_asrt = Asrt.Pred ("JSObject", [ proc_x_prototype ]) in
+                let proto_asrt =
+                  Asrt.Pred ("JSObject", [ proc_x_prototype ], [])
+                in
                 ([ x ], [ fun_obj_asrt; proto_asrt; a_x ])
           else ([], [])
         in
@@ -272,7 +276,7 @@ let create_pre_scope_pred
     name = pre_scope_prefix ^ fid;
     num_params = List.length p_args + 1;
     params;
-    ins = [ 0 ];
+    ins_number = 1;
     definitions = [ (None, Asrt.star (a_schain :: a_vars)) ];
     facts = [];
     pure = false;
@@ -296,21 +300,21 @@ let create_function_predicate
   let fo_asrt =
     Asrt.Pred
       ( "JSFunctionObject",
+        [ PVar x ],
         [
-          PVar x;
           Lit (String fid);
           fid_x_sc;
           Lit (Num (float_of_int (List.length fparams)));
           fid_prototype;
         ] )
   in
-  let proto_asrt = Asrt.Pred ("JSObject", [ fid_prototype ]) in
+  let proto_asrt = Asrt.Pred ("JSObject", [ fid_prototype ], []) in
 
   {
     name = pred_name;
     num_params = 1;
     params = [ ("x", None) ];
-    ins = [ 0 ];
+    ins_number = 1;
     definitions = [ (None, Asrt.star [ fo_asrt; proto_asrt ]) ];
     facts = [];
     pure = false;
@@ -324,7 +328,7 @@ let create_function_predicate
   name        : string;                                            (** Name of the predicate  *)
   num_params  : int;                                               (** Number of parameters   *)
   params      : (string * Type.t option) list;                     (** Actual parameters      *)
-  ins         : int list;                                          (** Ins                    *)
+  ins_number  : int;                                               (** Number of in-params    *)
   definitions : (((string * (string list)) option) * Asrt.t) list; (** Predicate definitions  *)
   pure        : bool;                                              (** Is the predicate pure  *)
   normalised  : bool;                                              (** If the predicate has been previously normalised *)
@@ -385,16 +389,18 @@ let create_post_scope_pred
     [ mtdt_er_a; ef_er_a; (* args_a; *) md_md_a; ef_md_a; er_fl_a ]
   in
 
-  let pred_params =
-    List.map (fun x -> Expr.PVar x) (JS2JSIL_Helpers.var_scope :: out_params)
+  (* The pre-scope predicate has a single in-parameter (the scope chain). *)
+  let pre_scope_ins = [ Expr.PVar JS2JSIL_Helpers.var_scope ] in
+  let pre_scope_outs = List.map (fun x -> Expr.PVar x) out_params in
+  let pre_scope_asrt =
+    Asrt.Pred (pre_scope_prefix ^ fid, pre_scope_ins, pre_scope_outs)
   in
-  let pre_scope_asrt = Asrt.Pred (pre_scope_prefix ^ fid, pred_params) in
 
   {
     name = post_scope_prefix ^ fid;
     num_params = List.length params;
     params;
-    ins = [ 0; 1 ];
+    ins_number = 2;
     definitions =
       [ (None, Asrt.star (pre_scope_asrt :: (args_asrts @ er_asrts))) ];
     facts = [];

@@ -1,24 +1,24 @@
 
-predicate list(+x, alpha) {
+predicate list(x; alpha) {
     (x == null) * (alpha == nil);
-    (x -> #a, #z) * (alpha == #a :: #beta) * list(#z, #beta)
+    (x -> #a, #z) * (alpha == #a :: #beta) * list(#z; #beta)
 }
 
-predicate lseg(+x, +y, alpha) {
+predicate lseg(x, y; alpha) {
   (x == y) * (alpha == nil);
-  (x -> #a, #z) * (alpha == #a :: #beta) * lseg(#z, y, #beta)
+  (x -> #a, #z) * (alpha == #a :: #beta) * lseg(#z, y; #beta)
 }
 
 lemma lseg_to_list {
   statement:
     forall x, alpha.
-      (x == #x) * (alpha == #alpha) * lseg(#x, null, #alpha) |- list(#x, #alpha)
+      (x == #x) * (alpha == #alpha) * lseg(#x, null; #alpha) |- list(#x; #alpha)
   variant: len alpha
   proof: unfold lseg(#x, null, #alpha);
          if (#x == null) {
            fold list(#x, #alpha)
          } else {
-           assert {bind: #next, #beta} (#x + 1 -> #next) * lseg(#next, null, #beta);
+           assert {bind: #next, #beta} (#x + 1 -> #next) * lseg(#next, null; #beta);
            apply lseg_to_list(#next, #beta);
            fold list(#x, #alpha)
          }
@@ -28,25 +28,25 @@ lemma lseg_append {
   statement:
     forall x, y, alpha, a, z.
       (x == #x) * (y == #y) * (alpha == #alpha) * (a == #a) * (z == #z) *
-      lseg(#x, #y, #alpha) *
-      (#y -> #a, #z) |- lseg(#x, #z, #alpha @ [ #a ])
+      lseg(#x, #y; #alpha) *
+      (#y -> #a, #z) |- lseg(#x, #z; #alpha @ [ #a ])
   variant: len alpha
   proof: unfold lseg(#x, #y, #alpha);
          if (#alpha == []) {
            fold lseg(#x, #z, #alpha @ [#a])
          } else {
-           assert {bind: #next, #beta} (#x + 1 -> #next) * lseg(#next, #y, #beta);
+           assert {bind: #next, #beta} (#x + 1 -> #next) * lseg(#next, #y; #beta);
            apply lseg_append(#next, #y, #beta, #a, #z); 
            fold lseg(#x, #z, #alpha @ [#a])
          } 
 }
 
-{ (x == #x) * list(#x, #alpha) }
+{ (x == #x) * list(#x; #alpha) }
 function llen(x) {
   y := x;
   n := 0;
   [[ fold lseg(x, y, []) ]];
-  [[ invariant {bind: y, n, #a1, #a2} lseg(x, y, #a1) * list(y, #a2) * (#alpha == #a1 @ #a2) * (n == len #a1) ]];
+  [[ invariant {bind: y, n, #a1, #a2} lseg(x, y; #a1) * list(y; #a2) * (#alpha == #a1 @ #a2) * (n == len #a1) ]];
   while (y != null) {
     [[ unfold list(y, #a2) ]];
     [[ assert {bind: #y, #b, #t} (y == #y) * (#y -> #b, #t) ]];
@@ -58,5 +58,5 @@ function llen(x) {
   [[ apply lseg_to_list(x, #alpha) ]];
   return n
 }
-{ list(#x, alpha) * (ret == len(#alpha)) }
+{ list(#x; alpha) * (ret == len(#alpha)) }
 

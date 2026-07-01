@@ -346,23 +346,24 @@ assertion_id_target:
 ;
 
 pred_param_target:
-  (* Program variable with in-parameter status and optional type *)
-  | in_param = option(FPLUS); v = VAR; t = option(preceded(COLON, type_target))
-    { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
-      (v, t), in_param }
+  (* Program variable with optional type *)
+  | v = VAR; t = option(preceded(COLON, type_target))
+    { (v, t) }
 ;
 
+(* Predicate parameters: in-parameters and out-parameters, separated by a
+   semicolon. E.g. [(in1, in2; out1, out2)], [(in1, in2;)] for all-ins,
+   [(;out1, out2)] for all-outs.
+   No semicolon implies all-ins.*)
 pred_head_target:
-  name = proc_name; LBRACE; params = separated_list(COMMA, pred_param_target); RBRACE;
-  { (* Register the predicate declaration in the syntax checker *)
+  name = proc_name; LBRACE;
+    ins = separated_list(COMMA, pred_param_target);
+    outs = outs(pred_param_target);
+  RBRACE;
+  { let params = ins @ outs in
     let num_params = List.length params in
-    let params, ins = List.split params in
-    let param_names, _ = List.split params in
-    let ins = List.map Option.get (List.filter (fun x -> x <> None) (List.mapi (fun i is_in -> if is_in then Some i else None) ins)) in
-    let ins = if (List.length ins > 0) then ins else (List.mapi (fun i _ -> i) param_names) in
-    (* register_predicate name num_params; *)
-    (* enter_predicate params; *)
-    (name, num_params, params, ins)
+    let ins_number = List.length ins in
+    (name, num_params, params, ins_number)
   }
 ;
 
@@ -813,8 +814,11 @@ top_level_g_assertion_target:
   a = g_assertion_target; EOF { a }
 
 predicate_call:
-  name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
-  { (name, params) }
+  name = proc_name; LBRACE;
+  ins = separated_list(COMMA, expr_target);
+  outs = outs(expr_target);
+  RBRACE
+  { (name, ins, outs) }
 
 g_assertion_target:
 (* (pure) /\ (pure) *)
@@ -828,9 +832,10 @@ g_assertion_target:
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { left_ass @ right_ass } %prec separating_conjunction
   | lhs = predicate_call; WAND; rhs = predicate_call
-    { [ Asrt.Wand {lhs; rhs } ] }
+    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
+      [ Asrt.Wand {lhs = (ln, li @ lo); rhs = (rn, ri @ ro) } ] }
 (* <CorePred>(es; es) *)
-  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
+  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); es2=outs(expr_target); RBRACE
     { [ Asrt.CorePred (v, es1, es2) ] }
 (* emp *)
   | LEMP;
@@ -838,8 +843,8 @@ g_assertion_target:
 (* x(e1, ..., en) *)
   | pcall = predicate_call
     {
-      let (name, params) = pcall in
-      [ Asrt.Pred (name, params) ]
+      let (name, ins, outs) = pcall in
+      [ Asrt.Pred (name, ins, outs) ]
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
@@ -878,7 +883,8 @@ g_logic_cmd_target:
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
-    { LCmd.SL (Package { lhs; rhs })}
+    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
+      LCmd.SL (Package { lhs = (ln, li @ lo); rhs = (rn, ri @ ro) })}
 
 (* unfold_all x *)
   | UNFOLDALL; name = proc_name
@@ -975,7 +981,7 @@ g_pred_target:
     let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
     let pred_nounfold = pred_abstract || Option.is_some nounfold in
-    let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let (pred_name, pred_num_params, pred_params, ins_number) = pred_head in
     let pred_definitions = Option.value ~default:[] pred_definitions in
     let () = if (pred_abstract <> (pred_definitions = [])) then
       raise (Failure (Format.asprintf "Malformed predicate %s: either abstract with definition or non-abstract without definition." pred_name))
@@ -1000,7 +1006,7 @@ g_pred_target:
         pred_internal = Option.is_some internal;
         pred_num_params;
         pred_params;
-        pred_ins;
+        ins_number;
         pred_definitions;
         pred_facts;
         pred_guard;
@@ -1262,3 +1268,12 @@ type_target:
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
 ;
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

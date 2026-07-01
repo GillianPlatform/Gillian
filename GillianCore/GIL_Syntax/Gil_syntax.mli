@@ -448,7 +448,7 @@ module Asrt : sig
 
   type atom =
     | Emp  (** Empty heap *)
-    | Pred of string * Expr.t list  (** Predicates *)
+    | Pred of string * Expr.t list * Expr.t list  (** Predicates *)
     | Pure of Expr.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
@@ -648,7 +648,9 @@ module Pred : sig
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
-    pred_ins : int list;  (** Ins *)
+    ins_number : int;
+        (** Number of in-parameters: the first [ins_number] parameters are ins,
+            and the remaining ones are outs *)
     pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
     pred_facts : Expr.t list;  (** Facts that hold for every definition *)
@@ -661,6 +663,10 @@ module Pred : sig
 
   (** Populates a Hashtbl from the given predicate list *)
   val init : t list -> (string, t) Hashtbl.t
+
+  (** [ins_indexes p] is the list of in-parameter indices
+      [[0; ...; ins_number - 1]] *)
+  val ins_indexes : t -> int list
 
   (** Returns the sets of in- and out-parameters of a predicate *)
   val ins_and_outs : t -> Utils.Containers.SI.t * Utils.Containers.SI.t
@@ -1324,7 +1330,13 @@ module Visitors : sig
          ; visit_PhiAssignment :
              'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
          ; visit_Pi : 'c -> Constant.t -> Constant.t
-         ; visit_Pred : 'c -> Asrt.atom -> string -> Expr.t list -> Asrt.atom
+         ; visit_Pred :
+             'c ->
+             Asrt.atom ->
+             string ->
+             Expr.t list ->
+             Expr.t list ->
+             Asrt.atom
          ; visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
          ; visit_Random : 'c -> Constant.t -> Constant.t
          ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1580,7 +1592,10 @@ module Visitors : sig
       'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
 
     method visit_Pi : 'c -> Constant.t -> Constant.t
-    method visit_Pred : 'c -> Asrt.atom -> string -> Expr.t list -> Asrt.atom
+
+    method visit_Pred :
+      'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
+
     method visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
     method visit_Random : 'c -> Constant.t -> Constant.t
     method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1836,7 +1851,7 @@ module Visitors : sig
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
-         ; visit_Pred : 'c -> string -> Expr.t list -> 'f
+         ; visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_Pure : 'c -> Expr.t -> 'f
          ; visit_Random : 'c -> 'f
          ; visit_ReturnError : 'c -> 'f
@@ -2054,7 +2069,7 @@ module Visitors : sig
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
-    method visit_Pred : 'c -> string -> Expr.t list -> 'f
+    method visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_Pure : 'c -> Expr.t -> 'f
     method visit_Random : 'c -> 'f
     method visit_ReturnError : 'c -> 'f
@@ -2273,7 +2288,7 @@ module Visitors : sig
          ; visit_PVar : 'c -> string -> unit
          ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
-         ; visit_Pred : 'c -> string -> Expr.t list -> unit
+         ; visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_Pure : 'c -> Expr.t -> unit
          ; visit_Random : 'c -> unit
          ; visit_ReturnError : 'c -> unit
@@ -2492,7 +2507,7 @@ module Visitors : sig
     method visit_PVar : 'c -> string -> unit
     method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit
-    method visit_Pred : 'c -> string -> Expr.t list -> unit
+    method visit_Pred : 'c -> string -> Expr.t list -> Expr.t list -> unit
     method visit_Pure : 'c -> Expr.t -> unit
     method visit_Random : 'c -> unit
     method visit_ReturnError : 'c -> unit

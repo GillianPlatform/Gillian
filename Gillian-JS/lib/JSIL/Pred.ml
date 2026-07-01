@@ -8,7 +8,8 @@ type t = {
   name : string;  (** Name of the predicate *)
   num_params : int;  (** Number of parameters *)
   params : (string * Type.t option) list;  (** Actual parameters *)
-  ins : int list;  (** Ins *)
+  ins_number : int;
+      (** Number of in-parameters (the first [ins_number] ones) *)
   definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions *)
   facts : Expr.t list;  (** Facts about the predicate *)
@@ -27,19 +28,21 @@ let init (preds : t list) : (string, t) Hashtbl.t =
   pred_def_tbl
 
 let pp fmt pred =
-  let { name; params; ins; definitions; _ } = pred in
-  let exist_ins = List.length pred.ins <> List.length pred.params in
-  let params_with_info =
-    if exist_ins then
-      List.mapi
-        (fun i (v, t) -> ((if List.mem i ins then "+" else "") ^ v, t))
-        params
-    else params
-  in
+  let { name; params; ins_number; definitions; _ } = pred in
   let pp_param fmt (v, t) =
     match t with
     | None -> Fmt.pf fmt "%s" v
     | Some typ -> Fmt.pf fmt "%s : %s" v (Type.str typ)
+  in
+  (* Prints params as [(in1, ..., ink; out1, ..., outm)] *)
+  let pp_params fmt params =
+    let ins = List.filteri (fun i _ -> i < ins_number) params in
+    let outs = List.filteri (fun i _ -> i >= ins_number) params in
+    Fmt.pf fmt "%a;%a"
+      Fmt.(list ~sep:(any ", ") pp_param)
+      ins
+      Fmt.(list ~sep:(any ", ") pp_param)
+      outs
   in
   let pp_id_ex fmt id_ex =
     match id_ex with
@@ -70,9 +73,7 @@ let pp fmt pred =
         Fmt.pf fmt "@\nfacts: %a;" Fmt.(list ~sep:(any " and ") Expr.pp) facts
   in
   Fmt.pf fmt "@[<v 2>%a%a%apred %s(%a):@\n%a;%a@]" pp_abstract pred.abstract
-    pp_pure pred.pure pp_nounfold pred.nounfold name
-    Fmt.(list ~sep:(any ", ") pp_param)
-    params_with_info
+    pp_pure pred.pure pp_nounfold pred.nounfold name pp_params params
     Fmt.(list ~sep:(any ",@\n") pp_def)
     definitions pp_facts pred.facts
 

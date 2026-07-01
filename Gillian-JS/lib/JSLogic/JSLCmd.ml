@@ -33,15 +33,17 @@ let rec js2jsil
   in
 
   match logic_cmd with
-  | Fold (Pred (s, les), fold_info) ->
+  | Fold (Pred (s, ins, outs), fold_info) ->
+      let les = ins @ outs in
       [ LCmd.SL (Fold (s, List.map fe les, translate_folding_info fold_info)) ]
-  | Flash (Pred (s, les)) ->
-      let p_name, les' = (s, List.map fe les) in
+  | Flash (Pred (s, ins, outs)) ->
+      let p_name, les' = (s, List.map fe (ins @ outs)) in
       [
         LCmd.SL (Unfold (p_name, les', None, false));
         LCmd.SL (Fold (p_name, les', None));
       ]
-  | Unfold (Pred (s, les), unfold_info) ->
+  | Unfold (Pred (s, ins, outs), unfold_info) ->
+      let les = ins @ outs in
       [ LCmd.SL (Unfold (s, List.map fe les, unfold_info, false)) ]
   | GUnfold name -> [ LCmd.SL (GUnfold name) ]
   | Assert (assertion, binders) ->

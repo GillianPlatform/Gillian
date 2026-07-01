@@ -39,5 +39,10 @@ val find : t -> (abs_t -> bool) -> abs_t option
 val get_all : maintain:bool -> (abs_t -> bool) -> t -> abs_t list
 val substitution_in_place : SVal.SESubst.t -> t -> unit
 
-(** Turns a predicate set into a list of assertions *)
-val to_assertions : t -> Asrt.t
+(** Turns a predicate set into a list of assertions. [split_ins_outs name args]
+    splits the (flat) argument list of a predicate instance into its in- and
+    out-arguments, so the resulting [Pred] atoms carry the proper separation. *)
+val to_assertions :
+  split_ins_outs:(string -> Expr.t list -> Expr.t list * Expr.t list) ->
+  t ->
+  Asrt.t

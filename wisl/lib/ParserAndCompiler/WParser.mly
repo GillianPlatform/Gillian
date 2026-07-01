@@ -9,7 +9,7 @@
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
-%token <CodeLoc.t> SEMICOLON        /* ; */
+%token <CodeLoc.t> SCOLON           /* ; */
 %token <CodeLoc.t> COMMA            /* , */
 %token <CodeLoc.t> DOT              /* . */
 %token <CodeLoc.t> ASSIGN           /* := */
@@ -117,7 +117,7 @@
 %type <WLExpr.t>                         variant_def
 %type <WLExpr.t>                         with_variant_def
 %type <WLCmd.t list>                     proof_def
-%type <(string * WType.t option) * bool> pred_param_ins
+%type <string * WType.t option>          pred_param
 %type <(string * string) list>           unfold_bindings
 %type <string * string>                  unfold_binding
 %type <CodeLoc.t * string list>          bindings_with_loc
@@ -219,18 +219,18 @@ var_list:
 
 
 statement_list_and_return:
-  | RETURN; e = expression; SEMICOLON? { ([], e)  }
-  | sm = statement; SEMICOLON; sle = statement_list_and_return
+  | RETURN; e = expression; SCOLON? { ([], e)  }
+  | sm = statement; SCOLON; sle = statement_list_and_return
     { let (sl, e) = sle in (sm::sl, e) }
 
 statement_list:
-  | sl = separated_nonempty_list_option_trailing(SEMICOLON, statement) { sl }
+  | sl = separated_nonempty_list_option_trailing(SCOLON, statement) { sl }
 
 
 /* not useful at the moment */
 /*
 logic_cmds:
-  | LCMD; lcmds = separated_list(SEMICOLON, logic_command); RCBRACE { lcmds }
+  | LCMD; lcmds = separated_list(SCOLON, logic_command); RCBRACE { lcmds }
  */
 
 type_target:
@@ -273,7 +273,7 @@ function_call:
     }
 
 function_call_list:
-  sl = separated_nonempty_list(SEMICOLON, function_call) { sl }
+  sl = separated_nonempty_list(SCOLON, function_call) { sl }
 
 
 statement:
@@ -471,24 +471,20 @@ with_variant_def:
   | WITH; variant = variant_def { variant }
 
 proof_def:
-  | PROOF; COLON; pr = separated_nonempty_list(SEMICOLON, logic_command)
+  | PROOF; COLON; pr = separated_nonempty_list(SCOLON, logic_command)
     { pr }
 
 predicate:
-  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
+  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, pred_param);
+    outs = outs(pred_param);
+    RBRACE; LCBRACE;
+    pred_definitions = separated_nonempty_list(SCOLON, logic_assertion);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
-      let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
-      (* ins looks like [true, false, true] *)
-      let ins = List.mapi (fun i is_in -> if is_in then Some i else None) ins in
-      (* ins looks like [Some 0, None, Some 2] *)
-      let ins = List.filter Option.is_some ins in
-      (* ins looks like [Some 0, Some 2] *)
-      let ins = List.map Option.get ins in
-      (* ins looks like [0, 2] *)
-  		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
-      (* if ins is empty then everything is an in *)
+      let pred_params = ins @ outs in
+      (* In-parameters are the first [List.length ins] parameters *)
+      let pred_ins = List.mapi (fun i _ -> i) ins in
       let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
       let pred_id = Generators.gen_id () in
@@ -502,11 +498,10 @@ predicate:
         pred_id;
       } }
 
-pred_param_ins:
-  | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
+pred_param:
+  | lx = IDENTIFIER; ty = option(preceded(COLON, type_target))
     { let (_, x) = lx in
-      let isin = Option.is_some inp in
-      ((x, Option.map fst $3), isin) }
+      (x, Option.map fst ty) }
 
 
 logic_command:
@@ -534,13 +529,13 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = IF; LBRACE; g = logic_expression; lend = RBRACE;
-    LCBRACE; thencmds = separated_list(SEMICOLON, logic_command); RCBRACE;
-    ELSE; LCBRACE; elsecmds = separated_list(SEMICOLON, logic_command); RCBRACE
+    LCBRACE; thencmds = separated_list(SCOLON, logic_command); RCBRACE;
+    ELSE; LCBRACE; elsecmds = separated_list(SCOLON, logic_command); RCBRACE
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, elsecmds) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = IF; LBRACE; g = logic_expression; lend = RBRACE;
-    LCBRACE; thencmds = separated_list(SEMICOLON, logic_command); RCBRACE;
+    LCBRACE; thencmds = separated_list(SCOLON, logic_command); RCBRACE;
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, []) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
@@ -576,14 +571,14 @@ lvar_or_pvar:
   | lx = LVAR { lx }
 
 wand:
-  | lname = IDENTIFIER; LBRACE; largs = separated_list(COMMA, logic_expression); RBRACE;
+  | lname = IDENTIFIER; LBRACE; lins = separated_list(COMMA, logic_expression); SCOLON; louts = separated_list(COMMA, logic_expression); RBRACE;
     WAND;
-    rname = IDENTIFIER; LBRACE; rargs = separated_list(COMMA, logic_expression); lend = RBRACE
+    rname = IDENTIFIER; LBRACE; rins = separated_list(COMMA, logic_expression); SCOLON; routs = separated_list(COMMA, logic_expression); lend = RBRACE
     {
       let (lstart, lname) = lname in
       let (_, rname) = rname in
       let loc = CodeLoc.merge lstart lend in
-      ((lname, largs), (rname, rargs), loc)
+      ((lname, lins @ louts), (rname, rins @ routs), loc)
     }
 
 logic_expression_with_permission:
@@ -600,9 +595,12 @@ logic_assertion:
   | wand = wand
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
-  | lpr = IDENTIFIER; LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
+  | lpr = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, logic_expression);
+    outs = outs(logic_expression);
+    lend = RBRACE
     { let (lstart, pr) = lpr in
-      let bare_assert = WLAssert.LPred (pr, params) in
+      let bare_assert = WLAssert.LPred (pr, ins, outs) in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
   | loc = EMP
@@ -731,3 +729,12 @@ separated_nonempty_list_option_trailing(SEP, X):
   | x = X SEP xs = separated_nonempty_list_option_trailing(SEP, X);
       { [x] @ xs }
   | x = X SEP { [x] }
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

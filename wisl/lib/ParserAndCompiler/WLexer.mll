@@ -87,7 +87,7 @@ rule read =
   | ':'      { COLON (curr lexbuf) }
   | ','      { COMMA (curr lexbuf) }
   | "."      { DOT (curr lexbuf) }
-  | ';'      { SEMICOLON (curr lexbuf) }
+  | ';'      { SCOLON (curr lexbuf) }
   | "|-"     { VDASH (curr lexbuf) }
   (* binary operators *)
   | "::"     { LSTCONS }

@@ -30,40 +30,40 @@ pred i__is_bounded_long(e: List, min: Int, max: Int):
 
 (* Actual value getters *)
 
-pred i__int (+e: List, k : Int):
+pred i__int (e: List; k : Int):
   (e == {{ "int", k }});
 
-pred i__long (+e: List, k : Int):
+pred i__long (e: List; k : Int):
   (e == {{ "long", k }});
 
-pred i__single (+e: List, k : Num):
+pred i__single (e: List; k : Num):
   (e == {{ "single", k }});
 
-pred i__float (+e: List, k : Num):
+pred i__float (e: List; k : Num):
   (e == {{ "float", k }});
 
-pred i__ptr_to_0 (+e : List, l : Obj):
+pred i__ptr_to_0 (e : List; l : Obj):
   (e == {{ l, 0i }});
 
-pred i__ptr (+e: List, l: Obj, o: Int):
+pred i__ptr (e: List; l: Obj, o: Int):
   (e == {{ l, o }}) * (0i i<=# o);
 
 (* arrays *)
 
-pred i__zeros_ptr_size(+ptr: List, +size: Int):
-  i__ptr(ptr, #l, #o) *
+pred i__zeros_ptr_size(ptr: List, size: Int):
+  i__ptr(ptr; #l, #o) *
   <mem_zeros>(#l, #o, #o i+ size; "Freeable");
 
-pred i__undefs_ptr_size(+ptr: List, +size: Int):
-  i__ptr(ptr, #l, #o) *
+pred i__undefs_ptr_size(ptr: List, size: Int):
+  i__ptr(ptr; #l, #o) *
   <mem_hole>(#l, #o, #o i+ size; "Freeable");
 
-pred i__array_ptr(+ptr: List, +size: Int, +chk: Str, content: List):
-  i__ptr(ptr, #l, #o) * (size == l-len content) * (0i i<=# size) *
+pred i__array_ptr(ptr: List, size: Int, chk: Str; content: List):
+  i__ptr(ptr; #l, #o) * (size == l-len content) * (0i i<=# size) *
   <mem_array>(#l, #o, size, chk; content, "Freeable");
 
 (* Pointer arithmetic *)
 
-pred i__ptr_add(+ptr: List, +to_add:Int, res: List):
-  i__ptr(ptr, #l, #o) *
+pred i__ptr_add(ptr: List, to_add:Int; res: List):
+  i__ptr(ptr; #l, #o) *
   (res == {{ #l, #o i+ to_add }});

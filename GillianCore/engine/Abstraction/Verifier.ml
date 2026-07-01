@@ -683,7 +683,7 @@ struct
     object
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.ss_monoid
-      method! visit_Pred _ pred_name _ = SS.singleton pred_name
+      method! visit_Pred _ pred_name _ _ = SS.singleton pred_name
       method! visit_Fold _ pred_name _ _ = SS.singleton pred_name
       method! visit_Unfold _ pred_name _ _ _ = SS.singleton pred_name
       method! visit_GUnfold _ pred_name = SS.singleton pred_name
@@ -775,7 +775,7 @@ struct
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
-              Hashtbl.add pred_ins name pred.pred.pred_ins;
+              Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
               pred_ins)
             preds
             (Hashtbl.create Config.medium_tbl_size)
@@ -1024,7 +1024,7 @@ struct
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : MP.pred) pred_ins ->
-            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
             pred_ins)
           preds
           (Hashtbl.create Config.medium_tbl_size)

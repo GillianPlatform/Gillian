@@ -8,14 +8,14 @@
 
 (* First projection of a list of pairs *)
 @nopath
-pure pred FirstProj(+lst : List, fProj : List) : (lst == {{  }}) *
+pure pred FirstProj(lst : List; fProj : List) : (lst == {{  }}) *
   (fProj == {{  }}), (lst == l+ ({{ {{ #fst, #lvar_js_7 }} }}, #rest)) *
-  FirstProj(#rest, #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
+  FirstProj(#rest; #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
   
   
 (*
 lemma FirstProjFunction(lst1, proj1, lst2, proj2)
-  [[  FirstProj(#lst1, #proj1) * FirstProj(#lst2, #proj2) * (#lst1 == #lst2) ]]
+  [[  FirstProj(#lst1; #proj1) * FirstProj(#lst2; #proj2) * (#lst1 == #lst2) ]]
   [[  (#proj1 == #proj2) ]]
   [*  unfold FirstProj(#lst1, #proj1)  [bind: (#fst1 := #fst) and (#rest1 := #rest) and (#fProjRest1 := #fProjRest)];
       if ((not (#lst1 = {{  }}))) then {
@@ -25,13 +25,13 @@ lemma FirstProjFunction(lst1, proj1, lst2, proj2)
   *]
   
 lemma FirstProjAppendPair(lst, fProj, prop, value)
-  [[  FirstProj(#lst, #fProj) ]]
-  [[  FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}), l+ (#fProj, {{ #prop }})) ]]
+  [[  FirstProj(#lst; #fProj) ]]
+  [[  FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}); l+ (#fProj, {{ #prop }})) ]]
   [*  unfold FirstProj(#lst, #fProj) ;
       if ((not (#lst = {{  }}))) then {
         sep_assert ((#lst == l+ ({{ {{ #fProp, #fValue }} }}, #restPVPairs)))
           [bind: #fProp, #fValue, #restPVPairs];
-        sep_assert (FirstProj(#restPVPairs, #restProj)) [bind: #restProj];
+        sep_assert (FirstProj(#restPVPairs; #restProj)) [bind: #restProj];
         apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value) 
       }  *]
 *)
@@ -48,7 +48,7 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
 @nopath
 pure pred Unique(l : List) :
   (l == {{  }}),
-  (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest, #setRest) *
+  (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest; #setRest) *
     (! (#fst --e-- #setRest)) * Unique(#rest);
     
     
@@ -61,7 +61,7 @@ pure pred Unique(l : List) :
 ******************************************)
 
 @nopath
-pure pred ListToSet(+lst : List, set : Set) :
+pure pred ListToSet(lst : List; set : Set) :
   (lst == {{  }}) * (set == -{  }-),
   (lst == l+ ({{ #e }}, #restLst)) *
-    ListToSet(#restLst, #restSet) * (set == -u- (#restSet, -{ #e }-));
+    ListToSet(#restLst; #restSet) * (set == -u- (#restSet, -{ #e }-));

@@ -204,7 +204,8 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
         let pred_i_plus =
-          Asrt.Pred (internal_pred, [ comp_expr1; comp_expr2; Expr.LVar lout ])
+          Asrt.Pred
+            (internal_pred, [ comp_expr1; comp_expr2 ], [ Expr.LVar lout ])
         in
         ( gvars1 @ gvars2 @ [ lout ],
           asrtl1 @ asrtl2 @ [ pred_i_plus ],
@@ -347,11 +348,14 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       (exs1 @ exs2, cla1 @ cla2)
   | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
   | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
-  | LPred (pr, lel) ->
-      let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
-      let exs = List.concat exsl in
-      let al = List.concat all in
-      (exs, Asrt.Pred (pr, el) :: al)
+  | LPred (pr, ins, outs) ->
+      let exsl_in, all_in, el_in = list_split_3 (List.map compile_lexpr ins) in
+      let exsl_out, all_out, el_out =
+        list_split_3 (List.map compile_lexpr outs)
+      in
+      let exs = List.concat (exsl_in @ exsl_out) in
+      let al = List.concat (all_in @ all_out) in
+      (exs, Asrt.Pred (pr, el_in, el_out) :: al)
   | LWand { lhs = lname, largs; rhs = rname, rargs } ->
       let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
       let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
@@ -971,6 +975,8 @@ let compile_pred filepath pred =
       =
     pred
   in
+  (* WISL puts in-parameters first, so [ins_number] is their count *)
+  let ins_number = List.length pred_ins in
   let types = WTypeMap.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WTypeMap.type_of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
@@ -991,7 +997,7 @@ let compile_pred filepath pred =
       pred_internal = false;
       pred_num_params = List.length pred_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
       (* FIXME: ADD SUPPORT FOR FACTS, GUARD, ABSTRACT, PURE *)

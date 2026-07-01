@@ -7,28 +7,28 @@
  *************************************)
 
 (* Object properties as a table *)
-pred ObjectTableStructure(+l:Obj, +PVPairs:List) :
+pred ObjectTableStructure(l:Obj, PVPairs:List) :
     (* Base case - no properties left *)
     (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
     (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
-    DataProp(l, #prop, #value) * types(#value : Str) *
+    DataProp(l, #prop; #value) * types(#value : Str) *
     ObjectTableStructure(l, #restPVPairs);
 
 (* Complete Object-as-Table predicate *)
-nounfold pred ObjectTable(+l:Obj, +PVPairs:List) :
+nounfold pred ObjectTable(l:Obj, PVPairs:List) :
     ObjectTableStructure(l, PVPairs) *
-    FirstProj(PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet);
 
 (* Object-as-Table absent property *)
 lemma ObjectTableAbsentProperty(l, PVPairs, prop)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet) *
     (! (#prop --e-- #pSet))
 ]]
@@ -39,31 +39,31 @@ lemma ObjectTableAbsentProperty(l, PVPairs, prop)
 ]]
 
 (* Removing a property from a list of prop-value pairs *)
-pred RemoveProp(+PVPairs : List, +prop : Str, found : Bool, value : Str, newPairs : List) :
+pred RemoveProp(PVPairs : List, prop : Str; found : Bool, value : Str, newPairs : List) :
     (PVPairs == {{ }}) * (found == false) * (value == "") * (newPairs == {{ }}),
 
     (PVPairs == {{ prop, value }} :: newPairs) * (found == true),
 
     (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
-    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, false, value, newPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop; false, value, newPairs) *
     (found == false),
 
     (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
-    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, true, value, #restNewPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop; true, value, #restNewPairs) *
     (found == true) * (newPairs == {{ #fstProp, #fstValue }} :: #restNewPairs);
 
 (* Object-as-Table present property *)
 lemma ObjectTablePresentProperty(l, PVPairs, prop)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     (#prop --e-- #pSet)
 ]]
 [[
-    RemoveProp(#PVPairs, #prop, true, #value, #newPairs) *
+    RemoveProp(#PVPairs, #prop; true, #value, #newPairs) *
     ObjectTableStructure(#l, #newPairs) *
-    DataProp(#l, #prop, #value) * types(#value : Str)
+    DataProp(#l, #prop; #value) * types(#value : Str)
 ]]
 [*
     unfold ObjectTableStructure(#l, #PVPairs);
@@ -85,10 +85,10 @@ lemma ObjectTablePresentProperty(l, PVPairs, prop)
 lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     (! (#prop --e-- #pSet)) *
-    DataProp(#l, #prop, #value) * types(#value : Str)
+    DataProp(#l, #prop; #value) * types(#value : Str)
 ]]
 [[
     ObjectTableStructure(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
@@ -109,10 +109,10 @@ lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
 lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     (! (#prop --e-- #pSet)) *
-    DataProp(#l, #prop, #value) * types(#value : Str) *
+    DataProp(#l, #prop; #value) * types(#value : Str) *
     empty_fields(l : -u- (#pSet, -{ #prop }-))
 ]]
 [[
@@ -125,20 +125,20 @@ lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
  *]
 
 (* Frozen object properties *)
-pred FrozenObjectTableStructure(+l:Obj, +PVPairs:List) :
+pred FrozenObjectTableStructure(l:Obj, PVPairs:List) :
     (* Base case - no properties left *)
     (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
     (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
-    DataPropConst(l, #prop, #value, true) *
+    DataPropConst(l, #prop; #value, true) *
     FrozenObjectTableStructure(l, #restPVPairs);
 
 (* Frozen Object-as-Table predicate *)
-nounfold pred FrozenObjectTable(+l:Obj, +PVPairs:List) :
+nounfold pred FrozenObjectTable(l:Obj, PVPairs:List) :
     FrozenObjectTableStructure(l, PVPairs) *
-    FirstProj(PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet);
 
 (******************************
@@ -151,15 +151,15 @@ nounfold pred FrozenObjectTable(+l:Obj, +PVPairs:List) :
  ******************************)
 
 (* Live decoded encryption context *)
-pred LiveDecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
-    JSObjWithProto(dECObj, null) *
-    toUtf8PairMap(ECKs, #utf8ECKs) *
+pred LiveDecodedEncryptionContext(dECObj : Obj, ECKs : List) :
+    JSObjWithProto(dECObj; null) *
+    toUtf8PairMap(ECKs; #utf8ECKs) *
     ObjectTable(dECObj, #utf8ECKs);
 
 (* Decoded encryption context *)
-pred DecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
-    JSObjGeneral(dECObj, null, "Object", false) *
-    toUtf8PairMap(ECKs, #utf8ECKs) *
+pred DecodedEncryptionContext(dECObj : Obj, ECKs : List) :
+    JSObjGeneral(dECObj; null, "Object", false) *
+    toUtf8PairMap(ECKs; #utf8ECKs) *
     FrozenObjectTable(dECObj, #utf8ECKs);
 
 (*****************************
@@ -175,62 +175,62 @@ pred DecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
 
 (* Prototype of EDK objects *)
 pred EDKPrototype () :
-    JSObjGeneral($l_edk_proto, null, "Object", false) *
+    JSObjGeneral($l_edk_proto; null, "Object", false) *
     empty_fields($l_edk_proto: -{ }-);
 
 (* EDK objects *)
-nounfold pred EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
-    JSObjGeneral(EDK, $l_edk_proto, "Object", false) *
-    readOnlyProperty(EDK, "providerId", pId) *
-    readOnlyProperty(EDK, "providerInfo", pInfo) *
-    readOnlyProperty(EDK, "encryptedDataKey", #aEDK) *
-        Uint8Array(#aEDK, #abEDK, 0, #viewSizeEDK) *
-        ArrayBuffer(#abEDK, encryptedDataKey) *
+nounfold pred EncryptedDataKey(EDK; pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
+    JSObjGeneral(EDK; $l_edk_proto, "Object", false) *
+    readOnlyProperty(EDK, "providerId"; pId) *
+    readOnlyProperty(EDK, "providerInfo"; pInfo) *
+    readOnlyProperty(EDK, "encryptedDataKey"; #aEDK) *
+        Uint8Array(#aEDK; #abEDK, 0, #viewSizeEDK) *
+        ArrayBuffer(#abEDK; encryptedDataKey) *
         (#viewSizeEDK == l-len encryptedDataKey) *
-    readOnlyProperty(EDK, "rawInfo", #aRInfo) *
-        Uint8Array(#aRInfo, #abRInfo, 0, #viewSizeRInfo) *
-        ArrayBuffer(#abRInfo, rawInfo) *
+    readOnlyProperty(EDK, "rawInfo"; #aRInfo) *
+        Uint8Array(#aRInfo; #abRInfo, 0, #viewSizeRInfo) *
+        ArrayBuffer(#abRInfo; rawInfo) *
         (#viewSizeRInfo == l-len rawInfo);
 
 (***** Arrays of deserialised EDKs *****)
 
 (* Live array of deserialised EDKs *)
-pred ArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
+pred ArrayOfDEDKsContents(a:Obj, start:Num; contents:List) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
-    DataProp(a, #index, #edk) *
-    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
-    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    DataProp(a, #index; #edk) *
+    EncryptedDataKey(#edk; #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId; #pId) * fromUtf8(#pInfo; #rawInfo) *
     (#element == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
     (contents == l+ ({{ #element }},  #rest)) *
     (#rest_start == start + 1) *
-    ArrayOfDEDKsContents(a, #rest, #rest_start);
+    ArrayOfDEDKsContents(a, #rest_start; #rest);
 
 (* Frozen array of deserialised EDKs *)
-pred FrozenArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
+pred FrozenArrayOfDEDKsContents(a:Obj, start:Num; contents:List) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
-    readOnlyProperty(a, #index, #edk) *
-    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
-    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    readOnlyProperty(a, #index; #edk) *
+    EncryptedDataKey(#edk; #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId; #pId) * fromUtf8(#pInfo; #rawInfo) *
     (#edk == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
     (contents == l+ ({{ #edk }}, #rest_contents)) *
     (#rest_start == start + 1) *
-    FrozenArrayOfDEDKsContents(a, #rest_contents, #rest_start);
+    FrozenArrayOfDEDKsContents(a, #rest_start; #rest_contents);
 
 (***** Deserialised EDKs *****)
 
 (* EDKs are first deserialised into a live array *)
-pred LiveDeserialisedEncryptedDataKeys (+a:Obj, EDKs:List) :
+pred LiveDeserialisedEncryptedDataKeys (a:Obj; EDKs:List) :
     ArrayStructure(a, l-len EDKs) *
-    ArrayOfDEDKsContents(a, EDKs, 0);
+    ArrayOfDEDKsContents(a, 0; EDKs);
 
 (* Deserialised EDKs are ultimately provided as a frozen array *)
-pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
+pred DeserialisedEncryptedDataKeys (a:Obj; contents:List) :
     FrozenArrayStructure(a, l-len contents) *
-    FrozenArrayOfDEDKsContents(a, contents, 0);
+    FrozenArrayOfDEDKsContents(a, 0; contents);
 
 (***************************
  ***************************
@@ -242,40 +242,40 @@ pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
  ***************************)
 
 (* Deserialised main part of the message header *)
-nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength, frameLength) :
+nounfold pred MessageHeader(messageHeader, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
     JSObject(messageHeader) *
-    DataProp(messageHeader, "version", version) *
-    DataProp(messageHeader, "type", type) *
-    DataProp(messageHeader, "suiteId", suiteId) *
-    DataProp(messageHeader, "messageId", #ui8aMessageId) *
-        Uint8Array(#ui8aMessageId, #abMessageId, 0, 16) *
-        ArrayBuffer(#abMessageId, messageId) *
-    DataProp(messageHeader, "encryptionContext", #dECObj) *
+    DataProp(messageHeader, "version"; version) *
+    DataProp(messageHeader, "type"; type) *
+    DataProp(messageHeader, "suiteId"; suiteId) *
+    DataProp(messageHeader, "messageId"; #ui8aMessageId) *
+        Uint8Array(#ui8aMessageId; #abMessageId, 0, 16) *
+        ArrayBuffer(#abMessageId; messageId) *
+    DataProp(messageHeader, "encryptionContext"; #dECObj) *
         DecodedEncryptionContext(#dECObj, ECKs) *
-    DataProp(messageHeader, "encryptedDataKeys", #dEDKs) *
-        DeserialisedEncryptedDataKeys(#dEDKs, EDKs) *
-    DataProp(messageHeader, "contentType", contentType) *
-    DataProp(messageHeader, "headerIvLength", headerIvLength) *
-    DataProp(messageHeader, "frameLength", frameLength);
+    DataProp(messageHeader, "encryptedDataKeys"; #dEDKs) *
+        DeserialisedEncryptedDataKeys(#dEDKs; EDKs) *
+    DataProp(messageHeader, "contentType"; contentType) *
+    DataProp(messageHeader, "headerIvLength"; headerIvLength) *
+    DataProp(messageHeader, "frameLength"; frameLength);
 
 (* Entire deserialised header *)
-nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength,
+nounfold pred HeaderInfo(headerInfo, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength,
                             frameLength, headerLength, rawHeaderData, headerIv, headerAuthTag) :
     JSObject(headerInfo) *
-    DataProp(headerInfo, "messageHeader", #messageHeader) *
-        MessageHeader(#messageHeader, version, type, suiteId, messageId, ECKs, EDKs, contentType, headerIvLength, frameLength) *
-    DataProp(headerInfo, "headerLength", headerLength) *
-    DataProp(headerInfo, "algorithmSuite", #algoSuiteObject) *
-        AlgorithmSuiteObject(#algoSuiteObject, headerIvLength, #tagLength) *
-    DataProp(headerInfo, "rawHeader", #rawHeader) *
-        Uint8Array(#rawHeader, #rawBuffer, 0, headerLength) *
-        ArrayBuffer(#rawBuffer, rawHeaderData) *
-    DataProp(headerInfo, "headerIv", #ui8aHeaderIv) *
-        Uint8Array(#ui8aHeaderIv, #abHeaderIv, 0, headerIvLength) *
-        ArrayBuffer(#abHeaderIv, headerIv) *
-    DataProp(headerInfo, "headerAuthTag", #ui8aHeaderAuthTag) *
-        Uint8Array(#ui8aHeaderAuthTag, #abHeaderAuthTag, 0, #tagLength / 8) *
-        ArrayBuffer(#abHeaderAuthTag, headerAuthTag);
+    DataProp(headerInfo, "messageHeader"; #messageHeader) *
+        MessageHeader(#messageHeader, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) *
+    DataProp(headerInfo, "headerLength"; headerLength) *
+    DataProp(headerInfo, "algorithmSuite"; #algoSuiteObject) *
+        AlgorithmSuiteObject(#algoSuiteObject; headerIvLength, #tagLength) *
+    DataProp(headerInfo, "rawHeader"; #rawHeader) *
+        Uint8Array(#rawHeader; #rawBuffer, 0, headerLength) *
+        ArrayBuffer(#rawBuffer; rawHeaderData) *
+    DataProp(headerInfo, "headerIv"; #ui8aHeaderIv) *
+        Uint8Array(#ui8aHeaderIv; #abHeaderIv, 0, headerIvLength) *
+        ArrayBuffer(#abHeaderIv; headerIv) *
+    DataProp(headerInfo, "headerAuthTag"; #ui8aHeaderAuthTag) *
+        Uint8Array(#ui8aHeaderAuthTag; #abHeaderAuthTag, 0, #tagLength / 8) *
+        ArrayBuffer(#abHeaderAuthTag; headerAuthTag);
 
 (******************************
  ******************************
@@ -293,13 +293,13 @@ axiomatic incomplete spec AP_map (xsc, vthis, cfun)
 (* Mapping EDKs into the resulting decoded EDK array *)
 [[
     (vthis == #vthis) * (cfun == #cfun) *
-    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs)
+    JSFunctionObject(#cfun; "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis; #EDKs)
 ]]
 [[
-    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs) *
-    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs)
+    JSFunctionObject(#cfun; "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis; #EDKs) *
+    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret; #EDKs)
 ]]
 normal
 
@@ -308,10 +308,10 @@ axiomatic spec Object_freeze(xsc, vthis, l)
 (* Freezing an array of deserialised EDKs *)
 <deserialised_EDKS>
 [[
-    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
+    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l; #EDKs)
 ]]
 [[
-    DeserialisedEncryptedDataKeys(#l, #EDKs) * (ret == #l)
+    DeserialisedEncryptedDataKeys(#l; #EDKs) * (ret == #l)
 ]]
 normal;
 
@@ -319,11 +319,11 @@ normal;
 <object_table : #PVPairs>
 [[
     (l == #l) *
-    JSObjGeneral(#l, #proto, #class, #ext) *
+    JSObjGeneral(#l; #proto, #class, #ext) *
     ObjectTable(#l, #PVPairs)
 ]]
 [[
-    JSObjGeneral(#l, #proto, #class, false) *
+    JSObjGeneral(#l; #proto, #class, false) *
     FrozenObjectTable(#l, #PVPairs)
 ]]
 normal

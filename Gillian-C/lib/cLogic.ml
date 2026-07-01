@@ -204,7 +204,7 @@ module CAssert = struct
         constr : CConstructor.t;
         typ : points_to_type;
       }
-    | Pred of string * CExpr.t list
+    | Pred of string * CExpr.t list * CExpr.t list
     | Emp
 
   let rec pp fmt a =
@@ -229,7 +229,9 @@ module CAssert = struct
         in
         Format.fprintf fmt "(%a -%s> %a)" CExpr.pp ptr (string_of_typ typ)
           CConstructor.pp constr
-    | Pred (s, el) -> Format.fprintf fmt "%s(%a)" s (pp_list CExpr.pp) el
+    | Pred (s, ins, outs) ->
+        Format.fprintf fmt "%s(%a; %a)" s (pp_list CExpr.pp) ins
+          (pp_list CExpr.pp) outs
     | Emp -> Format.fprintf fmt "emp"
 end
 
@@ -307,23 +309,23 @@ module CAbsPred = struct
     pure : bool;
     name : string;
     params : (string * GilType.t option) list;
-    ins : int list;
+    ins_number : int;
   }
 
-  let pp_params fmt (params, ins) =
+  (* Prints params as [in1, ..., ink; out1, ..., outm] *)
+  let pp_params fmt (params, ins_number) =
     let pp_typ_opt f = function
       | None -> ()
       | Some t -> Format.fprintf f ": %s" (GilType.str t)
     in
-    let plus f k = if List.mem k ins then Format.fprintf f "+" else () in
-    let rec aux k = function
+    let pp_param f (a, typ) = Fmt.pf f "%s%a" a pp_typ_opt typ in
+    let ins = List.filteri (fun i _ -> i < ins_number) params in
+    let outs = List.filteri (fun i _ -> i >= ins_number) params in
+    let pp_outs f = function
       | [] -> ()
-      | [ (a, typ) ] -> Format.fprintf fmt "%a%s%a" plus k a pp_typ_opt typ
-      | (a, typ) :: r ->
-          Format.fprintf fmt "%a%s%a, " plus k a pp_typ_opt typ;
-          aux (k + 1) r
+      | outs -> Fmt.pf f " %a" Fmt.(list ~sep:(any ", ") pp_param) outs
     in
-    aux 0 params
+    Fmt.pf fmt "%a;%a" Fmt.(list ~sep:(any ", ") pp_param) ins pp_outs outs
 
   let pp fmt pred =
     let pp_pure f = function
@@ -331,7 +333,7 @@ module CAbsPred = struct
       | false -> ()
     in
     Fmt.pf fmt "abstract %apred %s(%a)" pp_pure pred.pure pred.name pp_params
-      (pred.params, pred.ins)
+      (pred.params, pred.ins_number)
 end
 
 module CPred = struct
@@ -340,24 +342,24 @@ module CPred = struct
     name : string;
     params : (string * GilType.t option) list;
     definitions : (assert_annot option * CAssert.t) list;
-    ins : int list;
+    ins_number : int;
     no_unfold : bool;
   }
 
-  let pp_params fmt (params, ins) =
+  (* Prints params as [in1, ..., ink; out1, ..., outm] *)
+  let pp_params fmt (params, ins_number) =
     let pp_typ_opt f = function
       | None -> ()
       | Some t -> Format.fprintf f ": %s" (GilType.str t)
     in
-    let plus f k = if List.mem k ins then Format.fprintf f "+" else () in
-    let rec aux k = function
+    let pp_param f (a, typ) = Fmt.pf f "%s%a" a pp_typ_opt typ in
+    let ins = List.filteri (fun i _ -> i < ins_number) params in
+    let outs = List.filteri (fun i _ -> i >= ins_number) params in
+    let pp_outs f = function
       | [] -> ()
-      | [ (a, typ) ] -> Format.fprintf fmt "%a%s%a" plus k a pp_typ_opt typ
-      | (a, typ) :: r ->
-          Format.fprintf fmt "%a%s%a, " plus k a pp_typ_opt typ;
-          aux (k + 1) r
+      | outs -> Fmt.pf f "; %a" Fmt.(list ~sep:(any ", ") pp_param) outs
     in
-    aux 0 params
+    Fmt.pf fmt "%a%a" Fmt.(list ~sep:(any ", ") pp_param) ins pp_outs outs
 
   let pp_def fmt (da, a) =
     Format.fprintf fmt "%a%a"
@@ -372,7 +374,8 @@ module CPred = struct
     Format.fprintf fmt "@[<v 2>%apred %s %s(%a) {@\n%a@]@\n}" pp_pure pred.pure
       pred.name
       (if pred.no_unfold then "nounfold" else "")
-      pp_params (pred.params, pred.ins)
+      pp_params
+      (pred.params, pred.ins_number)
       (pp_list ~sep:(Fmt.any ";@\n") pp_def)
       pred.definitions
 end

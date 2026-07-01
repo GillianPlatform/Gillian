@@ -83,7 +83,7 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | MetaData (e1, e2) -> [ Asrt_utils.metadata ~loc:(fe e1) ~metadata:(fe e2) ]
   | EmptyFields (e1, e2) ->
       [ Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2) ]
-  | Pred (pn, es) -> [ Pred (pn, List.map fe es) ]
+  | Pred (pn, ins, outs) -> [ Pred (pn, List.map fe ins, List.map fe outs) ]
   | Pure f -> [ Pure (jsil2gil_expr f) ]
   | Types vts -> [ Types (List.map (fun (v, t) -> (fe v, t)) vts) ]
 
@@ -169,7 +169,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     (* TODO (Alexis): Set depending on module of pred *)
     pred_num_params = pred.num_params;
     pred_params = pred.params;
-    pred_ins = pred.ins;
+    ins_number = pred.ins_number;
     pred_definitions =
       List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
     pred_facts = List.map jsil2gil_expr pred.facts;

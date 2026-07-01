@@ -1296,8 +1296,9 @@ struct
     let open Asrt in
     function
     | Emp -> Fmt.pf ft "emp"
-    | Pred (name, params) ->
-        Fmt.pf ft "%s(%a)" name (pp_comma_sep pp_expr) params
+    | Pred (name, ins, outs) ->
+        Fmt.pf ft "%s(%a; %a)" name (pp_comma_sep pp_expr) ins
+          (pp_comma_sep pp_expr) outs
     | Types tls ->
         let pp_tl ft (e, t) = Fmt.pf ft "%a : %s" pp_expr e (Type.str t) in
         Fmt.pf ft "%a" (pp_comma_sep pp_tl) tls

@@ -56,7 +56,7 @@ spec TypeError (v)
 
     (** 2 **)
     [[ (v == #v) * types(#v:Str) ]]
-    [[ TypeErrorWithMessage(ret, #v) * empty_fields(ret : -{ "message" }-) ]]
+    [[ TypeErrorWithMessage(ret; #v) * empty_fields(ret : -{ "message" }-) ]]
     normal
 
 proc TypeError (v) {

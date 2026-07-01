@@ -129,8 +129,8 @@ let convert_struct_field
             ([], 0) components
         in
         let field_arg_list = pvmember#==(Expr.list field_args) in
-        let args = pvloc :: ofs :: field_args in
-        let pred_call = Asrt.Pred (pred_name, args) in
+        (* Struct predicates have the location and offset as their two ins. *)
+        let pred_call = Asrt.Pred (pred_name, [ pvloc; ofs ], field_args) in
         (Some GilType.ListType, [ field_arg_list; pred_call ])
     | Array (type_', len) ->
         let chunk =
@@ -165,14 +165,14 @@ let convert_struct_field
                     | I_ssize_t -> is_ssize_t
                     | I_bool -> is_bool
                   in
-                  let asrt = Asrt.Pred (pred, [ pvmember ]) in
+                  let asrt = Asrt.Pred (pred, [ pvmember ], []) in
                   Some (Some IntType, [ asrt ])
               | Signedbv _ | Unsignedbv _ | Enum _ | EnumTag _ ->
                   Some (Some IntType, [])
               | Double | Float -> Some (Some NumberType, [])
               | Pointer _ ->
                   let is_ptr_asrt =
-                    Asrt.Pred (Internal_Predicates.is_ptr, [ pvmember ])
+                    Asrt.Pred (Internal_Predicates.is_ptr, [ pvmember ], [])
                   in
                   Some (Some ListType, [ is_ptr_asrt ])
               | _ -> None
@@ -209,7 +209,8 @@ let convert_struct_param ~ctx ~offset ~struct_name = function
 
 let gen_pred_of_struct ctx ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
-  let pred_ins = [ 0; 1 ] in
+  (* The location and offset (the first two parameters) are the ins *)
+  let ins_number = 2 in
   let components =
     let struct_tag = "tag-" ^ struct_name in
     Ctx.resolve_struct_components ctx (Ctx.tag_lookup ctx struct_tag)
@@ -237,7 +238,7 @@ let gen_pred_of_struct ctx ann struct_name =
         pred_source_path = None;
         pred_loc = None;
         pred_internal = true;
-        pred_ins;
+        ins_number;
         pred_num_params;
         pred_params;
         pred_facts = [ (* FIXME: there are probably some facts to get *) ];
@@ -411,7 +412,9 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) ~pvar_map s c =
   let gen_ofs_var () = Expr.LVar (fresh_lvar ()) in
   let te = trans_expr ~pvar_map in
   let tse = trans_simpl_expr ~pvar_map in
-  let ptr_call p l o = Asrt.Pred (Internal_Predicates.ptr_get, [ p; l; o ]) in
+  let ptr_call p l o =
+    Asrt.Pred (Internal_Predicates.ptr_get, [ p ], [ l; o ])
+  in
   let sz x = CSVal.size_of ~ctx x |> Z.of_int in
   let interpret_s ~typ s =
     match typ with
@@ -488,7 +491,7 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) ~pvar_map s c =
       in
       let more_asrt, _, params_fields = split3_expr_comp (List.map te el) in
       let pr =
-        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields) :: more_asrt
+        Asrt.Pred (struct_pred, [ locv; ofsv ], params_fields) :: more_asrt
       in
       pr @ to_assert @ [ malloc_chunk size ]
 
@@ -530,9 +533,10 @@ let rec trans_asrt ~ctx ~pvar_map asrt =
     | Pure f ->
         let ma, _, fp = trans_form ~pvar_map f in
         Pure fp :: ma
-    | Pred (p, cel) ->
-        let ap, _, gel = split3_expr_comp (List.map te cel) in
-        Pred (p, gel) :: ap
+    | Pred (p, c_ins, c_outs) ->
+        let ap_in, _, g_ins = split3_expr_comp (List.map te c_ins) in
+        let ap_out, _, g_outs = split3_expr_comp (List.map te c_outs) in
+        Pred (p, g_ins, g_outs) :: (ap_in @ ap_out)
     | Emp -> [ Asrt.Emp ]
     | PointsTo { ptr = s; constr = c; typ } ->
         trans_constr ~pvar_map ~ctx ~typ s c
@@ -596,12 +600,8 @@ let trans_asrt_annot da =
 
 let trans_abs_pred ~filepath cl_pred =
   let CAbsPred.
-        {
-          name = pred_name;
-          params = pred_params;
-          ins = pred_ins;
-          pure = pred_pure;
-        } =
+        { name = pred_name; params = pred_params; ins_number; pure = pred_pure }
+      =
     cl_pred
   in
   let pred_num_params = List.length pred_params in
@@ -613,7 +613,7 @@ let trans_abs_pred ~filepath cl_pred =
       pred_internal = false;
       pred_num_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions = [];
       pred_facts = [];
       pred_guard = None;
@@ -630,7 +630,7 @@ let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
           name = pred_name;
           params = pred_params;
           definitions;
-          ins = pred_ins;
+          ins_number;
           no_unfold;
           pure = pred_pure;
         } =
@@ -655,7 +655,7 @@ let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
       pred_internal = false;
       pred_num_params;
       pred_params;
-      pred_ins;
+      ins_number;
       pred_definitions;
       (* FIXME: ADD SUPPORT FOR FACTS *)
       pred_facts = [];
@@ -684,7 +684,7 @@ let get_param_typasrt param =
     | _ -> None
   in
   match (pred, param.identifier) with
-  | Some pred, Some id -> Some (Asrt.Pred (pred, [ PVar id ]))
+  | Some pred, Some id -> Some (Asrt.Pred (pred, [ PVar id ], []))
   | _ -> None
 
 let trans_sspec ~ctx ~pvar_map ~params sspecs =
@@ -787,11 +787,11 @@ let add_trans_lemma ~ctx ~pvar_map filepath ann cl_lemma =
 
 module Machine_preds = struct
   let mk_pred pred_name params def =
-    let ins = ref [] in
+    let ins_number = ref 0 in
     let pred_params =
       params
-      |> List.mapi (fun i (p, ty, is_in) ->
-             let () = if is_in then ins := i :: !ins in
+      |> List.map (fun (p, ty, is_in) ->
+             let () = if is_in then incr ins_number in
              (p, ty))
     in
     Pred.
@@ -802,7 +802,7 @@ module Machine_preds = struct
         pred_internal = true;
         pred_num_params = List.length params;
         pred_params;
-        pred_ins = List.rev !ins;
+        ins_number = !ins_number;
         pred_definitions = [ (None, def) ];
         pred_facts = [];
         pred_guard = None;
@@ -845,7 +845,7 @@ module Machine_preds = struct
       let perm = Expr.string Perm.(to_string Freeable) in
       Asrt.
         [
-          Pred (Internal_Predicates.ptr_get, [ PVar "p"; l; Expr.zero_i ]);
+          Pred (Internal_Predicates.ptr_get, [ PVar "p" ], [ l; Expr.zero_i ]);
           CorePred
             ( LActions.(str_ga Single),
               [ l; start; chunk ],

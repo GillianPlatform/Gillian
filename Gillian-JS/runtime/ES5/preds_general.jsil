@@ -1,7 +1,7 @@
 (* 
  * General JS Object: location, prototype, class, extensibility
  *)
-pred JSObjGeneral (+l:Obj, proto, class:Str, ext:Bool) :
+pred JSObjGeneral (l:Obj; proto, class:Str, ext:Bool) :
   MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> proto) *
   ((#md, "@class")      -> class) *

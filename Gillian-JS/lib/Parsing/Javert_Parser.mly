@@ -496,9 +496,11 @@ assertion_target:
   | LMETADATA; LBRACE; eo = expr_target; COMMA; em = expr_target; RBRACE
     { Asrt.MetaData (eo, em) }
   | LEMP; { Asrt.Emp }
-  | name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
-    { (* validate_pred_assertion (name, params); *)
-      Asrt.Pred (name, params) }
+  | name = VAR; LBRACE;
+    ins = separated_list(COMMA, expr_target);
+    outs = outs(expr_target);
+    RBRACE
+    { Asrt.Pred (name, ins, outs) }
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
     { Asrt.Types type_pairs }
   | EMPTYFIELDS; LBRACE; le=expr_target; COLON; domain=expr_target; RBRACE
@@ -782,22 +784,21 @@ named_assertion_target:
   { (id, a) }
 
 pred_param_target:
-  (* Program variable with in-parameter status and optional type *)
-  | in_param = option(PLUS); v = VAR; t = option(preceded(COLON, type_target))
-    { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
-      (v, t), in_param }
+  (* Program variable with optional type *)
+  | v = VAR; t = option(preceded(COLON, type_target))
+    { (v, t) }
 
+(* Predicate parameters: in-parameters and out-parameters, separated by a
+   semicolon. E.g. [(in1, in2; out1, out2)], [(in1, in2;)], [(;out1, out2)]. *)
 pred_head_target:
-  name = VAR; LBRACE; params = separated_list(COMMA, pred_param_target); RBRACE;
-  { (* Register the predicate declaration in the syntax checker *)
+  name = VAR; LBRACE;
+    ins = separated_list(COMMA, pred_param_target);
+    outs = outs(pred_param_target);
+  RBRACE;
+  { let params = ins @ outs in
     let num_params = List.length params in
-    let params, ins = List.split params in
-    let param_names, _ = List.split params in
-    let ins = List.map Option.get (List.filter (fun x -> x <> None) (List.mapi (fun i is_in -> if is_in then Some i else None) ins)) in
-    let ins = if (List.length ins > 0) then ins else (List.mapi (fun i _ -> i) param_names) in
-    (* register_predicate name num_params; *)
-    (* enter_predicate params; *)
-    (name, num_params, params, ins)
+    let ins_number = List.length ins in
+    (name, num_params, params, ins_number)
   }
 
 pred_defs_target:
@@ -816,14 +817,14 @@ pred_target:
     let abstract = Option.is_some a in
     let nounfold = abstract || Option.is_some n in
     let pure = Option.is_some p in
-    let (name, num_params, params, ins) = pred_head in
+    let (name, num_params, params, ins_number) = pred_head in
     let definitions = Option.value ~default:[] definitions in
     let () = if (abstract <> (definitions = [])) then
       raise (Failure (Format.asprintf "JSIL: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
     in
     let normalised = !Config.previously_normalised in
     let facts = Option.value ~default:[] facts in
-    Pred.{ name; num_params; params; ins; definitions; facts; pure; abstract; nounfold; normalised } }
+    Pred.{ name; num_params; params; ins_number; definitions; facts; pure; abstract; nounfold; normalised } }
 
 /* MACROS */
 
@@ -1068,11 +1069,11 @@ js_assertion_target:
   | SCHAIN; LBRACE; fid=VAR; COLON; le=js_lexpr_target; RBRACE
     { JSAsrt.SChain (fid, le) }
 (* x(e1, ..., en) *)
-  | name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
-    {
-      (* validate_pred_assertion (name, params); *)
-      JSAsrt.Pred (name, params)
-    }
+  | name = VAR; LBRACE;
+    ins = separated_list(COMMA, js_lexpr_target);
+    outs = outs(js_lexpr_target);
+    RBRACE
+    { JSAsrt.Pred (name, ins, outs) }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, js_type_env_pair_target); RBRACE
     { JSAsrt.Types type_pairs }
@@ -1121,7 +1122,7 @@ js_pred_target:
   definitions = option(js_pred_defs_target); SCOLON;
   facts=option(js_pred_facts_target); EOF
     { (* Add the predicate to the collection *)
-      let (name, num_params, params, ins) = pred_head in
+      let (name, num_params, params, ins_number) = pred_head in
       let abstract = Option.is_some abstract in
       let nounfold = abstract || Option.is_some nounfold in
       let pure = Option.is_some pure in
@@ -1130,7 +1131,7 @@ js_pred_target:
       let () = if (abstract <> (definitions = [])) then
         raise (Failure (Format.asprintf "JS: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
       in
-      Jslogic.JSPred.{ name; num_params; params; ins; definitions; facts; abstract; pure; nounfold }
+      Jslogic.JSPred.{ name; num_params; params; ins_number; definitions; facts; abstract; pure; nounfold }
     }
 
 
@@ -1275,3 +1276,12 @@ top_level_js_pre_target:
 
 top_level_expr_target:
   e = expr_target; EOF { e }
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

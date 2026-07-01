@@ -13,7 +13,7 @@ struct vector_s {
 typedef struct vector_s Vector;
 
 /*@
-    pred nounfold vector(+p, cap, alpha) {
+    pred nounfold vector(p; cap, alpha) {
         p -m> struct vector_s { long(0); long(0); NULL } *
         (cap == 0) * (alpha == nil);
     
@@ -29,7 +29,7 @@ typedef struct vector_s Vector;
 
 /*@ spec vector_new_capacity(capacity) {
     requires: (capacity == long(#capacity)) * (0 <=# #capacity)
-    ensures: vector(ret, #capacity, nil)
+    ensures: vector(ret; #capacity, nil)
 }*/
 Vector* vector_new_capacity(size_t capacity) {
     Vector* vec = malloc(sizeof(Vector));
@@ -46,8 +46,8 @@ Vector* vector_new_capacity(size_t capacity) {
 }
 
 /*@ spec vector_len(vec) {
-    requires: (vec == #vec) * vector (#vec, #capacity, #content)
-    ensures: vector(#vec, #capacity, #content) * (#sz == len(#content)) * (ret == long(#sz))
+    requires: (vec == #vec) * vector (#vec; #capacity, #content)
+    ensures: vector(#vec; #capacity, #content) * (#sz == len(#content)) * (ret == long(#sz))
 }*/
 size_t vector_len(Vector *vec) {
     return vec->size;
@@ -55,14 +55,14 @@ size_t vector_len(Vector *vec) {
 
 /*@ spec vector_new() {
     requires: emp
-    ensures: vector(ret, 8, nil)
+    ensures: vector(ret; 8, nil)
 }*/
 Vector *vector_new() { return vector_new_capacity(DEFAULT_CAPACITY); }
 
 /*@ spec vector_realloc_buffer(vec, new_capacity) {
     requires: (vec == #vec) * (new_capacity == long(#nc)) *
-              vector(#vec, #cap, #alpha) * (#cap <=# #nc)
-    ensures: vector(#vec, #nc, #alpha)
+              vector(#vec; #cap, #alpha) * (#cap <=# #nc)
+    ensures: vector(#vec; #nc, #alpha)
 }*/
 void vector_realloc_buffer(Vector *vec, size_t new_capacity) {
     if (new_capacity) {

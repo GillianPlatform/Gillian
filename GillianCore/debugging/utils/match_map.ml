@@ -76,7 +76,7 @@ functor
             L.Report_id.pp child_id L.Report_id.pp id type_ Content_type.match_;
         let p =
           match asrt_report.step with
-          | Pred (p, _), _ -> p
+          | Pred (p, _, _), _ -> p
           | _ -> assertion
         in
         { id = child_id; kind = Fold p; result = result_of_id child_id }

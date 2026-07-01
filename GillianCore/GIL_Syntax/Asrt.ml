@@ -1,7 +1,7 @@
 (** {b GIL logic assertions}. *)
 type atom = TypeDef__.assertion_atom =
   | Emp  (** Empty heap *)
-  | Pred of string * Expr.t list  (** Predicates *)
+  | Pred of string * Expr.t list * Expr.t list  (** Predicates *)
   | Pure of Expr.t  (** Pure formula *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion *)
   | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
@@ -71,7 +71,7 @@ module Set = Set.Make (MyAssertion)
 let map (f_e : Expr.t -> Expr.t) : t -> t =
   List.map (function
     | Emp -> Emp
-    | Pred (s, le) -> Pred (s, List.map f_e le)
+    | Pred (s, ins, outs) -> Pred (s, List.map f_e ins, List.map f_e outs)
     | Pure form -> Pure (f_e form)
     | Types lt -> Types (List.map (fun (exp, typ) -> (f_e exp, typ)) lt)
     | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2)
@@ -104,7 +104,7 @@ let pred_names : t -> string list =
     object
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.non_ordered_list_monoid
-      method! visit_Pred () name _ = [ name ]
+      method! visit_Pred () name _ _ = [ name ]
     end
   in
   collector#visit_assertion ()
@@ -135,9 +135,10 @@ let make_pure (a : t) : Expr.t =
 let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
   function
   | Emp -> Fmt.string fmt "emp"
-  | Pred (name, params) ->
+  | Pred (name, ins, outs) ->
       let name = Pp_utils.maybe_quote_ident name in
-      Fmt.pf fmt "@[<h>%s(%a)@]" name (Fmt.list ~sep:Fmt.comma e_pp) params
+      let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
+      Fmt.pf fmt "@[<h>%s(%a; %a)@]" name pp_e_l ins pp_e_l outs
   | Types tls ->
       let pp_tl f (e, t) = Fmt.pf f "%a : %s" e_pp e (Type.str t) in
       Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls

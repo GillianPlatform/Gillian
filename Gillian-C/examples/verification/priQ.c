@@ -11,23 +11,23 @@ typedef struct pqn {
     struct pqn *next;
 } PQN;
 
-/*@ pred Node(+x, pri, val, next) {
+/*@ pred Node(x; pri, val, next) {
   x -m> struct pqn { int(pri); int(val); next } * (0 <# pri)
 } */
 
-/*@ pred PriQ(+x, max_pri, max_val, length){
+/*@ pred PriQ(x; max_pri, max_val, length){
   (x == NULL) * (max_pri == 0) * (length == 0) * (max_val == NULL);
 
-  Node(x, max_pri, max_val, #next) * (0 <# max_pri) * (not (#next == NULL)) *
-  PriQ(#next, #next_pri, #next_val, #len_next) * (#next_pri <=# max_pri) *
+  Node(x; max_pri, max_val, #next) * (0 <# max_pri) * (not (#next == NULL)) *
+  PriQ(#next; #next_pri, #next_val, #len_next) * (#next_pri <=# max_pri) *
   (length == #len_next + 1);
 
-  Node(x, max_pri, max_val, NULL) * (0 <# max_pri) * (length == 1)
+  Node(x; max_pri, max_val, NULL) * (0 <# max_pri) * (length == 1)
 } */
 
 /*@ spec makeNode(pri, val) {
   requires: (pri == int(#pri)) * (val == int(#val)) * (0 <# #pri)
-  ensures:  Node(ret, #pri, #val, NULL)
+  ensures:  Node(ret; #pri, #val, NULL)
 } */
 PQN *makeNode(int pri, int val) {
     PQN *r = malloc(sizeof(PQN));
@@ -39,27 +39,27 @@ PQN *makeNode(int pri, int val) {
 
 /*@ spec insert(queue, node) {
   requires: (#node == node) * (#queue == queue) *
-            PriQ(#queue, #qpri, #qval, #qlen) *
-            Node(#node, #npri, #nval, NULL) *
+            PriQ(#queue; #qpri, #qval, #qlen) *
+            Node(#node; #npri, #nval, NULL) *
             (#qpri <# #npri)
-  ensures:  PriQ(ret, #npri, #nval, #qlen + 1)
+  ensures:  PriQ(ret; #npri, #nval, #qlen + 1)
 
   OR
 
   requires: (#node == node) * (#queue == queue) *
-            PriQ(#queue, #qpri, #qval, #qlen) *
-            Node(#node, #npri, #nval, NULL) *
+            PriQ(#queue; #qpri, #qval, #qlen) *
+            Node(#node; #npri, #nval, NULL) *
             (#npri <=# #qpri)
-  ensures:  PriQ(ret, #qpri, #qval, #qlen + 1)
+  ensures:  PriQ(ret; #qpri, #qval, #qlen + 1)
 
   OR
 
   requires: (#node == node) * (#queue == queue) *
-            PriQ(#queue, #qpri, #qval, #qlen) *
-            Node(#node, #npri, #nval, NULL)
+            PriQ(#queue; #qpri, #qval, #qlen) *
+            Node(#node; #npri, #nval, NULL)
 
-  ensures:  PriQ(ret, #qpri, #qval, #qlen + 1) * (#npri <=# #qpri);
-            PriQ(ret, #npri, #nval, #qlen + 1) * (#qpri <# #npri)
+  ensures:  PriQ(ret; #qpri, #qval, #qlen + 1) * (#npri <=# #qpri);
+            PriQ(ret; #npri, #nval, #qlen + 1) * (#qpri <# #npri)
 } */
 
 PQN *insert(PQN *queue, PQN *node) {
@@ -78,23 +78,23 @@ PQN *insert(PQN *queue, PQN *node) {
 
 /*@ spec enqueue(queue, pri, val) {
   requires: (int(#npri) == pri) * (int(#nval) == val) * (#queue == queue) *
-            PriQ(#queue, #qpri, #qval,  #qlen) *
+            PriQ(#queue; #qpri, #qval,  #qlen) *
             (#qpri <# #npri) * (0 <# #npri)
-  ensures:  PriQ(ret, #npri, #nval, #qlen + 1)
+  ensures:  PriQ(ret; #npri, #nval, #qlen + 1)
 
   OR
 
   requires: (int(#npri) == pri) * (int(#nval) == val) * (#queue == queue) *
-            PriQ(#queue, #qpri, #qval, #qlen) *
+            PriQ(#queue; #qpri, #qval, #qlen) *
             (#npri <=# #qpri) * (0 <# #npri)
-  ensures:  PriQ(ret, #qpri, #qval, #qlen + 1)
+  ensures:  PriQ(ret; #qpri, #qval, #qlen + 1)
 } */
 PQN *enqueue(PQN *queue, int pri, int val) {
     return insert(queue, makeNode(pri, val));
 }
 
 /*@ spec peek(queue) {
-  requires: (queue == #queue) * PriQ(#queue, #qpri, #qval, #qlen)
+  requires: (queue == #queue) * PriQ(#queue; #qpri, #qval, #qlen)
   ensures:  ret -m> int(#qval);
             (#qval == NULL) * (ret == NULL)
 } */
@@ -110,9 +110,9 @@ int *peek(PQN *queue) {
 
 /*@ spec dequeue(queue) {
   requires: (queue == #queue) *
-            Node(#queue, #max_pri, #max_val, #next) *
-            PriQ(#next, #next_pri, #next_val, #len_next)
-  ensures:  PriQ(ret, #next_pri, #next_val, #len_next)
+            Node(#queue; #max_pri, #max_val, #next) *
+            PriQ(#next; #next_pri, #next_val, #len_next)
+  ensures:  PriQ(ret; #next_pri, #next_val, #len_next)
 } */
 PQN *dequeue(PQN *queue) {
     PQN *rest = queue->next;

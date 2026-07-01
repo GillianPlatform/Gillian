@@ -1,9 +1,9 @@
-predicate is_zero(+x, y) {
+predicate is_zero(x; y) {
     (x == 0) * (y == 1);
     (! (x == 0)) * (y == 0)
 }
 
-predicate is_int(+x: Int) {
+predicate is_int(x: Int) {
     emp
 }
 
@@ -17,7 +17,7 @@ function read(x, p) {
     };
     return r
 }
-{ is_zero(#v, ret) * (#x -> (#p: #v)) }
+{ is_zero(#v; ret) * (#x -> (#p: #v)) }
 
 { (x == #x) * (v == #v) * (#x -> (1.0: #y))}
 function write(x, v) {

@@ -498,8 +498,8 @@ module Make (SPState : PState.S) = struct
             (core_asrts, pure, types, preds, Wands.{ lhs; rhs } :: wands)
         | Emp -> (core_asrts, pure, types, preds, wands)
         | Types lst -> (core_asrts, pure, lst @ types, preds, wands)
-        | Pred (name, params) ->
-            (core_asrts, pure, types, (name, params) :: preds, wands)
+        | Pred (name, ins, outs) ->
+            (core_asrts, pure, types, (name, ins @ outs) :: preds, wands)
         | Pure f -> (core_asrts, f :: pure, types, preds, wands))
       ([], [], [], [], []) a
 

@@ -1,22 +1,22 @@
 // tree holds the list representation of a pre-order traveresal of a binary tree with root at x.
-predicate binary_tree(+x, tree, +p: Float) {
+predicate binary_tree(x, p: Float; tree) {
     (x == null) * (tree == nil);
-    (x -> (p: #a), (p: #l), (p: #r)) * binary_tree(#l, #left, p) * binary_tree(#r, #right, p) * (tree == #a::(#left @ #right))
+    (x -> (p: #a), (p: #l), (p: #r)) * binary_tree(#l, p; #left) * binary_tree(#r, p; #right) * (tree == #a::(#left @ #right))
 }
 
-predicate tree_height(+x, h: Int, +p: Float) {
+predicate tree_height(x, p: Float; h: Int) {
     (x == null) * (h == 0);
-    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl >= #hr) * (h == #hl + 1);
-    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl < #hr) * (h == #hr + 1)
+    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, p; #hl) * tree_height(#r, p; #hr) * (#hl >= #hr) * (h == #hl + 1);
+    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, p; #hl) * tree_height(#r, p; #hr) * (#hl < #hr) * (h == #hr + 1)
 }
 
-predicate list_member(+vs, +v, r : Bool){
+predicate list_member(vs, v; r : Bool){
   (vs == []) * (r == false);
   (vs == v :: #rest) * (r == true);
-  (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
+  (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v; r)
 }
 
-predicate replaced(+vs, +ws, +v, +w) {
+predicate replaced(vs, ws, v, w) {
     (vs == []) * (ws == []);
     (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w);
     (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w)
@@ -38,7 +38,7 @@ lemma replaced_concat {
 lemma list_member_concat {
   statement:
     forall vs1, vs2, v.
-      list_member(vs1, v, #r1) * list_member(vs2, v, #r2) |- list_member(vs1 @ vs2, v, (#r1 || #r2))
+      list_member(vs1, v; #r1) * list_member(vs2, v; #r2) |- list_member(vs1 @ vs2, v; (#r1 || #r2))
 
   proof:
     unfold list_member(vs1, v, #r1);
@@ -46,17 +46,17 @@ lemma list_member_concat {
       if (hd vs1 == v) {
         fold list_member(vs1 @ vs2, v, true)
       } else {
-        assert {bind: #nv1, #nvs1, #nr1} (vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v, #nr1);
+        assert {bind: #nv1, #nvs1, #nr1} (vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v; #nr1);
         apply list_member_concat(#nvs1, vs2, v)
       }
     }
 }
 
-predicate is_int(+a: Int) {
+predicate is_int(a: Int) {
     emp
 }
 
-predicate max(+a:Int, +b:Int, c:Int) {
+predicate max(a:Int, b:Int; c:Int) {
     (a >= b) * (c == a);
     (a <  b) * (c == b)
 }
@@ -70,10 +70,10 @@ function max(a, b) {
     };
     return r
 }
-{ max(#a, #b, ret) }
+{ max(#a, #b; ret) }
 
 [ spec height_spec: #p ]
-{ (t == #t) *  binary_tree(#t, #tree, #p) }
+{ (t == #t) *  binary_tree(#t, #p; #tree) }
 function height(t) {
     if (t == null) {
         r := 0
@@ -89,10 +89,10 @@ function height(t) {
     };
     return r
 }
-{ tree_height(#t, ret, #p) }
+{ tree_height(#t, #p; ret) }
 
 [ spec find_spec: #p ]
-{ (t == #t) * (v == #v) * binary_tree(#t, #tree, #p) }
+{ (t == #t) * (v == #v) * binary_tree(#t, #p; #tree) }
 function find(t, v) {
     if (t == null) {
         r := false
@@ -108,16 +108,16 @@ function find(t, v) {
                 is_in_right := find(rt, v) [ find_spec: (#p: #p) ]
             };
             r := is_in_left || is_in_right;
-            [[assert {bind: #left, #right} binary_tree(lt, #left, #p) * binary_tree(rt, #right, #p)]];
+            [[assert {bind: #left, #right} binary_tree(lt, #p; #left) * binary_tree(rt, #p; #right)]];
             [[apply list_member_concat(#left, #right, #v)]];
             [[fold list_member(x :: (#left @ #right), #v, r)]]
         }
     };
     return r
 }
-{ binary_tree(#t, #tree, #p) * list_member(#tree, #v, ret) }
+{ binary_tree(#t, #p; #tree) * list_member(#tree, #v; ret) }
 
-{ (t == #t) * (v == #v) * (w == #w) * binary_tree(#t, #tree, 1.0) }
+{ (t == #t) * (v == #v) * (w == #w) * binary_tree(#t, 1.0; #tree) }
 function replace(t, v, w) {
     if (t == null) {
         skip
@@ -130,14 +130,14 @@ function replace(t, v, w) {
         };
         lt := [t + 1];
         rt := [t + 2];
-        [[assert {bind: #left_tree, #right_tree} binary_tree(lt, #left_tree, 1.0) * binary_tree(rt, #right_tree, 1.0)]];
+        [[assert {bind: #left_tree, #right_tree} binary_tree(lt, 1.0; #left_tree) * binary_tree(rt, 1.0; #right_tree)]];
         par {
             u := replace(lt, v, w);
             u := replace(rt, v, w)
         };
-        [[assert {bind: #left_r_tree, #right_r_tree} binary_tree(lt, #left_r_tree, 1.0) * binary_tree(rt, #right_r_tree, 1.0)]];
+        [[assert {bind: #left_r_tree, #right_r_tree} binary_tree(lt, 1.0; #left_r_tree) * binary_tree(rt, 1.0; #right_r_tree)]];
         [[apply replaced_concat(#left_tree, #left_r_tree, #right_tree, #right_r_tree, #v, #w)]]
     };
     return 0
 }
-{ binary_tree(#t, #r_tree, 1.0) * replaced(#tree, #r_tree, #v, #w) }
+{ binary_tree(#t, 1.0; #r_tree) * replaced(#tree, #r_tree, #v, #w) }
