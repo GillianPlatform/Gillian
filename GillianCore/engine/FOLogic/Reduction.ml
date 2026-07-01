@@ -2881,9 +2881,6 @@ let reduce_assertion_loop
               rhs = (rname, List.map fe rargs);
             };
         ]
-    (* Predicates *)
-    | Pred (name, ins, outs) ->
-        [ Pred (name, List.map fe ins, List.map fe outs) ]
     (* Pure assertions *)
     | Pure (Lit (Bool true)) -> []
     | Pure (BinOp (f1, BinOp.And, f2)) -> [ Pure f1; Pure f2 ]

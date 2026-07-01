@@ -567,7 +567,8 @@ module Make (State : SState.S) :
     | Emp ->
         L.verbose (fun fmt -> fmt "Emp assertion.");
         [ Ok astate ]
-    | CorePred (a_id, ins, outs) ->
+    | CorePred (a_id, ins, outs)
+      when Option.is_none (Asrt.as_user_pred_name a_id) ->
         L.verbose (fun fmt -> fmt "Memory producer.");
 
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
@@ -594,7 +595,8 @@ module Make (State : SState.S) :
         match state' with
         | None -> []
         | Some _ -> [ Ok { state; preds; wands; pred_defs } ])
-    | Pred (pname, ins, outs) ->
+    | CorePred (cp_name, ins, outs) ->
+        let pname = Option.get (Asrt.as_user_pred_name cp_name) in
         L.verbose (fun fmt -> fmt "Predicate assertion.");
         let les = ins @ outs in
         let vs = List.map (subst_in_expr subst) les in
@@ -1235,7 +1237,8 @@ module Make (State : SState.S) :
         let open Res_list.Syntax in
         let res_list =
           match (p : Asrt.atom) with
-          | CorePred (a_id, e_ins, e_outs) -> (
+          | CorePred (a_id, e_ins, e_outs)
+            when Option.is_none (Asrt.as_user_pred_name a_id) -> (
               let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
               let failure = List.exists (fun x -> x = None) vs_ins in
               if failure then (
@@ -1262,7 +1265,8 @@ module Make (State : SState.S) :
                     let error = StateErr.EAsrt ([], fail_pf) in
                     Res_list.error_with error
                 | Vanish -> Res_list.vanish)
-          | Pred (pname, ins, outs) ->
+          | CorePred (cp_name, ins, outs) ->
+              let pname = Option.get (Asrt.as_user_pred_name cp_name) in
               let les = ins @ outs in
               L.verbose (fun m -> m "Matching predicate assertion");
               (* Perform substitution in all predicate parameters *)
@@ -1856,8 +1860,8 @@ module Make (State : SState.S) :
       if pred.pred_abstract || Option.is_some pred.pred_guard then
         [
           [
-            Asrt.Pred
-              (pred.pred_name, Pred.in_args pred largs, Pred.out_args pred largs);
+            Asrt.pred pred.pred_name (Pred.in_args pred largs)
+              (Pred.out_args pred largs);
           ];
         ]
       else
@@ -1947,7 +1951,9 @@ module Make (State : SState.S) :
         split_answer option =
       let open Syntaxes.Option in
       match (step, errs) with
-      | (Pred (name, ins, outs), _), _ ->
+      | (CorePred (cp_name, ins, outs), _), _
+        when Option.is_some (Asrt.as_user_pred_name cp_name) ->
+          let name = Option.get (Asrt.as_user_pred_name cp_name) in
           let MP.{ pred; def_mp; _ } = MP.get_pred_def astate.pred_defs name in
           let* () =
             if pred.pred_abstract || Option.is_some pred.pred_guard then None

@@ -201,10 +201,11 @@ module Make (State : SState.S) = struct
                    | Some s -> State.assume_t s e t)
                  (Some this_state)
             |> Option.to_list
-        | CorePred (corepred, ins, outs) ->
-            State.produce_core_pred corepred this_state (ins @ outs)
-        | Wand _ -> raise (Failure "DEATH. fix_list_apply wand")
-        | Pred _ -> raise (Failure "DEATH. fix_list_apply pred"))
+        | CorePred (corepred, ins, outs) -> (
+            match Asrt.as_user_pred_name corepred with
+            | Some _ -> raise (Failure "DEATH. fix_list_apply pred")
+            | None -> State.produce_core_pred corepred this_state (ins @ outs))
+        | Wand _ -> raise (Failure "DEATH. fix_list_apply wand"))
       [ s ] asrt
 
   type post_res = (Flag.t * Asrt.t list) option
