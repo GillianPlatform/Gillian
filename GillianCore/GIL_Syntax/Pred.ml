@@ -67,9 +67,9 @@ let pp fmt pred =
     let outs = List.filteri (fun i _ -> i >= pred.ins_number) params in
     let pp_out_block fmt'' = function
       | [] -> ()
-      | outs -> Fmt.pf fmt'' " %a" Fmt.(list ~sep:comma pp_param) outs
+      | outs -> Fmt.pf fmt'' "; %a" Fmt.(list ~sep:comma pp_param) outs
     in
-    Fmt.pf fmt' "%a;%a" Fmt.(list ~sep:comma pp_param) ins pp_out_block outs
+    Fmt.pf fmt' "%a%a" Fmt.(list ~sep:comma pp_param) ins pp_out_block outs
   in
   let pp_id_exs fmt' (id, exs) =
     if List.length exs > 0 then

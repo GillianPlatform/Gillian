@@ -357,9 +357,9 @@ module CPred = struct
     let outs = List.filteri (fun i _ -> i >= ins_number) params in
     let pp_outs f = function
       | [] -> ()
-      | outs -> Fmt.pf f " %a" Fmt.(list ~sep:(any ", ") pp_param) outs
+      | outs -> Fmt.pf f "; %a" Fmt.(list ~sep:(any ", ") pp_param) outs
     in
-    Fmt.pf fmt "%a;%a" Fmt.(list ~sep:(any ", ") pp_param) ins pp_outs outs
+    Fmt.pf fmt "%a%a" Fmt.(list ~sep:(any ", ") pp_param) ins pp_outs outs
 
   let pp_def fmt (da, a) =
     Format.fprintf fmt "%a%a"
