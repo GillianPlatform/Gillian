@@ -12,8 +12,8 @@
  *
  *)
 pred Cell_s (l:Obj, prop:Str; d) :
-    ((l, prop) -> d) * DataDescriptor(d;),
-    ((l, prop) -> d) * AccessorDescriptor(d;);
+    ((l, prop) -> d) * DataDescriptor(d),
+    ((l, prop) -> d) * AccessorDescriptor(d);
  
 
     

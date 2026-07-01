@@ -26,7 +26,7 @@ pred ErrorObjectWithMessage (l:Obj; pr:Obj, m:Str) :
  * 
  * An object is a type error if it is an Error object with the TypeError prototype
  *)
-pred TypeError(l:Obj;) : ErrorObject (l; $lterr_proto);
+pred TypeError(l:Obj) : ErrorObject (l; $lterr_proto);
 pred TypeErrorWithMessage (l:Obj; m:Str) : ErrorObjectWithMessage(l; $lterr_proto, m);
 
 (* 
@@ -34,7 +34,7 @@ pred TypeErrorWithMessage (l:Obj; m:Str) : ErrorObjectWithMessage(l; $lterr_prot
  * 
  * An object is a syntax error if it is an Error object with the SyntaxError prototype
  *)
-pred SyntaxError(l:Obj;) : ErrorObject (l; $lserr_proto);
+pred SyntaxError(l:Obj) : ErrorObject (l; $lserr_proto);
 pred SyntaxErrorWithMessage (l:Obj; m:Str) : ErrorObjectWithMessage(l; $lserr_proto, m);
 
 (* 
@@ -42,5 +42,5 @@ pred SyntaxErrorWithMessage (l:Obj; m:Str) : ErrorObjectWithMessage(l; $lserr_pr
  * 
  * An object is a reference error if it is an Error object with the ReferenceError prototype
  *)
-pred ReferenceError(l:Obj;) : ErrorObject (l; $lrferr_proto);
+pred ReferenceError(l:Obj) : ErrorObject (l; $lrferr_proto);
 pred ReferenceErrorWithMessage (l:Obj; m:Str) : ErrorObjectWithMessage(l; $lrferr_proto, m);

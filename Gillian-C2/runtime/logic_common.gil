@@ -1,6 +1,6 @@
 #internal
 
-pred i__is_ptr (e: List;):
+pred i__is_ptr (e: List):
   (e == {{ #loc, #ofs }}) * (0i i<=# #ofs) *
   types(#loc : Obj, #ofs : Int);
 

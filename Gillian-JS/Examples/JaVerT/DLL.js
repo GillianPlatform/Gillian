@@ -2,7 +2,7 @@
 
 /* 
   @pred Node(x:Obj; val, prev, next) : 
-    JSObject(x;) * DataProp(x, "val"; val) * DataProp(x, "prev"; prev) * DataProp(x, "next"; next);
+    JSObject(x) * DataProp(x, "val"; val) * DataProp(x, "prev"; prev) * DataProp(x, "next"; next);
 
   @pred DLL(x; alpha:List) :
     (x == null) * (alpha == {{ }}),
@@ -12,10 +12,10 @@
 /** 
   @id listCopy 
 
-  @pre  GlobalObject(;) * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy; "listCopy", _, _, _) *
+  @pre  GlobalObject() * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy; "listCopy", _, _, _) *
         (lst == #lst) * DLL(#lst; #alpha)
 
-  @post GlobalObject(;) * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy; "listCopy", _, _, _) * 
+  @post GlobalObject() * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy; "listCopy", _, _, _) * 
         DLL(#lst; #alpha) * DLL(ret; #alpha)
 */
 function listCopy (lst) { 
@@ -29,10 +29,10 @@ function listCopy (lst) {
 /** 
   @id listConcat 
 
-  @pre  GlobalObject(;) * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) *
+  @pre  GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) *
         (la == #la) * DLL(#la; #alpha) * (lb == #lb) * DLL(#lb; #beta)
 
-  @post GlobalObject(;) * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) * 
+  @post GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) * 
         DLL(ret; l+ (#alpha, #beta))
 */
 function listConcat(la, lb) {
@@ -48,10 +48,10 @@ function listConcat(la, lb) {
 /** 
   @id listAppend 
 
-  @pre  GlobalObject(;) * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) *
+  @pre  GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) *
         (lst == #lst) * DLL(#lst; #alpha) * (v == #v)
 
-  @post GlobalObject(;) * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) * 
+  @post GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) * 
         DLL(ret; l+ (#alpha, {{ #v }} ))
 */
 function listAppend(lst, v) {

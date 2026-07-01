@@ -8,39 +8,39 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
 
 // A predicate that allows us to connect JS and C error messages
 /*@
-    pred nounfold ECErrorCodeOfJSErrorMessage(errorMessage;) {
-        (errorMessage == `decodeEncryptionContext: Underflow, not enough data.`) * aws_last_error_is_SHORT_BUF(;);
-        (errorMessage == `decodeEncryptionContext: Not enough data to read key count.`) * aws_last_error_is_SHORT_BUF(;);
-        (errorMessage == `decodeEncryptionContext: Key Count is 0.`) * aws_last_error_is_BAD_CIPHERTEXT(;);
-        (errorMessage == `decodeEncryptionContext: Duplicate encryption context key value.`) * aws_last_error_is_BAD_CIPHERTEXT(;)
+    pred nounfold ECErrorCodeOfJSErrorMessage(errorMessage) {
+        (errorMessage == `decodeEncryptionContext: Underflow, not enough data.`) * aws_last_error_is_SHORT_BUF();
+        (errorMessage == `decodeEncryptionContext: Not enough data to read key count.`) * aws_last_error_is_SHORT_BUF();
+        (errorMessage == `decodeEncryptionContext: Key Count is 0.`) * aws_last_error_is_BAD_CIPHERTEXT();
+        (errorMessage == `decodeEncryptionContext: Duplicate encryption context key value.`) * aws_last_error_is_BAD_CIPHERTEXT()
     }
 */
 
 // Auxiliary predicates for capturing the loop invariant of the EC deserialisation
 /*@
-    pred enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys;) {
+    pred enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) {
         (ECKS == elements) * (keys == consumedKeys @ restKeys)
     }
 
     pred nounfold enc_ctx_deser_invariant_cases(definition, elementsDef, aad_len, esLength, restEsLength, restLength, ECKs, elements, consumedElements, restElements, keys, consumedKeys, restKeys; errorMessage) {
         (definition == `Complete`) * (elementsDef == `Complete`) *
         (aad_len == 2 + esLength) *
-        enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys;) *
+        enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) *
         (restEsLength == restLength) *
-        Unique(keys;) * (errorMessage == ``);
+        Unique(keys) * (errorMessage == ``);
 
         (definition == `Broken`) * (elementsDef == `Complete`) *
-        enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys;) *
-        Duplicated(consumedKeys, restKeys;) *
+        enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) *
+        Duplicated(consumedKeys, restKeys) *
         (errorMessage == `decodeEncryptionContext: Duplicate encryption context key value.`);
 
         (definition == `Broken`) * (elementsDef == `Complete`) *
         (not (aad_len == 2 + esLength)) *
-        enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys;) *
-        Unique(keys;) * (errorMessage == `decodeEncryptionContext: Overflow, too much data.`);
+        enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) *
+        Unique(keys) * (errorMessage == `decodeEncryptionContext: Overflow, too much data.`);
 
         (definition == `Broken`) * (elementsDef == `Incomplete`) *
-        Unique(keys;) * (errorMessage == `decodeEncryptionContext: Underflow, not enough data.`)
+        Unique(keys) * (errorMessage == `decodeEncryptionContext: Underflow, not enough data.`)
     }
 */
 
@@ -51,38 +51,38 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
     spec aws_cryptosdk_enc_ctx_deserialize(alloc, enc_ctx, cursor) {
         requires:
             (alloc == #alloc) * (enc_ctx == #enc_ctx) * (cursor == #cursor) *
-            default_allocator(#alloc;) *
+            default_allocator(#alloc) *
             empty_hash_table_ptr(#enc_ctx; #alloc) *
             valid_aws_byte_cursor_ptr(#cursor; #aad_len, #buffer, #buffer_content) *
             (0 <# #aad_len) *
             (not (#buffer == NULL)) *
             (#definition == `Complete`) * (#errorMessage == ``) *
             CRawEncryptionContext(#buffer_content; #ECKs) *
-            any_aws_last_error(;)
+            any_aws_last_error()
 
         ensures:
-            default_allocator(#alloc;) *
+            default_allocator(#alloc) *
             valid_hash_table_ptr(#enc_ctx; #alloc, #ECKs, #utf8ECKs) *
             valid_aws_byte_cursor_ptr(#cursor; 0, #buffer p+ #aad_len, []) *
             ARRAY(#buffer, char, #aad_len, #buffer_content) *
-            any_aws_last_error(;) *
+            any_aws_last_error() *
             (ret == int(0))
 
     OR
 
         requires:
             (alloc == #alloc) * (enc_ctx == #enc_ctx) * (cursor == #cursor) *
-            default_allocator(#alloc;) *
+            default_allocator(#alloc) *
             empty_hash_table_ptr(#enc_ctx; #alloc) *
             valid_aws_byte_cursor_ptr(#cursor; #aad_len, #buffer, #buffer_content) *
             (0 <# #aad_len) *
             (not (#buffer == NULL)) *
             (#definition == `Broken`) * (#errorMessage == `decodeEncryptionContext: Overflow, too much data.`) *
             BRawEncryptionContext(#buffer_content; #errorMessage, #ECKs) *
-            any_aws_last_error(;)
+            any_aws_last_error()
 
         ensures:
-            default_allocator(#alloc;) *
+            default_allocator(#alloc) *
             valid_hash_table_ptr(#enc_ctx; #alloc, #ECKs, #utf8ECKs) *
             valid_aws_byte_cursor_ptr(#cursor; #rest_len, #new_buffer, #rest_buffer) *
             (#new_buffer == #buffer p+ #consumed_len) *
@@ -90,14 +90,14 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
             (0 <# #consumed_len) *
             (0 <# #rest_len) *
             ARRAY(#buffer, char, #consumed_len, #consumed_content) *
-            any_aws_last_error(;) *
+            any_aws_last_error() *
             (ret == int(0))
 
     OR
 
         requires:
             (alloc == #alloc) * (enc_ctx == #enc_ctx) * (cursor == #cursor) *
-            default_allocator(#alloc;) *
+            default_allocator(#alloc) *
             empty_hash_table_ptr(#enc_ctx; #alloc) *
             valid_aws_byte_cursor_ptr(#cursor; #aad_len, #buffer, #buffer_content) *
             (0 <# #aad_len) *
@@ -105,17 +105,17 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
             (#definition == `Broken`) *
             (not (#errorMessage == `decodeEncryptionContext: Overflow, too much data.`)) *
             BRawEncryptionContext(#buffer_content; #errorMessage, #ECKs) *
-            any_aws_last_error(;)
+            any_aws_last_error()
 
         ensures:
-            default_allocator(#alloc;) *
+            default_allocator(#alloc) *
             empty_hash_table_ptr(#enc_ctx; #alloc) *
             valid_aws_byte_cursor_ptr(#cursor; #rest_len, #new_buffer, #rest_buffer) *
             (#new_buffer == #buffer p+ #consumed_len) *
             (#buffer_content ==  #consumed_content @ #rest_buffer) *
             (#consumed_len == (#aad_len - #rest_len)) *
             optBytes(#buffer, #consumed_len; #consumed_content) *
-            ECErrorCodeOfJSErrorMessage(#errorMessage;) *
+            ECErrorCodeOfJSErrorMessage(#errorMessage) *
             (ret == int(-1))
     }
 */
@@ -153,8 +153,8 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
                         #consumedElements, #restElements, \
                         #res_1_trash, #res_trash, #k_trash, #v_trash, #wc_trash, #b1, #b2]] "
             // The allocator and error global variable
-            "   default_allocator(#alloc;) * \
-                any_aws_last_error(;) * "
+            "   default_allocator(#alloc) * \
+                any_aws_last_error() * "
             // i is the number of ECKs parsed
             "(i == int(#i)) * \
             (#i <=# #elem_count) * \

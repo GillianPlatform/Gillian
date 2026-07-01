@@ -3,7 +3,7 @@ predicate is_zero(x; y) {
     (! (x == 0)) * (y == 0)
 }
 
-predicate is_int(x: Int;) {
+predicate is_int(x: Int) {
     emp
 }
 
@@ -35,7 +35,7 @@ function SHOULD_FAIL_incorrect_write(x, v) {
 }
 { (ret == 0) * (#x -> #v) }
 
-{ (x == #x) * (p == #p) * (w == #w) * is_int(#w;) * is_int(#v;) * (#p f<= 1.0) * (#x -> (#p: #v)) }
+{ (x == #x) * (p == #p) * (w == #w) * is_int(#w) * is_int(#v) * (#p f<= 1.0) * (#x -> (#p: #v)) }
 function read_and_add(x, p, w) {
     n := [x];
     m := n + w;
@@ -70,7 +70,7 @@ function conc_disjoint_writes() {
 }
 { ret -> 1, 2, 3 }
 
-{ (x == #x) * (#x -> #v) * is_int(#v;) }
+{ (x == #x) * (#x -> #v) * is_int(#v) }
 function conc_reads_same_loc(x) {
     y := new(2);
     par {

@@ -1,4 +1,4 @@
-predicate points_to_sub(x, a: Float, b: Float;) {
+predicate points_to_sub(x, a: Float, b: Float) {
     (a f>= b) * (#v == a f- b) * (x -> #v);
     (a f< b) * (#v == b f- a) * (x -> #v)
 }
@@ -21,7 +21,7 @@ function floating_subtraction(x, y) {
     [r] := z;
     return r
 }
-{ points_to_sub(ret, #x, #y;) }
+{ points_to_sub(ret, #x, #y) }
 
 { (x == #x) * (y == #y) }
 function floating_multiplication(x, y) {

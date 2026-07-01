@@ -2,7 +2,7 @@
 
 /**
 @pred idGenerator(ig, sc_ig; c_val : Num, prefix : Str) :
-   JSObject(ig;) * 
+   JSObject(ig) * 
    DataProp(ig, "getId"; #gni) * JSFunctionObject(#gni; "getId", #gni_sc, _, _) *
    DataProp(ig, "reset"; #ri)  * JSFunctionObject(#ri; "reset", #ri_sc, _, _) *
    closure(count: c_val, prefix: prefix; getId: #gni_sc, reset: #ri_sc, makeIdGen: sc_ig);

@@ -17,7 +17,7 @@ pred OARRAY(p, size; content) {
   (0 <# size)  * ARRAY(p, int, size, content) * ((len content) == size)
 }
 
-pred OUNINIT(p, size;) {
+pred OUNINIT(p, size) {
   (size == 0);
   (0 <# size) * UNDEFS(p, size)
 }
@@ -29,7 +29,7 @@ pred valid_array(ar; content) {
   (0 <# #capacity) *
   (#size <=# #capacity) *
   OARRAY(#buffer, #size; content) *
-  OUNINIT(#buffer p+ (#size * 4), (#capacity - #size) * 4;) *
+  OUNINIT(#buffer p+ (#size * 4), (#capacity - #size) * 4) *
   MALLOCED(#buffer, #capacity * 4)
 }
 */

@@ -261,16 +261,16 @@ lemma NotInListToUtf8(prop, props)
  ********************************)
 
 @nopath
-pure pred Unique(l : List;) :
+pure pred Unique(l : List) :
   (l == {{  }}),
   (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest; #setRest) *
-    (! (#fst --e-- #setRest)) * Unique(#rest;);
+    (! (#fst --e-- #setRest)) * Unique(#rest);
 
 (* In a unique list split into a left and a right sublist,
    no element from the right is on the left *)
 lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 [[
-    (#props == l+ (#prefix, #suffix)) * Unique(#props;) *
+    (#props == l+ (#prefix, #suffix)) * Unique(#props) *
     ListToSet(#prefix; #setPrefix) * ListToSet(#suffix; #setSuffix) *
     (#prop --e-- #setSuffix)
 ]]
@@ -295,11 +295,11 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 (* Appending an element to a unique list *)
 lemma UniqueAppendElement(lst, element)
 [[
-    Unique(#lst;) * ListToSet(#lst; #set) *
+    Unique(#lst) * ListToSet(#lst; #set) *
     (! (#element --e-- #set))
 ]]
 [[
-    Unique(l+ (#lst, {{ #element }});)
+    Unique(l+ (#lst, {{ #element }}))
 ]]
 [*
     unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest1 := #setRest)];
@@ -321,7 +321,7 @@ lemma UniqueAppendElement(lst, element)
 
 (* Lists with duplicates *)
 @nopath
-pure pred Duplicated(prefix:List, suffix:List;) :
+pure pred Duplicated(prefix:List, suffix:List) :
     (* Either the head is duplicated *)
     (suffix == l+ ({{ #fst }}, #rest)) *
     ListToSet(prefix; #preSet) *
@@ -331,4 +331,4 @@ pure pred Duplicated(prefix:List, suffix:List;) :
     (suffix == l+ ({{ #fst }}, #rest)) *
     ListToSet(prefix; #preSet) *
     (! (#fst --e-- #preSet)) *
-    Duplicated(l+ (prefix, {{ #fst }}), #rest;);
+    Duplicated(l+ (prefix, {{ #fst }}), #rest);

@@ -2,7 +2,7 @@ import "archi64_constants.gil", "internals.gil",
        "global_environment_common.gil", "internal_casts.gil",
        "internal_binops.gil", "internal_unops.gil", "internal_stdlib.gil";  
    
-pred is_u32(e;):
+pred is_u32(e):
      (0i i<=# e) * (e i<=# 4294967296i);
 
 pred ptr(p: List; l: Obj, o: Int):
@@ -321,7 +321,7 @@ proc push_front_node(var_1__self, var_2__node) {
 
 spec push_front(var_1__self, var_2__elt)
      [[ (var_1__self == #self) * (var_2__elt == #elt) *
-          DLL(#self; #content, #size) * is_u32(#elt;) *
+          DLL(#self; #content, #size) * is_u32(#elt) *
           (0i i<=# #size) * (#size i<# 18446744073709551615i) ]]
      (* Adding 1 to the size does not overflow *)
      [[ DLL(#self; l+({{ #elt }}, #content), #size i+ 1i) ]]

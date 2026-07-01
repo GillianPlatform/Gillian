@@ -48,7 +48,7 @@ function needs(condition, errorMessage) {
       Elements(#view, #readPos, #eCount, #fCount; #definition, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs; "needs", #n_sc, #n_len, #n_proto) *
-      JSInternals (;)
+      JSInternals ()
 
     @post
       (#definition == "Complete") *
@@ -56,9 +56,9 @@ function needs(condition, errorMessage) {
       ArrayBuffer(#ab; #data) *
       Elements(#view, #readPos, #eCount, #fCount; #definition, #eList, #esLength) *
       scope(needs : #needs) * JSFunctionObject(#needs; "needs", #n_sc, #n_len, #n_proto) *
-      JSInternals (;) *
+      JSInternals () *
 
-      JSObject(ret;) *
+      JSObject(ret) *
         DataProp(ret, "elements"; #elements) *
             ArrayOfArraysOfUInt8Arrays(#elements; #eList) *
         DataProp(ret, "readPos"; #ret_readPos) *
@@ -70,7 +70,7 @@ function needs(condition, errorMessage) {
       Elements(#view, #readPos, #eCount, #fCount; #definition, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs; "needs", #n_sc, #n_len, #n_proto) *
-      JSInternals (;) *
+      JSInternals () *
 
       (ret == false)
 */
@@ -93,7 +93,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) *
       scope(elementCount : #eLeft) * scope(fieldsPerElement: #fCount) *
       scope(element: _) * scope(fieldCount: _) * scope(fieldBinary: _) * scope(length: _) *
-      JSInternals(;) *
+      JSInternals() *
 
       CElements(#view, #readPos, #eCount - #eLeft, #fCount; #doneElsList, #doneElsLength) *
       Elements(#view, #outerLoopReadPos, #eLeft, #fCount; #definition, #remElsList, #remElsLength) *
@@ -118,7 +118,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         scope(dataView: #dataView) * DataView(#dataView; #ab, #viewOffset, #viewSize) *
         scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fLeft) *
         scope(fieldBinary: _) * scope(length: _) *
-        JSInternals(;) *
+        JSInternals() *
 
         CElement(#view, #outerLoopReadPos, #fCount - #fLeft; #doneElList, #doneElLength) *
         (#fList == l+ (#doneElList, #remElList)) *
@@ -201,7 +201,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     @onlyspec EncryptedDataKey (edk)
     [[
         (edk == #edk) *
-        JSObject(#edk;) *
+        JSObject(#edk) *
         DataProp(#edk, "providerId"; #pId) * types(#pId : Str) *
         DataProp(#edk, "providerInfo"; #pInfo) * types(#pInfo : Str) *
         DataProp(#edk, "encryptedDataKey"; #aEDK) *
@@ -215,7 +215,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         JSObjWithProto (this; $l_edk_proto)
     ]]
     [[
-        JSObject(#edk;) *
+        JSObject(#edk) *
         DataProp(#edk, "providerId"; #pId) *
         DataProp(#edk, "providerInfo"; #pInfo) *
         DataProp(#edk, "encryptedDataKey"; #aEDK) *
@@ -268,9 +268,9 @@ var toUtf8 = function (buffer) { };
 
 /**
 
-    @pred nounfold UniqueOrDuplicated(definition:Str, lst1:List, lst2:List, lst3:List;) :
-        (definition == "Complete") * Unique(lst1;),
-        (definition == "Broken") * Duplicated(lst2, lst3;);
+    @pred nounfold UniqueOrDuplicated(definition:Str, lst1:List, lst2:List, lst3:List) :
+        (definition == "Complete") * Unique(lst1),
+        (definition == "Broken") * Duplicated(lst2, lst3);
 
     @id decodeEncryptionContext
 
@@ -283,17 +283,17 @@ var toUtf8 = function (buffer) { };
          scope(needs : #needs) * JSFunctionObject(#needs; "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements; "readElements", #rE_sc, #rE_len, #rE_proto) *
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8; "toUtf8", #t_sc, #t_len, #t_proto) *
-         JSInternals(;)
+         JSInternals()
 
     @post Uint8Array(#eEC; #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer; #data) *
           RawEncryptionContext(#EC; #definition, #ECKs, #errorMessage) *
 
-          DecodedEncryptionContext(ret, #ECKs;) *
+          DecodedEncryptionContext(ret, #ECKs) *
 
           scope(needs : #needs) * JSFunctionObject(#needs; "needs", #n_sc, #n_len, #n_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements; "readElements", #rE_sc, #rE_len, #rE_proto) *
           scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8; "toUtf8", #t_sc, #t_len, #t_proto) *
-          JSInternals (;)
+          JSInternals ()
 */
 function decodeEncryptionContext(encodedEncryptionContext) {
   /* @tactic
@@ -347,8 +347,8 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         assert (
             scope(pairsCount: #pairsCount) * (#pairsCount == l-len #ECKs) *
             scope(elements: #elements) * ArrayOfArraysOfUInt8Arrays(#elements; #ECKs) *
-            scope(encryptionContext: #dECObj) * JSObject(#dECObj;) * empty_fields(#dECObj : -{ }-) *
-            toUtf8PairMap(#ECKs; #utf8ECKs) * FirstProj(#ECKs; #rProps) * UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps;)
+            scope(encryptionContext: #dECObj) * JSObject(#dECObj) * empty_fields(#dECObj : -{ }-) *
+            toUtf8PairMap(#ECKs; #utf8ECKs) * FirstProj(#ECKs; #rProps) * UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps)
         ) [bind: #pairsCount, #elements, #dECObj, #utf8ECKs, #rProps]
 
     @invariant
@@ -358,25 +358,25 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         scope(key: _) * scope(value: _) *
         toUtf8PairMap(#ECKs; #utf8ECKs) * FirstProj(#ECKs; #rProps) *
         CElements(#EC, 2., ((256. * #b0) + #b1), 2.; #ECKs, (l-len #rest)) *
-        UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps;) *
-        JSInternals(;) *
+        UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps) *
+        JSInternals() *
 
         scope(count: #count) * (#count <=# #pairsCount) *
-        ArrayStructure(#elements, #pairsCount;) *
+        ArrayStructure(#elements, #pairsCount) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, 0, #count; #done) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #count, #pairsCount - #count; #left) *
         (#ECKs == l+ (#done, #left)) *
-        FirstProj(#done; #doneRProps) * Unique(#doneRProps;) *
-        FirstProj(#left; #leftRProps) * UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps;) *
+        FirstProj(#done; #doneRProps) * Unique(#doneRProps) *
+        FirstProj(#left; #leftRProps) * UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps) *
         toUtf8PairMap(#done; #utf8Done) *
-        JSObject(#dECObj;) * ObjectTable(#dECObj, #utf8Done;)
+        JSObject(#dECObj) * ObjectTable(#dECObj, #utf8Done)
         [bind: #count, #done, #left, #doneRProps, #leftRProps, #utf8Done] */
   for (var count = 0; count < pairsCount; count++) {
     /*
         @tactic
-            unfold ArrayStructure(#elements, #pairsCount;);
-            unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps;);
-            unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps;);
+            unfold ArrayStructure(#elements, #pairsCount);
+            unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
+            unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
             unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #count, #pairsCount - #count; #left) [bind: (#ECK := #elementContents) and (#rest_left := #rest)];
             apply CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
             assert (#ECK == {{ #new_prop, #new_value }})
@@ -392,7 +392,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         @tactic
             assert (toUtf8(#new_prop; #utf8NProp)) [bind: #utf8NProp];
             assert (toUtf8(#new_value; #utf8NVal)) [bind: #utf8NVal];
-            unfold ObjectTable(#dECObj, #utf8Done;) [bind: (#doneProps := #pList) and (#donePropsSet := #pSet)];
+            unfold ObjectTable(#dECObj, #utf8Done) [bind: (#doneProps := #pList) and (#donePropsSet := #pSet)];
             apply FirstProjConcatSplit(#ECKs, #done, #left);
             apply ProduceListToSet(#doneRProps); apply ProduceListToSet(#leftRProps);
             assert (ListToSet(#doneRProps; #doneRPropsSet)) [bind: #doneRPropsSet];
@@ -405,7 +405,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
                 apply ObjectTableAbsentProperty(#dECObj, #utf8Done, #utf8NProp)
             } else {
                 apply FirstProjToUtf8MapPairCompat(#done);
-                unfold Duplicated(#doneRProps, #leftRProps;) [bind: (#doneRPropsSet2 := #preSet)];
+                unfold Duplicated(#doneRProps, #leftRProps) [bind: (#doneRPropsSet2 := #preSet)];
                 apply ListToSetFunction(#doneRProps, #doneRPropsSet, #doneRProps, #doneRPropsSet2);
                 if (#new_prop -e- #doneRPropsSet) then {
                     apply InListToUtf8(#new_prop, #doneRProps);
@@ -432,7 +432,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             apply ListToSetAddElement(#doneProps, #donePropsSet, #utf8NProp);
             apply UniqueAppendElement(#doneRProps, #new_prop);
             if (#definition = "Complete") then {
-                unfold Unique(#leftRProps;)
+                unfold Unique(#leftRProps)
             }
     */
     0 === 0;
@@ -444,8 +444,8 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         apply toUtf8PairMapInjective(#ECKs, #utf8ECKs, #done, #utf8Done);
         if (#definition = "Broken") then {
             unfold FirstProj(#left; #leftRProps);
-            unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps;);
-            unfold Duplicated(#doneRProps, #leftRProps;)
+            unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
+            unfold Duplicated(#doneRProps, #leftRProps)
         };
         use_subst [object_table : (#PVPairs: #utf8ECKs) ]
   */

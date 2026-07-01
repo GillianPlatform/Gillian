@@ -6,7 +6,7 @@
 #include "allocator.h"
 #include "error.h"
 
-/*@ pred default_allocator(allocator;) {
+/*@ pred default_allocator(allocator) {
   (allocator -> struct aws_allocator {
     funptr(s_default_malloc);
     funptr(s_default_free);

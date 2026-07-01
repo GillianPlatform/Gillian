@@ -2,13 +2,13 @@
 
 /*@
 
-pure pred invalid_read(read_len, cursor_len;) {
+pure pred invalid_read(read_len, cursor_len) {
   cursor_len <# read_len;
   2147483647 <# read_len;
   2147483647 <# cursor_len
 }
 
-pure pred valid_read(read_len, cursor_len;) {
+pure pred valid_read(read_len, cursor_len) {
   (read_len <=# cursor_len) *
   (read_len <=# 2147483647) *
   (cursor_len <=# 2147483647)
@@ -28,11 +28,11 @@ spec aws_byte_cursor_advance(_res, cursor, length) {
             (0 <=# #length) * ARRAY(#res, long, 2, #trash) *
             valid_aws_byte_cursor_ptr(#cursor; #cur_len, #buffer, #content)
 
-  ensures: invalid_read(#length, #cur_len;) *
+  ensures: invalid_read(#length, #cur_len) *
            valid_aws_byte_cursor_ptr(#res; 0, NULL, nil) *
            valid_aws_byte_cursor_ptr(#cursor; #cur_len, #buffer, #content);
 
-           valid_read(#length, #cur_len;) *
+           valid_read(#length, #cur_len) *
            valid_aws_byte_cursor_ptr(#res; #length, #buffer, #data) *
            valid_aws_byte_cursor_ptr(#cursor; #rest_len,
                                      #buffer p+ #length, #rest) *

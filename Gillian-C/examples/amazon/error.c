@@ -11,20 +11,20 @@ static int tl_last_error = 0;
 // Various predicates for describing errors
 /*@
 
-    pred any_aws_last_error(;) {
+    pred any_aws_last_error() {
         (error__tl_last_error -g> int(#trash))
     }
 
-    pred aws_last_error_is(err;) {
+    pred aws_last_error_is(err) {
         (error__tl_last_error -g> int(err))
     }
 
-    pred aws_last_error_is_SHORT_BUF(;) {
-        aws_last_error_is(3;)
+    pred aws_last_error_is_SHORT_BUF() {
+        aws_last_error_is(3)
     }
 
-    pred aws_last_error_is_BAD_CIPHERTEXT(;) {
-        aws_last_error_is(8192;)
+    pred aws_last_error_is_BAD_CIPHERTEXT() {
+        aws_last_error_is(8192)
     }
 */
 

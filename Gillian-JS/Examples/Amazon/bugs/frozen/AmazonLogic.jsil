@@ -191,7 +191,7 @@ nounfold pred BRawEncryptionContext(buffer:List; errorMessage:Str, ECKs:List) :
     rawToUInt16(#rawKC, false; #keyCount) *
     (0 <# #keyCount) *
     Elements(buffer, 2, #keyCount, 2; "Complete", ECKs, #ECKsLength) *
-    toUtf8PairMap(ECKs; #utf8ECKs) * FirstProj(ECKs; #ECKeys) * Duplicated({{ }}, #ECKeys;) *
+    toUtf8PairMap(ECKs; #utf8ECKs) * FirstProj(ECKs; #ECKeys) * Duplicated({{ }}, #ECKeys) *
     (2 + #ECKsLength == l-len buffer) *
     (errorMessage == "decodeEncryptionContext: Duplicate encryption context key value.");
 
@@ -201,16 +201,16 @@ pred RawEncryptionContext(buffer:List; definition:Str, ECKs:List, errorMessage:S
   (definition == "Broken")   * BRawEncryptionContext(buffer; errorMessage, ECKs);
 
 (* Live decoded encryption context *)
-pred LiveDecodedEncryptionContext(dECObj : Obj, ECKs : List;) :
+pred LiveDecodedEncryptionContext(dECObj : Obj, ECKs : List) :
     JSObjWithProto(dECObj; null) *
     toUtf8PairMap(ECKs; #utf8ECKs) *
-    ObjectTable(dECObj, #utf8ECKs;);
+    ObjectTable(dECObj, #utf8ECKs);
 
 (* Decoded encryption context *)
-pred DecodedEncryptionContext(dECObj : Obj, ECKs : List;) :
+pred DecodedEncryptionContext(dECObj : Obj, ECKs : List) :
     JSObjGeneral(dECObj; null, "Object", false) *
     toUtf8PairMap(ECKs; #utf8ECKs) *
-    FrozenObjectTable(dECObj, #utf8ECKs;);
+    FrozenObjectTable(dECObj, #utf8ECKs);
 
 
 (*****************************
@@ -226,7 +226,7 @@ pred DecodedEncryptionContext(dECObj : Obj, ECKs : List;) :
 (***** EDK objects *****)
 
 (* Prototype of EDK objects *)
-pred EDKPrototype (;) :
+pred EDKPrototype () :
     JSObjGeneral($l_edk_proto; null, "Object", false) *
     empty_fields($l_edk_proto : -{ }-);
 
@@ -276,12 +276,12 @@ pred FrozenArrayOfDEDKsContents(a:Obj, start:Num; contents:List) :
 
 (* EDKs are first deserialised into a live array *)
 pred LiveDeserialisedEncryptedDataKeys (a:Obj; EDKs:List) :
-    ArrayStructure(a, l-len EDKs;) *
+    ArrayStructure(a, l-len EDKs) *
     ArrayOfDEDKsContents(a, 0; EDKs);
 
 (* Deserialised EDKs are ultimately provided as a frozen array *)
 pred DeserialisedEncryptedDataKeys (a:Obj; contents:List) :
-    FrozenArrayStructure(a, l-len contents;) *
+    FrozenArrayStructure(a, l-len contents) *
     FrozenArrayOfDEDKsContents(a, 0; contents);
 
 (************************************
@@ -420,8 +420,8 @@ lemma toUtf8PairMapAppendPair(data, utf8Data, prop, value)
  *****************************)
 
 (* The object that holds information about allowed algorithm suites *)
-pred AlgorithmSuiteIdentifierObject(o;) :
-    JSObject(o;) *
+pred AlgorithmSuiteIdentifierObject(o) :
+    JSObject(o) *
     DataProp(o, "20";  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16"; 20) *
     DataProp(o, "70";  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16"; 70) *
     empty_fields(o : -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-);
@@ -431,7 +431,7 @@ pred AlgorithmSuiteIdentifierObject(o;) :
     TODO: This object is more complex than presented here.
  *)
 pred AlgorithmSuiteObject(aso: Obj; ivLength: Num, tagLength: Num) :
-    JSObject(aso;) *
+    JSObject(aso) *
     readOnlyProperty(aso, "ivLength";  ivLength) *
     readOnlyProperty(aso, "tagLength"; tagLength);
 
@@ -472,7 +472,7 @@ nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -490,7 +490,7 @@ nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -511,7 +511,7 @@ nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -550,7 +550,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (22 <=# l-len rawHeaderData) *
     (rawHeaderData == l+ ({{ version, type }}, #rawSuiteId, #rest)) *
     (l-len #rawSuiteId == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     BAlgorithmSuite(suiteId; errorMessage) *
 
@@ -567,7 +567,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -588,7 +588,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -610,7 +610,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -639,7 +639,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, #ivLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -679,7 +679,7 @@ nounfold pred Header(rawHeaderData; definition, part_one, version, type, suiteId
 
 (* Deserialised main part of the message header *)
 nounfold pred MessageHeader(messageHeader, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
-    JSObject(messageHeader;) *
+    JSObject(messageHeader) *
     DataProp(messageHeader, "version"; version) *
     DataProp(messageHeader, "type"; type) *
     DataProp(messageHeader, "suiteId"; suiteId) *
@@ -687,7 +687,7 @@ nounfold pred MessageHeader(messageHeader, ECKs; version, type, suiteId, message
         Uint8Array(#ui8aMessageId; #abMessageId, 0, 16) *
         ArrayBuffer(#abMessageId; messageId) *
     DataProp(messageHeader, "encryptionContext"; #dECObj) *
-        DecodedEncryptionContext(#dECObj, ECKs;) *
+        DecodedEncryptionContext(#dECObj, ECKs) *
     DataProp(messageHeader, "encryptedDataKeys"; #dEDKs) *
         DeserialisedEncryptedDataKeys(#dEDKs; EDKs) *
     DataProp(messageHeader, "contentType"; contentType) *
@@ -697,7 +697,7 @@ nounfold pred MessageHeader(messageHeader, ECKs; version, type, suiteId, message
 (* Entire deserialised header *)
 nounfold pred HeaderInfo(headerInfo, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength,
                             frameLength, headerLength, rawHeaderData, headerIv, headerAuthTag) :
-    JSObject(headerInfo;) *
+    JSObject(headerInfo) *
     DataProp(headerInfo, "messageHeader"; #messageHeader) *
         MessageHeader(#messageHeader, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) *
     DataProp(headerInfo, "headerLength"; headerLength) *
@@ -987,7 +987,7 @@ lemma NotInListToUtf8(prop, props)
    no element from the right is on the left *)
 lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 [[
-    (#props == l+ (#prefix, #suffix)) * Unique(#props;) *
+    (#props == l+ (#prefix, #suffix)) * Unique(#props) *
     ListToSet(#prefix; #setPrefix) * ListToSet(#suffix; #setSuffix) *
     (#prop --e-- #setSuffix)
 ]]
@@ -1012,11 +1012,11 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 (* Appending an element to a unique list *)
 lemma UniqueAppendElement(lst, element)
 [[
-    Unique(#lst;) * ListToSet(#lst; #set) *
+    Unique(#lst) * ListToSet(#lst; #set) *
     (! (#element --e-- #set))
 ]]
 [[
-    Unique(l+ (#lst, {{ #element }});)
+    Unique(l+ (#lst, {{ #element }}))
 ]]
 [*
     unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest1 := #setRest)];
@@ -1037,7 +1037,7 @@ lemma UniqueAppendElement(lst, element)
  ************************************)
 
 (* Lists with duplicates *)
-pure pred Duplicated(prefix:List, suffix:List;) :
+pure pred Duplicated(prefix:List, suffix:List) :
     (* Either the head is duplicated *)
     (suffix == #fst :: #rest) *
     ListToSet(prefix; #preSet) *
@@ -1047,7 +1047,7 @@ pure pred Duplicated(prefix:List, suffix:List;) :
     (suffix == #fst :: #rest) *
     ListToSet(prefix; #preSet) *
     (! (#fst --e-- #preSet)) *
-    Duplicated(l+ (prefix, {{ #fst }}), #rest;);
+    Duplicated(l+ (prefix, {{ #fst }}), #rest);
 
 (*************************************
  *************************************
@@ -1058,18 +1058,18 @@ pure pred Duplicated(prefix:List, suffix:List;) :
  *************************************)
 
 (* Object properties as a table *)
-pred ObjectTableStructure(l:Obj, PVPairs:List;) :
+pred ObjectTableStructure(l:Obj, PVPairs:List) :
     (* Base case - no properties left *)
     (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
     (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
     DataProp(l, #prop; #value) * types(#value : Str) *
-    ObjectTableStructure(l, #restPVPairs;);
+    ObjectTableStructure(l, #restPVPairs);
 
 (* Complete Object-as-Table predicate *)
-nounfold pred ObjectTable(l:Obj, PVPairs:List;) :
-    ObjectTableStructure(l, PVPairs;) *
+nounfold pred ObjectTable(l:Obj, PVPairs:List) :
+    ObjectTableStructure(l, PVPairs) *
     FirstProj(PVPairs; #pList) *
     ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet);
@@ -1077,14 +1077,14 @@ nounfold pred ObjectTable(l:Obj, PVPairs:List;) :
 (* Object-as-Table absent property *)
 lemma ObjectTableAbsentProperty(l, PVPairs, prop)
 [[
-    ObjectTableStructure(#l, #PVPairs;) *
+    ObjectTableStructure(#l, #PVPairs) *
     FirstProj(#PVPairs; #pList) *
     ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet) *
     (! (#prop --e-- #pSet))
 ]]
 [[
-    ObjectTableStructure(#l, #PVPairs;) *
+    ObjectTableStructure(#l, #PVPairs) *
     ((#l, #prop) -> none) *
     empty_fields(#l : -u- (#pSet, -{ #prop }-))
 ]]
@@ -1107,14 +1107,14 @@ pred RemoveProp(PVPairs : List, prop : Str; found : Bool, value : Str, newPairs 
 (* Object-as-Table present property *)
 lemma ObjectTablePresentProperty(l, PVPairs, prop)
 [[
-    ObjectTableStructure(#l, #PVPairs;) *
+    ObjectTableStructure(#l, #PVPairs) *
     FirstProj(#PVPairs; #pList) *
     ListToSet(#pList; #pSet) *
     (#prop --e-- #pSet)
 ]]
 [[
     RemoveProp(#PVPairs, #prop; true, #value, #newPairs) *
-    ObjectTableStructure(#l, #newPairs;) *
+    ObjectTableStructure(#l, #newPairs) *
     DataProp(#l, #prop; #value) * types(#value : Str)
 ]]
 [*
@@ -1124,7 +1124,7 @@ lemma ObjectTablePresentProperty(l, PVPairs, prop)
         unfold ListToSet(#pList, #pSet)
     } else {
         sep_assert (#PVPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
-        sep_assert (ObjectTableStructure(#l, #restPVPairs;));
+        sep_assert (ObjectTableStructure(#l, #restPVPairs));
         if (not (#fProp = #prop)) then {
             unfold FirstProj(#PVPairs, #pList);
             unfold ListToSet(#pList, #pSet);
@@ -1136,20 +1136,20 @@ lemma ObjectTablePresentProperty(l, PVPairs, prop)
 (* Appending property to Object-as-Table structure from the right *)
 lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
 [[
-    ObjectTableStructure(#l, #PVPairs;) *
+    ObjectTableStructure(#l, #PVPairs) *
     FirstProj(#PVPairs; #pList) *
     ListToSet(#pList; #pSet) *
     (! (#prop --e-- #pSet)) *
     DataProp(#l, #prop; #value) * types(#value : Str)
 ]]
 [[
-    ObjectTableStructure(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }});)
+    ObjectTableStructure(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
 ]]
 [*
     unfold ObjectTableStructure(#l, #PVPairs);
     if (not (#PVPairs = {{ }})) then {
         sep_assert (#PVPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
-        sep_assert (ObjectTableStructure(#l, #restPVPairs;));
+        sep_assert (ObjectTableStructure(#l, #restPVPairs));
         unfold FirstProj(#PVPairs, #pList);
         unfold ListToSet(#pList, #pSet);
         apply ObjectTableStructureAppendPVPair(#l, #restPVPairs, #prop, #value);
@@ -1160,7 +1160,7 @@ lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
 (* Appending property to Object-as-Table from the right *)
 lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
 [[
-    ObjectTableStructure(#l, #PVPairs;) *
+    ObjectTableStructure(#l, #PVPairs) *
     FirstProj(#PVPairs; #pList) *
     ListToSet(#pList; #pSet) *
     (! (#prop --e-- #pSet)) *
@@ -1168,7 +1168,7 @@ lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
     empty_fields(l : -u- (#pSet, -{ #prop }-))
 ]]
 [[
-    ObjectTable(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }});)
+    ObjectTable(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
 ]]
 [*
     apply FirstProjAppendPair(#PVPairs, #pList, #prop, #value);
@@ -1177,18 +1177,18 @@ lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
  *]
 
 (* Frozen object properties *)
-pred FrozenObjectTableStructure(l:Obj, PVPairs:List;) :
+pred FrozenObjectTableStructure(l:Obj, PVPairs:List) :
     (* Base case - no properties left *)
     (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
     (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
     DataPropConst(l, #prop; #value, true) *
-    FrozenObjectTableStructure(l, #restPVPairs;);
+    FrozenObjectTableStructure(l, #restPVPairs);
 
 (* Frozen Object-as-Table predicate *)
-nounfold pred FrozenObjectTable(l:Obj, PVPairs:List;) :
-    FrozenObjectTableStructure(l, PVPairs;) *
+nounfold pred FrozenObjectTable(l:Obj, PVPairs:List) :
+    FrozenObjectTableStructure(l, PVPairs) *
     FirstProj(PVPairs; #pList) *
     ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet);
@@ -1236,11 +1236,11 @@ normal;
 [[
     (l == #l) *
     JSObjGeneral(#l; #proto, #class, #ext) *
-    ObjectTable(#l, #PVPairs;)
+    ObjectTable(#l, #PVPairs)
 ]]
 [[
     JSObjGeneral(#l; #proto, #class, false) *
-    FrozenObjectTable(#l, #PVPairs;)
+    FrozenObjectTable(#l, #PVPairs)
 ]]
 normal
 

@@ -403,11 +403,11 @@ proc i__toString (v) {
 
 spec i__toObject (v) 
     [[ (v == undefined) ]]
-    [[ TypeError(ret;) ]]
+    [[ TypeError(ret) ]]
     error;
 
     [[ (v == null) ]]
-    [[ TypeError(ret;) ]]
+    [[ TypeError(ret) ]]
     error;
 
     [[ (v == #v) * types(#v:Obj) ]]
@@ -479,11 +479,11 @@ proc i__toObject (v) {
  *)
 spec i__checkObjectCoercible (v)
     [[ v == undefined ]]
-    [[ TypeError(ret;) ]]
+    [[ TypeError(ret) ]]
     error;
 
     [[ v == null ]]
-    [[ TypeError(ret;) ]]
+    [[ TypeError(ret) ]]
     error;
 
     [[ typeOf(v) --e-- -{ Bool, Num, Str, Obj }- ]]

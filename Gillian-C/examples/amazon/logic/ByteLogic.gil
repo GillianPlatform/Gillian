@@ -7,7 +7,7 @@
  ****************************************)
 
 (* A byte is positive and less than 256i *)
-pred isByte(byte: Int;):
+pred isByte(byte: Int):
   (byte i<# 256i) * (0i i<=# byte);
 
 (* Interpretation: one byte as an unsigned 8i-bit integer *)

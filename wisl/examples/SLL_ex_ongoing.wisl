@@ -79,9 +79,9 @@ predicate list_member(vs, v; r : Bool) {
 //
 // Predicate for freed list nodes
 //
-predicate freed_nodes(xs;) {
+predicate freed_nodes(xs) {
     (xs == [ null ]);
-    (xs == #x :: #xs) * freed(#x;) * freed_nodes(#xs;)
+    (xs == #x :: #xs) * freed(#x) * freed_nodes(#xs)
 }
 
 //
@@ -238,7 +238,7 @@ predicate SLL_prepend_pre(x; def, xs, vs, n) {
 }
 
 // General post-condition
-predicate SLL_prepend_post(def, x, xs, k, vs, n, retval;) {
+predicate SLL_prepend_post(def, x, xs, k, vs, n, retval) {
     (def == 0) * SLL_addrs_incl(retval; retval :: xs);
     (def == 2) * SLL_vals(retval; k :: vs);
     (def == 3) * SLL_incl(retval; retval :: xs, k :: vs);
@@ -252,7 +252,7 @@ function SLL_prepend(x, k){
     [z + 1] := x;
     return z
 }
-{ SLL_prepend_post(#def, #x, #xs, #k, #vs, #n, ret;) }
+{ SLL_prepend_post(#def, #x, #xs, #k, #vs, #n, ret) }
 
 //
 // 02r. List length
@@ -269,7 +269,7 @@ predicate SLL_length_pre(x; def, var : Int) {
 }
 
 // General post-condition
-predicate SLL_length_post(def, x, retval;) {
+predicate SLL_length_post(def, x, retval) {
     (def == 0) * SLL_addrs_incl(x; #xs) * (retval == len #xs);
     (def == 1) * SLL_addrs_excl(x; #xs) * (retval == len #xs);
     (def == 2) * SLL_vals(x; #vs) * (retval == len #vs);
@@ -290,7 +290,7 @@ function SLL_length(x) {
   };
   return n
 }
-{ SLL_length_post(#def, #x, ret;) }
+{ SLL_length_post(#def, #x, ret) }
 
 //
 // 02i. List Length
@@ -327,7 +327,7 @@ predicate SLL_concat_pre(x, y; def, xx, xy, vx, vy, nx, ny, var : Int) {
 }
 
 // General post-condition
-predicate SLL_concat_post(def, x, y, xx, xy, vx, vy, nx, ny, retval;) {
+predicate SLL_concat_post(def, x, y, xx, xy, vx, vy, nx, ny, retval) {
     (def == 0) * SLL_addrs_incl(retval; xx @ xy);
     (def == 2) * SLL_vals(retval; vx @ vy);
     (def == 3) * SLL_incl(retval; xx @ xy, vx @ vy);
@@ -346,7 +346,7 @@ function SLL_concat(x, y) {
   };
   return x
 }
-{ SLL_concat_post(#def, #x, #y, #xx, #xy, #vx, #vy, #nx, #ny, ret;) }
+{ SLL_concat_post(#def, #x, #y, #xx, #xy, #vx, #vy, #nx, #ny, ret) }
 
 //
 // 03i. List concatenation
@@ -390,7 +390,7 @@ predicate SLL_reverse_pre(x; def, xs, vs, n, var) {
 }
 
 // General post-condition
-predicate SLL_reverse_post(def, x, xs, vs, n, retval;) {
+predicate SLL_reverse_post(def, x, xs, vs, n, retval) {
     (def == 0) * SLL_addrs_incl(retval; rev xs) * (vs == []) * (n == 0);
     (def == 2) * SLL_vals(retval; rev vs) * (xs == []) * (n == 0);
     (def == 3) * SLL_incl(retval; rev xs, rev vs) * (n == 0);
@@ -410,7 +410,7 @@ function SLL_reverse(x){
   };
   return y
 }
-{ SLL_reverse_post(#def, #x, #xs, #vs, #n, ret;) }
+{ SLL_reverse_post(#def, #x, #xs, #vs, #n, ret) }
 
 //
 // 05r. List Membership
@@ -423,7 +423,7 @@ predicate SLL_member_pre(x; def, vs, var : Int) {
     (def == 4) * SLL_excl(x; #xs, vs) * (var == len vs)
 }
 
-predicate nounfold SLL_member_post(def, x, vs;) {
+predicate nounfold SLL_member_post(def, x, vs) {
     (def == 2) * SLL_vals(x; vs);
     (def == 3) * SLL_incl(x; #xs, vs);
     (def == 4) * SLL_excl(x; #xs, vs)
@@ -446,7 +446,7 @@ function SLL_member(x, k){
   };
   return found
 }
-{ SLL_member_post(#def, #x, #vs;) * list_member(#vs, #k; #r) * (ret == #r) }
+{ SLL_member_post(#def, #x, #vs) * list_member(#vs, #k; #r) * (ret == #r) }
 
 //
 // 05i. List membership
@@ -496,11 +496,11 @@ predicate SLL_free_pre(x; def, xs, var : Int) {
 }
 
 // General post-condition
-predicate SLL_free_post(def, x, xs;) {
-    (def == 0) * freed_nodes(xs @ [ null ];);
-    (def == 1) * freed_nodes(x :: xs;);
-    (def == 3) * freed_nodes(xs @ [ null ];);
-    (def == 4) * freed_nodes(x :: xs;)
+predicate SLL_free_post(def, x, xs) {
+    (def == 0) * freed_nodes(xs @ [ null ]);
+    (def == 1) * freed_nodes(x :: xs);
+    (def == 3) * freed_nodes(xs @ [ null ]);
+    (def == 4) * freed_nodes(x :: xs)
 }
 
 // Specified algorithm
@@ -515,4 +515,4 @@ function SLL_free(x){
   };
   return null
 }
-{ (ret == null) * SLL_free_post(#def, #x, #xs;)}
+{ (ret == null) * SLL_free_post(#def, #x, #xs)}

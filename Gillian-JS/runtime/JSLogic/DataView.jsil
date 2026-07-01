@@ -36,7 +36,7 @@ nounfold pred DataView (dv:Obj; buffer:Obj, byteOffset:Num, byteLength:Num) :
  **** DataView Prototype  ****
  *****************************)
 
-nounfold pred DataViewPrototype (proto;) :
+nounfold pred DataViewPrototype (proto) :
   JSObjWithProto (proto; $lobj_proto) *
   empty_fields (proto : -{ "buffer", "byteLength", "byteOffset", "constructor",
                                 "getUint8", "getUint16", "getUint32", "setUint8", "setUint16", "setUint32" }-) *
@@ -83,7 +83,7 @@ nounfold pred DataViewPrototype (proto;) :
  **** Built-in DataView Object ****
  **********************************)
 
-pred BI_DataViewObject (;) :
+pred BI_DataViewObject () :
   BIFunctionObject ($ldv; 1, $lfun_proto, empty, "DV_construct");
 
 (********************************************************************

@@ -6,7 +6,7 @@
  **** Common Array Structure  ****
  *********************************)
 
-pred ArrayStructure(a:Obj, arrayLength:Num;) :
+pred ArrayStructure(a:Obj, arrayLength:Num) :
   ((a, "push") -> none) *                            (* Push must be found in the prototype *)
   ((a, "map")  -> none) *
 
@@ -18,7 +18,7 @@ pred ArrayStructure(a:Obj, arrayLength:Num;) :
 
   ((a, "length") -> {{ "d", arrayLength, true, false, false }});
 
-pred FrozenArrayStructure(a:Obj, arrayLength:Num;) :
+pred FrozenArrayStructure(a:Obj, arrayLength:Num) :
   ((a, "push") -> none) *                            (* Push must be found in the prototype *)
   ((a, "map")  -> none) *
 
@@ -51,7 +51,7 @@ pred ArrayOfUInt8ArraysContents(a:Obj, start:Num, contentsLength:Num; contents:L
     facts: (contentsLength == l-len contents);
 
 pred ArrayOfUInt8Arrays (a:Obj; contents:List, arrayLength:Num) :
-    ArrayStructure(a, arrayLength;) *
+    ArrayStructure(a, arrayLength) *
     ArrayOfUInt8ArraysContents(a, 0, arrayLength; contents);
 
 (* ----------------------------------------------------------------------------------- *)
@@ -71,7 +71,7 @@ pred ArrayOfArraysOfUInt8ArraysContents(a:Obj, start:Num, contentsLength:Num; co
     facts: (contentsLength == l-len contents);
 
 pred ArrayOfArraysOfUInt8Arrays (a:Obj; contents:List) :
-    ArrayStructure(a, l-len contents;) *
+    ArrayStructure(a, l-len contents) *
     ArrayOfArraysOfUInt8ArraysContents(a, 0, l-len contents; contents);
 
 lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLength)
@@ -89,7 +89,7 @@ lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLengt
  **** Array Prototype  ****
  **************************)
 
-nounfold pred ArrayPrototype (proto;) :
+nounfold pred ArrayPrototype (proto) :
   JSObjWithProto (proto; $lobj_proto) *
   empty_fields (proto : -{ "push", "map" }-) *
 

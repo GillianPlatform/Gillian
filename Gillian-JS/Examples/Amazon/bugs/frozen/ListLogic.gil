@@ -46,10 +46,10 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
  ********************************)
   
 @nopath
-pure pred Unique(l : List;) :
+pure pred Unique(l : List) :
   (l == {{  }}),
   (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest; #setRest) *
-    (! (#fst --e-- #setRest)) * Unique(#rest;);
+    (! (#fst --e-- #setRest)) * Unique(#rest);
     
     
 (*****************************************

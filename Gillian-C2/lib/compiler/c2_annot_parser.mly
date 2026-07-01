@@ -288,8 +288,7 @@ spec_annot:
 abstract_predicate:
   | ABSTRACT; pure=option(PURE); PREDICATE; pname = IDENTIFIER; LBRACE;
     ins = separated_list(COMMA, pred_param);
-    SCOLON;
-    outs = separated_list(COMMA, pred_param);
+    outs = outs(pred_param);
     RBRACE;
     {
       let params = ins @ outs in
@@ -305,8 +304,7 @@ abstract_predicate:
 predicate:
   | pure=option(PURE); PREDICATE; no_unfold=option(NOUNFOLD); pname = IDENTIFIER; LBRACE;
     ins = separated_list(COMMA, pred_param);
-    SCOLON;
-    outs = separated_list(COMMA, pred_param);
+    outs = outs(pred_param);
     RBRACE; LCBRACE;
     defs = separated_nonempty_list(SCOLON, pred_definition);
     RCBRACE;
@@ -374,7 +372,9 @@ assertion:
     { CAssert.Undefs (ptr, size)}
   | MALLOCED; LBRACE; ptr = expression; COMMA; ofs = expression; RBRACE
     { CAssert.Malloced(ptr, ofs) }
-  | pname = IDENTIFIER; LBRACE; ins = separated_list(COMMA, expression); SCOLON; outs = separated_list(COMMA, expression); RBRACE
+  | pname = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, expression);
+    outs = outs(expression); RBRACE
     { CAssert.Pred (pname, ins, outs) }
 
 formula:
@@ -597,3 +597,12 @@ any_C_token:
   | AND
   | OR
   { () }
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

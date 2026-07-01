@@ -418,7 +418,7 @@ nounfold pred CRawEncryptedDataKeys(buffer : List, readPos : Num;
 
 (* Incomplete serialised EDKs *)
 @nopath
-nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num;) :
+nounfold pred IRawEncryptedDataKeys(buffer : List, readPos : Num) :
   (* Not enough data to read the number of EDKs *)
   (is_int readPos) * (0 <=# readPos) * (readPos <=# as_num (l-len buffer)) * (as_num (l-len buffer) <# (readPos + 2)),
 
@@ -446,7 +446,7 @@ nounfold pred BRawEncryptedDataKeys(buffer : List, readPos : Num; errorMessage :
 @nopath
 nounfold pred RawEncryptedDataKeys(buffer : List, readPos : Num; definition : Str, EDKs : List, EDKsLength : Num, errorMessage : Str) :
   (definition == "Complete") * (errorMessage == "") * CRawEncryptedDataKeys(buffer, readPos; EDKs, EDKsLength),
-  (definition == "Incomplete") * IRawEncryptedDataKeys(buffer, readPos;) * (EDKs == {{  }}) * (EDKsLength == 0) * (errorMessage == ""),
+  (definition == "Incomplete") * IRawEncryptedDataKeys(buffer, readPos) * (EDKs == {{  }}) * (EDKsLength == 0) * (errorMessage == ""),
   (definition == "Broken") * BRawEncryptedDataKeys(buffer, readPos; errorMessage) * (EDKs == {{  }}) * (EDKsLength == 0);
 
 
@@ -476,7 +476,7 @@ nounfold pred CRawEncryptionContext(buffer : List; ECKs : List) :
     rawToUInt16(#rawKC, false; #keyCount) * (0 <# #keyCount) *
     Elements(buffer, 2, #keyCount, 2; "Complete", ECKs, #ECKsLength) *
     toUtf8PairMap(ECKs; #utf8ECKs) * FirstProj(ECKs; #ECKeys) *
-    Unique(#ECKeys;) * (as_int (2 + #ECKsLength) == (l-len buffer));
+    Unique(#ECKeys) * (as_int (2 + #ECKsLength) == (l-len buffer));
 
 (* Broken serialised encryption context *)
 @nopath
@@ -504,7 +504,7 @@ nounfold pred BRawEncryptionContext(buffer:List; errorMessage:Str, ECKs:List) :
     rawToUInt16(#rawKC, false; #keyCount) *
     (0 <# #keyCount) *
     Elements(buffer, 2, #keyCount, 2; "Complete", ECKs, #ECKsLength) *
-    toUtf8PairMap(ECKs; #utf8ECKs) * FirstProj(ECKs; #ECKeys) * Duplicated({{ }}, #ECKeys;) *
+    toUtf8PairMap(ECKs; #utf8ECKs) * FirstProj(ECKs; #ECKeys) * Duplicated({{ }}, #ECKeys) *
     (as_int (2 + #ECKsLength) == l-len buffer) *
     (errorMessage == "decodeEncryptionContext: Duplicate encryption context key value.");
 
@@ -540,11 +540,11 @@ pred BAlgorithmSuite(numId; errorMessage) :
 
 (* The object that holds information about allowed algorithm suites *)
 @nopath
-pred AlgorithmSuiteIdentifierObject(o;) :
-    JSObject(o;) *
+pred AlgorithmSuiteIdentifierObject(o) :
+    JSObject(o) *
     DataProp(o, "20";  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16"; 20) *
     DataProp(o, "70";  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16"; 70) *
-    <Props>(o, -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-;);
+    <Props>(o, -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-);
 
 (*
     The object representing a given algorithm suite.
@@ -552,7 +552,7 @@ pred AlgorithmSuiteIdentifierObject(o;) :
  *)
 @nopath
 pred AlgorithmSuiteObject(aso: Obj; ivLength: Num, tagLength: Num) :
-    JSObject(aso;) *
+    JSObject(aso) *
     readOnlyProperty(aso, "ivLength";  ivLength) *
     readOnlyProperty(aso, "tagLength"; tagLength);
 
@@ -567,7 +567,7 @@ pred AlgorithmSuiteObject(aso: Obj; ivLength: Num, tagLength: Num) :
 
 (* The correct version and type *)
 @nopath
-pred CVersionAndType(version, type;) :
+pred CVersionAndType(version, type) :
   (version == 1) * (type == 128);
 
 (* Broken version and type *)
@@ -590,7 +590,7 @@ nounfold pred CHeader(rawHeaderData; part_one, version, type, suiteId,
     (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
     ((l-len #rawSuiteId) == 2i) *
     ((l-len messageId) == 16i) *
-    ((l-len #rawContextLength) == 2i) * CVersionAndType(version, type;) *
+    ((l-len #rawContextLength) == 2i) * CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -628,7 +628,7 @@ nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -646,7 +646,7 @@ nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -667,7 +667,7 @@ nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2) *
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -707,7 +707,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (22 <=# as_num (l-len rawHeaderData)) *
     (rawHeaderData == l+ ({{ version, type }}, #rawSuiteId, #rest)) *
     (l-len #rawSuiteId == 2i) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     BAlgorithmSuite(suiteId; errorMessage) *
 
@@ -724,7 +724,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2i) *
     (l-len messageId == 16i) *
     (l-len #rawContextLength == 2i) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -745,7 +745,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2i) *
     (l-len messageId == 16i) *
     (l-len #rawContextLength == 2i) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -767,7 +767,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2i) *
     (l-len messageId == 16i) *
     (l-len #rawContextLength == 2i) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *
@@ -796,7 +796,7 @@ nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId
     (l-len #rawSuiteId == 2i) *
     (l-len messageId == 16i) *
     (l-len #rawContextLength == 2i) *
-    CVersionAndType(version, type;) *
+    CVersionAndType(version, type) *
     rawToUInt16(#rawSuiteId, false; suiteId) *
     CAlgorithmSuite(suiteId; #stringId, #ivLength, #tagLength) *
     rawToUInt16(#rawContextLength, false; ECLength) *

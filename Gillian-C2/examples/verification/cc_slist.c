@@ -14,7 +14,7 @@ typedef struct cc_slist_s {
 /*@ pred sll(p; alpha) {
   (p -m> struct snode_s { #head; #tail } * (alpha == #head::#beta)) *
   sll(#tail;#beta) *
-  i__is_size_t(len alpha;);
+  i__is_size_t(len alpha);
   (p == NULL) * (alpha == nil)
 }
 
@@ -22,7 +22,7 @@ pred lseg(p, q; alpha) {
     (p == q) * (alpha == nil);
 
     (p -m> struct snode_s { #head; #tail }) * (alpha == #head::#beta) *
-    lseg(#tail, q; #beta) * i__is_size_t(len alpha;)
+    lseg(#tail, q; #beta) * i__is_size_t(len alpha)
 }
 
 pred cc_sll_ht(h, t, size; alpha) {
@@ -40,7 +40,7 @@ pred cc_sll(x; alpha) {
 }
 
 lemma lseg_append(p, q, alpha, a, end) {
-    hypothesis: lseg(#p, #q; #alpha) * (#q -m> struct snode_s { #a; #end }) * i__is_size_t((len #alpha) + 1;)
+    hypothesis: lseg(#p, #q; #alpha) * (#q -m> struct snode_s { #a; #end }) * i__is_size_t((len #alpha) + 1)
     conclusions: lseg(#p, #end; #alpha @ [#a])
     proof:
       unfold lseg(#p, #q, #alpha)[[bind #head: #head,
@@ -53,7 +53,7 @@ lemma lseg_append(p, q, alpha, a, end) {
 }
 
 lemma lseg_concat(p, q, r, alpha, gamma) {
-    hypothesis: lseg(#p, #q; #alpha) * lseg(#q, #r; #gamma) * i__is_size_t(len (#alpha @ #gamma);)
+    hypothesis: lseg(#p, #q; #alpha) * lseg(#q, #r; #gamma) * i__is_size_t(len (#alpha @ #gamma))
     conclusions: lseg(#p, #r; #alpha @ #gamma)
     proof:
       unfold lseg(#p, #q, #alpha)[[bind #head: #head,
@@ -68,7 +68,7 @@ lemma lseg_concat(p, q, r, alpha, gamma) {
 
 /*@ spec cc_slist_add_last(x, v) {
   requires: (x == #x) * cc_sll(#x; #alpha)
-          * (v == #v) * i__is_size_t((len #alpha) + 1;)
+          * (v == #v) * i__is_size_t((len #alpha) + 1)
   ensures:  cc_sll(#x; #alpha @ [ #v ])
 } */
 void cc_slist_add_last(CC_SList *x, int v) {
@@ -97,7 +97,7 @@ void cc_slist_add_last(CC_SList *x, int v) {
 /*@ spec cc_slist_splice(x, y) {
   requires: (x == #x) * cc_sll(#x; #alpha)
           * (y == #y) * cc_sll(#y; #beta)
-          * i__is_size_t((len #alpha) + (len #beta);)
+          * i__is_size_t((len #alpha) + (len #beta))
   ensures:  cc_sll(#x; #alpha @ #beta) * cc_sll(#y; [])
 } */
 void cc_slist_splice(CC_SList *x, CC_SList *y) {

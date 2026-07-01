@@ -32,12 +32,12 @@
             (#len <=# 65535) *
             optBytes(#bytes, #len; #rawContent) *
             toUtf8(#rawContent; #strContent) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
 
         ensures:
             valid_aws_string_ptr(ret; #alloc, #rawContent, #strContent) *
             optBytes(#bytes, #len; #rawContent) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
     }
 */
 struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
@@ -71,10 +71,10 @@ struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
     spec aws_string_destroy(str) {
         requires:
             valid_aws_string_ptr(str; #alloc, #rawContent, #strContent) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
 
         ensures:
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
 
     OR
 

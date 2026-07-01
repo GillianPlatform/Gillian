@@ -33,11 +33,11 @@
         requires:
             (hash == #hash) *
             valid_hash_table_ptr(#hash; #alloc, #rawContents, #contents) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
 
         ensures:
             empty_hash_table_ptr(#hash; #alloc) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
     }
 */
 

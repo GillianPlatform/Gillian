@@ -496,7 +496,10 @@ assertion_target:
   | LMETADATA; LBRACE; eo = expr_target; COMMA; em = expr_target; RBRACE
     { Asrt.MetaData (eo, em) }
   | LEMP; { Asrt.Emp }
-  | name = VAR; LBRACE; ins = separated_list(COMMA, expr_target); SCOLON; outs = separated_list(COMMA, expr_target); RBRACE
+  | name = VAR; LBRACE;
+    ins = separated_list(COMMA, expr_target);
+    outs = outs(expr_target);
+    RBRACE
     { Asrt.Pred (name, ins, outs) }
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
     { Asrt.Types type_pairs }
@@ -789,8 +792,8 @@ pred_param_target:
    semicolon. E.g. [(in1, in2; out1, out2)], [(in1, in2;)], [(;out1, out2)]. *)
 pred_head_target:
   name = VAR; LBRACE;
-    ins = separated_list(COMMA, pred_param_target); SCOLON;
-    outs = separated_list(COMMA, pred_param_target);
+    ins = separated_list(COMMA, pred_param_target);
+    outs = outs(pred_param_target);
   RBRACE;
   { let params = ins @ outs in
     let num_params = List.length params in
@@ -1066,7 +1069,10 @@ js_assertion_target:
   | SCHAIN; LBRACE; fid=VAR; COLON; le=js_lexpr_target; RBRACE
     { JSAsrt.SChain (fid, le) }
 (* x(e1, ..., en) *)
-  | name = VAR; LBRACE; ins = separated_list(COMMA, js_lexpr_target); SCOLON; outs = separated_list(COMMA, js_lexpr_target); RBRACE
+  | name = VAR; LBRACE;
+    ins = separated_list(COMMA, js_lexpr_target);
+    outs = outs(js_lexpr_target);
+    RBRACE
     { JSAsrt.Pred (name, ins, outs) }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, js_type_env_pair_target); RBRACE
@@ -1270,3 +1276,12 @@ top_level_js_pre_target:
 
 top_level_expr_target:
   e = expr_target; EOF { e }
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

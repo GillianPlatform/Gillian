@@ -24,7 +24,7 @@ nounfold pred ArrayBuffer (ab:Obj; data:List) :
  **** Array Buffer Prototype  ****
  *********************************)
 
-nounfold pred ArrayBufferPrototype (proto;) :
+nounfold pred ArrayBufferPrototype (proto) :
   JSObjWithProto (proto; $lobj_proto) *
   empty_fields (proto : -{ "byteLength", "constructor", "slice" }-) *
 

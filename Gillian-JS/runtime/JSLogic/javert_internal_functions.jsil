@@ -6,7 +6,7 @@
  **** GENERAL OBJECTS ****
  *************************)
 
-pred JSObject (l:Obj;) :
+pred JSObject (l:Obj) :
   MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> $lobj_proto) *
   ((#md, "@class")      -> "Object") *
@@ -75,17 +75,17 @@ pred BIFunctionObject (l:Obj; len:Num, proto:Obj, call, construct) :
  **** BUILT-IN OBJECTS ****
  **************************)
 
-pred JSInternals (;) :
-    GlobalObject (;) *
-    ObjectPrototype($lobj_proto;) *
-    FunctionPrototype($lfun_proto;) *
-    ArrayPrototype ($larr_proto;) *
-    ArrayBufferPrototype ($lab_proto;) *
-    BI_ErrorObject (;) *
-    BI_ObjectObject (;) *
-    BI_DataViewObject (;) *
-    DataViewPrototype($ldv_proto;) *
-    Uint8ArrayPrototype($lui8ar_proto;);
+pred JSInternals () :
+    GlobalObject () *
+    ObjectPrototype($lobj_proto) *
+    FunctionPrototype($lfun_proto) *
+    ArrayPrototype ($larr_proto) *
+    ArrayBufferPrototype ($lab_proto) *
+    BI_ErrorObject () *
+    BI_ObjectObject () *
+    BI_DataViewObject () *
+    DataViewPrototype($ldv_proto) *
+    Uint8ArrayPrototype($lui8ar_proto);
 
 pred BooleanObject (l:Obj; b:Bool) :
   MetaData(l, #md) * MetaData(#md, null) *
@@ -103,7 +103,7 @@ pred NumberObject (l:Obj; n:Num) :
   ((#md, "@primitiveValue") -> n) *
   empty_fields (#md : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
 
-pred BooleanPrototype (;) :
+pred BooleanPrototype () :
   (($lbool_proto, "constructor") -> {{ "d", $lbool, true, false, true }}) *
   MetaData($lbool_proto, #bpmd) * MetaData(#bpmd, null) *
   ((#bpmd, "@proto")          -> $lobj_proto) *
@@ -112,7 +112,7 @@ pred BooleanPrototype (;) :
   ((#bpmd, "@primitiveValue") -> false) *
   empty_fields (#bpmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
 
-pred NumberPrototype (;) :
+pred NumberPrototype () :
   (($lnum_proto, "constructor") -> {{ "d", $lnum, true, false, true }}) *
   MetaData($lnum_proto, #npmd) * MetaData(#npmd, null) *
   ((#npmd, "@proto")          -> $lobj_proto) *
@@ -121,8 +121,8 @@ pred NumberPrototype (;) :
   ((#npmd, "@primitiveValue") -> 0) *
   empty_fields (#npmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
 
-pred GlobalObject (;) :
-  JSObject ($lg;) *
+pred GlobalObject () :
+  JSObject ($lg) *
   (($lg, "Error") -> {{ "d", $lerr, true, false, true }}) *
   (($lg, "Object") -> {{ "d", $lobj, true, false, true }}) *
   (($lg, "DataView") -> {{ "d", $ldv, true, false, true }}) *
@@ -131,26 +131,26 @@ pred GlobalObject (;) :
 pred GlobalVar (v; val) :
   (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str);
 
-pred BI_ObjectObject (;) :
+pred BI_ObjectObject () :
   BIFunctionObject ($lobj; 0, $lobj_proto, "Object_call", "Object_construct") *
   DataPropGen($lobj, "create"; $lobj_create, true, false, true) *
   DataPropGen($lobj, "freeze"; $lobj_freeze, true, false, true) *
   JSBIFunction($lobj_create; "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-) *
   JSBIFunction($lobj_freeze; "Object_freeze", 2) * empty_fields($lobj_freeze : -{ "length" }-);
 
-pred ObjectPrototype (proto;) :
+pred ObjectPrototype (proto) :
   JSObjWithProto (proto; null) * empty_fields (proto : -{ "hasOwnProperty" }-) *
   ((proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   JSBIFunction($lop_hasOwnProperty; "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-);
 
-pred ObjectPrototypeComplete (;) :
+pred ObjectPrototypeComplete () :
   JSObjWithProto ($lobj_proto; null) * empty_fields ($lobj_proto : -{ "hasOwnProperty", "toString" }-) *
   (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   (($lobj_proto, "toString") -> {{ "d", $lop_toString, true, false, true }}) *
   JSBIFunction($lop_hasOwnProperty; "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-) *
   JSBIFunction($lop_toString; "OP_toString", 1) * empty_fields($lop_toString : -{ "length" }-);
 
-pred FunctionPrototype (proto;) :
+pred FunctionPrototype (proto) :
   ((proto, "length") -> {{ "d", 0, false, false, false }}) *
   ((proto, "call")   -> {{ "d", $lfp_call, true, false, true }}) *
   empty_fields(proto : -{ "call", "length" }-) *
@@ -162,7 +162,7 @@ pred FunctionPrototype (proto;) :
   empty_fields(#mfp : -{ "@proto", "@class", "@extensible", "@scope", "@call" }-) *
   JSBIFunction($lfp_call; "FP_call", 1);
 
-pred BI_ErrorObject (;) :
+pred BI_ErrorObject () :
   BIFunctionObject ($lerr; 1, $lerr_proto, "Error_call", "Error_construct");
 
 (***********************
@@ -177,47 +177,47 @@ pred ErrorObjectWithMessage (l:Obj; m:Str) :
   ((l, "message") -> {{"d", m, true, false, true}}) *
   ((#md, "@proto") -> $lerr_proto) * ((#md, "@class") -> "Error") * ((#md, "@extensible") -> true);
 
-pred TypeError(l:Obj;) : ErrorObject (l; $lterr_proto);
+pred TypeError(l:Obj) : ErrorObject (l; $lterr_proto);
 
-pred SyntaxError(l:Obj;) : ErrorObject (l; $lserr_proto);
+pred SyntaxError(l:Obj) : ErrorObject (l; $lserr_proto);
 
-pred ReferenceError(l:Obj;) : ErrorObject (l; $lrferr_proto);
+pred ReferenceError(l:Obj) : ErrorObject (l; $lrferr_proto);
 
 (************************
  ***** INITIAL HEAP *****
  ************************)
 
-pred initialHeapPost (globals;) :
+pred initialHeapPost (globals) :
     types(globals:Set) *
 
-    GlobalObject(;) *
+    GlobalObject() *
     empty_fields ($lg : -u- (-{ "Error", "Object", "DataView" }-, globals) ) *
 
-    ObjectPrototype($lobj_proto;) *
-    FunctionPrototype ($lfun_proto;) *
-    BooleanPrototype (;) * empty_fields ($lbool_proto : -{ "constructor" }-) *
-    NumberPrototype (;)  * empty_fields ($lnum_proto : -{ "constructor" }-) *
+    ObjectPrototype($lobj_proto) *
+    FunctionPrototype ($lfun_proto) *
+    BooleanPrototype () * empty_fields ($lbool_proto : -{ "constructor" }-) *
+    NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
 
-    BI_ErrorObject (;) * empty_fields($lerr : -{ "length", "prototype" }-) *
+    BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
 
     JSObjGeneral ($lerr_proto; $lobj_proto, "Error", true) *
     (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
     empty_fields($lerr_proto : -{ "message" }-);
 
-pred initialHeapPostWeak (;) :
-    GlobalObject(;) *
+pred initialHeapPostWeak () :
+    GlobalObject() *
 
-    ObjectPrototype($lobj_proto;) *
+    ObjectPrototype($lobj_proto) *
 
-    FunctionPrototype ($lfun_proto;) *
+    FunctionPrototype ($lfun_proto) *
 
-    BooleanPrototype (;) *
+    BooleanPrototype () *
     empty_fields ($lbool_proto : -{ "constructor" }-) *
 
-    NumberPrototype (;) *
+    NumberPrototype () *
     empty_fields ($lnum_proto : -{ "constructor" }-) *
 
-    BI_ErrorObject (;) * empty_fields($lerr : -{ "length", "prototype" }-) *
+    BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
 
     JSObjGeneral ($lerr_proto; $lobj_proto, "Error", true) *
     (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
@@ -253,7 +253,7 @@ pred readOnlyProperty (l:Obj, prop:Str; v) :
  * Resource: none
  *
  *)
-pure pred DataDescriptor (d:List;) :
+pure pred DataDescriptor (d:List) :
   (d == {{ "d", #dval, #dwrit, #denum, #dconf }}) *
   types (#dwrit:Bool, #denum:Bool, #dconf:Bool) *
   (! (#dval == empty));
@@ -264,7 +264,7 @@ pure pred DataDescriptor (d:List;) :
  * Resource: none
  *
  *)
-pure pred AccessorDescriptor (d:List;) :
+pure pred AccessorDescriptor (d:List) :
   (d == {{ "a", #dget, #dset, #denum, #dconf }}) *
   types (#denum:Bool, #dconf:Bool) *
   (! (#dget == empty)) * (! (#dset == empty));
@@ -275,7 +275,7 @@ pure pred AccessorDescriptor (d:List;) :
  * Resource: none
  *
  *)
-pure pred GenericDescriptor (d:List;) :
+pure pred GenericDescriptor (d:List) :
   (d == {{ "g", #genum, #gconf, #gval, #gwrit, #gget, #gset }});
 
 (*
@@ -309,21 +309,21 @@ pure pred desc_conf (d:List; v:Bool) :
  *)
 pred Cell_o (l:Obj, prop:Str; d) :
     ((l, prop) -> d) * (d == none),
-    ((l, prop) -> d) * DataDescriptor(d;),
-    ((l, prop) -> d) * AccessorDescriptor(d;);
+    ((l, prop) -> d) * DataDescriptor(d),
+    ((l, prop) -> d) * AccessorDescriptor(d);
 
 (**************************
  **** CLASS CLASSIFIERS ***
  **************************)
 
 (*
- * Predicate: isClass(c, X;)
+ * Predicate: isClass(c, X)
  *
  * Resource:
  *      (l, "@class")
  *
  *)
-pure pred isClass (c:Str, case:Str;) :
+pure pred isClass (c:Str, case:Str) :
   (case == "Array")      * (c == "Array"),
   (case == "String")     * (c == "String"),
   (case == "Non-Array")  * (! (c == "Array")),
@@ -337,12 +337,12 @@ pred Pi (l:Obj, prop:Str; d, ls:List, lcls:List, lpv:List) :
 
     (* Any object, cell exists in the heap *)
     Cell_o (l, prop; d) * types(d : List) *
-    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String";) *
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") *
     (ls == {{ l }}) * (lcls == {{ #cls }}) * (lpv == {{ "" }}),
 
     (* Non-string object, cell does not exist in the heap, down the prototype chain *)
     Cell_o (l, prop; none) *
-    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String";) * ((#md, "@proto") -> #lp) *
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") * ((#md, "@proto") -> #lp) *
     (ls == l :: #lls) * (lcls == #cls :: #lcls) * (lpv == "" :: #lpv) * types(#cls:Str) *
     (#lls == #lp :: #ols) * (#lcls == #pcls :: #ocls) * (#lpv == #ppv :: #otv) *
     types(#lp:Obj, #pcls:Str, #ppv:Str) *
@@ -350,7 +350,7 @@ pred Pi (l:Obj, prop:Str; d, ls:List, lcls:List, lpv:List) :
 
     (* Non-string object, cell does not exist in the heap, end of prototype chain *)
     Cell_o (l, prop; none) * (d == undefined) *
-    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String";) *  ((#md, "@proto") -> null) *
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") *  ((#md, "@proto") -> null) *
     (ls == {{ l }}) * (lcls == {{ #cls }}) * (lpv == {{ "" }});
 
 (*******************
@@ -409,7 +409,7 @@ proc create_default_object_concrete (l, pr, cl, ext) {
 spec Object_construct (xsc, vthis, l)
 
     [[ (l == #l) * types(#l:Undefined) ]]
-    [[ JSObject(ret;) * empty_fields(ret : -{ }-) ]]
+    [[ JSObject(ret) * empty_fields(ret : -{ }-) ]]
     normal
 
     (* TODO: for Object, Boolean, Number, String *)
@@ -526,7 +526,7 @@ spec create_function_object (xsc, call, construct, params)
       JSFunctionObject(ret; #call, #xsc, #len, #prototype) *
       empty_fields(ret : -{ "arguments", "caller", "length", "prototype" }-) *
       (#len == l-len #params) *
-      JSObject(#prototype;) *
+      JSObject(#prototype) *
       ((#prototype, "constructor") -> {{ "d", ret, true, false, true }}) *
       empty_fields(#prototype : -{ "constructor" }-)
     ]]
@@ -560,7 +560,7 @@ proc create_function_object (xsc, call, construct, params) {
 spec setupInitialHeap ()
 
   [[ emp ]]
-  [[ initialHeapPost( -{ }- ;) * (ret == empty) ]]
+  [[ initialHeapPost( -{ }- ) * (ret == empty) ]]
   normal
 
 proc setupInitialHeap () {
@@ -1426,13 +1426,13 @@ proc o__getOwnProperty (l, prop) {
 spec getOwnProperty (l, prop)
 
     [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop; none) *
-       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String";) ]]
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
     [[ Cell_o (#l, #prop; none) *
        MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == undefined) ]]
     normal;
 
     [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop; #dx) * types(#dx : List) *
-       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String";) ]]
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
     [[ Cell_o (#l, #prop; #dx) * MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == #dx) ]]
     normal *)
 
@@ -1504,7 +1504,7 @@ spec get (l, prop)
     normal;
 
     [[ (l == #l) * (prop == #prop) *
-       Pi (#l, #prop; #d, #ls, #cls, #pv) * DataDescriptor(#d;) ]]
+       Pi (#l, #prop; #d, #ls, #cls, #pv) * DataDescriptor(#d) ]]
     [[ Pi (#l, #prop; #d, #ls, #cls, #pv) * desc_val (#d; ret) ]]
     normal *)
 
@@ -1583,11 +1583,11 @@ spec i__getValue (v)
     normal;
 
     [[ (v == {{ "v", undefined, #field, true }}) * types (#field:Str) ]]
-    [[ ReferenceError(ret;) ]]
+    [[ ReferenceError(ret) ]]
     error;
 
     [[ (v == {{ "o", undefined, #field, true }}) * types (#field:Str) ]]
-    [[ ReferenceError(ret;) ]]
+    [[ ReferenceError(ret) ]]
     error;
 
     [[ (v == {{ "o", #obj, #field, true }}) *
@@ -1596,7 +1596,7 @@ spec i__getValue (v)
     normal;
 
     [[ (v == {{ "o", #obj, #field, true }}) *
-       Pi (#obj, #field; #d, #ls, #lcls, #lpv) * DataDescriptor (#d;)  ]]
+       Pi (#obj, #field; #d, #ls, #lcls, #lpv) * DataDescriptor (#d)  ]]
     [[ Pi (#obj, #field; #d, #ls, #lcls, #lpv) * desc_val (#d; #desc_val) * (ret == #desc_val) ]]
     normal;
 
@@ -1606,7 +1606,7 @@ spec i__getValue (v)
     normal;
 
     [[ (v == {{ "v", $lg, #field, true }}) *
-    Pi ($lg, #field; #d, #ls, #lcls, #lpv) * DataDescriptor (#d;)  ]]
+    Pi ($lg, #field; #d, #ls, #lcls, #lpv) * DataDescriptor (#d)  ]]
     [[ Pi ($lg, #field; #d, #ls, #lcls, #lpv) * desc_val (#d; #desc_val) * (ret == #desc_val) ]]
     normal;
 
@@ -1620,7 +1620,7 @@ spec i__getValue (v)
     [[ Pi($lbool_proto, #field; #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * (ret == undefined) ]]
     normal;
 
-    [[ (v == {{ "o", #b, #field }}) * types(#b:Bool) * Pi($lbool_proto, #field; #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * DataDescriptor(#d;) ]]
+    [[ (v == {{ "o", #b, #field }}) * types(#b:Bool) * Pi($lbool_proto, #field; #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * DataDescriptor(#d) ]]
     [[ Pi($lbool_proto, #field; #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * desc_val(#d; #dval) * (ret == #dval) ]]
     normal;
 
@@ -1628,7 +1628,7 @@ spec i__getValue (v)
     [[ Pi($lnum_proto, #field; #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * (ret == undefined) ]]
     normal;
 
-    [[ (v == {{ "o", #n, #field }}) * types(#n:Num) * Pi($lnum_proto, #field; #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * DataDescriptor(#d;) ]]
+    [[ (v == {{ "o", #n, #field }}) * types(#n:Num) * Pi($lnum_proto, #field; #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * DataDescriptor(#d) ]]
     [[ Pi($lnum_proto, #field; #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * desc_val(#d; #dval) * (ret == #dval) ]]
     normal *)
 
@@ -1689,7 +1689,7 @@ spec hasProperty (l, prop)
   normal;
 
   [[ (l == #l) * (prop == #prop) *
-     Pi (#l, #prop; #d, #ls, #cls, #pv) * DataDescriptor(#d;) ]]
+     Pi (#l, #prop; #d, #ls, #cls, #pv) * DataDescriptor(#d) ]]
   [[ Pi (#l, #prop; #d, #ls, #cls, #pv) * (ret == true) ]]
   normal *)
 
@@ -1709,30 +1709,30 @@ proc hasProperty (l, prop) {
 spec deleteProperty (l, prop, thrw)
 
     [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop; none) *
-       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String";) ]]
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
     [[ Cell_o (#l, #prop; none) *
        MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == true) ]]
     normal;
 
   [[ (l == #l) * (prop == #prop) *
-     Cell_o(#l, #prop; #d) * DataDescriptor(#d;) * desc_conf(#d; true) *
-     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String";) ]]
+     Cell_o(#l, #prop; #d) * DataDescriptor(#d) * desc_conf(#d; true) *
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
   [[ Cell_o(#l, #prop; none) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == true) ]]
   normal;
 
   [[ (l == #l) * (prop == #prop) * (thrw == false) *
-     Cell_o(#l, #prop; #d) * DataDescriptor(#d;) * desc_conf(#d; false) *
-     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String";) ]]
+     Cell_o(#l, #prop; #d) * DataDescriptor(#d) * desc_conf(#d; false) *
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
   [[ Cell_o(#l, #prop; #d) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == false) ]]
   normal;
 
   [[ (l == #l) * (prop == #prop) * (thrw == true) *
-     Cell_o(#l, #prop; #d) * DataDescriptor(#d;) * desc_conf(#d; false) *
-     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String";) ]]
+     Cell_o(#l, #prop; #d) * DataDescriptor(#d) * desc_conf(#d; false) *
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
   [[ Cell_o(#l, #prop; #d) *
-     MetaData(#l, #md) * ((#md, "@class") -> #cls) * TypeError(ret;) ]]
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * TypeError(ret) ]]
   error
 
 proc deleteProperty (l, prop, thrw) {

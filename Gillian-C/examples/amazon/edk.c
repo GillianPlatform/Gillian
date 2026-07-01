@@ -16,15 +16,15 @@ void __for_edk_struct_to_appear(struct aws_cryptosdk_edk edk) { (void)edk; }
         (edk_content == [#prov_id_content, #prov_info_content, #ct_content])
     }
 
-    pred nounfold empty_aws_cryptosdk_edk_ptr(edk;) {
+    pred nounfold empty_aws_cryptosdk_edk_ptr(edk) {
         (edk -> struct aws_cryptosdk_edk {
             #provider_id;
             #provider_info;
             #cipher_text
         }) *
-        empty_aws_byte_buf_fields(#provider_id;) *
-        empty_aws_byte_buf_fields(#provider_info;) *
-        empty_aws_byte_buf_fields(#ciphertext;)
+        empty_aws_byte_buf_fields(#provider_id) *
+        empty_aws_byte_buf_fields(#provider_info) *
+        empty_aws_byte_buf_fields(#ciphertext)
     }
 */
 
@@ -45,11 +45,11 @@ void aws_cryptosdk_edk_clean_up(struct aws_cryptosdk_edk *edk) {
         requires:
             (edk_list == #edk_list) *
             valid_edk_array_list_ptr(#edk_list; #alloc, #content) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
 
         ensures:
             empty_edk_array_list_ptr(#edk_list; #alloc) *
-            default_allocator(#alloc;)
+            default_allocator(#alloc)
     }
 */
 void aws_cryptosdk_edk_list_clear(struct aws_array_list *edk_list) {

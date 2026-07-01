@@ -74,13 +74,13 @@ lemma FirstProjToUtf8MapPairCompat(PVPairs)
  ********************************)
   
 @nopath
-pure pred Unique(l : List;) :
+pure pred Unique(l : List) :
   (l == {{  }}),
   (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest; #setRest) *
-    (! (#fst --e-- #setRest)) * Unique(#rest;);
+    (! (#fst --e-- #setRest)) * Unique(#rest);
     
 lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
-  [[  (#props == l+ (#prefix, #suffix)) * Unique(#props;) *
+  [[  (#props == l+ (#prefix, #suffix)) * Unique(#props) *
       ListToSet(#prefix; #setPrefix) * ListToSet(#suffix; #setSuffix) *
       (#prop --e-- #setSuffix) ]]
   [[  (! (#prop --e-- #setPrefix)) ]]
@@ -110,7 +110,7 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
  ************************************)
 
 (* Lists with duplicates *)
-pure pred Duplicated(prefix:List, suffix:List;) :
+pure pred Duplicated(prefix:List, suffix:List) :
     (* Either the head is duplicated *)
     (suffix == l+ ({{ #fst }}, #rest)) *
     ListToSet(prefix; #preSet) *
@@ -120,7 +120,7 @@ pure pred Duplicated(prefix:List, suffix:List;) :
     (suffix == l+ ({{ #fst }}, #rest)) *
     ListToSet(prefix; #preSet) *
     (! (#fst --e-- #preSet)) *
-    Duplicated(l+ (prefix, {{ #fst }}), #rest;);
+    Duplicated(l+ (prefix, {{ #fst }}), #rest);
         
 
 (*****************************************

@@ -16,21 +16,21 @@ predicate list_member(vs, v; r : Bool){
   (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v; r)
 }
 
-predicate replaced(vs, ws, v, w;) {
+predicate replaced(vs, ws, v, w) {
     (vs == []) * (ws == []);
-    (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w;);
-    (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w;)
+    (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w);
+    (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w)
 }
 
 lemma replaced_concat {
     statement:
       forall vs1, ws1, vs2, ws2, v, w.
-        replaced(vs1, ws1, v, w;) * replaced(vs2, ws2, v, w;) |- replaced(vs1 @ vs2, ws1 @ ws2, v, w;)
+        replaced(vs1, ws1, v, w) * replaced(vs2, ws2, v, w) |- replaced(vs1 @ vs2, ws1 @ ws2, v, w)
 
     proof:
       unfold replaced(vs1, ws1, v, w);
       if (!(vs1 == [])) {
-        assert {bind: #nv, #nw, #nvs1, #nws1} (vs1 == #nv :: #nvs1) * (ws1 == #nw :: #nws1) * replaced(#nvs1, #nws1, v, w;);
+        assert {bind: #nv, #nw, #nvs1, #nws1} (vs1 == #nv :: #nvs1) * (ws1 == #nw :: #nws1) * replaced(#nvs1, #nws1, v, w);
         apply replaced_concat(#nvs1, #nws1, vs2, ws2, v, w)
       }
 }
@@ -52,7 +52,7 @@ lemma list_member_concat {
     }
 }
 
-predicate is_int(a: Int;) {
+predicate is_int(a: Int) {
     emp
 }
 
@@ -61,7 +61,7 @@ predicate max(a:Int, b:Int; c:Int) {
     (a <  b) * (c == b)
 }
 
-{ (a == #a) * is_int(#a;) * (b == #b) * is_int(#b;) }
+{ (a == #a) * is_int(#a) * (b == #b) * is_int(#b) }
 function max(a, b) {
     if (a >= b) {
         r := a
@@ -140,4 +140,4 @@ function replace(t, v, w) {
     };
     return 0
 }
-{ binary_tree(#t, 1.0; #r_tree) * replaced(#tree, #r_tree, #v, #w;) }
+{ binary_tree(#t, 1.0; #r_tree) * replaced(#tree, #r_tree, #v, #w) }

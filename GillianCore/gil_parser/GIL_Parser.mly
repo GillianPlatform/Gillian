@@ -353,11 +353,12 @@ pred_param_target:
 
 (* Predicate parameters: in-parameters and out-parameters, separated by a
    semicolon. E.g. [(in1, in2; out1, out2)], [(in1, in2;)] for all-ins,
-   [(;out1, out2)] for all-outs. *)
+   [(;out1, out2)] for all-outs.
+   No semicolon implies all-ins.*)
 pred_head_target:
   name = proc_name; LBRACE;
-    ins = separated_list(COMMA, pred_param_target); SCOLON;
-    outs = separated_list(COMMA, pred_param_target);
+    ins = separated_list(COMMA, pred_param_target);
+    outs = outs(pred_param_target);
   RBRACE;
   { let params = ins @ outs in
     let num_params = List.length params in
@@ -813,7 +814,10 @@ top_level_g_assertion_target:
   a = g_assertion_target; EOF { a }
 
 predicate_call:
-  name = proc_name; LBRACE; ins = separated_list(COMMA, expr_target); SCOLON; outs = separated_list(COMMA, expr_target); RBRACE
+  name = proc_name; LBRACE;
+  ins = separated_list(COMMA, expr_target);
+  outs = outs(expr_target);
+  RBRACE
   { (name, ins, outs) }
 
 g_assertion_target:
@@ -831,7 +835,7 @@ g_assertion_target:
     { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
       [ Asrt.Wand {lhs = (ln, li @ lo); rhs = (rn, ri @ ro) } ] }
 (* <CorePred>(es; es) *)
-  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
+  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); es2=outs(expr_target); RBRACE
     { [ Asrt.CorePred (v, es1, es2) ] }
 (* emp *)
   | LEMP;
@@ -1264,3 +1268,12 @@ type_target:
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
 ;
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+
