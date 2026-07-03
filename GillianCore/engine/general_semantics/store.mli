@@ -31,7 +31,7 @@ module type S = sig
   val get : t -> Var.t -> vt option
 
   (** Return value of a given variable or throw *)
-  val get_unsafe : t -> Var.t -> vt
+  val get_exn : t -> Var.t -> vt
 
   (** Store constructor, with a list of bindings of the form (variable, value)
   *)

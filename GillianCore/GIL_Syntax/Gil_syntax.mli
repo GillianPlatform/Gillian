@@ -1234,13 +1234,15 @@ module Prog_env : sig
     val using : t -> (unit -> 'a) -> 'a
     val using_prog : ('a, 'b) Prog.t -> (unit -> 'c) -> 'c
     val get_datatype : string -> Datatype.t option
+    val get_datatype_exn : string -> Datatype.t
     val get_datatypes : unit -> Datatype.t Containers.StringMap.t
     val get_datatype_cycle : string -> SS.t
     val get_constructor : string -> Constructor.t option
+    val get_constructor_exn : string -> Constructor.t
     val get_constructor_type : string -> Type.t option
-    val get_constructor_type_unsafe : string -> Type.t
+    val get_constructor_type_exn : string -> Type.t
     val get_constructor_field_types : string -> Type.t option list option
-    val get_constructor_field_types_unsafe : string -> Type.t option list
+    val get_constructor_field_types_exn : string -> Type.t option list
   end
 
   module Function_env : sig

@@ -31,11 +31,11 @@ let mem (x : t) (v : string) : bool = Hashtbl.mem x v
 let empty (x : t) : bool = Hashtbl.length x == 0
 
 (* Type of a variable *)
-let get_unsafe (x : t) (var : string) : Type.t =
+let get_exn (x : t) (var : string) : Type.t =
   match Hashtbl.find_opt x var with
   | Some t -> t
   | None ->
-      raise (Failure ("Type_env.get_unsafe: variable " ^ var ^ " not found."))
+      raise (Failure ("Type_env.get_exn: variable " ^ var ^ " not found."))
 
 (* Get all matchable elements *)
 let matchables (x : t) : SS.t =

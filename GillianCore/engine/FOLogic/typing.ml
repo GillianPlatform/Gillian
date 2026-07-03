@@ -164,7 +164,7 @@ module Infer_types_to_gamma = struct
         | None -> false
         | Some field_types ->
             List_utils.lengths_eq field_types les
-            && tt = Datatype_env.get_constructor_type_unsafe n
+            && tt = Datatype_env.get_constructor_type_exn n
             && check_fields les field_types)
     | FuncApp (n, les) -> (
         match Function_env.get_function_param_types n with
@@ -556,7 +556,7 @@ module Type_lexpr = struct
       (* Set up gamma copy with the binders' type info *)
       let gamma_copy = Type_env.copy gamma in
       (* By this point we know c is in datatype env *)
-      let ts = Datatype_env.get_constructor_field_types_unsafe c in
+      let ts = Datatype_env.get_constructor_field_types_exn c in
       let () =
         List.iter2
           (fun b t ->
@@ -636,7 +636,7 @@ let te_of_list (vt : (Expr.t * Type.t) list) : Type_env.t option =
             if t <> t' then raise Break
         | LVar x | PVar x ->
             if Type_env.mem result x then (
-              let t' = Type_env.get_unsafe result x in
+              let t' = Type_env.get_exn result x in
               if t <> t' then raise Break)
             else Type_env.update result x t
         | _ -> (

@@ -506,7 +506,7 @@ module Datatype_operations = struct
     (module (val variant : Variant.Nary) : Variant.S)
 
   and encode_single_datatype ~cycle name =
-    let d = Datatype_env.get_datatype name |> Option.get in
+    let d = Datatype_env.get_datatype_exn name in
     let ctor_variants =
       List.map (encode_single_constructor ~cycle) d.datatype_constructors
     in
@@ -520,7 +520,7 @@ module Datatype_operations = struct
       SS.iter (encode_single_datatype ~cycle) cycle
 
   let ensure_encoded_c cname : unit =
-    let c = Datatype_env.get_constructor cname |> Option.get in
+    let c = Datatype_env.get_constructor_exn cname in
     ensure_encoded c.constructor_datatype
 
   let encode_datatype name =
@@ -1351,7 +1351,7 @@ let rec encode_logical_expression
       let constructors_t =
         match cs with
         | (cname, _, _) :: _ ->
-            let c = Datatype_env.get_constructor cname |> Option.get in
+            let c = Datatype_env.get_constructor_exn cname in
             Type.DatatypeType c.Constructor.constructor_datatype
         | [] -> exceptf "SMT - No cases given in case statement"
       in
@@ -1362,7 +1362,7 @@ let rec encode_logical_expression
       let cs, encs =
         cs
         |> List.map (fun (cname, bs, e) ->
-               let c = Datatype_env.get_constructor cname |> Option.get in
+               let c = Datatype_env.get_constructor_exn cname in
                let (module V : Variant.Nary) =
                  Datatype_operations.encode_constructor cname
                in
@@ -1382,7 +1382,7 @@ let rec encode_logical_expression
       let>-- _ = encs in
       extended_wrapped (match_datatype le_native.expr (cs @ [ fallback ]))
   | ConstructorApp (cname, les) ->
-      let c = Datatype_env.get_constructor cname |> Option.get in
+      let c = Datatype_env.get_constructor_exn cname in
       let (module V : Variant.Nary) =
         Datatype_operations.encode_constructor cname
       in

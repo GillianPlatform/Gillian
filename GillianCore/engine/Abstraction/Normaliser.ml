@@ -160,7 +160,7 @@ module Make (SPState : PState.S) = struct
                   match nle1 with
                   | Lit llit -> Lit (Type (Literal.type_of llit))
                   | LVar lvar -> (
-                      try Lit (Type (Type_env.get_unsafe gamma lvar))
+                      try Lit (Type (Type_env.get_exn gamma lvar))
                       with _ ->
                         UnOp (TypeOf, LVar lvar)
                         (* raise (Failure (Printf.sprintf "Logical variables always have a type, in particular: %s." lvar))) *)

@@ -18,7 +18,7 @@ val filter_in_place : t -> (string -> bool) -> unit
 val filter_vars : t -> Containers.SS.t -> t
 val filter_vars_in_place : t -> Containers.SS.t -> unit
 val get : t -> string -> Type.t option
-val get_unsafe : t -> string -> Type.t
+val get_exn : t -> string -> Type.t
 val get_var_type_pairs : t -> (string * Type.t) Seq.t
 val get_vars_of_type : t -> Type.t -> string list
 val init : unit -> t

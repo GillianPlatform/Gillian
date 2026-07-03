@@ -75,33 +75,46 @@ module Datatype_env = struct
   let get_datatypes () = (get ()).datatypes
   let get_datatype name = StringMap.find_opt name (get_datatypes ())
 
+  let get_datatype_exn name =
+    match get_datatype name with
+    | Some d -> d
+    | None ->
+        Fmt.failwith "Datatype_env.get_datatype_exn: datatype %s not found" name
+
   let get_datatype_cycle name =
     Option.value ~default:SS.empty (StringMap.find_opt name (get ()).cycles)
 
   let get_constructor cname = StringMap.find_opt cname (get ()).constructors
 
+  let get_constructor_exn cname =
+    match get_constructor cname with
+    | Some c -> c
+    | None ->
+        Fmt.failwith
+          "Datatype_env.get_constructor_exn: constructor %s not found" cname
+
   let get_constructor_type cname : Type.t option =
     let+ c = get_constructor cname in
     Type.DatatypeType c.constructor_datatype
 
-  let get_constructor_type_unsafe cname : Type.t =
+  let get_constructor_type_exn cname : Type.t =
     match get_constructor_type cname with
     | Some t -> t
     | None ->
         Fmt.failwith
-          "Datatype_env.get_constructor_type_unsafe: constructor %s not found."
+          "Datatype_env.get_constructor_type_exn: constructor %s not found."
           cname
 
   let get_constructor_field_types cname : Type.t option list option =
     let+ c = get_constructor cname in
     c.constructor_fields
 
-  let get_constructor_field_types_unsafe cname : Type.t option list =
+  let get_constructor_field_types_exn cname : Type.t option list =
     match get_constructor_field_types cname with
     | Some ts -> ts
     | None ->
         Fmt.failwith
-          "Datatype_env.get_constructor_field_types_unsafe: constructor %s not \
+          "Datatype_env.get_constructor_field_types_exn: constructor %s not \
            found."
           cname
 end
