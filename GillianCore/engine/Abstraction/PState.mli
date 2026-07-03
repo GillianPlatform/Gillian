@@ -5,12 +5,7 @@ module type S = sig
 
   module SMatcher : Matcher.S with type state_t = state_t
 
-  type t = SMatcher.t = {
-    state : state_t;
-    preds : Preds.t;
-    wands : Wands.t;
-    pred_defs : MP.preds_tbl_t;
-  }
+  type t = SMatcher.t
 
   include SState.S with type t := t
 
