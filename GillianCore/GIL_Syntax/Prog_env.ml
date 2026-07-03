@@ -12,20 +12,26 @@ module Datatype_env = struct
 
   let get () = Effect.perform Get_datatype_env
 
-  let check_constructor_params datatype_tbl =
+  let check_constructor_param datatype_tbl (c : Constructor.t) =
     let open Type in
     function
     | Some (DatatypeType n) ->
         if not (Hashtbl.mem datatype_tbl n) then
-          let msg = "Unknown type in constructor definition: " ^ n in
-          Logging.fail msg
+          let msg =
+            Fmt.str "Unknown datatype %s in definition of constructor %s" n
+              c.constructor_name
+          in
+          raise
+            (Gillian_result.Exc.compilation_error ?loc:c.constructor_loc msg)
     | _ -> ()
 
   let check_constructor datatype_tbl cs (c : Constructor.t) =
-    if StringMap.mem c.constructor_name cs then
-      Logging.fail
-        ("Cannot reuse datatype constructor names: " ^ c.constructor_name);
-    List.iter (check_constructor_params datatype_tbl) c.constructor_fields
+    let () =
+      if StringMap.mem c.constructor_name cs then
+        let msg = "Duplicate constructor name " ^ c.constructor_name in
+        raise (Gillian_result.Exc.compilation_error ?loc:c.constructor_loc msg)
+    in
+    List.iter (check_constructor_param datatype_tbl c) c.constructor_fields
 
   let find_cycles datatype_tbl =
     let get_edge =
