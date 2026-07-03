@@ -1,7 +1,7 @@
 #include "sll.h"
 
 /*@ spec listDispose(x) {
-  requires: list(#x, #alpha) * (x == #x)
+  requires: list(#x; #alpha) * (x == #x)
   ensures:  emp
 } */
 void listDispose(SLL *x) {
@@ -15,8 +15,8 @@ void listDispose(SLL *x) {
 }
 
 /*@ spec listCopy(x) {
-  requires: list(#x, #alpha) * (x == #x)
-  ensures:  list(ret, #alpha) * list(#x, #alpha)
+  requires: list(#x; #alpha) * (x == #x)
+  ensures:  list(ret; #alpha) * list(#x; #alpha)
 } */
 SLL *listCopy(SLL *x) {
     SLL *r;

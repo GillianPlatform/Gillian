@@ -1,6 +1,4 @@
-(**
-    Interface for a reporter
-*)
+(** Interface for a reporter *)
 
 module type S = sig
   (** Initializes the reporter *)

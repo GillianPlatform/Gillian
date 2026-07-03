@@ -195,7 +195,11 @@ functor
       let _ = consume_cmd prev_id branch_case exec_data state in
       ()
 
-    let get_matches_at_id id state = (get_exn state.map id).data.matches
+    let get_matches_at_id id state =
+      match get state.map id with
+      | Some node -> node.data.matches
+      | None -> []
+
     let path_of_id id state = (get_exn state.map id).data.branch_path
 
     let cases_at_id id state =
@@ -212,33 +216,150 @@ functor
     let memory_error_to_exception_info { error; _ } : exception_info =
       { id = Fmt.to_to_string SMemory.pp_err error; description = None }
 
-    let add_variables ~store ~memory ~is_gil_file ~get_new_scope_id variables :
-        Variable.scope list =
-      let () = ignore is_gil_file in
-      let store_id = get_new_scope_id () in
-      let memory_id = get_new_scope_id () in
-      let scopes : Variable.scope list =
-        [
-          { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" };
-        ]
-      in
-      let store_vars =
+    module Variables = struct
+      open Variable
+
+      module Scopes = struct
+        let pvars = { id = 1; name = "Store" }
+        let subst = { id = 2; name = "Substitutions" }
+        let heap = { id = 3; name = "Memory" }
+        let preds = { id = 4; name = "Predicates" }
+        let pfs = { id = 5; name = "Pure formulae" }
+        let types = { id = 6; name = "Types" }
+        let all = [ pvars; subst; heap; preds; pfs; types ]
+      end
+
+      let expr_to_string = Fmt.to_to_string (Fmt.hbox Expr.pp)
+
+      let get_store_vars store =
         store
-        |> List.map (fun (var, value) : Variable.t ->
-               let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-               Variable.create_leaf var value ())
-        |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
-      in
-      let memory_vars =
-        [
-          Variable.create_leaf ""
-            (Fmt.to_to_string (Fmt.hbox SMemory.pp) memory)
-            ();
-        ]
-      in
-      let () = Hashtbl.replace variables store_id store_vars in
-      let () = Hashtbl.replace variables memory_id memory_vars in
-      scopes
+        |> List.map (fun (name, value) : Variable.t ->
+               let value = expr_to_string value in
+               make ~name ~value ())
+        |> List.sort compare_name
+
+      let get_type_env_vars (types : Type_env.t) : Variable.t list =
+        Type_env.to_list types
+        |> List.map (fun (name, value) ->
+               let value = Type.str value in
+               make ~name ~value ())
+        |> List.sort compare_name
+
+      let get_pred_vars (preds : Preds.t) : Variable.t list =
+        preds |> Preds.to_list
+        |> List.map (fun pred ->
+               let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
+               make ~value ())
+        |> List.sort (fun v w -> String.compare v.value w.value)
+
+      let get_pure_formulae_vars (pfs : PFS.t) : Variable.t list =
+        pfs |> PFS.to_list
+        |> List.map (fun formula ->
+               let value = expr_to_string formula in
+               make ~value ())
+        |> List.sort compare_value
+
+      let get_subst_vars (subst : SVal.SESubst.t) : Variable.t list =
+        subst |> SVal.SESubst.to_list
+        |> List.map (fun (a, b) ->
+               let name = expr_to_string a in
+               let value = expr_to_string b in
+               make ~name ~value ())
+        |> List.sort compare_name
+
+      let get_variables'
+          ?add_heap_variables
+          _
+          { store; memory; pfs; types; preds; subst }
+          _ =
+        let variables = Hashtbl.create 0 in
+        (* Scopes and var refs share IDs; they can't clash *)
+        let new_var_ref =
+          let count = ref (List.length Scopes.all) in
+          fun () ->
+            let () = count := !count + 1 in
+            !count
+        in
+        let var_groups = [] in
+
+        (* Program variables *)
+        let var_groups =
+          let pvars = get_store_vars store in
+          (Scopes.pvars, Some pvars) :: var_groups
+        in
+
+        (* Subst *)
+        let var_groups =
+          match subst with
+          | Some subst ->
+              let subst_vars = get_subst_vars subst in
+              (Scopes.subst, Some subst_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        (* Heap *)
+        let var_groups =
+          match add_heap_variables with
+          | Some f ->
+              let new_groups =
+                f memory variables new_var_ref
+                |> List.map @@ fun scope -> (scope, None)
+              in
+              new_groups @ var_groups
+          | None ->
+              let heap_vars =
+                [
+                  Variable.create_leaf ""
+                    (Fmt.to_to_string (Fmt.hbox SMemory.pp) memory)
+                    ();
+                ]
+              in
+              (Scopes.heap, Some heap_vars) :: var_groups
+        in
+
+        (* Predicates *)
+        let var_groups =
+          match preds with
+          | Some preds ->
+              let pred_vars = get_pred_vars preds in
+              (Scopes.preds, Some pred_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        (* Pure formulae *)
+        let var_groups =
+          match pfs with
+          | Some pfs ->
+              let pfs_vars = get_pure_formulae_vars pfs in
+              (Scopes.pfs, Some pfs_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        (* Type environment *)
+        let var_groups =
+          match types with
+          | Some types ->
+              let type_vars = get_type_env_vars types in
+              (Scopes.types, Some type_vars) :: var_groups
+          | None -> var_groups
+        in
+
+        let scopes =
+          var_groups
+          |> List.rev_map @@ fun (scope, vars) ->
+             let () =
+               match vars with
+               | Some vars -> Hashtbl.replace variables Variable.(scope.id) vars
+               | None -> ()
+             in
+             scope
+        in
+        (scopes, variables)
+
+      let get_variables = get_variables' ?add_heap_variables:None
+    end
+
+    include Variables
 
     let select_case nexts =
       let case, _ =
@@ -388,4 +509,7 @@ functor
 
     let parse_and_compile_files ~entrypoint files =
       PC.parse_and_compile_files files |> Result.map (fun r -> (r, entrypoint))
+
+    let pp_expr _ = Expr.pp
+    let pp_asrt _ = Asrt.pp_atom
   end

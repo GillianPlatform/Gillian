@@ -35,7 +35,6 @@ end = struct
   type m_err_t = CMemory.err_t [@@deriving yojson, show]
   type err_t = (m_err_t, vt) StateErr.t [@@deriving show]
   type init_data = CMemory.init_data
-  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
 
@@ -132,11 +131,14 @@ end = struct
 
   let run_spec
       (_ : MP.spec)
-      (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) =
+      (_ : (string * (string * vt) list) option)
+      (_ : t) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
+
+  let run_par_spec _ _ =
+    failwith "ERROR: run_par_spec called for non-abstract execution"
 
   let unfolding_vals (_ : t) (_ : Expr.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
@@ -183,10 +185,6 @@ end = struct
   let pp_err fmt (err : err_t) : unit =
     match err with
     | EMem m_err -> CMemory.pp_err fmt m_err
-    | EType (v, t1, t2) ->
-        Fmt.pf fmt "EType(%a, %a, %s)" CVal.M.pp v
-          (Fmt.option ~none:(Fmt.any "None") (Fmt.of_to_string Type.str))
-          t1 (Type.str t2)
     | _ ->
         raise
           (Exceptions.Unsupported

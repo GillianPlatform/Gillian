@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 folder=$1
 count=$2
 
-WPST="opam exec -- gillian-c wpst"
+WPST="gillian-c wpst"
 
 for filename in $folder/*.c; do
     [ -f "$filename" ] || break

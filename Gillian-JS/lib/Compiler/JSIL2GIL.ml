@@ -15,9 +15,7 @@ module GCmd = Gil.Cmd
 module Expr = Gil.Expr
 module Annot = Gil.Annot
 
-(**
- *  Fresh identifiers
- *)
+(** * Fresh identifiers *)
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
   let r () = counter := 0 in
@@ -85,7 +83,8 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | MetaData (e1, e2) -> [ Asrt_utils.metadata ~loc:(fe e1) ~metadata:(fe e2) ]
   | EmptyFields (e1, e2) ->
       [ Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2) ]
-  | Pred (pn, es) -> [ Pred (pn, List.map fe es) ]
+  | Pred (pn, ins, outs) ->
+      [ GAsrt.pred pn (List.map fe ins) (List.map fe outs) ]
   | Pure f -> [ Pure (jsil2gil_expr f) ]
   | Types vts -> [ Types (List.map (fun (v, t) -> (fe v, t)) vts) ]
 
@@ -135,6 +134,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_normalised = spec.normalised;
     spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
+    spec_location = None;
   }
 
 (* TODO: Bring in OX *)
@@ -158,6 +158,7 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = Option.map jsil2gil_expr lemma.variant;
     lemma_existentials = lemma.existentials;
+    lemma_location = None;
   }
 
 let jsil2gil_pred (pred : Pred.t) : GPred.t =
@@ -169,7 +170,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     (* TODO (Alexis): Set depending on module of pred *)
     pred_num_params = pred.num_params;
     pred_params = pred.params;
-    pred_ins = pred.ins;
+    ins_number = pred.ins_number;
     pred_definitions =
       List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
     pred_facts = List.map jsil2gil_expr pred.facts;
@@ -445,7 +446,17 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
   | LGoto j -> [ (lab, GCmd.Goto j) ]
   | LGuardedGoto (e, j, k) -> [ (lab, GCmd.GuardedGoto (fe e, j, k)) ]
   | LCall (x, e, es, j, subst) ->
-      [ (lab, GCmd.Call (x, fe e, List.map fe es, j, subst)) ]
+      [
+        ( lab,
+          GCmd.Call
+            ( {
+                var_name = x;
+                fun_name = fe e;
+                args = List.map fe es;
+                bindings = subst;
+              },
+              j ) );
+      ]
   | LECall (x, e, es, j) -> [ (lab, GCmd.ECall (x, fe e, List.map fe es, j)) ]
   | LApply (x, e, j) -> [ (lab, GCmd.Apply (x, fe e, j)) ]
   | LArguments x -> [ (lab, GCmd.Arguments x) ]
@@ -476,6 +487,8 @@ let jsil2core_proc (proc : EProc.t) : ('a, string) GProc.t =
     proc_aliases = [];
     proc_calls = [];
     (* TODO *)
+    proc_display_name = None;
+    proc_hidden = false;
   }
 
 let translate_tbl (tbl : (string, 'a) Hashtbl.t) (f : 'a -> 'b) :

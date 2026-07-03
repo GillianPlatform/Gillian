@@ -1,10 +1,10 @@
 (* The length of an element is not smaller than the length of its first field *)
 lemma CElementFirstFieldLength(buffer, readPos, fCount, field, restFields, eLength)
 [[
-    CElement(#buffer, #readPos, #fCount, l+({{ #field }}, #restFields), #eLength)
+    CElement(#buffer, #readPos, #fCount; l+({{ #field }}, #restFields), #eLength)
 ]]
 [[
-    CElement(#buffer, #readPos, #fCount, l+({{ #field }}, #restFields), #eLength) *
+    CElement(#buffer, #readPos, #fCount; l+({{ #field }}, #restFields), #eLength) *
     (2 + l-len #field <=# #eLength)
 ]]
 [*
@@ -14,35 +14,35 @@ lemma CElementFirstFieldLength(buffer, readPos, fCount, field, restFields, eLeng
 (* The length of a non-empty complete element is strictly positive *)
 lemma CElementNonEmptyPositiveLength(buffer, readPos, fCount, fList, eLength)
 [[
-    CElement(#buffer, #readPos, #fCount, #fList, #eLength) * (0 <# #fCount)
+    CElement(#buffer, #readPos, #fCount; #fList, #eLength) * (0 <# #fCount)
 ]]
 [[
-    CElement(#buffer, #readPos, #fCount, #fList, #eLength) *
+    CElement(#buffer, #readPos, #fCount; #fList, #eLength) *
     (0 <# #eLength)
 ]]
 [*
     unfold CElement(#buffer, #readPos, #fCount, #fList, #eLength);
-    sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #fLength];
-    sep_assert (CElement(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restELength]
+    sep_assert (Field(#buffer, #readPos; #field, #fLength)) [bind: #fLength];
+    sep_assert (CElement(#buffer, #readPos + #fLength, #fCount - 1; #restFields, #restELength)) [bind: #restELength]
 *]
 
 (* Appending the first field of a given complete element to a complete element on its left *)
 lemma AppendFieldCC(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, fList2, eLength2)
 [[
-    CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1) *
-    CElement(#buffer, #readPos + #eLength1, #fCount2, l+({{ #field }}, #fList2), #eLength2) *
+    CElement(#buffer, #readPos, #fCount1; #fList1, #eLength1) *
+    CElement(#buffer, #readPos + #eLength1, #fCount2; l+({{ #field }}, #fList2), #eLength2) *
     (#shift == 2 + l-len #field)
 ]]
 [[
-    CElement(#buffer, #readPos, #fCount1 + 1, l+ (#fList1, {{ #field }}), #eLength1 + #shift) *
-    CElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift)
+    CElement(#buffer, #readPos, #fCount1 + 1; l+ (#fList1, {{ #field }}), #eLength1 + #shift) *
+    CElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1; #fList2, #eLength2 - #shift)
 ]]
 [*
     apply CElementFirstFieldLength(#buffer, #readPos + #eLength1, #fCount2, #field, #fList2, #eLength2);
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
         sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
-        sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
+        sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1; #rfl1, #reL1)) [bind: #reL1];
         apply AppendFieldCC(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2)
     }
 *]
@@ -52,18 +52,18 @@ lemma AppendFieldCC(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
 (* Appending a complete element to the given complete elements from the right *)
 lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, eLength)
 [[
-    CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
-    CElement(#buffer, #readPos + #esLength, #fCount, #fList, #eLength)
+    CElements(#buffer, #readPos, #eCount, #fCount; #eList, #esLength) *
+    CElement(#buffer, #readPos + #esLength, #fCount; #fList, #eLength)
 ]]
 [[
-    CElements(#buffer, #readPos, #eCount + 1, #fCount, l+ (#eList, {{ #fList }}), #esLength + #eLength)
+    CElements(#buffer, #readPos, #eCount + 1, #fCount; l+ (#eList, {{ #fList }}), #esLength + #eLength)
 ]]
 [*
     apply CElementNonEmptyPositiveLength(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
     unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
     if (0 < #eCount) then {
-        sep_assert (CElement(#buffer, #readPos, #fCount, #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
-        sep_assert (CElements(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
+        sep_assert (CElement(#buffer, #readPos, #fCount; #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
+        sep_assert (CElements(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount; #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
         apply CElementsAppend(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength, #fList, #eLength)
     }
  *]
@@ -71,19 +71,19 @@ lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, e
 (* Appending the first field of a given incomplete element to a complete element on its left *)
 lemma AppendFieldCI(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, fList2, eLength2)
 [[
-    CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1) *
-    IElement(#buffer, #readPos + #eLength1, #fCount2, l+({{ #field }}, #fList2), #eLength2) *
+    CElement(#buffer, #readPos, #fCount1; #fList1, #eLength1) *
+    IElement(#buffer, #readPos + #eLength1, #fCount2; l+({{ #field }}, #fList2), #eLength2) *
     (#shift == 2 + l-len #field)
 ]]
 [[
-    CElement(#buffer, #readPos, #fCount1 + 1, l+ (#fList1, {{ #field }}), #eLength1 + #shift) *
-    IElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift)
+    CElement(#buffer, #readPos, #fCount1 + 1; l+ (#fList1, {{ #field }}), #eLength1 + #shift) *
+    IElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1; #fList2, #eLength2 - #shift)
 ]]
 [*
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
         sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
-        sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
+        sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1; #rfl1, #reL1)) [bind: #reL1];
         apply AppendFieldCI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2)
     }
 *]
@@ -91,17 +91,17 @@ lemma AppendFieldCI(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
 (* Prepend an entire complete element to an incomplete element following it *)
 lemma PrependCElementI(buffer, readPos, fCount1, fList1, eLength1, fCount2, fList2, eLength2)
 [[
-    CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1) *
-    IElement(#buffer, #readPos + #eLength1, #fCount2, #fList2, #eLength2)
+    CElement(#buffer, #readPos, #fCount1; #fList1, #eLength1) *
+    IElement(#buffer, #readPos + #eLength1, #fCount2; #fList2, #eLength2)
 ]]
 [[
-    IElement(#buffer, #readPos, #fCount1 + #fCount2, l+ (#fList1, #fList2), #eLength1 + #eLength2)
+    IElement(#buffer, #readPos, #fCount1 + #fCount2; l+ (#fList1, #fList2), #eLength1 + #eLength2)
 ]]
 [*
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
         sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
-        sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
+        sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1; #rfl1, #reL1)) [bind: #reL1];
         apply PrependCElementI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #fList2, #eLength2)
     }
 *]
@@ -109,18 +109,18 @@ lemma PrependCElementI(buffer, readPos, fCount1, fList1, eLength1, fCount2, fLis
 (* An entire complete element sequence can be prepended to a general element sequence *)
 lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, esLength1, eCount2, fList2, esLength2)
 [[
-    CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1) *
-    Elements(#definition, #buffer, #readPos + #esLength1, #eCount2, #fCount, #fList2, #esLength2)
+    CElements(#buffer, #readPos, #eCount1, #fCount; #fList1, #esLength1) *
+    Elements(#buffer, #readPos + #esLength1, #eCount2, #fCount; #definition, #fList2, #esLength2)
 ]]
 [[
-    Elements(#definition, #buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
+    Elements(#buffer, #readPos, #eCount1 + #eCount2, #fCount; #definition, l+ (#fList1, #fList2), #esLength1 + #esLength2)
 ]]
 [*
     unfold CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1)
       [bind: (#fList := #element) and (#eLength := #eLength) and (#restElements := #restElements) and (#restESLength := #restLength)] ;
     if (0 < #eCount1) then {
         apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
-        unfold Elements(#definition, #buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength + #esLength2));
+        unfold Elements(#buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, #definition, l+ (#restElements, #fList2), (#restESLength + #esLength2));
         if (definition = "Incomplete") then {
             fold IElements(#buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
         }
@@ -130,20 +130,20 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
 (* Every element of an element sequence has the same number of fields *)
 lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, element, suffix)
 [[
-    CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+    CElements(#buffer, #readPos, #eCount, #fCount; #eList, #esLength) *
     (#eList == l+ (#prefix, {{ #element }}, #suffix))
 ]]
 [[
-    CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+    CElements(#buffer, #readPos, #eCount, #fCount; #eList, #esLength) *
     (l-len #element == #fCount)
 ]]
 [*
     apply DestructList(#prefix);
     unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
     if (not (#prefix = {{ }})) then {
-        sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #elementLength)) [bind: #elementLength];
+        sep_assert (CElement(#buffer, #readPos, #fCount; #fList, #elementLength)) [bind: #elementLength];
         sep_assert (#prefix == #head :: #rest) [bind: #head, #rest];
-        sep_assert (CElements(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
+        sep_assert (CElements(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount; l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
         apply CElementsElementLength(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
     }
  *]
@@ -167,49 +167,49 @@ lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, ele
 *)
 
 (* Broken serialised encryption context *)
-nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List, ECKs:List) :
+nounfold pred BRawEncryptionContext(buffer:List; errorMessage:Str, ECKs:List) :
     (* Not enough data provided *)
     (2 <# l-len buffer) *
     (#rawKC == l-sub (buffer, 0, 2)) *
-    rawToUInt16(#rawKC, false, #keyCount) *
+    rawToUInt16(#rawKC, false; #keyCount) *
     (0 <# #keyCount) * (ECKs == {{ }}) *
-    Elements("Incomplete", buffer, 2, #keyCount, 2, #eList, #esLength) *
+    Elements(buffer, 2, #keyCount, 2; "Incomplete", #eList, #esLength) *
     (errorMessage == "decodeEncryptionContext: Underflow, not enough data."),
 
     (* Too much data provided *)
     (2 <# l-len buffer) *
     (#rawKC == l-sub (buffer, 0, 2)) *
-    rawToUInt16(#rawKC, false, #keyCount) *
+    rawToUInt16(#rawKC, false; #keyCount) *
     (0 <# #keyCount) *
-    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    Elements(buffer, 2, #keyCount, 2; "Complete", ECKs, #ECKsLength) *
     (! (#ECKsLength + 2 == l-len buffer)) *
     (errorMessage == "decodeEncryptionContext: Overflow, too much data."),
 
     (* Duplicated key in context *)
     (2 <# l-len buffer) *
     (#rawKC == l-sub (buffer, 0, 2)) *
-    rawToUInt16(#rawKC, false, #keyCount) *
+    rawToUInt16(#rawKC, false; #keyCount) *
     (0 <# #keyCount) *
-    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
-    toUtf8PairMap(ECKs, #utf8ECKs) * FirstProj(ECKs, #ECKeys) * Duplicated({{ }}, #ECKeys) *
+    Elements(buffer, 2, #keyCount, 2; "Complete", ECKs, #ECKsLength) *
+    toUtf8PairMap(ECKs; #utf8ECKs) * FirstProj(ECKs; #ECKeys) * Duplicated({{ }}, #ECKeys) *
     (2 + #ECKsLength == l-len buffer) *
     (errorMessage == "decodeEncryptionContext: Duplicate encryption context key value.");
 
 (* General serialised encryption context *)
-pred RawEncryptionContext(definition:Str, +buffer:List, ECKs:List, errorMessage:Str) :
-  (definition == "Complete") * CRawEncryptionContext(buffer, ECKs) * (errorMessage == ""),
-  (definition == "Broken")   * BRawEncryptionContext(errorMessage, buffer, ECKs);
+pred RawEncryptionContext(buffer:List; definition:Str, ECKs:List, errorMessage:Str) :
+  (definition == "Complete") * CRawEncryptionContext(buffer; ECKs) * (errorMessage == ""),
+  (definition == "Broken")   * BRawEncryptionContext(buffer; errorMessage, ECKs);
 
 (* Live decoded encryption context *)
-pred LiveDecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
-    JSObjWithProto(dECObj, null) *
-    toUtf8PairMap(ECKs, #utf8ECKs) *
+pred LiveDecodedEncryptionContext(dECObj : Obj, ECKs : List) :
+    JSObjWithProto(dECObj; null) *
+    toUtf8PairMap(ECKs; #utf8ECKs) *
     ObjectTable(dECObj, #utf8ECKs);
 
 (* Decoded encryption context *)
-pred DecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
-    JSObjGeneral(dECObj, null, "Object", false) *
-    toUtf8PairMap(ECKs, #utf8ECKs) *
+pred DecodedEncryptionContext(dECObj : Obj, ECKs : List) :
+    JSObjGeneral(dECObj; null, "Object", false) *
+    toUtf8PairMap(ECKs; #utf8ECKs) *
     FrozenObjectTable(dECObj, #utf8ECKs);
 
 
@@ -227,62 +227,62 @@ pred DecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
 
 (* Prototype of EDK objects *)
 pred EDKPrototype () :
-    JSObjGeneral($l_edk_proto, null, "Object", false) *
+    JSObjGeneral($l_edk_proto; null, "Object", false) *
     empty_fields($l_edk_proto : -{ }-);
 
 (* EDK objects *)
-nounfold pred EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
-    JSObjGeneral(EDK, $l_edk_proto, "Object", false) *
-    readOnlyProperty(EDK, "providerId", pId) *
-    readOnlyProperty(EDK, "providerInfo", pInfo) *
-    readOnlyProperty(EDK, "encryptedDataKey", #aEDK) *
-        Uint8Array(#aEDK, #abEDK, 0, #viewSizeEDK) *
-        ArrayBuffer(#abEDK, encryptedDataKey) *
+nounfold pred EncryptedDataKey(EDK; pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
+    JSObjGeneral(EDK; $l_edk_proto, "Object", false) *
+    readOnlyProperty(EDK, "providerId"; pId) *
+    readOnlyProperty(EDK, "providerInfo"; pInfo) *
+    readOnlyProperty(EDK, "encryptedDataKey"; #aEDK) *
+        Uint8Array(#aEDK; #abEDK, 0, #viewSizeEDK) *
+        ArrayBuffer(#abEDK; encryptedDataKey) *
         (#viewSizeEDK == l-len encryptedDataKey) *
-    readOnlyProperty(EDK, "rawInfo", #aRInfo) *
-        Uint8Array(#aRInfo, #abRInfo, 0, #viewSizeRInfo) *
-        ArrayBuffer(#abRInfo, rawInfo) *
+    readOnlyProperty(EDK, "rawInfo"; #aRInfo) *
+        Uint8Array(#aRInfo; #abRInfo, 0, #viewSizeRInfo) *
+        ArrayBuffer(#abRInfo; rawInfo) *
         (#viewSizeRInfo == l-len rawInfo);
 
 (***** Arrays of deserialised EDKs *****)
 
 (* Live array of deserialised EDKs *)
-pred ArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
+pred ArrayOfDEDKsContents(a:Obj, start:Num; contents:List) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
-    DataProp(a, #index, #edk) *
-    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
-    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    DataProp(a, #index; #edk) *
+    EncryptedDataKey(#edk; #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId; #pId) * fromUtf8(#pInfo; #rawInfo) *
     (#element == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
     (contents == #element :: #rest) *
     (#rest_start == start + 1) *
-    ArrayOfDEDKsContents(a, #rest, #rest_start);
+    ArrayOfDEDKsContents(a, #rest_start; #rest);
 
 (* Frozen array of deserialised EDKs *)
-pred FrozenArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
+pred FrozenArrayOfDEDKsContents(a:Obj, start:Num; contents:List) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
-    readOnlyProperty(a, #index, #edk) *
-    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
-    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    readOnlyProperty(a, #index; #edk) *
+    EncryptedDataKey(#edk; #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId; #pId) * fromUtf8(#pInfo; #rawInfo) *
     (#edk == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
     (contents == #edk :: #rest_contents) *
     (#rest_start == start + 1) *
-    FrozenArrayOfDEDKsContents(a, #rest_contents, #rest_start);
+    FrozenArrayOfDEDKsContents(a, #rest_start; #rest_contents);
 
 (***** Deserialised EDKs *****)
 
 (* EDKs are first deserialised into a live array *)
-pred LiveDeserialisedEncryptedDataKeys (+a:Obj, EDKs:List) :
+pred LiveDeserialisedEncryptedDataKeys (a:Obj; EDKs:List) :
     ArrayStructure(a, l-len EDKs) *
-    ArrayOfDEDKsContents(a, EDKs, 0);
+    ArrayOfDEDKsContents(a, 0; EDKs);
 
 (* Deserialised EDKs are ultimately provided as a frozen array *)
-pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
+pred DeserialisedEncryptedDataKeys (a:Obj; contents:List) :
     FrozenArrayStructure(a, l-len contents) *
-    FrozenArrayOfDEDKsContents(a, contents, 0);
+    FrozenArrayOfDEDKsContents(a, 0; contents);
 
 (************************************
  ************************************
@@ -297,7 +297,7 @@ pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
 (* toUtf8 is injective *)
 lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
 [[
-    toUtf8(#rawData1, #utf8Data1) * toUtf8(#rawData2, #utf8Data2)
+    toUtf8(#rawData1; #utf8Data1) * toUtf8(#rawData2; #utf8Data2)
 ]]
 [[
     (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
@@ -305,16 +305,16 @@ lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
 ]]
 
 (*
-    fromUtf8(utf8Data, rawData) is an abstract predicate which
+    fromUtf8(utf8Data; rawData) is an abstract predicate which
     denotes that the raw bytes rawData are obtained by converting
     the string utf8Data into bytes
 *)
-abstract pure pred fromUtf8(+utf8Data:Str, rawData:List);
+abstract pure pred fromUtf8(utf8Data:Str; rawData:List);
 
 (* fromUtf8 is injective *)
 lemma fromUtf8Injective(utf8Data1, rawData1, utf8Data2, rawData2)
 [[
-    fromUtf8(#utf8Data1, #rawData1) * fromUtf8(#utf8Data2, #rawData2)
+    fromUtf8(#utf8Data1; #rawData1) * fromUtf8(#utf8Data2; #rawData2)
 ]]
 [[
     (#utf8Data1 == #utf8Data2) * (#rawData1 == #rawData2);
@@ -324,34 +324,34 @@ lemma fromUtf8Injective(utf8Data1, rawData1, utf8Data2, rawData2)
 (* Invertibility of toUtf8 with respect to fromUtf8 *)
 lemma toUtf8fromUtf8(rawData)
 [[
-    toUtf8(#rawData, #utf8Data)
+    toUtf8(#rawData; #utf8Data)
 ]]
 [[
-    fromUtf8(#utf8Data, #rawData)
+    fromUtf8(#utf8Data; #rawData)
 ]]
 
 (* Invertibility of fromUtf8 with respect to toUtf8 *)
 lemma fromUtf8toUtf8(utf8Data)
 [[
-    fromUtf8(#utf8Data, #rawData)
+    fromUtf8(#utf8Data; #rawData)
 ]]
 [[
-    toUtf8(#rawData, #utf8Data)
+    toUtf8(#rawData; #utf8Data)
 ]]
 
 (* UTF-8 Mapping of lists *)
-pure pred toUtf8Map(+data : List, utf8Data : List) :
+pure pred toUtf8Map(data : List; utf8Data : List) :
     (data == {{ }}) * (utf8Data == {{ }}),
 
     (data == #fst :: #rest) *
-    (toUtf8(#fst, #utf8Fst)) *
-    toUtf8Map(#rest, #utf8Rest) *
+    (toUtf8(#fst; #utf8Fst)) *
+    toUtf8Map(#rest; #utf8Rest) *
     (utf8Data == #utf8Fst :: #utf8Rest);
 
 (* toUtf8PairMap is injective *)
 lemma toUtf8MapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
 [[
-    toUtf8Map(#rawData1, #utf8Data1) * toUtf8Map(#rawData2, #utf8Data2)
+    toUtf8Map(#rawData1; #utf8Data1) * toUtf8Map(#rawData2; #utf8Data2)
 ]]
 [[
     (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
@@ -372,7 +372,7 @@ lemma toUtf8MapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
 (* toUtf8PairMap is injective *)
 lemma toUtf8PairMapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
 [[
-    toUtf8PairMap(#rawData1, #utf8Data1) * toUtf8PairMap(#rawData2, #utf8Data2)
+    toUtf8PairMap(#rawData1; #utf8Data1) * toUtf8PairMap(#rawData2; #utf8Data2)
 ]]
 [[
     (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
@@ -394,18 +394,18 @@ lemma toUtf8PairMapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
 (* Appending a pair to a mapping of lists of pairs *)
 lemma toUtf8PairMapAppendPair(data, utf8Data, prop, value)
 [[
-    toUtf8PairMap(#data, #utf8Data) *
-    toUtf8(#prop, #utf8Prop) *
-    toUtf8(#value, #utf8Value)
+    toUtf8PairMap(#data; #utf8Data) *
+    toUtf8(#prop; #utf8Prop) *
+    toUtf8(#value; #utf8Value)
 ]]
 [[
-    toUtf8PairMap(l+ (#data, {{ {{ #prop, #value }} }}), l+ (#utf8Data, {{ {{ #utf8Prop, #utf8Value }} }}))
+    toUtf8PairMap(l+ (#data, {{ {{ #prop, #value }} }}); l+ (#utf8Data, {{ {{ #utf8Prop, #utf8Value }} }}))
 ]]
 [*
     unfold toUtf8PairMap(#data, #utf8Data);
     if (not (#data = {{ }})) then {
         sep_assert (#data == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
-        sep_assert (toUtf8PairMap(#restPVPairs, #restUtf8Data)) [bind: #restUtf8Data];
+        sep_assert (toUtf8PairMap(#restPVPairs; #restUtf8Data)) [bind: #restUtf8Data];
         apply toUtf8PairMapAppendPair(#restPVPairs, #restUtf8Data, #prop, #value)
     }
 *]
@@ -422,18 +422,18 @@ lemma toUtf8PairMapAppendPair(data, utf8Data, prop, value)
 (* The object that holds information about allowed algorithm suites *)
 pred AlgorithmSuiteIdentifierObject(o) :
     JSObject(o) *
-    DataProp(o, "20",  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20) *
-    DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70) *
+    DataProp(o, "20";  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16"; 20) *
+    DataProp(o, "70";  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16"; 70) *
     empty_fields(o : -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-);
 
 (*
     The object representing a given algorithm suite.
     TODO: This object is more complex than presented here.
  *)
-pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
+pred AlgorithmSuiteObject(aso: Obj; ivLength: Num, tagLength: Num) :
     JSObject(aso) *
-    readOnlyProperty(aso, "ivLength",  ivLength) *
-    readOnlyProperty(aso, "tagLength", tagLength);
+    readOnlyProperty(aso, "ivLength";  ivLength) *
+    readOnlyProperty(aso, "tagLength"; tagLength);
 
 (***************************
  ***************************
@@ -445,7 +445,7 @@ pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
  ***************************)
 
 (* Broken version and type *)
-pred BVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
+pred BVersionAndType(version:Num, type:Num; errorMessage:Str) :
     (version == 65) * (type == 89) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
     (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header: Unsupported version and/or type.");
 
@@ -453,7 +453,7 @@ pred BVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
   ********   Header       *******)
 
 (* Serialised incomplete header *)
-nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, ECLength,
+nounfold pred IHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
     (* Not enough data to read first part *)
@@ -473,9 +473,9 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (l-len rawHeaderData <# 22 + ECLength) *
 
     (ECKs == {{ }}) *
@@ -491,16 +491,16 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (22 + ECLength <=# l-len rawHeaderData) *
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == ECLength) *
-    CRawEncryptionContext(#EC, ECKs) *
+    CRawEncryptionContext(#EC; ECKs) *
 
-    RawEncryptedDataKeys("Incomplete", rawHeaderData, 22 + ECLength, EDKs, _, errorMessage) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength; "Incomplete", EDKs, _, errorMessage) *
     (contentType == 0) * (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
     (* Not enough data to read the header IV and the authentication tag *)
@@ -512,33 +512,33 @@ nounfold pred IHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (22 + ECLength <=# l-len rawHeaderData) *
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == ECLength) *
-    CRawEncryptionContext(#EC, ECKs) *
+    CRawEncryptionContext(#EC; ECKs) *
 
     (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, 22 + ECLength, EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength; "Complete", EDKs, #EDKsLength, _) *
     (#EDKsLength == l-len #edks) *
     (l-len #rawFrameLength == 4) *
-    rawToUInt32(#rawFrameLength, false, frameLength) *
+    rawToUInt32(#rawFrameLength, false; frameLength) *
     (headerLength == 22 + ECLength + #EDKsLength + 1 + 4 + 1 + 4) *
     (l-len rawHeaderData <# headerLength + headerIvLength + (#tagLength / 8)) *
 
     (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
 (* Broken serialised header *)
-nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, ECLength,
+nounfold pred BHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
     (* Incorrect version and/or type *)
     (22 <=# l-len rawHeaderData) *
     (rawHeaderData == l+ ({{ version, type }}, #rest)) *
-    BVersionAndType(version, type, errorMessage) *
+    BVersionAndType(version, type; errorMessage) *
 
     (part_one == {{ }}) *
     (suiteId == 0) * (messageId == {{ }}) * (ECLength == 0) *
@@ -551,8 +551,8 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (rawHeaderData == l+ ({{ version, type }}, #rawSuiteId, #rest)) *
     (l-len #rawSuiteId == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    BAlgorithmSuite(suiteId, errorMessage) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    BAlgorithmSuite(suiteId; errorMessage) *
 
     (part_one == {{ }}) * (messageId == {{ }}) * (ECLength == 0) *
     (part_two == {{ }}) * (ECKs == {{ }}) *
@@ -568,14 +568,14 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (22 + ECLength <=# l-len rawHeaderData) *
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == ECLength) *
-    BRawEncryptionContext(errorMessage, #EC, ECKs) *
+    BRawEncryptionContext(#EC; errorMessage, ECKs) *
 
     (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
     (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -589,15 +589,15 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (22 + ECLength <=# l-len rawHeaderData) *
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == ECLength) *
-    CRawEncryptionContext(#EC, ECKs) *
-    RawEncryptedDataKeys("Broken", rawHeaderData, 22 + ECLength, _, _, errorMessage) *
+    CRawEncryptionContext(#EC; ECKs) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength; "Broken", _, _, errorMessage) *
 
     (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
     (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -611,19 +611,19 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, headerIvLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (22 + ECLength <=# l-len rawHeaderData) *
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == ECLength) *
-    CRawEncryptionContext(#EC, ECKs) *
+    CRawEncryptionContext(#EC; ECKs) *
     (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, 22 + ECLength, EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength; "Complete", EDKs, #EDKsLength, _) *
     (#EDKsLength == l-len #edks) *
     (l-len #rawReservedBytes == 4) *
-    rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
+    rawToUInt32(#rawReservedBytes, false; #reservedBytes) *
     (! (#reservedBytes == 0)) *
     (headerLength == 22 + ECLength + #EDKsLength + 1 + 4 + 1 + 4) *
     (headerLength + headerIvLength + (#tagLength / 8) <=# l-len rawHeaderData) *
@@ -640,16 +640,16 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (l-len messageId == 16) *
     (l-len #rawContextLength == 2) *
     CVersionAndType(version, type) *
-    rawToUInt16(#rawSuiteId, false, suiteId) *
-    CAlgorithmSuite(suiteId, #stringId, #ivLength, #tagLength) *
-    rawToUInt16(#rawContextLength, false, ECLength) *
+    rawToUInt16(#rawSuiteId, false; suiteId) *
+    CAlgorithmSuite(suiteId; #stringId, #ivLength, #tagLength) *
+    rawToUInt16(#rawContextLength, false; ECLength) *
     (22 + ECLength <=# l-len rawHeaderData) *
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == ECLength) *
-    CRawEncryptionContext(#EC, ECKs) *
+    CRawEncryptionContext(#EC; ECKs) *
     (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
-    RawEncryptedDataKeys("Complete", rawHeaderData, 22 + ECLength, EDKs, #EDKsLength, _) *
+    RawEncryptedDataKeys(rawHeaderData, 22 + ECLength; "Complete", EDKs, #EDKsLength, _) *
     (#EDKsLength == l-len #edks) *
     (headerLength == 22 + ECLength + #EDKsLength + 1 + 4 + 1 + 4) *
     (headerLength + #ivLength + (#tagLength / 8) <=# l-len rawHeaderData) *
@@ -659,59 +659,59 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
     (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
 (* General serialised header *)
-nounfold pred Header(definition, +rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
+nounfold pred Header(rawHeaderData; definition, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage) :
     (* Complete header *)
     (definition == "Complete") *
-    CHeader(rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
+    CHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
     (errorMessage == ""),
 
     (* Incomplete header *)
     (definition == "Incomplete") *
-    IHeader(rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
+    IHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
     (errorMessage == ""),
 
     (* Broken header *)
     (definition == "Broken") *
-    BHeader(rawHeaderData, part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage);
+    BHeader(rawHeaderData; part_one, version, type, suiteId, messageId, ECLength, part_two, ECKs, part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag, errorMessage);
 
  (********   Deserialised   *******
   ********   Header         *******)
 
 (* Deserialised main part of the message header *)
-nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength, frameLength) :
+nounfold pred MessageHeader(messageHeader, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
     JSObject(messageHeader) *
-    DataProp(messageHeader, "version", version) *
-    DataProp(messageHeader, "type", type) *
-    DataProp(messageHeader, "suiteId", suiteId) *
-    DataProp(messageHeader, "messageId", #ui8aMessageId) *
-        Uint8Array(#ui8aMessageId, #abMessageId, 0, 16) *
-        ArrayBuffer(#abMessageId, messageId) *
-    DataProp(messageHeader, "encryptionContext", #dECObj) *
+    DataProp(messageHeader, "version"; version) *
+    DataProp(messageHeader, "type"; type) *
+    DataProp(messageHeader, "suiteId"; suiteId) *
+    DataProp(messageHeader, "messageId"; #ui8aMessageId) *
+        Uint8Array(#ui8aMessageId; #abMessageId, 0, 16) *
+        ArrayBuffer(#abMessageId; messageId) *
+    DataProp(messageHeader, "encryptionContext"; #dECObj) *
         DecodedEncryptionContext(#dECObj, ECKs) *
-    DataProp(messageHeader, "encryptedDataKeys", #dEDKs) *
-        DeserialisedEncryptedDataKeys(#dEDKs, EDKs) *
-    DataProp(messageHeader, "contentType", contentType) *
-    DataProp(messageHeader, "headerIvLength", headerIvLength) *
-    DataProp(messageHeader, "frameLength", frameLength);
+    DataProp(messageHeader, "encryptedDataKeys"; #dEDKs) *
+        DeserialisedEncryptedDataKeys(#dEDKs; EDKs) *
+    DataProp(messageHeader, "contentType"; contentType) *
+    DataProp(messageHeader, "headerIvLength"; headerIvLength) *
+    DataProp(messageHeader, "frameLength"; frameLength);
 
 (* Entire deserialised header *)
-nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength,
+nounfold pred HeaderInfo(headerInfo, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength,
                             frameLength, headerLength, rawHeaderData, headerIv, headerAuthTag) :
     JSObject(headerInfo) *
-    DataProp(headerInfo, "messageHeader", #messageHeader) *
-        MessageHeader(#messageHeader, version, type, suiteId, messageId, ECKs, EDKs, contentType, headerIvLength, frameLength) *
-    DataProp(headerInfo, "headerLength", headerLength) *
-    DataProp(headerInfo, "algorithmSuite", #algoSuiteObject) *
-        AlgorithmSuiteObject(#algoSuiteObject, headerIvLength, #tagLength) *
-    DataProp(headerInfo, "rawHeader", #rawHeader) *
-        Uint8Array(#rawHeader, #rawBuffer, 0, headerLength) *
-        ArrayBuffer(#rawBuffer, rawHeaderData) *
-    DataProp(headerInfo, "headerIv", #ui8aHeaderIv) *
-        Uint8Array(#ui8aHeaderIv, #abHeaderIv, 0, headerIvLength) *
-        ArrayBuffer(#abHeaderIv, headerIv) *
-    DataProp(headerInfo, "headerAuthTag", #ui8aHeaderAuthTag) *
-        Uint8Array(#ui8aHeaderAuthTag, #abHeaderAuthTag, 0, #tagLength / 8) *
-        ArrayBuffer(#abHeaderAuthTag, headerAuthTag);
+    DataProp(headerInfo, "messageHeader"; #messageHeader) *
+        MessageHeader(#messageHeader, ECKs; version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) *
+    DataProp(headerInfo, "headerLength"; headerLength) *
+    DataProp(headerInfo, "algorithmSuite"; #algoSuiteObject) *
+        AlgorithmSuiteObject(#algoSuiteObject; headerIvLength, #tagLength) *
+    DataProp(headerInfo, "rawHeader"; #rawHeader) *
+        Uint8Array(#rawHeader; #rawBuffer, 0, headerLength) *
+        ArrayBuffer(#rawBuffer; rawHeaderData) *
+    DataProp(headerInfo, "headerIv"; #ui8aHeaderIv) *
+        Uint8Array(#ui8aHeaderIv; #abHeaderIv, 0, headerIvLength) *
+        ArrayBuffer(#abHeaderIv; headerIv) *
+    DataProp(headerInfo, "headerAuthTag"; #ui8aHeaderAuthTag) *
+        Uint8Array(#ui8aHeaderAuthTag; #abHeaderAuthTag, 0, #tagLength / 8) *
+        ArrayBuffer(#abHeaderAuthTag; headerAuthTag);
 
 (*****************************
  *****************************
@@ -762,7 +762,7 @@ lemma DestructList(lst)
 (* FirstProj is a function *)
 lemma FirstProjFunction(lst1, proj1, lst2, proj2)
 [[
-    FirstProj(#lst1, #proj1) * FirstProj(#lst2, #proj2) * (#lst1 == #lst2)
+    FirstProj(#lst1; #proj1) * FirstProj(#lst2; #proj2) * (#lst1 == #lst2)
 ]]
 [[
     (#proj1 == #proj2)
@@ -778,16 +778,16 @@ lemma FirstProjFunction(lst1, proj1, lst2, proj2)
 (* Adding a pair to a first projection *)
 lemma FirstProjAppendPair(lst, fProj, prop, value)
 [[
-    FirstProj(#lst, #fProj)
+    FirstProj(#lst; #fProj)
 ]]
 [[
-    FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}), l+ (#fProj, {{ #prop }}))
+    FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}); l+ (#fProj, {{ #prop }}))
 ]]
 [*
     unfold FirstProj(#lst, #fProj);
     if (not (#lst = {{ }})) then {
         sep_assert (#lst == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
-        sep_assert (FirstProj(#restPVPairs, #restProj)) [bind: #restProj];
+        sep_assert (FirstProj(#restPVPairs; #restProj)) [bind: #restProj];
         apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value)
     }
 *]
@@ -795,8 +795,8 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
 (* First projection goes through concatenation *)
 lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
 [[
-    (#PVPairs == l+ (#prefix, #suffix)) * FirstProj(#PVPairs, #props) *
-    FirstProj(#prefix, #preProps) * FirstProj(#suffix, #sufProps)
+    (#PVPairs == l+ (#prefix, #suffix)) * FirstProj(#PVPairs; #props) *
+    FirstProj(#prefix; #preProps) * FirstProj(#suffix; #sufProps)
 ]]
 [[
     (#props == l+ (#preProps, #sufProps))
@@ -816,12 +816,12 @@ lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
 (* Compatibility of first projection and toUtf8 *)
 lemma FirstProjToUtf8MapPairCompat(PVPairs)
 [[
-    FirstProj(#PVPairs, #props) *
-    toUtf8PairMap(#PVPairs, #utf8PVPairs) *
-    FirstProj(#utf8PVPairs, #utf8Props)
+    FirstProj(#PVPairs; #props) *
+    toUtf8PairMap(#PVPairs; #utf8PVPairs) *
+    FirstProj(#utf8PVPairs; #utf8Props)
 ]]
 [[
-    toUtf8Map(#props, #utf8Props)
+    toUtf8Map(#props; #utf8Props)
 ]]
 [*
     unfold FirstProj(#PVPairs, #props);
@@ -844,7 +844,7 @@ lemma FirstProjToUtf8MapPairCompat(PVPairs)
 (* ListToSet is a function *)
 lemma ListToSetFunction(lst1, set1, lst2, set2)
 [[
-    ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * (#lst1 == #lst2)
+    ListToSet(#lst1; #set1) * ListToSet(#lst2; #set2) * (#lst1 == #lst2)
 ]]
 [[
     (#set1 == #set2)
@@ -860,7 +860,7 @@ lemma ListToSetFunction(lst1, set1, lst2, set2)
 (* ListToSet concat-union compatibility *)
 lemma ListToSetUnion(lst1, lst2)
 [[
-    ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * ListToSet(l+ (#lst1, #lst2), #uset)
+    ListToSet(#lst1; #set1) * ListToSet(#lst2; #set2) * ListToSet(l+ (#lst1, #lst2); #uset)
 ]]
 [[
     (#uset == -u- (#set1, #set2))
@@ -882,7 +882,7 @@ lemma ProduceListToSet(lst)
     types(lst: List)
 ]]
 [[
-    ListToSet(#lst, #set)
+    ListToSet(#lst; #set)
 ]]
 [*
     apply DestructList(#lst);
@@ -895,16 +895,16 @@ lemma ProduceListToSet(lst)
 (* Adding an element in list-to-set conversion *)
 lemma ListToSetAddElement(lst, set, element)
 [[
-    ListToSet(#lst, #set)
+    ListToSet(#lst; #set)
 ]]
 [[
-    ListToSet(l+ (#lst, {{ #element }}), -u- (#set, -{ #element }-))
+    ListToSet(l+ (#lst, {{ #element }}); -u- (#set, -{ #element }-))
 ]]
 [*
     unfold ListToSet(#lst, #element);
     if (not (#lst = {{ }})) then {
         sep_assert (#lst == l+ ({{ #fProp }}, #restLst)) [bind: #fProp, #restLst];
-        sep_assert (ListToSet(#restLst, #restSet)) [bind: #restSet];
+        sep_assert (ListToSet(#restLst; #restSet)) [bind: #restSet];
         apply ListToSetAddElement(#restLst, #restSet, #element)
     }
 *]
@@ -913,7 +913,7 @@ lemma ListToSetAddElement(lst, set, element)
 lemma HeadInSet(lst)
 [[
     (#lst == #hd :: #tl) *
-    ListToSet(#lst, #set)
+    ListToSet(#lst; #set)
 ]]
 [[
     (#hd --e-- #set)
@@ -923,11 +923,11 @@ lemma HeadInSet(lst)
 (* toUtf8 mapping and list membership, positive *)
 lemma InListToUtf8(prop, props)
 [[
-    ListToSet(#props, #propsSet) *
+    ListToSet(#props; #propsSet) *
     (#prop --e-- #propsSet) *
-    toUtf8(#prop, #utf8Prop) *
-    toUtf8Map(#props, #utf8Props) *
-    ListToSet(#utf8Props, #utf8PropsSet)
+    toUtf8(#prop; #utf8Prop) *
+    toUtf8Map(#props; #utf8Props) *
+    ListToSet(#utf8Props; #utf8PropsSet)
 ]]
 [[
     (#utf8Prop --e-- #utf8PropsSet)
@@ -937,7 +937,7 @@ lemma InListToUtf8(prop, props)
     if (not (#props = {{ }})) then {
         sep_assert (#props == #fstProp :: #rest) [bind: #rest];
         unfold toUtf8Map(#props, #utf8Props);
-        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_assert (toUtf8(#fstProp; #utf8FstProp)) [bind: #utf8FstProp];
         sep_assert (#utf8Props == #utf8FstProp :: #restUtf8) [bind: #restUtf8];
         unfold ListToSet(#utf8Props, #utf8PropsSet);
         if (#prop = #fstProp) then {
@@ -952,11 +952,11 @@ lemma InListToUtf8(prop, props)
 (* toUtf8 mapping and list membership, negative *)
 lemma NotInListToUtf8(prop, props)
 [[
-    ListToSet(#props, #propsSet) *
+    ListToSet(#props; #propsSet) *
     (! (#prop --e-- #propsSet)) *
-    toUtf8(#prop, #utf8Prop) *
-    toUtf8Map(#props, #utf8Props) *
-    ListToSet(#utf8Props, #utf8PropsSet)
+    toUtf8(#prop; #utf8Prop) *
+    toUtf8Map(#props; #utf8Props) *
+    ListToSet(#utf8Props; #utf8PropsSet)
 ]]
 [[
     (! (#utf8Prop --e-- #utf8PropsSet))
@@ -968,7 +968,7 @@ lemma NotInListToUtf8(prop, props)
 
     if (not (#props = {{ }})) then {
         sep_assert (#props == #fstProp :: #rest) [bind: #rest];
-        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_assert (toUtf8(#fstProp; #utf8FstProp)) [bind: #utf8FstProp];
         apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
         apply NotInListToUtf8(#prop, #rest)
     }
@@ -988,7 +988,7 @@ lemma NotInListToUtf8(prop, props)
 lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 [[
     (#props == l+ (#prefix, #suffix)) * Unique(#props) *
-    ListToSet(#prefix, #setPrefix) * ListToSet(#suffix, #setSuffix) *
+    ListToSet(#prefix; #setPrefix) * ListToSet(#suffix; #setSuffix) *
     (#prop --e-- #setSuffix)
 ]]
 [[
@@ -1012,7 +1012,7 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
 (* Appending an element to a unique list *)
 lemma UniqueAppendElement(lst, element)
 [[
-    Unique(#lst) * ListToSet(#lst, #set) *
+    Unique(#lst) * ListToSet(#lst; #set) *
     (! (#element --e-- #set))
 ]]
 [[
@@ -1037,15 +1037,15 @@ lemma UniqueAppendElement(lst, element)
  ************************************)
 
 (* Lists with duplicates *)
-pure pred Duplicated(+prefix:List, +suffix:List) :
+pure pred Duplicated(prefix:List, suffix:List) :
     (* Either the head is duplicated *)
     (suffix == #fst :: #rest) *
-    ListToSet(prefix, #preSet) *
+    ListToSet(prefix; #preSet) *
     (#fst --e-- #preSet),
 
     (* Or the duplication is in the tail *)
     (suffix == #fst :: #rest) *
-    ListToSet(prefix, #preSet) *
+    ListToSet(prefix; #preSet) *
     (! (#fst --e-- #preSet)) *
     Duplicated(l+ (prefix, {{ #fst }}), #rest);
 
@@ -1058,28 +1058,28 @@ pure pred Duplicated(+prefix:List, +suffix:List) :
  *************************************)
 
 (* Object properties as a table *)
-pred ObjectTableStructure(+l:Obj, +PVPairs:List) :
+pred ObjectTableStructure(l:Obj, PVPairs:List) :
     (* Base case - no properties left *)
     (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
     (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
-    DataProp(l, #prop, #value) * types(#value : Str) *
+    DataProp(l, #prop; #value) * types(#value : Str) *
     ObjectTableStructure(l, #restPVPairs);
 
 (* Complete Object-as-Table predicate *)
-nounfold pred ObjectTable(+l:Obj, +PVPairs:List) :
+nounfold pred ObjectTable(l:Obj, PVPairs:List) :
     ObjectTableStructure(l, PVPairs) *
-    FirstProj(PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet);
 
 (* Object-as-Table absent property *)
 lemma ObjectTableAbsentProperty(l, PVPairs, prop)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet) *
     (! (#prop --e-- #pSet))
 ]]
@@ -1091,31 +1091,31 @@ lemma ObjectTableAbsentProperty(l, PVPairs, prop)
 [*  *]
 
 (* Removing a property from a list of prop-value pairs *)
-pred RemoveProp(+PVPairs : List, +prop : Str, found : Bool, value : Str, newPairs : List) :
+pred RemoveProp(PVPairs : List, prop : Str; found : Bool, value : Str, newPairs : List) :
     (PVPairs == {{ }}) * (found == false) * (value == "") * (newPairs == {{ }}),
 
     (PVPairs == {{ prop, value }} :: newPairs) * (found == true),
 
     (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
-    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, false, value, newPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop; false, value, newPairs) *
     (found == false),
 
     (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
-    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, true, value, #restNewPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop; true, value, #restNewPairs) *
     (found == true) * (newPairs == {{ #fstProp, #fstValue }} :: #restNewPairs);
 
 (* Object-as-Table present property *)
 lemma ObjectTablePresentProperty(l, PVPairs, prop)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     (#prop --e-- #pSet)
 ]]
 [[
-    RemoveProp(#PVPairs, #prop, true, #value, #newPairs) *
+    RemoveProp(#PVPairs, #prop; true, #value, #newPairs) *
     ObjectTableStructure(#l, #newPairs) *
-    DataProp(#l, #prop, #value) * types(#value : Str)
+    DataProp(#l, #prop; #value) * types(#value : Str)
 ]]
 [*
     unfold ObjectTableStructure(#l, #PVPairs);
@@ -1137,10 +1137,10 @@ lemma ObjectTablePresentProperty(l, PVPairs, prop)
 lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     (! (#prop --e-- #pSet)) *
-    DataProp(#l, #prop, #value) * types(#value : Str)
+    DataProp(#l, #prop; #value) * types(#value : Str)
 ]]
 [[
     ObjectTableStructure(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
@@ -1161,10 +1161,10 @@ lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
 lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
 [[
     ObjectTableStructure(#l, #PVPairs) *
-    FirstProj(#PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(#PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     (! (#prop --e-- #pSet)) *
-    DataProp(#l, #prop, #value) * types(#value : Str) *
+    DataProp(#l, #prop; #value) * types(#value : Str) *
     empty_fields(l : -u- (#pSet, -{ #prop }-))
 ]]
 [[
@@ -1177,20 +1177,20 @@ lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
  *]
 
 (* Frozen object properties *)
-pred FrozenObjectTableStructure(+l:Obj, +PVPairs:List) :
+pred FrozenObjectTableStructure(l:Obj, PVPairs:List) :
     (* Base case - no properties left *)
     (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
     (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
-    DataPropConst(l, #prop, #value, true) *
+    DataPropConst(l, #prop; #value, true) *
     FrozenObjectTableStructure(l, #restPVPairs);
 
 (* Frozen Object-as-Table predicate *)
-nounfold pred FrozenObjectTable(+l:Obj, +PVPairs:List) :
+nounfold pred FrozenObjectTable(l:Obj, PVPairs:List) :
     FrozenObjectTableStructure(l, PVPairs) *
-    FirstProj(PVPairs, #pList) *
-    ListToSet(#pList, #pSet) *
+    FirstProj(PVPairs; #pList) *
+    ListToSet(#pList; #pSet) *
     empty_fields(l : #pSet);
 
 (******************************
@@ -1209,13 +1209,13 @@ axiomatic incomplete spec AP_map (xsc, vthis, cfun)
 (* Mapping EDKs into the resulting decoded EDK array *)
 [[
     (vthis == #vthis) * (cfun == #cfun) *
-    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs)
+    JSFunctionObject(#cfun; "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis; #EDKs)
 ]]
 [[
-    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs) *
-    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs)
+    JSFunctionObject(#cfun; "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis; #EDKs) *
+    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret; #EDKs)
 ]]
 normal
 
@@ -1224,10 +1224,10 @@ axiomatic spec Object_freeze(xsc, vthis, l)
 (* Freezing an array of deserialised EDKs *)
 <deserialised_EDKS>
 [[
-    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
+    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l; #EDKs)
 ]]
 [[
-    DeserialisedEncryptedDataKeys(#l, #EDKs) * (ret == #l)
+    DeserialisedEncryptedDataKeys(#l; #EDKs) * (ret == #l)
 ]]
 normal;
 
@@ -1235,11 +1235,11 @@ normal;
 <object_table : #PVPairs>
 [[
     (l == #l) *
-    JSObjGeneral(#l, #proto, #class, #ext) *
+    JSObjGeneral(#l; #proto, #class, #ext) *
     ObjectTable(#l, #PVPairs)
 ]]
 [[
-    JSObjGeneral(#l, #proto, #class, false) *
+    JSObjGeneral(#l; #proto, #class, false) *
     FrozenObjectTable(#l, #PVPairs)
 ]]
 normal

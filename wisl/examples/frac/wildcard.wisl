@@ -1,0 +1,73 @@
+// Successfully verifies
+{ (x == #x) * (#x -> ("_" : #a)) }
+function wildcard_consumes_wildcard(x) {
+    r := [x];
+    return r
+}
+{ (#x -> ("_" : #a)) * (ret == #a) }
+
+
+// Fails to match against post-condition
+{ (x == #x) * (#x -> (0.5 : #a)) }
+function cannot_consume_wildcard_from_value(x) {
+    r := [x];
+    return r
+}
+{ (#x -> ("_" : #a)) * (ret == #a) }
+
+// Fails to match against post-condition
+{ (x == #x) * (#x -> ("_" : #a)) }
+function cannot_consume_value_from_wildcard(x) {
+    r := [x];
+    return r
+}
+{ (#x -> (0.5 : #a)) * (ret == #a) }
+
+// Successfully verifies
+{ (x == #x) * (#x -> ("_" : #a)) * (#x -> (0.5 : #a)) }
+function value_plus_wildcard_is_wildcard(x) {
+    // Current symbolic heap has wildcard permission for #x
+    r := [x];
+    return r
+}
+{ (#x -> ("_" : #a)) * (ret == #a) }
+
+// Successfully verifies
+{ (x == #x) * (#x -> ("_" : #a)) }
+function wildcard_is_duplicable(x) {
+    // Current symbolic heap has wildcard permission for #x
+    r := [x];
+    return r
+}
+{ (#x -> ("_" : #a)) * (#x -> ("_": #a)) * (ret == #a) }
+
+// Successfully verifies
+{ (x == #x) * (#x -> ("_" : #a)) }
+function cannot_write_wildcard(x) {
+    [x] := 0;
+    return 0
+}
+{ (#x -> ("_" : 0)) * (ret == 0) }
+
+// t_wislf verify wisl/examples/frac/wildcard.wisl -l tmi
+//
+// Parsing and compiling...                 
+// Preprocessing...
+// Obtaining specs to verify...
+// Obtaining lemmas to verify...
+// Obtained 6 symbolic tests in total
+// Running symbolic tests: 0.010292
+// Verifying one spec of procedure value_plus_wildcard_is_wildcard... s Success
+// Verifying one spec of procedure wildcard_consumes_wildcard... s Success
+// Verifying one spec of procedure cannot_consume_wildcard_from_value... f Failure
+// Verifying one spec of procedure wildcard_is_duplicable... s Success
+// Verifying one spec of procedure cannot_consume_value_from_wildcard... f Failure
+// Verifying one spec of procedure cannot_write_wildcard... f Failure
+// There were failures: 0.014838
+// Analysis failures!
+// 1. Couldn't satisfy postcondition [wisl/examples/frac/wildcard.wisl 16:3-35]
+// 2. Couldn't satisfy postcondition [wisl/examples/frac/wildcard.wisl 24:3-35]
+// 3. (PMap.MakeOpen.SubError (#loc_5, #loc_5,
+//    (Freeable.Make.SubError
+//       (MList.Make.SubError (#wisl__1, Fractional.NotEnoughPermission)))
+//    )) [wisl/examples/frac/wildcard.wisl 47:5-13]

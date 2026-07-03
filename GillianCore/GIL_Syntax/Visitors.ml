@@ -28,7 +28,8 @@ module Utils = struct
       method private plus = ( @ )
     end
 
-  (** Same as list_monoid but uses [rev_append] as [plus]. Will break any order-conservation *)
+  (** Same as list_monoid but uses [rev_append] as [plus]. Will break any
+      order-conservation *)
   class non_ordered_list_monoid =
     object
       method private zero = []
@@ -142,7 +143,7 @@ module Collectors = struct
       method! visit_LList () ls =
         [ TypeDef__.EList (List.map (fun x -> TypeDef__.Lit x) ls) ]
 
-      method! visit_EList () le = [ EList le ]
+      method! visit_EList () le = [ TypeDef__.EList le ]
 
       method! visit_NOp () nop les =
         match nop with

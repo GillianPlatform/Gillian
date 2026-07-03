@@ -806,6 +806,7 @@ type t =
   | StatementListNot
   | StatementListInstruction
   | StatementListInstructions
+[@@deriving to_yojson]
 
 let of_string str =
   match str with

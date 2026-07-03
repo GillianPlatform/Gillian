@@ -1,7 +1,7 @@
 type err_t = Symbol_not_found of string
 type def = FunDef of string | GlobVar of string
 
-let location_of_symbol str = "$l_" ^ str
+let location_of_symbol str = Gillian.Utils.Names.lloc_prefix ^ str
 
 (** maps location to definition *)
 type t = def String_map.t

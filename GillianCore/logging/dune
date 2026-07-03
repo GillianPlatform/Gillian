@@ -1,6 +1,6 @@
 (library
  (name logging)
  (public_name gillian.logging)
- (libraries fmt sqlite3)
+ (libraries fmt sqlite3 utils)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson)))

@@ -2,6 +2,15 @@
 
 module ParserAndCompiler = ParserAndCompiler
 
+module Act_console : sig
+  module Make
+      (ID : Init_data.S)
+      (PC : ParserAndCompiler.S with type init_data = ID.t)
+      (Abductor :
+        Abductor.S with type init_data = ID.t and type annot = PC.Annot.t)
+      (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S
+end
+
 module Make
     (ID : Init_data.S)
     (CMemory : CMemory.S with type init_data = ID.t)
@@ -22,6 +31,7 @@ module Make
          and type annot = PC.Annot.t
          and type init_data = ID.t
          and type pc_err = PC.err) : sig
-  (** Parses command-line arguments and starts the requested Gillian execution *)
+  (** Parses command-line arguments and starts the requested Gillian execution
+  *)
   val main : unit -> unit
 end

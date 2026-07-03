@@ -1,0 +1,7 @@
+(install
+ (section
+  (site
+   (gillian-c2 c_includes)))
+ (files
+  (gillian-c2.h as gillian-c2/gillian-c2.h))
+ (package gillian-c2))

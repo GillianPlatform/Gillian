@@ -523,7 +523,6 @@ proc setupInitialHeap () {
 
 
 
-
 			(* Date object *)
 
 			ret := "create_object_with_call_construct_concrete" ($ldate, "Date_call", "Date_construct", 7);

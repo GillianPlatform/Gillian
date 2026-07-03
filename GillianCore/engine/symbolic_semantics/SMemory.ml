@@ -1,6 +1,6 @@
 module type S = sig
-  (** Type of data that is given the first time memory is created.
-      Useful when there's global context to know about like a type-system *)
+  (** Type of data that is given the first time memory is created. Useful when
+      there's global context to know about like a type-system *)
   type init_data
 
   (** Type of GIL values *)
@@ -63,21 +63,25 @@ module type S = sig
   val can_fix : err_t -> bool
   val sure_is_nonempty : t -> bool
 
-  (** [split_further core_pred ins err] returns a way to split further a core_predicate if consuming it failed with error, if there is one.
-      In that case, it returns a pair containing
-      - a list of new ins. Each element is the list of ins for each sub-component of the core predicate;
+  (** [split_further core_pred ins err] returns a way to split further a
+      core_predicate if consuming it failed with error, if there is one. In that
+      case, it returns a pair containing
+      - a list of new ins. Each element is the list of ins for each
+        sub-component of the core predicate;
       - new way of learning the outs, as explained under.
 
-      For example let's say the core predicate [(x, []) ↦ [a, b]] (with 2 ins and 1 out) can be split into
+      For example let's say the core predicate [(x, []) ↦ [a, b]] (with 2 ins
+      and 1 out) can be split into
       - [(x, [0]) ↦ [a]]
-      - [(x, [1]) ↦ [b]]
-      And we try and consume the whole thing, but the memory only had [(x, [0]) ↦ [a]] in it.
-      Then this function, given the appropriate error, should a pair of two elements:
+      - [(x, [1]) ↦ [b]] And we try and consume the whole thing, but the memory
+        only had [(x, [0]) ↦ [a]] in it. Then this function, given the
+        appropriate error, should a pair of two elements:
       - the new ins: [ [ [x, [0]], [x, [1]] ] ]
-      - the new way of learning the outs: [ [  {{ l-nth(PVar("0:0"), 0), l-nth(PVar("1:0"), 0) }}   ] ]
+      - the new way of learning the outs:
+        [ [  {{ l-nth(PVar("0:0"), 0), l-nth(PVar("1:0"), 0) }}   ] ]
 
-      {b Important}: it is always sound for this function to return [None], it will just reduce the amount of automation.
-      *)
+      {b Important}: it is always sound for this function to return [None], it
+      will just reduce the amount of automation. *)
   val split_further :
     t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end

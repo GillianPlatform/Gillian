@@ -28,7 +28,7 @@ val str_ac : ac -> string
 (** Deserializes a string into an action *)
 val ac_from_str : string -> ac
 
-(** {3 Global assertion serialization } *)
+(** {3 Global assertion serialization} *)
 
 val str_ga : ga -> string
 val ga_from_str : string -> ga

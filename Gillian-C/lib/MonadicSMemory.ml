@@ -33,9 +33,6 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
       Logging.verbose (fun fmt -> fmt "Resolved %a as %s" Expr.pp lvar_loc l);
       Delayed.return l
 
-type vt = Values.t
-type st = Subst.t
-
 (* let ga = LActions.ga *)
 
 type err_t =
@@ -93,6 +90,10 @@ module Mem = struct
     match SMap.find_opt loc_name map with
     | Some t -> Delayed.return t
     | None -> Delayed.return SHeapTree.empty
+
+  let update_loc loc tree map =
+    if SHeapTree.is_empty tree then SMap.remove loc map
+    else SMap.add loc tree map
 
   (***** Implementation of local actions *****)
 
@@ -161,7 +162,7 @@ module Mem = struct
     let++ sval, perm, new_tree =
       map_lift_err loc_name (SHeapTree.cons_single tree ofs chunk)
     in
-    (SMap.add loc_name new_tree map, sval, perm)
+    (update_loc loc_name new_tree map, sval, perm)
 
   let prod_single map loc ofs chunk sval perm =
     let open DR.Syntax in
@@ -183,7 +184,7 @@ module Mem = struct
       let++ sarr, perm, new_tree =
         map_lift_err loc_name (SHeapTree.cons_array tree ofs size chunk)
       in
-      (SMap.add loc_name new_tree map, sarr, perm)
+      (update_loc loc_name new_tree map, sarr, perm)
 
   let prod_array map loc ofs size chunk array perm =
     let open DR.Syntax in
@@ -221,7 +222,7 @@ module Mem = struct
       let++ new_tree, perm =
         map_lift_err loc_name (sheap_consumer tree low high)
       in
-      (SMap.add loc_name new_tree map, perm)
+      (update_loc loc_name new_tree map, perm)
 
   let prod_simple ~sheap_producer map loc low high perm =
     let open DR.Syntax in
@@ -252,7 +253,7 @@ module Mem = struct
     let++ bounds, new_tree =
       SHeapTree.cons_bounds tree |> DR.of_result |> map_lift_err loc_name
     in
-    (SMap.add loc_name new_tree map, bounds)
+    (update_loc loc_name new_tree map, bounds)
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
@@ -375,8 +376,6 @@ let to_yojson t =
 
 let of_yojson m =
   Result.map (fun mem -> { genv = Global_env.empty; mem }) (Mem.of_yojson m)
-
-type action_ret = (t * vt list, err_t) result
 
 let make_branch ~heap ?(rets = []) () = (heap, rets)
 
@@ -809,13 +808,6 @@ let is_overlapping_asrt = LActions.is_overlapping_asrt_str
 module Lift = struct
   open Debugger.Utils
 
-  let get_store_vars store =
-    store
-    |> List.map (fun (var, value) : Variable.t ->
-           let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           Variable.create_leaf var value ())
-    |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
-
   let make_node ~get_new_scope_id ~variables ~name ~value ?(children = []) () :
       Variable.t =
     let var_ref = get_new_scope_id () in
@@ -831,18 +823,8 @@ module Lift = struct
     in
     { name; value; var_ref; type_ }
 
-  let add_variables
-      ~store
-      ~(memory : t)
-      ~is_gil_file:_
-      ~get_new_scope_id
-      variables =
+  let add_heap_variables (memory : t) variables get_new_scope_id =
     let mem = memory.mem in
-    (* Store first *)
-    let store_id = get_new_scope_id () in
-    let store_vars = get_store_vars store in
-    Hashtbl.replace variables store_id store_vars;
-    (* And finally heap*)
     let make_node = make_node ~get_new_scope_id ~variables in
     let heap_id = get_new_scope_id () in
     let heap_vars =
@@ -854,7 +836,6 @@ module Lift = struct
     Hashtbl.replace variables heap_id heap_vars;
     Variable.
       [
-        { id = store_id; name = "Store" };
         { id = heap_id; name = "Heap" }
         (* { id = genv_id; name = "Global Environment" }; *);
       ]

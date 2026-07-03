@@ -33,10 +33,10 @@ end
 
 (* Actual Exports *)
 
-module ParserAndCompiler = ParserAndCompiler.Dummy
+module ParserAndCompiler = WParserAndCompiler
 
 module ExternalSemantics =
-  Gillian.General.External.Dummy (ParserAndCompiler.Annot)
+  Gillian.General.External.Dummy (WParserAndCompiler.Annot)
 
 module MonadicSMemory_Base = Mapper (WISLSubst) (BaseMemory)
 module MonadicSMemory_ALoc = Mapper (WISLSubst) (ALocMemory)

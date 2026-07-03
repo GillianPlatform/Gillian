@@ -2,6 +2,7 @@ type ('a, 'b) t = ('a, 'b) Result.t Delayed.t
 
 let ok ?learned x = Delayed.return ?learned (Result.ok x)
 let error ?learned x = Delayed.return ?learned (Result.error x)
+let vanish = Delayed.vanish
 let of_result = Delayed.return
 
 let map (x : ('a, 'e) t) (f : 'a -> 'b) : ('b, 'e) t =

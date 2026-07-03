@@ -1,9 +1,11 @@
-; (executables
-;   (names cwisl wislverify)
-;   (libraries camelot wisl))
-
-(executable
- (name wisl)
- (public_name wisl)
+(executables
+ (names wisl wislf)
+ (public_names wisl wislf)
  (package wisl)
- (libraries gillian wSemantics wParserAndCompiler wUtils wDebugging))
+ (libraries
+  gillian
+  wStateEx
+  wStateFrac
+  wStateConcrete
+  wParserAndCompiler
+  wUtils))

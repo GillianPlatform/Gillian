@@ -10,6 +10,6 @@ module Make (BaseState : PState.S) : sig
        and type init_data = BaseState.init_data
        and type m_err_t = BaseState.t _t * BaseState.m_err_t
 
-  val make : procs:SS.t -> state:BaseState.t -> init_data:init_data -> t
+  val make : state:BaseState.t -> init_data:init_data -> t
   val get_components : t -> BaseState.t * BaseState.t
 end

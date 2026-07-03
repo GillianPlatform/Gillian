@@ -18,11 +18,11 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
 
 // Auxiliary predicates for capturing the loop invariant of the EC deserialisation
 /*@
-    pred enc_ctx_complete_case_equality(+ECKs, +elements, +restElements, +consumedElements, +keys, +consumedKeys, +restKeys) {
+    pred enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) {
         (ECKS == elements) * (keys == consumedKeys @ restKeys)
     }
 
-    pred nounfold enc_ctx_deser_invariant_cases(+definition, +elementsDef, +aad_len, +esLength, +restEsLength, +restLength, +ECKs, +elements, +consumedElements, +restElements, +keys, +consumedKeys, +restKeys, errorMessage) {
+    pred nounfold enc_ctx_deser_invariant_cases(definition, elementsDef, aad_len, esLength, restEsLength, restLength, ECKs, elements, consumedElements, restElements, keys, consumedKeys, restKeys; errorMessage) {
         (definition == `Complete`) * (elementsDef == `Complete`) *
         (aad_len == 2 + esLength) *
         enc_ctx_complete_case_equality(ECKs, elements, restElements, consumedElements, keys, consumedKeys, restKeys) *
@@ -52,18 +52,18 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
         requires:
             (alloc == #alloc) * (enc_ctx == #enc_ctx) * (cursor == #cursor) *
             default_allocator(#alloc) *
-            empty_hash_table_ptr(#enc_ctx, #alloc) *
-            valid_aws_byte_cursor_ptr(#cursor, #aad_len, #buffer, #buffer_content) *
+            empty_hash_table_ptr(#enc_ctx; #alloc) *
+            valid_aws_byte_cursor_ptr(#cursor; #aad_len, #buffer, #buffer_content) *
             (0 <# #aad_len) *
             (not (#buffer == NULL)) *
             (#definition == `Complete`) * (#errorMessage == ``) *
-            CRawEncryptionContext(#buffer_content, #ECKs) *
+            CRawEncryptionContext(#buffer_content; #ECKs) *
             any_aws_last_error()
 
         ensures:
             default_allocator(#alloc) *
-            valid_hash_table_ptr(#enc_ctx, #alloc, #ECKs, #utf8ECKs) *
-            valid_aws_byte_cursor_ptr(#cursor, 0, #buffer p+ #aad_len, []) *
+            valid_hash_table_ptr(#enc_ctx; #alloc, #ECKs, #utf8ECKs) *
+            valid_aws_byte_cursor_ptr(#cursor; 0, #buffer p+ #aad_len, []) *
             ARRAY(#buffer, char, #aad_len, #buffer_content) *
             any_aws_last_error() *
             (ret == int(0))
@@ -73,18 +73,18 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
         requires:
             (alloc == #alloc) * (enc_ctx == #enc_ctx) * (cursor == #cursor) *
             default_allocator(#alloc) *
-            empty_hash_table_ptr(#enc_ctx, #alloc) *
-            valid_aws_byte_cursor_ptr(#cursor, #aad_len, #buffer, #buffer_content) *
+            empty_hash_table_ptr(#enc_ctx; #alloc) *
+            valid_aws_byte_cursor_ptr(#cursor; #aad_len, #buffer, #buffer_content) *
             (0 <# #aad_len) *
             (not (#buffer == NULL)) *
             (#definition == `Broken`) * (#errorMessage == `decodeEncryptionContext: Overflow, too much data.`) *
-            BRawEncryptionContext(#errorMessage, #buffer_content, #ECKs) *
+            BRawEncryptionContext(#buffer_content; #errorMessage, #ECKs) *
             any_aws_last_error()
 
         ensures:
             default_allocator(#alloc) *
-            valid_hash_table_ptr(#enc_ctx, #alloc, #ECKs, #utf8ECKs) *
-            valid_aws_byte_cursor_ptr(#cursor, #rest_len, #new_buffer, #rest_buffer) *
+            valid_hash_table_ptr(#enc_ctx; #alloc, #ECKs, #utf8ECKs) *
+            valid_aws_byte_cursor_ptr(#cursor; #rest_len, #new_buffer, #rest_buffer) *
             (#new_buffer == #buffer p+ #consumed_len) *
             (#buffer_content ==  #consumed_content @ #rest_buffer) *
             (0 <# #consumed_len) *
@@ -98,23 +98,23 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
         requires:
             (alloc == #alloc) * (enc_ctx == #enc_ctx) * (cursor == #cursor) *
             default_allocator(#alloc) *
-            empty_hash_table_ptr(#enc_ctx, #alloc) *
-            valid_aws_byte_cursor_ptr(#cursor, #aad_len, #buffer, #buffer_content) *
+            empty_hash_table_ptr(#enc_ctx; #alloc) *
+            valid_aws_byte_cursor_ptr(#cursor; #aad_len, #buffer, #buffer_content) *
             (0 <# #aad_len) *
             (not (#buffer == NULL)) *
             (#definition == `Broken`) *
             (not (#errorMessage == `decodeEncryptionContext: Overflow, too much data.`)) *
-            BRawEncryptionContext(#errorMessage, #buffer_content, #ECKs) *
+            BRawEncryptionContext(#buffer_content; #errorMessage, #ECKs) *
             any_aws_last_error()
 
         ensures:
             default_allocator(#alloc) *
-            empty_hash_table_ptr(#enc_ctx, #alloc) *
-            valid_aws_byte_cursor_ptr(#cursor, #rest_len, #new_buffer, #rest_buffer) *
+            empty_hash_table_ptr(#enc_ctx; #alloc) *
+            valid_aws_byte_cursor_ptr(#cursor; #rest_len, #new_buffer, #rest_buffer) *
             (#new_buffer == #buffer p+ #consumed_len) *
             (#buffer_content ==  #consumed_content @ #rest_buffer) *
             (#consumed_len == (#aad_len - #rest_len)) *
-            optBytes(#buffer, #consumed_len, #consumed_content) *
+            optBytes(#buffer, #consumed_len; #consumed_content) *
             ECErrorCodeOfJSErrorMessage(#errorMessage) *
             (ret == int(-1))
     }
@@ -137,15 +137,15 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         return aws_raise_error(AWS_CRYPTOSDK_ERR_BAD_CIPHERTEXT);
 
     GILLIAN("assert [[bind #l_ec, #elem_count]] (elem_count == [#l_ec, 2]) * ARRAY(ptr(#l_ec, 0), int16, 1, [ #elem_count ]) ");
-    GILLIAN("assert [[bind #elementsDef, #elements, #esLength]] Elements(#elementsDef, #buffer_content, 2, #elem_count, 2, #elements, #esLength)");
-    GILLIAN("unfold Elements(#elementsDef, #buffer_content, 2, #elem_count, 2, #ECKS, #esLength)");
+    GILLIAN("assert [[bind #elementsDef, #elements, #esLength]] Elements(#buffer_content, 2, #elem_count, 2; #elementsDef, #elements, #esLength)");
+    GILLIAN("unfold Elements(#buffer_content, 2, #elem_count, 2, #elementsDef, #ECKS, #esLength)");
     GILLIAN("assert [[bind #lengthPtr]] (length == [#l, 2]) * (#lengthPtr == ptr(#l, 0))");
     GILLIAN(
         "assert [[bind #l_res_1, #l_res, #l_k_cursor, #l_v_cursor]] \
             (_res__1 == [#l_res_1, 16]) * (_res == [#l_res, 16]) * \
             (k_cursor == [#l_k_cursor, 16]) * (v_cursor == [#l_v_cursor, 16]) * \
             (was_created == [#l_wc, 4])");
-    GILLIAN("assert [[bind #keys]] FirstProj(#elements, #keys)");
+    GILLIAN("assert [[bind #keys]] FirstProj(#elements; #keys)");
     GILLIAN(
         "invariant: [[bind i, #i, #togo, #trash, #restBuffer, #restLength, \
                         #cbptr, #consumedLength, #consumedBuffer, #restEsLength, \
@@ -167,8 +167,8 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             (#consumedBuffer == lsub(#buffer_content, 2, #consumedLength)) * \
             (#buffer_content == [ #b1, #b2 ] @ #consumedBuffer @ #restBuffer) * \
             (#esLength == #consumedLength + #restEsLength) * \
-            optBytes(#buffer p+ 2, #consumedLength, #consumedBuffer) * \
-            valid_aws_byte_cursor_ptr(#cursor, #restLength, #cbptr, #restBuffer) * \
+            optBytes(#buffer p+ 2, #consumedLength; #consumedBuffer) * \
+            valid_aws_byte_cursor_ptr(#cursor; #restLength, #cbptr, #restBuffer) * \
             ((len #buffer_content) == #aad_len) * (len #restBuffer == #restLength) * \
             (0 <# #elem_count) * "
             // Spacial information about the table
@@ -176,18 +176,18 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             // They are unique, so they can be put safely in the hashtable
             // The UTF8 condition is necessary for the hashtable strings to work
             // That information is required for the hash_table_put to work
-            "Elements(#elementsDef, #buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restEsLength) * \
-            FirstProj(#elements, #keys) * \
-            FirstProj(#consumedElements, #consumedKeys) * \
-            FirstProj(#restElements, #restKeys) * \
-            toUtf8PairMap(#consumedElements, #consumedUtf8Elements) * \
-            FirstProj(#consumedUtf8Elements, #consumedUtf8Keys) * \
-            toUtf8PairMap(#restElements, #restUtf8Elements) * \
-            valid_hash_table_ptr(#enc_ctx, #alloc, #consumedElements, #consumedUtf8Elements) * "
+            "Elements(#buffer_content, 2 + #consumedLength, #togo, 2; #elementsDef, #restElements, #restEsLength) * \
+            FirstProj(#elements; #keys) * \
+            FirstProj(#consumedElements; #consumedKeys) * \
+            FirstProj(#restElements; #restKeys) * \
+            toUtf8PairMap(#consumedElements; #consumedUtf8Elements) * \
+            FirstProj(#consumedUtf8Elements; #consumedUtf8Keys) * \
+            toUtf8PairMap(#restElements; #restUtf8Elements) * \
+            valid_hash_table_ptr(#enc_ctx; #alloc, #consumedElements, #consumedUtf8Elements) * "
             // The different cases represented in the invariant
             "enc_ctx_deser_invariant_cases( \
                 #definition, #elementsDef, #aad_len, #esLength, #restEsLength, #restLength, #ECKs, \
-                #elements, #consumedElements, #restElements, #keys, #consumedKeys, #restKeys, #errorMessage \
+                #elements, #consumedElements, #restElements, #keys, #consumedKeys, #restKeys; #errorMessage \
             ) * "
             // Csharpminor trickery, variable that are defined inside the loop
             // still need to be in the invariant because they are hoisted and treated as
@@ -201,7 +201,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             (was_created == [#l_wc, 4]) * ARRAY(ptr(#l_wc, 0), int, 1, [#wc_trash])");
     for (uint16_t i = 0; i < elem_count; i++) {
         uint16_t length;
-        GILLIAN("unfold Elements(#elementsDef, #buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restEsLength)");
+        GILLIAN("unfold Elements(#buffer_content, 2 + #consumedLength, #togo, 2, #elementsDef, #restElements, #restEsLength)");
         GILLIAN(
             "if (#elementsDef = `Complete`) {"
             "  unfold CElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength)"
@@ -259,7 +259,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             aws_string_new_from_array(alloc, v_cursor.ptr, v_cursor.len);
 
         GILLIAN("apply ProduceListToSet(#consumedKeys)");
-        GILLIAN("assert [[bind #consumedKeySet]] ListToSet(#consumedKeys, #consumedKeySet)");
+        GILLIAN("assert [[bind #consumedKeySet]] ListToSet(#consumedKeys; #consumedKeySet)");
         GILLIAN("apply FirstProjConcatSplit(#elements, #consumedElements, #restElements)");
         GILLIAN("unfold FirstProj(#restElements, #restKeys)");
         GILLIAN("apply FirstProjToUtf8MapPairCompat(#consumedElements)");
@@ -300,14 +300,14 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         GILLIAN("apply FirstProjAppendPair(#consumedElements, #consumedKeys, #this_key, #this_value)");
         GILLIAN("apply toUtf8PairMapAppendPair(#consumedElements, #consumedUtf8Elements, #this_key, #this_value)");
         GILLIAN("assert [[bind #utf8Key, #utf8Value]] \
-                    toUtf8(#this_key, #utf8Key) * \
-                    toUtf8(#this_value, #utf8Value)");
+                    toUtf8(#this_key; #utf8Key) * \
+                    toUtf8(#this_value; #utf8Value)");
         GILLIAN("apply FirstProjAppendPair(#consumedUtf8Elements, #consumedUtf8Keys, #utf8Key, #utf8Value)");
         GILLIAN("apply FirstProjToUtf8MapPairCompat(#consumedElements @ [ [#this_key, #this_value] ])");
     }
 
     GILLIAN("assert #togo == 0");
-    GILLIAN("unfold Elements(#elementsDef, #buffer_content, (2 + #consumedLength), #togo, 2, #restElements, #restEsLength)");
+    GILLIAN("unfold Elements(#buffer_content, (2 + #consumedLength), #togo, 2, #elementsDef, #restElements, #restEsLength)");
     GILLIAN("unfold CElements(#buffer_content, (2 + #consumedLength), #togo, 2, #restElements, #restEsLength)");
 
     GILLIAN(

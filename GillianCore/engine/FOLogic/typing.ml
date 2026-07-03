@@ -1,3 +1,4 @@
+open Prog_env
 module L = Logging
 module SSubst = SVal.SESubst
 
@@ -126,6 +127,11 @@ module Infer_types_to_gamma = struct
     let f' = f flag in
     let f = f flag gamma new_gamma in
     let ( = ) = Type.equal in
+    let check_field le = function
+      | Some tt -> f le tt
+      | None -> true
+    in
+    let check_fields = List.for_all2 check_field in
     match le with
     (* Literals are always typable *)
     | Lit lit -> Literal.type_of lit = tt
@@ -153,106 +159,49 @@ module Infer_types_to_gamma = struct
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
     | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
     | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
-    | ConstructorApp (n, les) ->
-        if Datatype_env.is_initialised () then
-          let field_types = Datatype_env.get_constructor_field_types n in
-          let check_field le tt =
-            match tt with
-            | Some tt -> f le tt
-            | None -> true
-          in
-          match field_types with
-          | Some tts ->
-              if List.length tts <> List.length les then false
-              else
-                tt = Datatype_env.get_constructor_type_unsafe n
-                && List.for_all2 check_field les tts
-          | None -> false
-        else
-          (* Can't say for certain whether or not the constructor is typable *)
-          true
-    | FuncApp (n, les) ->
-        if Function_env.is_initialised () then
-          let check_field le tt =
-            match tt with
-            | Some tt -> f le tt
-            | None -> true
-          in
-          let param_types = Function_env.get_function_param_types n in
-          match param_types with
-          | Some tts ->
-              if List.length tts <> List.length les then false
-              else
-                (* Only check param types, we don't check return type of function *)
-                List.for_all2 check_field les tts
-          | None -> false
-        else
-          (* Can't say for certain whether or not the constructor is typable *)
-          true
+    | ConstructorApp (n, les) -> (
+        match Datatype_env.get_constructor_field_types n with
+        | None -> false
+        | Some field_types ->
+            List_utils.lengths_eq field_types les
+            && tt = Datatype_env.get_constructor_type_unsafe n
+            && check_fields les field_types)
+    | FuncApp (n, les) -> (
+        match Function_env.get_function_param_types n with
+        | None -> false
+        | Some field_types ->
+            (* Only check param types, we don't check return type of function *)
+            List_utils.lengths_eq field_types les
+            && check_fields les field_types)
     | Cases (le, cs) ->
         let scrutinee_type_check =
-          if Datatype_env.is_initialised () then
-            let constructors = List.map (fun (c, _, _) -> c) cs in
-            let constructor_types =
-              List.map Datatype_env.get_constructor_type constructors
-            in
-            let constructors_type =
-              match List.filter_map (fun t -> t) constructor_types with
-              | [] -> None (* No constructor type was 'Some' *)
-              | t :: ts ->
-                  if
-                    List.for_all (( = ) t) ts
-                    && Stdlib.( = )
-                         (List.length constructor_types)
-                         (List.length (t :: ts))
-                  then Some t (* All constructors have type t *)
-                  else None (* Not all constructors have type t *)
-            in
-            (* We expect the scrutinee to have the same type as the constructors *)
-            (* against which it is being matched. *)
-            Option.fold ~none:false ~some:(f le) constructors_type
-          else
-            (* Can't type check scrutinee - we don't know types of constructors *)
-            (* Assume it type checks *)
-            true
+          let constructor_types =
+            List.map (fun (c, _, _) -> Datatype_env.get_constructor_type c) cs
+          in
+          match Option_utils.all constructor_types with
+          | None | Some [] -> false
+          | Some (t :: ts) -> List.for_all (( = ) t) ts && f le t
         in
 
         let case_type_check (c, bs, le) =
           let gamma_copy = Type_env.copy gamma in
           let new_gamma_copy = Type_env.copy new_gamma in
           let binders_okay =
-            if Datatype_env.is_initialised () then
-              let binder_types = Datatype_env.get_constructor_field_types c in
-              match binder_types with
-              | None ->
-                  (* Datatype env is initialised but can't find constructor *)
-                  false
-              | Some ts ->
-                  (* Update type info of binders *)
-                  if List.length ts <> List.length bs then false
-                  else
+            match Datatype_env.get_constructor_field_types c with
+            | Some ts when List_utils.lengths_eq ts bs ->
+                List.iter2
+                  (fun b t ->
                     let () =
-                      List.iter2
-                        (fun b t ->
-                          let () =
-                            match t with
-                            | Some t -> Type_env.update gamma_copy b t
-                            | None -> Type_env.remove gamma_copy b
-                          in
-                          Type_env.remove new_gamma_copy b)
-                        bs ts
+                      match t with
+                      | Some t -> Type_env.update gamma_copy b t
+                      | None -> Type_env.remove gamma_copy b
                     in
-                    true
-            else
-              (* Type info not known about binders - simply remove them *)
-              let () =
-                List.iter
-                  (fun b ->
-                    let () = Type_env.remove gamma_copy b in
                     Type_env.remove new_gamma_copy b)
-                  bs
-              in
-              true
+                  bs ts;
+                true
+            | _ ->
+                (* Datatype env is initialised but can't find constructor *)
+                false
           in
           let ret =
             if binders_okay then
@@ -575,58 +524,47 @@ module Type_lexpr = struct
     if not ite then def_neg else infer_type gamma le BooleanType
 
   and type_constructor_app gamma n les =
-    if Datatype_env.is_initialised () then
-      let tts_opt = Datatype_env.get_constructor_field_types n in
-      match tts_opt with
-      | Some tts ->
-          if typable_list gamma ?target_types:(Some tts) les then
-            (* TODO: We don't attempt to infer the type of function applications *)
-            (* How would we handle recursive functions? *)
-            (* Requires signifcant change to typing algorithm *)
-            (None, true)
-          else def_neg
-      | None -> def_neg
-    else (None, true)
+    match Datatype_env.get_constructor_field_types n with
+    | Some tts ->
+        if typable_list gamma ?target_types:(Some tts) les then
+          (* TODO: We don't attempt to infer the type of function applications *)
+          (* How would we handle recursive functions? *)
+          (* Requires signifcant change to typing algorithm *)
+          (None, true)
+        else def_neg
+    | None -> def_neg
 
   and type_func_app gamma n les =
-    if Function_env.is_initialised () then
-      let tts_opt = Function_env.get_function_param_types n in
-      match tts_opt with
-      | Some tts ->
-          if typable_list gamma ?target_types:(Some tts) les then
-            def_pos (Datatype_env.get_constructor_type n)
-          else def_neg
-      | None -> def_neg
-    else (None, true)
+    match Function_env.get_function_param_types n with
+    | Some tts ->
+        if typable_list gamma ?target_types:(Some tts) les then
+          def_pos (Datatype_env.get_constructor_type n)
+        else def_neg
+    | None -> def_neg
 
   and type_case gamma t_scrutinee (c, bs, le) =
-    if Datatype_env.is_initialised () then
-      let t_constructor = Datatype_env.get_constructor_type c in
-      let types_match =
-        match (t_scrutinee, t_constructor) with
-        | _, None -> false (* Constructor not found in datatype env *)
-        | Some t1, Some t2 when Type.equal t1 t2 -> true
-        | None, _ -> true
-        | _ -> false
-      in
-      if not types_match then def_neg
-      else
-        (* Set up gamma copy with the binders' type info *)
-        let gamma_copy = Type_env.copy gamma in
-        (* By this point we know c is in datatype env *)
-        let ts = Datatype_env.get_constructor_field_types_unsafe c in
-        let () =
-          List.iter2
-            (fun b t ->
-              match t with
-              | Some t -> Type_env.update gamma_copy b t
-              | None -> Type_env.remove gamma_copy b)
-            bs ts
-        in
-        f gamma_copy le
+    let t_constructor = Datatype_env.get_constructor_type c in
+    let types_match =
+      match (t_scrutinee, t_constructor) with
+      | _, None -> false (* Constructor not found in datatype env *)
+      | Some t1, Some t2 when Type.equal t1 t2 -> true
+      | None, _ -> true
+      | _ -> false
+    in
+    if not types_match then def_neg
     else
+      (* Set up gamma copy with the binders' type info *)
       let gamma_copy = Type_env.copy gamma in
-      let () = List.iter (fun b -> Type_env.remove gamma_copy b) bs in
+      (* By this point we know c is in datatype env *)
+      let ts = Datatype_env.get_constructor_field_types_unsafe c in
+      let () =
+        List.iter2
+          (fun b t ->
+            match t with
+            | Some t -> Type_env.update gamma_copy b t
+            | None -> Type_env.remove gamma_copy b)
+          bs ts
+      in
       f gamma_copy le
 
   and type_cases gamma le cs =
@@ -650,8 +588,8 @@ module Type_lexpr = struct
   (** This function returns a triple [(t_opt, b, fs)] where
       - [t_opt] is the type of [le] if we can find one
       - [b] indicates if the thing is typable
-      - [fs] indicates the constraints that must be satisfied for [le] to be typable
-  *)
+      - [fs] indicates the constraints that must be satisfied for [le] to be
+        typable *)
   and f (gamma : Type_env.t) (le : Expr.t) : Type.t option * bool =
     let typable_list = typable_list gamma in
 

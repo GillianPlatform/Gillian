@@ -552,10 +552,8 @@ let translate_single_func_specs
   in
   fun_spec
 
-(**
-  * Populates the new fun_tbl given the old fun_tbl
-  * by compiling the specs in the old fun_tbl
-*)
+(** * Populates the new fun_tbl given the old fun_tbl * by compiling the specs
+    in the old fun_tbl *)
 let translate_specs
     (cc_tbl : cc_tbl_type)
     (vis_tbl : vis_tbl_type)

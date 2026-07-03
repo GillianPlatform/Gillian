@@ -12,23 +12,23 @@ typedef struct Array {
 
 // The following should be in the Gillian-C stdlib
 /*@
-pred OARRAY(+p, +size, content) {
+pred OARRAY(p, size; content) {
   (size == 0) * (content == nil);
   (0 <# size)  * ARRAY(p, int, size, content) * ((len content) == size)
 }
 
-pred OUNINIT(+p, +size) {
+pred OUNINIT(p, size) {
   (size == 0);
   (0 <# size) * UNDEFS(p, size)
 }
 */
 
 /*@
-pred valid_array(+ar, content) {
+pred valid_array(ar; content) {
   (ar -> struct Array { #buffer; long(#capacity); long(#size) }) *
   (0 <# #capacity) *
   (#size <=# #capacity) *
-  OARRAY(#buffer, #size, content) *
+  OARRAY(#buffer, #size; content) *
   OUNINIT(#buffer p+ (#size * 4), (#capacity - #size) * 4) *
   MALLOCED(#buffer, #capacity * 4)
 }
@@ -36,8 +36,8 @@ pred valid_array(+ar, content) {
 
 /*@ spec push(ar, value) {
   requires: (ar == #ar) * (value == int(#value)) *
-            valid_array(#ar, #content)
-  ensures:  valid_array(#ar, #content @ [#value])
+            valid_array(#ar; #content)
+  ensures:  valid_array(#ar; #content @ [#value])
 }*/
 void push(Array *ar, int value) {
     if (ar->size == ar->capacity) {
@@ -54,8 +54,8 @@ void push(Array *ar, int value) {
 
 /* spec remove(ar, index) {
   requires: (ar == #ar) * (index == long(#index)) *
-            valid_array(#ar, #content) * (0 <=# #index) * (#index <# (len #content))
-  ensures:  valid_array(#ar, lsub(#content, 0, #index) @ lsub(#content, #index + 1, (len #content) - #index - 1))
+            valid_array(#ar; #content) * (0 <=# #index) * (#index <# (len #content))
+  ensures:  valid_array(#ar; lsub(#content, 0, #index) @ lsub(#content, #index + 1, (len #content) - #index - 1))
 }
 */
 void remove(Array *ar, size_t index) {

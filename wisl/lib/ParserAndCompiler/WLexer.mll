@@ -14,6 +14,7 @@ let gvars = "gvar_" digit+ (* generated variables during compilation *)
 let identifier = letter(letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
 let integer = digit+
+let float = digit* '.' digit*
 let loc = "$l" (letter|digit|'_')*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
@@ -36,6 +37,7 @@ rule read =
   | "dispose"{ DELETE (curr lexbuf) }
   | "pure" { PURE (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
+  | "par"    { PAR (curr lexbuf) }
   | "predicate" { PREDICATE (curr lexbuf) }
   | "datatype" { DATATYPE (curr lexbuf) }
   | "invariant" { INVARIANT (curr lexbuf) }
@@ -54,13 +56,15 @@ rule read =
   | "proof"  { PROOF (curr lexbuf) }
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
-  | "bind" { EXIST (curr lexbuf) }
+  | "bind" { BIND (curr lexbuf) }
+  | "spec" { SPEC (curr lexbuf) }
   | "case"  { CASE (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }
   | "Bool" { TBOOL (curr lexbuf) }
   | "String" { TSTRING (curr lexbuf) }
+  | "Float" { TFLOAT (curr lexbuf) }
   | "Any" { TANY (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
@@ -87,7 +91,7 @@ rule read =
   | ':'      { COLON (curr lexbuf) }
   | ','      { COMMA (curr lexbuf) }
   | "."      { DOT (curr lexbuf) }
-  | ';'      { SEMICOLON (curr lexbuf) }
+  | ';'      { SCOLON (curr lexbuf) }
   | '\''     { QUOTE (curr lexbuf) }
   | "|-"     { VDASH (curr lexbuf) }
   (* binary operators *)
@@ -98,11 +102,20 @@ rule read =
   | '>'      { GREATERTHAN }
   | '<'      { LESSTHAN }
   | "<="     { LESSEQUAL }
+  | "f>="    { FGREATEREQUAL }
+  | "f>"     { FGREATERTHAN }
+  | "f<"     { FLESSTHAN }
+  | "f<="    { FLESSEQUAL }
   | '+'      { PLUS }
   | '-'      { MINUS }
   | '*'      { TIMES }
   | '/'      { DIV }
   | '%'      { MOD }
+  | "f+"     { FPLUS }
+  | "f-"     { FMINUS }
+  | "f*"     { FTIMES }
+  | "f/"     { FDIV }
+  | "f%"     { FMOD }
   | "&&"     { AND }
   | "||"     { OR }
   | "!="     { NEQ }
@@ -118,6 +131,7 @@ rule read =
   (* identifiers *)
   | white    { read lexbuf }
   | newline  { new_line lexbuf; read lexbuf }
+  | float    { FLOAT (curr lexbuf, float_of_string (Lexing.lexeme lexbuf)) }
   | integer   { INTEGER (curr lexbuf, int_of_string (Lexing.lexeme lexbuf)) }
   | gvars    { IDENTIFIER (curr lexbuf, (Lexing.lexeme lexbuf)^"_user") } (* if it has a name of generated var, we add _user *)
   | identifier { IDENTIFIER (curr lexbuf, Lexing.lexeme lexbuf) }

@@ -5,7 +5,7 @@ type id
 
 module IdSet : Set.S with type elt = id
 
-(** {3 General manipulations } *)
+(** {3 General manipulations} *)
 
 val make : ?init_capacity:int -> unit -> t
 val reset : t -> unit

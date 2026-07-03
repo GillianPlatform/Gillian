@@ -23,7 +23,7 @@
 
 // Optional value or null
 /*@
-pred or_NULL(+x, +x_opt) {
+pred or_NULL(x, x_opt) {
     x_opt == x;
     x_opt == NULL
 }
@@ -31,7 +31,7 @@ pred or_NULL(+x, +x_opt) {
 
 // Any valid header
 /*@
-pred nounfold any_valid_aws_cryptosdk_hdr(+hdr, allocator) {
+pred nounfold any_valid_aws_cryptosdk_hdr(hdr; allocator) {
   (hdr -> struct aws_cryptosdk_hdr {
     allocator;
     #alg_id;
@@ -44,16 +44,16 @@ pred nounfold any_valid_aws_cryptosdk_hdr(+hdr, allocator) {
     #auth_len
   }) *
   (not (allocator == NULL)) *
-  valid_aws_byte_buf_fields(#iv, #len_iv, #cap_iv, #buf_iv, #iv_alloc, #content_iv) * or_NULL(allocator, #iv_alloc) *
-  valid_aws_byte_buf_fields(#auth_tag, #len_auth_tag, #cap_auth_tag, #buf_auth_tag, #auth_tag_alloc, #content_auth_tag) * or_NULL(allocator, #auth_tag_alloc) *
-  valid_hash_table_fields(#enc_ctx, allocator, #ctx_content, #ctx_content_utf8) *
-  valid_edk_array_list_fields(#edk_list, allocator, #edk_content)
+  valid_aws_byte_buf_fields(#iv; #len_iv, #cap_iv, #buf_iv, #iv_alloc, #content_iv) * or_NULL(allocator, #iv_alloc) *
+  valid_aws_byte_buf_fields(#auth_tag; #len_auth_tag, #cap_auth_tag, #buf_auth_tag, #auth_tag_alloc, #content_auth_tag) * or_NULL(allocator, #auth_tag_alloc) *
+  valid_hash_table_fields(#enc_ctx; allocator, #ctx_content, #ctx_content_utf8) *
+  valid_edk_array_list_fields(#edk_list; allocator, #edk_content)
 }
 */
 
 // Empty header
 /*@
-pred nounfold empty_aws_cryptosdk_hdr(+hdr, allocator) {
+pred nounfold empty_aws_cryptosdk_hdr(hdr; allocator) {
   (hdr -> struct aws_cryptosdk_hdr {
     allocator;
     int(0);
@@ -68,14 +68,14 @@ pred nounfold empty_aws_cryptosdk_hdr(+hdr, allocator) {
   (not (allocator == NULL)) *
   empty_aws_byte_buf_fields(#iv) *
   empty_aws_byte_buf_fields(#auth_tag) *
-  empty_hash_table_fields(#enc_ctx, allocator) *
-  empty_edk_array_list_fields(#edk_list, allocator)
+  empty_hash_table_fields(#enc_ctx; allocator) *
+  empty_edk_array_list_fields(#edk_list; allocator)
 }
 */
 
 // Deserialised header
 /*@
-pred nounfold header_struct(+hdr, allocator, alg_id, message_id, enc_ctx_content, edk_content, frame_len, auth_len, iv, auth_tag) {
+pred nounfold header_struct(hdr; allocator, alg_id, message_id, enc_ctx_content, edk_content, frame_len, auth_len, iv, auth_tag) {
   (hdr -> struct aws_cryptosdk_hdr {
     allocator;
     int(alg_id);
@@ -88,12 +88,12 @@ pred nounfold header_struct(+hdr, allocator, alg_id, message_id, enc_ctx_content
     long(auth_len)
   }) *
   (not (allocator == NULL)) *
-  valid_aws_byte_buf_fields(#iv, len iv, len iv, #iv_buf, allocator, iv) *
+  valid_aws_byte_buf_fields(#iv; len iv, len iv, #iv_buf, allocator, iv) *
   (0 <# len iv) * (not (#iv_buf == NULL)) *
-  valid_aws_byte_buf_fields(#auth_tag, len auth_tag, len auth_tag, #auth_buf, allocator, auth_tag) *
+  valid_aws_byte_buf_fields(#auth_tag; len auth_tag, len auth_tag, #auth_buf, allocator, auth_tag) *
   (0 <# len auth_tag) * (not (#auth_buf == NULL)) *
-  valid_hash_table_fields(#enc_ctx, allocator, enc_ctx_content, #enc_ctx_utf8) *
-  valid_edk_array_list_fields(#edk_list, allocator, edk_content)
+  valid_hash_table_fields(#enc_ctx; allocator, enc_ctx_content, #enc_ctx_utf8) *
+  valid_edk_array_list_fields(#edk_list; allocator, edk_content)
 }
 */
 
@@ -129,20 +129,20 @@ int is_known_type(uint8_t content_type) {
     spec aws_cryptosdk_algorithm_is_known(alg_id) {
         requires:
             (alg_id == int(#alg_id)) *
-            CAlgorithmSuite(#alg_id, #stringId, #ivLength, #tagLength)
+            CAlgorithmSuite(#alg_id; #stringId, #ivLength, #tagLength)
 
         ensures:
-            CAlgorithmSuite(#alg_id, #stringId, #ivLength, #tagLength) *
+            CAlgorithmSuite(#alg_id; #stringId, #ivLength, #tagLength) *
             (ret == TRUE)
 
     OR
 
         requires:
             (alg_id == int(#alg_id)) *
-            BAlgorithmSuite(#alg_id, #errorMessage)
+            BAlgorithmSuite(#alg_id; #errorMessage)
 
         ensures:
-            BAlgorithmSuite(#alg_id, #errorMessage) *
+            BAlgorithmSuite(#alg_id; #errorMessage) *
             (ret == FALSE)
     }
 */
@@ -173,20 +173,20 @@ int aws_cryptosdk_algorithm_is_known(uint16_t alg_id) {
     spec aws_cryptosdk_algorithm_ivlen(alg_id) {
         requires:
             (alg_id == int(#alg_id)) *
-            CAlgorithmSuite(#alg_id, #stringId, #ivLength, #tagLength)
+            CAlgorithmSuite(#alg_id; #stringId, #ivLength, #tagLength)
 
         ensures:
-            CAlgorithmSuite(#alg_id, #stringId, #ivLength, #tagLength) *
+            CAlgorithmSuite(#alg_id; #stringId, #ivLength, #tagLength) *
             (ret == int(#ivLength))
 
     OR
 
         requires:
             (alg_id == int(#alg_id)) *
-            BAlgorithmSuite(#alg_id, #errorMessage)
+            BAlgorithmSuite(#alg_id; #errorMessage)
 
         ensures:
-            BAlgorithmSuite(#alg_id, #errorMessage) *
+            BAlgorithmSuite(#alg_id; #errorMessage) *
             (ret == int(-1))
     }
 */
@@ -208,20 +208,20 @@ int aws_cryptosdk_algorithm_ivlen(uint16_t alg_id) {
     spec aws_cryptosdk_algorithm_taglen(alg_id) {
         requires:
             (alg_id == int(#alg_id)) *
-            CAlgorithmSuite(#alg_id, #stringId, #ivLength, #tagLength)
+            CAlgorithmSuite(#alg_id; #stringId, #ivLength, #tagLength)
 
         ensures:
-            CAlgorithmSuite(#alg_id, #stringId, #ivLength, #tagLength) *
+            CAlgorithmSuite(#alg_id; #stringId, #ivLength, #tagLength) *
             (ret == int(#tagLength))
 
     OR
 
         requires:
             (alg_id == int(#alg_id)) *
-            BAlgorithmSuite(#alg_id, #errorMessage)
+            BAlgorithmSuite(#alg_id; #errorMessage)
 
         ensures:
-            BAlgorithmSuite(#alg_id, #errorMessage) *
+            BAlgorithmSuite(#alg_id; #errorMessage) *
             (ret == int(-1))
     }
 */
@@ -241,11 +241,11 @@ int aws_cryptosdk_algorithm_taglen(uint16_t alg_id) {
     spec aws_cryptosdk_hdr_clear(hdr) {
         requires:
             (hdr == #hdr) *
-            any_valid_aws_cryptosdk_hdr(#hdr, #alloc) *
+            any_valid_aws_cryptosdk_hdr(#hdr; #alloc) *
             default_allocator(#alloc)
 
         ensures:
-            empty_aws_cryptosdk_hdr(#hdr, #alloc) *
+            empty_aws_cryptosdk_hdr(#hdr; #alloc) *
             default_allocator(#alloc)
     }
 */
@@ -278,8 +278,8 @@ void aws_cryptosdk_hdr_clear(struct aws_cryptosdk_hdr *hdr) {
         requires:
             (allocator == #alloc) * (edk == #edk) * (cur == #cur) *
             default_allocator(#alloc) *
-            Element(#definition, #content, 0, 3, #edk_content, #element_length) *
-            valid_aws_byte_cursor_ptr(#cur, #total_length, #buffer, #content) *
+            Element(#content, 0, 3; #definition, #edk_content, #element_length) *
+            valid_aws_byte_cursor_ptr(#cur; #total_length, #buffer, #content) *
             (not (#buffer == NULL)) *
             any_aws_last_error() *
             ARRAY(#edk, long, 12, #trash) *
@@ -291,20 +291,20 @@ void aws_cryptosdk_hdr_clear(struct aws_cryptosdk_hdr *hdr) {
         ensures:
             default_allocator(#alloc) *
             (#definition == `Complete`) *
-            valid_aws_byte_cursor_ptr(#cur, #total_length - #element_length, #buffer p+ #element_length, #rest) *
-            valid_aws_cryptosdk_edk_ptr(#edk, #alloc, #edk_content) *
+            valid_aws_byte_cursor_ptr(#cur; #total_length - #element_length, #buffer p+ #element_length, #rest) *
+            valid_aws_cryptosdk_edk_ptr(#edk; #alloc, #edk_content) *
             ARRAY(#buffer, char, #element_length, #edk_raw_content) *
             any_aws_last_error() *
             (ret == int(0));
 
             default_allocator(#alloc) *
             (#definition == `Incomplete`) *
-            valid_aws_byte_cursor_ptr(#cur, #left_length, #new_buffer, #restAfterConsuming) *
+            valid_aws_byte_cursor_ptr(#cur; #left_length, #new_buffer, #restAfterConsuming) *
             (0 <=# #consumed_length) *
             (#consumed_length == #total_length - #left_length) *
             (#new_buffer == #buffer p+ #consumed_length) *
             empty_aws_cryptosdk_edk_ptr(#edk) *
-            optBytes(#buffer, #consumed_length, #consumed_data) *
+            optBytes(#buffer, #consumed_length; #consumed_data) *
             (#content == #consumed_data @ #restAfterConsuming) *
             aws_last_error_is_SHORT_BUF() *
             (ret == int(-1))
@@ -318,7 +318,7 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
     memset(edk, 0, sizeof(*edk));
 
     GILLIAN("apply valid_aws_byte_cursor_ptr_facts(#cur, #total_length, #buffer, #content)");
-    GILLIAN("unfold Element(#definition, #content, 0, 3, #edk_content, #element_length)");
+    GILLIAN("unfold Element(#content, 0, 3, #definition, #edk_content, #element_length)");
     GILLIAN(
         "if (#definition = `Complete`) { \
             unfold CElement(#content, 0, 3, #edk_content, #element_length) \
@@ -398,13 +398,13 @@ MEM_ERR:
     spec aws_cryptosdk_hdr_parse(hdr, pcursor) {
         requires:
             (hdr == #hdr) * (pcursor == #pcursor) *
-            valid_aws_byte_cursor_ptr(#pcursor, #length, #buffer, #data) *
-            Header(#definition, #data, #part_one, #version, #type, #suiteId, #messageId,
+            valid_aws_byte_cursor_ptr(#pcursor; #length, #buffer, #data) *
+            Header(#data; #definition, #part_one, #version, #type, #suiteId, #messageId,
                    #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength,
                    #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage) *
             (#length == len #data) *
             (#length <# 2147483647) *
-            any_valid_aws_cryptosdk_hdr(#hdr, #alloc) *
+            any_valid_aws_cryptosdk_hdr(#hdr; #alloc) *
             default_allocator(#alloc) *
             any_aws_last_error() *
             (#definition == `Incomplete`)
@@ -412,22 +412,22 @@ MEM_ERR:
         ensures:
             (#definition == `Complete`) *
             ARRAY(#buffer, char, #length, #data) *
-            valid_aws_byte_cursor_ptr(#pcursor, 0, #end_buffer, []) *
-            header_struct(#hdr, #alloc, #suiteId, #messageId, #ECKs, #EDKs, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+            valid_aws_byte_cursor_ptr(#pcursor; 0, #end_buffer, []) *
+            header_struct(#hdr; #alloc, #suiteId, #messageId, #ECKs, #EDKs, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
             default_allocator(#alloc) *
             any_aws_last_error() *
             (ret == int(0));
 
             (#definition == `Incomplete`) *
-            valid_aws_byte_cursor_ptr(#pcursor, #length, #buffer, #data) *
-            empty_aws_cryptosdk_hdr(#hdr, #alloc) *
+            valid_aws_byte_cursor_ptr(#pcursor; #length, #buffer, #data) *
+            empty_aws_cryptosdk_hdr(#hdr; #alloc) *
             default_allocator(#alloc) *
             aws_last_error_is_SHORT_BUF() *
             (ret == int(-1));
 
             (#definition == `Broken`) *
-            valid_aws_byte_cursor_ptr(#pcursor, #length, #buffer, #data) *
-            empty_aws_cryptosdk_hdr(#hdr, #alloc) *
+            valid_aws_byte_cursor_ptr(#pcursor; #length, #buffer, #data) *
+            empty_aws_cryptosdk_hdr(#hdr; #alloc) *
             default_allocator(#alloc) *
             aws_last_error_is_BAD_CIPHERTEXT() *
             (ret == int(-1))
@@ -437,7 +437,7 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
                             struct aws_byte_cursor *pcursor) {
 
     GILLIAN(
-        "unfold Header(#definition, #data, #part_one, #version, #type, \
+        "unfold Header(#data, #definition, #part_one, #version, #type, \
             #suiteId, #messageId, #ECLength, #part_two, #ECKs, \
             #part_three, #EDKs, #contentType, #headerIvLength, \
             #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage) \
@@ -511,7 +511,7 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
 
     GILLIAN("unfold_all Elements");
     if (aad_len) {
-        GILLIAN("if (#definition = `Broken`) { if (#ECDef = `Broken`) { unfold BRawEncryptionContext(#errorMessage, #BEC, #ECKs) } }");
+        GILLIAN("if (#definition = `Broken`) { if (#ECDef = `Broken`) { unfold BRawEncryptionContext(#BEC, #errorMessage, #ECKs) } }");
         struct aws_byte_cursor aad = aws_byte_cursor_advance(&cur, aad_len);
         // Note that, even if this fails with SHORT_BUF, we report a parse
         // error, since we know we have enough data (according to the aad
@@ -562,8 +562,8 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
                 (#eList == #EDKs) * \
                 (#EDKsAndRest == lsub(#part_three, 2, (len #part_three) - 2)) * \
                 (#EDKsAndRest == #justEDKs @ #restOfHeader) * \
-                CElements(#EDKsAndRest, 0, #edk_count, 3, #eList, #totalEDKLength) * \
-                valid_aws_byte_cursor_ptr(#cur, #atEDKs, #bptr, #EDKsAndRest) \
+                CElements(#EDKsAndRest, 0, #edk_count, 3; #eList, #totalEDKLength) * \
+                valid_aws_byte_cursor_ptr(#cur; #atEDKs, #bptr, #EDKsAndRest) \
         } else { \
             if (#edkDef = `Incomplete`) { \
                 assert [[bind #edk_al, #edkLenb0, #edkLenb1, #justEDKs, #EDKsAndRest, #restOfHeader, #totalEDKLength, #atEDKs, #bptr, #eList]] \
@@ -571,8 +571,8 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
                     (#edks == ([ #edkLenb0, #edkLenb1 ] @ #justEDKs)) * \
                     (#EDKsAndRest == lsub(#part_three, 2, (len #part_three) - 2)) * \
                     (#EDKsAndRest == #justEDKs @ #restOfHeader) * \
-                    IElements(#EDKsAndRest, 0, #edk_count, 3, #eList, #totalEDKLength) * \
-                    valid_aws_byte_cursor_ptr(#cur, #atEDKs, #bptr, #EDKsAndRest) \
+                    IElements(#EDKsAndRest, 0, #edk_count, 3; #eList, #totalEDKLength) * \
+                    valid_aws_byte_cursor_ptr(#cur; #atEDKs, #bptr, #EDKsAndRest) \
             } else { \
                 assert False \
             } \
@@ -587,13 +587,13 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
             any_aws_last_error() * \
             (i == int(#i)) * default_allocator(#alloc) * \
             (#hdr -> ptr(#all, #alo)) * (#alloc == ptr(#all, #alo)) * \
-            optBytes(#bptr, #readLength, #readEDKs) * \
+            optBytes(#bptr, #readLength; #readEDKs) * \
             (#readLength == len #readEDKs) * \
             (len #data == 22 + #ECLength + 2 + #readLength + #restLength) * \
-            valid_aws_byte_cursor_ptr(#cur, #restLength, #cbptr, #restEDKsAndRest) * \
-            valid_edk_array_list_ptr(#edk_al, #alloc, #acc) * \
+            valid_aws_byte_cursor_ptr(#cur; #restLength, #cbptr, #restEDKsAndRest) * \
+            valid_edk_array_list_ptr(#edk_al; #alloc, #acc) * \
             (len #acc == #i) * (#eList == #acc @ #restEDKs) * \
-            Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) * \
+            Elements(#restEDKsAndRest, 0, #rest_count, 3; #edkDef, #restEDKs, #restEDKLength) * \
             (#restLength == len #restEDKsAndRest) * \
             (#rest_count == (#edk_count - #i)) * \
             (#restLength == (#atEDKs - #readLength)) * \
@@ -610,7 +610,7 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
 
         GILLIAN("unfold_all i__ptr");
         GILLIAN("unfold_all i__ptr_add");
-        GILLIAN("unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
+        GILLIAN("unfold Elements(#restEDKsAndRest, 0, #rest_count, 3, #edkDef, #restEDKs, #restEDKLength)");
         GILLIAN(
             "if (#edkDef = `Complete`) { \
                 unfold CElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) \
@@ -645,12 +645,12 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
     GILLIAN("assert (len #acc == #edk_count)");
     GILLIAN(
         "if (#edkDef = `Incomplete`) { \
-            unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength); \
+            unfold Elements(#restEDKsAndRest, 0, #rest_count, 3, #edkDef, #restEDKs, #restEDKLength); \
             unfold IElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) \
         }");
     GILLIAN("assert (len #restEDKs == 0) ");
     GILLIAN("assert (#rest_count == 0) * (#EDKs == #acc) ");
-    GILLIAN("unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
+    GILLIAN("unfold Elements(#restEDKsAndRest, 0, #rest_count, 3, #edkDef, #restEDKs, #restEDKLength)");
     GILLIAN("unfold CElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
     GILLIAN("assert (len #leftEDKs == 0)");
 

@@ -1,6 +1,4 @@
-(**
-    Reporter which logs to a file
-*)
+(** Reporter which logs to a file *)
 
 let filename = "file.log"
 let out_channel = ref None

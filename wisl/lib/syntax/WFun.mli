@@ -6,7 +6,7 @@ type t = {
   return_expr : WExpr.t;
   floc : CodeLoc.t;
   fid : int;
-  is_loop_body : bool;
+  loop_body_of : string option;
 }
 
 val get_id : t -> int
@@ -15,7 +15,13 @@ val get_name : t -> string
 val get_spec : t -> WSpec.t option
 
 val add_spec :
-  t -> WLAssert.t -> WLAssert.t -> WLExpr.t option -> CodeLoc.t -> t
+  ?existentials:string * string list ->
+  t ->
+  WLAssert.t ->
+  WLAssert.t ->
+  WLExpr.t option ->
+  CodeLoc.t ->
+  t
 
 val functions_called : t -> string list
 val has_spec : t -> bool

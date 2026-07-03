@@ -30,8 +30,8 @@ val add : 'a t -> 'a -> unit
 (** [rep uf e] finds the representative of node [e] in the union-find [uf] *)
 val rep : 'a t -> 'a -> 'a
 
-(** [union uf e1 e2] merges elements [e1] and [e2] in the 
-        union-find [uf], performing path compression along the way. *)
+(** [union uf e1 e2] merges elements [e1] and [e2] in the union-find [uf],
+    performing path compression along the way. *)
 val union : 'a t -> 'a -> 'a -> unit
 
 (** [fold f ac uf] folds over the union find uf *)

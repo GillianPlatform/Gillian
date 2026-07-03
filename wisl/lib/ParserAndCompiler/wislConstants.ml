@@ -2,8 +2,6 @@ let internal_imports = [ "wisl_pointer_arith.gil"; "wisl_core.gil" ]
 let internal_prefix = "i__"
 
 module Prefix = struct
-  let gvar = "gvar"
-  let sgvar = "#wisl__"
   let loopinv_lab = "loopinv"
   let loop_lab = "loop"
   let ctn_lab = "continue"

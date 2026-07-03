@@ -8,17 +8,17 @@ import `../logic/StringStruct`;
 */
 
 /*@
-  pred valid_aws_string_ptr(+str, alloc, content) {
-    m_struct_aws_string_exposing_pointer(str, alloc, long(#len), #bytes) *
+  pred valid_aws_string_ptr(str; alloc, content) {
+    m_struct_aws_string_exposing_pointer(str; alloc, long(#len), #bytes) *
     (0 <=# #len) *
     ARRAY(#bytes, char, #len + 1, #bytes_content) *
     (#rawContent == lsub(#bytes_content, 0, #len)) *
     (#bytes_content == #rawContent @ [ 0 ]) *
-    toUtf8(#rawContent, content)
+    toUtf8(#rawContent; content)
   }
 */
 
-/*@ pred nounfold optBytes(+bytes, +length, content) {
+/*@ pred nounfold optBytes(bytes, length; content) {
   (length == 0) * (content == nil);
   (0 <# length) * ARRAY(bytes, char, length, content)
 }
@@ -29,11 +29,11 @@ import `../logic/StringStruct`;
   requires: (allocator == #alloc) *
             (bytes == #bytes) * (length == long(#len)) *
             (#len <=# 65535) *
-            optBytes(#bytes, #len, #rawContent) *
-            toUtf8(#rawContent, #strContent) *
+            optBytes(#bytes, #len; #rawContent) *
+            toUtf8(#rawContent; #strContent) *
             default_allocator(#alloc)
-  ensures:  valid_aws_string_ptr(ret, #alloc, #strContent) *
-            optBytes(#bytes, #len, #rawContent) *
+  ensures:  valid_aws_string_ptr(ret; #alloc, #strContent) *
+            optBytes(#bytes, #len; #rawContent) *
             default_allocator(#alloc)
 }
 */
@@ -64,7 +64,7 @@ struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
 }
 
 /*@ spec aws_string_destroy(str) {
-    requires: valid_aws_string_ptr(str, #alloc, #strContent) *
+    requires: valid_aws_string_ptr(str; #alloc, #strContent) *
               default_allocator(#alloc)
     ensures: default_allocator(#alloc)
 

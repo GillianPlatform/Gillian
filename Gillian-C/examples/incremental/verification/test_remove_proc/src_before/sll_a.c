@@ -1,21 +1,21 @@
 #include "sll.h"
 
-/*@ pred list(+p, alpha) {
+/*@ pred list(p; alpha) {
   (p -m> struct ln { #head; #tail } * (alpha == #head::#beta)) *
-  list(#tail,#beta);
+  list(#tail;#beta);
   (p == NULL) * (alpha == nil)
 }
 
-pred listSeg(+p, +q, alpha) {
+pred listSeg(p, q; alpha) {
     ( p == q ) * (alpha == nil);
 
     (p -m> struct ln { #head; #tail } * (alpha == #head::#beta)) *
-    listSeg(#tail, q, #beta)
+    listSeg(#tail, q; #beta)
 }
 
 lemma lsegToList(p, alpha) {
-    hypothesis: listSeg(#p, NULL, #alpha)
-    conclusions: list(#p, #alpha)
+    hypothesis: listSeg(#p, NULL; #alpha)
+    conclusions: list(#p; #alpha)
     proof:
       unfold listSeg(#p, NULL, #alpha) [[bind #head: #head,
                                            #tail: #tail,
@@ -27,8 +27,8 @@ lemma lsegToList(p, alpha) {
 }
 
 lemma listSegAppend(p, q, alpha, a, end) {
-    hypothesis: listSeg(#p, #q, #alpha) * (#q -m> struct ln { #a; #end })
-    conclusions: listSeg(#p, #end, #alpha @ [#a])
+    hypothesis: listSeg(#p, #q; #alpha) * (#q -m> struct ln { #a; #end })
+    conclusions: listSeg(#p, #end; #alpha @ [#a])
     proof:
       unfold listSeg(#p, #q, #alpha)[[bind #head: #head,
                                            #tail: #tail,
@@ -41,8 +41,8 @@ lemma listSegAppend(p, q, alpha, a, end) {
 */
 
 /*@ spec listAppend(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * (#v == int(#z))
-  ensures:  list(ret, #alpha @ [ #v ])
+  requires: (x == #x) * list(#x; #alpha) * (v == #v) * (#v == int(#z))
+  ensures:  list(ret; #alpha @ [ #v ])
 } */
 SLL *listAppend(SLL *x, int v) {
     if (x == NULL) {
@@ -52,7 +52,7 @@ SLL *listAppend(SLL *x, int v) {
         return el;
     } else {
         SLL *tailp = listAppend(x->next, v);
-        __builtin_annot("assert [[bind #t]] list(tailp, #t)");
+        __builtin_annot("assert [[bind #t]] list(tailp; #t)");
         __builtin_annot("unfold list(tailp, #t)");
         __builtin_annot("fold list(tailp, #t)");
         x->next = tailp;
@@ -64,8 +64,8 @@ SLL *listAppend(SLL *x, int v) {
   requires: (x -m> struct ln { #head; NULL }) *
             (x == #v) *
             (z == #z) *
-            list(#z, #alpha)
-  ensures: list(ret, #head::#alpha)
+            list(#z; #alpha)
+  ensures: list(ret; #head::#alpha)
 } */
 SLL *listPrepend(SLL *x, SLL *z) {
     __builtin_annot("unfold list(#z, #alpha)");
@@ -74,8 +74,8 @@ SLL *listPrepend(SLL *x, SLL *z) {
 }
 
 /*@ spec listPrependV(x, v) {
-  requires: (x == #x) * list(#x, #alpha) * (v == #v) * (#v == int(#z))
-  ensures: list(ret, #v::#alpha)
+  requires: (x == #x) * list(#x; #alpha) * (v == #v) * (#v == int(#z))
+  ensures: list(ret; #v::#alpha)
 }
 */
 SLL* listPrependV(SLL *x, int v) {
@@ -87,8 +87,8 @@ SLL* listPrependV(SLL *x, int v) {
 }
 
 /*@ spec listLength(x) {
-  requires: list(#x, #alpha) * (x == #x)
-  ensures:  list(#x, #alpha) * (ret == int(#r)) * (#r == len #alpha)
+  requires: list(#x; #alpha) * (x == #x)
+  ensures:  list(#x; #alpha) * (ret == int(#r)) * (#r == len #alpha)
 } */
 int listLength(SLL *x) {
     if (x == NULL) {

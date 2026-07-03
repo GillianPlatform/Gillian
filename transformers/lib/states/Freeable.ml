@@ -38,7 +38,7 @@ module Make (S : MyMonadicSMemory.S) :
          (fun (a, arg, ret) -> (SubAction a, arg, ret))
          (S.list_actions ())
 
-  type pred = FreedPred | SubPred of S.pred
+  type pred = FreedPred | SubPred of S.pred [@@deriving yojson]
 
   let pred_from_str = function
     | "freed" -> Some FreedPred
@@ -55,7 +55,7 @@ module Make (S : MyMonadicSMemory.S) :
   let empty () : t = None
   let simplify s = if S.is_empty s then None else SubState s
 
-  let execute_action action s (args : Values.t list) :
+  let[@inline] execute_action action s (args : Values.t list) :
       (t * Values.t list, err_t) DR.t =
     let open Delayed.Syntax in
     match (action, s) with
@@ -77,7 +77,7 @@ module Make (S : MyMonadicSMemory.S) :
     | Free, Freed -> DR.error DoubleFree
     | Free, None -> DR.error NotEnoughResourceToFree
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     match (pred, s) with
     | SubPred p, SubState s -> (
@@ -95,7 +95,7 @@ module Make (S : MyMonadicSMemory.S) :
     | FreedPred, Freed -> DR.ok (empty (), [])
     | FreedPred, None -> DR.error MissingFreed
 
-  let produce pred s args =
+  let[@inline] produce pred s args =
     let open Delayed.Syntax in
     match (pred, s) with
     | SubPred p, SubState s ->
@@ -165,8 +165,9 @@ module Make (S : MyMonadicSMemory.S) :
     | SubState s -> S.assertions_others s
     | _ -> []
 
-  let get_recovery_tactic = function
-    | SubError e -> S.get_recovery_tactic e
+  let get_recovery_tactic s e =
+    match (s, e) with
+    | SubState s, SubError e -> S.get_recovery_tactic s e
     | _ -> Gillian.General.Recovery_tactic.none (* TODO *)
 
   let can_fix = function
@@ -177,11 +178,11 @@ module Make (S : MyMonadicSMemory.S) :
 
   let get_fixes = function
     | SubError e ->
-        S.get_fixes e |> MyUtils.deep_map (MyAsrt.map_cp lift_corepred)
+        S.get_fixes e |> MyUtils.deep_map lift_corepred
         (* Fix can either be inner fix, or if empty the memory is freed!
            But Gillian C/WISL doesn't implement this so we comment it out
            to have comparable performance *)
-        (* @ [ [ MyAsrt.CorePred (FreedPred, [], []) ] ]*)
-    | MissingFreed -> [ [ MyAsrt.CorePred (FreedPred, [], []) ] ]
+        (* @ [ [ (FreedPred, [], []) ] ]*)
+    | MissingFreed -> [ [ (FreedPred, [], []) ] ]
     | _ -> failwith "Invalid fix call"
 end

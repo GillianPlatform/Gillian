@@ -23,7 +23,7 @@ type t =
   | PointsTo of JSExpr.t * JSExpr.t * JSExpr.t
   | MetaData of JSExpr.t * JSExpr.t
   | Emp
-  | Pred of string * JSExpr.t list
+  | Pred of string * JSExpr.t list * JSExpr.t list
   | Types of (string * Type.t) list
   | Scope of string * JSExpr.t
   | VarSChain of string * string * JSExpr.t * JSExpr.t
@@ -71,10 +71,10 @@ let rec js2jsil
   let fp = js2jsil_pure scope_le in
   let fe = JSExpr.js2jsil scope_le in
 
-  let compile_pred s les =
-    let a' = Asrt.Pred (s, List.map fe les) in
+  let compile_pred s ins outs =
+    let a' = Asrt.Pred (s, List.map fe ins, List.map fe outs) in
     if s = funobj_pred_name then
-      match les with
+      match ins @ outs with
       | [ _; Lit (String fid); le_sc; _; _ ] ->
           Asrt.Star (a', f (SChain (fid, le_sc)))
       | _ -> a'
@@ -91,26 +91,34 @@ let rec js2jsil
   | Types vts ->
       Asrt.Types (List.map (fun (v, t) -> (Expr.from_var_name v, t)) vts)
   | EmptyFields (e, domain) -> Asrt.EmptyFields (fe e, fe domain)
-  | Pred (name, [ loc; Lit (String fid); sch; args_len; fproto ])
-    when name = "JSFunctionObject" || name = "JSFunctionObjectStrong" ->
-      let len = List.length (get_vis_list vis_tbl fid) in
-      let a_len =
-        Asrt.Pure
-          (BinOp
-             (Lit (Num (float_of_int (len - 1))), Equal, UnOp (LstLen, fe sch)))
-      in
-      let a_lg =
-        Asrt.Pure
-          (BinOp
-             ( Lit (Loc locGlobName),
-               Equal,
-               Expr.BinOp (fe sch, LstNth, Expr.Lit (Num (float_of_int 0))) ))
-      in
-      let a_pred =
-        compile_pred name [ loc; Lit (String fid); sch; args_len; fproto ]
-      in
-      Asrt.star [ a_lg; a_len; a_pred ]
-  | Pred (s, les) -> compile_pred s les
+  | Pred (name, ins, outs)
+    when (name = "JSFunctionObject" || name = "JSFunctionObjectStrong")
+         &&
+         match ins @ outs with
+         | [ _; Lit (String _); _; _; _ ] -> true
+         | _ -> false -> (
+      match ins @ outs with
+      | [ _loc; Lit (String fid); sch; _args_len; _fproto ] ->
+          let len = List.length (get_vis_list vis_tbl fid) in
+          let a_len =
+            Asrt.Pure
+              (BinOp
+                 ( Lit (Num (float_of_int (len - 1))),
+                   Equal,
+                   UnOp (LstLen, fe sch) ))
+          in
+          let a_lg =
+            Asrt.Pure
+              (BinOp
+                 ( Lit (Loc locGlobName),
+                   Equal,
+                   Expr.BinOp (fe sch, LstNth, Expr.Lit (Num (float_of_int 0)))
+                 ))
+          in
+          let a_pred = compile_pred name ins outs in
+          Asrt.star [ a_lg; a_len; a_pred ]
+      | _ -> assert false)
+  | Pred (s, ins, outs) -> compile_pred s ins outs
   (* le_x'  = Te(le_x)
         le_sc' = Te(le_sc)
      ----------------------------------------------
@@ -257,8 +265,8 @@ let rec js2jsil
 
 let errors_assertion () =
   Asrt.Star
-    ( Pred (type_error_pred_name, [ PVar var_te ]),
-      Pred (syntax_error_pred_name, [ PVar var_se ]) )
+    ( Pred (type_error_pred_name, [ PVar var_te ], []),
+      Pred (syntax_error_pred_name, [ PVar var_se ], []) )
 
 let js2jsil_tactic
     (cc_tbl : cc_tbl_type)

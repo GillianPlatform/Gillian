@@ -13,11 +13,12 @@ module Make
       -> Backend.S with type category = Suite.category)
     (Outcome : Outcome.S)
     (Suite : Suite.S)
-    (Expectations : Expectations.S
-                      with type info = Suite.info
-                       and type category = Suite.category
-                       and type matcher = Backend(Outcome)(Suite).matcher
-                       and type outcome = Outcome.t) : S = struct
+    (Expectations :
+      Expectations.S
+        with type info = Suite.info
+         and type category = Suite.category
+         and type matcher = Backend(Outcome)(Suite).matcher
+         and type outcome = Outcome.t) : S = struct
   module Backend = Backend (Outcome) (Suite)
   module PC = Outcome.ParserAndCompiler
 
@@ -126,21 +127,19 @@ module Make
           Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
         in
         if should_execute prog filename prev_results_opt then
-          match MP.init_prog prog with
-          | Error _ -> failwith "Failed to create matching plans"
-          | Ok prog ->
-              let () = before_execution () in
-              let ret =
-                Interpreter.evaluate_proc
-                  (fun x -> x)
-                  prog !Config.entry_point []
-                  (State.init progs.init_data)
-              in
-              let call_graph = Interpreter.call_graph in
-              let copy = Call_graph.merge (Call_graph.make ()) call_graph in
-              let () = Hashtbl.add cur_call_graphs filename copy in
-              let () = tests_ran := filename :: !tests_ran in
-              Ok ret
+          let prog = MP.init_prog prog in
+          let () = before_execution () in
+          let ret =
+            Interpreter.evaluate_proc
+              (fun x -> x)
+              prog !Config.entry_point []
+              (State.init progs.init_data)
+          in
+          let call_graph = Interpreter.call_graph in
+          let copy = Call_graph.merge (Call_graph.make ()) call_graph in
+          let () = Hashtbl.add cur_call_graphs filename copy in
+          let () = tests_ran := filename :: !tests_ran in
+          Ok ret
         else Ok []
         (* TODO (Alexis): Persist and fetch actual execution summary *)
       in

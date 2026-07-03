@@ -174,6 +174,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token RETURN
 %token THROW
 %token EXTERN
+%token PAR
 (* Logic variables *)
 %token <string> LVAR
 (* Logical expressions *)
@@ -345,23 +346,24 @@ assertion_id_target:
 ;
 
 pred_param_target:
-  (* Program variable with in-parameter status and optional type *)
-  | in_param = option(FPLUS); v = VAR; t = option(preceded(COLON, type_target))
-    { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
-      (v, t), in_param }
+  (* Program variable with optional type *)
+  | v = VAR; t = option(preceded(COLON, type_target))
+    { (v, t) }
 ;
 
+(* Predicate parameters: in-parameters and out-parameters, separated by a
+   semicolon. E.g. [(in1, in2; out1, out2)], [(in1, in2;)] for all-ins,
+   [(;out1, out2)] for all-outs.
+   No semicolon implies all-ins.*)
 pred_head_target:
-  name = proc_name; LBRACE; params = separated_list(COMMA, pred_param_target); RBRACE;
-  { (* Register the predicate declaration in the syntax checker *)
+  name = proc_name; LBRACE;
+    ins = separated_list(COMMA, pred_param_target);
+    outs = outs(pred_param_target);
+  RBRACE;
+  { let params = ins @ outs in
     let num_params = List.length params in
-    let params, ins = List.split params in
-    let param_names, _ = List.split params in
-    let ins = List.map Option.get (List.filter (fun x -> x <> None) (List.mapi (fun i is_in -> if is_in then Some i else None) ins)) in
-    let ins = if (List.length ins > 0) then ins else (List.mapi (fun i _ -> i) param_names) in
-    (* register_predicate name num_params; *)
-    (* enter_predicate params; *)
-    (name, num_params, params, ins)
+    let ins_number = List.length ins in
+    (name, num_params, params, ins_number)
   }
 ;
 
@@ -653,6 +655,8 @@ gproc_target:
         proc_spec;
         proc_aliases = [];
         proc_calls = [];
+        proc_display_name = None;
+        proc_hidden = false;
       }
   }
 ;
@@ -676,6 +680,14 @@ gcmd_with_annot:
       let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
+
+gcmd_call:
+  | v=VAR; DEFEQ; e=expr_target;
+    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+    {
+      ({ var_name = v; fun_name = e; args = es; bindings = subst }, oi)
+    }
+
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)
@@ -693,10 +705,20 @@ gcmd_target:
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { Cmd.GuardedGoto (e, i, j) }
 (* x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble] *)
-  | v=VAR; DEFEQ; e=expr_target;
-    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+  | call=gcmd_call
     {
-      Cmd.Call (v, e, es, oi, subst)
+      let call, oi = call in
+      Cmd.Call (call, oi)
+    }
+(* par [x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble]; ...] *)
+  | PAR; LBRACKET; calls=separated_list(SCOLON, gcmd_call); RBRACKET
+    {
+      let calls = List.map (fun (call, oi) ->
+          if Option.is_some oi then failwith "Par call doesn't support error label";
+          call
+        ) calls
+      in
+      Cmd.Par calls
     }
 (* x := e(e1, ..., en) with j *)
   | v=VAR; DEFEQ; EXTERN; pname=VAR;
@@ -747,7 +769,8 @@ g_spec_target:
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
     let spec_incomplete = Option.is_some incomplete in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
+    let spec_location = Some (get_loc $startpos $endpos) in
+    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify; spec_location } in
     spec
   }
 ;
@@ -791,8 +814,11 @@ top_level_g_assertion_target:
   a = g_assertion_target; EOF { a }
 
 predicate_call:
-  name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
-  { (name, params) }
+  name = proc_name; LBRACE;
+  ins = separated_list(COMMA, expr_target);
+  outs = outs(expr_target);
+  RBRACE
+  { (name, ins, outs) }
 
 g_assertion_target:
 (* (pure) /\ (pure) *)
@@ -806,9 +832,10 @@ g_assertion_target:
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { left_ass @ right_ass } %prec separating_conjunction
   | lhs = predicate_call; WAND; rhs = predicate_call
-    { [ Asrt.Wand {lhs; rhs } ] }
+    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
+      [ Asrt.Wand {lhs = (ln, li @ lo); rhs = (rn, ri @ ro) } ] }
 (* <CorePred>(es; es) *)
-  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
+  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); es2=outs(expr_target); RBRACE
     { [ Asrt.CorePred (v, es1, es2) ] }
 (* emp *)
   | LEMP;
@@ -816,8 +843,8 @@ g_assertion_target:
 (* x(e1, ..., en) *)
   | pcall = predicate_call
     {
-      let (name, params) = pcall in
-      [ Asrt.Pred (name, params) ]
+      let (name, ins, outs) = pcall in
+      [ Asrt.pred name ins outs ]
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
@@ -856,7 +883,8 @@ g_logic_cmd_target:
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
-    { LCmd.SL (Package { lhs; rhs })}
+    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
+      LCmd.SL (Package { lhs = (ln, li @ lo); rhs = (rn, ri @ ro) })}
 
 (* unfold_all x *)
   | UNFOLDALL; name = proc_name
@@ -953,7 +981,7 @@ g_pred_target:
     let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
     let pred_nounfold = pred_abstract || Option.is_some nounfold in
-    let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let (pred_name, pred_num_params, pred_params, ins_number) = pred_head in
     let pred_definitions = Option.value ~default:[] pred_definitions in
     let () = if (pred_abstract <> (pred_definitions = [])) then
       raise (Failure (Format.asprintf "Malformed predicate %s: either abstract with definition or non-abstract without definition." pred_name))
@@ -978,7 +1006,7 @@ g_pred_target:
         pred_internal = Option.is_some internal;
         pred_num_params;
         pred_params;
-        pred_ins;
+        ins_number;
         pred_definitions;
         pred_facts;
         pred_guard;
@@ -992,7 +1020,9 @@ g_pred_target:
 
 variant_target:
   VARIANT LBRACE; variant = expr_target; RBRACE
-  { variant }
+  {
+    Printf.eprintf "Warning: variants are not currently being used by Gillian, no termination is checked.\n";
+    variant }
 
 
 lemma_head_target:
@@ -1024,6 +1054,7 @@ g_lemma_target:
         lemmas_with_no_paths := SS.add lemma_name !lemmas_with_no_paths
     in
     let lemma_existentials = Option.value ~default:[] lemma_existentials in
+    let lemma_location = Some (get_loc $startpos $endpos) in
     let spec = Lemma.{
       lemma_hyp;
       lemma_concs;
@@ -1039,6 +1070,7 @@ g_lemma_target:
         lemma_variant;
         lemma_proof;
         lemma_existentials;
+        lemma_location;
       }
   }
 ;
@@ -1134,7 +1166,7 @@ type_env_pair_target:
 logic_variable_target:
   v = LVAR
   {
-    let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
+    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
     Expr.LVar v_imported }
 ;
@@ -1236,3 +1268,12 @@ type_target:
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
 ;
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

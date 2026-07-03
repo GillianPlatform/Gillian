@@ -1,8 +1,8 @@
 (** Utility functions for floating point arithmetic *)
 
 (** Checks if a float is an integer
-    
-  Note that [-0] is {b not} considered an integer *)
+
+    Note that [-0] is {b not} considered an integer *)
 let is_int (f : float) : bool =
   let f' = float_of_int (int_of_float f) in
   f = f' && copysign 1.0 f = copysign 1.0 f'
@@ -13,8 +13,8 @@ let is_normal (f : float) =
   not (fc = FP_infinite || fc = FP_nan)
 
 (** Rounds a float towards 0
-    
-  Returns 0 if NaN, and unchanged if infinite*)
+
+    Returns 0 if NaN, and unchanged if infinite*)
 let to_int n =
   match classify_float n with
   | FP_nan -> 0.
@@ -114,8 +114,8 @@ let uint32_right_shift_f x y =
 let uint64_int_right_shift x y = Z.shift_right x (Z.to_int y)
 
 (** Stringifies a float, adapting based on its size, or whether it's an integer
-    
-  Assumes the float is normal and positive *)
+
+    Assumes the float is normal and positive *)
 let string_of_pos_float num =
   (* Is the number an integer? *)
   let inum = int_of_float num in

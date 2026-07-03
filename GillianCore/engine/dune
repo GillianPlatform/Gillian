@@ -5,6 +5,7 @@
  (public_name gillian.engine)
  (libraries
   utils
+  smt
   menhirLib
   fmt
   cmdliner
@@ -13,11 +14,11 @@
   gil_parsing
   logging
   incrementalAnalysis
-  debugger_log
-  simple_smt
-  sexplib)
+  debugger_log)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto))
  (flags
   :standard
   -open

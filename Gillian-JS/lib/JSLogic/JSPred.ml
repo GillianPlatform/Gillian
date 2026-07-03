@@ -7,7 +7,7 @@ type t = {
   name : string;
   num_params : int;
   params : (string * Type.t option) list;
-  ins : int list;
+  ins_number : int;
   definitions : ((string * string list) option * JSAsrt.t) list;
   facts : Expr.t list;
   abstract : bool;
@@ -29,7 +29,7 @@ let js2jsil
     Pred.name = pred_def.name;
     num_params = pred_def.num_params;
     params = pred_def.params;
-    ins = pred_def.ins;
+    ins_number = pred_def.ins_number;
     definitions = jsil_definitions;
     facts = pred_def.facts;
     pure = pred_def.pure;

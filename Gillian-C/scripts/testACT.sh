@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
-ACT="opam exec -- gillian-c act"
+ACT="gillian-c act"
 
 echo "--- bi-abducing SLL ---"
 time $ACT act/sll.c -l disabled

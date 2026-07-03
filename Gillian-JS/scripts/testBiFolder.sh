@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 folder=$1
 count=$2

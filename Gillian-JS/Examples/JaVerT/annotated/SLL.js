@@ -1,24 +1,24 @@
 /* 
-  @pred Node(+x:Obj, val, next) : 
-    JSObject(x) * DataProp(x, "val", val) * DataProp(x, "next", next);
+  @pred Node(x:Obj; val, next) : 
+    JSObject(x) * DataProp(x, "val"; val) * DataProp(x, "next"; next);
 
-  @pred SLL(+x, alpha:List) :
+  @pred SLL(x; alpha:List) :
     (x == null) * (alpha == {{ }}),
-    Node(x, #val, #next) * SLL(#next, #beta) * (alpha == #val :: #beta);
+    Node(x; #val, #next) * SLL(#next; #beta) * (alpha == #val :: #beta);
 */
 
 
 /** 
   @id listCopy 
 
-  @pre  GlobalObject() * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy, "listCopy", _, _, _) *
-        (lst == #lst) * SLL(#lst, #alpha)
+  @pre  GlobalObject() * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy; "listCopy", _, _, _) *
+        (lst == #lst) * SLL(#lst; #alpha)
 
-  @post GlobalObject() * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy, "listCopy", _, _, _) * 
-        SLL(#lst, #alpha) * SLL(ret, #alpha)
+  @post GlobalObject() * scope(listCopy: #listCopy) * JSFunctionObject(#listCopy; "listCopy", _, _, _) * 
+        SLL(#lst; #alpha) * SLL(ret; #alpha)
 */
 function listCopy (lst) { 
-  /* @tactic unfold SLL(#lst, #alpha) */
+  /* @tactic unfold SLL(#lst; #alpha) */
   if (lst === null) { 
     return null
   }  else {
@@ -29,16 +29,16 @@ function listCopy (lst) {
 /** 
   @id listConcat 
 
-  @pre  GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat, "listConcat", _, _, _) *
-        (la == #la) * SLL(#la, #alpha) * (lb == #lb) * SLL(#lb, #beta)
+  @pre  GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) *
+        (la == #la) * SLL(#la; #alpha) * (lb == #lb) * SLL(#lb; #beta)
 
-  @post GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat, "listConcat", _, _, _) * 
-        SLL(ret, l+ (#alpha, #beta))
+  @post GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) * 
+        SLL(ret; l+ (#alpha, #beta))
 */
 function listConcat(la, lb) {
   if (la === null) return lb; 
 
-  /* @tactic unfold SLL(#la, #alpha) */
+  /* @tactic unfold SLL(#la; #alpha) */
   la.next = listConcat(la.next, lb);
   return la
 }
@@ -46,11 +46,11 @@ function listConcat(la, lb) {
 /** 
   @id listAppend 
 
-  @pre  GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat, "listConcat", _, _, _) *
-        (lst == #lst) * SLL(#lst, #alpha) * (v == #v)
+  @pre  GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) *
+        (lst == #lst) * SLL(#lst; #alpha) * (v == #v)
 
-  @post GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat, "listConcat", _, _, _) * 
-        SLL(ret, l+ (#alpha, {{ #v }} ))
+  @post GlobalObject() * scope(listConcat: #listConcat) * JSFunctionObject(#listConcat; "listConcat", _, _, _) * 
+        SLL(ret; l+ (#alpha, {{ #v }} ))
 */
 function listAppend(lst, v) {
   var newNode = { val: v, next : null };

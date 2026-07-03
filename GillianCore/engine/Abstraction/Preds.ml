@@ -82,7 +82,8 @@ let pop_all preds f =
 let remove_by_name (preds : t) (pname : string) : abs_t option =
   pop preds (fun (n, _) -> String.equal n pname)
 
-(** Find predicate_assertion via pname. Returns a list with all the pabs with name pname *)
+(** Find predicate_assertion via pname. Returns a list with all the pabs with
+    name pname *)
 let find_pabs_by_name (preds : t) (pname : string) : abs_t list =
   List.filter (fun (pn, _) -> pn = pname) !preds
 
@@ -224,7 +225,12 @@ let substitution_in_place (subst : st) (preds : t) : unit =
   let pred_substitution subst (s, vs) = (s, List.map (subst_in_val subst) vs) in
   preds := List.map (pred_substitution subst) !preds
 
-let to_assertions (preds : t) : Asrt.atom list =
+let to_assertions
+    ~(split_ins_outs : string -> vt list -> vt list * vt list)
+    (preds : t) : Asrt.atom list =
   let preds = to_list preds in
-  let pred_to_assert (n, args) = Asrt.Pred (n, args) in
+  let pred_to_assert (n, args) =
+    let ins, outs = split_ins_outs n args in
+    Asrt.pred n ins outs
+  in
   List.sort Asrt.compare (List.map pred_to_assert preds)

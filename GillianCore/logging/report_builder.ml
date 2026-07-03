@@ -62,7 +62,7 @@ let make
     {
       id = Report_id.next ();
       title;
-      elapsed_time = Sys.time ();
+      elapsed_time = Unix.gettimeofday ();
       previous = get_previous ();
       parent = get_parent ();
       content;

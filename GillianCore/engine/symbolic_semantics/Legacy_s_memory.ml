@@ -1,6 +1,6 @@
 module type S = sig
-  (** Type of data that is given the first time memory is created.
-      Useful when there's global context to know about like a type-system *)
+  (** Type of data that is given the first time memory is created. Useful when
+      there's global context to know about like a type-system *)
   type init_data
 
   (** Type of GIL values *)

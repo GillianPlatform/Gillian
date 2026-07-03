@@ -1,6 +1,7 @@
 (** Unique name generators
-  
-  These functions generate a unique name of a particular format on each call *)
+
+    These functions generate a unique name of a particular format on each call
+*)
 
 (** Generates a literal location name *)
 val fresh_loc : unit -> string

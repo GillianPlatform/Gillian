@@ -67,6 +67,13 @@ module Make (Annot : Annot.S) = struct
     in
     { labeled_prog; init_data }
 
+  let get_callees (proc : ('a, 'b) Proc.t) : string list =
+    Array.to_list proc.proc_body
+    |> List.filter_map (function
+         | _, _, Cmd.Call ({ fun_name = Expr.Lit (Literal.String callee); _ }, _)
+           -> Some callee
+         | _ -> None)
+
   let trans_procs procs path internal_file =
     let procs' = Hashtbl.create Config.small_tbl_size in
     let () =
@@ -77,7 +84,9 @@ module Make (Annot : Annot.S) = struct
             else Some path
           in
           let proc_internal = proc.proc_internal || internal_file in
-          Hashtbl.add procs' name { proc with proc_source_path; proc_internal })
+          let proc_calls = get_callees proc in
+          Hashtbl.add procs' name
+            { proc with proc_source_path; proc_internal; proc_calls })
         procs
     in
     procs'
@@ -165,7 +174,7 @@ module Make (Annot : Annot.S) = struct
       let rec find fname paths =
         match paths with
         | [] ->
-            Fmt.failwith "Cannot resolve \"%s\", looked in %a and ." fname
+            Fmt.failwith "Cannot resolve \"%s\", looked in %a." fname
               Fmt.(list ~sep:(any ", ") string)
               runtime_paths
         | path :: rest ->
@@ -287,15 +296,17 @@ module Make (Annot : Annot.S) = struct
     in
     let procs, predecessors =
       Hashtbl.fold
-        (fun (_ : string) (proc : (annot, string) Proc.t) (procs, predecessors) ->
+        (fun (_ : string) (proc : (annot, string) Proc.t) (procs, predecessors)
+           ->
           let proc, new_predecessors = proc_of_ext_proc proc in
           (proc :: procs, new_predecessors @ predecessors))
         ext_program.procs ([], [])
     in
-    Prog.make_indexed ~lemmas:ext_program.lemmas ~preds:ext_program.preds
-      ~only_specs:ext_program.only_specs ~procs ~predecessors
-      ~funcs:ext_program.funcs ~macros:ext_program.macros
-      ~bi_specs:ext_program.bi_specs ~datatypes:ext_program.datatypes ()
+    let { lemmas; preds; only_specs; funcs; macros; bi_specs; datatypes; _ } =
+      ext_program
+    in
+    Prog.make_indexed ~lemmas ~preds ~only_specs ~procs ~predecessors ~funcs
+      ~macros ~bi_specs ~datatypes ()
 
   let parse_literal lexbuf = parse GIL_Parser.lit_target lexbuf
   let parse_expression lexbuf = parse GIL_Parser.top_level_expr_target lexbuf

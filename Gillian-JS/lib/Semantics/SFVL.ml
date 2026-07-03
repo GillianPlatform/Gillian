@@ -21,7 +21,7 @@ let pp ft sfvl =
     ft sfvl
 
 (*************************************)
-(** Field Value List Functions      **)
+(** Field Value List Functions **)
 
 (*************************************)
 

@@ -3,7 +3,7 @@ module Expr = Gillian.Gil_syntax.Expr
 module SS = Containers.SS
 
 (***************************************************************)
-(** Separation Logic Commmands                                **)
+(** Separation Logic Commmands **)
 
 (***************************************************************)
 
@@ -12,13 +12,12 @@ type unfold_info = (string * string) list
 
 (** {b JSIL Separation Logic commands}. *)
 type t =
-  | Fold of string * Expr.t list * folding_info option  (** Fold             *)
-  | Unfold of string * Expr.t list * unfold_info option * bool
-      (** Unfold           *)
-  | GUnfold of string  (** Global Unfold    *)
-  | ApplyLem of string * Expr.t list * string list  (** Apply lemma      *)
-  | SepAssert of Asrt.t * string list  (** Assert           *)
-  | Invariant of Asrt.t * string list  (** Invariant        *)
+  | Fold of string * Expr.t list * folding_info option  (** Fold *)
+  | Unfold of string * Expr.t list * unfold_info option * bool  (** Unfold *)
+  | GUnfold of string  (** Global Unfold *)
+  | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
+  | SepAssert of Asrt.t * string list  (** Assert *)
+  | Invariant of Asrt.t * string list  (** Invariant *)
 
 let pp_folding_info =
   let pp_ui f (v, le) = Fmt.pf f "(%s := %a)" v Expr.pp le in

@@ -1,19 +1,5 @@
 %{
   open CLogic
-
-  let process_pred_params params_ins =
-      let (params, ins) = List.split params_ins in
-      (* ins looks like [true, false, true] *)
-      let ins = List.mapi (fun i is_in -> if is_in then Some i else None) ins in
-      (* ins looks like [Some 0, None, Some 2] *)
-      let ins = List.filter Option.is_some ins in
-      (* ins looks like [Some 0, Some 2] *)
-      let ins = List.map Option.get ins in
-      (* ins looks like [0, 2] *)
-      (* if ins is empty then everything is an in *)
-  		let ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) params) in
-      (params, ins)
-
 %}
 
 (* punctuation *)
@@ -291,30 +277,34 @@ spec_annot:
 
 abstract_predicate:
   | ABSTRACT; pure=option(PURE); PREDICATE; pname = IDENTIFIER; LBRACE;
-    params_ins = separated_list(COMMA, pred_params_ins);
+    ins = separated_list(COMMA, pred_param);
+    outs = outs(pred_param);
     RBRACE;
     {
-      let (params, pred_ins) = process_pred_params params_ins in
+      let params = ins @ outs in
+      let ins_number = List.length ins in
       CAbsPred. {
         pure = Option.is_some(pure);
         name = pname;
         params;
-        ins = pred_ins;
+        ins_number;
       }
     }
 
 predicate:
   | pure=option(PURE); PREDICATE; no_unfold=option(NOUNFOLD); pname = IDENTIFIER; LBRACE;
-    params_ins = separated_list(COMMA, pred_params_ins);
+    ins = separated_list(COMMA, pred_param);
+    outs = outs(pred_param);
     RBRACE; LCBRACE;
     defs = separated_nonempty_list(SCOLON, pred_definition);
     RCBRACE;
     {
-      let (params, pred_ins) = process_pred_params params_ins in
+      let params = ins @ outs in
+      let ins_number = List.length ins in
       CPred.{
         name = pname;
-        params = params;
-        ins = pred_ins;
+        params;
+        ins_number;
         definitions = defs;
         no_unfold = Option.is_some(no_unfold);
         pure = Option.is_some(pure);
@@ -334,10 +324,9 @@ existentials:
   | COLON; lvs = separated_nonempty_list(COMMA, lvar_with_gil_type); { lvs }
 
 
-pred_params_ins:
-  | inp = option(PLUS); x = IDENTIFIER; typ = option(with_gil_type)
-    { let isin = Option.is_some inp in
-      ((x, typ), isin) }
+pred_param:
+  | x = IDENTIFIER; typ = option(with_gil_type)
+    { (x, typ) }
 
 typ:
   | INT16T { Chunk.Mint16unsigned }
@@ -373,8 +362,11 @@ assertion:
     { CAssert.Undefs (ptr, size)}
   | MALLOCED; LBRACE; ptr = expression; COMMA; ofs = expression; RBRACE
     { CAssert.Malloced(ptr, ofs) }
-  | pname = IDENTIFIER; LBRACE; el = separated_list(COMMA, expression); RBRACE
-    { CAssert.Pred (pname, el) }
+  | pname = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, expression);
+    outs = outs(expression);
+    RBRACE
+    { CAssert.Pred (pname, ins, outs) }
 
 formula:
   | LBRACE; formula; RBRACE { $2 }
@@ -596,3 +588,12 @@ any_C_token:
   | AND
   | OR
   { () }
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

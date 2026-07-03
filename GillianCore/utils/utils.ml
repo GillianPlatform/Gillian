@@ -124,9 +124,12 @@ module Gillian_result = struct
   include Gillian_result
 end
 
+module Tarjan = Tarjan
+
 (**/**)
 
 module Preprocessing_utils = Preprocessing_utils
-module Statistics = Statistics
+
+type _ Effect.t += Sys_error_during_logging : (string * string) -> unit Effect.t
 
 (**/**)

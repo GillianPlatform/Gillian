@@ -1,6 +1,6 @@
 (** @canonical Gillian.Symbolic.Type_env
-  
-  Interface for typing environments *)
+
+    Interface for typing environments *)
 
 open SVal
 

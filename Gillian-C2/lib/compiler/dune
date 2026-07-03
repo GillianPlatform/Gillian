@@ -1,3 +1,10 @@
+(menhir
+ (modules c2_annot_parser)
+ (flags --explain))
+
+(ocamllex
+ (modules c2_annot_lexer))
+
 (library
  (name gillian_C2_compiler)
  (libraries

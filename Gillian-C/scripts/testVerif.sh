@@ -1,6 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-VERIFY="time opam exec -- gillian-c verify"
+if [[ "${GITHUB_ACTIONS}" ]]; then
+	GILLIAN_C="gillian-c"
+else
+  GILLIAN_C="dune exec -- gillian-c"
+fi
+
+VERIFY="time $GILLIAN_C verify"
 
 echo "--- verifying SLL ---"
 $VERIFY verification/sll.c -l disabled
@@ -16,4 +22,16 @@ printf "\n\n"
 
 echo "--- verifying sort ---"
 $VERIFY verification/sort.c -l disabled
+printf "\n\n"
+
+echo "--- verifying vector ---"
+$VERIFY verification/vector.c -l disabled
+printf "\n\n"
+
+echo "--- verifying array ---"
+$VERIFY verification/array.c -l disabled
+printf "\n\n"
+
+echo "--- verifying batch ---"
+$VERIFY verification/batch.c -l disabled
 printf "\n\n"

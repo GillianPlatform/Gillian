@@ -319,7 +319,8 @@ module SVArray = struct
     | AllUndef -> AllUndef
     | Arr e -> Arr (Expr.list_sub ~lst:e ~start:o ~size:len)
 
-  (** This assumes chunks are properly respected outside of the call of this function *)
+  (** This assumes chunks are properly respected outside of the call of this
+      function *)
   let array_cons (el : SVal.t) arr = concat (singleton el) arr
 
   let array_append arr el = concat arr (singleton el)

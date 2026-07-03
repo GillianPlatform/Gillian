@@ -32,4 +32,4 @@ and datatype_component =
   | Padding of { name : string; bits : int }
 
 and enum_component = { name : string; value : int }
-[@@deriving show { with_path = false }, eq]
+[@@deriving to_yojson, show { with_path = false }, eq]

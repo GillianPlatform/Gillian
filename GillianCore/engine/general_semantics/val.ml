@@ -1,6 +1,6 @@
 (** @canonical Gillian.General.Val
 
-  Interface for GIL Values *)
+    Interface for GIL Values *)
 
 (** @canonical Gillian.General.Val.S *)
 module type S = sig

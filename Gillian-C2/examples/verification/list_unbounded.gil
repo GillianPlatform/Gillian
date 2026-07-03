@@ -3,18 +3,18 @@ import "archi64_constants.gil", "internals.gil",
        "internal_binops.gil", "internal_stdlib.gil";
 
 
-pred Ptr(+p: List, l: Obj, o: Int):
+pred Ptr(p: List; l: Obj, o: Int):
   (p == {{ l, o }});
   
-pred is_ptr(+p: List):
+pred is_ptr(p: List):
   (p == {{ #l, #o }}) * types(#l: Obj, #o: Int);
   
-pred is_u32(+v : Int):
+pred is_u32(v : Int):
       (0i i<=# v) * (v i<=# 4294967295i);
 
-pred SLL(+p: List, sz: Int):
+pred SLL(p: List; sz: Int):
   (* First case is the Empty case *)
-  Ptr(p, #l, #o) * (* p is a pointer *)
+  Ptr(p; #l, #o) * (* p is a pointer *)
     (* Discriminant is zero *)
     <mem_single>(#l, #o, "u32"; 0i, "Freeable") *
     (* The rest is uninitialized *)
@@ -23,7 +23,7 @@ pred SLL(+p: List, sz: Int):
     (sz == 0i),
 
   (* Second case is a Node(u32, Box<List>)) *)
-  Ptr(p, #l, #o) * (* p is a pointer *)
+  Ptr(p; #l, #o) * (* p is a pointer *)
     (* Discriminant is zero *)
     <mem_single>(#l, #o, "u32"; 1i, "Freeable") *
     (* It has a value, but we discard it *)
@@ -32,16 +32,16 @@ pred SLL(+p: List, sz: Int):
        phantom data, but they're ZSTs so we ignore them *)
     (* Now comes the box to the rest *)
     is_ptr(#next) * <mem_single>(#l, #o i+ 8i, "u64"; #next, "Freeable") *
-    SLL(#next, #sz_next) *
+    SLL(#next; #sz_next) *
     (* The size of the list is the size of the rest plus one *)
     (sz == (#sz_next i+ 1i)) *
     (0i i<# sz);
 
 
 spec list_length(self)
-  [[ (self == #self) * SLL(#self, #sz) *
+  [[ (self == #self) * SLL(#self; #sz) *
      (0i i<=# #sz) * (#sz i<# 18446744073709551615i) ]]
-  [[ SLL(#self, #sz) * (ret == #sz) ]]
+  [[ SLL(#self; #sz) * (ret == #sz) ]]
   normal
 
 

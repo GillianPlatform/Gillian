@@ -1,6 +1,6 @@
 (** @canonical Gillian.General.External
 
-  Interface for executing external functions *)
+    Interface for executing external functions *)
 
 module T (Annot : Annot.S) = struct
   module type S = functor
@@ -31,10 +31,11 @@ module Dummy
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
+    (State :
+      State.S
+        with type vt = Val.t
+         and type st = ESubst.t
+         and type store_t = Store.t)
     (Callstack : Call_stack.S with type vt = Val.t and type store_t = Store.t) =
 struct
   let execute _ _ _ _ _ _ _ _ = failwith "Unimplemented External module"

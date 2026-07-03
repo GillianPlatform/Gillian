@@ -11,8 +11,8 @@ end
 (** @canonical Gillian.Concrete.Subst *)
 module Subst = struct
   (** Substitutions
-      
-    A mapping of GIL variables to GIL values *)
+
+      A mapping of GIL variables to GIL values *)
 
   (** @inline *)
   include CVal.CSubst
@@ -35,6 +35,6 @@ module State = struct
 end
 
 (** @canonical Gillian.Concrete.Memory_S
-  
-  Interface for a concrete memory model *)
+
+    Interface for a concrete memory model *)
 module type Memory_S = CMemory.S

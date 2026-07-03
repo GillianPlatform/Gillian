@@ -1,5 +1,4 @@
-(** Throw this exception if some unexpected goto
-    was received for compilation *)
+(** Throw this exception if some unexpected goto was received for compilation *)
 exception UnexpectedGoto of string
 
 (** Throw this exception if there is a bug in the compiler code *)

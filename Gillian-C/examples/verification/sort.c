@@ -5,30 +5,30 @@ typedef struct ln {
   struct ln* next;
 } SLL;
 
-/*@ pred UList(+x, E) {
+/*@ pred UList(x; E) {
   (x == NULL) * (E == -{}-);
 
   (x -m> struct ln { int(#val); NULL }) * (E == -{ #val }-);
 
   (x -m> struct ln { int(#val); #next }) * (not (#next == NULL)) *
-  UList(#next, #Ep) *
+  UList(#next; #Ep) *
   (E == -u-(-{ #val }-, #Ep))
 } */
 
-/*@ pred OUList(+x, E) {
+/*@ pred OUList(x; E) {
   (x == NULL) * (E == -{ }-);
 
   (x -m> struct ln { int(#val); NULL }) * (E == -{ #val }-);
 
   (x -m> struct ln { int(#val); #next }) * (not (#next == NULL)) *
-  OUList(#next, #Ep) *
+  OUList(#next; #Ep) *
   (E == -u-(-{ #val }-, #Ep)) *
   (forall #z : Int. (#z --e-- #Ep => #val <# #z))
 } */
 
 /*@ spec makeNode(v) {
   requires: (v == int(#v))
-  ensures:  OUList(ret, -{ #v }-)
+  ensures:  OUList(ret; -{ #v }-)
 } */
 SLL* makeNode(int v) {
   SLL* r = malloc(sizeof(SLL));
@@ -39,8 +39,8 @@ SLL* makeNode(int v) {
 
 /*@ spec listPrepend(x, v) {
   requires: (v == int(#v)) * (x == #x) *
-            OUList(#x, #E) * (forall #z : Int. (#z --e-- #E => #v <# #z))
-  ensures: OUList(ret, -u-(-{#v}-, #E))
+            OUList(#x; #E) * (forall #z : Int. (#z --e-- #E => #v <# #z))
+  ensures: OUList(ret; -u-(-{#v}-, #E))
 } */
 SLL* listPrepend(SLL* x, int v) {
   SLL* new_node = makeNode(v);
@@ -51,8 +51,8 @@ SLL* listPrepend(SLL* x, int v) {
 }
 
 /*@ spec insert(l, v) {
-  requires: (l == #l) * (v == int(#v)) * OUList(#l, #E)
-  ensures: OUList(ret, -u-(-{#v}-, #E))
+  requires: (l == #l) * (v == int(#v)) * OUList(#l; #E)
+  ensures: OUList(ret; -u-(-{#v}-, #E))
 } */
 SLL* insert(SLL* l, int v) {
   if (l == NULL) {
@@ -70,8 +70,8 @@ SLL* insert(SLL* l, int v) {
 }
 
 /*@ spec sort(l) {
-  requires: (l == #l) * UList(#l, #E)
-  ensures: OUList(ret, #E)
+  requires: (l == #l) * UList(#l; #E)
+  ensures: OUList(ret; #E)
 } */
 SLL* sort(SLL* l) {
   if (l == NULL) {

@@ -27,7 +27,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     List.map (fun (a, args, ret) -> (A1 a, args, ret)) (S1.list_actions ())
     @ List.map (fun (a, args, ret) -> (A2 a, args, ret)) (S2.list_actions ())
 
-  type pred = P1 of S1.pred | P2 of S2.pred
+  type pred = P1 of S1.pred | P2 of S2.pred [@@deriving yojson]
 
   let pred_from_str s =
     match IDer.get_ided s with
@@ -59,7 +59,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     | None -> DR.ok (S2.empty ())
     | S1 _ -> DR.error MismatchedState
 
-  let execute_action action s args =
+  let[@inline] execute_action action s args =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match action with
@@ -78,7 +78,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', v) -> Ok (S2 s2', v)
         | Error e -> Error (E2 e))
 
-  let consume pred s ins =
+  let[@inline] consume pred s ins =
     let open Delayed.Syntax in
     let open DR.Syntax in
     match pred with
@@ -97,7 +97,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
         | Ok (s2', outs) -> Ok (S2 s2', outs)
         | Error e -> Error (E2 e))
 
-  let produce pred s args =
+  let[@inline] produce pred s args =
     let open Delayed.Syntax in
     let open MyUtils.Syntax in
     match pred with
@@ -179,10 +179,10 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     | S2 s2 -> S2.assertions_others s2
     | None -> []
 
-  let get_recovery_tactic e =
-    match e with
-    | E1 e1 -> S1.get_recovery_tactic e1
-    | E2 e2 -> S2.get_recovery_tactic e2
+  let get_recovery_tactic st e =
+    match (st, e) with
+    | S1 s1, E1 e1 -> S1.get_recovery_tactic s1 e1
+    | S2 s2, E2 e2 -> S2.get_recovery_tactic s2 e2
     | _ -> failwith "get_recovery_tactic: mismatched arguments"
 
   let can_fix = function
@@ -192,9 +192,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
 
   let get_fixes e =
     match e with
-    | E1 e1 ->
-        S1.get_fixes e1 |> MyUtils.deep_map (MyAsrt.map_cp lift_corepred_1)
-    | E2 e2 ->
-        S2.get_fixes e2 |> MyUtils.deep_map (MyAsrt.map_cp lift_corepred_2)
+    | E1 e1 -> S1.get_fixes e1 |> MyUtils.deep_map lift_corepred_1
+    | E2 e2 -> S2.get_fixes e2 |> MyUtils.deep_map lift_corepred_2
     | _ -> failwith "get_fixes: invalid error"
 end

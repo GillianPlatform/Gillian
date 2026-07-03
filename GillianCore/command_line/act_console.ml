@@ -6,9 +6,8 @@ module L = Logging
 module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (Abductor : Abductor.S
-                  with type init_data = ID.t
-                   and type annot = PC.Annot.t)
+    (Abductor :
+      Abductor.S with type init_data = ID.t and type annot = PC.Annot.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -23,6 +22,10 @@ struct
   let specs_to_stdout =
     let doc = "Emit specs to stdout, useful for testing." in
     Arg.(value & flag & info [ "specs-to-stdout" ] ~doc)
+
+  let ignored_procs =
+    let doc = "Procs to ignore" in
+    Arg.(value & opt_all string [] & info [ "ignore" ] ~doc)
 
   let parse_eprog file files already_compiled =
     if not already_compiled then
@@ -65,30 +68,6 @@ struct
     let out_path = Filename.concat dirname (fname ^ "_bi.gil") in
     Io_utils.save_file_pp out_path (Prog.pp_labeled ~pp_annot) e_prog
 
-  let make_callgraph (prog : ('a, 'b) Prog.t) =
-    let fcalls =
-      Hashtbl.fold
-        (fun _ proc acc ->
-          Proc.(proc.proc_name, proc.proc_aliases, proc.proc_calls) :: acc)
-        prog.procs []
-    in
-    let call_graph = Call_graph.make () in
-    let fnames = Hashtbl.create (List.length fcalls * 2) in
-    fcalls
-    |> List.iter (fun (sym, aliases, _) ->
-           Call_graph.add_proc call_graph sym;
-           Hashtbl.add fnames sym sym;
-           aliases |> List.iter (fun alias -> Hashtbl.add fnames alias sym));
-    fcalls
-    |> List.iter (fun (caller, _, callees) ->
-           callees
-           |> List.iter (fun callee ->
-                  match Hashtbl.find_opt fnames callee with
-                  | Some callee ->
-                      Call_graph.add_proc_call call_graph caller callee
-                  | None -> ()));
-    call_graph
-
   let process_files
       files
       already_compiled
@@ -110,21 +89,19 @@ struct
     let+ prog =
       Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
-    let call_graph = make_callgraph prog in
+    let call_graph = Prog.make_callgraph prog in
     let () =
       L.normal (fun m -> m "@\n*** Stage 2: DONE transforming the program.@\n")
     in
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.@\n") in
     let () = Config.unfolding := false in
     let prog = LogicPreprocessing.preprocess prog true in
-    match MP.init_prog prog with
-    | Error _ -> failwith "Creation of matching plans failed."
-    | Ok prog' ->
-        let () =
-          Abductor.test_prog ~init_data ~call_graph prog' incremental
-            source_files_opt
-        in
-        if should_emit_specs then emit_specs e_prog prog' file
+    let prog' = MP.init_prog prog in
+    let () =
+      Abductor.test_prog ~init_data ~call_graph prog' incremental
+        source_files_opt
+    in
+    if should_emit_specs then emit_specs e_prog prog' file
 
   let act
       files
@@ -137,6 +114,7 @@ struct
       incremental
       bi_unroll_depth
       bi_no_spec_depth
+      ignored_specs
       () =
     let () = Config.current_exec_mode := BiAbduction in
     let () = PC.initialize BiAbduction in
@@ -146,12 +124,13 @@ struct
     let () = Config.bi_no_spec_depth := bi_no_spec_depth in
     let () = Config.specs_to_stdout := specs_to_stdout in
     let () = Config.max_branching := bi_unroll_depth in
+    let () = Config.bi_ignore_procs := ignored_specs in
     let () = Config.under_approximation := true in
     let r =
       process_files files already_compiled outfile_opt should_emit_specs
         incremental
     in
-    let () = if !Config.stats then Statistics.print_statistics () in
+    let () = if !Config.stats then L.Statistics.print_statistics () in
     let () = Common_args.exit_on_error r in
     exit 0
 
@@ -159,7 +138,7 @@ struct
     Term.(
       const act $ files $ already_compiled $ output_gil $ no_heap $ stats
       $ should_emit_specs $ specs_to_stdout $ incremental $ bi_unroll_depth
-      $ bi_no_spec_depth)
+      $ bi_no_spec_depth $ ignored_procs)
 
   let act_info =
     let doc =

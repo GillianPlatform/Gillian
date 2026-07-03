@@ -1,12 +1,18 @@
-(**
-    Interface for GIL General States.
-    They are considered to be mutable.
-*)
+(** Interface for GIL General States. They are considered to be mutable. *)
 module type S = sig
-  include SState.S
-
   type state_t
-  type abs_t = string * vt list
+  type abs_t = string * SVal.M.t list
+
+  module SMatcher : Matcher.S with type state_t = state_t
+
+  type t = SMatcher.t = {
+    state : state_t;
+    preds : Preds.t;
+    wands : Wands.t;
+    pred_defs : MP.preds_tbl_t;
+  }
+
+  include SState.S with type t := t
 
   val make_p :
     preds:MP.preds_tbl_t ->
@@ -18,6 +24,17 @@ module type S = sig
     unit ->
     t
 
+  val make_p_from_heap :
+    pred_defs:MP.preds_tbl_t ->
+    store:store_t ->
+    heap:heap_t ->
+    spec_vars:SS.t ->
+    wands:Wands.t ->
+    preds:Preds.t ->
+    pfs:PFS.t ->
+    gamma:Type_env.t ->
+    t
+
   val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
@@ -26,13 +43,12 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_preds : t -> Preds.t -> t
 
+  val get_wands : t -> Wands.t
+
   (** Set wands of given symbolic state *)
   val set_wands : t -> Wands.t -> t
 
-  (** Set variants of given symbolic state *)
-  val set_variants : t -> variants_t -> t
-
-  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool
+  val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val add_pred_defs : MP.preds_tbl_t -> t -> t
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit

@@ -14,7 +14,7 @@ pure pred valid_read(read_len, cursor_len) {
   (cursor_len <=# 2147483647)
 }
 
-pred nounfold valid_aws_byte_cursor_ptr(+cur, length, buffer: List, alpha) {
+pred nounfold valid_aws_byte_cursor_ptr(cur; length, buffer: List, alpha) {
   (cur -> struct aws_byte_cursor { long(0); buffer }) *
   (length == 0) * (alpha == nil);
 
@@ -26,15 +26,15 @@ pred nounfold valid_aws_byte_cursor_ptr(+cur, length, buffer: List, alpha) {
 spec aws_byte_cursor_advance(_res, cursor, length) {
   requires: (_res == #res) * (cursor == #cursor) * (length == long(#length)) *
             (0 <=# #length) * ARRAY(#res, long, 2, #trash) *
-            valid_aws_byte_cursor_ptr(#cursor, #cur_len, #buffer, #content)
+            valid_aws_byte_cursor_ptr(#cursor; #cur_len, #buffer, #content)
 
   ensures: invalid_read(#length, #cur_len) *
-           valid_aws_byte_cursor_ptr(#res, 0, NULL, nil) *
-           valid_aws_byte_cursor_ptr(#cursor, #cur_len, #buffer, #content);
+           valid_aws_byte_cursor_ptr(#res; 0, NULL, nil) *
+           valid_aws_byte_cursor_ptr(#cursor; #cur_len, #buffer, #content);
 
            valid_read(#length, #cur_len) *
-           valid_aws_byte_cursor_ptr(#res, #length, #buffer, #data) *
-           valid_aws_byte_cursor_ptr(#cursor, #rest_len,
+           valid_aws_byte_cursor_ptr(#res; #length, #buffer, #data) *
+           valid_aws_byte_cursor_ptr(#cursor; #rest_len,
                                      #buffer p+ #length, #rest) *
            (#length == len #data) *
            (#content == #data @ #rest) *

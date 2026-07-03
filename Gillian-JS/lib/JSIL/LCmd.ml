@@ -3,18 +3,18 @@ module Expr = Gillian.Gil_syntax.Expr
 module Type = Gillian.Gil_syntax.Type
 
 (***************************************************************)
-(** Logic Commmands                                           **)
+(** Logic Commmands **)
 
 (***************************************************************)
 
 (** {b JSIL logic commands}. *)
 type t =
-  | If of Expr.t * t list * t list  (** If-then-else     *)
+  | If of Expr.t * t list * t list  (** If-then-else *)
   | Branch of Expr.t  (** branching on a FO formual *)
-  | Macro of string * Expr.t list  (** Macro            *)
-  | Assert of Expr.t  (** Assert           *)
-  | Assume of Expr.t  (** Assume           *)
-  | AssumeType of Expr.t * Type.t  (** Assume Type      *)
+  | Macro of string * Expr.t list  (** Macro *)
+  | Assert of Expr.t  (** Assert *)
+  | Assume of Expr.t  (** Assume *)
+  | AssumeType of Expr.t * Type.t  (** Assume Type *)
   | FreshSVar of string
   | SL of SLCmd.t
 

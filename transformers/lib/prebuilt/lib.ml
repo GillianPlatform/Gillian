@@ -16,6 +16,24 @@ module WISL_Split = struct
   module MonadicSMemory = WISL.MonadicSMemory_Split
 end
 
+module WISLF_Base = struct
+  module MonadicSMemory = WISLF.MonadicSMemory_Base
+  module ParserAndCompiler = WISLF.ParserAndCompiler
+  module ExternalSemantics = WISLF.ExternalSemantics
+  module InitData = Gillian.General.Init_data.Dummy
+  module MyInitData = States.MyMonadicSMemory.DummyID
+end
+
+module WISLF_ALoc = struct
+  include WISLF_Base
+  module MonadicSMemory = WISLF.MonadicSMemory_ALoc
+end
+
+module WISLF_Split = struct
+  include WISLF_Base
+  module MonadicSMemory = WISLF.MonadicSMemory_Split
+end
+
 module JSIL_Base = struct
   module MonadicSMemory = JSIL.MonadicSMemory_Base
   module ParserAndCompiler = JSIL.ParserAndCompiler

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 foldername=${PWD##*/}
 if [ "$foldername" != "wisl" ]

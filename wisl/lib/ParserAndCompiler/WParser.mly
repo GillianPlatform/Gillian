@@ -1,14 +1,15 @@
 %token EOF
 
 (* key words *)
-%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE
+%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP FRESH NEW DELETE PAR
 %token <CodeLoc.t> PURE FUNCTION RETURN PREDICATE LEMMA DATATYPE
-%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE EXIST FORALL CASE
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT ASSUME ASSUME_TYPE BIND FORALL CASE
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF CONFIG
+%token <CodeLoc.t> SPEC
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
-%token <CodeLoc.t> SEMICOLON        /* ; */
+%token <CodeLoc.t> SCOLON           /* ; */
 %token <CodeLoc.t> COMMA            /* , */
 %token <CodeLoc.t> DOT              /* . */
 %token <CodeLoc.t> ASSIGN           /* := */
@@ -31,12 +32,14 @@
 %token <CodeLoc.t> TBOOL
 %token <CodeLoc.t> TSTRING
 %token <CodeLoc.t> TANY
+%token <CodeLoc.t> TFLOAT
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
 
 (* values *)
 %token <CodeLoc.t * int> INTEGER
+%token <CodeLoc.t * float> FLOAT
 %token <CodeLoc.t * string> STRING
 
 (* Binary operators *)
@@ -45,11 +48,20 @@
 %token GREATERTHAN     /* > */
 %token LESSEQUAL       /* <= */
 %token GREATEREQUAL    /* => */
+%token FLESSTHAN       /* f< */
+%token FGREATERTHAN    /* f> */
+%token FLESSEQUAL      /* f<= */
+%token FGREATEREQUAL   /* f=> */
 %token PLUS            /* + */
 %token MINUS           /* - */
 %token TIMES           /* * */
 %token DIV             /* / */
 %token MOD             /* % */
+%token FPLUS           /* f+ */
+%token FMINUS          /* f- */
+%token FTIMES          /* f* */
+%token FDIV            /* f/ */
+%token FMOD            /* f% */
 %token AND             /* && */
 %token OR              /* || */
 %token NEQ             /* != */
@@ -74,11 +86,11 @@
 %left OR
 %left AND
 %nonassoc EQUAL NEQ
-%nonassoc LESSTHAN LESSEQUAL GREATERTHAN GREATEREQUAL
+%nonassoc LESSTHAN LESSEQUAL GREATERTHAN GREATEREQUAL FLESSTHAN FLESSEQUAL FGREATERTHAN FGREATEREQUAL
 %nonassoc LSTCONS
 %left LSTCAT
-%left PLUS MINUS
-%left TIMES DIV MOD
+%left PLUS MINUS FPLUS FMINUS
+%left TIMES DIV MOD FTIMES FDIV FMOD
 
 %nonassoc binop_prec
 %nonassoc unop_prec
@@ -110,7 +122,9 @@
 %type <WLExpr.t>                                variant_def
 %type <WLExpr.t>                                with_variant_def
 %type <WLCmd.t list>                            proof_def
-%type <(string * WType.t option) * bool>        pred_param_ins
+%type <string * WType.t option>                 pred_param
+%type <(string * string) list>                  unfold_bindings
+%type <string * string>                         unfold_binding
 %type <CodeLoc.t * string list>                 bindings_with_loc
 %type <WLExpr.t>                                logic_expression
 %type <WBinOp.t>                                logic_binop
@@ -152,18 +166,45 @@ definitions:
     { let (fs, ps, ls, ds, pfs, cs) = defs in
       (fs, ps, ls, ds, pfs, c::cs) }
 
+config_val:
+  | v = value_with_loc
+    { v }
+  | vs = separated_nonempty_list(COMMA, IDENTIFIER)
+    { let (loc, id), vs = List.(hd vs, tl vs) in
+      let (loc, ids) = List.fold_left (fun (loc, ids) (loc', id) ->
+        let loc = CodeLoc.merge loc loc' in
+        let ids = (WVal.Str id) :: ids in
+        loc, ids)
+        (loc, [ WVal.Str id ]) vs
+      in
+      let v = WVal.VList ids in
+      loc, v }
+
 config:
-  | lstart = CONFIG; id = IDENTIFIER; COLON; value = value_with_loc
+  | lstart = CONFIG; id = IDENTIFIER; COLON; value = config_val
     { let (_, id) = id in
       let (lend, value) = value in
       let loc = CodeLoc.merge lstart lend in
       id, value, loc }
+
+
+spec_bindings:
+  | lstart = LBRACK; SPEC; spec_name = IDENTIFIER; COLON; vs_with_loc = separated_list(COMMA, LVAR); RBRACK
+    { let (_, variables) = List.split vs_with_loc in
+      let (_, spec_name) = spec_name in
+      (lstart, spec_name, variables) }
 
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion_top_level; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
     post = logic_assertion_top_level; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
+  | bindings = spec_bindings; LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+  post = logic_assertion; lend = RCBRACE
+  { let lstart, spec_name, lvars = bindings in
+    let existentials = Some (spec_name, lvars) in
+    let loc = CodeLoc.merge lstart lend in
+    WFun.add_spec ?existentials f pre post variant loc }
   | f = fct { f }
 
 fct:
@@ -183,7 +224,7 @@ fct:
         spec = None;
         floc;
         fid;
-        is_loop_body = false;
+        loop_body_of = None;
       } }
 
 
@@ -194,27 +235,65 @@ var_list:
 
 
 statement_list_and_return:
-  | RETURN; e = expression { ([], e)  }
-  | sm = statement; SEMICOLON; sle = statement_list_and_return
+  | RETURN; e = expression; SCOLON? { ([], e)  }
+  | sm = statement; SCOLON; sle = statement_list_and_return
     { let (sl, e) = sle in (sm::sl, e) }
 
 statement_list:
-  | sl = separated_nonempty_list(SEMICOLON, statement) { sl }
+  | sl = separated_nonempty_list_option_trailing(SCOLON, statement) { sl }
 
 
 /* not useful at the moment */
 /*
 logic_cmds:
-  | LCMD; lcmds = separated_list(SEMICOLON, logic_command); RCBRACE { lcmds }
+  | LCMD; lcmds = separated_list(SCOLON, logic_command); RCBRACE { lcmds }
  */
 
 type_target:
-  | TLIST { WType.WList }
-  | TINT { WType.WInt }
-  | TBOOL { WType.WBool }
-  | TSTRING { WType.WString }
-  | TANY { WType.WAny }
-  | datatype = IDENTIFIER { let (_, datatype) = datatype in WType.WDatatype datatype }
+  | loc = TLIST { WType.WList, loc }
+  | loc = TINT { WType.WInt, loc }
+  | loc = TBOOL { WType.WBool, loc }
+  | loc = TSTRING { WType.WString, loc }
+  | loc = TFLOAT { WType.WFloat, loc }
+  | loc = TANY { WType.WAny, loc }
+  | datatype = IDENTIFIER
+    { let (loc, datatype) = datatype in
+      WType.WDatatype datatype, loc }
+
+logical_binding:
+  | LBRACE; lhs = LVAR; COLON; rhs = LVAR; RBRACE
+  { let (_, lhs) = lhs in
+    let (loc, rhs) = rhs in
+    let bare_lexpr = WLExpr.LVar rhs in
+    let expr = WLExpr.make bare_lexpr loc in
+    (lhs, expr)
+  }
+
+passed_logical_bindings:
+  | LBRACK; spec_name = IDENTIFIER; COLON; bindings = separated_nonempty_list(COMMA, logical_binding); lend = RBRACK
+  { let (_, spec_name) = spec_name in
+    (spec_name, bindings, lend)
+  }
+
+function_call:
+  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
+    { let (lstart, x) = lx in
+      let (_, f) = lf in
+      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; RBRACE; bindings = passed_logical_bindings
+    { let (lstart, x) = lx in
+      let (_, f) = lf in
+      let (spec_name, bindings, lend) = bindings in
+      let bare_stmt = WStmt.FunCall (x, f, params, Some (spec_name, bindings)) in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+
+function_call_list:
+  sl = separated_nonempty_list(SCOLON, function_call) { sl }
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -250,10 +329,10 @@ statement:
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
-  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
-    { let (lstart, x) = lx in
-      let (_, f) = lf in
-      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+  | s = function_call { s }
+  | lstart = PAR; LCBRACE; fs = function_call_list; lend = RCBRACE;
+    {
+      let bare_stmt = WStmt.Par (fs) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
@@ -297,7 +376,7 @@ statement:
     }
   | lstart = ASSUME_TYPE; LBRACE; e = expression; COMMA; t = type_target; lend = RBRACE;
     {
-      let bare_stmt = WStmt.AssumeType (e, t) in
+      let bare_stmt = WStmt.AssumeType (e, fst t) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
@@ -339,18 +418,27 @@ expression:
       WExpr.make bare_expr loc } %prec unop_prec
 
 binop:
-  | EQUAL        { WBinOp.EQUAL }
-  | LESSTHAN     { WBinOp.LESSTHAN }
-  | GREATERTHAN  { WBinOp.GREATERTHAN }
-  | LESSEQUAL    { WBinOp.LESSEQUAL }
-  | GREATEREQUAL { WBinOp.GREATEREQUAL }
-  | PLUS         { WBinOp.PLUS }
-  | MINUS        { WBinOp.MINUS }
-  | TIMES        { WBinOp.TIMES }
-  | DIV          { WBinOp.DIV }
-  | MOD          { WBinOp.MOD }
-  | AND          { WBinOp.AND }
-  | OR           { WBinOp.OR }
+  | EQUAL         { WBinOp.EQUAL }
+  | LESSTHAN      { WBinOp.LESSTHAN }
+  | GREATERTHAN   { WBinOp.GREATERTHAN }
+  | LESSEQUAL     { WBinOp.LESSEQUAL }
+  | GREATEREQUAL  { WBinOp.GREATEREQUAL }
+  | FLESSTHAN     { WBinOp.FLESSTHAN }
+  | FGREATERTHAN  { WBinOp.FGREATERTHAN }
+  | FLESSEQUAL    { WBinOp.FLESSEQUAL }
+  | FGREATEREQUAL { WBinOp.FGREATEREQUAL }
+  | PLUS          { WBinOp.PLUS }
+  | MINUS         { WBinOp.MINUS }
+  | TIMES         { WBinOp.TIMES }
+  | DIV           { WBinOp.DIV }
+  | MOD           { WBinOp.MOD }
+  | FPLUS         { WBinOp.FPLUS }
+  | FMINUS        { WBinOp.FMINUS }
+  | FTIMES        { WBinOp.FTIMES }
+  | FDIV          { WBinOp.FDIV }
+  | FMOD          { WBinOp.FMOD }
+  | AND           { WBinOp.AND }
+  | OR            { WBinOp.OR }
 
 unop_with_loc:
   | loc = NOT  { (loc, WUnOp.NOT) }
@@ -360,6 +448,7 @@ unop_with_loc:
   | loc = TAIL { (loc, WUnOp.TAIL) }
 
 value_with_loc:
+  | lf = FLOAT    { let (loc, f) = lf in (loc, WVal.Float f)}
   | lf = INTEGER  { let (loc, f) = lf in (loc, WVal.Int f) }
   | ls = STRING   { let (loc, s) = ls in (loc, WVal.Str s) }
   | loc = TRUE    { (loc, WVal.Bool true) }
@@ -392,30 +481,29 @@ lemma:
           } }
 
 variant_def:
-  | VARIANT; COLON; e = logic_expression { e }
+  | VARIANT; COLON; e = logic_expression {
+    Printf.eprintf "Warning: variants are not currently being used by Gillian, no termination is checked.\n";
+    e
+  }
 
 with_variant_def:
   | WITH; variant = variant_def { variant }
 
 proof_def:
-  | PROOF; COLON; pr = separated_nonempty_list(SEMICOLON, logic_command)
+  | PROOF; COLON; pr = separated_nonempty_list(SCOLON, logic_command)
     { pr }
 
 predicate:
-  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion_top_level);
+  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, pred_param);
+    outs = outs(pred_param);
+    RBRACE; LCBRACE;
+    pred_definitions = separated_nonempty_list(SCOLON, logic_assertion_top_level);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
-      let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
-      (* ins looks like [true, false, true] *)
-      let ins = List.mapi (fun i is_in -> if is_in then Some i else None) ins in
-      (* ins looks like [Some 0, None, Some 2] *)
-      let ins = List.filter Option.is_some ins in
-      (* ins looks like [Some 0, Some 2] *)
-      let ins = List.map Option.get ins in
-      (* ins looks like [0, 2] *)
-      let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
-      (* if ins is empty then everything is an in *)
+      let pred_params = ins @ outs in
+      (* In-parameters are the first [List.length ins] parameters *)
+      let pred_ins = List.mapi (fun i _ -> i) ins in
       let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
       let pred_id = Generators.gen_id () in
@@ -429,11 +517,10 @@ predicate:
         pred_id;
       } }
 
-pred_param_ins:
-  | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
+pred_param:
+  | lx = IDENTIFIER; ty = option(preceded(COLON, type_target))
     { let (_, x) = lx in
-      let isin = Option.fold ~some:(fun _ -> true) ~none:false inp in
-      ((x, $3), isin) }
+      (x, Option.map fst ty) }
 
 
 logic_command:
@@ -448,9 +535,9 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = UNFOLD; lpr = IDENTIFIER;
-      LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
-    { let (_, pr) = lpr in
-      let bare_lcmd = WLCmd.Unfold (pr, params) in
+      LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE; bindings = option(unfold_bindings)
+    { let (_, pred) = lpr in
+      let bare_lcmd = WLCmd.Unfold { pred; params; bindings } in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = APPLY; lbopt = option(bindings_with_loc); lname = IDENTIFIER; LBRACE;
@@ -461,13 +548,13 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = IF; LBRACE; g = logic_expression; lend = RBRACE;
-    LCBRACE; thencmds = separated_list(SEMICOLON, logic_command); RCBRACE;
-    ELSE; LCBRACE; elsecmds = separated_list(SEMICOLON, logic_command); RCBRACE
+    LCBRACE; thencmds = separated_list(SCOLON, logic_command); RCBRACE;
+    ELSE; LCBRACE; elsecmds = separated_list(SCOLON, logic_command); RCBRACE
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, elsecmds) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = IF; LBRACE; g = logic_expression; lend = RBRACE;
-    LCBRACE; thencmds = separated_list(SEMICOLON, logic_command); RCBRACE;
+    LCBRACE; thencmds = separated_list(SCOLON, logic_command); RCBRACE;
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, []) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
@@ -484,8 +571,16 @@ logic_command:
       let bare_lcmd = WLCmd.Invariant (a, b, variant) in
       WLCmd.make bare_lcmd loc }
 
+unfold_bindings:
+  | LCBRACE; BIND; binds = separated_list(COMMA, unfold_binding); RCBRACE;
+    { binds }
+
+unfold_binding:
+  | a = LVAR; COLON; b = LVAR { (snd a, snd b) }
+  | a = LVAR { (snd a, snd a) }
+
 bindings_with_loc:
-  | lstart = LCBRACE; EXIST; COLON; lvll = separated_list(COMMA, lvar_or_pvar); lend = RCBRACE;
+  | lstart = LCBRACE; BIND; COLON; lvll = separated_list(COMMA, lvar_or_pvar); lend = RCBRACE;
     { let (_, lvl) = List.split lvll in
       let loc = CodeLoc.merge lstart lend in
       (loc, lvl) }
@@ -495,14 +590,14 @@ lvar_or_pvar:
   | lx = LVAR { lx }
 
 wand:
-  | lname = IDENTIFIER; LBRACE; largs = separated_list(COMMA, logic_expression); RBRACE;
+  | lname = IDENTIFIER; LBRACE; lins = separated_list(COMMA, logic_expression); SCOLON; louts = separated_list(COMMA, logic_expression); RBRACE;
     WAND;
-    rname = IDENTIFIER; LBRACE; rargs = separated_list(COMMA, logic_expression); lend = RBRACE
+    rname = IDENTIFIER; LBRACE; rins = separated_list(COMMA, logic_expression); SCOLON; routs = separated_list(COMMA, logic_expression); lend = RBRACE
     {
       let (lstart, lname) = lname in
       let (_, rname) = rname in
       let loc = CodeLoc.merge lstart lend in
-      ((lname, largs), (rname, rargs), loc)
+      ((lname, lins @ louts), (rname, rins @ routs), loc)
     }
 
 logic_assertion_top_level:
@@ -512,6 +607,12 @@ logic_assertion_top_level:
       WLAssert.make bare_assert loc }
   | la = logic_assertion; { la }
 
+logic_expression_with_permission:
+  | LBRACE; perm = logic_expression; COLON; expr = logic_expression; RBRACE;
+    { (Some perm, expr) }
+  | expr = logic_expression;
+    { (None, expr) }
+
 logic_assertion:
   | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
     { let bare_assert = WLAssert.get la in
@@ -520,9 +621,12 @@ logic_assertion:
   | wand = wand
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
-  | lpr = IDENTIFIER; LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
+  | lpr = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, logic_expression);
+    outs = outs(logic_expression);
+    lend = RBRACE
     { let (lstart, pr) = lpr in
-      let bare_assert = WLAssert.LPred (pr, params) in
+      let bare_assert = WLAssert.LPred (pr, ins, outs) in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
   | loc = EMP
@@ -533,11 +637,11 @@ logic_assertion:
       let lstart, lend = WLAssert.get_loc la1, WLAssert.get_loc la2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc } %prec separating_conjunction
-  | le1 = logic_expression; ARROW; le2 = separated_nonempty_list(COMMA, logic_expression)
+  | le1 = logic_expression; ARROW; le2 = separated_nonempty_list(COMMA, logic_expression_with_permission)
     { let rec get_lend lel =
         match lel with
         | []  -> failwith "Nonempty list cannot be empty"
-        | [a] -> WLExpr.get_loc a
+        | [(_, a)] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
       let bare_assert = WLAssert.LPointsTo (le1, le2) in
@@ -545,11 +649,11 @@ logic_assertion:
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-  | le1 = logic_expression; BLOCK_ARROW; le2 = separated_nonempty_list(COMMA, logic_expression)
+  | le1 = logic_expression; BLOCK_ARROW; le2 = separated_nonempty_list(COMMA, logic_expression_with_permission)
     { let rec get_lend lel =
         match lel with
         | []  -> failwith "Nonempty list cannot be empty"
-        | [a] -> WLExpr.get_loc a
+        | [(_, a)] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
       let bare_assert = WLAssert.LBlockPointsTo (le1, le2) in
@@ -561,8 +665,22 @@ logic_assertion:
     { let bare_assert = WLAssert.LPure formula in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-
-
+  | loc = TRUE
+    { let bare_lexpr = WLExpr.LVal (WVal.Bool true) in
+      let lexpr = WLExpr.make bare_lexpr loc in
+      let bare_assert = WLAssert.LPure lexpr in
+      WLAssert.make bare_assert loc }
+  | loc = FALSE
+    { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
+      let lexpr = WLExpr.make bare_lexpr loc in
+      let bare_assert = WLAssert.LPure lexpr in
+      WLAssert.make bare_assert loc }
+  | e = logic_expression; COLON; ty = type_target
+    { let (ty, lend) = ty in
+      let bare_assert = WLAssert.LType (e, ty) in
+      let lstart = WLExpr.get_loc e in
+      let loc = CodeLoc.merge lstart lend in
+      WLAssert.make bare_assert loc }
 
 logic_expression:
   | lstart = LBRACE; le = logic_expression; lend = RBRACE
@@ -623,7 +741,7 @@ logic_expression:
       let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LConstructorApp (name, l) in
       WLExpr.make bare_lexpr loc }
-  | lstart = CASE; scrutinee = logic_expression; LCBRACE; cases = separated_list(SEMICOLON, logic_case); lend = RCBRACE
+  | lstart = CASE; scrutinee = logic_expression; LCBRACE; cases = separated_list(SCOLON, logic_case); lend = RCBRACE
     {
       let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LCases(scrutinee, cases) in
@@ -667,7 +785,7 @@ tuple_binders:
 
 datatype:
   | lstart = DATATYPE; ldname = IDENTIFIER; LCBRACE;
-    raw_constructors = separated_nonempty_list(SEMICOLON, constructor);
+    raw_constructors = separated_nonempty_list(SCOLON, constructor);
     lend = RCBRACE;
     {
       let (_, datatype_name) = ldname in
@@ -706,7 +824,7 @@ constructor:
 
 constructor_fields:
   | LBRACE; args = separated_list(COMMA, type_target); lend = RBRACE
-    { (args, lend) }
+    { (List.map fst args, lend) }
 
 
 (* Pure Functions *)
@@ -727,4 +845,20 @@ pure_function:
 
 pure_function_param:
   | lx = IDENTIFIER; typ = option(preceded(COLON, type_target))
-  { let (_, x) = lx in (x, typ) }
+  { let (_, x) = lx in (x, Option.map fst typ) }
+
+/* https://discuss.ocaml.org/t/solving-shift-reduce-conflicts-for-optional-trailing-comma-in-menhir/15042 */
+separated_nonempty_list_option_trailing(SEP, X):
+  | x = X { [x] }
+  | x = X SEP xs = separated_nonempty_list_option_trailing(SEP, X);
+      { [x] @ xs }
+  | x = X SEP { [x] }
+
+%inline outs(X):
+  xs = option_preceded_separated_list(SCOLON, COMMA, X)
+  { xs }
+
+%inline option_preceded_separated_list(PREC, SEP, X):
+  | PREC; xs = separated_list(SEP, X) { xs }
+  | { [] }
+

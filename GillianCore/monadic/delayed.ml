@@ -1,6 +1,5 @@
 module Expr = Gil_syntax.Expr
 module Type = Gil_syntax.Type
-module Smt = Engine.Smt
 
 exception NonExhaustiveEntailment of Expr.t list
 
@@ -95,6 +94,15 @@ let delayed_eval2 f x y ~curr_pc =
 
 let reduce = delayed_eval FOSolver.reduce_expr
 let resolve_loc = delayed_eval FOSolver.resolve_loc_name
+
+let assume_types e_tys ~curr_pc =
+  let new_tys = Engine.Typing.reverse_type_lexpr false curr_pc.Pc.gamma e_tys in
+  match new_tys with
+  | None -> [] (* type inconsistency, vanish *)
+  | Some new_tys ->
+      let new_tys = Engine.Type_env.to_list new_tys in
+      let new_pc = Pc.extend_types curr_pc new_tys in
+      [ Branch.make ~pc:new_pc ~value:() ]
 
 let entails =
   let entails ~pc lhs rhs =

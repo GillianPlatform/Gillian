@@ -7,26 +7,43 @@ let unfolded_preds : (string, Pred.t) Hashtbl.t = Hashtbl.create small_tbl_size
 (*
  *  Auto-Unfolding Non-recursive Predicates in Assertions
  * 	-----------------------------------------------------
- * *)
+ *)
 let rec auto_unfold
     ?(unfold_rec_predicates = false)
     ?loc
     (predicates : (string, Pred.t) Hashtbl.t)
     (rec_tbl : (string, bool) Hashtbl.t)
     (asrt : Asrt.t) : Asrt.t list =
+  let should_not_unfold name =
+    (* We don't unfold:
+       - Recursive predicates (except in some very specific cases)
+       - predicates marked with no-unfold
+       - predicates with a guard *)
+    (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
+    ||
+    let pred = Hashtbl.find predicates name in
+    pred.pred_nounfold || Option.is_some pred.pred_guard
+  in
+  (* The original first arm's guard: a user predicate we must keep folded. *)
+  let must_keep_folded cp_name =
+    match Asrt.as_user_pred_name cp_name with
+    | Some name -> should_not_unfold name
+    | None -> false
+  in
+  (* The original second arm's guard: the assertion is a user predicate. *)
+  let is_user_pred cp_name = Option.is_some (Asrt.as_user_pred_name cp_name) in
+  (* The user predicate has already been unfolded (it is in [unfolded_preds]). *)
+  let is_already_unfolded cp_name =
+    match Asrt.as_user_pred_name cp_name with
+    | Some name -> Hashtbl.mem unfolded_preds name
+    | None -> false
+  in
   asrt
   |> List.map (function
-       (* We don't unfold:
-           - Recursive predicates (except in some very specific cases)
-           - predicates marked with no-unfold
-           - predicates with a guard *)
-       | Asrt.Pred (name, _) as asrt
-         when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
-              ||
-              let pred = Hashtbl.find predicates name in
-              pred.pred_nounfold || Option.is_some pred.pred_guard ->
-           [ [ asrt ] ]
-       | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
+       | Asrt.CorePred (cp_name, ins, outs) as asrt
+         when (not (must_keep_folded cp_name)) && is_already_unfolded cp_name ->
+           let name = Option.get (Asrt.as_user_pred_name cp_name) in
+           let args = ins @ outs in
            L.verbose (fun fmt ->
                fmt "Unfolding predicate: %s with nounfold %b" name
                  (Hashtbl.find predicates name).pred_nounfold);
@@ -41,12 +58,24 @@ let rec auto_unfold
                     instead of %i"
                    name (List.length args) (List.length params)
                in
-               raise (Gillian_result.Exc.verification_failure ?loc msg)
+               raise
+                 (Gillian_result.Exc.analysis_failure ~is_preprocessing:true
+                    ?loc msg)
            in
            let subst = SVal.SSubst.init combined in
            let defs = List.map (fun (_, def) -> def) pred.pred_definitions in
-           List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
-       | Pred (name, args) as asrt -> (
+           let asrts =
+             List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
+           in
+           L.tmi (fun m ->
+               m "%a ->\n%a" Asrt.pp_atom asrt
+                 (Fmt.list ~sep:(Fmt.any "\n;\n") Asrt.pp)
+                 asrts);
+           asrts
+       | Asrt.CorePred (cp_name, ins, outs) as asrt
+         when (not (must_keep_folded cp_name)) && is_user_pred cp_name -> (
+           let name = Option.get (Asrt.as_user_pred_name cp_name) in
+           let args = ins @ outs in
            try
              L.tmi (fun fmt -> fmt "AutoUnfold: %a : %s" Asrt.pp_atom asrt name);
              let pred : Pred.t = Hashtbl.find predicates name in
@@ -274,6 +303,9 @@ let unfold_spec
       concat_map_fst (auto_unfold preds rec_info) sspec.ss_pre
     in
     L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec.spec_name);
+    L.tmi (fun fmt ->
+        fmt "@[<hov 2>Testing admissibility for assertions:@.%a@]"
+          (Fmt.list Asrt.pp) (List.map fst pres));
     let pres =
       List.filter
         (fun (pre, _) -> Simplifications.admissible_assertion pre)
@@ -491,7 +523,8 @@ let explicit_param_types
         | Ok pred -> pred
         | Error msg ->
             raise
-              (Gillian_result.Exc.verification_failure ?loc:pred.pred_loc msg)
+              (Gillian_result.Exc.analysis_failure ~is_preprocessing:true
+                 ?loc:pred.pred_loc msg)
       in
       (* Join the new predicate definition with all previous for the same predicate (if any) *)
       try
@@ -617,7 +650,6 @@ let add_closing_tokens preds =
       let pred_name = Pred.close_token_name pred in
       let pred_params = Pred.in_args pred pred.pred_params in
       let pred_num_params = List.length pred_params in
-      let pred_ins = List.init pred_num_params Fun.id in
       let close_token =
         Pred.
           {
@@ -627,7 +659,7 @@ let add_closing_tokens preds =
             pred_internal = false;
             pred_num_params;
             pred_params;
-            pred_ins;
+            ins_number = pred_num_params;
             pred_facts = [];
             pred_definitions = [];
             pred_guard = None;
@@ -641,42 +673,41 @@ let add_closing_tokens preds =
     guarded_predicates
 
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
-  let f (prog : ('a, int) Prog.t) unfold =
-    let procs = prog.procs in
-    let preds = prog.preds in
-    let lemmas = prog.lemmas in
-    let onlyspecs = prog.only_specs in
+  L.Phase.with_normal ~title:"Logic preprocessing" @@ fun () ->
+  Prog_env.using_prog prog @@ fun () ->
+  let procs = prog.procs in
+  let preds = prog.preds in
+  let lemmas = prog.lemmas in
+  let onlyspecs = prog.only_specs in
 
-    let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
+  let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
 
-    let () =
-      Hashtbl.filter_map_inplace
-        (fun _ lemma ->
-          let lemma = Lemma.add_param_bindings lemma in
-          Some lemma)
-        lemmas'
-    in
-
-    let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
-      match unfold with
-      | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
-      | true ->
-          let preds'', rec_info = unfold_preds preds' in
-          let procs'' = unfold_procs preds'' rec_info procs' in
-          let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in
-          let lemmas'' = unfold_lemmas preds'' rec_info lemmas' in
-          let onlyspecs' = unfold_specs preds'' rec_info onlyspecs in
-          (* create_partial_matches procs'';  *)
-          (preds'', procs'', bi_specs, lemmas'', onlyspecs')
-    in
-    add_closing_tokens preds'';
-    {
-      prog with
-      preds = preds'';
-      procs = procs'';
-      bi_specs;
-      lemmas = lemmas'';
-      only_specs = onlyspecs';
-    }
+  let () =
+    Hashtbl.filter_map_inplace
+      (fun _ lemma ->
+        let lemma = Lemma.add_param_bindings lemma in
+        Some lemma)
+      lemmas'
   in
-  L.Phase.with_normal ~title:"Logic preprocessing" (fun () -> f prog unfold)
+
+  let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
+    match unfold with
+    | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
+    | true ->
+        let preds'', rec_info = unfold_preds preds' in
+        let procs'' = unfold_procs preds'' rec_info procs' in
+        let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in
+        let lemmas'' = unfold_lemmas preds'' rec_info lemmas' in
+        let onlyspecs' = unfold_specs preds'' rec_info onlyspecs in
+        (* create_partial_matches procs'';  *)
+        (preds'', procs'', bi_specs, lemmas'', onlyspecs')
+  in
+  add_closing_tokens preds'';
+  {
+    prog with
+    preds = preds'';
+    procs = procs'';
+    bi_specs;
+    lemmas = lemmas'';
+    only_specs = onlyspecs';
+  }

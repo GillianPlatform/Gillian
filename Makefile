@@ -1,20 +1,34 @@
-OCAML_VARIANT=ocaml-variants.5.2.0+options
-DEV_PACKAGES=ocaml-lsp-server,feather,fileutils
-BUILD_PACKAGES=ocamlformat.0.26.2,odoc
+OCAML_VARIANT=ocaml-variants.5.3.0+options
+DEV_PACKAGES=ocaml-lsp-server
+BUILD_PACKAGES=ocamlformat.0.27.0,odoc
+ifeq ($(NO_OPAM_EXEC),)
+	OPAM_EXEC = opam exec --
+else
+	OPAM_EXEC =
+endif
 
 build:
-	opam exec -- dune build @all
+	$(OPAM_EXEC) dune build @all
 
 fmt:
-	opam exec -- dune fmt
+	$(OPAM_EXEC) dune fmt
+
+opam:
+	$(OPAM_EXEC) dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam transformers.opam
 
 deps:
-	opam exec -- dune build gillian.opam wisl.opam gillian-js.opam gillian-c.opam gillian-c2.opam transformers.opam
+	make opam
 	opam install . -y --deps-only
 
-init-dev:
+switch:
 	opam switch create . --packages=${OCAML_VARIANT},${BUILD_PACKAGES},${DEV_PACKAGES} -y --deps-only
-	opam exec -- ./githooks/install.ml
+
+githooks:
+	./githooks/install
+
+init-dev:
+	make switch
+	make githooks
 
 init-ci:
 	opam install . -y --deps-only
@@ -24,7 +38,7 @@ uninstall:
 	opam remove gillian gillian-c gillian-js wisl gillian-c2 transformers -y
 
 watch:
-	opam exec -- dune build --watch
+	$(OPAM_EXEC) dune build --watch
 
 c-init-env:
 	./Gillian-C/scripts/setup_environment.sh
@@ -36,27 +50,7 @@ js-init-env:
 	./Gillian-JS/scripts/setup_environment.sh
 
 docs:
-	@echo "===== BUILDING ODOC ====="
-	make odoc
-	@echo "===== BUILDING SPHINX ====="
-	make sphinx
+	$(OPAM_EXEC) dune build @doc
+	$(OPAM_EXEC) odoc html-generate --as-json -o _docs ./_build/default/_doc/_odocls/gillian/gillian.odocl
 
-docs-watch:
-	./scripts/watch_docs.sh
-
-odoc:
-	opam exec -- dune build @doc
-	mkdir -p _docs
-	rsync -auv --delete _build/default/_doc/_html/. _docs/odoc/
-
-odoc-watch:
-	./scripts/watch_odoc.sh > /dev/null &
-	opam exec -- dune build @doc --watch --terminal-persistence=preserve
-
-sphinx:
-	sphinx-build sphinx _docs/sphinx
-
-sphinx-watch:
-	sphinx-autobuild sphinx _docs/sphinx/
-
-.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs odoc sphinx
+.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs githooks switch deps opam

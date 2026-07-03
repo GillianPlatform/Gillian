@@ -1,10 +1,7 @@
 open SVal
 
-(**
-  Interface for GIL Stores.
-  GIL stores are mappings from GIL variables to GIL values.
-  GIL stores are mutable.
-*)
+(** Interface for GIL Stores. GIL stores are mappings from GIL variables to GIL
+    values. GIL stores are mutable. *)
 module type S = sig
   (** Type of GIL values *)
   type vt
@@ -33,7 +30,8 @@ module type S = sig
   (** Return value of a given variable or throw *)
   val get_unsafe : t -> Var.t -> vt
 
-  (** Store constructor, with a list of bindings of the form (variable, value) *)
+  (** Store constructor, with a list of bindings of the form (variable, value)
+  *)
   val init : (Var.t * vt) list -> t
 
   (** Store iterator *)
@@ -77,123 +75,99 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   (** Actual type of GIL Stores *)
   type t = (Var.t, vt) Hashtbl.t [@@deriving yojson]
 
-  (**
-    Store initialisation
+  (** Store initialisation
 
-    @param vars_and_vals Variables and values to be put in the store
-    @return Newly constructed and initialised store
-  *)
+      @param vars_and_vals Variables and values to be put in the store
+      @return Newly constructed and initialised store *)
   let init (vars_and_vals : (Var.t * vt) list) : t =
     Hashtbl.of_seq (List.to_seq vars_and_vals)
 
-  (**
-    Store copy
+  (** Store copy
 
-    @param store Target store
-    @return Copy of the given store
-  *)
+      @param store Target store
+      @return Copy of the given store *)
   let copy (store : t) : t = Hashtbl.copy store
 
-  (**
-    Store lookup
+  (** Store lookup
 
-    @param store Target store
-    @param x Target variable
-    @return Optional value of the variable in the store
-  *)
+      @param store Target store
+      @param x Target variable
+      @return Optional value of the variable in the store *)
   let get (store : t) (x : Var.t) : vt option = Hashtbl.find_opt store x
 
-  (**
-    Store get with throw
+  (** Store get with throw
 
-    @param store Target store
-    @param x Target variable
-    @raise Failure Variable not found in the store
-    @return Value of the variable in the store
-  *)
+      @param store Target store
+      @param x Target variable
+      @raise Failure Variable not found in the store
+      @return Value of the variable in the store *)
   let get_unsafe (store : t) (v : Var.t) : vt =
     match get store v with
     | Some result -> result
     | None -> Fmt.failwith "Store.get_unsafe: variable %s not found in store" v
 
-  (**
-    Store update (in-place)
+  (** Store update (in-place)
 
-    @param store Target store
-    @param x Target variable
-    @param v Value to be put
-  *)
+      @param store Target store
+      @param x Target variable
+      @param v Value to be put *)
   let put (store : t) (x : Var.t) (v : vt) : unit = Hashtbl.replace store x v
 
-  (**
-    Store removal (in-place)
+  (** Store removal (in-place)
 
-    @param store Target store
-    @param x Target variable
-  *)
+      @param store Target store
+      @param x Target variable *)
   let remove (store : t) (x : Var.t) : unit = Hashtbl.remove store x
 
-  (**
-    Store membership check
+  (** Store membership check
 
-    @param store Target store
-    @param x Target variable
-    @return true if the variable is in the store, false otherwise
-  *)
+      @param store Target store
+      @param x Target variable
+      @return true if the variable is in the store, false otherwise *)
   let mem (store : t) (x : Var.t) : bool = Hashtbl.mem store x
 
-  (**
-    Store iterator
+  (** Store iterator
 
-    @param store Target store
-    @param f Iterator function
-  *)
+      @param store Target store
+      @param f Iterator function *)
   let iter (store : t) (f : Var.t -> vt -> unit) : unit = Hashtbl.iter f store
 
-  (**
-    Store fold
+  (** Store fold
 
-    @param store Target store
-    @param f Fold function
-    @param ac Accumulator
-  *)
+      @param store Target store
+      @param f Fold function
+      @param ac Accumulator *)
   let fold (store : t) (f : Var.t -> vt -> 'a -> 'a) (ac : 'a) : 'a =
     Hashtbl.fold f store ac
 
-  (**
-    Store bindings
+  (** Store bindings
 
-    @param store Target store
-    @return Bindings of the store formatted as (variable, value)
-  *)
+      @param store Target store
+      @return Bindings of the store formatted as (variable, value) *)
   let bindings (store : t) : (Var.t * vt) list =
     Hashtbl.to_seq store |> List.of_seq
 
-  (**
-    Store domain
+  (** Store domain
 
-    @param store Target store
-    @return Set of variables that are in the domain of the store
-  *)
+      @param store Target store
+      @return Set of variables that are in the domain of the store *)
   let domain (store : t) : Var.Set.t =
     Hashtbl.to_seq_keys store |> Var.Set.of_seq
 
-  (**
-    Store filtering (in-place)
+  (** Store filtering (in-place)
 
-    @param store Target store
-    @param f The filtering function
-  *)
+      @param store Target store
+      @param f The filtering function *)
   let filter_map_inplace (store : t) (f : Var.t -> vt -> vt option) : unit =
     Hashtbl.filter_map_inplace f store
 
-  (**
-    Store partition
+  (** Store partition
 
-    @param store Target store
-    @param f The partitioning function
-    @return Set of variables satisfying the function, set of variables not satisfying the function
-  *)
+      @param store Target store
+      @param f The partitioning function
+      @return
+        Set of variables satisfying the function, set of variables not
+        satisfying the function *)
   let partition (store : t) (f : vt -> bool) : Var.Set.t * Var.Set.t =
     fold store
       (fun store le (pred_xs, npred_xs) ->
@@ -201,13 +175,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
         else (pred_xs, Var.Set.add store npred_xs))
       (Var.Set.empty, Var.Set.empty)
 
-  (**
-    Store projection
+  (** Store projection
 
-    @param store Target store
-    @param xs List of variables to be projected
-    @return New store that only contains the projected variables
-  *)
+      @param store Target store
+      @param xs List of variables to be projected
+      @return New store that only contains the projected variables *)
   let projection (store : t) (vars : Var.t list) : t =
     let projected = Hashtbl.create (List.length vars) in
     List.iter
@@ -216,12 +188,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       vars;
     projected
 
-  (**
-    Store printer
+  (** Store printer
 
-    @param store GIL store
-    @return String representation of the store
-  *)
+      @param store GIL store
+      @return String representation of the store *)
   let pp fmt (store : t) =
     let sep = Fmt.any "@\n" in
     let pp_pair =
@@ -246,12 +216,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     in
     (Fmt.list ~sep pp_pair) fmt bindings
 
-  (**
-    Store to substitution
+  (** Store to substitution
 
-    @param store to turn into an ssubst
-    @return ssubst mapping the store variables to lexprs
-  *)
+      @param store to turn into an ssubst
+      @return ssubst mapping the store variables to lexprs *)
   let to_ssubst (store : t) : SESubst.t =
     let subst = SESubst.init [] in
     iter store (fun x v -> SESubst.put subst (Expr.PVar x) (Val.to_expr v));

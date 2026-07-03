@@ -20,6 +20,7 @@ module NOp = NOp
 module Pred = Pred
 module Proc = Proc
 module Prog = Prog
+module Prog_env = Prog_env
 module SLCmd = SLCmd
 module Spec = Spec
 module Type = Type

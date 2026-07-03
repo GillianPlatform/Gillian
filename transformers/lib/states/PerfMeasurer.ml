@@ -23,11 +23,11 @@ module Make (S : SMemory.S) = struct
   let get_init_data = m1 "get_init_data" get_init_data
   let clear = m1 "clear" clear
 
-  let execute_action a =
+  let[@inline] execute_action a =
     m3 (Format.asprintf "execute_action/%s" a) (execute_action a)
 
-  let consume p = m3 (Format.asprintf "consume/%s" p) (consume p)
-  let produce p = m3 (Format.asprintf "produce/%s" p) (produce p)
+  let[@inline] consume p = m3 (Format.asprintf "consume/%s" p) (consume p)
+  let[@inline] produce p = m3 (Format.asprintf "produce/%s" p) (produce p)
   let is_overlapping_asrt = m1 "is_overlapping_asrt" is_overlapping_asrt
   let copy = m1 "copy" copy
 

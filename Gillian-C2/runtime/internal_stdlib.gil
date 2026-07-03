@@ -1,11 +1,10 @@
 #internal
 
 proc i__malloc(sz) {
-      chunk := "i__ptr_chunk"();
       ptr_sz := "i__ptr_size"();
       bl := [mem_alloc](i- ptr_sz, sz);
       b := l-nth(bl, 0i);
-      u := [mem_store](chunk, b, i- ptr_sz, sz);
+      u := [mem_store]("ptr", b, i- ptr_sz, sz);
       ret := {{ b, 0i }};
       return
 };
@@ -21,9 +20,8 @@ proc i__calloc(n, sz) {
 };
 
 proc i__free(ptr) {
-         chunk := "i__ptr_chunk"();
          ptr_sz := "i__ptr_size"();
-         sz := [mem_load](chunk, l-nth(ptr, 0i), l-nth(ptr, 1i) i- ptr_sz);
+         sz := [mem_load]("ptr", l-nth(ptr, 0i), l-nth(ptr, 1i) i- ptr_sz);
          sz := l-nth(sz, 0i);
          goto [ sz i< 0i ] die ctn;
    die:  fail[free]("Deallocating a pointer of negative size");

@@ -39,20 +39,10 @@ module Builder = struct
       double_width = get ~field:"double_width" b.double_width;
       int_width = get ~field:"int_width" b.int_width;
       is_big_endian = get ~field:"is_big_endian" b.is_big_endian;
-      long_double_width = get ~field:"long_double_width" b.long_double_width;
       long_int_width = get ~field:"long_int_width" b.long_int_width;
-      long_long_int_width =
-        get ~field:"long_long_int_width" b.long_long_int_width;
-      memory_operand_size =
-        get ~field:"memory_operand_size" b.memory_operand_size;
       null_is_zero = get ~field:"null_is_zero" b.null_is_zero;
       pointer_width = get ~field:"pointer_width" b.pointer_width;
-      short_int_width = get ~field:"short_int_width" b.short_int_width;
       single_width = get ~field:"single_width" b.single_width;
-      wchar_t_is_unsigned =
-        get ~field:"wchar_t_is_unsigned" b.wchar_t_is_unsigned;
-      wchar_t_width = get ~field:"wchar_t_width" b.wchar_t_width;
-      word_size = get ~field:"word_size" b.word_size;
     }
 end
 
@@ -62,9 +52,12 @@ open Irep.Infix
    constant lifting should be done in exactly one place and then used in other files. *)
 
 let as_int (sym : Symbol.t) =
-  sym.value $ Value
-  |> Irep.as_just_bitpattern ~width:32 ~signed:false
-  |> Z.to_int
+  match sym.value.sub with
+  | [] ->
+      Gerror.unexpected ~irep:sym.value
+        "Expected sub when building machine model!"
+  | sub :: _ ->
+      sub $ Value |> Irep.as_just_bitpattern ~width:32 ~signed:false |> Z.to_int
 
 let as_bool sym =
   match as_int sym with
@@ -78,10 +71,9 @@ let as_string (sym : Symbol.t) =
   let ops = sym.value.sub in
   List.nth ops 1 $ Value |> Irep.as_just_string
 
-(** Modifies the symtab in-place,
-  removes every field corresponding to the machine model,
-  return the built machine model.
-  Will fail if the symtab is incomplete *)
+(** Modifies the symtab in-place, removes every field corresponding to the
+    machine model, return the built machine model. Will fail if the symtab is
+    incomplete *)
 let consume_from_symtab (symtab : Symtab.t) =
   let open Builder in
   let builder = make_b () in

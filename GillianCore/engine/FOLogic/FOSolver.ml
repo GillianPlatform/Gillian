@@ -1,9 +1,7 @@
 open SVal
 module L = Logging
 
-(** ****************
-  * SATISFIABILITY *
-  * **************** **)
+(** **************** * SATISFIABILITY * * **************** **)
 
 let get_axioms (fs : Expr.Set.t) (_ : Type_env.t) : Expr.Set.t =
   Expr.Set.fold
@@ -40,7 +38,8 @@ let simplify_pfs_and_gamma
 let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Smt.check_sat fs gamma in
+  let gamma_tbl = Type_env.as_hashtbl gamma in
+  let model = Smt.check_sat fs gamma_tbl in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -64,7 +63,7 @@ let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
   | None -> None
   | Some model -> (
       try
-        Smt.lift_model model gamma update smt_vars;
+        Smt.lift_model model gamma_tbl update smt_vars;
         Some subst
       with e ->
         let () =
@@ -80,7 +79,7 @@ let check_satisfiability
     ?relevant_info
     (fs : Expr.t list)
     (gamma : Type_env.t) : bool =
-  (* let t = if time = "" then 0. else Sys.time () in *)
+  (* let t = if time = "" then 0. else Unix.gettimeofday () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ?relevant_info ~matching fs gamma in
   let axioms = get_axioms fs gamma in
@@ -88,10 +87,14 @@ let check_satisfiability
   if Expr.Set.is_empty fs then true
   else if Expr.Set.mem Expr.false_ fs then false
   else
-    let result = Smt.is_sat fs gamma in
+    let result =
+      try Smt.is_sat fs (Type_env.as_hashtbl gamma)
+      with Smt.SMT_error _ | Smt.SMT_unknown ->
+        if !Config.under_approximation then false else raise Smt.SMT_unknown
+    in
     (* if time <> "" then
        Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
-         (Sys.time () -. t); *)
+         (Unix.gettimeofday () -. t); *)
     result
 
 let sat ~matching ~pfs ~gamma formula : bool =
@@ -109,9 +112,7 @@ let sat ~matching ~pfs ~gamma formula : bool =
         (formula' :: PFS.to_list pfs)
         gamma
 
-(** ************
-  * ENTAILMENT *
-  * ************ **)
+(** ************ * ENTAILMENT * * ************ **)
 
 let check_entailment
     ?(matching = false)
@@ -135,7 +136,7 @@ let check_entailment
   (* SOUNDNESS !!DANGER!!: call to simplify_implication       *)
   (* Simplify maximally the implication to be checked         *)
   (* Remove from the typing environment the unused variables  *)
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let left_fs = PFS.copy left_fs in
   let gamma = Type_env.copy gamma in
   let right_fs = PFS.of_list right_fs in
@@ -198,7 +199,9 @@ let check_entailment
       let _ = Simplifications.simplify_pfs_and_gamma formulae gamma_left in
 
       let model =
-        Smt.check_sat (Expr.Set.of_list (PFS.to_list formulae)) gamma
+        Smt.check_sat
+          (Expr.Set.of_list (PFS.to_list formulae))
+          (Type_env.as_hashtbl gamma)
       in
       let ret = Option.is_none model in
       L.(verbose (fun m -> m "Entailment returned %b" ret));
@@ -208,28 +211,30 @@ let check_entailment
                L.tmi (fun m -> m "Here's the model:\n%a" Smt.pp_sexp model))
       in
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
-         (Sys.time () -. t); *)
+         (Unix.gettimeofday () -. t); *)
       ret
 
-let is_equal ~pfs ~gamma e1 e2 =
-  (* let t = Sys.time () in *)
-  let feq = Reduction.reduce_lexpr ~gamma ~pfs (BinOp (e1, Equal, e2)) in
+let is_equal ?matching ~pfs ~gamma e1 e2 =
+  (* let t = Unix.gettimeofday () in *)
+  let feq =
+    Reduction.reduce_lexpr ?matching ~gamma ~pfs (BinOp (e1, Equal, e2))
+  in
   let result =
     match feq with
     | Lit (Bool b) -> b
     | BinOp (_, Equal, _) | BinOp (_, And, _) ->
-        check_entailment SS.empty pfs [ feq ] gamma
+        check_entailment ?matching SS.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure
              ("Equality reduced to something unexpected: "
              ^ (Fmt.to_to_string Expr.pp) feq))
   in
-  (* Utils.Statistics.update_statistics "FOS: is_equal" (Sys.time () -. t); *)
+  (* Utils.Statistics.update_statistics "FOS: is_equal" (Unix.gettimeofday () -. t); *)
   result
 
 let is_different ~pfs ~gamma e1 e2 =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let feq =
     Reduction.reduce_lexpr ~gamma ~pfs (UnOp (Not, BinOp (e1, Equal, e2)))
   in
@@ -243,7 +248,7 @@ let is_different ~pfs ~gamma e1 e2 =
              ("Inequality reduced to something unexpected: "
              ^ (Fmt.to_to_string Expr.pp) feq))
   in
-  (* Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t); *)
+  (* Utils.Statistics.update_statistics "FOS: is different" (Unix.gettimeofday () -. t); *)
   result
 
 let num_is_less_or_equal ~pfs ~gamma e1 e2 =

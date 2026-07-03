@@ -1,10 +1,11 @@
 (** GIL Procedures *)
 
-(** Labeled procedures. Every command is annotated with a label, and the gotos indicate to which label one should jump.
-    Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
-    Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
-    (starting from 0).
-    *)
+(** Labeled procedures. Every command is annotated with a label, and the gotos
+    indicate to which label one should jump. Labels can be of any type. However,
+    we say "labeled" when the labels are strings, and "indexed" when the labels
+    are integers. Most functions in Gillian that work with indexed procedures
+    assume for efficiency that the label of the i-th command is always Some i
+    (starting from 0). *)
 type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_name : string;
   proc_source_path : string option;
@@ -14,6 +15,12 @@ type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_spec : Spec.t option;
   proc_aliases : string list;
   proc_calls : string list;
+  (* Debugger options *)
+  proc_display_name : (string * string) option;
+      (** A friendly name for the proc, when displayed in the debugger *)
+  proc_hidden : bool;
+      (** Whether the proc should be hidden at the "top level" in the debugger
+      *)
 }
 [@@deriving yojson]
 
@@ -137,15 +144,13 @@ let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
                 | GuardedGoto (e, lt, lf) ->
                     Cmd.GuardedGoto
                       (e, find_with_error mapping lt, find_with_error mapping lf)
-                | Call (x, e, le, ol, subst) ->
+                | Call (call, error_label) ->
                     Cmd.Call
-                      ( x,
-                        e,
-                        le,
-                        (match ol with
+                      ( call,
+                        match error_label with
                         | None -> None
-                        | Some lab -> Some (find_with_error mapping lab)),
-                        subst )
+                        | Some lab -> Some (find_with_error mapping lab) )
+                | Par fcalls -> Cmd.Par fcalls
                 | ECall (x, e, le, ol) ->
                     Cmd.ECall
                       ( x,

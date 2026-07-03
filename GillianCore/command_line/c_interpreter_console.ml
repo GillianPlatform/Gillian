@@ -6,9 +6,8 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (CState : CState.S with type init_data = ID.t)
-    (C_interpreter : G_interpreter.S
-                       with type annot = PC.Annot.t
-                        and type state_t = CState.t)
+    (C_interpreter :
+      G_interpreter.S with type annot = PC.Annot.t and type state_t = CState.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -27,11 +26,7 @@ struct
     | _ -> false
 
   let run debug (prog : ('a, int) Prog.t) init_data : unit =
-    let prog =
-      match MP.init_prog prog with
-      | Ok prog -> prog
-      | _ -> failwith "Program could not be initialised"
-    in
+    let prog = MP.init_prog prog in
     let ret =
       C_interpreter.evaluate_proc
         (fun x -> x)

@@ -9,11 +9,15 @@ let of_yojson (json : Yojson.Safe.t) : (t, string) result =
   in
   let tbl = Hashtbl.create 1000 in
   let+ () =
+    let cur_name = ref "" in
     try
       Ok
         (List.iter
-           (fun (name, sym) -> Hashtbl.replace tbl name (Symbol.of_yojson sym))
+           (fun (name, sym) ->
+             cur_name := name;
+             Hashtbl.replace tbl name (Symbol.of_yojson sym))
            symbols)
-    with Kutils.J.Parse_error (_, s) -> Error s
+    with Kutils.J.Parse_error (_, s) ->
+      Error ("When parsing symbol " ^ !cur_name ^ ": " ^ s)
   in
   tbl

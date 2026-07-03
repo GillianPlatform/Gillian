@@ -225,6 +225,10 @@ let make_get_value_call x err =
         [ x_v ] )
   | Some x_v -> (x_v, LBasic Skip, [])
 
+let make_check_nonzero_call x err =
+  let x_n = number_var_of_var x in
+  (x_n, LCall (x_n, Lit (String checkNonZero), [ x ], Some err, None))
+
 let make_to_number_call x x_v err =
   let x_n = number_var_of_var x in
   (x_n, LCall (x_n, Lit (String toNumberName), [ PVar x_v ], Some err, None))
@@ -408,16 +412,32 @@ let translate_multiplicative_binop x1 x2 x1_v x2_v aop err =
     LBasic (Assignment (x_r, BinOp (PVar x1_n, jsil_aop, PVar x2_n)))
   in
 
+  (* In JavaScript, division (and modulo) by zero is well-defined: it yields
+     [Infinity], [-Infinity] or [NaN] and never raises an exception. The
+     [check_nonzero] guard that turns it into an error is therefore only
+     emitted when the user opts in via the [--forbid-div-by-zero] flag. *)
+  let nonzero_cmds, nonzero_errs =
+    match aop with
+    | (JS_Parser.Syntax.Div | JS_Parser.Syntax.Mod)
+      when !Javert_utils.Js_config.forbid_div_by_zero ->
+        let nonzero_err, nonzero_cmd =
+          make_check_nonzero_call (PVar x2_n) err
+        in
+        (* x2_n_n := "check_nonzero"(x2_n) with err *)
+        ([ (None, nonzero_cmd) ], [ nonzero_err ])
+    | _ -> ([], [])
+  in
+
   let new_cmds =
     [
       (None, cmd_tn_x1);
       (*  x1_n := i__toNumber (x1_v) with err  *)
-      (None, cmd_tn_x2);
-      (*  x2_n := i__toNumber (x2_v) with err  *)
-      (None, cmd_ass_xr) (*  x_r := x1_n * x2_n                   *);
+      (None, cmd_tn_x2) (*  x2_n := i__toNumber (x2_v) with err  *);
     ]
+    @ nonzero_cmds
+    @ [ (None, cmd_ass_xr) (*  x_r := x1_n * x2_n  *) ]
   in
-  let new_errs = [ x1_n; x2_n ] in
+  let new_errs = [ x1_n; x2_n ] @ nonzero_errs in
   (new_cmds, new_errs, x_r)
 
 let translate_binop_plus x1 x2 x1_v x2_v err =
@@ -2528,7 +2548,8 @@ let rec translate_expr tr_ctx e :
                      (None,           cmd_goto_test_empty);  (*        goto [ x_r1 = empty ] next3 next4                                       *)
                      (Some next3,     cmd_ret_undefined);    (* next3: x_r2 := undefined                                                       *)
                      (Some next4,     cmd_phi_final)         (* next4: x_r3 := PHI(x_r1, x_r2)                                                 *)
-                   ] *)))
+                   ] *)
+              ))
       in
       let errs =
         errs_ef @ errs_xf_val @ errs_args @ [ var_te; var_te ]
@@ -6147,7 +6168,8 @@ and translate_statement tr_ctx e =
 
       let cmds =
         cmds (*  cmds                            *) @ cmd_gv_x
-        @ (*  x_v := i__getValue (x) with err *)
+        @
+        (*  x_v := i__getValue (x) with err *)
         cmd_goto
       in
 

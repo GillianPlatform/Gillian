@@ -25,7 +25,7 @@ let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
 (* Reduction of assertions *)
 
 (*************************************)
-(** Symbolic state simplification   **)
+(** Symbolic state simplification **)
 
 (*************************************)
 
@@ -297,14 +297,12 @@ let _resolve_set_existentials
     (rpfs, !exists, gamma))
   else (rpfs, !exists, gamma)
 
-(**
-  Pure entailment: simplify pure formulae and typing environment
+(** Pure entailment: simplify pure formulae and typing environment
 
-  @param pfs Pure formulae (modified destructively)
-  @param gamma Typing environment (modified destructively)
-  @param vars_to_save Logical variables that cannot be deleted
-  @return Substitution from logical variables to logical expressions
-*)
+    @param pfs Pure formulae (modified destructively)
+    @param gamma Typing environment (modified destructively)
+    @param vars_to_save Logical variables that cannot be deleted
+    @return Substitution from logical variables to logical expressions *)
 let simplify_pfs_and_gamma
     ?(matching = false)
     ?(kill_new_lvars : bool option)
@@ -313,7 +311,7 @@ let simplify_pfs_and_gamma
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
     (gamma : Type_env.t) : SESubst.t * SS.t =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
     ref (Option.value ~default:SS.empty existentials)
@@ -471,7 +469,7 @@ let simplify_pfs_and_gamma
                 extend_with pf;
                 vars_to_kill := SS.union !vars_to_kill new_vars;
                 `Replace whole)
-        (*  *)
+        (* *)
         | BinOp (UnOp (LstLen, x), Equal, BinOp (Lit (Int n), IPlus, LVar z))
           when Z.geq n Z.zero ->
             let new_lvars =
@@ -683,6 +681,25 @@ let simplify_pfs_and_gamma
                     | Some tv ->
                         if t <> tv then stop_explain "Type mismatch"
                         else `Filter)
+                (* Int breakdown *)
+                | ( Lit (Num n),
+                    BinOp (l, FPlus, BinOp (Lit (Num 256.), FTimes, r)) )
+                  when PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, l))
+                       && PFS.mem pfs (BinOp (Lit (Num 0.), FLessThanEqual, r))
+                       && PFS.mem pfs (BinOp (l, FLessThan, Lit (Num 256.)))
+                       && PFS.mem pfs (BinOp (r, FLessThan, Lit (Num 256.))) ->
+                    let n = int_of_float n in
+                    let eq_l =
+                      Expr.BinOp (l, Equal, Lit (Num (float_of_int (n mod 256))))
+                    in
+                    let eq_r =
+                      Expr.BinOp (r, Equal, Lit (Num (float_of_int (n / 256))))
+                    in
+                    L.verbose (fun fmt ->
+                        fmt "Breakdown:\n\tn : %d\n\tl : %a\n\tr : %a" n Expr.pp
+                          eq_l Expr.pp eq_r);
+                    extend_with eq_l;
+                    `Replace eq_r
                 | _, _ -> `Replace whole))
         (* All other cases *)
         | _ -> `Replace whole
@@ -841,8 +858,8 @@ let simplify_pfs_and_gamma
       in
 
       (*****************************************
-        ********* THIS IS THE BEGINNING *********
-        *****************************************)
+       ********* THIS IS THE BEGINNING *********
+       *****************************************)
       PFS.sort lpfs;
       let old_pfs = ref (PFS.init ()) in
       let iteration_count = ref 0 in
@@ -918,7 +935,7 @@ let simplify_pfs_and_gamma
       Hashtbl.replace simplification_cache key cached_simplification;
 
       (* Utils.Statistics.update_statistics "FOS: SimplifyPFSandGamma"
-         (Sys.time () -. t); *)
+         (Unix.gettimeofday () -. t); *)
 
       (* Step 5 - Sort ALoc transitivity *)
       let rec find_loc_all_the_way aloc res =
@@ -954,7 +971,7 @@ let simplify_implication
     (lpfs : PFS.t)
     (rpfs : PFS.t)
     (gamma : Type_env.t) =
-  (* let t = Sys.time () in *)
+  (* let t = Unix.gettimeofday () in *)
   List.iter
     (fun (pf : Expr.t) ->
       match pf with
@@ -994,13 +1011,13 @@ let simplify_implication
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           exists PFS.pp lpfs PFS.pp rpfs Type_env.pp gamma));
   (* Utils.Statistics.update_statistics "FOS: SimplifyImplication"
-     (Sys.time () -. t); *)
+     (Unix.gettimeofday () -. t); *)
   exists
 
 let admissible_assertion (a : Asrt.t) : bool =
   L.(
     tmi (fun m ->
-        m "-----------\nAdmissible?\n----------\n%s"
+        m "-----------\nAdmissible?\n-----------\n%s"
           ((Fmt.to_to_string Asrt.full_pp) a)));
 
   let pfs = PFS.init () in
@@ -1023,7 +1040,7 @@ let admissible_assertion (a : Asrt.t) : bool =
     List.iter separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
     let res = not (PFS.mem pfs Expr.false_) in
-    L.tmi (fun m -> m "Admissible? %b" res);
+    L.tmi (fun m -> m "Admissible? %b\n" res);
     res
   with e ->
     L.tmi (fun m ->

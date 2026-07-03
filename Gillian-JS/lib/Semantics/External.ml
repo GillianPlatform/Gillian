@@ -11,10 +11,11 @@ module M
     (Val : Val.S)
     (ESubst : Engine.ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
+    (State :
+      State.S
+        with type vt = Val.t
+         and type st = ESubst.t
+         and type store_t = Store.t)
     (Call_stack : Call_stack.S with type vt = Val.t and type store_t = Store.t) =
 struct
   (* module Call_stack = Call_stack.M(Val)(Store) *)
@@ -25,19 +26,17 @@ struct
     let state' = State.set_store state store in
     state'
 
-  (**
-    JavaScript Eval
+  (** JavaScript Eval
 
-    @param prog JSIL program
-    @param state Current state
-    @param preds Current predicates
-    @param cs Current call stack
-    @param i Current index
-    @param x Variable that stores the result
-    @param v_args Parameters
-    @param j Optional error index
-    @return Resulting configuration
-  *)
+      @param prog JSIL program
+      @param state Current state
+      @param preds Current predicates
+      @param cs Current call stack
+      @param i Current index
+      @param x Variable that stores the result
+      @param v_args Parameters
+      @param j Optional error index
+      @return Resulting configuration *)
   let execute_eval (prog : ('a, int) GProg.t) state cs i x v_args j =
     let store = State.get_store state in
     let v_args = v_args @ [ Val.from_literal Undefined ] in
@@ -130,18 +129,16 @@ struct
 
   (* Two arguments only, the parameters and the function body *)
 
-  (**
-    JavaScript Function Constructor
+  (** JavaScript Function Constructor
 
-    @param prog JSIL program
-    @param state Current state
-    @param cs Current call stack
-    @param i Current index
-    @param x Variable that stores the result
-    @param v_args Parameters
-    @param j Optional error index
-    @return Resulting configuration
-  *)
+      @param prog JSIL program
+      @param state Current state
+      @param cs Current call stack
+      @param i Current index
+      @param x Variable that stores the result
+      @param v_args Parameters
+      @param j Optional error index
+      @return Resulting configuration *)
   let execute_function_constructor prog state cs i x v_args j =
     let throw message =
       let _ = update_store state x (Val.from_literal (String message)) in
@@ -188,19 +185,17 @@ struct
             | _ -> throw "Not a script."))
     | _, _ -> throw "Body or parameters not a string."
 
-  (**
-    General External Procedure Treatment
+  (** General External Procedure Treatment
 
-    @param prog JSIL program
-    @param state Current state
-    @param cs Current call stack
-    @param i Current index
-    @param x Variable that stores the result
-    @param pid Procedure identifier
-    @param v_args Parameters
-    @param j Optional error index
-    @return Resulting configuration
-  *)
+      @param prog JSIL program
+      @param state Current state
+      @param cs Current call stack
+      @param i Current index
+      @param x Variable that stores the result
+      @param pid Procedure identifier
+      @param v_args Parameters
+      @param j Optional error index
+      @return Resulting configuration *)
   let execute
       (prog : ('a, int) GProg.t)
       (state : State.t)

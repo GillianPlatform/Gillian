@@ -2,18 +2,17 @@ open JSLogicCommon
 open Jsil_syntax
 
 type t =
-  | Fold of JSAsrt.t * (string * (string * JSExpr.t) list) option
-      (** Fold          *)
+  | Fold of JSAsrt.t * (string * (string * JSExpr.t) list) option  (** Fold *)
   | Unfold of JSAsrt.t * (string * string) list option  (** Single Unfold *)
   | GUnfold of string  (** Global unfold *)
-  | Flash of JSAsrt.t  (** Unfold/fold   *)
-  | If of JSExpr.t * t list * t list  (** If-then-else  *)
+  | Flash of JSAsrt.t  (** Unfold/fold *)
+  | If of JSExpr.t * t list * t list  (** If-then-else *)
   | Branch of JSAsrt.pt (* Branching *)
-  | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
-  | Macro of string * JSExpr.t list  (** Macro         *)
-  | Assert of (JSAsrt.t * string list)  (** Assert        *)
+  | ApplyLemma of string * JSExpr.t list  (** Lemma *)
+  | Macro of string * JSExpr.t list  (** Macro *)
+  | Assert of (JSAsrt.t * string list)  (** Assert *)
   | Assume of JSAsrt.pt  (** Assume *)
-  | Invariant of (JSAsrt.t * string list)  (** Invariant     *)
+  | Invariant of (JSAsrt.t * string list)  (** Invariant *)
   | UseSubst of string * (string * JSExpr.t) list
 
 let rec js2jsil
@@ -34,15 +33,17 @@ let rec js2jsil
   in
 
   match logic_cmd with
-  | Fold (Pred (s, les), fold_info) ->
+  | Fold (Pred (s, ins, outs), fold_info) ->
+      let les = ins @ outs in
       [ LCmd.SL (Fold (s, List.map fe les, translate_folding_info fold_info)) ]
-  | Flash (Pred (s, les)) ->
-      let p_name, les' = (s, List.map fe les) in
+  | Flash (Pred (s, ins, outs)) ->
+      let p_name, les' = (s, List.map fe (ins @ outs)) in
       [
         LCmd.SL (Unfold (p_name, les', None, false));
         LCmd.SL (Fold (p_name, les', None));
       ]
-  | Unfold (Pred (s, les), unfold_info) ->
+  | Unfold (Pred (s, ins, outs), unfold_info) ->
+      let les = ins @ outs in
       [ LCmd.SL (Unfold (s, List.map fe les, unfold_info, false)) ]
   | GUnfold name -> [ LCmd.SL (GUnfold name) ]
   | Assert (assertion, binders) ->

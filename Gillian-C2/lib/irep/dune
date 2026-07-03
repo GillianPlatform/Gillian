@@ -1,3 +1,5 @@
 (library
  (name irep_lib)
- (libraries yojson kutils))
+ (libraries yojson kutils)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson)))
