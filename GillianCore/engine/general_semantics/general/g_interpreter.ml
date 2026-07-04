@@ -637,7 +637,21 @@ struct
       | If (e, lcmds_t, lcmds_e) ->
           eval_if e lcmds_t lcmds_e prog annot state eval_expr
       | Branch fof -> eval_branch fof state
-      | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
+      | SL sl_cmd -> (
+          (* [Fold]/[Unfold]/[GUnfold]/[Package] are issued as calls to
+             reserved memory actions (which need to be caught by the state);
+             the other SL commands are still evaluated by [evaluate_slcmd]. *)
+          match SLCmd.to_action sl_cmd with
+          | Some (action, args) ->
+              (* The encoded arguments are raw (unevaluated) expressions; they
+                 are lifted to values without evaluation (the abstract state
+                 evaluates them itself), and the empty return list is dropped. *)
+              let v_args =
+                List.map (fun e -> Option.get (Val.from_expr e)) args
+              in
+              State.execute_action action state v_args
+              |> List.map (Result.map fst)
+          | None -> State.evaluate_slcmd prog sl_cmd state)
 
     and eval_lcmds
         ?(top = false)

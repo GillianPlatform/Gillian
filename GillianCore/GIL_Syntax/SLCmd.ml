@@ -154,3 +154,120 @@ let pp fmt lcmd =
       in
       Fmt.pf fmt "invariant %a %a" (Fmt.parens Asrt.pp) a pp_exs existentials
   | SymbExec -> Fmt.pf fmt "symb_exec"
+
+(** {2 Predicate actions}
+
+    Some SLCmds are just syntactic sugar for special actions to be executed from
+    the memory. For legacy reason, we have an encoding and decoding from one to
+    the other. *)
+
+let fold_action = Asrt.user_pred_prefix ^ "fold"
+let unfold_action = Asrt.user_pred_prefix ^ "unfold"
+let gunfold_action = Asrt.user_pred_prefix ^ "gunfold"
+let package_action = Asrt.user_pred_prefix ^ "package"
+
+let is_pred_action (a : string) : bool =
+  String.equal a fold_action
+  || String.equal a unfold_action
+  || String.equal a gunfold_action
+  || String.equal a package_action
+
+(* -- encoding -- *)
+
+let enc_fold_info : folding_info option -> Expr.t = function
+  | None -> Expr.Lit Nono
+  | Some (id, bindings) ->
+      let enc_binding (x, e) = Expr.EList [ Expr.string x; e ] in
+      Expr.EList [ Expr.string id; Expr.EList (List.map enc_binding bindings) ]
+
+let enc_unfold_info : unfold_info option -> Expr.t = function
+  | None -> Expr.Lit Nono
+  | Some l ->
+      let enc_binding (x, y) = Expr.EList [ Expr.string x; Expr.string y ] in
+      Expr.EList (List.map enc_binding l)
+
+let to_action : t -> (string * Expr.t list) option = function
+  | Fold (pname, les, fold_info) ->
+      Some
+        ( fold_action,
+          [ Expr.string pname; Expr.EList les; enc_fold_info fold_info ] )
+  | Unfold (pname, les, unfold_info, b) ->
+      Some
+        ( unfold_action,
+          [
+            Expr.string pname;
+            Expr.EList les;
+            enc_unfold_info unfold_info;
+            Expr.bool b;
+          ] )
+  | GUnfold pname -> Some (gunfold_action, [ Expr.string pname ])
+  | Package { lhs = lname, largs; rhs = rname, rargs } ->
+      Some
+        ( package_action,
+          [
+            Expr.string lname;
+            Expr.EList largs;
+            Expr.string rname;
+            Expr.EList rargs;
+          ] )
+  | _ -> None
+
+(* -- decoding -- *)
+
+let dec_str : Expr.t -> string = function
+  | Expr.Lit (String s) -> s
+  | e ->
+      Fmt.failwith "SLCmd.of_action: expected a string literal, got %a" Expr.pp
+        e
+
+let dec_les : Expr.t -> Expr.t list = function
+  | Expr.EList les -> les
+  | e -> Fmt.failwith "SLCmd.of_action: expected an EList, got %a" Expr.pp e
+
+let dec_fold_info : Expr.t -> folding_info option = function
+  | Expr.Lit Nono -> None
+  | Expr.EList [ id; bindings ] ->
+      let dec_binding = function
+        | Expr.EList [ x; e ] -> (dec_str x, e)
+        | e ->
+            Fmt.failwith "SLCmd.of_action: malformed fold binding %a" Expr.pp e
+      in
+      Some (dec_str id, List.map dec_binding (dec_les bindings))
+  | e -> Fmt.failwith "SLCmd.of_action: malformed fold info %a" Expr.pp e
+
+let dec_unfold_info : Expr.t -> unfold_info option = function
+  | Expr.Lit Nono -> None
+  | Expr.EList l ->
+      let dec_binding = function
+        | Expr.EList [ x; y ] -> (dec_str x, dec_str y)
+        | e ->
+            Fmt.failwith "SLCmd.of_action: malformed unfold binding %a" Expr.pp
+              e
+      in
+      Some (List.map dec_binding l)
+  | e -> Fmt.failwith "SLCmd.of_action: malformed unfold info %a" Expr.pp e
+
+let dec_bool : Expr.t -> bool = function
+  | Expr.Lit (Bool b) -> b
+  | e ->
+      Fmt.failwith "SLCmd.of_action: expected a boolean literal, got %a" Expr.pp
+        e
+
+let of_action (action : string) (args : Expr.t list) : t option =
+  match args with
+  | [ pname; les; fold_info ] when String.equal action fold_action ->
+      Some (Fold (dec_str pname, dec_les les, dec_fold_info fold_info))
+  | [ pname; les; unfold_info; b ] when String.equal action unfold_action ->
+      Some
+        (Unfold
+           (dec_str pname, dec_les les, dec_unfold_info unfold_info, dec_bool b))
+  | [ pname ] when String.equal action gunfold_action ->
+      Some (GUnfold (dec_str pname))
+  | [ lname; largs; rname; rargs ] when String.equal action package_action ->
+      Some
+        (Package
+           {
+             lhs = (dec_str lname, dec_les largs);
+             rhs = (dec_str rname, dec_les rargs);
+           })
+  | _ -> None

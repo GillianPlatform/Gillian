@@ -563,6 +563,36 @@ module SLCmd : sig
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
+
+  (** {2 Predicate actions}
+
+      Some SLCmds are just syntactic sugar for special actions to be executed
+      from the memory. For legacy reason, we have an encoding and decoding from
+      one to the other.
+
+      We reserve these memory-action name: each carries
+      {!Asrt.user_pred_prefix}. The interpreter issues [Fold], [Unfold],
+      [GUnfold] and [Package] as calls to these actions instead of through
+      [evaluate_slcmd]. *)
+
+  val fold_action : string
+  val unfold_action : string
+  val gunfold_action : string
+  val package_action : string
+
+  (** [is_pred_action a] holds iff [a] is one of the four reserved actions
+      above. *)
+  val is_pred_action : string -> bool
+
+  (** [to_action c] encodes a predicate-manipulating command as
+      [(action_name, args)], or [None] for any other command (those are still
+      handled by [evaluate_slcmd]). The arguments are left {b unevaluated} (as
+      they are syntactically matched against later). *)
+  val to_action : t -> (string * Expr.t list) option
+
+  (** [of_action name args] is the inverse of {!to_action}: it rebuilds the
+      command for one of the four reserved action names, or [None] otherwise. *)
+  val of_action : string -> Expr.t list -> t option
 end
 
 (** @canonical Gillian.Gil_syntax.LCmd *)
