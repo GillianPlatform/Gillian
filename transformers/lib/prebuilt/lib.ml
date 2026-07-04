@@ -3,7 +3,7 @@ module WISL_Base = struct
   module ParserAndCompiler = WISL.ParserAndCompiler
   module ExternalSemantics = WISL.ExternalSemantics
   module InitData = Gillian.General.Init_data.Dummy
-  module MyInitData = States.MyMonadicSMemory.DummyID
+  module MyInitData = Gillian.Combinators.MyMonadicSMemory.DummyID
 end
 
 module WISL_ALoc = struct
@@ -21,7 +21,7 @@ module WISLF_Base = struct
   module ParserAndCompiler = WISLF.ParserAndCompiler
   module ExternalSemantics = WISLF.ExternalSemantics
   module InitData = Gillian.General.Init_data.Dummy
-  module MyInitData = States.MyMonadicSMemory.DummyID
+  module MyInitData = Gillian.Combinators.MyMonadicSMemory.DummyID
 end
 
 module WISLF_ALoc = struct
@@ -39,7 +39,7 @@ module JSIL_Base = struct
   module ParserAndCompiler = JSIL.ParserAndCompiler
   module ExternalSemantics = JSIL.ExternalSemantics
   module InitData = Gillian.General.Init_data.Dummy
-  module MyInitData = States.MyMonadicSMemory.DummyID
+  module MyInitData = Gillian.Combinators.MyMonadicSMemory.DummyID
 end
 
 module JSIL_ALoc = struct

@@ -4,7 +4,6 @@
  (name prebuilt)
  (public_name transformers.prebuilt)
  (libraries
-  states
   gillian
   gillian.ppx_sat.runtime
   gillian-js.js2jsil_lib

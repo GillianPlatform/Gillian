@@ -1841,7 +1841,7 @@ module Make (State : SState.S) :
         ]
       else
         let unfolded_pred =
-          Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
+          Hashtbl.find_opt Unfolded_preds.tbl pred.pred_name
         in
         let pred = Option.value ~default:pred unfolded_pred in
         List.map snd pred.pred_definitions

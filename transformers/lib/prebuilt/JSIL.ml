@@ -1,7 +1,7 @@
 open Gillian.Monadic
 open Utils
 open Gil_syntax
-module ExpMap = States.MyUtils.ExpMap
+module ExpMap = Gillian.Combinators.MyUtils.ExpMap
 
 (* Default instantiation is Nono *)
 module StringIndex = struct
@@ -15,9 +15,9 @@ end
    Split accordingly (unpatched product gives the args to both sides) *)
 module PatchedProduct
     (IDs : IDs)
-    (S1 : States.MyMonadicSMemory.S)
-    (S2 : States.MyMonadicSMemory.S) :
-  States.MyMonadicSMemory.S with type t = S1.t * S2.t = struct
+    (S1 : Gillian.Combinators.MyMonadicSMemory.S)
+    (S2 : Gillian.Combinators.MyMonadicSMemory.S) :
+  Gillian.Combinators.MyMonadicSMemory.S with type t = S1.t * S2.t = struct
   include Product (IDs) (S1) (S2)
 
   let instantiate v =
@@ -51,8 +51,8 @@ end
 
 (* the "Props" predicate considers its out an in, so it must be removed
    from consumption and then checked for equality. *)
-module MoveInToOut (S : States.MyMonadicSMemory.S) :
-  States.MyMonadicSMemory.S with type t = S.t = struct
+module MoveInToOut (S : Gillian.Combinators.MyMonadicSMemory.S) :
+  Gillian.Combinators.MyMonadicSMemory.S with type t = S.t = struct
   include S
 
   let[@inline] consume pred s ins =
@@ -259,7 +259,7 @@ struct
   let pp ft (h : t) =
     let open Fmt in
     let sorted_locs_with_vals =
-      States.MyUtils.SMap.bindings h
+      Gillian.Combinators.MyUtils.SMap.bindings h
       |> List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2)
     in
     let pp_one ft (loc, fv_pairs) = pf ft "@[%s |-> %a@]" loc S.pp fv_pairs in
@@ -284,7 +284,7 @@ struct
           current_recovery
         else
           let locs_to_add =
-            States.MyUtils.SMap.fold
+            Gillian.Combinators.MyUtils.SMap.fold
               (fun key obj acc ->
                 match S.get_metadata obj with
                 | Some e when List.exists (Expr.equal e) alocs -> key :: acc
@@ -314,7 +314,7 @@ module PatchAlloc (Map : OpenPMapType) = struct
         let* idx =
           match idx with
           | Expr.Lit Empty -> Delayed.return (Some (ALoc.alloc ()))
-          | _ -> States.MyUtils.get_loc idx
+          | _ -> Gillian.Combinators.MyUtils.get_loc idx
         in
         let idx =
           match idx with

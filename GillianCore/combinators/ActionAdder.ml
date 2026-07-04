@@ -1,5 +1,5 @@
 open Gil_syntax
-open Gillian.Monadic
+open Monadic
 
 module type ActionAddition = sig
   type t
@@ -17,7 +17,7 @@ module type ActionAddition = sig
   val get_fixes : err_t -> string Fix.t list
 
   val get_recovery_tactic :
-    t -> err_t -> Expr.t Gillian.General.Recovery_tactic.t
+    t -> err_t -> Expr.t Engine.General.Recovery_tactic.t
 end
 
 module Make (A : ActionAddition) (S : MyMonadicSMemory.S with type t = A.t) =

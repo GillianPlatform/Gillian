@@ -1,9 +1,9 @@
-open Gillian.Monadic
-open Gillian.Symbolic
+open Monadic
+open Engine.Symbolic
 open Gil_syntax
-module Containers = Gillian.Utils.Containers
+module Containers = Utils.Containers
 module DR = Delayed_result
-module Recovery_tactic = Gillian.General.Recovery_tactic
+module Recovery_tactic = Engine.General.Recovery_tactic
 
 module type S = sig
   (* Type of states *)

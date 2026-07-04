@@ -3,11 +3,13 @@
  (public_name gillian.debugger_utils)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson lwt_ppx))
- (libraries engine gil_syntax utils debugger_log)
+ (libraries engine verify gil_syntax utils debugger_log)
  (flags
   :standard
   -open
   Engine
+  -open
+  Verify
   -open
   Utils
   -open

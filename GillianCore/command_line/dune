@@ -8,6 +8,8 @@
   utils
   usage_logs
   engine
+  verify
+  biabduction
   bulk
   logging
   debugger_lifter
@@ -26,6 +28,10 @@
   Utils
   -open
   Engine
+  -open
+  Verify
+  -open
+  Biabduction
   -open
   Bulk
   -open

@@ -16,4 +16,4 @@
   t_wislf_s
   c_bi_abd)
  (package transformers)
- (libraries prebuilt states gillian transformers_abductor))
+ (libraries prebuilt gillian transformers_abductor))

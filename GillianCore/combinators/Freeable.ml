@@ -1,6 +1,6 @@
-open Gillian.Utils
-open Gillian.Monadic
-open Gillian.Symbolic
+open Utils
+open Monadic
+open Engine.Symbolic
 module DR = Delayed_result
 
 type 'a freeable = None | Freed | SubState of 'a [@@deriving yojson, show]
@@ -168,7 +168,7 @@ module Make (S : MyMonadicSMemory.S) :
   let get_recovery_tactic s e =
     match (s, e) with
     | SubState s, SubError e -> S.get_recovery_tactic s e
-    | _ -> Gillian.General.Recovery_tactic.none (* TODO *)
+    | _ -> Engine.General.Recovery_tactic.none (* TODO *)
 
   let can_fix = function
     | SubError e -> S.can_fix e

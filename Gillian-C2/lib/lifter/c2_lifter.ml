@@ -34,7 +34,7 @@ module Make
     (Gil :
       Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
         with type Lifter.memory = SMemory.t)
-    (Verification : Engine.Verifier.S with type annot = C2_annot.t) =
+    (Verification : Verify.Verifier.S with type annot = C2_annot.t) =
 struct
   open Exec_map
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport

@@ -1,4 +1,4 @@
-open States
+open Gillian.Combinators
 (* Uncomment to import transformer shorthands
    open Prebuilt.Utils *)
 

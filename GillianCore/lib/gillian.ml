@@ -41,6 +41,10 @@ module Bulk = Bulk
 module Monadic = Monadic
 module ParserAndCompiler = ParserAndCompiler
 
+(** State-model combinators (PMap, MList, Freeable, Fractional, …) used to
+    compose memory models. *)
+module Combinators = Combinators
+
 (** Modules for the debugger and related TL-lifting *)
 module Debugger = struct
   module Logging = Debugger_log.Public
@@ -56,11 +60,11 @@ end
 
 module Abstraction = struct
   module MP = Engine.MP
-  module Verifier = Engine.Verifier
+  module Verifier = Verify.Verifier
   module Normaliser = Engine.Normaliser
 end
 
-module Abductor = Engine.Abductor
+module Abductor = Biabduction.Abductor
 
 (* module Test262 = Test262_main *)
 

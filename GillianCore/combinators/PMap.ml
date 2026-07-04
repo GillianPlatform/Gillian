@@ -1,6 +1,6 @@
 open Gil_syntax
-open Gillian.Monadic
-module Subst = Gillian.Symbolic.Subst
+open Monadic
+module Subst = Engine.Symbolic.Subst
 module DR = Delayed_result
 module DO = Delayed_option
 
@@ -379,13 +379,13 @@ struct
         let sub_recover =
           match I.find_opt_unsafe (fst st) idx with
           | Some codom -> S.get_recovery_tactic codom e
-          | None -> Gillian.General.Recovery_tactic.none
+          | None -> Engine.General.Recovery_tactic.none
         in
-        Gillian.General.Recovery_tactic.merge sub_recover
-          (Gillian.General.Recovery_tactic.try_unfold [ idx ])
+        Engine.General.Recovery_tactic.merge sub_recover
+          (Engine.General.Recovery_tactic.try_unfold [ idx ])
     | NotAllocated idx | InvalidIndexValue idx ->
-        Gillian.General.Recovery_tactic.try_unfold [ idx ]
-    | _ -> Gillian.General.Recovery_tactic.none
+        Engine.General.Recovery_tactic.try_unfold [ idx ]
+    | _ -> Engine.General.Recovery_tactic.none
 
   let can_fix = function
     | SubError (_, _, e) -> S.can_fix e
@@ -545,12 +545,11 @@ struct
         let sub_recover =
           match I.find_opt_unsafe st idx with
           | Some codom -> S.get_recovery_tactic codom e
-          | None -> Gillian.General.Recovery_tactic.none
+          | None -> Engine.General.Recovery_tactic.none
         in
-        Gillian.General.Recovery_tactic.merge sub_recover
-          (Gillian.General.Recovery_tactic.try_unfold [ idx ])
-    | InvalidIndexValue idx ->
-        Gillian.General.Recovery_tactic.try_unfold [ idx ]
+        Engine.General.Recovery_tactic.merge sub_recover
+          (Engine.General.Recovery_tactic.try_unfold [ idx ])
+    | InvalidIndexValue idx -> Engine.General.Recovery_tactic.try_unfold [ idx ]
 
   let can_fix = function
     | SubError (_, _, e) -> S.can_fix e

@@ -1,4 +1,4 @@
-open Gillian.Monadic
+open Monadic
 module DR = Delayed_result
 
 type ('a, 'pred) bi_state = { state : 'a; anti_frame : 'pred Fix.t }
@@ -75,11 +75,11 @@ module Make (Mem : MyMonadicSMemory.S) :
   (* Variables *)
 
   let lvars s =
-    let open Gillian.Utils.Containers in
+    let open Utils.Containers in
     Mem.lvars s.state |> SS.union (Fix.lvars s.anti_frame)
 
   let alocs s =
-    let open Gillian.Utils.Containers in
+    let open Utils.Containers in
     Mem.alocs s.state |> SS.union (Fix.alocs s.anti_frame)
 
   let substitution_in_place subst s =

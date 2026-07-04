@@ -1,5 +1,5 @@
-open Gillian.Utils
-open Gillian.Monadic
+open Utils
+open Monadic
 open MyUtils
 module DR = Delayed_result
 
