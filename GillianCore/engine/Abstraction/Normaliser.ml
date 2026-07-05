@@ -888,8 +888,7 @@ module Make (SPState : PState.S) = struct
         let preds' = normalise_preds pred_defs store pfs gamma subst preds in
         let wands' = normalise_wands wands in
         let astate : SPState.t =
-          SPState.make_p ~preds:pred_defs ~init_data ~store ~pfs ~gamma
-            ~spec_vars:svars ()
+          SPState.make_p ~init_data ~store ~pfs ~gamma ~spec_vars:svars ()
         in
         let astate = SPState.set_preds astate preds' in
         let astate = SPState.set_wands astate wands' in

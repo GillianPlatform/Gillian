@@ -49,7 +49,8 @@ module type S = sig
   val postprocess_files : SourceFiles.t option -> unit
 
   module Debug : sig
-    val get_tests_for_prog : init_data:SPState.init_data -> prog_t -> proc_tests
+    val get_tests_for_prog :
+      init_data:SPState.init_data -> prog_t -> MP.preds_tbl_t * proc_tests
 
     val analyse_result :
       t -> Logging.Report_id.t -> SAInterpreter.result_t -> bool
@@ -777,6 +778,10 @@ struct
         raise
           (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?loc msg)
     | Ok preds ->
+        (* The predicate table is ambient for the whole verification via the
+           [Get_pred_defs] effect. Testify (below) reads it through
+           [PState.to_assertions]/[produce], so install it here. *)
+        MP.with_pred_table preds @@ fun () ->
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : MP.pred) pred_ins ->
@@ -875,6 +880,9 @@ struct
     let cur_time = Unix.gettimeofday () in
     Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
     let result =
+      (* Interpretation, lemma proofs and post-condition matching all read the
+         ambient predicate table via the [Get_pred_defs] effect. *)
+      MP.with_pred_table prog'.preds @@ fun () ->
       let rec aux = function
         | [], acc -> acc
         | _, acc when not (Gillian_result.should_continue acc) -> acc
@@ -1026,6 +1034,10 @@ struct
       let open Syntaxes.Option in
       let ipreds = MP.init_preds prog.preds in
       let preds = Result.get_ok ipreds in
+      (* Testify reads the predicate table via [PState.to_assertions], so install
+         it here; the returned table is also handed to the debugger, which
+         re-installs it while stepping and matching. *)
+      MP.with_pred_table preds @@ fun () ->
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : MP.pred) pred_ins ->
@@ -1059,7 +1071,7 @@ struct
           m
             ~json:[ ("tests", proc_tests_to_yojson tests) ]
             "Verifier.Debug.get_tests_for_prog: Got tests");
-      tests
+      (preds, tests)
 
     let analyse_result test parent_id result =
       analyse_proc_result test Normal ~parent_id result |> Result.is_ok
