@@ -537,10 +537,7 @@ let ins_outs_formula (kb : KB.t) (pf : Expr.t) : (KB.t * outs) list =
 
 (** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs for a
     given assertion [a] under a given knowledge base [kb] *)
-let ins_outs_assertion
-    (_pred_ins : (string, int list) Hashtbl.t)
-    (kb : KB.t)
-    (asrt : Asrt.atom) : (KB.t * outs) list =
+let ins_outs_assertion (kb : KB.t) (asrt : Asrt.atom) : (KB.t * outs) list =
   match (asrt : Asrt.atom) with
   | Emp -> []
   | Pure form -> ins_outs_formula kb form
@@ -574,9 +571,9 @@ let simplify_asrts ?(sorted = true) a =
     let overlapping = List.sort_uniq Stdlib.compare overlapping in
     List.sort Asrt.prioritise (separating @ overlapping)
 
-let s_init_atoms ~preds kb atoms =
+let s_init_atoms kb atoms =
   let step_of_atom ~kb atom =
-    ins_outs_assertion preds kb atom
+    ins_outs_assertion kb atom
     |> List.find_map (fun (ins, outs) ->
            if KB.subset ins kb then Some (atom, outs) else None)
   in
@@ -603,11 +600,10 @@ let s_init_atoms ~preds kb atoms =
   in
   search [] kb atoms
 
-let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
-    (step list, Asrt.t) result =
+let s_init (kb : KB.t) (a : Asrt.t) : (step list, Asrt.t) result =
   L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
   let atoms = simplify_asrts a in
-  s_init_atoms ~preds kb atoms
+  s_init_atoms kb atoms
 
 let of_step_list ?post ?label (steps : step list) : t =
   let rec consume_steps = function
@@ -666,7 +662,6 @@ let init
     ?(use_params : bool option)
     (known_matchables : KB.t)
     (params : KB.t)
-    (preds : (string, int list) Hashtbl.t)
     (asrts_posts :
       (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
     : (t, Asrt.atom list list) result =
@@ -691,7 +686,7 @@ let init
         L.verbose (fun m -> m "Known matchables: %a\n" kb_pp known_matchables);
         L.verbose (fun m -> m "Existentials: %a\n" kb_pp existentials);
         let known_matchables = KB.union known_matchables existentials in
-        (s_init ~preds known_matchables asrt, lab, posts))
+        (s_init known_matchables asrt, lab, posts))
       asrts_posts
   in
   let successes, errors =
@@ -733,8 +728,7 @@ let pp ft mp =
   in
   aux ~prefix:"" mp
 
-let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
-    ((string, spec) Hashtbl.t, err) result =
+let init_specs (specs : Spec.t list) : ((string, spec) Hashtbl.t, err) result =
   let u_specs = Hashtbl.create Config.medium_tbl_size in
   try
     List.iter
@@ -765,7 +759,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
             spec.spec_sspecs
         in
 
-        let mp = init ~use_params:true KB.empty params preds sspecs in
+        let mp = init ~use_params:true KB.empty params sspecs in
         match mp with
         | Error err ->
             raise (MPError (MPSpec (spec.spec_name, err), spec.spec_location))
@@ -783,7 +777,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
     Ok u_specs
   with MPError e -> Error e
 
-let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
+let init_lemmas (lemmas : Lemma.t list) :
     ((string, lemma) Hashtbl.t, err) result =
   let u_lemmas = Hashtbl.create Config.medium_tbl_size in
   try
@@ -801,7 +795,7 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
                 (None, Some (Flag.Normal, List.map fst spec.lemma_concs)) ))
             lemma.lemma_specs
         in
-        let mp = init ~use_params:true KB.empty params preds sspecs in
+        let mp = init ~use_params:true KB.empty params sspecs in
         match mp with
         | Error err ->
             raise
@@ -820,14 +814,6 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
 let init_preds (preds : (string, Pred.t) Hashtbl.t) :
     ((string, pred) Hashtbl.t, err) result =
   let u_preds = Hashtbl.create Config.medium_tbl_size in
-  let pred_ins =
-    Hashtbl.fold
-      (fun name (pred : Pred.t) pred_ins ->
-        Hashtbl.add pred_ins name (Pred.ins_indexes pred);
-        pred_ins)
-      preds
-      (Hashtbl.create Config.medium_tbl_size)
-  in
   try
     Hashtbl.iter
       (fun name (pred : Pred.t) ->
@@ -851,7 +837,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
             pred.pred_definitions
         in
         let create_or_raise defs =
-          match init known_params KB.empty pred_ins defs with
+          match init known_params KB.empty defs with
           | Error err ->
               raise (MPError (MPPred (pred.pred_name, err), pred.pred_loc))
           (* let msg = Printf.sprintf "Predicate definition of %s cannot be turned into MP" pred.name in
@@ -887,19 +873,11 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : 'a prog =
       | Some preds_tbl -> Ok preds_tbl
       | None -> init_preds prog.preds
     in
-    let pred_ins =
-      Hashtbl.fold
-        (fun name (pred : pred) pred_ins ->
-          Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
-          pred_ins)
-        preds
-        (Hashtbl.create Config.medium_tbl_size)
-    in
     let* lemmas =
       L.verbose (fun fmt -> fmt "Calculating MPs for lemmas");
-      init_lemmas pred_ins lemmas
+      init_lemmas lemmas
     in
-    let+ specs = init_specs pred_ins all_specs in
+    let+ specs = init_specs all_specs in
     let coverage : (string * int, int) Hashtbl.t =
       Hashtbl.create Config.big_tbl_size
     in
@@ -1017,15 +995,6 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
     | Some proc -> proc
   in
 
-  let pred_ins =
-    Hashtbl.fold
-      (fun name (pred : pred) pred_ins ->
-        Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
-        pred_ins)
-      prog.preds
-      (Hashtbl.create Config.medium_tbl_size)
-  in
-
   let posts_from_sspecs sspecs =
     List.map
       (fun (sspec : Spec.st) ->
@@ -1039,7 +1008,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
         (fun (x, y) -> (x, (None, y)))
         (posts_from_sspecs spec.spec_sspecs)
     in
-    let mp = init ~use_params:true KB.empty params pred_ins posts in
+    let mp = init ~use_params:true KB.empty params posts in
     match mp with
     | Error _ ->
         let msg =
@@ -1060,7 +1029,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
     let new_mp =
       List.fold_left
         (fun current_mp (asrt, post) ->
-          match s_init ~preds:pred_ins params asrt with
+          match s_init params asrt with
           | Error _ ->
               if !Config.under_approximation then (
                 L.verbose (fun m ->

@@ -1889,14 +1889,6 @@ module Make (State : SState.S) :
       in
       r
 
-    let make_pred_ins_table pred_tbl =
-      let tbl = Hashtbl.create (Hashtbl.length pred_tbl) in
-      Hashtbl.iter
-        (fun pname pred ->
-          Hashtbl.add tbl pname (Pred.ins_indexes pred.MP.pred))
-        pred_tbl;
-      tbl
-
     type split_answer = {
       init_subst : State.st;
       mp : MP.t;
@@ -2019,12 +2011,7 @@ module Make (State : SState.S) :
           in
           let atoms = List.rev_append new_cps learning_equalities in
           let mp =
-            let steps =
-              MP.s_init_atoms
-                ~preds:(make_pred_ins_table (MP.get_pred_defs ()))
-                kb atoms
-              |> Result.get_ok
-            in
+            let steps = MP.s_init_atoms kb atoms |> Result.get_ok in
             MP.of_step_list steps
           in
           { init_subst; mp; fold_outs_info = (subst, step, out_params, outs) }

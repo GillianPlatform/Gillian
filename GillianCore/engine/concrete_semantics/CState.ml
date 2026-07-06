@@ -147,7 +147,7 @@ end = struct
       (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let match_invariant _ _ _ _ _ =
+  let match_invariant _ _ _ _ =
     raise (Failure "ERROR: match_invariant called for concrete execution")
 
   let frame_on _ _ _ =

@@ -149,7 +149,7 @@ module Make (State : SState.S) = struct
     | Ok state' -> Ok { bi_state with state = state' }
     | Error err -> Error (lift_error bi_state err)
 
-  let match_invariant _ _ _ _ _ =
+  let match_invariant _ _ _ _ =
     raise (Failure "ERROR: match_invariant called for bi-abductive execution")
 
   let frame_on _ _ _ =
