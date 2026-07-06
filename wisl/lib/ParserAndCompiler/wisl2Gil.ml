@@ -253,6 +253,12 @@ let compile_lexpr_perm ?fname lexpr =
   | Some lexpr -> compile_lexpr ?fname lexpr
   | None -> ([], [], Expr.num 1.0)
 
+(* Maps each WISL predicate name to its number of in-parameters. A magic wand
+   stores flat rhs args, so to build the GIL wand encoding (whose outs are only
+   the rhs out-args) the compiler must split those args by this count. Populated
+   by [compile] before any assertion is compiled. *)
+let pred_ins_counts : (string, int) Hashtbl.t = Hashtbl.create 32
+
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lassert = compile_lassert ~fname in
@@ -360,7 +366,14 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
       let exs = List.concat (exs1 @ exs2) in
       let al = List.concat (al1 @ al2) in
-      (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
+      (* Split the (ins-first) rhs args into ins/outs by the rhs predicate's
+         number of in-parameters, so the wand's outs are only the rhs outs. *)
+      let k =
+        Option.value ~default:0 (Hashtbl.find_opt pred_ins_counts rname)
+      in
+      let r_ins = List.filteri (fun i _ -> i < k) el2 in
+      let r_outs = List.filteri (fun i _ -> i >= k) el2 in
+      (exs, Asrt.wand (lname, el1) (rname, r_ins) r_outs :: al)
   | LPure lf ->
       let _, al, e = compile_lexpr lf in
       let e =
@@ -1184,6 +1197,15 @@ let compile_lemma
     }
 
 let compile ~filepath WProg.{ context; predicates; lemmas } =
+  (* Record each predicate's in-parameter count before compiling any assertion,
+     so magic-wand compilation can split rhs args into ins/outs. *)
+  let () = Hashtbl.reset pred_ins_counts in
+  let () =
+    List.iter
+      (fun (p : WPred.t) ->
+        Hashtbl.replace pred_ins_counts p.pred_name (List.length p.pred_ins))
+      predicates
+  in
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in

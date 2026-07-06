@@ -1300,25 +1300,35 @@ struct
         let pp_tl ft (e, t) = Fmt.pf ft "%a : %s" pp_expr e (Type.str t) in
         Fmt.pf ft "%a" (pp_comma_sep pp_tl) tls
     | Pure e -> Fmt.pf ft "%a" pp_expr e
+    | CorePred (a, ins, outs) when Option.is_some (Asrt.as_wand_name a) -> (
+        let lname, rname = Option.get (Asrt.as_wand_name a) in
+        (* Reconstruct the raw wand args from the stored semantic ins/outs, using
+           the rhs predicate's number of in-parameters. *)
+        match Asrt.pred_ins_number rname with
+        | Some rhs_ins_number ->
+            let (_, largs), (_, rargs) =
+              Option.get
+                (Asrt.as_wand ~rhs_ins_number (CorePred (a, ins, outs)))
+            in
+            Fmt.pf ft "%s(%a) -* %s(%a)" lname (pp_comma_sep pp_expr) largs
+              rname (pp_comma_sep pp_expr) rargs
+        | None ->
+            Fmt.pf ft "<%s>(%a; %a)" a (pp_comma_sep pp_expr) ins
+              (pp_comma_sep pp_expr) outs)
+    | CorePred (a, ins, outs) when Option.is_some (Asrt.as_user_pred_name a) ->
+        let name = Option.get (Asrt.as_user_pred_name a) in
+        Fmt.pf ft "%s(%a; %a)" name (pp_comma_sep pp_expr) ins
+          (pp_comma_sep pp_expr) outs
     | CorePred (a, ins, outs) -> (
-        match Asrt.as_user_pred_name a with
-        | Some name ->
-            Fmt.pf ft "%s(%a; %a)" name (pp_comma_sep pp_expr) ins
-              (pp_comma_sep pp_expr) outs
-        | None -> (
-            match (WislLActions.ga_from_str a, ins, outs) with
-            | Some Cell, [ loc; offset ], [ value ] ->
-                Fmt.pf ft "[%a, %a] -> %a" pp_expr loc pp_expr offset pp_expr
-                  value
-            | Some Bound, [ loc ], [ bound ] ->
-                Fmt.pf ft "%a has bound %a" pp_expr loc pp_expr bound
-            | Some Freed, [ loc ], [] -> Fmt.pf ft "%a is freed" pp_expr loc
-            | _ ->
-                Fmt.pf ft "%s(%a, %a)" a (pp_comma_sep pp_expr) ins
-                  (pp_comma_sep pp_expr) outs))
-    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
-        Fmt.pf ft "%s(%a) -* %s(%a)" lname (pp_comma_sep pp_expr) largs rname
-          (pp_comma_sep pp_expr) rargs
+        match (WislLActions.ga_from_str a, ins, outs) with
+        | Some Cell, [ loc; offset ], [ value ] ->
+            Fmt.pf ft "[%a, %a] -> %a" pp_expr loc pp_expr offset pp_expr value
+        | Some Bound, [ loc ], [ bound ] ->
+            Fmt.pf ft "%a has bound %a" pp_expr loc pp_expr bound
+        | Some Freed, [ loc ], [] -> Fmt.pf ft "%a is freed" pp_expr loc
+        | _ ->
+            Fmt.pf ft "%s(%a, %a)" a (pp_comma_sep pp_expr) ins
+              (pp_comma_sep pp_expr) outs)
 
   module Lift_variables = struct
     open Engine

@@ -158,7 +158,6 @@ and assertion_atom =
   | Pure of expr
   | Types of (expr * typ) list
   | CorePred of string * expr list * expr list
-  | Wand of { lhs : string * expr list; rhs : string * expr list }
 
 and assertion = assertion_atom list
 and bindings = string * (string * expr) list

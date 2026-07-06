@@ -490,16 +490,32 @@ module Make (SPState : PState.S) = struct
       * (string * Expr.t list) list
       * Wands.wand list =
     List.fold_left
-      (fun (core_asrts, pure, types, preds, wands) (a : Asrt.atom) ->
-        match a with
-        | CorePred (cp_name, es1, es2) -> (
-            match Asrt.as_user_pred_name cp_name with
-            | Some name ->
-                (core_asrts, pure, types, (name, es1 @ es2) :: preds, wands)
-            | None ->
-                ((cp_name, es1, es2) :: core_asrts, pure, types, preds, wands))
-        | Wand { lhs; rhs } ->
-            (core_asrts, pure, types, preds, Wands.{ lhs; rhs } :: wands)
+      (fun (core_asrts, pure, types, preds, wands) -> function
+        | Asrt.CorePred (cp_name, es1, es2)
+          when Option.is_some (Asrt.as_wand_name cp_name) ->
+            (* A magic wand: reconstruct the raw ([lhs], [rhs]) from its semantic
+               ins/outs, using the rhs predicate's number of in-parameters (read
+               from the ambient predicate table). *)
+            let _, rname = Option.get (Asrt.as_wand_name cp_name) in
+            let rhs_ins_number =
+              (MP.get_pred_def (MP.get_pred_defs ()) rname).pred.ins_number
+            in
+            let (lname, largs), (rname, rargs) =
+              Option.get
+                (Asrt.as_wand ~rhs_ins_number
+                   (Asrt.CorePred (cp_name, es1, es2)))
+            in
+            ( core_asrts,
+              pure,
+              types,
+              preds,
+              Wands.{ lhs = (lname, largs); rhs = (rname, rargs) } :: wands )
+        | CorePred (cp_name, es1, es2)
+          when Option.is_some (Asrt.as_user_pred_name cp_name) ->
+            let name = Option.get (Asrt.as_user_pred_name cp_name) in
+            (core_asrts, pure, types, (name, es1 @ es2) :: preds, wands)
+        | CorePred (cp_name, es1, es2) ->
+            ((cp_name, es1, es2) :: core_asrts, pure, types, preds, wands)
         | Emp -> (core_asrts, pure, types, preds, wands)
         | Types lst -> (core_asrts, pure, lst @ types, preds, wands)
         | Pure f -> (core_asrts, f :: pure, types, preds, wands))

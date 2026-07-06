@@ -451,8 +451,6 @@ module Asrt : sig
     | Pure of Expr.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
-    | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
-        (** Magic wand of the form [P(...) -* Q(...)] *)
   [@@deriving yojson, eq]
 
   type t = atom list [@@deriving yojson, eq]
@@ -471,6 +469,44 @@ module Asrt : sig
 
   (** [pred name ins outs] builds a user-predicate assertion atom. *)
   val pred : string -> Expr.t list -> Expr.t list -> atom
+
+  (** Prefix and separator encoding a magic wand [lname(..) -* rname(..)] as a
+      {!CorePred} name [wand_prefix ^ lname ^ wand_sep ^ rname]. Set once; never
+      hardcode elsewhere. *)
+  val wand_prefix : string
+
+  val wand_sep : string
+
+  (** [wand_name lname rname] is the core-predicate name encoding the wand
+      [lname(..) -* rname(..)]. *)
+  val wand_name : string -> string -> string
+
+  (** [as_wand_name s] is [Some (lname, rname)] when [s] encodes a magic wand,
+      and [None] otherwise. *)
+  val as_wand_name : string -> (string * string) option
+
+  (** [wand (lname, largs) (rname, r_ins) r_outs] builds a magic-wand assertion
+      atom. A wand's semantic ins are [largs @ r_ins] and its outs are [r_outs]
+      (only the rhs out-arguments); these are stored as the {!CorePred}'s ins
+      and outs respectively. *)
+  val wand : string * Expr.t list -> string * Expr.t list -> Expr.t list -> atom
+
+  (** [as_wand ~rhs_ins_number a] recovers [Some (lhs, rhs)] when [a] is a
+      wand-encoding {!CorePred}, and [None] otherwise. [rhs_ins_number] is the
+      number of in-parameters of the rhs predicate, needed to split the stored
+      ins back into [largs] and [r_ins]. *)
+  val as_wand :
+    rhs_ins_number:int ->
+    atom ->
+    ((string * Expr.t list) * (string * Expr.t list)) option
+
+  (** Effect looking up a predicate's number of in-parameters. Performed by the
+      wand printer; handled by [Engine.MP.with_pred_table]. *)
+  type _ Effect.t += Pred_ins_number : string -> int option Effect.t
+
+  (** [pred_ins_number name] performs {!Pred_ins_number}, returning [None] when
+      no handler (predicate table) is installed. *)
+  val pred_ins_number : string -> int option
 
   (** Comparison of assertions *)
   val compare : atom -> atom -> int
@@ -1294,12 +1330,6 @@ module Visitors : sig
              Expr.t list ->
              Expr.t list ->
              Asrt.atom
-         ; visit_Wand :
-             'c ->
-             Asrt.atom ->
-             string * Expr.t list ->
-             string * Expr.t list ->
-             Asrt.atom
          ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
          ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
          ; visit_GuardedGoto : 'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
@@ -1541,13 +1571,6 @@ module Visitors : sig
 
     method visit_CorePred :
       'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
-
-    method visit_Wand :
-      'c ->
-      Asrt.atom ->
-      string * Expr.t list ->
-      string * Expr.t list ->
-      Asrt.atom
 
     method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
     method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
@@ -1810,7 +1833,6 @@ module Visitors : sig
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
          ; visit_function_call : 'c -> Cmd.function_call -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
-         ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
          ; visit_Goto : 'c -> 'g -> 'f
          ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2027,7 +2049,6 @@ module Visitors : sig
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
     method visit_function_call : 'c -> Cmd.function_call -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
-    method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
     method visit_Goto : 'c -> 'g -> 'f
     method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2246,8 +2267,6 @@ module Visitors : sig
              unit
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
-         ; visit_Wand :
-             'c -> string * Expr.t list -> string * Expr.t list -> unit
          ; visit_GUnfold : 'c -> string -> unit
          ; visit_Goto : 'c -> 'f -> unit
          ; visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit
@@ -2462,10 +2481,6 @@ module Visitors : sig
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
-
-    method visit_Wand :
-      'c -> string * Expr.t list -> string * Expr.t list -> unit
-
     method visit_GUnfold : 'c -> string -> unit
     method visit_Goto : 'c -> 'f -> unit
     method visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit

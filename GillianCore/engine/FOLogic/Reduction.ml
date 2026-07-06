@@ -2872,15 +2872,6 @@ let reduce_assertion_loop
   let f : Asrt.atom -> Asrt.t = function
     (* Empty heap *)
     | Asrt.Emp -> []
-    (* Star *)
-    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
-        [
-          Wand
-            {
-              lhs = (lname, List.map fe largs);
-              rhs = (rname, List.map fe rargs);
-            };
-        ]
     (* Pure assertions *)
     | Pure (Lit (Bool true)) -> []
     | Pure (BinOp (f1, BinOp.And, f2)) -> [ Pure f1; Pure f2 ]

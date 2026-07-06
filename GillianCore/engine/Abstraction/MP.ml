@@ -81,6 +81,13 @@ let with_pred_table (tbl : preds_tbl_t) (f : unit -> 'a) : 'a =
   match f () with
   | x -> x
   | effect Get_pred_defs, k -> Effect.Deep.continue k tbl
+  | effect Asrt.Pred_ins_number name, k ->
+      let ins_number =
+        Option.map
+          (fun (p : pred) -> p.pred.ins_number)
+          (Hashtbl.find_opt tbl name)
+      in
+      Effect.Deep.continue k ins_number
 
 type err_ =
   | MPSpec of string * Asrt.t list
@@ -531,40 +538,27 @@ let ins_outs_formula (kb : KB.t) (pf : Expr.t) : (KB.t * outs) list =
 (** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs for a
     given assertion [a] under a given knowledge base [kb] *)
 let ins_outs_assertion
-    (pred_ins : (string, int list) Hashtbl.t)
+    (_pred_ins : (string, int list) Hashtbl.t)
     (kb : KB.t)
     (asrt : Asrt.atom) : (KB.t * outs) list =
-  let get_pred_ins name =
-    match Hashtbl.find_opt pred_ins name with
-    | None -> raise (Failure ("ins_outs_assertion. Unknown Predicate: " ^ name))
-    | Some ins -> ins
-  in
   match (asrt : Asrt.atom) with
   | Emp -> []
   | Pure form -> ins_outs_formula kb form
-  | CorePred (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
+  (* Magic wands are core predicates whose stored ins/outs are already the
+     wand's semantic ins/outs, so the generic case below handles them. *)
+  | CorePred (_name, lie, loe) -> ins_and_outs_from_lists kb lie loe
   (* The types assertion has no outs and requires all ins *)
   | Types [ (e, _) ] ->
       let ins = simple_ins_expr e in
       List.map (fun ins -> (ins, [])) ins
   | Types _ -> failwith "Impossible: non-atomic types assertion in get_pred_ins"
-  | Wand { lhs = _, largs; rhs = rname, rargs } ->
-      let r_ins = get_pred_ins rname in
-      let _, llie, lloe =
-        List.fold_left
-          (fun (i, lie, loe) arg ->
-            if List.mem i r_ins then (i + 1, arg :: lie, loe)
-            else (i + 1, lie, arg :: loe))
-          (0, [], []) rargs
-      in
-      ins_and_outs_from_lists kb (largs @ List.rev llie) lloe
 
 let simplify_asrts ?(sorted = true) a =
   let rec aux (a : Asrt.atom) : Asrt.atom list =
     match a with
     | Pure (Lit (Bool true)) | Emp -> []
     | Pure (BinOp (f1, And, f2)) -> aux (Pure f1) @ aux (Pure f2)
-    | Pure _ | CorePred _ | Wand _ -> [ a ]
+    | Pure _ | CorePred _ -> [ a ]
     | Types _ -> (
         let a = Reduction.reduce_assertion [ a ] in
         match a with
