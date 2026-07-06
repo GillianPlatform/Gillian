@@ -81,8 +81,19 @@
 %token <CodeLoc.t> EMP LSTNIL
 %token <CodeLoc.t * string> LVAR
 
-(* Precedence *)
+(* Precedence.
+   [separating_conjunction] is the lowest: the assertion [*] combines whole
+   assertions.  [coerce_prec] is the precedence of the bare
+   [logic_expression -> assertion] coercion; keeping it below [RBRACE] makes a
+   parenthesised pure expression parse as an expression (and then coerce)
+   rather than ambiguously as an assertion.  [*] (TIMES) is separating
+   conjunction in the logic and is *not* an expression operator there (logic
+   expressions never multiply), so a bare pure expression followed by [*]
+   reduces to an assertion and the [*] separates.  Expression operators
+   otherwise use standard arithmetic precedence. *)
 %left separating_conjunction
+%nonassoc coerce_prec
+%nonassoc RBRACE
 %left OR
 %left AND
 %nonassoc EQUAL NEQ
@@ -91,8 +102,7 @@
 %left LSTCAT
 %left PLUS MINUS FPLUS FMINUS
 %left TIMES DIV MOD FTIMES FDIV FMOD
-
-%nonassoc binop_prec
+%nonassoc LSTNTH
 %nonassoc unop_prec
 
 (* Types and start *)
@@ -402,14 +412,22 @@ expression:
     { let bare_expr = WExpr.BinOp (e1, b, e2) in
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
-      WExpr.make bare_expr loc } %prec binop_prec
+      WExpr.make bare_expr loc }
+  (* [*] is only multiplication in program expressions (there is no separating
+     conjunction here), so it lives with the other binops. It is kept out of
+     [binop] because in the logic [*] means separating conjunction. *)
+  | e1 = expression; TIMES; e2 = expression
+    { let bare_expr = WExpr.BinOp (e1, WBinOp.TIMES, e2) in
+      let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
+      let loc = CodeLoc.merge lstart lend in
+      WExpr.make bare_expr loc }
   | e1 = expression; NEQ; e2 = expression
     { let bare_expr = WExpr.BinOp (e1, EQUAL, e2) in
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       let expr = WExpr.make bare_expr loc in
       let bare_expr = WExpr.UnOp (NOT, expr) in
-      WExpr.make bare_expr loc } %prec binop_prec
+      WExpr.make bare_expr loc }
   | lu = unop_with_loc; e = expression
     { let (lstart, u) = lu in
       let bare_expr = WExpr.UnOp (u, e) in
@@ -417,7 +435,11 @@ expression:
       let loc = CodeLoc.merge lstart lend in
       WExpr.make bare_expr loc } %prec unop_prec
 
-binop:
+(* Inlined so each [e1 op e2] production inherits the precedence of its
+   operator token (see the precedence table above).  [TIMES] is deliberately
+   absent: in the logic it is separating conjunction, and in program
+   expressions it is handled by a dedicated production. *)
+%inline binop:
   | EQUAL         { WBinOp.EQUAL }
   | LESSTHAN      { WBinOp.LESSTHAN }
   | GREATERTHAN   { WBinOp.GREATERTHAN }
@@ -429,7 +451,6 @@ binop:
   | FGREATEREQUAL { WBinOp.FGREATEREQUAL }
   | PLUS          { WBinOp.PLUS }
   | MINUS         { WBinOp.MINUS }
-  | TIMES         { WBinOp.TIMES }
   | DIV           { WBinOp.DIV }
   | MOD           { WBinOp.MOD }
   | FPLUS         { WBinOp.FPLUS }
@@ -601,10 +622,6 @@ wand:
     }
 
 logic_assertion_top_level:
-  | formula = logic_expression;
-    { let bare_assert = WLAssert.LPure formula in
-      let loc = WLExpr.get_loc formula in
-      WLAssert.make bare_assert loc }
   | la = logic_assertion; { la }
 
 logic_expression_with_permission:
@@ -621,9 +638,15 @@ logic_assertion:
   | wand = wand
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
+  (* A predicate call with an explicit in/out separator [;].  The
+     semicolon-less form [p(a, b)] is instead parsed as a pure-function
+     application (a [logic_expression]) and turned into an (all-in) predicate
+     call by the coercion below; this avoids an unresolvable reduce/reduce
+     conflict between predicate calls and pure-function applications. *)
   | lpr = IDENTIFIER; LBRACE;
     ins = separated_list(COMMA, logic_expression);
-    outs = outs(logic_expression);
+    SCOLON;
+    outs = separated_list(COMMA, logic_expression);
     lend = RBRACE
     { let (lstart, pr) = lpr in
       let bare_assert = WLAssert.LPred (pr, ins, outs) in
@@ -661,26 +684,24 @@ logic_assertion:
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-  | lstart = LBRACE; formula = logic_expression; lend = RBRACE;
-    { let bare_assert = WLAssert.LPure formula in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
-  | loc = TRUE
-    { let bare_lexpr = WLExpr.LVal (WVal.Bool true) in
-      let lexpr = WLExpr.make bare_lexpr loc in
-      let bare_assert = WLAssert.LPure lexpr in
-      WLAssert.make bare_assert loc }
-  | loc = FALSE
-    { let bare_lexpr = WLExpr.LVal (WVal.Bool false) in
-      let lexpr = WLExpr.make bare_lexpr loc in
-      let bare_assert = WLAssert.LPure lexpr in
-      WLAssert.make bare_assert loc }
   | e = logic_expression; COLON; ty = type_target
     { let (ty, lend) = ty in
       let bare_assert = WLAssert.LType (e, ty) in
       let lstart = WLExpr.get_loc e in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
+  (* A bare (pure) logic expression is a pure assertion.  A bare
+     application [p(args)] denotes an all-in predicate call (pure functions
+     only appear as sub-expressions, never as a whole assertion).  This is the
+     single place where pure expressions become assertions, so [TRUE], [FALSE]
+     and a parenthesised pure expression [(e)] all go through here. *)
+  | f = logic_expression
+    { let bare_assert =
+        match WLExpr.get f with
+        | WLExpr.LPureFunApp (name, args) -> WLAssert.LPred (name, args, [])
+        | _ -> WLAssert.LPure f
+      in
+      WLAssert.make bare_assert (WLExpr.get_loc f) } %prec coerce_prec
 
 logic_expression:
   | lstart = LBRACE; le = logic_expression; lend = RBRACE
@@ -748,8 +769,10 @@ logic_expression:
       WLExpr.make bare_lexpr loc
     }
 
-(* We also have lists in the logic *)
-logic_binop:
+(* We also have lists in the logic.  Inlined (like [binop]) so each operator
+   keeps its own precedence.  Note there is no [*] here: in the logic [*] is
+   separating conjunction, never multiplication. *)
+%inline logic_binop:
   | b = binop { b }
   | LSTCONS { WBinOp.LSTCONS }
   | LSTCAT { WBinOp.LSTCAT }
