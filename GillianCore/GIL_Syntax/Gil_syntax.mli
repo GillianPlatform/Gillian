@@ -485,6 +485,12 @@ module Asrt : sig
       and [None] otherwise. *)
   val as_wand_name : string -> (string * string) option
 
+  val wand_to_core_pred :
+    string * Expr.t list ->
+    string * Expr.t list ->
+    Expr.t list ->
+    string * Expr.t list * Expr.t list
+
   (** [wand (lname, largs) (rname, r_ins) r_outs] builds a magic-wand assertion
       atom. A wand's semantic ins are [largs @ r_ins] and its outs are [r_outs]
       (only the rhs out-arguments); these are stored as the {!CorePred}'s ins

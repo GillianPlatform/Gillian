@@ -550,35 +550,8 @@ module Make (State : SState.S) :
         let rargs = List.map (subst_in_expr subst) rargs in
         Wands.extend wands Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
         Res_list.return astate
-    | CorePred (a_id, ins, outs)
-      when Option.is_none (Asrt.as_user_pred_name a_id) ->
-        L.verbose (fun fmt -> fmt "Memory producer.");
-
-        let vs = List.map (subst_in_expr subst) (ins @ outs) in
-        (* We filter action errors, in theory, production cannot fail, it may only vanish. *)
-        State.produce_core_pred a_id state vs
-        |> List.map (fun state' ->
-               Ok
-                 Pred_state.
-                   {
-                     state = state';
-                     preds = Preds.copy preds;
-                     wands = Wands.copy wands;
-                   })
-    | Types les -> (
-        L.verbose (fun fmt -> fmt "Types assertion.");
-        let state' =
-          List.fold_left
-            (fun state (le, t) ->
-              Option.bind state (fun state ->
-                  let v = subst_in_expr subst le in
-                  State.assume_t state v t))
-            (Some state) les
-        in
-        match state' with
-        | None -> []
-        | Some _ -> [ Ok { state; preds; wands } ])
-    | CorePred (cp_name, ins, outs) ->
+    | CorePred (cp_name, ins, outs)
+      when Option.is_some (Asrt.as_user_pred_name cp_name) ->
         let pname = Option.get (Asrt.as_user_pred_name cp_name) in
         L.verbose (fun fmt -> fmt "Predicate assertion.");
         let les = ins @ outs in
@@ -613,6 +586,33 @@ module Make (State : SState.S) :
         let state = State.copy state in
         Preds.extend ~pure preds (pname, vs);
         Pred_state.{ state; preds; wands }
+    | CorePred (a_id, ins, outs) ->
+        L.verbose (fun fmt -> fmt "Memory producer.");
+
+        let vs = List.map (subst_in_expr subst) (ins @ outs) in
+        (* We filter action errors, in theory, production cannot fail, it may only vanish. *)
+        State.produce_core_pred a_id state vs
+        |> List.map (fun state' ->
+               Ok
+                 Pred_state.
+                   {
+                     state = state';
+                     preds = Preds.copy preds;
+                     wands = Wands.copy wands;
+                   })
+    | Types les -> (
+        L.verbose (fun fmt -> fmt "Types assertion.");
+        let state' =
+          List.fold_left
+            (fun state (le, t) ->
+              Option.bind state (fun state ->
+                  let v = subst_in_expr subst le in
+                  State.assume_t state v t))
+            (Some state) les
+        in
+        match state' with
+        | None -> []
+        | Some _ -> [ Ok { state; preds; wands } ])
     | Pure (BinOp (PVar x, Equal, le)) | Pure (BinOp (le, Equal, PVar x)) -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         match SVal.SESubst.get subst (PVar x) with
