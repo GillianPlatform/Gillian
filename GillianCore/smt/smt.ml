@@ -2,6 +2,7 @@ open Gil_syntax
 open Utils
 open Simple_smt
 open Syntaxes.Option
+open Containers
 open Prog_env
 
 (* open Ctx *)
@@ -113,24 +114,39 @@ end
     encoding time, we keep track of the necessary dependencies of the assertion
     being encoded through [Require_definition]. *)
 
-type definition = {
+type definition_pre = {
   id : int;
   decls : unit -> sexp list;  (** the SMT commands declaring this definition *)
-  depends_on : definition list;  (** definitions that must be emitted first *)
+  depends_on : definition_pre list;
+      (** definitions that must be emitted first *)
 }
+
+type definition = sexp list * int list
+
+let pp_definition fmt (decls, _) =
+  Fmt.pf fmt "%a" (Fmt.list ~sep:(Fmt.any "\n") Sexplib.Sexp.pp_hum) decls
 
 let make_definition' =
   let counter = ref 0 in
   fun ?(depends_on = []) decls ->
     incr counter;
-    { id = !counter; decls; depends_on }
+    ({ id = !counter; decls; depends_on } : definition_pre)
 
 let make_definition ?depends_on decls =
   let decls () = decls in
   make_definition' ?depends_on decls
 
+let finalize_definitions (defs : (int, definition_pre) Hashtbl.t) :
+    definition IntMap.t =
+  defs |> Hashtbl.to_seq
+  |> Seq.map (fun (_, { id; decls; depends_on }) ->
+         let decls = decls () in
+         let depends_on = List.map (fun d -> d.id) depends_on in
+         (id, (decls, depends_on)))
+  |> IntMap.of_seq
+
 type _ Effect.t +=
-  | Require_definition : definition -> unit Effect.t
+  | Require_definition : definition_pre -> unit Effect.t
   | Require_usr_datatypes : SS.t -> unit Effect.t
   | Get_usr_datatypes :
       ((module Variant.S) * (string * string list * (module Variant.S) list))
@@ -173,8 +189,7 @@ let with_necessary_usr_datatypes (f : unit -> 'a) : 'a =
 
 (** Run [f], returning its result together with the set of definitions it
     required (keyed by id), closed under the [depends_on] relation. *)
-let with_necessary_definitions (f : unit -> 'a) :
-    'a * (int, definition) Hashtbl.t =
+let with_necessary_definitions (f : unit -> 'a) : 'a * definition IntMap.t =
   let needed_defs = Hashtbl.create 17 in
   let rec add_def d =
     if not (Hashtbl.mem needed_defs d.id) then (
@@ -188,19 +203,19 @@ let with_necessary_definitions (f : unit -> 'a) :
         add_def d;
         Effect.Deep.continue k ()
   in
-  (result, needed_defs)
+  (result, finalize_definitions needed_defs)
 
 (** Send each required definition through [emit], preceded by the definitions it
     depends on (so declarations always come before their uses). *)
-let emit_definitions ~emit (needed : (int, definition) Hashtbl.t) =
-  let emitted = Hashtbl.create (Hashtbl.length needed) in
-  let rec go d =
-    if not (Hashtbl.mem emitted d.id) then (
-      Hashtbl.replace emitted d.id ();
-      List.iter go d.depends_on;
-      List.iter emit (d.decls ()))
+let emit_definitions ~emit (needed : definition IntMap.t) =
+  let emitted = Hashset.empty ~size:(IntMap.cardinal needed) () in
+  let rec go id (decls, depends_on) =
+    if not (Hashset.mem emitted id) then (
+      Hashset.add emitted id;
+      List.iter (fun id -> go id (IntMap.find id needed)) depends_on;
+      List.iter emit decls)
   in
-  Hashtbl.iter (fun _ d -> go d) needed
+  IntMap.iter (fun id d -> go id d) needed
 
 let solver =
   ref
@@ -261,8 +276,7 @@ let sexps_to_yojson sexps =
 
 let pp_typenv = Fmt.(Dump.hashtbl string (Fmt.of_to_string Type.str))
 
-let encoding_cache :
-    (Expr.Set.t, sexp list * (int, definition) Hashtbl.t) Hashtbl.t =
+let encoding_cache : (Expr.Set.t, sexp list * definition IntMap.t) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
 
 let sat_cache : (Expr.Set.t, sexp option) Hashtbl.t =
@@ -495,7 +509,8 @@ module Datatype_operations = struct
          | Some t ->
              let () =
                match t with
-               | Type.DatatypeType name -> ensure_encoded name
+               | Type.DatatypeType name when not (SS.mem name cycle) ->
+                   ensure_encoded name
                | _ -> ()
              in
              native_sort_of_type t
@@ -527,12 +542,14 @@ module Datatype_operations = struct
     ensure_encoded name;
     let cycle, lit_variant, _ = Hashtbl.find datatype_cache name in
     require_usr_datatypes cycle;
+    require_definition Lit_operations.def_gil_literal;
     lit_variant
 
   let encode_constructor cname =
     ensure_encoded_c cname;
     let cycle, variant = Hashtbl.find constructor_cache cname in
     require_usr_datatypes cycle;
+    require_definition Lit_operations.def_gil_literal;
     variant
 end
 
@@ -1503,7 +1520,7 @@ let encode_assertions_needs_handler (fs : Expr.Set.t) (gamma : typenv) :
    while encoding). Both are cached, so the dependency set survives a cache
    hit -- it cannot be recomputed from the encoded terms without re-encoding. *)
 let encode_assertions (fs : Expr.Set.t) (gamma : typenv) :
-    sexp list * (int, definition) Hashtbl.t =
+    sexp list * definition IntMap.t =
   let- () = Hashtbl.find_opt encoding_cache fs in
   let result =
     with_necessary_definitions @@ fun () ->
@@ -1541,15 +1558,23 @@ module Dump = struct
     let () = close_out c in
     ()
 
-  let dump fs gamma cmds =
+  let dump fs gamma cmds necessary_defs =
     to_file (fun c ->
         Fmt.pf
           (Format.formatter_of_out_channel c)
-          "GIL query:\nFS: %a\nGAMMA: %a\nEncoded as SMT Query:\n%a@?"
+          "GIL query:\n\
+           FS: %a\n\
+           GAMMA: %a\n\
+           Encoded as SMT Query:\n\
+           %a\n\n\
+           Necessary definitions:\n\
+           %a@?"
           (Fmt.iter ~sep:Fmt.comma Expr.Set.iter Expr.pp)
           fs pp_typenv gamma
           (Fmt.list ~sep:(Fmt.any "\n") Sexplib.Sexp.pp_hum)
-          cmds)
+          cmds
+          (Fmt.seq ~sep:(Fmt.any "\n\n") pp_definition)
+          (necessary_defs |> IntMap.to_seq |> Seq.map snd))
 end
 
 (* We never use the solver incrementally: every query starts by fully
@@ -1573,7 +1598,10 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () = reset_solver () in
   with_necessary_usr_datatypes @@ fun () ->
   let encoded_assertions, necessary_definitions = encode_assertions fs gamma in
-  let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
+  let () =
+    if !Config.dump_smt then
+      Dump.dump fs gamma encoded_assertions necessary_definitions
+  in
   let () = emit_definitions ~emit:cmd necessary_definitions in
   let () = List.iter cmd encoded_assertions in
   L.verbose (fun fmt -> fmt "Reached SMT.");

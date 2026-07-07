@@ -79,11 +79,11 @@ lemma list_member_concat {
 //
 // Standard over-approximating SLL predicate with contents
 //
-predicate SLL(+x, vs) {
+predicate SLL(x; vs) {
   // Empty SLL
   (x == null) * (vs == 'Nil);
   // One SLL node and the rest
-  (x -b> #v, #next) * SLL(#next, #vs) *
+  (x -b> #v, #next) * SLL(#next; #vs) *
   (vs == 'Cons(#v, #vs))
 }
 
@@ -94,7 +94,7 @@ function SLL_allocate_node(v){
   [t] := v;
   return t
 }
-{ SLL(ret, 'Cons(#v, 'Nil)) }
+{ SLL(ret; 'Cons(#v, 'Nil)) }
 
 // This incorrect spec should fail to verify
 { (v == #v) * (u == #u) }
@@ -103,7 +103,7 @@ function SLL_allocate_node_fails(u, v){
   [t] := v;
   return t
 }
-{ SLL(ret, 'Cons(#u, 'Nil)) }
+{ SLL(ret; 'Cons(#u, 'Nil)) }
 
 
 //
@@ -111,16 +111,16 @@ function SLL_allocate_node_fails(u, v){
 //
 
 // 01. Prepending a given value to a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+{ (x == #x) * (k == #k) * SLL(#x; #vs) }
 function SLL_prepend(x, k){
     z := SLL_allocate_node(k);
     [z + 1] := x;
     return z
 }
-{ SLL(ret, 'Cons(#k, #vs)) }
+{ SLL(ret; 'Cons(#k, #vs)) }
 
 // 02. Appending a given value to a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+{ (x == #x) * (k == #k) * SLL(#x; #vs) }
 function SLL_append(x, k){
   if (x == null) {
     x := SLL_allocate_node(k)
@@ -131,10 +131,10 @@ function SLL_append(x, k){
   };
   return x
 }
-{ SLL(ret,  append(#vs, #k)) }
+{ SLL(ret;  append(#vs, #k)) }
 
 // 03. Appending a given SLL node to a given SLL
-{ (x == #x) * (y == #y) * SLL(#x, #vs) * SLL(#y, 'Cons(#vy, 'Nil)) }
+{ (x == #x) * (y == #y) * SLL(#x; #vs) * SLL(#y; 'Cons(#vy, 'Nil)) }
 function SLL_append_node(x, y) {
   if (x == null) {
     x := y
@@ -145,10 +145,10 @@ function SLL_append_node(x, y) {
   };
   return x
 }
-{ SLL(ret, append(#vs, #vy)) }
+{ SLL(ret; append(#vs, #vy)) }
 
 // 04. Concatenating two lists
-{(x == #x) * (y == #y) * SLL(#x, #vx) * SLL(#y, #vy) }
+{(x == #x) * (y == #y) * SLL(#x; #vx) * SLL(#y; #vy) }
 function SLL_concat(x, y) {
   if (x == null){
     x := y
@@ -159,10 +159,10 @@ function SLL_concat(x, y) {
   };
   return x
 }
-{ SLL(ret,  concatenate(#vx, #vy)) }
+{ SLL(ret;  concatenate(#vx, #vy)) }
 
 // 05. Copying a given SLL
-{ (x == #x) * SLL(#x, #vs) }
+{ (x == #x) * SLL(#x; #vs) }
 function SLL_copy(x){
   y := null;
   if (x != null) {
@@ -176,10 +176,10 @@ function SLL_copy(x){
   };
   return y
 }
-{ SLL(#x, #vs) * SLL(ret, #vs) }
+{ SLL(#x; #vs) * SLL(ret; #vs) }
 
 // 06. Calculating the length of a given SLL
-{ (x == #x) *  SLL(#x, #vs) }
+{ (x == #x) *  SLL(#x; #vs) }
 function SLL_length(x) {
   n := 0;
   if (x == null){
@@ -194,7 +194,7 @@ function SLL_length(x) {
 { ret == length(#vs) }
 
 // This spec fails to verify
-{ (x == #x) *  SLL(#x, #vs) }
+{ (x == #x) *  SLL(#x; #vs) }
 function SLL_length_fails(x) {
   n := 0;
   if (x == null){
@@ -209,7 +209,7 @@ function SLL_length_fails(x) {
 { ret == double_length(#vs) }
 
 // 07. Reversing a given SLL
-{ (x == #x) *  SLL(#x, #vs) }
+{ (x == #x) *  SLL(#x; #vs) }
 function SLL_reverse(x){
   if (x != null) {
     t := [x + 1];
@@ -221,10 +221,10 @@ function SLL_reverse(x){
   };
   return y
 }
-{ SLL(ret, reverse(#vs)) }
+{ SLL(ret; reverse(#vs)) }
 
 // 08. Checking if a given value is in a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+{ (x == #x) * (k == #k) * SLL(#x; #vs) }
 function SLL_member(x, k){
   found := false;
   if (x == null){
@@ -240,10 +240,10 @@ function SLL_member(x, k){
   };
   return found
 }
-{ SLL(#x, #vs) * (ret == list_member(#vs, #k)) }
+{ SLL(#x; #vs) * (ret == list_member(#vs, #k)) }
 
 // 09. Removing a given value from a given SLL
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+{ (x == #x) * (k == #k) * SLL(#x; #vs) }
 function SLL_remove(x, k) {
   if (x == null) {
     skip
@@ -260,10 +260,10 @@ function SLL_remove(x, k) {
   };
   return x
 }
-{ SLL(ret, #nvs) * (list_member(#nvs, #k) == false) }
+{ SLL(ret; #nvs) * (list_member(#nvs, #k) == false) }
 
 // This spec should fail
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+{ (x == #x) * (k == #k) * SLL(#x; #vs) }
 function SLL_remove_fails_1(x, k) {
   if (x == null) {
     skip
@@ -280,10 +280,10 @@ function SLL_remove_fails_1(x, k) {
   };
   return x
 }
-{ SLL(ret, #nvs) * (list_member(#nvs, #k) == true) }
+{ SLL(ret; #nvs) * (list_member(#nvs, #k) == true) }
 
 // So should this one
-{ (x == #x) * (k == #k) * SLL(#x, #vs) }
+{ (x == #x) * (k == #k) * SLL(#x; #vs) }
 function SLL_remove_fails_2(x, k) {
   if (x == null) {
     skip
@@ -300,10 +300,10 @@ function SLL_remove_fails_2(x, k) {
   };
   return x
 }
-{ SLL(ret, #nvs) * (list_member(#nvs, #k) == false) }
+{ SLL(ret; #nvs) * (list_member(#nvs, #k) == false) }
 
 // 10. Freeing a given SLL
-{ (x == #x) * SLL(#x, #vs) }
+{ (x == #x) * SLL(#x; #vs) }
 function SLL_free(x){
   if (x == null) {
     skip
