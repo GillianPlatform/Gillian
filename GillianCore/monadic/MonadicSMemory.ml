@@ -32,14 +32,10 @@ module type S = sig
   val produce : core_pred:string -> t -> vt list -> t Delayed.t
   val is_overlapping_asrt : string -> bool
 
-  (** State Copy *)
-  val copy : t -> t
-
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 
-  val substitution_in_place : st -> t -> t Delayed.t
-  val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
+  val substitution : st -> t -> t Delayed.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
@@ -93,9 +89,9 @@ module Lift (MSM : S) :
     let gpc = Pc.to_gpc pc in
     Gbranch.{ pc = gpc; value }
 
-  let substitution_in_place ~pfs ~gamma subst mem :
+  let substitution ~pfs ~gamma subst mem :
       (t * Expr.Set.t * (string * Type.t) list) list =
-    let process = substitution_in_place subst mem in
+    let process = substitution subst mem in
     let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
     let branches = Delayed.resolve ~curr_pc process in
     List.map

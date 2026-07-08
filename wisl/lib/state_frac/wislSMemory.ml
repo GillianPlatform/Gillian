@@ -166,7 +166,6 @@ let produce ~core_pred heap args =
       Delayed.vanish ()
   | Ok (heap', _) -> Delayed.return heap'
 
-let copy = WislSHeap.copy
 let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 
 (* TODO: Implement properly *)
@@ -185,11 +184,7 @@ let pp_err fmt t =
     | OutOfBounds _ -> "Out Of Bounds"
     | InvalidLocation _ -> "Invalid Location")
 
-let substitution_in_place = WislSHeap.substitution_in_place
-
-let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
-  WislSHeap.clean_up keep mem
-
+let substitution = WislSHeap.substitution
 let lvars = WislSHeap.lvars
 let alocs = WislSHeap.alocs
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap

@@ -158,8 +158,6 @@ end = struct
   let fresh_loc ?loc:_ (_ : t) =
     raise (Failure "fresh_loc not implemented in concrete state")
 
-  let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
-
   let match_assertion (_ : t) (_ : st) (_ : MP.step) =
     raise (Failure "Match assertion from concrete state.")
 

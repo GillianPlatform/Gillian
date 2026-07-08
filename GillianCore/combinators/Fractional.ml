@@ -153,7 +153,7 @@ module Make (FracA : FracA_S) = struct
         Delayed.return ~learned:[ v == v' ] (Some (v, new_q))
     | Frac, _, _ -> failwith "Invalid Frac produce"
 
-  let substitution_in_place subst s =
+  let substitution subst s =
     match s with
     | None -> Delayed.return None
     | Some (v, q) ->

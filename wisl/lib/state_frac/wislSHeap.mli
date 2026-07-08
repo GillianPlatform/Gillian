@@ -17,7 +17,6 @@ val init : unit -> t
 val is_empty : t -> bool
 val alloc : t -> int -> t * string
 val dispose : t -> string -> (t, err) Delayed_result.t
-val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
 val load :
   t -> string -> Expr.t -> (Expr.t * Expr.t * Expr.t, err) Delayed_result.t
@@ -43,10 +42,9 @@ val get_freed : t -> string -> (unit, err) Delayed_result.t
 val set_freed : t -> string -> t Delayed.t
 val rem_freed : t -> string -> (t, err) Delayed_result.t
 val pp : t Fmt.t
-val copy : t -> t
 val lvars : t -> SS.t
 val alocs : t -> SS.t
-val substitution_in_place : Gillian.Symbolic.Subst.t -> t -> t Delayed.t
+val substitution : Gillian.Symbolic.Subst.t -> t -> t Delayed.t
 val assertions : t -> Asrt.atom list
 val to_seq : t -> (string * (SFVL.t * int option) option) Seq.t
 

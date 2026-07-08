@@ -91,16 +91,12 @@ module M = struct
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
   let alocs (heap : t) : Containers.SS.t = SHeap.alocs heap
 
-  let clean_up ?(keep = Expr.Set.empty) (_ : t) : Expr.Set.t * Expr.Set.t =
-    (Expr.Set.empty, keep)
-
-  let substitution_in_place (subst : st) (heap : t) : t Delayed.t =
+  let substitution (subst : st) (heap : t) : t Delayed.t =
     Delayed.return (SHeap.substitution subst heap)
 
   let pp fmt (heap : t) : unit = SHeap.pp fmt heap
   let pp_by_need locs fmt heap = SHeap.pp_by_need locs fmt heap
   let get_print_info = SHeap.get_print_info
-  let copy (heap : t) : t = heap
   let init () : t = SHeap.init ()
   let get_init_data _ = ()
   let clear (_ : t) = init () (* We don't maintain any context *)

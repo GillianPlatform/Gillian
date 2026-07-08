@@ -167,11 +167,11 @@ module Make (S : MyMonadicSMemory.S) :
         ((b, Some n), [ Expr.zero_i ])
     | [] -> failwith "Invalid arguments for list instantiation"
 
-  let substitution_in_place sub (b, n) =
+  let substitution sub (b, n) =
     let open Delayed.Syntax in
     let subst = Subst.subst_in_expr sub ~partial:true in
     let mapper (idx, s) =
-      let+ s' = S.substitution_in_place sub s in
+      let+ s' = S.substitution sub s in
       let idx' = subst idx in
       (idx', s')
     in

@@ -422,7 +422,7 @@ module Make (SMemory : SMemory.S) :
             subst);
       SStore.substitution_in_place subst store;
 
-      let memories = SMemory.substitution_in_place ~pfs ~gamma subst heap in
+      let memories = SMemory.substitution ~pfs ~gamma subst heap in
 
       let states =
         match memories with
@@ -482,7 +482,7 @@ module Make (SMemory : SMemory.S) :
     let { heap; store; pfs; gamma; spec_vars } = state in
     let result =
       {
-        heap = SMemory.copy heap;
+        heap;
         store = SStore.copy store;
         pfs = PFS.copy pfs;
         gamma = Type_env.copy gamma;
@@ -572,7 +572,7 @@ module Make (SMemory : SMemory.S) :
       SStore.substitution_in_place ~subst_all subst store;
       PFS.substitution subst pfs;
       Typing.substitution_in_place subst gamma;
-      match SMemory.substitution_in_place ~pfs ~gamma subst heap with
+      match SMemory.substitution ~pfs ~gamma subst heap with
       | [] -> failwith "IMPOSSIBLE: SMemory always returns at least one memory"
       | [ (mem, lpfs, lgamma) ] ->
           let () = Expr.Set.iter (PFS.extend pfs) lpfs in
@@ -604,21 +604,6 @@ module Make (SMemory : SMemory.S) :
 
   let produce (_ : t) (_ : st) (_ : Asrt.t) : (t, err_t) Res_list.t =
     raise (Failure "produce_post from non-abstract symbolic state.")
-
-  let clean_up ?(keep = ES.empty) (state : t) : unit =
-    let { heap; store; _ } = state in
-    let keep =
-      keep
-      |> SS.fold (fun x ac -> ES.add (Expr.ALoc x) ac) (SStore.alocs store)
-      |> SS.fold (fun x ac -> ES.add (Expr.LVar x) ac) (SStore.lvars store)
-    in
-    let forgettables, keep = SMemory.clean_up ~keep heap in
-    L.verbose (fun fmt ->
-        fmt "Forgettables: %a"
-          (Fmt.list ~sep:Fmt.comma Expr.pp)
-          (ES.elements forgettables));
-    L.verbose (fun fmt ->
-        fmt "Keep: %a" (Fmt.list ~sep:Fmt.comma Expr.pp) (ES.elements keep))
 
   let update_subst (state : t) (subst : st) : unit =
     let { pfs; gamma; _ } = state in

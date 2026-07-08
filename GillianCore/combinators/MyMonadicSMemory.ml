@@ -80,7 +80,7 @@ module type S = sig
 
   (** Applies a substitution to the state. This can branch, eg. when attempting
       to resolve equality of expressions. *)
-  val substitution_in_place : Subst.t -> t -> t Delayed.t
+  val substitution : Subst.t -> t -> t Delayed.t
 
   (** Pretty print the state *)
   val pp : Format.formatter -> t -> unit
@@ -100,7 +100,6 @@ module Defaults = struct
   type st = Subst.t
 
   let is_overlapping_asrt _ = false
-  let copy state = state (* assumes state is immutable *)
   let get_print_info _ _ = (Containers.SS.empty, Containers.SS.empty)
   let sure_is_nonempty _ = false
 
@@ -108,7 +107,6 @@ module Defaults = struct
     failwith "Implement here (get_failing_constraint)"
 
   let split_further _ _ _ _ = None
-  let clean_up ?(keep = Expr.Set.empty) _ = (Expr.Set.empty, keep)
   let mem_constraints _ = []
 end
 

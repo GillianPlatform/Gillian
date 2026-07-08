@@ -109,10 +109,6 @@ let init () = SMap.empty
 
 (* Simply initializes an empty heap *)
 
-(****** Standard stuff about maps ********)
-
-let copy heap = heap
-
 (***** Implementation of local actions *****)
 
 let alloc (heap : t) size =
@@ -375,7 +371,7 @@ let merge_loc (heap : t) new_loc old_loc : t =
           let heap = SMap.add new_loc (Block.Allocated { data; bound }) heap in
           SMap.remove old_loc heap)
 
-let substitution_in_place subst heap =
+let substitution subst heap =
   (* First we replace in the offset and values using fvl *)
   let heap = SMap.map (Block.substitution ~partial:true subst) heap in
   (* Then we replace within the locations themselves *)
@@ -534,46 +530,3 @@ let add_debugger_variables
       scopes vars
   in
   scopes
-
-(***** Clean-up *****)
-
-let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
-  let heap, forgettables =
-    SMap.fold
-      (fun (aloc : string) (block : Block.t) (heap, forgettables) ->
-        match block with
-        | Freed -> (heap, forgettables)
-        | Allocated { data; bound; _ } -> (
-            match
-              (SFVL.is_empty data, bound, Expr.Set.mem (ALoc aloc) keep)
-            with
-            | true, None, false ->
-                ( SMap.remove aloc heap,
-                  Expr.Set.add (Expr.ALoc aloc) forgettables )
-            | _ -> (heap, forgettables)))
-      heap (heap, Expr.Set.empty)
-  in
-  let keep =
-    SMap.fold
-      (fun (aloc : string) (block : Block.t) keep ->
-        let keep = Expr.Set.add (ALoc aloc) keep in
-        match block with
-        | Freed -> keep
-        | Allocated { data; _ } ->
-            let data_alocs =
-              Expr.Set.of_list
-                (List.map
-                   (fun x -> Expr.ALoc x)
-                   (SS.elements (SFVL.alocs data)))
-            in
-            let data_lvars =
-              Expr.Set.of_list
-                (List.map
-                   (fun x -> Expr.LVar x)
-                   (SS.elements (SFVL.lvars data)))
-            in
-            Expr.Set.union keep (Expr.Set.union data_alocs data_lvars))
-      heap keep
-  in
-  let forgettables = Expr.Set.diff forgettables keep in
-  (forgettables, keep)

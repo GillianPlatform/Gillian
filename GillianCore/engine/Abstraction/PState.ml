@@ -1113,8 +1113,6 @@ module Make (State : SState.S) :
   let fresh_loc ?(loc : vt option) (astate : t) : vt =
     State.fresh_loc ?loc astate.state
 
-  let clean_up ?keep:_ (astate : t) : unit = State.clean_up astate.state
-
   let produce (astate : t) (subst : st) (a : Asrt.t) : (t, err_t) Res_list.t =
     SMatcher.produce astate subst a
 

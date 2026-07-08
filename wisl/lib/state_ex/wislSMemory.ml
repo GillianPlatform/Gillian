@@ -156,7 +156,6 @@ let produce ~core_pred heap args =
       Delayed.vanish ()
   | Ok (heap', _) -> Delayed.return heap'
 
-let copy = WislSHeap.copy
 let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 
 (* TODO: Implement properly *)
@@ -184,11 +183,7 @@ let get_recovery_tactic _ e =
       Recovery_tactic.try_unfold (loc :: ofs)
   | _ -> Recovery_tactic.none
 
-let substitution_in_place = WislSHeap.substitution_in_place
-
-let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
-  WislSHeap.clean_up keep mem
-
+let substitution = WislSHeap.substitution
 let lvars heap = WislSHeap.lvars heap
 let alocs heap = WislSHeap.alocs heap
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap
