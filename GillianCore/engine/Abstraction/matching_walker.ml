@@ -563,8 +563,13 @@ and consume_core_pred_step
             m "Executing consume: %s with ins: @[<h>%a@]" a_id
               Fmt.(list ~sep:comma Expr.pp)
               vs_ins);
+        (* The outs already known through the substitution are forwarded as a
+           candidate-selection hint (they are still checked below, by
+           [match_ins_outs_lists]). *)
+        let outs_hint = List.map (subst_in_expr_opt ops s subst) e_outs in
         let** s'', vs_outs =
-          ops.consume_core_pred ~no_auto_fold a_id s vs_ins
+          Consume_hints.with_hint outs_hint (fun () ->
+              ops.consume_core_pred ~no_auto_fold a_id s vs_ins)
         in
         (* Separate outs into direct matchables and others *)
         match match_ins_outs_lists ops s'' subst step vs_outs e_outs with
@@ -803,8 +808,7 @@ and match_
                   match_mp ops ?prev_id ([ (astate, subst'', mp) ], [])
                 in
                 let recovery_base =
-                  if ops.advance_recovery_base () then astate
-                  else recovery_base
+                  if ops.advance_recovery_base () then astate else recovery_base
                 in
                 handle_ret ?prev_id ~fuel:(fuel - 1) ~recovery_base new_ret))
     | Error errors ->

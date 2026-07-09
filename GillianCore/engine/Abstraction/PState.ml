@@ -433,7 +433,7 @@ module Make (State : SState.S) :
       (* The memory is immutable, so the substituted state must be used (the
          pure part of the state is still substituted in place). *)
       if SS.is_empty vars_to_forget then astate
-      else (
+      else
         let oblivion_subst = fresh_subst vars_to_forget in
         L.verbose (fun m ->
             m "Forget @[%a@] with subst: %a"
@@ -446,7 +446,7 @@ module Make (State : SState.S) :
         let astate = List.hd subst_in_place in
 
         L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate);
-        astate)
+        astate
     in
     let mp =
       match mp with
@@ -950,7 +950,7 @@ module Make (State : SState.S) :
             (* The memory is immutable, so the substituted state must be used
                (the pure part of the state is still substituted in place). *)
             if SS.is_empty vars_to_forget then astate
-            else (
+            else
               let oblivion_subst = fresh_subst vars_to_forget in
               L.verbose (fun m ->
                   m "Forget @[%a@] with subst: %a"
@@ -966,7 +966,7 @@ module Make (State : SState.S) :
 
               L.verbose (fun m ->
                   m "State after substitution:@\n@[%a@]\n" pp astate);
-              astate)
+              astate
           in
           let mp =
             match mp with
@@ -1223,14 +1223,13 @@ module Make (State : SState.S) :
       | Ok (state, _) -> Ok (copy_with_state astate state)
       | Error err -> Error err
     in
-    (* Post-action simplifications, mirroring [eval_pred_slcmd]. *)
+    (* Post-action simplifications, mirroring [eval_pred_slcmd] — the legacy
+       unfold additionally simplified with [~matching:true] internally, which
+       is what unifies the abstract locations an unfolding introduces. *)
     let** astate =
       match (evaluated : SLCmd.t) with
-      | Unfold (_, _, _, false) ->
+      | Unfold _ | GUnfold _ ->
           let _, states = simplify ~kill_new_lvars:true ~matching:true astate in
-          Res_list.just_oks states
-      | GUnfold _ ->
-          let _, states = simplify ~kill_new_lvars:true astate in
           Res_list.just_oks states
       | _ -> Res_list.return astate
     in

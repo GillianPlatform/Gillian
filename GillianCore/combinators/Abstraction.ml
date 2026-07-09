@@ -208,8 +208,17 @@ module Make (S : MonadicSMemory.S) = struct
 
   (* Extends the pc with formulas that have already been reduced, without
      re-reduction or typeof-rehoming — mirrors [PFS.extend] in
-     [SState.assume_a]. *)
+     [SState.assume_a], except that conjunctions are split (like [Pc.extend]
+     does): location resolution and friends only scan top-level formulas, so
+     an equality buried in a conjunction would be invisible to them. *)
   let learn (pc : Pc.t) (fs : Expr.t list) : Pc.t =
+    let rec split_conjunct : Expr.t -> Expr.t list = function
+      | BinOp (f1, And, f2) -> split_conjunct f1 @ split_conjunct f2
+      | UnOp (Not, BinOp (f1, Or, f2)) ->
+          split_conjunct (BinOp (UnOp (Not, f1), And, UnOp (Not, f2)))
+      | f -> [ f ]
+    in
+    let fs = List.concat_map split_conjunct fs in
     { pc with learned = Expr.Set.add_seq (List.to_seq fs) pc.learned }
 
   let with_matching (pc : Pc.t) (matching : bool) : Pc.t = { pc with matching }
@@ -583,7 +592,15 @@ module Make (S : MonadicSMemory.S) = struct
     | User pname ->
         let pred = get_def pname in
         let n_outs = pred.pred.pred_num_params - pred.pred.ins_number in
-        let vs = List.map Option.some ins @ List.init n_outs (fun _ -> None) in
+        (* The walker forwards the outs it already knows as a
+           candidate-selection hint (mirroring the legacy consume, which
+           scored candidates on known outs too). *)
+        let outs =
+          match Consume_hints.take () with
+          | Some hint when List.length hint = n_outs -> hint
+          | _ -> List.init n_outs (fun _ -> None)
+        in
+        let vs = List.map Option.some ins @ outs in
         consume_upred ~no_auto_fold ms pname vs
     | Wand { lhs; rhs } -> consume_wand ms ~lname:lhs ~rname:rhs ins
 
@@ -651,9 +668,12 @@ module Make (S : MonadicSMemory.S) = struct
     let rpred = MP.get_pred_def pred_defs rname in
     let largs, r_ins = List_utils.split_at ins lpred.pred.pred_num_params in
     let n_routs = rpred.pred.pred_num_params - rpred.pred.ins_number in
-    let query : Wands.query =
-      { lname; rname; largs; r_ins; r_outs = List.init n_routs (fun _ -> None) }
+    let r_outs =
+      match Consume_hints.take () with
+      | Some hint when List.length hint = n_routs -> hint
+      | _ -> List.init n_routs (fun _ -> None)
     in
+    let query : Wands.query = { lname; rname; largs; r_ins; r_outs } in
     L.tmi (fun m -> m "Abstraction.consume_wand @[<h>%a@]" Wands.pp_query query);
     let wands_ref = Wands.init ms.st.wands in
     match
