@@ -20,11 +20,10 @@ module InitData = Prebuilt.InitData
    let () = Debug.print_info () *)
 
 (* Convert custom state model -> Gillian state model *)
-module PatchedMem = MyMonadicSMemory.Make (MyMem) (Prebuilt.MyInitData)
+(* For measuring performance, wrap this in PerfMeasurer.Make *)
+module SMemory = MyMonadicSMemory.Make (MyMem) (Prebuilt.MyInitData)
 
 (* Gillian Instantiation *)
-(* For measuring performance, wrap this in PerfMeasurer.Make *)
-module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 module Lifter = Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (PC)
 
 module CLI =

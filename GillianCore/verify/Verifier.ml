@@ -1052,12 +1052,12 @@ struct
 end
 
 module From_scratch
-    (SMemory : SMemory.S)
+    (SMemory : Monadic.MonadicSMemory.S)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) =
 struct
   module INTERNAL__ = struct
-    module SState = SState.Make (SMemory)
+    module SState = SState.Make (Monadic.MonadicSMemory.Lift (SMemory))
   end
 
   include

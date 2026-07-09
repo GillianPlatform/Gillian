@@ -5,7 +5,7 @@ module Act_console = Act_console
 module Make
     (ID : Init_data.S)
     (CMemory : CMemory.S with type init_data = ID.t)
-    (SMemory : SMemory.S with type init_data = ID.t)
+    (SMemory : Monadic.MonadicSMemory.S with type init_data = ID.t)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (External : External.T(PC.Annot).S)
     (Runners : Runners.S)
@@ -27,7 +27,7 @@ struct
   module C_interpreter =
     G_interpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (PC) (External)
 
-  module SState = SState.Make (SMemory)
+  module SState = SState.Make (Monadic.MonadicSMemory.Lift (SMemory))
 
   module S_interpreter =
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)

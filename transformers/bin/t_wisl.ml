@@ -1,9 +1,7 @@
 open Prebuilt.Lib.WISL_Base
 
-module PatchedMem =
+module SMemory =
   Gillian.Combinators.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)
-
-module SMemory = Gillian.Monadic.MonadicSMemory.Lift (PatchedMem)
 
 module Lifter =
   Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (ParserAndCompiler)
