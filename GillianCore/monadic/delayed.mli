@@ -4,6 +4,13 @@ type 'a t
 
 val resolve : curr_pc:Pc.t -> 'a t -> 'a Branch.t list
 
+(** Inverse of {!resolve}: wraps direct-style code (an explicit function from
+    the current path condition to its outcome branches) into the monad. This is
+    the entry point for code that must thread several path conditions at once
+    (e.g. matching-based reasoning in memory models) and therefore cannot live
+    inside a single ambient [Delayed] computation. *)
+val of_resolver : (curr_pc:Pc.t -> 'a Branch.t list) -> 'a t
+
 val return :
   ?learned:Expr.t list -> ?learned_types:(string * Type.t) list -> 'a -> 'a t
 

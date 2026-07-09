@@ -15,6 +15,7 @@ let () =
 type 'a t = curr_pc:Pc.t -> 'a Branch.t list
 
 let resolve ~curr_pc p = p ~curr_pc
+let of_resolver f = f
 
 (** When using Branching, it should be certain that the paths are complete *)
 

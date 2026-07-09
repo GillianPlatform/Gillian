@@ -63,10 +63,30 @@ let abs_of_yojson state_of_yojson (yojson : Yojson.Safe.t) :
 
 module Make (S : MonadicSMemory.S) = struct
   type t = S.t abs [@@deriving yojson, show]
-  type err_t = S.err_t [@@deriving yojson, show]
+
+  (** Errors of the abstraction layer. Each abstraction-specific constructor
+      mirrors the [StateErr.t] error that [PState]/[Matcher] raise for the same
+      situation today, so that [can_fix]/[get_fixes]/[get_recovery_tactic]/
+      [get_failing_constraint] behave identically once predicate reasoning
+      happens below the state:
+      - [MissingUPred] ≙ [EAsrt (vs, true_)] (the [true_] is what lets the
+        recovery mechanism trigger);
+      - [MissingWand] ≙ [EPure false_];
+      - [AsrtFailure] ≙ [EAsrt];
+      - [OtherErr] ≙ [EOther];
+      - [SubError] ≙ [EMem]. *)
+  type err_t =
+    | MissingUPred of { name : string; vs : Expr.t list }
+    | MissingWand of { lname : string; rname : string }
+    | AsrtFailure of Expr.t list * Expr.t
+    | OtherErr of string
+    | SubError of S.err_t
+  [@@deriving yojson, show]
+
   type init_data = S.init_data
 
   let pp_err = pp_err_t
+  let sub_err e = SubError e
   let get_init_data s = S.get_init_data s.mem
 
   let clear (t : t) =
@@ -125,7 +145,9 @@ module Make (S : MonadicSMemory.S) = struct
     let open DR.Syntax in
     match action_from_str action_name with
     | SubAction action_name ->
-        let++ m', v = S.execute_action ~action_name s.mem args in
+        let++ m', v =
+          DR.map_error (S.execute_action ~action_name s.mem args) sub_err
+        in
         ({ s with mem = m' }, v)
     | Fold | Unfold | GUnfold | Package -> failwith "todo"
 
@@ -134,9 +156,11 @@ module Make (S : MonadicSMemory.S) = struct
     let open DR.Syntax in
     match pred_from_str core_pred with
     | SubPred core_pred ->
-        let++ mem', outs = S.consume ~core_pred s.mem ins in
+        let++ mem', outs =
+          DR.map_error (S.consume ~core_pred s.mem ins) sub_err
+        in
         ({ s with mem = mem' }, outs)
-    | _ -> failwith "consume only works with subpredicates"
+    | _ -> failwith "todo"
 
   let produce_upred (name : string) (args : Expr.t list) (s : t) =
     let open Delayed.Syntax in
@@ -223,10 +247,30 @@ module Make (S : MonadicSMemory.S) = struct
     let wand_asrts = List.map (wand_to_asrt ~pred_defs) s.wands in
     sub_asrt @ upred_asrts @ wand_asrts
 
-  (* FIXME: this should probably evolve in concert with the predicates? *)
-  let can_fix err = S.can_fix err
-  let get_fixes err = S.get_fixes err
-  let get_recovery_tactic (s : t) (e : err_t) = S.get_recovery_tactic s.mem e
+  let can_fix = function
+    | MissingUPred _ -> true
+    | MissingWand _ -> false
+    | AsrtFailure (_, pf) -> Reduction.reduce_lexpr pf <> Expr.false_
+    | OtherErr _ -> false
+    | SubError e -> S.can_fix e
+
+  let get_fixes = function
+    (* User predicates and wands are never abduced (the bi-abduction fix
+       machinery refuses such fixes); an empty fix list makes the branch die,
+       exactly like [EAsrt (vs, true_)] does today. *)
+    | MissingUPred _ | MissingWand _ | OtherErr _ -> []
+    | AsrtFailure (_, pf) -> (
+        match Reduction.reduce_lexpr pf with
+        | Lit (Bool _) -> []
+        | pf -> [ [ Asrt.Pure pf ] ])
+    | SubError e -> S.get_fixes e
+
+  let get_recovery_tactic (s : t) (e : err_t) =
+    match e with
+    | MissingUPred { vs; _ } -> Recovery_tactic.try_unfold vs
+    | AsrtFailure (vs, _) -> Recovery_tactic.try_unfold vs
+    | MissingWand _ | OtherErr _ -> Recovery_tactic.none
+    | SubError e -> S.get_recovery_tactic s.mem e
 
   let lvars (s : t) : Containers.SS.t =
     let open Containers in
@@ -272,8 +316,23 @@ module Make (S : MonadicSMemory.S) = struct
     in
     S.alocs s.mem |> SS.union pred_alocs |> SS.union wand_alocs
 
-  let split_further _ _ _ _ = None
-  let sure_is_nonempty s = S.sure_is_nonempty s.mem
+  let split_further (s : t) (core_pred : string) (ins : Expr.t list) (err : err_t)
+      =
+    match (pred_from_str core_pred, err) with
+    | SubPred core_pred, SubError err ->
+        S.split_further s.mem core_pred ins err
+    | _ -> None
+
+  let sure_is_nonempty (s : t) =
+    S.sure_is_nonempty s.mem
+    || (match s.wands with
+       | [] -> false
+       | _ -> true)
+    || List.exists
+         (fun (name, _) ->
+           let pred_def = MP.get_pred_def (MP.get_pred_defs ()) name in
+           not pred_def.pred.pred_pure)
+         s.preds
   let pp_by_need vars ft t = pp_abs (S.pp_by_need vars) ft t
   let get_print_info vars s = S.get_print_info vars s.mem
 
@@ -295,7 +354,9 @@ module Make (S : MonadicSMemory.S) = struct
     let wands = List.map subst_wand s.wands in
     { mem; preds; wands }
 
-  let get_failing_constraint err = S.get_failing_constraint err
+  let get_failing_constraint = function
+    | MissingUPred _ | MissingWand _ | AsrtFailure _ | OtherErr _ -> Expr.true_
+    | SubError e -> S.get_failing_constraint e
 end
 
 module _ (S : MonadicSMemory.S) : MonadicSMemory.S with type t = S.t abs =

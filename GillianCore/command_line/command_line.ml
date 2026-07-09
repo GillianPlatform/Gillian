@@ -24,8 +24,8 @@ struct
   module Gil_parsing = Gil_parsing.Make (PC.Annot)
   module CState = CState.Make (CMemory)
 
-  module VSMemory =
-    Monadic.MonadicSMemory.Lift (Combinators.Abstraction.Make (SMemory))
+  module AbsMemory = Combinators.Abstraction.Make (SMemory)
+  module VSMemory = Monadic.MonadicSMemory.Lift (AbsMemory)
 
   module C_interpreter =
     G_interpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (PC) (External)
@@ -37,36 +37,42 @@ struct
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
 
   module SPState = PState.Make (VSState)
-
-  module S_verification_NEEDS_CLEANUP =
-    Verifier.Make (SState) (PState.Make (SState)) (PC) (External)
-
   module Verification = Verifier.Make (VSState) (SPState) (PC) (External)
-  module S_lifter = Lifter (S_verification_NEEDS_CLEANUP)
   module Abductor = Abductor.Make (SPState) (PC) (External)
 
-  (* The tool-provided [Lifter] works over the raw memory [SMemory.t], but the
-     verification state's heap is [SMemory.t Combinators.Abstraction.abs] (the
-     predicate/wand-carrying wrapper). [get_variables] is the only member of
-     [Debugger_lifter.S] that mentions [memory], so we apply [Lifter] to
-     [Verification] to get all the right associated types and then re-project the
-     abstraction wrapper's [mem] field back onto the raw lifter. *)
+  (* The tool-provided [Lifter] works over the raw memory [SMemory.t] and its
+     errors, but the verification state's heap is
+     [SMemory.t Combinators.Abstraction.abs] (the predicate/wand-carrying
+     wrapper) and its memory errors are [AbsMemory.err_t]. [get_variables] and
+     [memory_error_to_exception_info] are the only members of
+     [Debugger_lifter.S] that mention those types, so we apply [Lifter] to
+     [Verification] to get all the right associated types and re-project the
+     abstraction wrapper back onto the raw lifter. *)
   module V_lifter = struct
     module Raw = Lifter (Verification)
     include Raw
 
     type memory = Verification.heap_t
+    type memory_error = Verification.SPState.m_err_t
 
     let get_variables t (astate : memory Debugger_utils.astate) id =
       let raw_astate : SMemory.t Debugger_utils.astate =
         { astate with memory = astate.memory.Combinators.Abstraction.mem }
       in
       Raw.get_variables t raw_astate id
+
+    let memory_error_to_exception_info
+        (info : (memory_error, _, _) Debugger_lifter.memory_error_info) :
+        Debugger_utils.exception_info =
+      match info.error with
+      | AbsMemory.SubError error ->
+          Raw.memory_error_to_exception_info { info with error }
+      | error ->
+          { id = Fmt.to_to_string AbsMemory.pp_err error; description = None }
   end
 
   module Symb_debugger =
-    Debugger.Symbolic_debugger.Make (ID) (PC) (S_verification_NEEDS_CLEANUP)
-      (S_lifter)
+    Debugger.Symbolic_debugger.Make (ID) (PC) (Verification) (V_lifter)
 
   module Verif_debugger =
     Debugger.Verification_debugger.Make (ID) (PC) (Verification) (V_lifter)

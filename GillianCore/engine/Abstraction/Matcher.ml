@@ -1227,7 +1227,8 @@ module Make (State : SState.S) :
               let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
               let failure = List.exists (fun x -> x = None) vs_ins in
               if failure then (
-                Fmt.pr "I don't know all ins for %a????" Asrt.pp_atom p;
+                L.verbose (fun m ->
+                    m "I don't know all ins for %a????" Asrt.pp_atom p);
                 if !Config.under_approximation then [] else resource_fail)
               else
                 let vs_ins = List.map Option.get vs_ins in
