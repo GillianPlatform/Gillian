@@ -669,6 +669,11 @@ module Make (State : SState.S) :
         (fun astate errs -> State.get_recovery_tactic astate.state errs);
       try_recovering = (fun astate tactic -> try_recovering astate tactic);
       unfold_concrete_preds = (fun astate -> unfold_concrete_preds astate);
+      (* The legacy retry loop progresses because [try_recovering] pops tried
+         predicates from the (mutable, state-level) predicate set; when the
+         predicates live in the immutable memory, the loop must advance its
+         recovery base instead. *)
+      advance_recovery_base = (fun () -> !Config.preds_in_memory);
       pp = pp_astate;
       pp_err = pp_err_t;
       log = log_hooks;
@@ -687,135 +692,156 @@ module Make (State : SState.S) :
       (t * SVal.SESubst.t * post_res, err_t) Res_list.t =
     W.match_ state_ops ~in_matching astate subst mp match_kind
 
-  (* Legacy produce arm for wand assertions (preds/wands outside the memory). *)
+  (* Legacy produce arm for wand assertions (preds/wands outside the memory).
+     When [Config.preds_in_memory] is set, wands are produced by the memory
+     like any core predicate. *)
   and produce_wand_arm (astate : t) (subst : SVal.SESubst.t) (a : Asrt.atom) :
       (t, err_t) Res_list.t =
-    match a with
-    | CorePred (name, _, _) ->
-        if !Config.under_approximation then
-          L.fail "Wand assertions are not supported in under-approximation mode";
-        L.verbose (fun m -> m "Wand assertion.");
-        (* Reconstruct the raw wand from its semantic ins/outs (needs the rhs
+    if !Config.preds_in_memory then
+      W.produce_core_pred_atom state_ops astate subst a
+    else
+      match a with
+      | CorePred (name, _, _) ->
+          if !Config.under_approximation then
+            L.fail
+              "Wand assertions are not supported in under-approximation mode";
+          L.verbose (fun m -> m "Wand assertion.");
+          (* Reconstruct the raw wand from its semantic ins/outs (needs the rhs
            predicate's number of in-parameters) before storing it. *)
-        let pred_defs = MP.get_pred_defs () in
-        let _, rname = Option.get (Asrt.as_wand_name name) in
-        let rhs_ins_number =
-          (MP.get_pred_def pred_defs rname).pred.ins_number
-        in
-        let (lname, largs), (rname, rargs) =
-          Option.get (Asrt.as_wand ~rhs_ins_number a)
-        in
-        let largs = List.map (subst_in_expr subst) largs in
-        let rargs = List.map (subst_in_expr subst) rargs in
-        Wands.extend astate.wands
-          Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
-        Res_list.return astate
-    | _ -> raise (Failure "Impossible: produce_wand_arm on non-wand")
+          let pred_defs = MP.get_pred_defs () in
+          let _, rname = Option.get (Asrt.as_wand_name name) in
+          let rhs_ins_number =
+            (MP.get_pred_def pred_defs rname).pred.ins_number
+          in
+          let (lname, largs), (rname, rargs) =
+            Option.get (Asrt.as_wand ~rhs_ins_number a)
+          in
+          let largs = List.map (subst_in_expr subst) largs in
+          let rargs = List.map (subst_in_expr subst) rargs in
+          Wands.extend astate.wands
+            Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
+          Res_list.return astate
+      | _ -> raise (Failure "Impossible: produce_wand_arm on non-wand")
 
-  (* Legacy produce arm for user-predicate assertions. *)
+  (* Legacy produce arm for user-predicate assertions. When
+     [Config.preds_in_memory] is set, user predicates are produced by the
+     memory like any core predicate. *)
   and produce_upred_arm (astate : t) (subst : SVal.SESubst.t) (a : Asrt.atom) :
       (t, err_t) Res_list.t =
-    match a with
-    | CorePred (cp_name, ins, outs) ->
-        let open Res_list.Syntax in
-        let pred_defs = MP.get_pred_defs () in
-        let pname = Option.get (Asrt.as_user_pred_name cp_name) in
-        L.verbose (fun fmt -> fmt "Predicate assertion.");
-        let les = ins @ outs in
-        let vs = List.map (subst_in_expr subst) les in
-        let pred_def = Hashtbl.find pred_defs pname in
-        let++ ({ state; preds; wands } : t) =
-          match pred_def.pred.pred_facts with
-          | [] -> Res_list.return astate
-          | facts ->
-              let params =
-                List.map
-                  (fun p ->
-                    let x, _ = p in
-                    Expr.PVar x)
-                  pred_def.pred.pred_params
-              in
-              let facts =
-                List.fold_left2
-                  (fun facts param le ->
-                    let subst =
-                      Expr.subst_expr_for_expr ~to_subst:param ~subst_with:le
-                    in
-                    List.map subst facts)
-                  facts params les
-              in
-              let facts = Asrt.Pure (Expr.conjunct facts) in
-              W.produce_assertion state_ops astate subst facts
-        in
-        let pure = pred_def.pred.pred_pure in
-        let preds = Preds.copy preds in
-        let wands = Wands.copy wands in
-        let state = State.copy state in
-        Preds.extend ~pure preds (pname, vs);
-        Pred_state.{ state; preds; wands }
-    | _ -> raise (Failure "Impossible: produce_upred_arm on non-pred")
+    if !Config.preds_in_memory then
+      W.produce_core_pred_atom state_ops astate subst a
+    else
+      match a with
+      | CorePred (cp_name, ins, outs) ->
+          let open Res_list.Syntax in
+          let pred_defs = MP.get_pred_defs () in
+          let pname = Option.get (Asrt.as_user_pred_name cp_name) in
+          L.verbose (fun fmt -> fmt "Predicate assertion.");
+          let les = ins @ outs in
+          let vs = List.map (subst_in_expr subst) les in
+          let pred_def = Hashtbl.find pred_defs pname in
+          let++ ({ state; preds; wands } : t) =
+            match pred_def.pred.pred_facts with
+            | [] -> Res_list.return astate
+            | facts ->
+                let params =
+                  List.map
+                    (fun p ->
+                      let x, _ = p in
+                      Expr.PVar x)
+                    pred_def.pred.pred_params
+                in
+                let facts =
+                  List.fold_left2
+                    (fun facts param le ->
+                      let subst =
+                        Expr.subst_expr_for_expr ~to_subst:param ~subst_with:le
+                      in
+                      List.map subst facts)
+                    facts params les
+                in
+                let facts = Asrt.Pure (Expr.conjunct facts) in
+                W.produce_assertion state_ops astate subst facts
+          in
+          let pure = pred_def.pred.pred_pure in
+          let preds = Preds.copy preds in
+          let wands = Wands.copy wands in
+          let state = State.copy state in
+          Preds.extend ~pure preds (pname, vs);
+          Pred_state.{ state; preds; wands }
+      | _ -> raise (Failure "Impossible: produce_upred_arm on non-pred")
 
-  (* Legacy consume arm for wand assertions. *)
+  (* Legacy consume arm for wand assertions. When [Config.preds_in_memory] is
+     set, wands are consumed from the memory like any core predicate. *)
   and consume_wand_arm
-      ~no_auto_fold:_
+      ~(no_auto_fold : bool)
       (astate : t)
       (subst : SVal.SESubst.t)
       (step : MP.step) : (t, err_t) Res_list.t =
-    match (fst step : Asrt.atom) with
-    | CorePred (name, _ins, outs) ->
-        if !Config.under_approximation then L.fail "Wand in under-approx";
-        let pred_defs = MP.get_pred_defs () in
-        let _, rname = Option.get (Asrt.as_wand_name name) in
-        let rhs_ins_number =
-          (MP.get_pred_def pred_defs rname).pred.ins_number
-        in
-        let lhs, rhs = Option.get (Asrt.as_wand ~rhs_ins_number (fst step)) in
-        (* The wand's outs are exactly the rhs out-args, i.e. the stored
+    if !Config.preds_in_memory then
+      W.consume_core_pred_step state_ops ~no_auto_fold astate subst step
+    else
+      match (fst step : Asrt.atom) with
+      | CorePred (name, _ins, outs) ->
+          if !Config.under_approximation then L.fail "Wand in under-approx";
+          let pred_defs = MP.get_pred_defs () in
+          let _, rname = Option.get (Asrt.as_wand_name name) in
+          let rhs_ins_number =
+            (MP.get_pred_def pred_defs rname).pred.ins_number
+          in
+          let lhs, rhs = Option.get (Asrt.as_wand ~rhs_ins_number (fst step)) in
+          (* The wand's outs are exactly the rhs out-args, i.e. the stored
            core-predicate outs. *)
-        let les_outs = outs in
-        let fold_outs_info = (subst, step, les_outs) in
-        consume_wand ~fold_outs_info astate subst Wands.{ lhs; rhs }
-    | _ -> raise (Failure "Impossible: consume_wand_arm on non-wand")
+          let les_outs = outs in
+          let fold_outs_info = (subst, step, les_outs) in
+          consume_wand ~fold_outs_info astate subst Wands.{ lhs; rhs }
+      | _ -> raise (Failure "Impossible: consume_wand_arm on non-wand")
 
-  (* Legacy consume arm for user-predicate assertions. *)
+  (* Legacy consume arm for user-predicate assertions. When
+     [Config.preds_in_memory] is set, user predicates are consumed from the
+     memory like any core predicate. *)
   and consume_upred_arm
       ~(no_auto_fold : bool)
       (astate : t)
       (subst : SVal.SESubst.t)
       (step : MP.step) : (t, err_t) Res_list.t =
-    match (fst step : Asrt.atom) with
-    | CorePred (cp_name, ins, outs) ->
-        let pname = Option.get (Asrt.as_user_pred_name cp_name) in
-        let les = ins @ outs in
-        L.verbose (fun m -> m "Matching predicate assertion");
-        (* Perform substitution in all predicate parameters *)
-        L.verbose (fun fmt -> fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
-        L.verbose (fun fmt -> fmt "SUBST:\n%a" SVal.SESubst.pp subst);
-        let vs = List.map (subst_in_expr_opt astate subst) les in
-        (* The in/out split is carried by the assertion's syntax. *)
-        let vs_ins = List.map (subst_in_expr_opt astate subst) ins in
-        let les_outs = outs in
-        (* All of which must have survived substitution *)
-        let failure = List.exists (fun x -> x = None) vs_ins in
-        if failure then (
-          L.verbose (fun m -> m "Cannot match: not all in-parameters known");
-          resource_fail)
-        else
-          let vs_ins = List.map Option.get vs_ins in
-          L.verbose (fun m ->
-              m "Looking for ins: %a"
-                Fmt.(brackets (list ~sep:comma Expr.pp))
-                vs_ins);
-          let consume_pred_res =
-            consume_pred ~no_auto_fold astate pname vs
-              ~fold_outs_info:(subst, step, les_outs)
-          in
-          if List.is_empty consume_pred_res then
-            L.verbose ~severity:Warning (fun m -> m "Consume_pred vanished!");
-          let open Res_list.Syntax in
-          let++ astate', _ = consume_pred_res in
-          astate'
-    | _ -> raise (Failure "Impossible: consume_upred_arm on non-pred")
+    if !Config.preds_in_memory then
+      W.consume_core_pred_step state_ops ~no_auto_fold astate subst step
+    else
+      match (fst step : Asrt.atom) with
+      | CorePred (cp_name, ins, outs) ->
+          let pname = Option.get (Asrt.as_user_pred_name cp_name) in
+          let les = ins @ outs in
+          L.verbose (fun m -> m "Matching predicate assertion");
+          (* Perform substitution in all predicate parameters *)
+          L.verbose (fun fmt ->
+              fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
+          L.verbose (fun fmt -> fmt "SUBST:\n%a" SVal.SESubst.pp subst);
+          let vs = List.map (subst_in_expr_opt astate subst) les in
+          (* The in/out split is carried by the assertion's syntax. *)
+          let vs_ins = List.map (subst_in_expr_opt astate subst) ins in
+          let les_outs = outs in
+          (* All of which must have survived substitution *)
+          let failure = List.exists (fun x -> x = None) vs_ins in
+          if failure then (
+            L.verbose (fun m -> m "Cannot match: not all in-parameters known");
+            resource_fail)
+          else
+            let vs_ins = List.map Option.get vs_ins in
+            L.verbose (fun m ->
+                m "Looking for ins: %a"
+                  Fmt.(brackets (list ~sep:comma Expr.pp))
+                  vs_ins);
+            let consume_pred_res =
+              consume_pred ~no_auto_fold astate pname vs
+                ~fold_outs_info:(subst, step, les_outs)
+            in
+            if List.is_empty consume_pred_res then
+              L.verbose ~severity:Warning (fun m -> m "Consume_pred vanished!");
+            let open Res_list.Syntax in
+            let++ astate', _ = consume_pred_res in
+            astate'
+      | _ -> raise (Failure "Impossible: consume_upred_arm on non-pred")
 
   and consume_wand
       ~fold_outs_info
@@ -1223,35 +1249,92 @@ module Make (State : SState.S) :
                   errs))
     | None -> Some (None, astate)
 
+  (* When predicates live in the memory, recovery is delegated to it through
+     the reserved [SLCmd.recover_action]: recovered states come back as ok
+     branches (zero branches = the path legitimately vanishes), errors mean
+     recovery failed. The tactic witness is only used for logging. *)
+  and try_recovering_in_memory (astate : t) (tactic : Expr.t Recovery_tactic.t)
+      : (t list * recovery_tactic, string) result =
+    let enc_opt = function
+      | None -> Expr.Lit Nono
+      | Some vs -> Expr.EList vs
+    in
+    let enc_args =
+      [
+        enc_opt tactic.try_fold;
+        enc_opt tactic.try_unfold;
+        Expr.Lit (String "high");
+      ]
+    in
+    let results =
+      State.execute_action SLCmd.recover_action astate.state enc_args
+    in
+    let oks =
+      List.filter_map
+        (function
+          | Ok (st, _) -> Some st
+          | Error _ -> None)
+        results
+    in
+    match (oks, results) with
+    | [], _ :: _ -> Error "In-memory recovery failed"
+    | _ ->
+        let states =
+          List.map
+            (fun state ->
+              Pred_state.
+                {
+                  state;
+                  preds = Preds.copy astate.preds;
+                  wands = Wands.copy astate.wands;
+                })
+            oks
+        in
+        (* The legacy unfold simplified the resulting states (collapsing the
+           equality chains an unfolding introduces); do the same here, at the
+           state level. *)
+        let states =
+          List.concat_map
+            (fun astate -> snd (simplify_astate ~matching:true astate))
+            states
+        in
+        Ok
+          ( states,
+            Try_unfold ("<memory>", Option.value ~default:[] tactic.try_unfold)
+          )
+
   and try_recovering (astate : t) (tactic : Expr.t Recovery_tactic.t) :
       (t list * recovery_tactic, string) result =
-    let open Syntaxes.Result in
     if !Config.under_approximation then
       L.fail "Recovery tactics not handled in UX mode";
-    L.verbose (fun m -> m "Attempting to recover");
-    let- fold_error =
-      match tactic.try_fold with
-      | Some fold_values -> (
-          let pname, res = fold_guarded_with_vals astate fold_values in
-          let pname = Option.value ~default:"!UNKNOWN!" pname in
-          let successes, errors = Res_list.split res in
-          match errors with
-          | [] -> Ok (successes, Try_fold (pname, fold_values))
-          | _ ->
-              let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
-              Error error_string)
+    if !Config.preds_in_memory then try_recovering_in_memory astate tactic
+    else
+      let open Syntaxes.Result in
+      L.verbose (fun m -> m "Attempting to recover");
+      let- fold_error =
+        match tactic.try_fold with
+        | Some fold_values -> (
+            let pname, res = fold_guarded_with_vals astate fold_values in
+            let pname = Option.value ~default:"!UNKNOWN!" pname in
+            let successes, errors = Res_list.split res in
+            match errors with
+            | [] -> Ok (successes, Try_fold (pname, fold_values))
+            | _ ->
+                let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
+                Error error_string)
+        | None ->
+            L.verbose (fun m -> m "No fold recovery tactic");
+            Error "None"
+      in
+      (* This matches the legacy behaviour *)
+      let unfold_values = Option.value ~default:[] tactic.try_unfold in
+      match unfold_with_vals' ~auto_level:`High astate unfold_values with
       | None ->
-          L.verbose (fun m -> m "No fold recovery tactic");
-          Error "None"
-    in
-    (* This matches the legacy behaviour *)
-    let unfold_values = Option.value ~default:[] tactic.try_unfold in
-    match unfold_with_vals' ~auto_level:`High astate unfold_values with
-    | None ->
-        Fmt.error "try_fold: %s\ntry_unfold: Automatic unfold failed" fold_error
-    | Some (pname, next_states) ->
-        let sp = List.map snd next_states in
-        Ok (sp, Try_unfold (pname, unfold_values))
+          Fmt.error "try_fold: %s\ntry_unfold: Automatic unfold failed"
+            fold_error
+      | Some (pname, next_states) ->
+          let sp = List.map snd next_states in
+          Ok (sp, Try_unfold (pname, unfold_values))
 
   let produce_assertion (astate : t) (subst : SVal.SESubst.t) (a : Asrt.atom) :
       (t, err_t) Res_list.t =

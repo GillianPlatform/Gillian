@@ -33,8 +33,14 @@ let manual_proof = ref false
 (** Transitional (predicate-refactor Phase 8): when set, user-defined predicates
     and wands are handled by the [Combinators.Abstraction] memory combinator
     instead of [PState]/[Matcher]. Allows A/B-running every suite both ways
-    during the transition; scheduled for removal once the flip is complete. *)
-let preds_in_memory = ref false
+    during the transition (toggled with the [GILLIAN_PREDS_IN_MEMORY]
+    environment variable); scheduled for removal once the flip is complete. *)
+let preds_in_memory =
+  ref
+    (match Sys.getenv_opt "GILLIAN_PREDS_IN_MEMORY" with
+    | Some ("0" | "false") -> false
+    | Some _ -> true
+    | None -> false)
 
 let max_branching = ref 100
 let leak_check = ref false

@@ -622,8 +622,13 @@ module SLCmd : sig
   val gunfold_action : string
   val package_action : string
 
-  (** [is_pred_action a] holds iff [a] is one of the four reserved actions
-      above. *)
+  (** Reserved action asking the predicate-carrying memory to recover from a
+      failure by folding/unfolding; its arguments encode a recovery tactic
+      ([fold values or none; unfold values or none; "low"/"high"]). It does not
+      correspond to any SL command. *)
+  val recover_action : string
+
+  (** [is_pred_action a] holds iff [a] is one of the reserved actions above. *)
   val is_pred_action : string -> bool
 
   (** [to_action c] encodes a predicate-manipulating command as

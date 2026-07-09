@@ -491,8 +491,13 @@ module Make (SPState : PState.S) = struct
       * Wands.wand list =
     List.fold_left
       (fun (core_asrts, pure, types, preds, wands) -> function
+        (* When [Config.preds_in_memory] is set, user-predicate and wand core
+           predicates stay in [core_asrts] and are produced into the memory
+           like any other core predicate (the memory learns the predicate
+           facts itself). *)
         | Asrt.CorePred (cp_name, es1, es2)
-          when Option.is_some (Asrt.as_wand_name cp_name) ->
+          when (not !Config.preds_in_memory)
+               && Option.is_some (Asrt.as_wand_name cp_name) ->
             (* A magic wand: reconstruct the raw ([lhs], [rhs]) from its semantic
                ins/outs, using the rhs predicate's number of in-parameters (read
                from the ambient predicate table). *)
@@ -511,7 +516,8 @@ module Make (SPState : PState.S) = struct
               preds,
               Wands.{ lhs = (lname, largs); rhs = (rname, rargs) } :: wands )
         | CorePred (cp_name, es1, es2)
-          when Option.is_some (Asrt.as_user_pred_name cp_name) ->
+          when (not !Config.preds_in_memory)
+               && Option.is_some (Asrt.as_user_pred_name cp_name) ->
             let name = Option.get (Asrt.as_user_pred_name cp_name) in
             (core_asrts, pure, types, (name, es1 @ es2) :: preds, wands)
         | CorePred (cp_name, es1, es2) ->

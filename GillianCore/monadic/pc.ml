@@ -78,6 +78,12 @@ let extend pc fs =
 
 let extend_types pc types = { pc with learned_types = types @ pc.learned_types }
 
+(** A pc whose learned facts contain literal [false] denotes an unreachable
+    branch (learning goes through {!extend}, which reduces formulas, so a
+    contradiction that reduction can detect is exactly [Lit (Bool false)]). *)
+let is_trivially_false (pc : t) : bool =
+  Expr.Set.mem (Expr.Lit (Bool false)) pc.learned
+
 let equal pca pcb =
   pca.pfs = pcb.pfs && pca.gamma = pcb.gamma
   && Expr.Set.equal pca.learned pcb.learned

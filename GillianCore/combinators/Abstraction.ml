@@ -108,15 +108,28 @@ module Make (S : MonadicSMemory.S) = struct
     | SubPred of string
   [@@deriving yojson]
 
-  let is_overlapping_asrt s = S.is_overlapping_asrt s
+  (* User predicates and wands are never overlapping assertions; only
+     genuine core predicates are passed down (some memories fail hard on
+     unknown names). *)
+  let is_overlapping_asrt s =
+    match (Asrt.as_user_pred_name s, Asrt.as_wand_name s) with
+    | None, None -> S.is_overlapping_asrt s
+    | _ -> false
 
-  type action = Fold | Unfold | GUnfold | Package | SubAction of string
+  type action =
+    | Fold
+    | Unfold
+    | GUnfold
+    | Package
+    | Recover
+    | SubAction of string
 
   let action_from_str str =
     if str = SLCmd.fold_action then Fold
     else if str = SLCmd.unfold_action then Unfold
     else if str = SLCmd.gunfold_action then GUnfold
     else if str = SLCmd.package_action then Package
+    else if str = SLCmd.recover_action then Recover
     else SubAction str
 
   let action_to_str = function
@@ -124,6 +137,7 @@ module Make (S : MonadicSMemory.S) = struct
     | Unfold -> SLCmd.unfold_action
     | GUnfold -> SLCmd.gunfold_action
     | Package -> SLCmd.package_action
+    | Recover -> SLCmd.recover_action
     | SubAction a -> a
 
   let pred_from_str str : pred =
@@ -282,9 +296,14 @@ module Make (S : MonadicSMemory.S) = struct
       : ('a * mstate) list =
     let curr_pc = with_matching ms.pc matching in
     Delayed.resolve ~curr_pc d
-    |> List.map (fun (b : 'a Branch.t) ->
-           ( Branch.value b,
-             { ms with pc = with_matching (Branch.pc b) ms.pc.matching } ))
+    |> List.filter_map (fun (b : 'a Branch.t) ->
+           (* Branches that learned a literal [false] are unreachable: prune
+              them, like the state-level satisfiability checks would. *)
+           if Pc.is_trivially_false (Branch.pc b) then None
+           else
+             Some
+               ( Branch.value b,
+                 { ms with pc = with_matching (Branch.pc b) ms.pc.matching } ))
 
   (* Internal automation (recovery, eager concrete unfolding) is only active
      in over-approximating verification — mirroring the gates of the engine's
@@ -528,6 +547,9 @@ module Make (S : MonadicSMemory.S) = struct
       get_recovery_tactic = (fun ms errs -> recovery_tactic_of_errs ms errs);
       try_recovering = (fun ms tactic -> try_recovering ms tactic);
       unfold_concrete_preds = (fun ms -> unfold_concrete_preds ms);
+      (* The predicate store is immutable: the retry loop must advance its
+         recovery base for the predicate selection to progress. *)
+      advance_recovery_base = (fun () -> true);
       pp = (fun fmt ms -> pp fmt ms.st);
       pp_err = pp_err_t;
       log =
@@ -1552,42 +1574,17 @@ module Make (S : MonadicSMemory.S) = struct
                      recovered)
            | Error e -> [ Error (SubError e) ])
 
-  (* Step-local consume recovery: replaces the engine's whole-plan retry for
-     resource steps. *)
-  let rec consume_with_recovery
-      ~fuel
-      core_pred
-      (ms : mstate)
-      (ins : Expr.t list) : (mstate * Expr.t list, err_t) Res_list.t =
-    consume_dispatch ~no_auto_fold:false core_pred ms ins
-    |> List.concat_map (function
-         | Ok _ as ok -> [ ok ]
-         | Error e when fuel > 0 && recovery_enabled () && can_fix e -> (
-             let tactic = recovery_tactic_of_errs ms [ e ] in
-             L.verbose (fun m ->
-                 m "Consume of %s failed; attempting recovery with tactic:\n%a"
-                   core_pred
-                   (Recovery_tactic.pp Expr.pp)
-                   tactic);
-             match try_recovering ms tactic with
-             | Error msg ->
-                 L.normal (fun m -> m "Recovery tactic failed: %s" msg);
-                 [ Error e ]
-             | Ok (recovered, _) ->
-                 List.concat_map
-                   (fun ms' ->
-                     match unfold_concrete_preds ms' with
-                     | None ->
-                         [
-                           Error (OtherErr "Unfolding concrete value failed???");
-                         ]
-                     | Some (_, ms'') ->
-                         consume_with_recovery ~fuel:(fuel - 1) core_pred ms''
-                           ins)
-                   recovered)
-         | Error e -> [ Error e ])
+  (* {2 The MonadicSMemory boundary}
 
-  (* {2 The MonadicSMemory boundary} *)
+     Recovery is deliberately NOT wired around consume/produce: for
+     state-level matching, fold/unfold recovery is driven by the matching
+     retry loop (which reaches this memory through [SLCmd.recover_action]),
+     exactly like the legacy engine; adding a second, step-local retry loop
+     here stacks search on search and blows up on recursive predicates.
+     Likewise, the eager concrete-unfolding pass only runs on action results
+     (mirroring the legacy call sites: after the predicate-manipulating
+     commands and after recovery); running it after every consume/produce
+     lets it ping-pong against auto-folding. *)
 
   let post_pass (results : (mstate * 'a, err_t) Res_list.t) :
       (mstate * 'a, err_t) Res_list.t =
@@ -1600,18 +1597,19 @@ module Make (S : MonadicSMemory.S) = struct
 
   let to_branches ~(entry_pc : Pc.t) (results : (mstate * 'a, err_t) Res_list.t)
       : (t * 'a, err_t) result Branch.t list =
-    List.map
+    List.filter_map
       (function
-        | Ok (ms, v) -> Branch.make ~pc:ms.pc ~value:(Ok (ms.st, v))
-        | Error e -> Branch.make ~pc:entry_pc ~value:(Error e))
+        | Ok (ms, v) ->
+            if Pc.is_trivially_false ms.pc then None
+            else Some (Branch.make ~pc:ms.pc ~value:(Ok (ms.st, v)))
+        | Error e -> Some (Branch.make ~pc:entry_pc ~value:(Error e)))
       results
 
   let consume ~core_pred (s : t) (ins : Expr.t list) :
       (t * Expr.t list, err_t) DR.t =
     Delayed.of_resolver (fun ~curr_pc ->
         let ms = { st = s; pc = curr_pc } in
-        consume_with_recovery ~fuel:10 core_pred ms ins
-        |> post_pass
+        consume_dispatch ~no_auto_fold:false core_pred ms ins
         |> to_branches ~entry_pc:curr_pc)
 
   let produce ~(core_pred : string) (s : t) (ins_and_outs : Expr.t list) :
@@ -1619,8 +1617,9 @@ module Make (S : MonadicSMemory.S) = struct
     Delayed.of_resolver (fun ~curr_pc ->
         let ms = { st = s; pc = curr_pc } in
         produce_dispatch core_pred ms ins_and_outs
-        |> List.concat_map unfold_concrete_pass
-        |> List.map (fun ms -> Branch.make ~pc:ms.pc ~value:ms.st))
+        |> List.filter_map (fun ms ->
+               if Pc.is_trivially_false ms.pc then None
+               else Some (Branch.make ~pc:ms.pc ~value:ms.st)))
 
   (* The predicate-manipulating SL commands arrive as reserved actions with
      the [SLCmd] encoding; the state (PState) has already evaluated the
@@ -1682,6 +1681,39 @@ module Make (S : MonadicSMemory.S) = struct
         Fmt.failwith "Invalid predicate-action encoding for %s"
           (action_to_str act)
 
+  (* The [recover_action] boundary: the state asks the memory to recover from
+     a failure by folding/unfolding. The arguments encode the tactic; the
+     branches are the recovered states. "Nothing to unfold" is an error branch
+     (the caller keeps its original state), while an unfolding that vanished
+     yields zero branches (the caller's path dies) — mirroring the legacy
+     semantics of [unfold_with_vals]/[try_recovering]. *)
+  let execute_recover (ms : mstate) (args : Expr.t list) :
+      (mstate * Expr.t list, err_t) Res_list.t =
+    let dec_vals = function
+      | Expr.Lit Nono -> None
+      | Expr.EList vs -> Some vs
+      | Expr.Lit (LList lits) -> Some (List.map Expr.lit lits)
+      | _ -> Fmt.failwith "Invalid recover-action encoding"
+    in
+    match args with
+    | [ fold_e; unfold_e; Lit (String level) ] -> (
+        let try_fold = dec_vals fold_e in
+        let try_unfold = dec_vals unfold_e in
+        match level with
+        | "low" -> (
+            let vals = Option.value ~default:[] try_unfold in
+            match unfold_with_vals' ~auto_level:`Low ms vals with
+            | None -> Res_list.error_with (OtherErr "Nothing to unfold")
+            | Some (_, next_states) ->
+                List.map (fun (_, ms') -> Ok (ms', [])) next_states)
+        | "high" -> (
+            let tactic : Expr.t Recovery_tactic.t = { try_fold; try_unfold } in
+            match try_recovering ms tactic with
+            | Error msg -> Res_list.error_with (OtherErr msg)
+            | Ok (recovered, _) -> List.map (fun ms' -> Ok (ms', [])) recovered)
+        | _ -> Fmt.failwith "Invalid recover-action level %s" level)
+    | _ -> Fmt.failwith "Invalid recover-action encoding"
+
   let execute_action ~(action_name : string) (s : t) (args : Expr.t list) =
     Delayed.of_resolver (fun ~curr_pc ->
         let ms = { st = s; pc = curr_pc } in
@@ -1691,6 +1723,7 @@ module Make (S : MonadicSMemory.S) = struct
               execute_sub_action ~fuel:10 action_name ms args
           | (Fold | Unfold | GUnfold | Package) as act ->
               execute_pred_action act ms args
+          | Recover -> execute_recover ms args
         in
         results |> post_pass |> to_branches ~entry_pc:curr_pc)
 

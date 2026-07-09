@@ -148,6 +148,36 @@ module Make (State : SState.S) :
     match (!Config.unfolding && unfold, v) with
     | _, Lit (Bool true) -> [ astate' ]
     | false, _ -> [ astate' ]
+    | true, _ when !Config.preds_in_memory -> (
+        (* Predicates live in the memory: ask it to unfold around the assumed
+           expression (low-level automation). No recovered state (an error)
+           keeps the original state; zero branches kill the path. *)
+        let unfold_vals = Expr.base_elements v in
+        let enc_args =
+          [ Expr.Lit Nono; Expr.EList unfold_vals; Expr.Lit (String "low") ]
+        in
+        let results =
+          State.execute_action SLCmd.recover_action astate'.state enc_args
+        in
+        let oks =
+          List.filter_map
+            (function
+              | Ok (st, _) -> Some st
+              | Error _ -> None)
+            results
+        in
+        match (oks, results) with
+        | [], _ :: _ -> [ astate' ]
+        | _ ->
+            let* state = oks in
+            let astate = copy_with_state astate' state in
+            (* Mirrors the legacy path: the unfold itself simplified with
+               [~matching:true], and this function then simplified again. *)
+            let* astate =
+              snd (simplify ~kill_new_lvars:false ~matching:true astate)
+            in
+            let _, astates = simplify ~kill_new_lvars:false astate in
+            astates)
     | true, _ -> (
         let unfold_vals = Expr.base_elements v in
         match
@@ -399,19 +429,25 @@ module Make (State : SState.S) :
 
     let mp = MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ] in
     let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
-    if not (SS.is_empty vars_to_forget) then (
-      let oblivion_subst = fresh_subst vars_to_forget in
-      L.verbose (fun m ->
-          m "Forget @[%a@] with subst: %a"
-            Fmt.(iter ~sep:comma SS.iter string)
-            vars_to_forget SVal.SESubst.pp oblivion_subst);
+    let astate =
+      (* The memory is immutable, so the substituted state must be used (the
+         pure part of the state is still substituted in place). *)
+      if SS.is_empty vars_to_forget then astate
+      else (
+        let oblivion_subst = fresh_subst vars_to_forget in
+        L.verbose (fun m ->
+            m "Forget @[%a@] with subst: %a"
+              Fmt.(iter ~sep:comma SS.iter string)
+              vars_to_forget SVal.SESubst.pp oblivion_subst);
 
-      (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
-      let subst_in_place = substitution_in_place oblivion_subst astate in
-      assert (List.length subst_in_place = 1);
-      let astate = List.hd subst_in_place in
+        (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+        let subst_in_place = substitution_in_place oblivion_subst astate in
+        assert (List.length subst_in_place = 1);
+        let astate = List.hd subst_in_place in
 
-      L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate));
+        L.verbose (fun m -> m "State after substitution:@\n@[%a@]\n" pp astate);
+        astate)
+    in
     let mp =
       match mp with
       | Error asrts ->
@@ -910,20 +946,28 @@ module Make (State : SState.S) :
             MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ]
           in
           let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
-          if not (SS.is_empty vars_to_forget) then (
-            let oblivion_subst = fresh_subst vars_to_forget in
-            L.verbose (fun m ->
-                m "Forget @[%a@] with subst: %a"
-                  Fmt.(iter ~sep:comma SS.iter string)
-                  vars_to_forget SVal.SESubst.pp oblivion_subst);
+          let astate =
+            (* The memory is immutable, so the substituted state must be used
+               (the pure part of the state is still substituted in place). *)
+            if SS.is_empty vars_to_forget then astate
+            else (
+              let oblivion_subst = fresh_subst vars_to_forget in
+              L.verbose (fun m ->
+                  m "Forget @[%a@] with subst: %a"
+                    Fmt.(iter ~sep:comma SS.iter string)
+                    vars_to_forget SVal.SESubst.pp oblivion_subst);
 
-            (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
-            let subst_in_place = substitution_in_place oblivion_subst astate in
-            assert (List.length subst_in_place = 1);
-            let astate = List.hd subst_in_place in
+              (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
+              let subst_in_place =
+                substitution_in_place oblivion_subst astate
+              in
+              assert (List.length subst_in_place = 1);
+              let astate = List.hd subst_in_place in
 
-            L.verbose (fun m ->
-                m "State after substitution:@\n@[%a@]\n" pp astate));
+              L.verbose (fun m ->
+                  m "State after substitution:@\n@[%a@]\n" pp astate);
+              astate)
+          in
           let mp =
             match mp with
             | Error asrts ->
@@ -1125,12 +1169,83 @@ module Make (State : SState.S) :
   let update_subst (astate : t) (subst : st) : unit =
     State.update_subst astate.state subst
 
+  (* When predicate reasoning lives in the memory ([Config.preds_in_memory]),
+     the predicate-manipulating actions are executed by the memory itself; but
+     three state-level concerns remain PState's job (they need the store, the
+     spec-var set, or state-wide simplification, none of which exist below the
+     state):
+     - evaluating the store-dependent sub-expressions of the encoded command
+       (Fold/Unfold arguments and fold-info bindings; Package arguments stay
+       raw, matching the legacy behavior);
+     - registering Unfold binding names as spec vars;
+     - the post-action simplifications that [eval_pred_slcmd] used to perform.
+     TODO: when PState is removed, argument evaluation moves to the
+     interpreter (and [SLCmd.of_action] must then tolerate reduced
+     encodings). *)
+  let exec_pred_action_in_memory (sl_cmd : SLCmd.t) (astate : t) : action_ret =
+    let eval_expr e = eval_expr astate e in
+    let open Res_list.Syntax in
+    let evaluated, pre_spec_vars =
+      match (sl_cmd : SLCmd.t) with
+      | Fold (p, les, finfo) ->
+          let les = List.map eval_expr les in
+          let finfo =
+            Option.map
+              (fun (id, bs) ->
+                (id, List.map (fun (x, e) -> (x, eval_expr e)) bs))
+              finfo
+          in
+          (SLCmd.Fold (p, les, finfo), SS.empty)
+      | Unfold (p, les, ub, b) ->
+          let les = List.map eval_expr les in
+          let spec_vars =
+            match ub with
+            | None -> SS.empty
+            | Some bs -> SS.of_list (List.map fst bs)
+          in
+          (SLCmd.Unfold (p, les, ub, b), spec_vars)
+      | (GUnfold _ | Package _) as cmd -> (cmd, SS.empty)
+      | _ -> failwith "exec_pred_action_in_memory: not a predicate action"
+    in
+    let astate =
+      if SS.is_empty pre_spec_vars then astate
+      else add_spec_vars astate pre_spec_vars
+    in
+    let action, args =
+      match SLCmd.to_action evaluated with
+      | Some enc -> enc
+      | None -> failwith "exec_pred_action_in_memory: not a predicate action"
+    in
+    let** astate =
+      let open Syntaxes.List in
+      let+ result = State.execute_action action astate.state args in
+      match result with
+      | Ok (state, _) -> Ok (copy_with_state astate state)
+      | Error err -> Error err
+    in
+    (* Post-action simplifications, mirroring [eval_pred_slcmd]. *)
+    let** astate =
+      match (evaluated : SLCmd.t) with
+      | Unfold (_, _, _, false) ->
+          let _, states = simplify ~kill_new_lvars:true ~matching:true astate in
+          Res_list.just_oks states
+      | GUnfold _ ->
+          let _, states = simplify ~kill_new_lvars:true astate in
+          Res_list.just_oks states
+      | _ -> Res_list.return astate
+    in
+    let _, astates = simplify astate in
+    Res_list.just_oks astates
+    |> List.map (Result.map (fun astate -> (astate, [])))
+
   let execute_action (action : string) (astate : t) (args : vt list) :
       action_ret =
     (* The predicate-manipulating SL commands are issued as calls to reserved
        actions (see {!SLCmd.to_action}); we catch them here and run their
        fold/unfold semantics. They produce no return values (hence [[]]). *)
     match SLCmd.of_action action args with
+    | Some sl_cmd when !Config.preds_in_memory ->
+        exec_pred_action_in_memory sl_cmd astate
     | Some sl_cmd ->
         eval_pred_slcmd sl_cmd astate
         |> List.map (Result.map (fun astate -> (astate, [])))
