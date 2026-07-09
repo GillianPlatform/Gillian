@@ -1,4 +1,4 @@
-type match_kind =
+type match_kind = Matching_walker.match_kind =
   | Postcondition of string
   | Fold of string
   | FunctionCall of string
@@ -7,7 +7,7 @@ type match_kind =
   | PredicateGuard
 [@@deriving yojson]
 
-type recovery_tactic =
+type recovery_tactic = Matching_walker.recovery_tactic =
   | Try_fold of string * Expr.t list
   | Try_unfold of string * Expr.t list
 [@@deriving yojson]

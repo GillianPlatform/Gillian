@@ -316,11 +316,13 @@ module Make (S : MonadicSMemory.S) = struct
     in
     S.alocs s.mem |> SS.union pred_alocs |> SS.union wand_alocs
 
-  let split_further (s : t) (core_pred : string) (ins : Expr.t list) (err : err_t)
-      =
+  let split_further
+      (s : t)
+      (core_pred : string)
+      (ins : Expr.t list)
+      (err : err_t) =
     match (pred_from_str core_pred, err) with
-    | SubPred core_pred, SubError err ->
-        S.split_further s.mem core_pred ins err
+    | SubPred core_pred, SubError err -> S.split_further s.mem core_pred ins err
     | _ -> None
 
   let sure_is_nonempty (s : t) =
@@ -333,6 +335,7 @@ module Make (S : MonadicSMemory.S) = struct
            let pred_def = MP.get_pred_def (MP.get_pred_defs ()) name in
            not pred_def.pred.pred_pure)
          s.preds
+
   let pp_by_need vars ft t = pp_abs (S.pp_by_need vars) ft t
   let get_print_info vars s = S.get_print_info vars s.mem
 

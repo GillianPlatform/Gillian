@@ -23,7 +23,6 @@ module Make
 struct
   module Gil_parsing = Gil_parsing.Make (PC.Annot)
   module CState = CState.Make (CMemory)
-
   module AbsMemory = Combinators.Abstraction.Make (SMemory)
   module VSMemory = Monadic.MonadicSMemory.Lift (AbsMemory)
 
