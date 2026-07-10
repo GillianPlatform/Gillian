@@ -30,17 +30,16 @@ let previously_normalised = ref false
 let unfolding = ref true
 let manual_proof = ref false
 
-(** Transitional (predicate-refactor Phase 8): when set, user-defined predicates
-    and wands are handled by the [Combinators.Abstraction] memory combinator
-    instead of [PState]/[Matcher]. Allows A/B-running every suite both ways
-    during the transition (toggled with the [GILLIAN_PREDS_IN_MEMORY]
-    environment variable); scheduled for removal once the flip is complete. *)
+(** Transitional (predicate-refactor Phase 8): user-defined predicates and wands
+    are handled by the [Combinators.Abstraction] memory combinator instead of
+    [PState]/[Matcher]. Setting [GILLIAN_PREDS_IN_MEMORY=0] selects the legacy
+    engine-side handling; the variable (and the legacy path) are scheduled for
+    removal once the transition is complete. *)
 let preds_in_memory =
   ref
     (match Sys.getenv_opt "GILLIAN_PREDS_IN_MEMORY" with
     | Some ("0" | "false") -> false
-    | Some _ -> true
-    | None -> false)
+    | _ -> true)
 
 let max_branching = ref 100
 let leak_check = ref false
