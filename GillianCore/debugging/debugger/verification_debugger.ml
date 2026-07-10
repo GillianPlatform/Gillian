@@ -162,7 +162,9 @@ struct
             let memory = get_heap astate.state in
             let pfs = get_pfs astate.state in
             let types = get_typ_env astate.state in
-            let preds = astate.preds in
+            (* Predicates live in the memory; the lifter re-projects them from
+               [memory] when building the variable panes. *)
+            let preds = Preds.init [] in
             let astate =
               make_astate ~store ~memory ~pfs ~types ~preds ?subst ()
             in

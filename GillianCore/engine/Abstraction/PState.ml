@@ -48,7 +48,7 @@ module Make (State : SState.S) :
   module SMatcher = Matcher.Make (State)
 
   type init_data = State.init_data
-  type t = State.t Pred_state.t
+  type t = State.t
   type vt = Expr.t [@@deriving yojson, show]
   type st = SVal.SESubst.t
   type store_t = SStore.t
@@ -70,19 +70,9 @@ module Make (State : SState.S) :
 
   type action_ret = (t * vt list, err_t) Res_list.t
 
-  let init init_data =
-    Pred_state.
-      {
-        state = State.init init_data;
-        preds = Preds.init [];
-        wands = Wands.init [];
-      }
-
-  let get_init_data astate = State.get_init_data astate.Pred_state.state
-  let sure_is_nonempty t = State.sure_is_nonempty t.Pred_state.state
-
-  let copy_with_state (astate : t) (state : state_t) =
-    Pred_state.copy_with_state astate state
+  let init = State.init
+  let get_init_data = State.get_init_data
+  let sure_is_nonempty = State.sure_is_nonempty
 
   let make_p
       ~(init_data : init_data)
@@ -91,15 +81,13 @@ module Make (State : SState.S) :
       ~(gamma : Type_env.t)
       ~(spec_vars : SS.t)
       () : t =
-    let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
-    { state; preds = Preds.init []; wands = Wands.init [] }
+    State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars
 
   let make_s_from_heap ~heap:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ =
     failwith "Calling make_s_from_heap on SState"
 
-  let make_p_from_heap ~store ~heap ~spec_vars ~wands ~preds ~pfs ~gamma =
-    let sstate = State.make_s_from_heap ~store ~heap ~spec_vars ~pfs ~gamma in
-    Pred_state.{ state = sstate; preds; wands }
+  let make_p_from_heap ~store ~heap ~spec_vars ~wands:_ ~preds:_ ~pfs ~gamma =
+    State.make_s_from_heap ~store ~heap ~spec_vars ~pfs ~gamma
 
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
@@ -109,33 +97,23 @@ module Make (State : SState.S) :
       ?(kill_new_lvars : bool option)
       ?(matching = false)
       (astate : t) : SVal.SESubst.t * t list =
-    let subst, states =
-      State.simplify ~save ?kill_new_lvars ~matching astate.state
-    in
-    Preds.substitution_in_place subst astate.preds;
-    Wands.substitution_in_place subst astate.wands;
-    match states with
-    | [] -> (subst, [])
-    | [ state ] -> (subst, [ { astate with state } ])
-    | states -> (subst, List.map (copy_with_state astate) states)
+    State.simplify ~save ?kill_new_lvars ~matching astate
 
   let eval_expr (astate : t) (e : Expr.t) =
-    try State.eval_expr astate.state e
+    try State.eval_expr astate e
     with State.Internal_State_Error (errs, _) ->
       raise (Internal_State_Error (errs, astate))
 
-  let get_store (astate : t) : SStore.t = State.get_store astate.state
+  let get_store = State.get_store
+  let set_store = State.set_store
 
-  let set_store (astate : t) (store : SStore.t) : t =
-    { astate with state = State.set_store astate.state store }
-
-  let get_preds (astate : t) : Preds.t = astate.preds
-  let get_wands (astate : t) : Wands.t = astate.wands
+  (* Predicates live in the memory, so there are none at the state level. *)
+  let get_preds (_ : t) : Preds.t = Preds.init []
+  let get_wands (_ : t) : Wands.t = Wands.init []
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in
-    let* state = State.assume ~unfold astate.state v in
-    let astate' = { astate with state } in
+    let* astate' = State.assume ~unfold astate v in
     match (!Config.unfolding && unfold, v) with
     | _, Lit (Bool true) -> [ astate' ]
     | false, _ -> [ astate' ]
@@ -153,7 +131,7 @@ module Make (State : SState.S) :
           ]
         in
         let results =
-          State.execute_action SLCmd.recover_action astate'.state enc_args
+          State.execute_action SLCmd.recover_action astate' enc_args
         in
         let oks =
           List.filter_map
@@ -165,8 +143,7 @@ module Make (State : SState.S) :
         match (oks, results) with
         | [], _ :: _ -> [ astate' ]
         | _ ->
-            let* state = oks in
-            let astate = copy_with_state astate' state in
+            let* astate = oks in
             (* Mirrors the legacy path: the unfold itself simplified with
                [~matching:true], and this function then simplified again. *)
             let* astate =
@@ -175,84 +152,22 @@ module Make (State : SState.S) :
             let _, astates = simplify ~kill_new_lvars:false astate in
             astates)
 
-  let assume_a
-      ?(matching = false)
-      ?(production = false)
-      ?(time = "")
-      (astate : t)
-      (fs : Expr.t list) : t option =
-    match State.assume_a ~matching ~production ~time astate.state fs with
-    | Some state -> Some { astate with state }
-    | None -> None
-
-  let assume_t (astate : t) (v : Expr.t) (t : Type.t) : t option =
-    State.assume_t astate.state v t
-    |> Option.map (fun state -> { astate with state })
-
-  let sat_check (astate : t) (v : Expr.t) : bool =
-    State.sat_check astate.state v
-
-  let sat_check_f (astate : t) (fs : Expr.t list) : SVal.SESubst.t option =
-    State.sat_check_f astate.state fs
-
-  let assert_a (astate : t) (fs : Expr.t list) : bool =
-    State.assert_a astate.state fs
-
-  let equals (astate : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
-    State.equals astate.state v1 v2
-
-  let get_type (astate : t) (v : Expr.t) : Type.t option =
-    State.get_type astate.state v
-
-  let copy (astate : t) : t =
-    let Pred_state.{ state; preds; wands } = astate in
-    {
-      state = State.copy state;
-      preds = Preds.copy preds;
-      wands = Wands.copy wands;
-    }
-
-  let simplify_val (astate : t) (v : Expr.t) : Expr.t =
-    State.simplify_val astate.state v
-
-  let pp fmt (astate : t) : unit = Pred_state.pp State.pp fmt astate
-
-  let pp_by_need pvars lvars locs fmt astate : unit =
-    Pred_state.pp State.(pp_by_need pvars lvars locs) fmt astate
-
-  let add_spec_vars (astate : t) (vs : Var.Set.t) : t =
-    let state = State.add_spec_vars astate.state vs in
-    { astate with state }
-
-  let get_spec_vars (astate : t) : Var.Set.t = State.get_spec_vars astate.state
-
-  let get_lvars (astate : t) : Var.Set.t =
-    let Pred_state.{ state; preds; wands; _ } = astate in
-    State.get_lvars state
-    |> SS.union (Preds.get_lvars preds)
-    |> SS.union (Wands.get_lvars wands)
-
-  let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
-    let Pred_state.{ state; preds; wands; _ } = astate in
-    let pred_defs = MP.get_pred_defs () in
-    let s_asrts = State.to_assertions ?to_keep state in
-    let split_ins_outs name args =
-      let pred = (MP.get_pred_def pred_defs name).pred in
-      (Pred.in_args pred args, Pred.out_args pred args)
-    in
-    let p_asrts = Preds.to_assertions ~split_ins_outs preds in
-    let w_asrts = Wands.to_assertions wands in
-    List.sort Asrt.compare (p_asrts @ s_asrts @ w_asrts)
-
-  let substitution_in_place ?(subst_all = false) (subst : st) (astate : t) :
-      t list =
-    let Pred_state.{ state; preds; wands } = astate in
-    Preds.substitution_in_place subst preds;
-    Wands.substitution_in_place subst wands;
-    List.map
-      (fun state ->
-        Pred_state.{ state; preds = Preds.copy preds; wands = Wands.copy wands })
-      (State.substitution_in_place ~subst_all subst state)
+  let assume_a = State.assume_a
+  let assume_t = State.assume_t
+  let sat_check = State.sat_check
+  let sat_check_f = State.sat_check_f
+  let assert_a = State.assert_a
+  let equals = State.equals
+  let get_type = State.get_type
+  let copy = State.copy
+  let simplify_val = State.simplify_val
+  let pp = State.pp
+  let pp_by_need = State.pp_by_need
+  let add_spec_vars = State.add_spec_vars
+  let get_spec_vars = State.get_spec_vars
+  let get_lvars = State.get_lvars
+  let to_assertions = State.to_assertions
+  let substitution_in_place = State.substitution_in_place
 
   let update_store (state : t) (x : string option) (v : Expr.t) : t =
     match x with
@@ -367,26 +282,13 @@ module Make (State : SState.S) :
     let subst_lst = lvars_subst @ alocs_subst in
     SVal.SESubst.init subst_lst
 
-  let clear_resource (astate : t) =
-    let Pred_state.{ state; preds; wands = _ } = astate in
-    let pred_defs = MP.get_pred_defs () in
-    let state = State.clear_resource state in
-    let preds_list = Preds.to_list preds in
-    List.iter
-      (fun (name, vs) ->
-        let pred_def = Hashtbl.find pred_defs name in
-        if not pred_def.pred.pred_pure then
-          let _ =
-            Preds.pop preds (fun (name', vs') -> name' = name && vs' = vs)
-          in
-          ())
-      preds_list;
-    Pred_state.{ state; preds; wands = Wands.init [] }
+  (* Predicates live in the memory and are cleared with it. *)
+  let clear_resource = State.clear_resource
 
   let consume astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
       failwith "Binding of pure variables in *-assert.";
-    let store = State.get_store astate.Pred_state.state in
+    let store = State.get_store astate in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
     let pvars_diff = SS.diff pvars_a pvars_store in
@@ -398,7 +300,7 @@ module Make (State : SState.S) :
     let store_subst = SStore.to_ssubst store in
     let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
     (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
-    let state_lvars = State.get_lvars astate.state in
+    let state_lvars = State.get_lvars astate in
     let known_lvars =
       SS.elements
         (SS.diff (SS.inter state_lvars (Asrt.lvars a)) (SS.of_list binders))
@@ -482,15 +384,11 @@ module Make (State : SState.S) :
         let result =
           let** new_astate = SMatcher.produce new_state full_subst a_produce in
           let new_state' =
-            State.add_spec_vars new_astate.state (SS.of_list binders)
+            State.add_spec_vars new_astate (SS.of_list binders)
           in
-          let subst, new_states =
-            State.simplify ~kill_new_lvars:true new_state'
-          in
-          let () = Preds.substitution_in_place subst new_astate.preds in
-          let () = Wands.substitution_in_place subst new_astate.wands in
+          let _, new_states = State.simplify ~kill_new_lvars:true new_state' in
           let+ new_state = new_states in
-          Ok (copy_with_state new_astate new_state)
+          Ok new_state
         in
         Res_list.map_error
           (fun _ ->
@@ -505,7 +403,7 @@ module Make (State : SState.S) :
     | Error err ->
         let fail_pfs : Expr.t = State.get_failing_constraint err in
 
-        let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
+        let failing_model = State.sat_check_f astate [ fail_pfs ] in
         let msg =
           Fmt.str
             "Assert failed with argument @[<h>%a@]. matching failed.@\n\
@@ -521,7 +419,7 @@ module Make (State : SState.S) :
         Res_list.error_with (StateErr.EPure fail_pfs)
 
   let produce astate a =
-    let store = State.get_store astate.Pred_state.state in
+    let store = State.get_store astate in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
     let pvars_diff = SS.diff pvars_a pvars_store in
@@ -536,20 +434,16 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let full_subst = make_id_subst a in
     let** new_astate = SMatcher.produce astate full_subst a in
-    let subst, new_states =
-      State.simplify ~kill_new_lvars:true new_astate.state
-    in
-    let () = Preds.substitution_in_place subst new_astate.preds in
-    let () = Wands.substitution_in_place subst new_astate.wands in
+    let _, new_states = State.simplify ~kill_new_lvars:true new_astate in
     let+ new_state = new_states in
-    Ok (copy_with_state new_astate new_state)
+    Ok new_state
 
   let match_invariant
       (revisited : bool)
       (astate : t)
       (a : Asrt.t)
       (binders : string list) : (t * t, err_t) Res_list.t =
-    let store = State.get_store astate.state in
+    let store = State.get_store astate in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
     let pvars_diff = SS.diff pvars_a pvars_store in
@@ -563,7 +457,7 @@ module Make (State : SState.S) :
       List.partition Names.is_lvar_name binders
     in
     let known_pvars = List.map Expr.from_var_name (SS.elements pvars_a) in
-    let state_lvars = State.get_lvars astate.state in
+    let state_lvars = State.get_lvars astate in
     let known_lvars =
       SS.elements
         (SS.diff
@@ -614,7 +508,7 @@ module Make (State : SState.S) :
         (fun (e : Expr.t) ->
           let binding =
             match e with
-            | PVar x -> SStore.get (State.get_store astate.state) x
+            | PVar x -> SStore.get (State.get_store astate) x
             | LVar _ | ALoc _ -> Some e
             | _ ->
                 raise
@@ -634,7 +528,7 @@ module Make (State : SState.S) :
       | Ok state -> Ok state
       | Error err ->
           let fail_pfs : Expr.t = State.get_failing_constraint err in
-          let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
+          let failing_model = State.sat_check_f astate [ fail_pfs ] in
           let () =
             L.print_to_all
               (Format.asprintf
@@ -693,8 +587,7 @@ module Make (State : SState.S) :
       let pvar_subst_list_known =
         List.map
           (fun x ->
-            ( Expr.PVar x,
-              Option.get (SStore.get (State.get_store astate.state) x) ))
+            (Expr.PVar x, Option.get (SStore.get (State.get_store astate) x)))
           known_pvars
       in
       let pvar_subst_list_bound =
@@ -732,10 +625,9 @@ module Make (State : SState.S) :
       let* res = SMatcher.produce invariant_state full_subst a_produce in
       match res with
       | Ok new_astate ->
-          let new_state' =
-            State.add_spec_vars new_astate.state (SS.of_list lvar_binders)
+          let invariant_state =
+            State.add_spec_vars new_astate (SS.of_list lvar_binders)
           in
-          let invariant_state = { new_astate with state = new_state' } in
           let _, invariant_states =
             simplify ~kill_new_lvars:true invariant_state
           in
@@ -792,7 +684,7 @@ module Make (State : SState.S) :
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (astate : t) :
       (t, err_t) Res_list.t =
     let eval_expr e =
-      try State.eval_expr astate.state e
+      try State.eval_expr astate e
       with State.Internal_State_Error (errs, _) ->
         raise (Internal_State_Error (errs, astate))
     in
@@ -806,7 +698,7 @@ module Make (State : SState.S) :
       | SepAssert (a, binders) -> (
           if not (List.for_all Names.is_lvar_name binders) then
             failwith "Binding of pure variables in *-assert.";
-          let store = State.get_store astate.state in
+          let store = State.get_store astate in
           let pvars_store = SStore.domain store in
           let pvars_a = Asrt.pvars a in
           let pvars_diff = SS.diff pvars_a pvars_store in
@@ -820,7 +712,7 @@ module Make (State : SState.S) :
           let store_subst = SStore.to_ssubst store in
           let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
           (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
-          let state_lvars = State.get_lvars astate.state in
+          let state_lvars = State.get_lvars astate in
           let known_lvars =
             SS.elements
               (SS.diff
@@ -922,16 +814,14 @@ module Make (State : SState.S) :
                   SMatcher.produce new_state full_subst a_produce
                 in
                 let new_state' =
-                  State.add_spec_vars new_astate.state (SS.of_list binders)
+                  State.add_spec_vars new_astate (SS.of_list binders)
                 in
-                let subst, new_states =
+                let _, new_states =
                   State.simplify ~kill_new_lvars:true new_state'
                 in
-                let () = Preds.substitution_in_place subst new_astate.preds in
-                let () = Wands.substitution_in_place subst new_astate.wands in
                 let+ new_state = new_states in
 
-                Ok (copy_with_state new_astate new_state)
+                Ok new_state
               in
               Res_list.map_error
                 (fun _ ->
@@ -946,7 +836,7 @@ module Make (State : SState.S) :
           | Error err ->
               let fail_pfs : Expr.t = State.get_failing_constraint err in
 
-              let failing_model = State.sat_check_f astate.state [ fail_pfs ] in
+              let failing_model = State.sat_check_f astate [ fail_pfs ] in
               let msg =
                 Fmt.str
                   "Assert failed with argument @[<h>%a@]. matching failed.@\n\
@@ -1042,11 +932,8 @@ module Make (State : SState.S) :
         in
         Some success
 
-  let unfolding_vals (astate : t) (fs : Expr.t list) : vt list =
-    State.unfolding_vals astate.state fs
-
-  let fresh_loc ?(loc : vt option) (astate : t) : vt =
-    State.fresh_loc ?loc astate.state
+  let unfolding_vals = State.unfolding_vals
+  let fresh_loc = State.fresh_loc
 
   let produce (astate : t) (subst : st) (a : Asrt.t) : (t, err_t) Res_list.t =
     SMatcher.produce astate subst a
@@ -1057,8 +944,7 @@ module Make (State : SState.S) :
   let produce_posts (astate : t) (subst : st) (asrts : Asrt.t list) : t list =
     SMatcher.produce_posts astate subst asrts
 
-  let update_subst (astate : t) (subst : st) : unit =
-    State.update_subst astate.state subst
+  let update_subst = State.update_subst
 
   (* Predicate reasoning lives in the memory: the predicate-manipulating
      actions are executed by the memory itself; but three state-level concerns
@@ -1108,9 +994,9 @@ module Make (State : SState.S) :
     in
     let** astate =
       let open Syntaxes.List in
-      let+ result = State.execute_action action astate.state args in
+      let+ result = State.execute_action action astate args in
       match result with
-      | Ok (state, _) -> Ok (copy_with_state astate state)
+      | Ok (state, _) -> Ok state
       | Error err -> Error err
     in
     (* Post-action simplifications, mirroring the legacy engine — the legacy
@@ -1134,40 +1020,15 @@ module Make (State : SState.S) :
        fold/unfold semantics. They produce no return values (hence [[]]). *)
     match SLCmd.of_action action args with
     | Some sl_cmd -> exec_pred_action_in_memory sl_cmd astate
-    | None -> (
-        let open Syntaxes.List in
-        let+ result = State.execute_action action astate.state args in
-        match result with
-        | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
-        | Error err -> Error err)
+    | None -> State.execute_action action astate args
 
-  let consume_core_pred core_pred astate in_args =
-    let open Syntaxes.List in
-    let+ result =
-      State.consume_core_pred core_pred astate.Pred_state.state in_args
-    in
-    match result with
-    | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
-    | Error err -> Error err
-
-  let produce_core_pred core_pred astate args =
-    let open Syntaxes.List in
-    let+ state =
-      State.produce_core_pred core_pred astate.Pred_state.state args
-    in
-    copy_with_state astate state
-
-  let split_core_pred_further astate core_pred ins err =
-    State.split_core_pred_further astate.Pred_state.state core_pred ins err
-
-  let mem_constraints (astate : t) : Expr.t list =
-    State.mem_constraints astate.state
-
-  let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
+  let consume_core_pred = State.consume_core_pred
+  let produce_core_pred = State.produce_core_pred
+  let split_core_pred_further = State.split_core_pred_further
+  let mem_constraints = State.mem_constraints
+  let is_overlapping_asrt = State.is_overlapping_asrt
   let pp_err = State.pp_err
-
-  let get_recovery_tactic astate vs =
-    State.get_recovery_tactic astate.Pred_state.state vs
+  let get_recovery_tactic = State.get_recovery_tactic
 
   let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
@@ -1180,13 +1041,10 @@ module Make (State : SState.S) :
     L.verbose (fun m -> m "AState: get_fixes");
     State.get_fixes errs
 
-  let get_equal_values astate = State.get_equal_values astate.Pred_state.state
-  let get_heap astate = State.get_heap astate.Pred_state.state
-  let get_typ_env astate = State.get_typ_env astate.Pred_state.state
-  let get_pfs astate = State.get_pfs astate.Pred_state.state
-
-  let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
-    Pred_state.of_yojson State.of_yojson yojson
-
-  let to_yojson pstate = Pred_state.to_yojson State.to_yojson pstate
+  let get_equal_values = State.get_equal_values
+  let get_heap = State.get_heap
+  let get_typ_env = State.get_typ_env
+  let get_pfs = State.get_pfs
+  let of_yojson = State.of_yojson
+  let to_yojson = State.to_yojson
 end

@@ -12,17 +12,72 @@ type recovery_tactic = Matching_walker.recovery_tactic =
   | Try_unfold of string * Expr.t list
 [@@deriving yojson]
 
+(** What the matching engine requires of a state. This is a strict subset of
+    {!SState.S}, spelled out so that this module does not depend on the [SState]
+    compilation unit — which lets [SState] itself instantiate {!Make}. *)
+module type MatchableState = sig
+  type t [@@deriving yojson]
+  type m_err_t
+  type err_t = (m_err_t, Expr.t) StateErr.t [@@deriving yojson, show]
+
+  val pp : Format.formatter -> t -> unit
+
+  val pp_by_need :
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Format.formatter ->
+    t ->
+    unit
+
+  val pp_err : Format.formatter -> err_t -> unit
+  val copy : t -> t
+  val get_store : t -> SStore.t
+  val set_store : t -> SStore.t -> t
+
+  val simplify :
+    ?save:bool ->
+    ?kill_new_lvars:bool ->
+    ?matching:bool ->
+    t ->
+    SVal.SESubst.t * t list
+
+  val simplify_val : t -> Expr.t -> Expr.t
+
+  val assume_a :
+    ?matching:bool ->
+    ?production:bool ->
+    ?time:string ->
+    t ->
+    Expr.t list ->
+    t option
+
+  val assume_t : t -> Expr.t -> Type.t -> t option
+  val assert_a : t -> Expr.t list -> bool
+  val get_type : t -> Expr.t -> Type.t option
+  val unfolding_vals : t -> Expr.t list -> Expr.t list
+  val can_fix : err_t -> bool
+  val get_recovery_tactic : t -> err_t list -> Expr.t Recovery_tactic.t
+
+  val execute_action :
+    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+
+  val consume_core_pred :
+    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+
+  val produce_core_pred : string -> t -> Expr.t list -> t list
+end
+
 module type S = sig
   type err_t
   type state_t
-  type t = state_t Pred_state.t
+  type t = state_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * SVal.SESubst.t * MP.t) list * err_t list
 
   module Logging : sig
     module AstateRec : sig
-      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
-      [@@deriving yojson]
+      type t = { state : state_t } [@@deriving yojson]
     end
 
     module AssertionReport : sig
@@ -99,7 +154,7 @@ module type S = sig
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 end
 
-module Make (State : SState.S) :
+module Make (State : MatchableState) :
   S with type state_t = State.t and type err_t = State.err_t = struct
   open Literal
   open Containers
@@ -108,29 +163,24 @@ module Make (State : SState.S) :
 
   type state_t = State.t [@@deriving yojson]
   type err_t = State.err_t [@@deriving yojson, show]
-  type t = State.t Pred_state.t
+  type t = State.t
   type post_res = (Flag.t * Asrt.t list) option
   type s_state = t * SVal.SESubst.t * MP.t
   type search_state = s_state list * err_t list
 
   module Logging = struct
-    let pp_astate = Pred_state.pp State.pp
+    let pp_astate = State.pp
 
     let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate
         =
-      Pred_state.pp State.(pp_by_need pvars lvars locs) fmt astate
+      State.pp_by_need pvars lvars locs fmt astate
 
     module AstateRec = struct
       type t' = t
+      type t = { state : state_t } [@@deriving yojson]
 
-      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
-      [@@deriving yojson]
-
-      let from ({ state; preds; wands; _ } : t') = { state; preds; wands }
-
-      let pp_custom pp_astate fmt { state; preds; wands } =
-        pp_astate fmt Pred_state.{ state; preds; wands }
-
+      let from (state : t') = { state }
+      let pp_custom pp_astate fmt { state } = pp_astate fmt state
       let pp = pp_custom pp_astate
     end
 
@@ -238,36 +288,15 @@ module Make (State : SState.S) :
   open Logging
 
   let update_store (astate : t) (x : string) (v : Expr.t) : t =
-    let store = State.get_store astate.state in
+    let store = State.get_store astate in
     let () = SStore.put store x v in
-    let state' = State.set_store astate.state store in
-    { astate with state = state' }
+    State.set_store astate store
 
   let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
       SVal.SESubst.t * t list =
-    let Pred_state.{ state; preds; wands } = astate in
-    let subst, states =
-      State.simplify ~save ~kill_new_lvars:false ~matching state
-    in
-    Preds.substitution_in_place subst preds;
-    Wands.substitution_in_place subst wands;
-    match states with
-    | [] -> (subst, [])
-    | [ state ] -> (subst, [ { astate with state } ])
-    | states ->
-        ( subst,
-          List.map
-            (fun state ->
-              Pred_state.
-                { state; preds = Preds.copy preds; wands = Wands.copy wands })
-            states )
+    State.simplify ~save ~kill_new_lvars:false ~matching astate
 
-  let copy_astate (astate : t) : t =
-    {
-      state = State.copy astate.state;
-      preds = Preds.copy astate.preds;
-      wands = Wands.copy astate.wands;
-    }
+  let copy_astate (astate : t) : t = State.copy astate
 
   let log_hooks : (t, err_t) W.log_hooks =
     {
@@ -368,50 +397,33 @@ module Make (State : SState.S) :
             log { astate = AstateRec.from astate; num_results; tactic }));
     }
 
-  (* The state-level instantiation of the matching walker, and the
-     predicate/wand reasoning that (for now) lives outside the memory: the
-     [Pred_state]-based arms are passed to the walker as hooks, and the
-     fold/unfold machinery below goes through the walker for assertion-level
-     production and matching. This forms one big recursive knot. *)
+  (* The state-level instantiation of the matching walker. Predicates and
+     wands live in the memory, so this is purely the generic walker plus the
+     state-level recovery channel (the reserved recover action). This forms
+     one big recursive knot. *)
   let rec state_ops : (t, err_t) W.ops =
     {
       assume_pure =
         (fun ~production ?time astate fs ->
-          State.assume_a ~matching:true ~production ?time astate.state fs
-          |> Option.map (fun state -> { astate with state }));
-      assert_pure = (fun astate fs -> State.assert_a astate.state fs);
-      assume_type =
-        (fun astate e t ->
-          State.assume_t astate.state e t
-          |> Option.map (fun state -> { astate with state }));
-      get_type = (fun astate e -> State.get_type astate.state e);
-      simplify_val = (fun astate v -> State.simplify_val astate.state v);
+          State.assume_a ~matching:true ~production ?time astate fs);
+      assert_pure = (fun astate fs -> State.assert_a astate fs);
+      assume_type = (fun astate e t -> State.assume_t astate e t);
+      get_type = (fun astate e -> State.get_type astate e);
+      simplify_val = (fun astate v -> State.simplify_val astate v);
       consume_core_pred =
         (fun ~no_auto_fold:_ a_id astate vs_ins ->
-          let open Res_list.Syntax in
-          let** state'', vs_outs =
-            State.consume_core_pred a_id astate.state vs_ins
-          in
-          Res_list.return ({ astate with state = state'' }, vs_outs));
+          State.consume_core_pred a_id astate vs_ins);
       produce_core_pred =
         (fun a_id astate vs ->
-          State.produce_core_pred a_id astate.state vs
-          |> List.map (fun state' ->
-                 Ok
-                   Pred_state.
-                     {
-                       state = state';
-                       preds = Preds.copy astate.preds;
-                       wands = Wands.copy astate.wands;
-                     }));
+          State.produce_core_pred a_id astate vs |> List.map Result.ok);
       copy = copy_astate;
       update_store;
       mk_asrt_err = (fun vs pf -> StateErr.EAsrt (vs, pf));
       mk_other_err = (fun msg -> StateErr.EOther msg);
       can_fix = State.can_fix;
-      unfolding_vals = (fun astate fs -> State.unfolding_vals astate.state fs);
+      unfolding_vals = (fun astate fs -> State.unfolding_vals astate fs);
       get_recovery_tactic =
-        (fun astate errs -> State.get_recovery_tactic astate.state errs);
+        (fun astate errs -> State.get_recovery_tactic astate errs);
       try_recovering =
         (fun astate ~tried tactic -> try_recovering astate ~tried tactic);
       (* Predicates live in the memory: there is nothing to eagerly unfold at
@@ -458,9 +470,7 @@ module Make (State : SState.S) :
         enc_tried;
       ]
     in
-    let results =
-      State.execute_action SLCmd.recover_action astate.state enc_args
-    in
+    let results = State.execute_action SLCmd.recover_action astate enc_args in
     let oks =
       List.filter_map
         (function
@@ -479,17 +489,7 @@ module Make (State : SState.S) :
               (n, args) :: tried
           | _ -> tried
         in
-        let states =
-          List.map
-            (fun (state, _) ->
-              Pred_state.
-                {
-                  state;
-                  preds = Preds.copy astate.preds;
-                  wands = Wands.copy astate.wands;
-                })
-            oks
-        in
+        let states = List.map fst oks in
         (* The legacy unfold simplified the resulting states (collapsing the
            equality chains an unfolding introduces); do the same here, at the
            state level. *)
@@ -513,9 +513,9 @@ module Make (State : SState.S) :
       L.fail "Recovery tactics not handled in UX mode";
     try_recovering_in_memory astate ~tried tactic
 
-  (* The public [try_recovering] (used by [PState] for the interpreter's
-     action-failure retries) keeps its historical signature; the exclusion set
-     is only threaded by the matching retry loop. *)
+  (* The public [try_recovering] (used for the interpreter's action-failure
+     retries) keeps its historical signature; the exclusion set is only
+     threaded by the matching retry loop. *)
   let try_recovering (astate : t) (tactic : Expr.t Recovery_tactic.t) :
       (t list * recovery_tactic, string) result =
     try_recovering astate ~tried:[] tactic
