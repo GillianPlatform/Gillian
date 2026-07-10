@@ -1581,70 +1581,20 @@ module Make (S : MonadicSMemory.S) = struct
      The engine no longer drives fold/unfold recovery: it happens here, when a
      sub-memory action or a consumption fails with a fixable error. *)
 
-  (* Mirrors the interpreter's action-failure retry loop
-     (recovery from the pre-action state, tactic merged from the action
-     parameters and the error, fuel-limited). *)
-  (* Mirrors the interpreter's action-failure retry loop: recovery is
-     attempted ONCE per action evaluation (from the pre-action state, on the
-     first fixable error), and on success the whole action is re-executed on
-     the recovered states — not once per error branch, which multiplies
-     recovery attempts on branchy actions. *)
-  let rec execute_sub_action
-      ~fuel
-      action_name
-      (ms : mstate)
-      (args : Expr.t list) : (mstate * Expr.t list, err_t) Res_list.t =
-    let branches =
-      resolve_with_matching ~matching:false ms
-        (S.execute_action ~action_name ms.st.mem args)
-    in
-    let as_results () =
-      List.map
-        (fun (res, ms') ->
-          match res with
-          | Ok (mem', vs) ->
-              Ok ({ ms' with st = { ms'.st with mem = mem' } }, vs)
-          | Error e -> Error (SubError e))
-        branches
-    in
-    let fixable_error =
-      if fuel > 0 && recovery_enabled () then
-        List.find_map
-          (fun (res, _) ->
-            match res with
-            | Error e when S.can_fix e -> Some e
-            | _ -> None)
-          branches
-      else None
-    in
-    match fixable_error with
-    | None -> as_results ()
-    | Some e -> (
-        let tactic_from_params =
-          Recovery_tactic.try_unfold (List.concat_map Expr.base_elements args)
-        in
-        let tactic =
-          Recovery_tactic.merge tactic_from_params
-            (S.get_recovery_tactic ms.st.mem e)
-          |> augment_recovery_tactic ms.pc
-        in
-        L.verbose (fun m ->
-            m "Action %s failed; attempting recovery with tactic:\n%a"
-              action_name
-              (Recovery_tactic.pp Expr.pp)
-              tactic);
-        (* Each retry recovers afresh from its own pre-action state: progress
-           comes from the recovered state having consumed the unfolded
-           predicate, exactly like the interpreter's legacy retry loop. *)
-        match try_recovering ms ~tried:[] tactic with
-        | Error msg ->
-            L.normal (fun m -> m "Recovery tactic failed: %s" msg);
-            as_results ()
-        | Ok (recovered, _, _) ->
-            List.concat_map
-              (fun ms'' ->
-                execute_sub_action ~fuel:(fuel - 1) action_name ms'' args)
-              recovered)
+  (* Sub-memory action failures are NOT recovered here: they flow up
+     unswallowed so the interpreter's own retry loop drives recovery through
+     the reserved recover action (which ends with a state-level simplify —
+     recovering here would skip that canonicalization, leaving alias chains
+     that force every later action on the same structure to re-unfold it). *)
+  let execute_sub_action action_name (ms : mstate) (args : Expr.t list) :
+      (mstate * Expr.t list, err_t) Res_list.t =
+    resolve_with_matching ~matching:false ms
+      (S.execute_action ~action_name ms.st.mem args)
+    |> List.map (fun (res, ms') ->
+           match res with
+           | Ok (mem', vs) ->
+               Ok ({ ms' with st = { ms'.st with mem = mem' } }, vs)
+           | Error e -> Error (SubError e))
 
   (* {2 The MonadicSMemory boundary}
 
@@ -1813,8 +1763,7 @@ module Make (S : MonadicSMemory.S) = struct
         let ms = { st = s; pc = curr_pc } in
         let results =
           match action_from_str action_name with
-          | SubAction action_name ->
-              execute_sub_action ~fuel:10 action_name ms args
+          | SubAction action_name -> execute_sub_action action_name ms args
           | (Fold | Unfold | GUnfold | Package) as act ->
               execute_pred_action act ms args
           | Recover -> execute_recover ms args
