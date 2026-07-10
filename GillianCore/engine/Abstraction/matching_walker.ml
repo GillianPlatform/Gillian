@@ -6,12 +6,10 @@
     The machinery is polymorphic in the state ['s] it operates over and the
     error type ['err] it emits; every state operation is received through an
     {!ops} record. It is instantiated twice:
-    - at the {i state} level by [Matcher.Make] (['s = State.t Pred_state.t]),
-      where user-defined predicates and wands are (transitionally) handled by
-      the [consume_/produce_*_hook]s;
+    - at the {i state} level by [Matcher.Make] (['s = State.t Pred_state.t]);
     - at the {i memory} level by the [Combinators.Abstraction] combinator (['s]
-      = memory + path condition), where those hooks are [None] and user-defined
-      predicates and wands are consumed/produced like any other core predicate.
+      = memory + path condition), where user-defined predicates and wands are
+      consumed/produced like any other core predicate.
 
     The machinery is written in direct style (lists of results, explicit states)
     rather than in a monad: the memory-level instantiation threads several
@@ -82,27 +80,6 @@ type ('s, 'err) ops = {
     Expr.t list ->
     ('s * Expr.t list, 'err) Res_list.t;
   produce_core_pred : string -> 's -> Expr.t list -> ('s, 'err) Res_list.t;
-  (* Transitional hooks: [Some] routes user-predicate/wand atoms through the
-     legacy [Pred_state]-based arms; [None] lets them fall through to
-     [consume_core_pred]/[produce_core_pred] like any core predicate. *)
-  consume_upred_hook :
-    (no_auto_fold:bool ->
-    's ->
-    SVal.SESubst.t ->
-    MP.step ->
-    ('s, 'err) Res_list.t)
-    option;
-  consume_wand_hook :
-    (no_auto_fold:bool ->
-    's ->
-    SVal.SESubst.t ->
-    MP.step ->
-    ('s, 'err) Res_list.t)
-    option;
-  produce_upred_hook :
-    ('s -> SVal.SESubst.t -> Asrt.atom -> ('s, 'err) Res_list.t) option;
-  produce_wand_hook :
-    ('s -> SVal.SESubst.t -> Asrt.atom -> ('s, 'err) Res_list.t) option;
   (* Structure / store. [update_store] is only meaningful at the state level
      (it is reached when producing a [ret = e] pure atom of a post-condition);
      the memory-level instantiation fails on it. *)
@@ -191,14 +168,6 @@ let rec produce_assertion
   | Emp ->
       L.verbose (fun fmt -> fmt "Emp assertion.");
       [ Ok s ]
-  | CorePred (name, _, _) when Option.is_some (Asrt.as_wand_name name) -> (
-      match ops.produce_wand_hook with
-      | Some hook -> hook s subst a
-      | None -> produce_core_pred_atom ops s subst a)
-  | CorePred (name, _, _) when Option.is_some (Asrt.as_user_pred_name name) -> (
-      match ops.produce_upred_hook with
-      | Some hook -> hook s subst a
-      | None -> produce_core_pred_atom ops s subst a)
   | CorePred _ -> produce_core_pred_atom ops s subst a
   | Types les -> (
       L.verbose (fun fmt -> fmt "Types assertion.");
@@ -426,16 +395,6 @@ and match_assertion'
       let p, _ = step in
       let res_list =
         match (p : Asrt.atom) with
-        | CorePred (name, _, _) when Option.is_some (Asrt.as_wand_name name)
-          -> (
-            match ops.consume_wand_hook with
-            | Some hook -> hook ~no_auto_fold s subst step
-            | None -> consume_core_pred_step ops ~no_auto_fold s subst step)
-        | CorePred (name, _, _)
-          when Option.is_some (Asrt.as_user_pred_name name) -> (
-            match ops.consume_upred_hook with
-            | Some hook -> hook ~no_auto_fold s subst step
-            | None -> consume_core_pred_step ops ~no_auto_fold s subst step)
         | CorePred _ -> consume_core_pred_step ops ~no_auto_fold s subst step
         (* Conjunction should not be here *)
         | Pure (BinOp (_, And, _)) ->

@@ -55,12 +55,10 @@ struct
     type memory_error = Verification.SPState.m_err_t
 
     let get_variables t (astate : memory Debugger_utils.astate) id =
-      (* When predicates live in the memory, re-project them so the debugger's
+      (* Predicates live in the memory: re-project them so the debugger's
          predicate pane keeps working. *)
       let preds =
-        if !Utils.Config.preds_in_memory then
-          Some (Preds.init astate.memory.Combinators.Abstraction.preds)
-        else astate.preds
+        Some (Preds.init astate.memory.Combinators.Abstraction.preds)
       in
       let raw_astate : SMemory.t Debugger_utils.astate =
         {

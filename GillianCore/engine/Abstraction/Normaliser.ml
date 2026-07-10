@@ -482,50 +482,22 @@ module Make (SPState : PState.S) = struct
     L.verbose (fun m -> m "Finished normalising pure assertions.");
     result
 
-  (** Separate an assertion into: core_asrts, pure, typing and predicates *)
+  (** Separate an assertion into: core_asrts, pure and typing. User-predicate
+      and wand core predicates stay in the core assertions and are produced into
+      the memory like any other core predicate (the memory learns the predicate
+      facts itself). *)
   let separate_assertion (a : Asrt.t) :
       (string * Expr.t list * Expr.t list) list
       * Expr.t list
-      * (Expr.t * Type.t) list
-      * (string * Expr.t list) list
-      * Wands.wand list =
+      * (Expr.t * Type.t) list =
     List.fold_left
-      (fun (core_asrts, pure, types, preds, wands) -> function
-        (* When [Config.preds_in_memory] is set, user-predicate and wand core
-           predicates stay in [core_asrts] and are produced into the memory
-           like any other core predicate (the memory learns the predicate
-           facts itself). *)
-        | Asrt.CorePred (cp_name, es1, es2)
-          when (not !Config.preds_in_memory)
-               && Option.is_some (Asrt.as_wand_name cp_name) ->
-            (* A magic wand: reconstruct the raw ([lhs], [rhs]) from its semantic
-               ins/outs, using the rhs predicate's number of in-parameters (read
-               from the ambient predicate table). *)
-            let _, rname = Option.get (Asrt.as_wand_name cp_name) in
-            let rhs_ins_number =
-              (MP.get_pred_def (MP.get_pred_defs ()) rname).pred.ins_number
-            in
-            let (lname, largs), (rname, rargs) =
-              Option.get
-                (Asrt.as_wand ~rhs_ins_number
-                   (Asrt.CorePred (cp_name, es1, es2)))
-            in
-            ( core_asrts,
-              pure,
-              types,
-              preds,
-              Wands.{ lhs = (lname, largs); rhs = (rname, rargs) } :: wands )
-        | CorePred (cp_name, es1, es2)
-          when (not !Config.preds_in_memory)
-               && Option.is_some (Asrt.as_user_pred_name cp_name) ->
-            let name = Option.get (Asrt.as_user_pred_name cp_name) in
-            (core_asrts, pure, types, (name, es1 @ es2) :: preds, wands)
-        | CorePred (cp_name, es1, es2) ->
-            ((cp_name, es1, es2) :: core_asrts, pure, types, preds, wands)
-        | Emp -> (core_asrts, pure, types, preds, wands)
-        | Types lst -> (core_asrts, pure, lst @ types, preds, wands)
-        | Pure f -> (core_asrts, f :: pure, types, preds, wands))
-      ([], [], [], [], []) a
+      (fun (core_asrts, pure, types) -> function
+        | Asrt.CorePred (cp_name, es1, es2) ->
+            ((cp_name, es1, es2) :: core_asrts, pure, types)
+        | Emp -> (core_asrts, pure, types)
+        | Types lst -> (core_asrts, pure, lst @ types)
+        | Pure f -> (core_asrts, f :: pure, types))
+      ([], [], []) a
 
   (** Normalise type assertions (Intialise type environment *)
   let normalise_types
@@ -581,48 +553,6 @@ module Make (SPState : PState.S) = struct
     in
 
     result
-
-  let normalise_wands (wands : Wands.wand list) : Wands.t = Wands.init wands
-
-  (** Normalise Predicate Assertions (Initialise Predicate Set) *)
-  let normalise_preds
-      (pred_defs : (string, MP.pred) Hashtbl.t)
-      (store : SStore.t)
-      (pfs : PFS.t)
-      (gamma : Type_env.t)
-      (subst : SVal.SESubst.t)
-      (pred_asrts : (string * Expr.t list) list) : Preds.t =
-    let fe = normalise_lexpr ~store ~subst gamma in
-    let preds = Preds.init [] in
-
-    List.iter
-      (fun (pn, les) ->
-        let pred_def = Hashtbl.find_opt pred_defs pn in
-        match pred_def with
-        | None ->
-            L.fail
-              (Format.asprintf
-                 "Impossible: Predicate %s not found in predicate table during \
-                  normalisation."
-                 pn)
-        | Some pred_def ->
-            let params, _ = List.split pred_def.pred.pred_params in
-            let params = List.map (fun x -> Expr.PVar x) params in
-            let facts =
-              List.fold_left
-                (fun facts (param, le) ->
-                  List.map
-                    (fun fact ->
-                      Expr.subst_expr_for_expr ~to_subst:param ~subst_with:le
-                        fact)
-                    facts)
-                pred_def.pred.pred_facts (List.combine params les)
-            in
-            List.iter (fun fact -> PFS.extend pfs fact) facts;
-            Preds.extend preds (pn, List.map fe les))
-      pred_asrts;
-
-    preds
 
   let generate_overlapping_constraints
       (c_asrts : (string * Expr.t list * Expr.t list) list) : Expr.t list =
@@ -840,9 +770,13 @@ module Make (SPState : PState.S) = struct
     List.iter find_spec_var_eqs a;
     SESubst.substitute_asrt subst ~partial:true a
 
-  (** Given an assertion creates a symbolic state and a substitution *)
+  (** Given an assertion creates a symbolic state and a substitution. The
+      predicate table is no longer used directly (predicates are produced into
+      the memory, which reads the ambient {!MP.get_pred_defs}); the parameter is
+      kept so callers still document that the ambient table must be installed.
+  *)
   let normalise_assertion
-      ~(pred_defs : MP.preds_tbl_t)
+      ~pred_defs:(_ : MP.preds_tbl_t)
       ~(init_data : SPState.init_data)
       ?(pvars : SS.t option)
       (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
@@ -863,7 +797,7 @@ module Make (SPState : PState.S) = struct
     let subst = SESubst.init [] in
 
     (* Step 2b -- Separate assertion *)
-    let c_asrts, pfs, types, preds, wands =
+    let c_asrts, pfs, types =
       try separate_assertion a
       with Failure msg ->
         L.verbose (fun m -> m "I died here terribly with msg: %s!\n" msg);
@@ -907,13 +841,9 @@ module Make (SPState : PState.S) = struct
         L.verbose (fun m -> m "PFS after extenzion:\n%a" PFS.pp pfs);
 
         (* Step 7 -- Construct the state *)
-        let preds' = normalise_preds pred_defs store pfs gamma subst preds in
-        let wands' = normalise_wands wands in
         let astate : SPState.t =
           SPState.make_p ~init_data ~store ~pfs ~gamma ~spec_vars:svars ()
         in
-        let astate = SPState.set_preds astate preds' in
-        let astate = SPState.set_wands astate wands' in
         let open Syntaxes.List in
         let res =
           let* astate = produce_core_asrts astate c_asrts' in

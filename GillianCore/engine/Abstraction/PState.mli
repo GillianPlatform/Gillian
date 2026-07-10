@@ -31,14 +31,7 @@ module type S = sig
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t
 
-  (** Set preds of given symbolic state *)
-  val set_preds : t -> Preds.t -> t
-
   val get_wands : t -> Wands.t
-
-  (** Set wands of given symbolic state *)
-  val set_wands : t -> Wands.t -> t
-
   val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end

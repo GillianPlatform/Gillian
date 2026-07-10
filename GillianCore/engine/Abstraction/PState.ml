@@ -31,14 +31,7 @@ module type S = sig
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t
 
-  (** Set preds of given symbolic state *)
-  val set_preds : t -> Preds.t -> t
-
   val get_wands : t -> Wands.t
-
-  (** Set preds of given symbolic state *)
-  val set_wands : t -> Wands.t -> t
-
   val matches : t -> st -> MP.t -> Matcher.match_kind -> bool option
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end
@@ -137,8 +130,6 @@ module Make (State : SState.S) :
     { astate with state = State.set_store astate.state store }
 
   let get_preds (astate : t) : Preds.t = astate.preds
-  let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
-  let set_wands astate wands = Pred_state.{ astate with wands }
   let get_wands (astate : t) : Wands.t = astate.wands
 
   let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
@@ -148,7 +139,7 @@ module Make (State : SState.S) :
     match (!Config.unfolding && unfold, v) with
     | _, Lit (Bool true) -> [ astate' ]
     | false, _ -> [ astate' ]
-    | true, _ when !Config.preds_in_memory -> (
+    | true, _ -> (
         (* Predicates live in the memory: ask it to unfold around the assumed
            expression (low-level automation). No recovered state (an error)
            keeps the original state; zero branches kill the path. *)
@@ -181,16 +172,6 @@ module Make (State : SState.S) :
             let* astate =
               snd (simplify ~kill_new_lvars:false ~matching:true astate)
             in
-            let _, astates = simplify ~kill_new_lvars:false astate in
-            astates)
-    | true, _ -> (
-        let unfold_vals = Expr.base_elements v in
-        match
-          SMatcher.unfold_with_vals ~auto_level:`Low astate' unfold_vals
-        with
-        | None -> [ astate' ]
-        | Some next_states ->
-            let* _, astate = next_states in
             let _, astates = simplify ~kill_new_lvars:false astate in
             astates)
 
@@ -362,14 +343,10 @@ module Make (State : SState.S) :
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
-    final_states
-    |> List.filter_map @@ fun final_state ->
-       match SMatcher.unfold_concrete_preds final_state with
-       | Some (_, with_unfolded_concrete) ->
-           Some (Ok (with_unfolded_concrete, fl))
-       | None ->
-           L.verbose (fun m -> m "WARNING: late unsat");
-           None
+    (* Concrete-ins predicates are eagerly unfolded by the memory itself (as a
+       post-pass on its operations), so there is nothing left to unfold at the
+       state level here. *)
+    List.map (fun final_state -> Ok (final_state, fl)) final_states
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
@@ -805,97 +782,6 @@ module Make (State : SState.S) :
         List.map Result.ok states)
       (Res_list.return astate) frames
 
-  (** Evaluation of the predicate-manipulating SL commands
-      ([Fold]/[Unfold]/[GUnfold]/[Package]). These are no longer reached through
-      [evaluate_slcmd]: the interpreter issues them as calls to reserved memory
-      actions, which [execute_action] (below) catches and forwards here. The
-      predicate table is read from the ambient {!MP.get_pred_defs} (identical to
-      [prog.preds]), so no [prog] argument is needed. *)
-  let eval_pred_slcmd (lcmd : SLCmd.t) (astate : t) : (t, err_t) Res_list.t =
-    let pred_defs = MP.get_pred_defs () in
-    let eval_expr e =
-      try State.eval_expr astate.state e
-      with State.Internal_State_Error (errs, _) ->
-        raise (Internal_State_Error (errs, astate))
-    in
-    let open Res_list.Syntax in
-    let** resulting_astate =
-      match lcmd with
-      | Fold (pname, les, fold_info) ->
-          let vs = List.map eval_expr les in
-          let pred = MP.get_pred_def pred_defs pname in
-          let additional_bindings =
-            Option.fold
-              ~some:(fun (_, bindings) ->
-                List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
-              ~none:[] fold_info
-          in
-          SMatcher.fold ~additional_bindings ~match_kind:LogicCommand
-            ~state:astate pred vs
-      | Unfold (pname, les, additional_bindings, b) ->
-          (* Unfoldig predicate with name [pname] and arguments [les].
-             [additional_bindings] is the set set of additional bindings that may be learned when unfolding,
-             and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
-          (* 1) We retrieve the definition of the predicate to unfold and make sure
-             it is not abstract and hence can be unfolded. *)
-          let pred = MP.get_pred_def pred_defs pname in
-          if pred.pred.pred_abstract then
-            Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
-          (* 2) We evaluate the arguments, filter to keep only the in-parameters
-             (which are sufficient to trigger the unfold) *)
-          let vs = List.map eval_expr les in
-          let vs_ins = Pred.in_args pred.pred vs in
-          let vs = List.map Option.some vs in
-          (* FIXME: make sure correct number of params *)
-          (* 3) We consume the predicate from the state. *)
-          let cons_res = SMatcher.consume_pred astate pname vs in
-          let () =
-            match (cons_res, !Config.under_approximation) with
-            | [], false ->
-                Fmt.failwith
-                  "HORROR - unfold vanished while consuming folded predicate: \
-                   %a"
-                  SLCmd.pp lcmd
-            | _ -> ()
-          in
-          let** astate, vs' = cons_res in
-          L.verbose (fun m ->
-              m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Expr.pp) vs');
-          let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
-          L.verbose (fun m ->
-              m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
-                SLCmd.pp_unfold_info additional_bindings);
-          if b then SMatcher.rec_unfold astate pname vs
-          else (
-            L.verbose (fun m ->
-                m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Expr.pp) vs);
-            let** _, state =
-              SMatcher.unfold ?additional_bindings astate pname vs
-            in
-            let _, states =
-              simplify ~kill_new_lvars:true ~matching:true state
-            in
-            Res_list.just_oks states)
-      | Package { lhs; rhs } ->
-          let++ astate =
-            let res = SMatcher.package_wand astate { lhs; rhs } in
-            L.verbose (fun m ->
-                m "wand package returned %a"
-                  (List_res.pp ~ok:pp ~err:pp_err_t)
-                  res);
-            Res_list.of_list_res res
-          in
-          Wands.extend astate.wands { lhs; rhs };
-          astate
-      | GUnfold pname ->
-          let** astate = SMatcher.unfold_all astate pname in
-          let _, astates = simplify ~kill_new_lvars:true astate in
-          Res_list.just_oks astates
-      | _ -> failwith "eval_pred_slcmd: expected Fold/Unfold/GUnfold/Package"
-    in
-    let _, astates = simplify resulting_astate in
-    Res_list.just_oks astates
-
   (** Evaluation of logic commands
 
       @param prog GIL program
@@ -1174,16 +1060,15 @@ module Make (State : SState.S) :
   let update_subst (astate : t) (subst : st) : unit =
     State.update_subst astate.state subst
 
-  (* When predicate reasoning lives in the memory ([Config.preds_in_memory]),
-     the predicate-manipulating actions are executed by the memory itself; but
-     three state-level concerns remain PState's job (they need the store, the
-     spec-var set, or state-wide simplification, none of which exist below the
-     state):
+  (* Predicate reasoning lives in the memory: the predicate-manipulating
+     actions are executed by the memory itself; but three state-level concerns
+     remain PState's job (they need the store, the spec-var set, or state-wide
+     simplification, none of which exist below the state):
      - evaluating the store-dependent sub-expressions of the encoded command
        (Fold/Unfold arguments and fold-info bindings; Package arguments stay
        raw, matching the legacy behavior);
      - registering Unfold binding names as spec vars;
-     - the post-action simplifications that [eval_pred_slcmd] used to perform.
+     - the post-action simplifications the legacy engine used to perform.
      TODO: when PState is removed, argument evaluation moves to the
      interpreter (and [SLCmd.of_action] must then tolerate reduced
      encodings). *)
@@ -1228,7 +1113,7 @@ module Make (State : SState.S) :
       | Ok (state, _) -> Ok (copy_with_state astate state)
       | Error err -> Error err
     in
-    (* Post-action simplifications, mirroring [eval_pred_slcmd] — the legacy
+    (* Post-action simplifications, mirroring the legacy engine — the legacy
        unfold additionally simplified with [~matching:true] internally, which
        is what unifies the abstract locations an unfolding introduces. *)
     let** astate =
@@ -1248,11 +1133,7 @@ module Make (State : SState.S) :
        actions (see {!SLCmd.to_action}); we catch them here and run their
        fold/unfold semantics. They produce no return values (hence [[]]). *)
     match SLCmd.of_action action args with
-    | Some sl_cmd when !Config.preds_in_memory ->
-        exec_pred_action_in_memory sl_cmd astate
-    | Some sl_cmd ->
-        eval_pred_slcmd sl_cmd astate
-        |> List.map (Result.map (fun astate -> (astate, [])))
+    | Some sl_cmd -> exec_pred_action_in_memory sl_cmd astate
     | None -> (
         let open Syntaxes.List in
         let+ result = State.execute_action action astate.state args in

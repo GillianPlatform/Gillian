@@ -29,18 +29,6 @@ let current_exec_mode : Exec_mode.t ref = ref Exec_mode.Verification
 let previously_normalised = ref false
 let unfolding = ref true
 let manual_proof = ref false
-
-(** Transitional (predicate-refactor Phase 8): user-defined predicates and wands
-    are handled by the [Combinators.Abstraction] memory combinator instead of
-    [PState]/[Matcher]. Setting [GILLIAN_PREDS_IN_MEMORY=0] selects the legacy
-    engine-side handling; the variable (and the legacy path) are scheduled for
-    removal once the transition is complete. *)
-let preds_in_memory =
-  ref
-    (match Sys.getenv_opt "GILLIAN_PREDS_IN_MEMORY" with
-    | Some ("0" | "false") -> false
-    | _ -> true)
-
 let max_branching = ref 100
 let leak_check = ref false
 

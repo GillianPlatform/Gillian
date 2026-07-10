@@ -561,10 +561,6 @@ module Make (S : MonadicSMemory.S) = struct
           consume_dispatch ~no_auto_fold name ms ins);
       produce_core_pred =
         (fun name ms vs -> produce_dispatch name ms vs |> List.map Result.ok);
-      consume_upred_hook = None;
-      consume_wand_hook = None;
-      produce_upred_hook = None;
-      produce_wand_hook = None;
       copy = copy_mstate;
       update_store =
         (fun _ _ _ -> L.fail "update_store in memory-level matching");
@@ -622,7 +618,7 @@ module Make (S : MonadicSMemory.S) = struct
 
   (** Consumes a user predicate. If the predicate is not "verbatim" in our set
       of preds, and it is not abstract and we are not in manual mode, we attempt
-      to fold it. Mirrors [Matcher.consume_pred]. *)
+      to fold it. Mirrors the legacy state-level predicate consumption. *)
   and consume_upred
       ~(no_auto_fold : bool)
       (ms : mstate)
@@ -673,7 +669,7 @@ module Make (S : MonadicSMemory.S) = struct
         let values = List.filter_map Fun.id vs in
         Res_list.error_with (MissingUPred { name = pname; vs = values })
 
-  (* Mirrors [Matcher.consume_wand]; the query outs are unknown at the
+  (* Mirrors the legacy state-level wand consumption; the query outs are unknown at the
      core-predicate boundary (the walker matches them afterwards). *)
   and consume_wand (ms : mstate) ~lname ~rname (ins : Expr.t list) :
       (mstate * Expr.t list, err_t) Res_list.t =
@@ -786,7 +782,7 @@ module Make (S : MonadicSMemory.S) = struct
       };
     ]
 
-  (* Mirrors [Matcher.fold]. *)
+  (* Mirrors the legacy state-level fold. *)
   and fold
       ?(in_matching = false)
       ?(additional_bindings = [])
@@ -849,7 +845,7 @@ module Make (S : MonadicSMemory.S) = struct
     | None -> Res_list.return ms'
     | Some guard -> W.produce mem_ops ms' subst' guard
 
-  (* Mirrors [Matcher.unfold]. The state-level version additionally registered
+  (* Mirrors the legacy state-level unfold. The state-level version additionally registered
      the binding names as spec vars and simplified the resulting states; both
      are state-level concerns handled above the memory (PState's action shim
      and the SMT-backed candidate matching, respectively). *)
@@ -979,7 +975,7 @@ module Make (S : MonadicSMemory.S) = struct
           L.verbose (fun m -> m "NOTHING TO UNFOLD!!!!\n");
           None
 
-  (* Mirrors [Matcher.unfold_concrete_preds], with a pc-aware concreteness
+  (* Mirrors the legacy eager unfolding of concrete-ins predicates, with a pc-aware concreteness
      check (the state-level version relied on [State.simplify] having
      substituted the predicate arguments first). *)
   and unfold_concrete_preds (ms : mstate) :
@@ -1049,7 +1045,7 @@ module Make (S : MonadicSMemory.S) = struct
                   errs))
     | None -> Some (None, ms)
 
-  (* Mirrors [Matcher.try_recovering]. *)
+  (* Mirrors the legacy state-level recovery. *)
   and try_recovering
       (ms : mstate)
       ~(tried : upred list)
