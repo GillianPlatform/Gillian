@@ -85,7 +85,7 @@ module type PMapImpl = sig
   val fold : (Expr.t -> Entry.t -> 'a -> 'a) -> t -> 'a -> 'a
   val for_all : (Entry.t -> bool) -> t -> bool
   val compose : t -> t -> t Delayed.t
-  val substitution_in_place : Subst.t -> t -> t Delayed.t
+  val substitution : Subst.t -> t -> t Delayed.t
 end
 
 module type OpenPMapType = sig
@@ -343,10 +343,10 @@ struct
         ((h, Some d), [])
     | _ -> failwith "Invalid arguments for instantiation"
 
-  let substitution_in_place sub (h, d) =
+  let substitution sub (h, d) =
     let open Delayed.Syntax in
     let d' = Option.map (Subst.subst_in_expr sub ~partial:true) d in
-    let+ h' = I.substitution_in_place sub h in
+    let+ h' = I.substitution sub h in
     (h', d')
 
   let accumulate ~fn_k ~fn_v h =
@@ -522,7 +522,7 @@ struct
     | [] -> (I.empty, [])
     | _ -> failwith "Invalid arguments for instantiation"
 
-  let substitution_in_place = I.substitution_in_place
+  let substitution = I.substitution
 
   let accumulate ~fn_k ~fn_v h =
     let open Utils.Containers.SS in
@@ -662,10 +662,10 @@ struct
 
   let compose = ExpMap.sym_merge S.compose
 
-  let substitution_in_place sub h =
+  let substitution sub h =
     let open Delayed.Syntax in
     let mapper (idx, s) =
-      let+ s' = S.substitution_in_place sub s in
+      let+ s' = S.substitution sub s in
       let idx' = Subst.subst_in_expr sub ~partial:true idx in
       (idx', s')
     in
@@ -737,11 +737,11 @@ struct
     let+ sh = ExpMap.sym_merge S.compose sh1 sh2 in
     (ch, sh)
 
-  let substitution_in_place sub (ch, sh) =
+  let substitution sub (ch, sh) =
     let open Delayed.Syntax in
     let subst = Subst.subst_in_expr sub ~partial:true in
     let mapper (idx, s) =
-      let+ s' = S.substitution_in_place sub s in
+      let+ s' = S.substitution sub s in
       let idx' = subst idx in
       (idx', s')
     in
@@ -818,7 +818,7 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
     in
     List.fold_left compose_binding (Delayed.return h1) (SMap.bindings h2)
 
-  let substitution_in_place sub h =
+  let substitution sub h =
     let open Delayed.Syntax in
     let aloc_subst =
       Subst.fold sub
@@ -832,7 +832,7 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
       SMap.fold
         (fun k v acc ->
           let* acc = acc in
-          let+ s' = S.substitution_in_place sub v in
+          let+ s' = S.substitution sub v in
           SMap.add k s' acc)
         h
         (Delayed.return SMap.empty)

@@ -4,12 +4,12 @@ module Init_data = Gillian.General.Init_data.Dummy
 
 module Gillian_C2_lifter =
   Gillian.Debugger.Lifter.Gil_fallback_lifter.Make
-    (SMemory)
+    (MonadicSMemory)
     (C2ParserAndCompiler)
     (Lifter.C2_lifter.Make)
 
 module CLI =
-  Gillian.Command_line.Make (Init_data) (CMemory) (SMemory)
+  Gillian.Command_line.Make (Init_data) (CMemory) (MonadicSMemory)
     (C2ParserAndCompiler)
     (External.M)
     (struct

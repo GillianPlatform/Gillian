@@ -3,12 +3,9 @@ module type S = sig
   type m_err
   type annot
 
-  module SPState : PState.S with type heap_t = heap_t and type m_err_t = m_err
+  module State : SState.S with type heap_t = heap_t and type m_err_t = m_err
 
-  type state = SPState.t
-
-  module SState :
-    SState.S with type t = SPState.state_t and type heap_t = heap_t
+  type state = State.t
 
   module SAInterpreter :
     G_interpreter.S
@@ -17,10 +14,10 @@ module type S = sig
        and type store_t = SStore.t
        and type state_t = state
        and type heap_t = heap_t
-       and type state_err_t = SPState.err_t
+       and type state_err_t = State.err_t
        and type annot = annot
 
-  module SMatcher : Matcher.S with type state_t = SPState.state_t
+  module SMatcher : Matcher.S with type state_t = State.t
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -30,14 +27,14 @@ module type S = sig
   val reset : unit -> unit
 
   val verify_prog :
-    init_data:SPState.init_data ->
+    init_data:State.init_data ->
     prog_t ->
     bool ->
     SourceFiles.t option ->
     unit Gillian_result.t
 
   val init_proc :
-    init_data:SPState.init_data ->
+    init_data:State.init_data ->
     prog_t ->
     string ->
     SAInterpreter.result_t SAInterpreter.cont_func list
@@ -46,7 +43,7 @@ module type S = sig
 
   module Debug : sig
     val get_tests_for_prog :
-      init_data:SPState.init_data -> prog_t -> MP.preds_tbl_t * proc_tests
+      init_data:State.init_data -> prog_t -> MP.preds_tbl_t * proc_tests
 
     val analyse_result :
       t -> Logging.Report_id.t -> SAInterpreter.result_t -> bool
@@ -54,21 +51,11 @@ module type S = sig
 end
 
 module Make
-    (SState :
-      SState.S
-        with type vt = SVal.M.t
-         and type st = SVal.SESubst.t
-         and type store_t = SStore.t)
-    (SPState :
-      PState.S
-        with type state_t = SState.t
-         and type heap_t = SState.heap_t
-         and type init_data = SState.init_data)
+    (State : SState.S)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) :
   S
-    with type heap_t = SPState.heap_t
-     and type m_err = SPState.m_err_t
-     and module SPState = SPState
-     and module SState = SState
+    with type heap_t = State.heap_t
+     and type m_err = State.m_err_t
+     and module State = State
      and type annot = PC.Annot.t

@@ -166,11 +166,19 @@ let unfold_action = Asrt.user_pred_prefix ^ "unfold"
 let gunfold_action = Asrt.user_pred_prefix ^ "gunfold"
 let package_action = Asrt.user_pred_prefix ^ "package"
 
+(** Reserved action asking the predicate-carrying memory to recover from a
+    failure by folding/unfolding. It does not correspond to any SL command; its
+    arguments encode a recovery tactic
+    ([fold values or none; unfold values or none; "low"/"high"]). Only
+    meaningful when predicate reasoning lives in the memory. *)
+let recover_action = Asrt.user_pred_prefix ^ "recover"
+
 let is_pred_action (a : string) : bool =
   String.equal a fold_action
   || String.equal a unfold_action
   || String.equal a gunfold_action
   || String.equal a package_action
+  || String.equal a recover_action
 
 (* -- encoding -- *)
 

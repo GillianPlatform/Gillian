@@ -164,8 +164,6 @@ module Make (State : SState.S) = struct
   let fresh_loc ?loc:_ (_ : t) : Expr.t =
     raise (Failure "fresh_loc inside BI STATE")
 
-  let clean_up ?keep:_ ({ state; _ } : t) : unit = State.clean_up state
-
   let get_components ({ state; af_state; _ } : t) : State.t * State.t =
     (state, af_state)
 

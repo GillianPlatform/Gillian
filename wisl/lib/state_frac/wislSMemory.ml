@@ -35,7 +35,7 @@ let resolve_loc_or_alloc loc =
 
 let store heap loc offset value =
   let* loc = resolve_loc_or_alloc loc in
-  let++ loc, ofs = WislSHeap.store heap loc offset value in
+  let++ heap, loc, ofs = WislSHeap.store heap loc offset value in
   (heap, [ loc; ofs ])
 
 let load heap loc offset =
@@ -51,12 +51,12 @@ let get_cell heap loc offset permission =
 
 let set_cell heap loc offset value permission =
   let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.set_cell heap loc offset value permission in
+  let++ heap = WislSHeap.set_cell heap loc offset value permission in
   (heap, [])
 
 let rem_cell heap loc offset permission =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_cell heap loc offset permission in
+  let++ heap = WislSHeap.rem_cell heap loc offset permission in
   (heap, [])
 
 let get_bound heap loc permission =
@@ -68,12 +68,12 @@ let get_bound heap loc permission =
 
 let set_bound heap loc (bound : int) permission =
   let* loc = resolve_loc_or_alloc loc in
-  let++ () = WislSHeap.set_bound heap loc bound permission in
+  let++ heap = WislSHeap.set_bound heap loc bound permission in
   (heap, [])
 
 let rem_bound heap loc permission =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_bound heap loc permission in
+  let++ heap = WislSHeap.rem_bound heap loc permission in
   (heap, [])
 
 let get_freed heap loc =
@@ -84,21 +84,21 @@ let get_freed heap loc =
 
 let set_freed heap loc =
   let* loc = resolve_loc_or_alloc loc in
-  let+ () = WislSHeap.set_freed heap loc in
+  let+ heap = WislSHeap.set_freed heap loc in
   Ok (heap, [])
 
 let rem_freed heap loc =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_freed heap loc in
+  let++ heap = WislSHeap.rem_freed heap loc in
   (heap, [])
 
 let alloc heap (size : int) =
-  let loc = WislSHeap.alloc heap size in
+  let heap, loc = WislSHeap.alloc heap size in
   ok (heap, [ Expr.ALoc loc; Expr.Lit (Int Z.zero) ])
 
 let dispose heap loc =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.dispose heap loc in
+  let++ heap = WislSHeap.dispose heap loc in
   (heap, [])
 
 let execute_action ~action_name heap args =
@@ -166,7 +166,6 @@ let produce ~core_pred heap args =
       Delayed.vanish ()
   | Ok (heap', _) -> Delayed.return heap'
 
-let copy = WislSHeap.copy
 let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 
 (* TODO: Implement properly *)
@@ -185,11 +184,7 @@ let pp_err fmt t =
     | OutOfBounds _ -> "Out Of Bounds"
     | InvalidLocation _ -> "Invalid Location")
 
-let substitution_in_place = WislSHeap.substitution_in_place
-
-let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
-  WislSHeap.clean_up keep mem
-
+let substitution = WislSHeap.substitution
 let lvars = WislSHeap.lvars
 let alocs = WislSHeap.alocs
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap

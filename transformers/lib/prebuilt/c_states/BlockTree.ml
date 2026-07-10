@@ -1651,7 +1651,7 @@ module M = struct
         else Delayed.return false
     | _ -> Delayed.return false
 
-  let substitution_in_place subst s =
+  let substitution subst s =
     let le_subst = Subst.subst_in_expr subst ~partial:true in
     let sval_subst = SVal.substitution ~le_subst in
     let svarr_subst = SVal.SVArray.subst ~le_subst in

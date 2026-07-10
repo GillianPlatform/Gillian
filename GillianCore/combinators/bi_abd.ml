@@ -82,9 +82,9 @@ module Make (Mem : MyMonadicSMemory.S) :
     let open Utils.Containers in
     Mem.alocs s.state |> SS.union (Fix.alocs s.anti_frame)
 
-  let substitution_in_place subst s =
+  let substitution subst s =
     let open Monadic.Delayed.Syntax in
-    let+ state = Mem.substitution_in_place subst s.state in
+    let+ state = Mem.substitution subst s.state in
     let anti_frame = Fix.subst subst s.anti_frame in
     { state; anti_frame }
 

@@ -404,7 +404,6 @@ let sure_is_nonempty state =
 
 let get_init_data { genv; _ } = genv
 let clear { genv; _ } = { genv; mem = just_functions genv }
-let copy h = h
 
 let pp_params fmt params =
   let rec aux fmtp = function
@@ -777,16 +776,13 @@ let execute_action ~action_name heap params =
 (* LActions static *)
 
 (* Serialization and operations *)
-let substitution_in_place subst heap =
+let substitution subst heap =
   let open Delayed.Syntax in
   let { mem; genv } = heap in
   let+ mem = Mem.substitution subst mem in
   match mem with
   | Ok mem -> { mem; genv }
   | Error e -> Fmt.failwith "Error in substitution: %a" SHeapTree.pp_err e
-
-let clean_up ?(keep = Expr.Set.empty) _ : Expr.Set.t * Expr.Set.t =
-  (Expr.Set.empty, keep)
 
 let lvars heap = Mem.lvars heap.mem
 let alocs heap = Mem.alocs heap.mem

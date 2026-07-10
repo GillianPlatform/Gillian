@@ -106,10 +106,10 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     ((s1, s2), v1 @ v2)
   (* Maybe forbid it? *)
 
-  let substitution_in_place st (s1, s2) =
+  let substitution st (s1, s2) =
     let open Delayed.Syntax in
-    let* s1' = S1.substitution_in_place st s1 in
-    let+ s2' = S2.substitution_in_place st s2 in
+    let* s1' = S1.substitution st s1 in
+    let+ s2' = S2.substitution st s2 in
     (s1', s2')
 
   let lvars (s1, s2) = Containers.SS.union (S1.lvars s1) (S2.lvars s2)

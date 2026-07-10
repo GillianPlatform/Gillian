@@ -1,6 +1,6 @@
 type 'a _t
 
-module Make (BaseState : PState.S) : sig
+module Make (BaseState : SState.S) : sig
   include
     State.S
       with type t = BaseState.t _t

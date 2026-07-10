@@ -54,7 +54,7 @@ let[@inline] produce core_pred s args =
   | Ex, Some _, _ -> Delayed.vanish ()
   | Ex, _, _ -> failwith "Invalid PointsTo produce"
 
-let substitution_in_place subst s =
+let substitution subst s =
   Option.map (Subst.subst_in_expr ~partial:true subst) s |> Delayed.return
 
 let compose s1 s2 =

@@ -138,11 +138,11 @@ module Make (S : MyMonadicSMemory.S) :
     let s, v = S.instantiate v in
     (SubState s, v)
 
-  let substitution_in_place sub s =
+  let substitution sub s =
     let open Delayed.Syntax in
     match s with
     | SubState s ->
-        let+ s' = S.substitution_in_place sub s in
+        let+ s' = S.substitution sub s in
         SubState s'
     | s -> Delayed.return s
 

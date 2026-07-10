@@ -2,11 +2,11 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (Verification :
-      Verifier.S with type SPState.init_data = ID.t and type annot = PC.Annot.t)
+      Verifier.S with type State.init_data = ID.t and type annot = PC.Annot.t)
     (Lifter :
       Debugger_lifter.S
         with type memory = Verification.SAInterpreter.heap_t
-         and type memory_error = Verification.SPState.m_err_t
+         and type memory_error = Verification.State.m_err_t
          and type tl_ast = PC.tl_ast
          and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
          and type annot = PC.Annot.t
@@ -18,11 +18,11 @@ struct
   module Impl : Debugger_impl = struct
     type proc_state_ext = unit
 
-    (* Despite the name, this debugger steps the [PState]-based interpreter
-       ([module State] = [Verification.SPState]), so stepping through a session
-       whose program uses predicates performs [Get_pred_defs] (matching,
-       fold/unfold). We compile the predicate table once and install it around
-       every step. *)
+    (* Despite the name, this debugger steps the verification interpreter
+       ([module State] = [Verification.State], over the predicate-carrying
+       memory), so stepping through a session whose program uses predicates
+       performs [Get_pred_defs] (matching, fold/unfold). We compile the
+       predicate table once and install it around every step. *)
     type debug_state_ext = MP.preds_tbl_t
 
     let preprocess_prog ~no_unfold:_ prog = prog

@@ -14,7 +14,7 @@ end
 module Make
     (ID : Init_data.S)
     (CMemory : CMemory.S with type init_data = ID.t)
-    (SMemory : SMemory.S with type init_data = ID.t)
+    (SMemory : Monadic.MonadicSMemory.S with type init_data = ID.t)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (External : External.T(PC.Annot).S)
     (Runners : sig

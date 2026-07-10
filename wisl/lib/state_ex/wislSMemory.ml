@@ -38,12 +38,12 @@ let get_cell heap (loc : vt) (offset : vt) =
 
 let set_cell ~alloc_if_missing heap (loc : vt) (offset : vt) (value : vt) =
   let** loc = resolve_loc ~alloc_if_missing loc in
-  let++ () = WislSHeap.set_cell ~alloc_if_missing heap loc offset value in
+  let++ heap = WislSHeap.set_cell ~alloc_if_missing heap loc offset value in
   (heap, [])
 
 let rem_cell heap (loc : vt) (offset : vt) =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_cell heap loc offset in
+  let++ heap = WislSHeap.rem_cell heap loc offset in
   (heap, [])
 
 let get_bound heap loc =
@@ -55,12 +55,12 @@ let get_bound heap loc =
 
 let set_bound ~alloc_if_missing heap (loc : vt) (bound : int) =
   let** loc = resolve_loc ~alloc_if_missing loc in
-  let++ () = WislSHeap.set_bound ~alloc_if_missing heap loc bound in
+  let++ heap = WislSHeap.set_bound ~alloc_if_missing heap loc bound in
   (heap, [])
 
 let rem_bound heap loc =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_bound heap loc in
+  let++ heap = WislSHeap.rem_bound heap loc in
   (heap, [])
 
 let get_freed heap loc =
@@ -71,21 +71,21 @@ let get_freed heap loc =
 
 let set_freed ~alloc_if_missing heap (loc : vt) =
   let** loc = resolve_loc ~alloc_if_missing loc in
-  let++ () = WislSHeap.set_freed ~alloc_if_missing heap loc in
+  let++ heap = WislSHeap.set_freed ~alloc_if_missing heap loc in
   (heap, [])
 
 let rem_freed heap loc =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.rem_freed heap loc in
+  let++ heap = WislSHeap.rem_freed heap loc in
   (heap, [])
 
 let alloc heap (size : int) =
-  let loc = WislSHeap.alloc heap size in
+  let heap, loc = WislSHeap.alloc heap size in
   ok (heap, [ Expr.Lit (Loc loc); Lit (Int Z.zero) ])
 
 let dispose heap loc =
   let** loc = resolve_loc loc in
-  let++ () = WislSHeap.dispose heap loc in
+  let++ heap = WislSHeap.dispose heap loc in
   (heap, [])
 
 let execute_action
@@ -156,7 +156,6 @@ let produce ~core_pred heap args =
       Delayed.vanish ()
   | Ok (heap', _) -> Delayed.return heap'
 
-let copy = WislSHeap.copy
 let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 
 (* TODO: Implement properly *)
@@ -184,11 +183,7 @@ let get_recovery_tactic _ e =
       Recovery_tactic.try_unfold (loc :: ofs)
   | _ -> Recovery_tactic.none
 
-let substitution_in_place = WislSHeap.substitution_in_place
-
-let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
-  WislSHeap.clean_up keep mem
-
+let substitution = WislSHeap.substitution
 let lvars heap = WislSHeap.lvars heap
 let alocs heap = WislSHeap.alocs heap
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap
