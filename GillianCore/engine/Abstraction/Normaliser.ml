@@ -5,7 +5,7 @@ module SESubst = SVal.SESubst
 
 let new_lvar_name var = lvar_prefix ^ var
 
-module Make (SPState : PState.S) = struct
+module Make (State : SState.S) = struct
   (*  ------------------------------------------------------------------
    *  List Preprocessing
    *  ------------------------------------------------------------------
@@ -563,7 +563,7 @@ module Make (SPState : PState.S) = struct
       in
       let f_iter (c_asrt : string * Expr.t list * Expr.t list) : unit =
         let a, ins, outs = c_asrt in
-        if SPState.is_overlapping_asrt a then
+        if State.is_overlapping_asrt a then
           try
             let other_asrts = Hashtbl.find summary a in
             Hashtbl.replace summary a ((ins, outs) :: other_asrts);
@@ -669,9 +669,8 @@ module Make (SPState : PState.S) = struct
     (c_asrts'', subst', subst)
 
   let produce_core_asrts
-      (astate : SPState.t)
-      (core_asrts : (string * Expr.t list * Expr.t list) list) : SPState.t list
-      =
+      (astate : State.t)
+      (core_asrts : (string * Expr.t list * Expr.t list) list) : State.t list =
     let f_aux (es : Expr.t list) : SS.t * SS.t =
       List.fold_left
         (fun (ret1, ret2) e ->
@@ -716,7 +715,7 @@ module Make (SPState : PState.S) = struct
          (fun current_states (a, ins, outs) ->
            let open Syntaxes.List in
            let* current_state = current_states in
-           SPState.produce current_state subst [ Asrt.CorePred (a, ins, outs) ]
+           State.produce current_state subst [ Asrt.CorePred (a, ins, outs) ]
            |>
            (* If some production fails, we ignore *)
            List.filter_map (function
@@ -728,7 +727,7 @@ module Make (SPState : PState.S) = struct
                         with Message: %a. Might have lost some paths ?"
                        Asrt.pp_atom
                        (Asrt.CorePred (a, ins, outs))
-                       SPState.pp_err msg);
+                       State.pp_err msg);
                  None))
          [ astate ]
 
@@ -777,9 +776,9 @@ module Make (SPState : PState.S) = struct
   *)
   let normalise_assertion
       ~pred_defs:(_ : MP.preds_tbl_t)
-      ~(init_data : SPState.init_data)
+      ~(init_data : State.init_data)
       ?(pvars : SS.t option)
-      (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
+      (a : Asrt.t) : ((State.t * SESubst.t) list, string) result =
     let falsePFs pfs = PFS.mem pfs Expr.false_ in
     let a = normalise_a_bit a in
     let svars = SS.filter is_spec_var_name (Asrt.lvars a) in
@@ -841,26 +840,26 @@ module Make (SPState : PState.S) = struct
         L.verbose (fun m -> m "PFS after extenzion:\n%a" PFS.pp pfs);
 
         (* Step 7 -- Construct the state *)
-        let astate : SPState.t =
-          SPState.make_p ~init_data ~store ~pfs ~gamma ~spec_vars:svars ()
+        let astate : State.t =
+          State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars:svars
         in
         let open Syntaxes.List in
         let res =
           let* astate = produce_core_asrts astate c_asrts' in
 
           (* Step 8 -- Check if the symbolic state makes sense *)
-          let mem_constraints = SPState.mem_constraints astate in
+          let mem_constraints = State.mem_constraints astate in
           if
             FOSolver.check_satisfiability
               (mem_constraints @ PFS.to_list pfs)
               gamma
           then (
             (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
-            let _, states = SPState.simplify ~matching:true astate in
+            let _, states = State.simplify ~matching:true astate in
             let+ state = states in
             L.verbose (fun m ->
                 m "AFTER NORMALISATION: %d states: @\n%a" (List.length states)
-                  SPState.pp astate);
+                  State.pp astate);
             (state, SESubst.copy subst))
           else (
             L.verbose (fun m ->

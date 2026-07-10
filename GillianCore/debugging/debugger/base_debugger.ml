@@ -10,11 +10,11 @@ module Premake
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (Verification :
-      Verifier.S with type SPState.init_data = ID.t and type annot = PC.Annot.t)
+      Verifier.S with type State.init_data = ID.t and type annot = PC.Annot.t)
     (Lifter :
       Lift.S
         with type memory = Verification.SAInterpreter.heap_t
-         and type memory_error = Verification.SPState.m_err_t
+         and type memory_error = Verification.State.m_err_t
          and type tl_ast = PC.tl_ast
          and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
          and type annot = PC.Annot.t
@@ -26,7 +26,7 @@ struct
   module Breakpoints = Set.Make (Int)
   module Annot = PC.Annot
   module Content_type = L.Logging_constants.Content_type
-  module State = Verification.SPState
+  module State = Verification.State
   module Store = Store
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
@@ -150,7 +150,7 @@ struct
     (** Install the ambient predicate table (see {!Engine.MP.with_pred_table})
         for the duration of [f], so that predicate lookups performed while
         stepping and matching resolve the [Get_pred_defs] effect. Both debuggers
-        step the [PState]-based interpreter (see [module State]), so both must
+        step the verification interpreter (see [module State]), so both must
         supply the real table. *)
     val with_pred_table : debug_state_ext base_debug_state -> (unit -> 'a) -> 'a
   end

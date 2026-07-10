@@ -60,4 +60,3 @@ module Dummy_memory = SMemory.Dummy
 module Store = SStore
 
 module SState = SState
-module PState = PState

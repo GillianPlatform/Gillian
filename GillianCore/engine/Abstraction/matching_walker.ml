@@ -6,7 +6,8 @@
     The machinery is polymorphic in the state ['s] it operates over and the
     error type ['err] it emits; every state operation is received through an
     {!ops} record. It is instantiated twice:
-    - at the {i state} level by [Matcher.Make] (['s = State.t Pred_state.t]);
+    - at the {i state} level by [Matcher.Make] (instantiated by [SState] over
+      itself);
     - at the {i memory} level by the [Combinators.Abstraction] combinator (['s]
       = memory + path condition), where user-defined predicates and wands are
       consumed/produced like any other core predicate.

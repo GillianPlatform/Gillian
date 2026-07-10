@@ -6,11 +6,11 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (Verification :
-      Verifier.S with type SPState.init_data = ID.t and type annot = PC.Annot.t)
+      Verifier.S with type State.init_data = ID.t and type annot = PC.Annot.t)
     (Lifter :
       Debugger_lifter.S
         with type memory = Verification.SAInterpreter.heap_t
-         and type memory_error = Verification.SPState.m_err_t
+         and type memory_error = Verification.State.m_err_t
          and type tl_ast = PC.tl_ast
          and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
          and type annot = PC.Annot.t
@@ -142,7 +142,7 @@ struct
             in
             let open L.Logging_constants.Content_type in
             let open Verification.SMatcher.Logging in
-            let open Verification.SState in
+            let open Verification.State in
             let astate, subst =
               if type_ = assertion then
                 let report =
@@ -158,16 +158,13 @@ struct
                 Fmt.failwith "get_astate: report %a has unexpected type %s"
                   L.Report_id.pp id type_
             in
+            (* Predicates live in the memory; the lifter re-projects them from
+               [memory] when building the variable panes. *)
             let store = get_store astate.state |> Store.bindings in
             let memory = get_heap astate.state in
             let pfs = get_pfs astate.state in
             let types = get_typ_env astate.state in
-            (* Predicates live in the memory; the lifter re-projects them from
-               [memory] when building the variable panes. *)
-            let preds = Preds.init [] in
-            let astate =
-              make_astate ~store ~memory ~pfs ~types ~preds ?subst ()
-            in
+            let astate = make_astate ~store ~memory ~pfs ~types ?subst () in
             Some (id, astate)
         | [] -> None
       in
@@ -177,8 +174,7 @@ struct
       let memory = State.get_heap astate in
       let pfs = State.get_pfs astate in
       let types = State.get_typ_env astate in
-      let preds = State.get_preds astate in
-      (id, make_astate ~store ~memory ~pfs ~types ~preds ())
+      (id, make_astate ~store ~memory ~pfs ~types ())
   end
 
   include Make (Impl)

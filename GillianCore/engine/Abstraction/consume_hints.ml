@@ -7,7 +7,8 @@
     predicate-carrying memory for candidate selection only — they are still
     checked (never assumed) by the walker afterwards.
 
-    This dies together with [PState], when the memory interfaces can evolve. *)
+    This dies when state-level matching can pass the known outs structurally
+    (i.e. when the memory interfaces can evolve). *)
 
 let current : Expr.t option list option ref = ref None
 

@@ -66,7 +66,7 @@ module Make (S : MonadicSMemory.S) = struct
   type t = S.t abs [@@deriving yojson, show]
 
   (** Errors of the abstraction layer. Each abstraction-specific constructor
-      mirrors the [StateErr.t] error that [PState]/[Matcher] raise for the same
+      mirrors the [StateErr.t] error that the state level raises for the same
       situation today, so that [can_fix]/[get_fixes]/[get_recovery_tactic]/
       [get_failing_constraint] behave identically once predicate reasoning
       happens below the state:
@@ -847,7 +847,7 @@ module Make (S : MonadicSMemory.S) = struct
 
   (* Mirrors the legacy state-level unfold. The state-level version additionally registered
      the binding names as spec vars and simplified the resulting states; both
-     are state-level concerns handled above the memory (PState's action shim
+     are state-level concerns handled above the memory (SState's action shim
      and the SMT-backed candidate matching, respectively). *)
   and unfold
       ?(additional_bindings = [])
@@ -1640,7 +1640,7 @@ module Make (S : MonadicSMemory.S) = struct
                else Some (Branch.make ~pc:ms.pc ~value:ms.st)))
 
   (* The predicate-manipulating SL commands arrive as reserved actions with
-     the [SLCmd] encoding; the state (PState) has already evaluated the
+     the [SLCmd] encoding; the state has already evaluated the
      store-dependent sub-expressions. *)
   let execute_pred_action (act : action) (ms : mstate) (args : Expr.t list) :
       (mstate * Expr.t list, err_t) Res_list.t =
@@ -1769,7 +1769,7 @@ module Make (S : MonadicSMemory.S) = struct
   let is_exclusively_owned (_ : t) (_ : Expr.t list) =
     failwith
       "Cannot determine with certainty if an abstract memory is exclusively \
-       owned. Use [Pred_state.is_exclusively_owned] instead."
+       owned."
 
   let is_empty (_ : t) =
     failwith "Cannot determine with certainty if an abstract memory is empty."

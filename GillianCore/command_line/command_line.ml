@@ -35,9 +35,8 @@ struct
   module S_interpreter =
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
 
-  module SPState = PState.Make (VSState)
-  module Verification = Verifier.Make (VSState) (SPState) (PC) (External)
-  module Abductor = Abductor.Make (SPState) (PC) (External)
+  module Verification = Verifier.Make (VSState) (PC) (External)
+  module Abductor = Abductor.Make (VSState) (PC) (External)
 
   (* The tool-provided [Lifter] works over the raw memory [SMemory.t] and its
      errors, but the verification state's heap is
@@ -52,7 +51,7 @@ struct
     include Raw
 
     type memory = Verification.heap_t
-    type memory_error = Verification.SPState.m_err_t
+    type memory_error = Verification.State.m_err_t
 
     let get_variables t (astate : memory Debugger_utils.astate) id =
       (* Predicates live in the memory: re-project them so the debugger's
