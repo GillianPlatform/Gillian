@@ -154,7 +154,12 @@ module Make (State : SState.S) :
            keeps the original state; zero branches kill the path. *)
         let unfold_vals = Expr.base_elements v in
         let enc_args =
-          [ Expr.Lit Nono; Expr.EList unfold_vals; Expr.Lit (String "low") ]
+          [
+            Expr.Lit Nono;
+            Expr.EList unfold_vals;
+            Expr.Lit (String "low");
+            Expr.EList [];
+          ]
         in
         let results =
           State.execute_action SLCmd.recover_action astate'.state enc_args

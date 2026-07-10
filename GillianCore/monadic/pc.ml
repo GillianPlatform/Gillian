@@ -9,19 +9,31 @@ type t = {
   learned : Expr.Set.t;
   learned_types : (string * Type.t) list;
   matching : bool;
+  mutable materialized : (Pure_context.t * Type_env.t) option;
+      (** Memoized result of folding [learned]/[learned_types] into copies of
+          [pfs]/[gamma] (see [FOSolver.build_full_pfs]) — materialization is hot
+          in candidate-scoring loops. Never set when both deltas are empty. *)
 }
 
-let copy { pfs; gamma; learned; learned_types; matching } =
+let copy { pfs; gamma; learned; learned_types; matching; _ } =
   {
     pfs = Pure_context.copy pfs;
     gamma = Type_env.copy gamma;
     learned;
     learned_types;
     matching;
+    materialized = None;
   }
 
 let make ~pfs ~gamma ~matching ?(learned = []) ?(learned_types = []) () =
-  { pfs; gamma; learned = Expr.Set.of_list learned; learned_types; matching }
+  {
+    pfs;
+    gamma;
+    learned = Expr.Set.of_list learned;
+    learned_types;
+    matching;
+    materialized = None;
+  }
 
 let init ?(matching = false) () =
   make ~pfs:(Pure_context.init ()) ~gamma:(Type_env.init ()) ~matching ()
@@ -74,9 +86,11 @@ let extend pc fs =
     pc with
     learned = Expr.Set.add_seq (List.to_seq new_pfs) pc.learned;
     learned_types = new_gamma @ pc.learned_types;
+    materialized = None;
   }
 
-let extend_types pc types = { pc with learned_types = types @ pc.learned_types }
+let extend_types pc types =
+  { pc with learned_types = types @ pc.learned_types; materialized = None }
 
 (** A pc whose learned facts contain literal [false] denotes an unreachable
     branch (learning goes through {!extend}, which reduces formulas, so a

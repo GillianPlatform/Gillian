@@ -115,16 +115,19 @@ type ('s, 'err) ops = {
   unfolding_vals : 's -> Expr.t list -> Expr.t list;
   (* Recovery hooks for the fuel-limited retry loop of {!match_}. *)
   get_recovery_tactic : 's -> 'err list -> Expr.t Recovery_tactic.t;
+  (* [tried] is the set of predicate candidates already unfolded by previous
+     iterations of the retry loop; the implementation must not select those
+     again and must return the updated set. The legacy state-level
+     instantiation ignores it (it pops tried candidates from its mutable
+     predicate set instead, which persists in the recovery base); immutable
+     predicate stores honour it, which is what makes the loop progress (and
+     terminate) exactly like the legacy one. *)
   try_recovering :
-    's -> Expr.t Recovery_tactic.t -> ('s list * recovery_tactic, string) result;
+    's ->
+    tried:(string * Expr.t list) list ->
+    Expr.t Recovery_tactic.t ->
+    ('s list * (string * Expr.t list) list * recovery_tactic, string) result;
   unfold_concrete_preds : 's -> (SVal.SESubst.t option * 's) option;
-  (* Whether successive iterations of the retry loop should recover from the
-     previously recovered state rather than from the initial one. The legacy
-     state-level instantiation recovers from the initial state and relies on
-     [try_recovering] mutating its predicate set in place (removing tried
-     predicates) for the loop to progress; instantiations with an immutable
-     predicate store must advance the base instead. *)
-  advance_recovery_base : unit -> bool;
   (* Printing / logging. *)
   pp : Format.formatter -> 's -> unit;
   pp_err : Format.formatter -> 'err -> unit;
@@ -756,7 +759,7 @@ and match_
   let subst_i = SVal.SESubst.copy subst in
   let can_fix errs = List.exists ops.can_fix errs in
 
-  let rec handle_ret ?prev_id ~fuel ~recovery_base ret =
+  let rec handle_ret ?prev_id ~fuel ~tried ret =
     L.set_previous ~force_none:true prev_id;
     match ret with
     | Ok successes ->
@@ -769,7 +772,7 @@ and match_
         L.verbose (fun fmt -> fmt "Matcher.match_: Failure");
         if !Config.under_approximation then
           L.fail "MATCHING ABORTED IN UX MODE???";
-        let tactics = ops.get_recovery_tactic recovery_base errs in
+        let tactics = ops.get_recovery_tactic astate_i errs in
         L.verbose (fun m ->
             m
               "Match. Unable to match. About to attempt the following recovery \
@@ -777,11 +780,11 @@ and match_
                %a"
               (Recovery_tactic.pp Expr.pp)
               tactics);
-        match ops.try_recovering recovery_base tactics with
+        match ops.try_recovering astate_i ~tried tactics with
         | Error msg ->
             L.normal (fun m -> m "Match. Recovery tactic failed: %s" msg);
             Res_list.just_errors errs
-        | Ok (sp, tactic) -> (
+        | Ok (sp, tried, tactic) -> (
             let open Syntaxes.List in
             let recovery_report_id =
               let id = ref None in
@@ -807,14 +810,11 @@ and match_
                 let new_ret =
                   match_mp ops ?prev_id ([ (astate, subst'', mp) ], [])
                 in
-                let recovery_base =
-                  if ops.advance_recovery_base () then astate else recovery_base
-                in
-                handle_ret ?prev_id ~fuel:(fuel - 1) ~recovery_base new_ret))
+                handle_ret ?prev_id ~fuel:(fuel - 1) ~tried new_ret))
     | Error errors ->
         L.verbose (fun fmt -> fmt "Matcher.match: Failure");
         Res_list.just_errors errors
   in
   ops.log.with_match_parent astate subst mp match_kind (fun () ->
       let ret = match_mp ops ([ (astate, subst, mp) ], []) in
-      handle_ret ~fuel:10 ~recovery_base:astate_i ret)
+      handle_ret ~fuel:10 ~tried:[] ret)

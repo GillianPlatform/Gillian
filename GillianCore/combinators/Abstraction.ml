@@ -219,7 +219,11 @@ module Make (S : MonadicSMemory.S) = struct
       | f -> [ f ]
     in
     let fs = List.concat_map split_conjunct fs in
-    { pc with learned = Expr.Set.add_seq (List.to_seq fs) pc.learned }
+    {
+      pc with
+      learned = Expr.Set.add_seq (List.to_seq fs) pc.learned;
+      materialized = None;
+    }
 
   let with_matching (pc : Pc.t) (matching : bool) : Pc.t = { pc with matching }
   let copy_mstate (ms : mstate) : mstate = { ms with pc = Pc.copy ms.pc }
@@ -467,6 +471,7 @@ module Make (S : MonadicSMemory.S) = struct
 
   let consume_pred_with_vs
       ~(auto_level : [ `Low | `High ])
+      ~(exclude : upred list)
       (ms : mstate)
       (values : Expr.t list) : (upred * upred list) option =
     let pred_defs = MP.get_pred_defs () in
@@ -487,9 +492,23 @@ module Make (S : MonadicSMemory.S) = struct
       | `Low -> [ strategy_1 ~ms ~values ~pred_defs; strategy_2 ~pred_defs ]
     in
     let strategies = List.map wrap_strategy strategies in
-    let preds_ref = Preds.init ms.st.preds in
+    (* Candidates already tried by the enclosing retry loop are excluded from
+       selection (the legacy code popped them from its mutable predicate set);
+       the chosen one is removed from the FULL predicate list. *)
+    let selectable =
+      List.filter (fun pa -> not (List.mem pa exclude)) ms.st.preds
+    in
+    let preds_ref = Preds.init selectable in
     List.find_map (Preds.strategic_choice ~consume:true preds_ref) strategies
-    |> Option.map (fun chosen -> (chosen, Preds.to_list preds_ref))
+    |> Option.map (fun chosen ->
+           let remaining_ref = Preds.init ms.st.preds in
+           let popped =
+             Preds.pop remaining_ref (fun (n, args) ->
+                 let cn, cargs = chosen in
+                 String.equal n cn && List.equal Expr.equal args cargs)
+           in
+           assert (Option.is_some popped);
+           (chosen, Preds.to_list remaining_ref))
 
   let select_guarded_predicate_to_fold (ms : mstate) (values : Expr.t list) :
       upred option =
@@ -554,11 +573,8 @@ module Make (S : MonadicSMemory.S) = struct
       can_fix;
       unfolding_vals = (fun _ fs -> unfolding_vals fs);
       get_recovery_tactic = (fun ms errs -> recovery_tactic_of_errs ms errs);
-      try_recovering = (fun ms tactic -> try_recovering ms tactic);
+      try_recovering = (fun ms ~tried tactic -> try_recovering ms ~tried tactic);
       unfold_concrete_preds = (fun ms -> unfold_concrete_preds ms);
-      (* The predicate store is immutable: the retry loop must advance its
-         recovery base for the predicate selection to progress. *)
-      advance_recovery_base = (fun () -> true);
       pp = (fun fmt ms -> pp fmt ms.st);
       pp_err = pp_err_t;
       log =
@@ -930,15 +946,16 @@ module Make (S : MonadicSMemory.S) = struct
 
   and unfold_with_vals'
       ~(auto_level : [ `High | `Low ])
+      ~(exclude : upred list)
       (ms : mstate)
-      (vs : Expr.t list) : (string * (SVal.SESubst.t * mstate) list) option =
+      (vs : Expr.t list) : (upred * (SVal.SESubst.t * mstate) list) option =
     L.verbose (fun m ->
         m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n"
           Fmt.(list ~sep:comma Expr.pp)
           vs);
     if !Config.manual_proof then None
     else
-      match consume_pred_with_vs ~auto_level ms vs with
+      match consume_pred_with_vs ~auto_level ~exclude ms vs with
       | Some ((pname, v_args), remaining_preds) -> (
           L.verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname);
           (* The strategic choice consumes the selected predicate. *)
@@ -951,7 +968,7 @@ module Make (S : MonadicSMemory.S) = struct
                   m "Unfold complete: %s(@[<h>%a@]): %d" pname
                     Fmt.(list ~sep:comma Expr.pp)
                     v_args (List.length rets));
-              Some (pname, only_successes)
+              Some ((pname, v_args), only_successes)
           | _ :: _ ->
               L.verbose (fun m ->
                   m "Unfolding failed in unfold_with_vals: %a"
@@ -980,12 +997,17 @@ module Make (S : MonadicSMemory.S) = struct
       | _ -> true
     in
     let should_unfold (pname, vs) =
-      (* Find a predicate with only concrete args and without a guard. *)
+      (* Find a predicate with only concrete args and without a guard. The
+         concreteness check is purely syntactic, like the legacy one: the
+         state-level simplifications substitute the predicate arguments in the
+         memory, so relevant arguments are syntactically concrete by the time
+         this runs (a pc-aware check here reduces every argument against the
+         full pfs after every operation, which is prohibitive). *)
       let pred = MP.get_pred_def pred_defs pname in
       Option.is_none pred.pred.pred_guard
       && Pred.in_args pred.pred vs
          |> List.for_all (fun in_arg ->
-                match Expr.to_literal (simplify_val ms in_arg) with
+                match Expr.to_literal in_arg with
                 | None -> false
                 | Some lit -> is_unfoldable_lit lit)
     in
@@ -1028,8 +1050,11 @@ module Make (S : MonadicSMemory.S) = struct
     | None -> Some (None, ms)
 
   (* Mirrors [Matcher.try_recovering]. *)
-  and try_recovering (ms : mstate) (tactic : Expr.t Recovery_tactic.t) :
-      (mstate list * W.recovery_tactic, string) result =
+  and try_recovering
+      (ms : mstate)
+      ~(tried : upred list)
+      (tactic : Expr.t Recovery_tactic.t) :
+      (mstate list * upred list * W.recovery_tactic, string) result =
     let open Syntaxes.Result in
     if !Config.under_approximation then
       L.fail "Recovery tactics not handled in UX mode";
@@ -1041,7 +1066,7 @@ module Make (S : MonadicSMemory.S) = struct
           let pname = Option.value ~default:"!UNKNOWN!" pname in
           let successes, errors = Res_list.split res in
           match errors with
-          | [] -> Ok (successes, W.Try_fold (pname, fold_values))
+          | [] -> Ok (successes, tried, W.Try_fold (pname, fold_values))
           | _ ->
               let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
               Error error_string)
@@ -1051,12 +1076,14 @@ module Make (S : MonadicSMemory.S) = struct
     in
     (* This matches the legacy behaviour *)
     let unfold_values = Option.value ~default:[] tactic.try_unfold in
-    match unfold_with_vals' ~auto_level:`High ms unfold_values with
+    match
+      unfold_with_vals' ~auto_level:`High ~exclude:tried ms unfold_values
+    with
     | None ->
         Fmt.error "try_fold: %s\ntry_unfold: Automatic unfold failed" fold_error
-    | Some (pname, next_states) ->
+    | Some (((pname, _) as chosen), next_states) ->
         let sp = List.map snd next_states in
-        Ok (sp, W.Try_unfold (pname, unfold_values))
+        Ok (sp, chosen :: tried, W.Try_unfold (pname, unfold_values))
 
   and rec_unfold
       ?(fuel = 10)
@@ -1090,7 +1117,7 @@ module Make (S : MonadicSMemory.S) = struct
       ~(auto_level : [ `High | `Low ])
       (ms : mstate)
       (vs : Expr.t list) : (SVal.SESubst.t * mstate) list option =
-    unfold_with_vals' ~auto_level ms vs |> Option.map snd
+    unfold_with_vals' ~auto_level ~exclude:[] ms vs |> Option.map snd
 
   (* The eager concrete-unfolding post-pass, run after every boundary
      operation. Replaces the two engine call sites (post-spec-application and
@@ -1557,42 +1584,67 @@ module Make (S : MonadicSMemory.S) = struct
   (* Mirrors the interpreter's action-failure retry loop
      (recovery from the pre-action state, tactic merged from the action
      parameters and the error, fuel-limited). *)
+  (* Mirrors the interpreter's action-failure retry loop: recovery is
+     attempted ONCE per action evaluation (from the pre-action state, on the
+     first fixable error), and on success the whole action is re-executed on
+     the recovered states — not once per error branch, which multiplies
+     recovery attempts on branchy actions. *)
   let rec execute_sub_action
       ~fuel
       action_name
       (ms : mstate)
       (args : Expr.t list) : (mstate * Expr.t list, err_t) Res_list.t =
-    resolve_with_matching ~matching:false ms
-      (S.execute_action ~action_name ms.st.mem args)
-    |> List.concat_map (fun (res, ms') ->
-           match res with
-           | Ok (mem', vs) ->
-               [ Ok ({ ms' with st = { ms'.st with mem = mem' } }, vs) ]
-           | Error e when fuel > 0 && recovery_enabled () && S.can_fix e -> (
-               let tactic_from_params =
-                 Recovery_tactic.try_unfold
-                   (List.concat_map Expr.base_elements args)
-               in
-               let tactic =
-                 Recovery_tactic.merge tactic_from_params
-                   (S.get_recovery_tactic ms.st.mem e)
-                 |> augment_recovery_tactic ms.pc
-               in
-               L.verbose (fun m ->
-                   m "Action %s failed; attempting recovery with tactic:\n%a"
-                     action_name
-                     (Recovery_tactic.pp Expr.pp)
-                     tactic);
-               match try_recovering ms tactic with
-               | Error msg ->
-                   L.normal (fun m -> m "Recovery tactic failed: %s" msg);
-                   [ Error (SubError e) ]
-               | Ok (recovered, _) ->
-                   List.concat_map
-                     (fun ms'' ->
-                       execute_sub_action ~fuel:(fuel - 1) action_name ms'' args)
-                     recovered)
-           | Error e -> [ Error (SubError e) ])
+    let branches =
+      resolve_with_matching ~matching:false ms
+        (S.execute_action ~action_name ms.st.mem args)
+    in
+    let as_results () =
+      List.map
+        (fun (res, ms') ->
+          match res with
+          | Ok (mem', vs) ->
+              Ok ({ ms' with st = { ms'.st with mem = mem' } }, vs)
+          | Error e -> Error (SubError e))
+        branches
+    in
+    let fixable_error =
+      if fuel > 0 && recovery_enabled () then
+        List.find_map
+          (fun (res, _) ->
+            match res with
+            | Error e when S.can_fix e -> Some e
+            | _ -> None)
+          branches
+      else None
+    in
+    match fixable_error with
+    | None -> as_results ()
+    | Some e -> (
+        let tactic_from_params =
+          Recovery_tactic.try_unfold (List.concat_map Expr.base_elements args)
+        in
+        let tactic =
+          Recovery_tactic.merge tactic_from_params
+            (S.get_recovery_tactic ms.st.mem e)
+          |> augment_recovery_tactic ms.pc
+        in
+        L.verbose (fun m ->
+            m "Action %s failed; attempting recovery with tactic:\n%a"
+              action_name
+              (Recovery_tactic.pp Expr.pp)
+              tactic);
+        (* Each retry recovers afresh from its own pre-action state: progress
+           comes from the recovered state having consumed the unfolded
+           predicate, exactly like the interpreter's legacy retry loop. *)
+        match try_recovering ms ~tried:[] tactic with
+        | Error msg ->
+            L.normal (fun m -> m "Recovery tactic failed: %s" msg);
+            as_results ()
+        | Ok (recovered, _, _) ->
+            List.concat_map
+              (fun ms'' ->
+                execute_sub_action ~fuel:(fuel - 1) action_name ms'' args)
+              recovered)
 
   (* {2 The MonadicSMemory boundary}
 
@@ -1715,22 +1767,44 @@ module Make (S : MonadicSMemory.S) = struct
       | Expr.Lit (LList lits) -> Some (List.map Expr.lit lits)
       | _ -> Fmt.failwith "Invalid recover-action encoding"
     in
+    let dec_tried = function
+      | Expr.EList l ->
+          List.map
+            (function
+              | Expr.EList [ Expr.Lit (String n); Expr.EList args ] -> (n, args)
+              | Expr.EList [ Expr.Lit (String n); Expr.Lit (LList lits) ] ->
+                  (n, List.map Expr.lit lits)
+              | _ -> Fmt.failwith "Invalid recover-action tried encoding")
+            l
+      | _ -> Fmt.failwith "Invalid recover-action tried encoding"
+    in
     match args with
-    | [ fold_e; unfold_e; Lit (String level) ] -> (
+    | [ fold_e; unfold_e; Lit (String level); tried_e ] -> (
         let try_fold = dec_vals fold_e in
         let try_unfold = dec_vals unfold_e in
+        let tried = dec_tried tried_e in
         match level with
         | "low" -> (
             let vals = Option.value ~default:[] try_unfold in
-            match unfold_with_vals' ~auto_level:`Low ms vals with
+            match unfold_with_vals' ~auto_level:`Low ~exclude:tried ms vals with
             | None -> Res_list.error_with (OtherErr "Nothing to unfold")
             | Some (_, next_states) ->
                 List.map (fun (_, ms') -> Ok (ms', [])) next_states)
         | "high" -> (
             let tactic : Expr.t Recovery_tactic.t = { try_fold; try_unfold } in
-            match try_recovering ms tactic with
+            match try_recovering ms ~tried tactic with
             | Error msg -> Res_list.error_with (OtherErr msg)
-            | Ok (recovered, _) -> List.map (fun ms' -> Ok (ms', [])) recovered)
+            | Ok (recovered, tried', _) ->
+                (* Return the newly-tried candidate (if any) so the caller's
+                   retry loop can exclude it from later attempts. *)
+                let rets =
+                  if List.length tried' > List.length tried then
+                    match tried' with
+                    | (n, cargs) :: _ -> [ Expr.string n; Expr.EList cargs ]
+                    | [] -> []
+                  else []
+                in
+                List.map (fun ms' -> Ok (ms', rets)) recovered)
         | _ -> Fmt.failwith "Invalid recover-action level %s" level)
     | _ -> Fmt.failwith "Invalid recover-action encoding"
 

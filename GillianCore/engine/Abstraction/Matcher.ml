@@ -667,13 +667,9 @@ module Make (State : SState.S) :
       unfolding_vals = (fun astate fs -> State.unfolding_vals astate.state fs);
       get_recovery_tactic =
         (fun astate errs -> State.get_recovery_tactic astate.state errs);
-      try_recovering = (fun astate tactic -> try_recovering astate tactic);
+      try_recovering =
+        (fun astate ~tried tactic -> try_recovering astate ~tried tactic);
       unfold_concrete_preds = (fun astate -> unfold_concrete_preds astate);
-      (* The legacy retry loop progresses because [try_recovering] pops tried
-         predicates from the (mutable, state-level) predicate set; when the
-         predicates live in the immutable memory, the loop must advance its
-         recovery base instead. *)
-      advance_recovery_base = (fun () -> !Config.preds_in_memory);
       pp = pp_astate;
       pp_err = pp_err_t;
       log = log_hooks;
@@ -1253,17 +1249,27 @@ module Make (State : SState.S) :
      the reserved [SLCmd.recover_action]: recovered states come back as ok
      branches (zero branches = the path legitimately vanishes), errors mean
      recovery failed. The tactic witness is only used for logging. *)
-  and try_recovering_in_memory (astate : t) (tactic : Expr.t Recovery_tactic.t)
-      : (t list * recovery_tactic, string) result =
+  and try_recovering_in_memory
+      (astate : t)
+      ~(tried : (string * Expr.t list) list)
+      (tactic : Expr.t Recovery_tactic.t) :
+      (t list * (string * Expr.t list) list * recovery_tactic, string) result =
     let enc_opt = function
       | None -> Expr.Lit Nono
       | Some vs -> Expr.EList vs
+    in
+    let enc_tried =
+      Expr.EList
+        (List.map
+           (fun (n, args) -> Expr.EList [ Expr.string n; Expr.EList args ])
+           tried)
     in
     let enc_args =
       [
         enc_opt tactic.try_fold;
         enc_opt tactic.try_unfold;
         Expr.Lit (String "high");
+        enc_tried;
       ]
     in
     let results =
@@ -1272,16 +1278,24 @@ module Make (State : SState.S) :
     let oks =
       List.filter_map
         (function
-          | Ok (st, _) -> Some st
+          | Ok ok -> Some ok
           | Error _ -> None)
         results
     in
     match (oks, results) with
     | [], _ :: _ -> Error "In-memory recovery failed"
     | _ ->
+        (* The chosen candidate (if any) comes back in the action's return
+           values, so that the retry loop excludes it from later attempts. *)
+        let tried =
+          match oks with
+          | (_, [ Expr.Lit (String n); Expr.EList args ]) :: _ ->
+              (n, args) :: tried
+          | _ -> tried
+        in
         let states =
           List.map
-            (fun state ->
+            (fun (state, _) ->
               Pred_state.
                 {
                   state;
@@ -1300,15 +1314,22 @@ module Make (State : SState.S) :
         in
         Ok
           ( states,
+            tried,
             Try_unfold ("<memory>", Option.value ~default:[] tactic.try_unfold)
           )
 
-  and try_recovering (astate : t) (tactic : Expr.t Recovery_tactic.t) :
-      (t list * recovery_tactic, string) result =
+  and try_recovering
+      (astate : t)
+      ~(tried : (string * Expr.t list) list)
+      (tactic : Expr.t Recovery_tactic.t) :
+      (t list * (string * Expr.t list) list * recovery_tactic, string) result =
     if !Config.under_approximation then
       L.fail "Recovery tactics not handled in UX mode";
-    if !Config.preds_in_memory then try_recovering_in_memory astate tactic
+    if !Config.preds_in_memory then
+      try_recovering_in_memory astate ~tried tactic
     else
+      (* The legacy path pops tried candidates from its mutable predicate set,
+         so the [tried] parameter is passed through unchanged. *)
       let open Syntaxes.Result in
       L.verbose (fun m -> m "Attempting to recover");
       let- fold_error =
@@ -1318,7 +1339,7 @@ module Make (State : SState.S) :
             let pname = Option.value ~default:"!UNKNOWN!" pname in
             let successes, errors = Res_list.split res in
             match errors with
-            | [] -> Ok (successes, Try_fold (pname, fold_values))
+            | [] -> Ok (successes, tried, Try_fold (pname, fold_values))
             | _ ->
                 let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
                 Error error_string)
@@ -1334,7 +1355,15 @@ module Make (State : SState.S) :
             fold_error
       | Some (pname, next_states) ->
           let sp = List.map snd next_states in
-          Ok (sp, Try_unfold (pname, unfold_values))
+          Ok (sp, tried, Try_unfold (pname, unfold_values))
+
+  (* The public [try_recovering] (used by [PState] for the interpreter's
+     action-failure retries) keeps its historical signature; the exclusion set
+     is only threaded by the matching retry loop. *)
+  let try_recovering (astate : t) (tactic : Expr.t Recovery_tactic.t) :
+      (t list * recovery_tactic, string) result =
+    try_recovering astate ~tried:[] tactic
+    |> Result.map (fun (states, _, witness) -> (states, witness))
 
   let produce_assertion (astate : t) (subst : SVal.SESubst.t) (a : Asrt.atom) :
       (t, err_t) Res_list.t =
