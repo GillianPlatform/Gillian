@@ -190,11 +190,13 @@ module Make (FracA : FracA_S) = struct
 
   let lvars = function
     | None -> Containers.SS.empty
-    | Some (v, _) -> Expr.lvars v
+    | Some (v, q) ->
+        Containers.SS.union (Expr.lvars v) (Expr.lvars (FracA.to_expr q))
 
   let alocs = function
     | None -> Containers.SS.empty
-    | Some (v, _) -> Expr.alocs v
+    | Some (v, q) ->
+        Containers.SS.union (Expr.alocs v) (Expr.alocs (FracA.to_expr q))
 
   let assertions = function
     | None -> []

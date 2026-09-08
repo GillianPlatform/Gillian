@@ -120,7 +120,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     | S2 s1, S2 s2 ->
         let+ s' = S2.compose s1 s2 in
         S2 s'
-    | S1 _, S2 _ | S2 _, S1 _ -> failwith "Sum.compose: mismatched arguments"
+    | S1 _, S2 _ | S2 _, S1 _ -> Delayed.vanish ()
 
   let is_exclusively_owned s e =
     match s with
