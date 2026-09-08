@@ -174,7 +174,8 @@ module Make (FracA : FracA_S) = struct
   let is_exclusively_owned s _ =
     match s with
     | None -> Delayed.return false
-    | Some (_, q) -> Delayed.check_sat (FracA.is_1 q)
+    | Some (_, q) ->
+        if%sat FracA.is_1 q then Delayed.return true else Delayed.return false
 
   let is_empty = function
     | None -> true
