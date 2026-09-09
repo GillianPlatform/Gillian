@@ -232,6 +232,14 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 
 (***** Precedence of operators *****)
 (* The later an operator is listed, the higher precedence it is given. *)
+(* [coerce_prec] is the (lowest) precedence of the [pure -> assertion]
+   coercion; making it lower than [RBRACE] resolves the (harmless) ambiguity
+   of a parenthesised pure assertion in favour of the pure-assertion
+   parentheses. [ISINT] is given a very low precedence so that its expression
+   argument binds as much as possible (i.e. [is-int a + b] is [is-int (a+b)]). *)
+%nonassoc coerce_prec
+%nonassoc RBRACE
+%nonassoc ISINT
 (* Logic operators have lower precedence *)
 %nonassoc DOT
 %left LOR
@@ -256,7 +264,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left TIMES DIV MOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 
-%nonassoc binop_prec
 %nonassoc unop_prec
 
 (* Common *)
@@ -371,7 +378,11 @@ unop_target:
   | INTTONUM    { UnOp.IntToNum }
   | NUMTOINT    { UnOp.NumToInt }
 
-binop_target:
+(* Inlined so that each [e1 op e2] production inherits the precedence of its
+   operator token, letting the precedence table above disambiguate expressions
+   (instead of the old [%prec binop_prec] which forced a flat left-associative
+   parse regardless of operator). *)
+%inline binop_target:
   | EQUAL              { BinOp.Equal }
   | LESSTHAN           { BinOp.FLessThan }
   | LESSTHANEQUAL      { BinOp.FLessThanEqual }
@@ -410,7 +421,7 @@ expr_target:
   }
   | ALOC { Expr.ALoc $1 }
   | v = VAR { Expr.PVar v }
-  | e1=expr_target; bop=binop_target; e2=expr_target { Expr.BinOp (e1, bop, e2) } %prec binop_prec
+  | e1=expr_target; bop=binop_target; e2=expr_target { Expr.BinOp (e1, bop, e2) }
   | e1=expr_target; LSTCONS; e2=expr_target { Expr.NOp (LstCat, [ EList [ e1 ]; e2 ]) }
   | e1=expr_target; GREATERTHAN;  e2=expr_target { Expr.BinOp (e2, FLessThan, e1) }
   | e1=expr_target; GREATERTHANEQUAL; e2=expr_target { Expr.BinOp (e2, FLessThanEqual, e1) }
@@ -508,7 +519,7 @@ assertion_target:
   | LBRACE; ass=assertion_target; RBRACE
     { ass }
   | f = pure_assertion_target
-    { Asrt.Pure f }
+    { Asrt.Pure f } %prec coerce_prec
 
 /* COMMANDS */
 
@@ -948,7 +959,7 @@ js_lexpr_target:
     { JSExpr.LVar lvar }
 (* e binop e *)
   | e1=js_lexpr_target; bop=binop_target; e2=js_lexpr_target
-    { JSExpr.BinOp (e1, bop, e2) } %prec binop_prec
+    { JSExpr.BinOp (e1, bop, e2) }
 (* List cons *)
   | e1=js_lexpr_target; LSTCONS; e2=js_lexpr_target { JSExpr.NOp (LstCat, [ EList [ e1 ]; e2 ]) }
 (* unop e *)
@@ -1054,7 +1065,7 @@ js_pure_assertion_target:
 js_assertion_target:
 (* Pure *)
   | f = js_pure_assertion_target
-    { JSAsrt.Pure f }
+    { JSAsrt.Pure f } %prec coerce_prec
 (* P * Q *)
 (* The precedence of the separating conjunction is not the same as the arithmetic product *)
   | left_ass=js_assertion_target; TIMES; right_ass=js_assertion_target

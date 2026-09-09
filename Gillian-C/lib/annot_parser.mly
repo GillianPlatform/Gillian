@@ -122,21 +122,34 @@
 (* NOps *)
 %token SETUNION
 
-(* Precedence *)
+(* Precedence.
+   Expression operators use standard arithmetic precedence.  The formula
+   connectives (=> || && not) sit below the comparison operators
+   (== <# <=# --e--), which in turn sit below every expression operator, so
+   that the operands of a comparison or points-to greedily absorb arithmetic
+   (e.g. [x -> a + b] is [x -> (a+b)]).  [low_prec] is the (lowest) precedence
+   given to the comparison, points-to-constructor and [formula -> assertion]
+   coercion productions; keeping it below [RBRACE] resolves the harmless
+   ambiguity of a parenthesised pure assertion in favour of the parentheses.
+   [DOT] is the lowest of all, so a quantifier body extends as far right as
+   possible.  Note that [*] (STAR) is overloaded: it is arithmetic
+   multiplication inside an expression and separating conjunction between
+   (closed) assertions; both uses share this single, high precedence. *)
 %nonassoc DOT
-
-%left IMPLIES
-%left STAR
+%nonassoc low_prec LEQ LLT LLEQ LSETMEM
+%nonassoc RBRACE
+%right IMPLIES
+%left LOR
+%left LAND
 %nonassoc LNOT
-
-%nonassoc EQ
-%nonassoc SETSUB
+%left OR
+%left AND
+%nonassoc EQ LT SETMEM SETSUB
 %left SETDIFF
 %nonassoc LSTCONS
 %left LSTCAT
-%left PLUS
-
-%nonassoc binop_prec
+%left PLUS MINUS
+%left STAR DIV PTRPLUS
 %nonassoc unop_prec
 
 %start <CLogic.CProg.t> prog
@@ -351,7 +364,7 @@ assertion:
     let ptr = CExpr.SExpr (String v) in
     CAssert.PointsTo { ptr; constr=cs; typ=Global }
   }
-  | f = formula { CAssert.Pure f }
+  | f = formula { CAssert.Pure f } %prec low_prec
   | ZEROS; LBRACE; ptr = expression; COMMA; size = expression; RBRACE
     { CAssert.Zeros(ptr, size) }
   | ARRAY; LBRACE; ptr = expression; COMMA; chunk = typ; COMMA;  size = expression; COMMA; content = expression; RBRACE
@@ -410,7 +423,7 @@ constructor:
     el = separated_nonempty_list(SCOLON, expression); RCBRACE
     { Constructor.ConsTyp (id, el) } */
   | e = expression
-    { CConstructor.ConsExpr e }
+    { CConstructor.ConsExpr e } %prec low_prec
 
 
 expression:
@@ -421,7 +434,7 @@ expression:
     { CExpr.EList el }
   | NIL { CExpr.EList [] }
   | e1 = expression; b = binop; e2 = expression
-    { CExpr.BinOp (e1, b, e2) } %prec binop_prec
+    { CExpr.BinOp (e1, b, e2) }
   | u = unop; e = expression
     { CExpr.UnOp (u, e) } %prec unop_prec
   | SETOP; el = separated_list(COMMA, expression); SETCL
@@ -459,7 +472,10 @@ simple_expr:
   | loc = LOC { CSimplExpr.Loc loc }
   | str = STRING { CSimplExpr.String str}
 
-binop:
+(* Inlined so that each [e1 op e2] production inherits the precedence of its
+   operator token (see the precedence table above), instead of the old flat
+   [%prec binop_prec]. *)
+%inline binop:
   | LSTCONS { CBinOp.LstCons }
   | LSTCAT  { CBinOp.LstCat }
   | PLUS    { CBinOp.Plus }
