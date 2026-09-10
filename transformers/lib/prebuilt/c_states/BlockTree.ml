@@ -5,6 +5,7 @@ module DR = Delayed_result
 module DO = Delayed_option
 module SS = Gillian.Utils.Containers.SS
 module CoreP = Constr.Core
+module Fix = States.Fix
 
 (* Import from Cgil lib: *)
 module CConstants = Cgil_lib.CConstants
@@ -1690,22 +1691,35 @@ module M = struct
               in
               let null_ptr = Expr.EList [ null_typ; Expr.int 0 ] in
               [
-                [ (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]) ];
                 [
-                  (Single, [ ofs; chunk_as_expr ], [ null_ptr; freeable_perm ]);
+                  Fix.CorePred
+                    (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]);
+                  Fix.Types [ (new_var2, Type.IntType) ];
+                ];
+                [
+                  Fix.CorePred
+                    ( Single,
+                      [ ofs; chunk_as_expr ],
+                      [ null_ptr; freeable_perm ] );
                 ];
               ]
           | _ ->
-              let type_str =
+              let type_str, type_gil =
                 match chunk with
-                | Chunk.Mfloat32 -> single_type
-                | Chunk.Mfloat64 -> float_type
-                | Chunk.Mint64 -> long_type
-                | _ -> int_type
+                | Chunk.Mfloat32 -> (single_type, Type.NumberType)
+                | Chunk.Mfloat64 -> (float_type, Type.NumberType)
+                | Chunk.Mint64 -> (long_type, Type.IntType)
+                | _ -> (int_type, Type.IntType)
               in
               let new_var = Expr.LVar (LVar.alloc ()) in
               let value = Expr.EList [ Expr.string type_str; new_var ] in
-              [ [ (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]) ] ]
+              [
+                [
+                  Fix.CorePred
+                    (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]);
+                  Fix.Types [ (new_var, type_gil) ];
+                ];
+              ]
         in
         (* Additional fix for store operation to handle case of unitialized memory *)
         if is_store then
@@ -1716,7 +1730,10 @@ module M = struct
           in
           let uninit =
             [
-              [ (Hole, [ ofs; offset_by_chunk ofs chunk ], [ freeable_perm ]) ];
+              [
+                Fix.CorePred
+                  (Hole, [ ofs; offset_by_chunk ofs chunk ], [ freeable_perm ]);
+              ];
             ]
           in
           uninit @ fixes

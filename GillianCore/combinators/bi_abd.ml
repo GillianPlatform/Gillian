@@ -44,6 +44,15 @@ module Make (Mem : MyMonadicSMemory.S) :
                   fixes);
             List.map Delayed.return fixes |> Delayed.branches
           in
+          let types, cp_list =
+            List.partition_map
+              (function
+                | Fix.Types types -> Left types
+                | Fix.CorePred (cp, ins, outs) -> Right (cp, ins, outs))
+              cp_list
+          in
+          (* produce types first to avoid querying for them when producing core predicates *)
+          let* () = Delayed.assume_types (List.concat types) in
           let* state' =
             List.fold_left
               (fun state (pred, ins, outs) ->
