@@ -901,12 +901,15 @@ module Tree = struct
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
-    let replace_node _ = sarr_leaf ~low ~chunk ~array ~size ~perm in
-    let rebuild_parent = of_children in
-    let range = Range.of_low_chunk_and_size low chunk size in
-    let** _, t = frame_range t ~replace_node ~rebuild_parent range in
-    let+ () = SVArr.learn_chunk ~chunk ~size array in
-    Ok t
+    let open Expr.Infix in
+    if%sat size == Expr.zero_i then DR.ok t
+    else
+      let replace_node _ = sarr_leaf ~low ~chunk ~array ~size ~perm in
+      let rebuild_parent = of_children in
+      let range = Range.of_low_chunk_and_size low chunk size in
+      let** _, t = frame_range t ~replace_node ~rebuild_parent range in
+      let+ () = SVArr.learn_chunk ~chunk ~size array in
+      Ok t
 
   let cons_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
       (SVal.t * Perm.t option * t, err) DR.t =
@@ -1698,9 +1701,7 @@ module M = struct
                 ];
                 [
                   Fix.CorePred
-                    ( Single,
-                      [ ofs; chunk_as_expr ],
-                      [ null_ptr; freeable_perm ] );
+                    (Single, [ ofs; chunk_as_expr ], [ null_ptr; freeable_perm ]);
                 ];
               ]
           | _ ->
