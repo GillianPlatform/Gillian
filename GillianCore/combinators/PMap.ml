@@ -287,7 +287,13 @@ struct
         match s with
         | _, Some _ -> Delayed.vanish ()
         | h, None ->
-            let* () = Delayed.assume_types [ (d', Type.SetType) ] in
+            let* () =
+              (* trying to type a non-lvar/pvar on a set type fails. *)
+              match d' with
+              | Expr.LVar _ | Expr.PVar _ ->
+                  Delayed.assume_types [ (d', Type.SetType) ]
+              | _ -> Delayed.return ()
+            in
             (* This would be the correct implementation, but the handling of sets is bad so
                it creates all sorts of issues (eg. in matching plans)...
                let dom = ExpMap.bindings h |> List.map fst in
