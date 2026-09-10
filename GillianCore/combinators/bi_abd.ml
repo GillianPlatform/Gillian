@@ -44,7 +44,7 @@ module Make (Mem : MyMonadicSMemory.S) :
                   fixes);
             List.map Delayed.return fixes |> Delayed.branches
           in
-          let types, cp_list =
+          let types, core_preds =
             List.partition_map
               (function
                 | Fix.Types types -> Left types
@@ -59,8 +59,10 @@ module Make (Mem : MyMonadicSMemory.S) :
                 let* state = state in
                 Mem.produce pred state (ins @ outs))
               (Delayed.return state.state)
-              cp_list
+              core_preds
           in
+          (* the whole fix, types included, is recorded in the anti-frame so the
+             inferred spec carries them too *)
           let anti_frame = cp_list @ state.anti_frame in
           (* We produce that fix in our current state *)
           let new_state = { state = state'; anti_frame } in

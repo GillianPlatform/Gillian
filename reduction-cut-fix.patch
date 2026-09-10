@@ -1,0 +1,40 @@
+diff --git a/GillianCore/engine/FOLogic/Reduction.ml b/GillianCore/engine/FOLogic/Reduction.ml
+index 142cc3db..d77732ef 100644
+--- a/GillianCore/engine/FOLogic/Reduction.ml
++++ b/GillianCore/engine/FOLogic/Reduction.ml
+@@ -683,7 +683,8 @@ module Canonical = struct
+               | None -> singleton e))
+       | _ -> singleton e
+ 
+-    let cut (el : Expr.t) (er : Expr.t) : bool * Expr.t * Expr.t =
++    let cut ?(symb_cancel = false) (el : Expr.t) (er : Expr.t) :
++        bool * Expr.t * Expr.t =
+       (* L.verbose (fun fmt -> fmt "In cut: %a, %a" Expr.pp el Expr.pp er); *)
+       let success = ref false in
+       let cl = of_expr (P.canonicalise el) in
+@@ -702,6 +703,7 @@ module Canonical = struct
+             match Expr.Map.find_opt e restl with
+             | None -> (restl, restr)
+             | Some vl ->
++                if symb_cancel then success := true;
+                 if vl = vr then
+                   (Expr.Map.remove e restl, Expr.Map.remove e restr)
+                 else if vl > vr then
+@@ -2327,7 +2329,7 @@ and reduce_lexpr_loop
+             | UnOp (LstLen, le), Lit (Int z) when Z.equal z Z.one ->
+                 BinOp (le, Equal, EList [])
+             | _ ->
+-                let success, el, er = Cint.cut flel fler in
++                let success, el, er = Cint.cut ~symb_cancel:true flel fler in
+                 if success then Expr.BinOp (el, ILessThan, er) else def)
+         | FLessThanEqual -> (
+             let success, el, er = Cnum.cut flel fler in
+@@ -2340,7 +2342,7 @@ and reduce_lexpr_loop
+               | Some x -> Lit (Bool x)
+               | None -> def)
+         | ILessThanEqual -> (
+-            let success, el, er = Cint.cut flel fler in
++            let success, el, er = Cint.cut ~symb_cancel:true flel fler in
+             if success then BinOp (el, ILessThanEqual, er)
+             else
+               match

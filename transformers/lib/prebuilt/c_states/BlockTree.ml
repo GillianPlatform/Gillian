@@ -5,7 +5,7 @@ module DR = Delayed_result
 module DO = Delayed_option
 module SS = Gillian.Utils.Containers.SS
 module CoreP = Constr.Core
-module Fix = States.Fix
+module Fix = Gillian.Combinators.Fix
 
 (* Import from Cgil lib: *)
 module CConstants = Cgil_lib.CConstants
