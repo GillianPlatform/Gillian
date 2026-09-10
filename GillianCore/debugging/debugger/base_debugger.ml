@@ -146,6 +146,13 @@ struct
       debug_state_ext base_debug_state ->
       proc_state_ext base_proc_state ->
       (L.Report_id.t * State.heap_t astate) option
+
+    (** Install the ambient predicate table (see {!Engine.MP.with_pred_table})
+        for the duration of [f], so that predicate lookups performed while
+        stepping and matching resolve the [Get_pred_defs] effect. Both debuggers
+        step the [PState]-based interpreter (see [module State]), so both must
+        supply the real table. *)
+    val with_pred_table : debug_state_ext base_debug_state -> (unit -> 'a) -> 'a
   end
 
   module Make (Debugger_impl : Debugger_impl) = struct
@@ -1045,6 +1052,7 @@ struct
         exec_data
 
       let with_lifter_effects f proc_state state =
+        Debugger_impl.with_pred_table state.debug_state @@ fun () ->
         let open Lift in
         let open Lifter in
         let open Effect.Deep in

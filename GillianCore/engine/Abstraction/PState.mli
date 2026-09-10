@@ -10,7 +10,6 @@ module type S = sig
   include SState.S with type t := t
 
   val make_p :
-    preds:MP.preds_tbl_t ->
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
@@ -20,7 +19,6 @@ module type S = sig
     t
 
   val make_p_from_heap :
-    pred_defs:MP.preds_tbl_t ->
     store:store_t ->
     heap:heap_t ->
     spec_vars:SS.t ->
@@ -29,8 +27,6 @@ module type S = sig
     pfs:PFS.t ->
     gamma:Type_env.t ->
     t
-
-  val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t

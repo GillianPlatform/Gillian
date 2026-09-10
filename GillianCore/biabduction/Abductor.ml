@@ -522,6 +522,9 @@ struct
       (source_files : SourceFiles.t option) : unit =
     let open ResultsDir in
     let open ChangeTracker in
+    (* The predicate table is ambient for the whole run (normalisation,
+       interpretation and spec synthesis) via the [Get_pred_defs] effect. *)
+    MP.with_pred_table prog.preds @@ fun () ->
     if incremental && prev_results_exist () then
       (* Only test changed procedures *)
       let cur_source_files =

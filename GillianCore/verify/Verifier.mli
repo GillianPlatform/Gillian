@@ -45,7 +45,8 @@ module type S = sig
   val postprocess_files : SourceFiles.t option -> unit
 
   module Debug : sig
-    val get_tests_for_prog : init_data:SPState.init_data -> prog_t -> proc_tests
+    val get_tests_for_prog :
+      init_data:SPState.init_data -> prog_t -> MP.preds_tbl_t * proc_tests
 
     val analyse_result :
       t -> Logging.Report_id.t -> SAInterpreter.result_t -> bool

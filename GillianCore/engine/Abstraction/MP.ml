@@ -68,6 +68,20 @@ let kb_pp = Fmt.(braces (iter ~sep:comma KB.iter Expr.full_pp))
 
 type preds_tbl_t = (string, pred) Hashtbl.t
 
+(** The predicate-definition table is an ambient, read-only value for the
+    duration of an analysis. Rather than threading it through every abstract
+    state, it is exposed via an effect: {!get_pred_defs} retrieves it, and
+    {!with_pred_table} installs the table for the extent of a computation.
+    Modelled on {!Smt.with_necessary_definitions}. *)
+type _ Effect.t += Get_pred_defs : preds_tbl_t Effect.t
+
+let get_pred_defs () : preds_tbl_t = Effect.perform Get_pred_defs
+
+let with_pred_table (tbl : preds_tbl_t) (f : unit -> 'a) : 'a =
+  match f () with
+  | x -> x
+  | effect Get_pred_defs, k -> Effect.Deep.continue k tbl
+
 type err_ =
   | MPSpec of string * Asrt.t list
   | MPPred of string * Asrt.t list

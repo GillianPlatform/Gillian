@@ -178,8 +178,7 @@ module Make (State : SState.S) :
       let from ({ state; preds; wands; _ } : t') = { state; preds; wands }
 
       let pp_custom pp_astate fmt { state; preds; wands } =
-        pp_astate fmt
-          Pred_state.{ state; preds; wands; pred_defs = Hashtbl.create 0 }
+        pp_astate fmt Pred_state.{ state; preds; wands }
 
       let pp = pp_custom pp_astate
     end
@@ -308,7 +307,7 @@ module Make (State : SState.S) :
 
   let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
       SVal.SESubst.t * t list =
-    let Pred_state.{ state; preds; wands; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands } = astate in
     let subst, states =
       State.simplify ~save ~kill_new_lvars:false ~matching state
     in
@@ -322,12 +321,7 @@ module Make (State : SState.S) :
           List.map
             (fun state ->
               Pred_state.
-                {
-                  state;
-                  preds = Preds.copy preds;
-                  pred_defs;
-                  wands = Wands.copy wands;
-                })
+                { state; preds = Preds.copy preds; wands = Wands.copy wands })
             states )
 
   let copy_astate (astate : t) : t =
@@ -335,7 +329,6 @@ module Make (State : SState.S) :
       state = State.copy astate.state;
       preds = Preds.copy astate.preds;
       wands = Wands.copy astate.wands;
-      pred_defs = astate.pred_defs;
     }
 
   let subst_in_expr_opt (astate : t) (subst : SVal.SESubst.t) (e : Expr.t) :
@@ -460,7 +453,8 @@ module Make (State : SState.S) :
       ~(auto_level : [ `Low | `High ])
       (astate : t)
       (values : Expr.t list) : abs_t option =
-    let Pred_state.{ state; preds; pred_defs; _ } = astate in
+    let Pred_state.{ state; preds; _ } = astate in
+    let pred_defs = MP.get_pred_defs () in
 
     let wrap_strategy f (name, args) =
       let pred = Predicate_selection_strategies.get_pred_def ~pred_defs name in
@@ -488,7 +482,8 @@ module Make (State : SState.S) :
 
   let select_guarded_predicate_to_fold (astate : t) (values : Expr.t list) :
       abs_t option =
-    let Pred_state.{ state; preds; pred_defs; _ } = astate in
+    let Pred_state.{ state; preds; _ } = astate in
+    let pred_defs = MP.get_pred_defs () in
     let wrap_strat f (name, args) =
       if Option.is_some (Pred.pred_name_from_close_token_name name) then
         f (name, args)
@@ -520,7 +515,8 @@ module Make (State : SState.S) :
       (subst : SVal.SESubst.t)
       (a : Asrt.atom) : (t, err_t) Res_list.t =
     let open Res_list.Syntax in
-    let Pred_state.{ state; preds; pred_defs; wands } = astate in
+    let Pred_state.{ state; preds; wands } = astate in
+    let pred_defs = MP.get_pred_defs () in
     let other_state_err msg = [ Error (StateErr.EOther msg) ] in
 
     L.verbose (fun m ->
@@ -551,7 +547,6 @@ module Make (State : SState.S) :
                      state = state';
                      preds = Preds.copy preds;
                      wands = Wands.copy wands;
-                     pred_defs;
                    })
     | Types les -> (
         L.verbose (fun fmt -> fmt "Types assertion.");
@@ -565,14 +560,14 @@ module Make (State : SState.S) :
         in
         match state' with
         | None -> []
-        | Some _ -> [ Ok { state; preds; wands; pred_defs } ])
+        | Some _ -> [ Ok { state; preds; wands } ])
     | CorePred (cp_name, ins, outs) ->
         let pname = Option.get (Asrt.as_user_pred_name cp_name) in
         L.verbose (fun fmt -> fmt "Predicate assertion.");
         let les = ins @ outs in
         let vs = List.map (subst_in_expr subst) les in
         let pred_def = Hashtbl.find pred_defs pname in
-        let++ { state; preds; wands; pred_defs } =
+        let++ { state; preds; wands } =
           match pred_def.pred.pred_facts with
           | [] -> Res_list.return astate
           | facts ->
@@ -593,14 +588,14 @@ module Make (State : SState.S) :
                   facts params les
               in
               let facts = Asrt.Pure (Expr.conjunct facts) in
-              produce_assertion { state; preds; wands; pred_defs } subst facts
+              produce_assertion { state; preds; wands } subst facts
         in
         let pure = pred_def.pred.pred_pure in
         let preds = Preds.copy preds in
         let wands = Wands.copy wands in
         let state = State.copy state in
         Preds.extend ~pure preds (pname, vs);
-        Pred_state.{ state; preds; wands; pred_defs }
+        Pred_state.{ state; preds; wands }
     | Wand { lhs = lname, largs; rhs = rname, rargs } ->
         if !Config.under_approximation then
           L.fail "Wand assertions are not supported in under-approximation mode";
@@ -616,8 +611,7 @@ module Make (State : SState.S) :
             let v_le = subst_in_expr subst le in
             let opt_res =
               Option.map
-                (fun state ->
-                  [ Ok Pred_state.{ state; preds; wands; pred_defs } ])
+                (fun state -> [ Ok Pred_state.{ state; preds; wands } ])
                 (State.assume_a ~matching:true
                    ~production:!Config.delay_entailment state
                    [ BinOp (v_x, Equal, v_le) ])
@@ -661,8 +655,7 @@ module Make (State : SState.S) :
             in
             other_state_err msg
         | Some state' ->
-            Res_list.return
-              Pred_state.{ state = state'; preds; wands; pred_defs })
+            Res_list.return Pred_state.{ state = state'; preds; wands })
 
   and produce_asrt_list (astate : t) (subst : SVal.SESubst.t) (sas : Asrt.t) :
       (t, err_t) Res_list.t =
@@ -672,7 +665,7 @@ module Make (State : SState.S) :
       SVal.SESubst.iter subst (fun v value ->
           SVal.SESubst.put subst v (State.simplify_val astate.state value))
     in
-    let** { state; preds; wands; pred_defs } =
+    let** { state; preds; wands } =
       List.fold_left
         (fun intermediate_states asrt ->
           let** intermediate_state = intermediate_states in
@@ -705,8 +698,7 @@ module Make (State : SState.S) :
     | None ->
         L.normal (fun fmt -> fmt "final state non admissible");
         Res_list.vanish
-    | Some state ->
-        Res_list.return Pred_state.{ state; preds; pred_defs; wands }
+    | Some state -> Res_list.return Pred_state.{ state; preds; wands }
 
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
       (t, err_t) Res_list.t =
@@ -783,11 +775,12 @@ module Make (State : SState.S) :
       (astate : t)
       (pname : string)
       (args : Expr.t list) : (SVal.SESubst.t * t, err_t) Res_list.t =
-    let pred = MP.get_pred_def astate.pred_defs pname in
+    let pred_defs = MP.get_pred_defs () in
+    let pred = MP.get_pred_def pred_defs pname in
     let params = List.map (fun (x, _) -> Expr.PVar x) pred.pred.pred_params in
 
     let open Res_list.Syntax in
-    let** { state; preds; wands; pred_defs } =
+    let** { state; preds; wands } =
       match pred.pred.pred_guard with
       | None -> Res_list.return astate
       | Some _ ->
@@ -841,7 +834,7 @@ module Make (State : SState.S) :
           L.tmi (fun m ->
               m "%a" Fmt.(list ~sep:(any "\n;\n") Asrt.pp) definitions);
           let state' = State.add_spec_vars state new_spec_vars in
-          let astate = Pred_state.{ state = state'; preds; wands; pred_defs } in
+          let astate = Pred_state.{ state = state'; preds; wands } in
           let rest_results =
             let* def = rest_defs in
             produce (copy_astate astate) (SVal.SESubst.copy subst_i) def
@@ -883,7 +876,7 @@ module Make (State : SState.S) :
       match select_guarded_predicate_to_fold astate vs with
       | Some (pname, v_args) ->
           L.verbose (fun m -> m "FOUND STH TO FOLD: %s!!!!\n" pname);
-          let pred = MP.get_pred_def astate.pred_defs pname in
+          let pred = MP.get_pred_def (MP.get_pred_defs ()) pname in
           let rets =
             fold ~in_matching:true ~match_kind:(Fold pname)
               ~state:(copy_astate astate) pred v_args
@@ -938,12 +931,11 @@ module Make (State : SState.S) :
       (wand : Wands.wand) =
     let open Res_list.Syntax in
     L.verbose (fun m -> m "Matching wand assertion");
+    let pred_defs = MP.get_pred_defs () in
     (* We start by building the query *)
     let** query =
       let query_opt =
-        Wands.make_query ~pred_defs:astate.pred_defs
-          ~subst:(subst_in_expr_opt astate subst)
-          wand
+        Wands.make_query ~pred_defs ~subst:(subst_in_expr_opt astate subst) wand
       in
       match query_opt with
       | None ->
@@ -954,18 +946,13 @@ module Make (State : SState.S) :
     in
     let semantic_eq = State.equals astate.state in
     L.tmi (fun m -> m "Matcher.consume_wand @[<h>%a@]" Wands.pp_query query);
-    match
-      Wands.consume_wand ~pred_defs:astate.pred_defs ~semantic_eq astate.wands
-        query
-    with
+    match Wands.consume_wand ~pred_defs ~semantic_eq astate.wands query with
     | Some wand -> (
         (* The wand was found *)
         L.verbose (fun m ->
             m "Returning the following wand (before checking outs equality): %a"
               Wands.pp_wand wand);
-        let _, wand_outs =
-          Wands.wand_ins_outs ~pred_defs:astate.pred_defs wand
-        in
+        let _, wand_outs = Wands.wand_ins_outs ~pred_defs wand in
         let subst, step, les_outs = fold_outs_info in
         L.verbose (fun m ->
             m
@@ -1004,7 +991,8 @@ module Make (State : SState.S) :
           Fmt.(list ~sep:comma (Dump.option Expr.pp))
           vs);
 
-    let Pred_state.{ state; preds; wands; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands } = astate in
+    let pred_defs = MP.get_pred_defs () in
     let pred = MP.get_pred_def pred_defs pname in
     let pred_def = pred.pred in
     let pred_pure = pred_def.pred_pure in
@@ -1035,7 +1023,7 @@ module Make (State : SState.S) :
             match match_ins_outs_lists state subst step vs les_outs with
             | Success new_state ->
                 Res_list.return
-                  (Pred_state.{ state = new_state; wands; preds; pred_defs }, vs)
+                  (Pred_state.{ state = new_state; wands; preds }, vs)
             | Abort fail_pf ->
                 (* TODO: why is this not EPure (fail_pf) ? *)
                 let error = StateErr.EAsrt ([], fail_pf) in
@@ -1149,7 +1137,8 @@ module Make (State : SState.S) :
       (step : MP.step) : (t, err_t) Res_list.t * L.Report_id.t option =
     let open Syntaxes.Option in
     (* Auxiliary function for actions and predicates, with indexed outs *)
-    let Pred_state.{ state; wands; preds; pred_defs } = astate in
+    let Pred_state.{ state; wands; preds } = astate in
+    let pred_defs = MP.get_pred_defs () in
 
     let assertion_loggable =
       let+ () = if L.Mode.enabled () then Some () else None in
@@ -1233,7 +1222,7 @@ module Make (State : SState.S) :
                 with
                 | Success state''' ->
                     Res_list.return
-                      Pred_state.{ state = state'''; preds; wands; pred_defs }
+                      Pred_state.{ state = state'''; preds; wands }
                 | Abort fail_pf ->
                     (* TODO: why is this not EPure (fail_pf) ? *)
                     let error = StateErr.EAsrt ([], fail_pf) in
@@ -1345,8 +1334,7 @@ module Make (State : SState.S) :
                   match cons_pure state to_asrt with
                   | Success new_state ->
                       Res_list.return
-                        Pred_state.
-                          { state = new_state; preds; wands; pred_defs }
+                        Pred_state.{ state = new_state; preds; wands }
                   | Vanish -> Res_list.vanish
                   | Abort _ ->
                       let vs = State.unfolding_vals state [ pf ] in
@@ -1379,7 +1367,7 @@ module Make (State : SState.S) :
                     | None -> Res_list.vanish
                     | Some state' ->
                         Res_list.return
-                          Pred_state.{ state = state'; wands; preds; pred_defs }
+                          Pred_state.{ state = state'; wands; preds }
                   else
                     let les, _ = List.split les in
                     let les =
@@ -1702,7 +1690,8 @@ module Make (State : SState.S) :
     | Some guard -> produce astate' subst' guard
 
   and unfold_concrete_preds (astate : t) : (SVal.SESubst.t option * t) option =
-    let Pred_state.{ preds; pred_defs; _ } = astate in
+    let Pred_state.{ preds; _ } = astate in
+    let pred_defs = MP.get_pred_defs () in
 
     let is_unfoldable_lit lit =
       match lit with
@@ -1930,7 +1919,7 @@ module Make (State : SState.S) :
         when Option.is_some (Asrt.as_user_pred_name cp_name) ->
           let name = Option.get (Asrt.as_user_pred_name cp_name) in
           let MP.{ pred; def_mp; _ } =
-            MP.get_pred_def astate.Pred_state.pred_defs name
+            MP.get_pred_def (MP.get_pred_defs ()) name
           in
           let* () =
             if pred.pred_abstract || Option.is_some pred.pred_guard then None
@@ -2018,7 +2007,7 @@ module Make (State : SState.S) :
           let mp =
             let steps =
               MP.s_init_atoms
-                ~preds:(make_pred_ins_table astate.pred_defs)
+                ~preds:(make_pred_ins_table (MP.get_pred_defs ()))
                 kb atoms
               |> Result.get_ok
             in
@@ -2206,13 +2195,14 @@ module Make (State : SState.S) :
         Fmt.failwith "Wand packaging not handled in UX mode";
       (* First, we create a state that matches the lhs,
          trying to unfold the content if possible. *)
+      let pred_defs = MP.get_pred_defs () in
       let lhs_states =
         make_lhs_states
           ~empty_state:(clear_resource (copy_astate astate))
-          ~pred_defs:astate.pred_defs wand.lhs
+          ~pred_defs wand.lhs
       in
-      let rpred = MP.get_pred_def astate.pred_defs (fst wand.rhs) in
-      (* let lpred = MP.get_pred_def astate.pred_defs (fst wand.lhs) in *)
+      let rpred = MP.get_pred_def pred_defs (fst wand.rhs) in
+      (* let lpred = MP.get_pred_def pred_defs (fst wand.lhs) in *)
       let rhs_mp =
         if Option.is_some rpred.pred.pred_guard then
           L.fail "Magic Wand rhs is guarded!";
