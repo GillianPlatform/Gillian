@@ -813,15 +813,13 @@ module Make (State : SState.S) :
         List.map Result.ok states)
       (Res_list.return astate) frames
 
-  (** Evaluation of logic commands
-
-      @param prog GIL program
-      @param lcmd Logic command to be evaluated
-      @param state Current state
-      @param preds Current predicate set
-      @return List of states/predicate sets resulting from the evaluation *)
-  let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (astate : t) :
-      (t, err_t) Res_list.t =
+  (** Evaluation of the predicate-manipulating SL commands
+      ([Fold]/[Unfold]/[GUnfold]/[Package]). These are no longer reached through
+      [evaluate_slcmd]: the interpreter issues them as calls to reserved memory
+      actions, which [execute_action] (below) catches and forwards here. The
+      predicate table is read from [astate.pred_defs] (identical to
+      [prog.preds]), so no [prog] argument is needed. *)
+  let eval_pred_slcmd (lcmd : SLCmd.t) (astate : t) : (t, err_t) Res_list.t =
     let eval_expr e =
       try State.eval_expr astate.state e
       with State.Internal_State_Error (errs, _) ->
@@ -830,10 +828,9 @@ module Make (State : SState.S) :
     let open Res_list.Syntax in
     let** resulting_astate =
       match lcmd with
-      | SymbExec -> failwith "Impossible: Untreated SymbExec"
       | Fold (pname, les, fold_info) ->
           let vs = List.map eval_expr les in
-          let pred = MP.get_pred_def prog.preds pname in
+          let pred = MP.get_pred_def astate.pred_defs pname in
           let additional_bindings =
             Option.fold
               ~some:(fun (_, bindings) ->
@@ -848,7 +845,7 @@ module Make (State : SState.S) :
              and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
           (* 1) We retrieve the definition of the predicate to unfold and make sure
              it is not abstract and hence can be unfolded. *)
-          let pred = MP.get_pred_def prog.preds pname in
+          let pred = MP.get_pred_def astate.pred_defs pname in
           if pred.pred.pred_abstract then
             Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
           (* 2) We evaluate the arguments, filter to keep only the in-parameters
@@ -901,6 +898,32 @@ module Make (State : SState.S) :
           let** astate = SMatcher.unfold_all astate pname in
           let _, astates = simplify ~kill_new_lvars:true astate in
           Res_list.just_oks astates
+      | _ -> failwith "eval_pred_slcmd: expected Fold/Unfold/GUnfold/Package"
+    in
+    let _, astates = simplify resulting_astate in
+    Res_list.just_oks astates
+
+  (** Evaluation of logic commands
+
+      @param prog GIL program
+      @param lcmd Logic command to be evaluated
+      @param state Current state
+      @param preds Current predicate set
+      @return List of states/predicate sets resulting from the evaluation *)
+  let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (astate : t) :
+      (t, err_t) Res_list.t =
+    let eval_expr e =
+      try State.eval_expr astate.state e
+      with State.Internal_State_Error (errs, _) ->
+        raise (Internal_State_Error (errs, astate))
+    in
+    let open Res_list.Syntax in
+    let** resulting_astate =
+      match lcmd with
+      | SymbExec -> failwith "Impossible: Untreated SymbExec"
+      | Fold _ | Unfold _ | GUnfold _ | Package _ ->
+          failwith
+            "Fold/Unfold/GUnfold/Package must be routed through execute_action"
       | SepAssert (a, binders) -> (
           if not (List.for_all Names.is_lvar_name binders) then
             failwith "Binding of pure variables in *-assert.";
@@ -1164,11 +1187,19 @@ module Make (State : SState.S) :
 
   let execute_action (action : string) (astate : t) (args : vt list) :
       action_ret =
-    let open Syntaxes.List in
-    let+ result = State.execute_action action astate.state args in
-    match result with
-    | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
-    | Error err -> Error err
+    (* The predicate-manipulating SL commands are issued as calls to reserved
+       actions (see {!SLCmd.to_action}); we catch them here and run their
+       fold/unfold semantics. They produce no return values (hence [[]]). *)
+    match SLCmd.of_action action args with
+    | Some sl_cmd ->
+        eval_pred_slcmd sl_cmd astate
+        |> List.map (Result.map (fun astate -> (astate, [])))
+    | None -> (
+        let open Syntaxes.List in
+        let+ result = State.execute_action action astate.state args in
+        match result with
+        | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
+        | Error err -> Error err)
 
   let consume_core_pred core_pred astate in_args =
     let open Syntaxes.List in
