@@ -698,6 +698,7 @@ module Canonical = struct
             match Expr.Map.find_opt e restl with
             | None -> (restl, restr)
             | Some vl ->
+                success := true;
                 if vl = vr then
                   (Expr.Map.remove e restl, Expr.Map.remove e restr)
                 else if vl > vr then

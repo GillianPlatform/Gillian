@@ -38,7 +38,16 @@ let simplify_pfs_and_gamma
 let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Smt.check_sat fs (Type_env.as_hashtbl gamma) in
+  let gamma_tbl = Type_env.as_hashtbl gamma in
+  (* This is only ever used to build a counter-model for error reporting, so a
+     query we cannot encode or decide simply yields no model. *)
+  let model =
+    try Smt.check_sat fs gamma_tbl
+    with Smt.SMT_error _ | Smt.SMT_unknown ->
+      L.normal (fun m ->
+          m "check_satisfiability_with_model: could not decide query, no model");
+      None
+  in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -197,20 +206,28 @@ let check_entailment
       let formulae = PFS.of_list (right_f :: (left_fs @ [] (* axioms *))) in
       let _ = Simplifications.simplify_pfs_and_gamma formulae gamma_left in
 
-      let model =
-        Smt.check_sat
-          (Expr.Set.of_list (PFS.to_list formulae))
-          (Type_env.as_hashtbl gamma_left)
+      (* An entailment we cannot encode or decide is one we cannot prove:
+         report "not entailed", the sound answer both over- and
+         under-approximately. *)
+      let ret =
+        match
+          Smt.check_sat
+            (Expr.Set.of_list (PFS.to_list formulae))
+            (Type_env.as_hashtbl gamma_left)
+        with
+        | model ->
+            let () =
+              model
+              |> Option.iter (fun model ->
+                     L.tmi (fun m -> m "Here's the model:\n%a" Smt.pp_sexp model))
+            in
+            Option.is_none model
+        | exception (Smt.SMT_error _ | Smt.SMT_unknown) ->
+            L.normal (fun m ->
+                m "Entailment could not be decided, reporting not entailed");
+            false
       in
-      let ret = Option.is_none model in
       L.(verbose (fun m -> m "Entailment returned %b" ret));
-      let () =
-        model
-        |> Option.iter (fun model ->
-               L.tmi (fun m -> m "Here's the model:\n%a" Smt.pp_sexp model))
-      in
-      (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
-         (Unix.gettimeofday () -. t); *)
       ret
 
 let is_equal ?matching ~pfs ~gamma e1 e2 =
