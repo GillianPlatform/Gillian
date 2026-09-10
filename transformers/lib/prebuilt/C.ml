@@ -87,7 +87,7 @@ module ExtendMemory (S : OpenPMapType with module Entry = BaseBlock) = struct
       | _ -> false
 
     let map_fixes mapper =
-      Gillian.Combinators.MyUtils.deep_map (fun (p, i, o) -> (mapper p, i, o))
+      Gillian.Combinators.Fix.map_corepred (fun (p, i, o) -> (mapper p, i, o))
 
     let get_fixes = function
       | BaseError e -> S.get_fixes e |> map_fixes S.pred_to_str

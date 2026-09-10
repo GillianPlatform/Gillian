@@ -95,4 +95,4 @@ let get_recovery_tactic _ _ = Recovery_tactic.none
 let can_fix MissingState = true
 
 let get_fixes MissingState =
-  [ [ (Ex, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]
+  [ [ Fix.CorePred (Ex, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]
