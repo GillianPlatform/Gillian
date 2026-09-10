@@ -131,7 +131,6 @@ struct
       ~(init_data : SPState.init_data)
       (func_or_lemma_name : string)
       (preds : (string, MP.pred) Hashtbl.t)
-      (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
       (id : int)
@@ -229,9 +228,7 @@ struct
         let simple_posts =
           List.map (fun (post, _) -> (post, (label, None))) posts
         in
-        let post_mp =
-          MP.init known_matchables Expr.Set.empty pred_ins simple_posts
-        in
+        let post_mp = MP.init known_matchables Expr.Set.empty simple_posts in
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_mp with
         | Error _ ->
@@ -313,14 +310,13 @@ struct
       ~init_data
       (spec_name : string)
       (preds : MP.preds_tbl_t)
-      (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
       (id : int)
       (sspec : Spec.st) : (t option * Spec.st option) list =
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
-      testify ~init_data spec_name preds pred_ins name params id sspec.ss_pre
+      testify ~init_data spec_name preds name params id sspec.ss_pre
         sspec.ss_posts (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
@@ -336,7 +332,6 @@ struct
       ~init_data
       (spec_name : string)
       (preds : MP.preds_tbl_t)
-      (pred_ins : (string, int list) Hashtbl.t)
       (spec : Spec.t) : t list * Spec.t =
     if not spec.spec_to_verify then ([], spec)
     else
@@ -361,7 +356,7 @@ struct
         List.fold_left
           (fun (id, tests, sspecs) sspec ->
             let tests_and_specs =
-              testify_sspec ~init_data spec_name preds pred_ins spec.spec_name
+              testify_sspec ~init_data spec_name preds spec.spec_name
                 spec.spec_params id sspec
             in
             let new_tests, new_specs =
@@ -387,16 +382,13 @@ struct
       L.verbose (fun m -> m "Simplified SPECS:@\n@[%a@]@\n" Spec.pp new_spec);
       (tests, new_spec)
 
-  let testify_lemma
-      ~init_data
-      (preds : MP.preds_tbl_t)
-      (pred_ins : (string, int list) Hashtbl.t)
-      (lemma : Lemma.t) : t list * Lemma.t =
+  let testify_lemma ~init_data (preds : MP.preds_tbl_t) (lemma : Lemma.t) :
+      t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
         (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant = _ } ->
           let to_verify = Option.is_some lemma.lemma_proof in
-          testify ~init_data lemma.lemma_name preds pred_ins lemma.lemma_name
+          testify ~init_data lemma.lemma_name preds lemma.lemma_name
             lemma.lemma_params 0 lemma_hyp lemma_concs None None to_verify)
         lemma.lemma_specs
     in
@@ -782,15 +774,6 @@ struct
            [Get_pred_defs] effect. Testify (below) reads it through
            [PState.to_assertions]/[produce], so install it here. *)
         MP.with_pred_table preds @@ fun () ->
-        let pred_ins =
-          Hashtbl.fold
-            (fun name (pred : MP.pred) pred_ins ->
-              Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
-              pred_ins)
-            preds
-            (Hashtbl.create Config.medium_tbl_size)
-        in
-
         (* STEP 1: Get the specs to verify *)
         Fmt.pr "Obtaining specs to verify...\n@?";
         let specs_to_verify =
@@ -805,7 +788,7 @@ struct
           List.concat_map
             (fun (spec : Spec.t) ->
               let tests, new_spec =
-                testify_spec ~init_data spec.spec_name preds pred_ins spec
+                testify_spec ~init_data spec.spec_name preds spec
               in
               let proc = Prog.get_proc_exn prog spec.spec_name in
               Hashtbl.replace prog.procs proc.proc_name
@@ -833,9 +816,7 @@ struct
         let tests' : t list =
           List.concat_map
             (fun lemma ->
-              let tests, new_lemma =
-                testify_lemma ~init_data preds pred_ins lemma
-              in
+              let tests, new_lemma = testify_lemma ~init_data preds lemma in
               Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
               tests)
             lemmas_to_verify
@@ -1038,20 +1019,12 @@ struct
          it here; the returned table is also handed to the debugger, which
          re-installs it while stepping and matching. *)
       MP.with_pred_table preds @@ fun () ->
-      let pred_ins =
-        Hashtbl.fold
-          (fun name (pred : MP.pred) pred_ins ->
-            Hashtbl.add pred_ins name (Pred.ins_indexes pred.pred);
-            pred_ins)
-          preds
-          (Hashtbl.create Config.medium_tbl_size)
-      in
       let specs = Prog.get_specs prog in
       let tests =
         specs
         |> List.filter_map (fun (spec : Spec.t) ->
                let tests, new_spec =
-                 testify_spec ~init_data spec.spec_name preds pred_ins spec
+                 testify_spec ~init_data spec.spec_name preds spec
                in
                if List.length tests > 1 then
                  DL.log (fun m ->

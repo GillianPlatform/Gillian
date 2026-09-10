@@ -529,7 +529,7 @@ module Make (SMemory : SMemory.S) :
       (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let match_invariant _ _ _ _ _ =
+  let match_invariant _ _ _ _ =
     raise (Failure "ERROR: match_invariant called for pure symbolic execution")
 
   let clear_resource (state : t) : t =

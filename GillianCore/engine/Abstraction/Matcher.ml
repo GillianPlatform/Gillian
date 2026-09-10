@@ -533,6 +533,23 @@ module Make (State : SState.S) :
     | Emp ->
         L.verbose (fun fmt -> fmt "Emp assertion.");
         [ Ok astate ]
+    | CorePred (name, _, _) when Option.is_some (Asrt.as_wand_name name) ->
+        if !Config.under_approximation then
+          L.fail "Wand assertions are not supported in under-approximation mode";
+        L.verbose (fun m -> m "Wand assertion.");
+        (* Reconstruct the raw wand from its semantic ins/outs (needs the rhs
+           predicate's number of in-parameters) before storing it. *)
+        let _, rname = Option.get (Asrt.as_wand_name name) in
+        let rhs_ins_number =
+          (MP.get_pred_def pred_defs rname).pred.ins_number
+        in
+        let (lname, largs), (rname, rargs) =
+          Option.get (Asrt.as_wand ~rhs_ins_number a)
+        in
+        let largs = List.map (subst_in_expr subst) largs in
+        let rargs = List.map (subst_in_expr subst) rargs in
+        Wands.extend wands Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
+        Res_list.return astate
     | CorePred (a_id, ins, outs)
       when Option.is_none (Asrt.as_user_pred_name a_id) ->
         L.verbose (fun fmt -> fmt "Memory producer.");
@@ -596,14 +613,6 @@ module Make (State : SState.S) :
         let state = State.copy state in
         Preds.extend ~pure preds (pname, vs);
         Pred_state.{ state; preds; wands }
-    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
-        if !Config.under_approximation then
-          L.fail "Wand assertions are not supported in under-approximation mode";
-        L.verbose (fun m -> m "Wand assertion.");
-        let largs = List.map (subst_in_expr subst) largs in
-        let rargs = List.map (subst_in_expr subst) rargs in
-        Wands.extend wands Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
-        Res_list.return astate
     | Pure (BinOp (PVar x, Equal, le)) | Pure (BinOp (le, Equal, PVar x)) -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         match SVal.SESubst.get subst (PVar x) with
@@ -1200,6 +1209,19 @@ module Make (State : SState.S) :
         let open Res_list.Syntax in
         let res_list =
           match (p : Asrt.atom) with
+          | CorePred (name, _ins, outs)
+            when Option.is_some (Asrt.as_wand_name name) ->
+              if !Config.under_approximation then L.fail "Wand in under-approx";
+              let _, rname = Option.get (Asrt.as_wand_name name) in
+              let rhs_ins_number =
+                (MP.get_pred_def pred_defs rname).pred.ins_number
+              in
+              let lhs, rhs = Option.get (Asrt.as_wand ~rhs_ins_number p) in
+              (* The wand's outs are exactly the rhs out-args, i.e. the stored
+                 core-predicate outs. *)
+              let les_outs = outs in
+              let fold_outs_info = (subst, step, les_outs) in
+              consume_wand ~fold_outs_info astate subst Wands.{ lhs; rhs }
           | CorePred (a_id, e_ins, e_outs)
             when Option.is_none (Asrt.as_user_pred_name a_id) -> (
               let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
@@ -1261,14 +1283,6 @@ module Make (State : SState.S) :
                       m "Consume_pred vanished!");
                 let++ astate', _ = consume_pred_res in
                 astate'
-          | Wand { lhs; rhs } ->
-              if !Config.under_approximation then L.fail "Wand in under-approx";
-              let les_outs =
-                let pred = (MP.get_pred_def pred_defs (fst rhs)).pred in
-                Pred.out_args pred (snd rhs)
-              in
-              let fold_outs_info = (subst, step, les_outs) in
-              consume_wand ~fold_outs_info astate subst { lhs; rhs }
           (* Conjunction should not be here *)
           | Pure (BinOp (_, And, _)) ->
               raise (Failure "Match assertion: And: should have been reduced")
@@ -1875,14 +1889,6 @@ module Make (State : SState.S) :
       in
       r
 
-    let make_pred_ins_table pred_tbl =
-      let tbl = Hashtbl.create (Hashtbl.length pred_tbl) in
-      Hashtbl.iter
-        (fun pname pred ->
-          Hashtbl.add tbl pname (Pred.ins_indexes pred.MP.pred))
-        pred_tbl;
-      tbl
-
     type split_answer = {
       init_subst : State.st;
       mp : MP.t;
@@ -2005,12 +2011,7 @@ module Make (State : SState.S) :
           in
           let atoms = List.rev_append new_cps learning_equalities in
           let mp =
-            let steps =
-              MP.s_init_atoms
-                ~preds:(make_pred_ins_table (MP.get_pred_defs ()))
-                kb atoms
-              |> Result.get_ok
-            in
+            let steps = MP.s_init_atoms kb atoms |> Result.get_ok in
             MP.of_step_list steps
           in
           { init_subst; mp; fold_outs_info = (subst, step, out_params, outs) }
