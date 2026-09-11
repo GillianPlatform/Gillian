@@ -123,6 +123,11 @@ let all =
 
 let leak_pc_copy () ~(curr_pc : Pc.t) = return (Pc.to_gpc curr_pc) ~curr_pc
 
+(** Whether the current path is being explored in matching mode. Unlike
+    {!leak_pc_copy}, this does not copy the path condition. *)
+let matching () ~(curr_pc : Pc.t) =
+  [ Branch.make ~pc:curr_pc ~value:curr_pc.Pc.matching ]
+
 module Syntax = struct
   let ( let* ) = bind
   let ( let+ ) = map

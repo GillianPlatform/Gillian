@@ -60,7 +60,7 @@ end) : SymExprMap = struct
     | Some v -> Delayed.return (Some (k, v)) (* Direct match *)
     | None ->
         let open Delayed.Syntax in
-        let* { matching; _ } = Delayed.leak_pc_copy () in
+        let* matching = Delayed.matching () in
         let rec find_match = function
           | [] -> Delayed.return None
           | (k', v) :: tl -> (
