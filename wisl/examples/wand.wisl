@@ -8,9 +8,9 @@ predicate Q(x) {
 
 lemma should_fail {
   statement:
-    forall x, y. P(x; y) |- Q(x) * (Q(x) -* P(x; y))
+    forall x, y. P(x, y) |- Q(x) * (Q(x) -* P(x, y))
   proof:
-    package (Q(x) -* P(x; y))
+    package (Q(x) -* P(x, y))
 }
 
 predicate R(x, y) {
