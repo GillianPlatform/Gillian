@@ -570,13 +570,23 @@ lvar_or_pvar:
   | x = IDENTIFIER { x }
   | lx = LVAR { lx }
 
+(* A predicate application [p(ins; outs)]. The [;] is optional: the in/out
+   split is derived from the predicate's definition by the engine's
+   [Prog.resolve_pred_ins_outs] pass. Shared with the [wand] rule below, so
+   that the two are one reduction and stay conflict-free. *)
+pred_call:
+  | lpr = IDENTIFIER; LBRACE;
+    ins = separated_list(COMMA, logic_expression);
+    outs = outs(logic_expression);
+    lend = RBRACE
+    { let (lstart, pr) = lpr in
+      (pr, ins, outs, lstart, lend) }
+
 wand:
-  | lname = IDENTIFIER; LBRACE; lins = separated_list(COMMA, logic_expression); SCOLON; louts = separated_list(COMMA, logic_expression); RBRACE;
-    WAND;
-    rname = IDENTIFIER; LBRACE; rins = separated_list(COMMA, logic_expression); SCOLON; routs = separated_list(COMMA, logic_expression); lend = RBRACE
+  | lhs = pred_call; WAND; rhs = pred_call
     {
-      let (lstart, lname) = lname in
-      let (_, rname) = rname in
+      let (lname, lins, louts, lstart, _) = lhs in
+      let (rname, rins, routs, _, lend) = rhs in
       let loc = CodeLoc.merge lstart lend in
       ((lname, lins @ louts), (rname, rins @ routs), loc)
     }
@@ -595,11 +605,8 @@ logic_assertion:
   | wand = wand
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
-  | lpr = IDENTIFIER; LBRACE;
-    ins = separated_list(COMMA, logic_expression);
-    outs = outs(logic_expression);
-    lend = RBRACE
-    { let (lstart, pr) = lpr in
+  | pcall = pred_call
+    { let (pr, ins, outs, lstart, lend) = pcall in
       let bare_assert = WLAssert.LPred (pr, ins, outs) in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
