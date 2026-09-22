@@ -204,7 +204,7 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
         let pred_i_plus =
-          Asrt.pred internal_pred [ comp_expr1; comp_expr2 ] [ Expr.LVar lout ]
+          Asrt.pred internal_pred [ comp_expr1; comp_expr2; Expr.LVar lout ] []
         in
         ( gvars1 @ gvars2 @ [ lout ],
           asrtl1 @ asrtl2 @ [ pred_i_plus ],

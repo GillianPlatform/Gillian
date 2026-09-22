@@ -39,20 +39,15 @@ end
 module Others = struct
   open CConstants
 
-  (* The in/out split below must match the runtime predicate definitions, since
-     the engine trusts the split carried by the assertion. All-ins predicates
-     use [pred]; predicates with out-parameters spell out [ins] and [outs]. *)
-  let pred name ins outs = Asrt.pred name ins outs
-  let pred_in name ins = Asrt.pred name ins []
+  (* Applications are built flat: [Prog.resolve_pred_ins_outs] derives the
+     in/out split from the runtime predicate definition, so no split needs to
+     be restated (nor kept in sync) here. *)
+  let pred name args = Asrt.pred name args []
 
-  (* [i__malloced] is, unfortunately, declared with a different in/out split
-     depending on the architecture: [(p; bytes)] in 64-bit, [(p, bytes;)] in
-     32-bit. *)
-  let malloced_pred p bytes =
-    if Compcert.Archi.ptr64 then
-      pred Internal_Predicates.malloced [ p ] [ bytes ]
-    else pred_in Internal_Predicates.malloced [ p; bytes ]
-
+  (* [i__malloced] is declared with a different in/out split depending on the
+     architecture -- [(p; bytes)] in 64-bit, [(p, bytes;)] in 32-bit -- which
+     the flat form is simply indifferent to. *)
+  let malloced_pred p bytes = pred Internal_Predicates.malloced [ p; bytes ]
   let malloced_abst ~ptr ~total_size = malloced_pred ptr total_size
 
   let malloced ~ptr ~total_size =
@@ -61,15 +56,15 @@ module Others = struct
     malloced_pred (Expr.list [ loc; ofs ]) size
 
   let zeros_ptr_size ~ptr ~size =
-    pred_in Internal_Predicates.zeros_ptr_size [ ptr; size ]
+    pred Internal_Predicates.zeros_ptr_size [ ptr; size ]
 
   let undefs_ptr_size ~ptr ~size =
-    pred_in Internal_Predicates.undefs_ptr_size [ ptr; size ]
+    pred Internal_Predicates.undefs_ptr_size [ ptr; size ]
 
   let array_ptr ~ptr ~chunk ~size ~content =
     let chunk_str = Expr.string (Chunk.to_string chunk) in
-    pred Internal_Predicates.array_ptr [ ptr; size; chunk_str ] [ content ]
+    pred Internal_Predicates.array_ptr [ ptr; size; chunk_str; content ]
 
   let ptr_add ~ptr ~to_add ~res =
-    pred Internal_Predicates.ptr_add [ ptr; to_add ] [ res ]
+    pred Internal_Predicates.ptr_add [ ptr; to_add; res ]
 end

@@ -130,7 +130,7 @@ let convert_struct_field
         in
         let field_arg_list = pvmember#==(Expr.list field_args) in
         (* Struct predicates have the location and offset as their two ins. *)
-        let pred_call = Asrt.pred pred_name [ pvloc; ofs ] field_args in
+        let pred_call = Asrt.pred pred_name (pvloc :: ofs :: field_args) [] in
         (Some GilType.ListType, [ field_arg_list; pred_call ])
     | Array (type_', len) ->
         let chunk =
@@ -412,7 +412,7 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) ~pvar_map s c =
   let gen_ofs_var () = Expr.LVar (fresh_lvar ()) in
   let te = trans_expr ~pvar_map in
   let tse = trans_simpl_expr ~pvar_map in
-  let ptr_call p l o = Asrt.pred Internal_Predicates.ptr_get [ p ] [ l; o ] in
+  let ptr_call p l o = Asrt.pred Internal_Predicates.ptr_get [ p; l; o ] [] in
   let sz x = CSVal.size_of ~ctx x |> Z.of_int in
   let interpret_s ~typ s =
     match typ with
@@ -489,7 +489,7 @@ let trans_constr ~(ctx : Ctx.t) ~(typ : CAssert.points_to_type) ~pvar_map s c =
       in
       let more_asrt, _, params_fields = split3_expr_comp (List.map te el) in
       let pr =
-        Asrt.pred struct_pred [ locv; ofsv ] params_fields :: more_asrt
+        Asrt.pred struct_pred (locv :: ofsv :: params_fields) [] :: more_asrt
       in
       pr @ to_assert @ [ malloc_chunk size ]
 
@@ -843,7 +843,7 @@ module Machine_preds = struct
       let perm = Expr.string Perm.(to_string Freeable) in
       Asrt.
         [
-          Asrt.pred Internal_Predicates.ptr_get [ PVar "p" ] [ l; Expr.zero_i ];
+          Asrt.pred Internal_Predicates.ptr_get [ PVar "p"; l; Expr.zero_i ] [];
           CorePred
             ( LActions.(str_ga Single),
               [ l; start; chunk ],
