@@ -127,6 +127,96 @@ let pp fmt pred =
    Fmt.(list ~sep:(any ",@\n") (hovbox ~indent:2 pp_def))
    pred.pred_definitions pp_facts pred.pred_facts *)
 
+(** {2 Resolving the in/out split of a predicate application}
+
+    A predicate application carries its own [(ins; outs)] split, which the
+    engine trusts (see {!Engine.MP.ins_outs_assertion}). The split is however a
+    fixed property of the {e definition}, so requiring every use site to restate
+    it is pure burden. {!resolve_ins_outs} derives the split from the predicate
+    table, so that writing the [;] in an application becomes optional.
+
+    An application whose [outs] are empty is taken to be {e unsplit} (the
+    surface syntax [p(a, b)] and [p(a, b;)] are indistinguishable after
+    parsing), and is re-split at the definition's [ins_number]. An application
+    that {e does} carry outs must agree with the definition, otherwise the [;]
+    is misplaced and we report it.
+
+    The function is total and idempotent: applying it to an already-resolved
+    atom returns it unchanged. *)
+
+let resolve_user_pred
+    (preds : (string, t) Hashtbl.t)
+    (name : string)
+    (ins : Expr.t list)
+    (outs : Expr.t list) : (Asrt.atom, string) result =
+  let unresolved = Ok (Asrt.pred name ins outs) in
+  match Hashtbl.find_opt preds name with
+  (* An undefined predicate, or one applied to the wrong number of arguments,
+     cannot be resolved. Leave it alone rather than reporting here: the
+     existing checks ([extend_asrt_pred_types], [MP.get_pred_def]) give those
+     two errors, and reporting them here would newly reject programs in the
+     execution modes, which never ran those checks. *)
+  | None -> unresolved
+  | Some pred ->
+      let args = ins @ outs in
+      if List.length args <> pred.pred_num_params then unresolved
+      else if outs = [] then
+        (* Unsplit application: derive the split from the definition. *)
+        Ok (Asrt.pred name (in_args pred args) (out_args pred args))
+      else if List.length ins = pred.ins_number then
+        Ok (Asrt.pred name ins outs)
+      else
+        Fmt.error
+          "Misplaced ';' in the application of predicate %s: it has %i \
+           in-parameter(s), but the application declares %i."
+          name pred.ins_number (List.length ins)
+
+let resolve_wand
+    (preds : (string, t) Hashtbl.t)
+    ((lname, rname) : string * string)
+    (ins : Expr.t list)
+    (outs : Expr.t list) : (Asrt.atom, string) result =
+  let unresolved = Ok (Asrt.CorePred (Asrt.wand_name lname rname, ins, outs)) in
+  (* As above: an unknown operand, or a wrong total arity, is left for the
+     existing checks to report. *)
+  match (Hashtbl.find_opt preds lname, Hashtbl.find_opt preds rname) with
+  | Some lpred, Some rpred ->
+      (* A wand's stored ins are [largs @ r_ins] and its outs are [r_outs]. *)
+      let args = ins @ outs in
+      let n_largs = lpred.pred_num_params in
+      if List.length args <> n_largs + rpred.pred_num_params then unresolved
+      else
+        let largs, rargs = List_utils.split_at args n_largs in
+        let n_routs = rpred.pred_num_params - rpred.ins_number in
+        if outs = [] then
+          (* Unsplit application: derive the rhs split from the definition. *)
+          Ok
+            (Asrt.wand (lname, largs)
+               (rname, in_args rpred rargs)
+               (out_args rpred rargs))
+        else if List.length outs = n_routs then unresolved
+        else
+          Fmt.error
+            "Misplaced ';' in the magic wand %s -* %s: %s has %i \
+             out-parameter(s), but the application declares %i."
+            lname rname rname n_routs (List.length outs)
+  | _ -> unresolved
+
+(** [resolve_ins_outs preds a] normalises the in/out split of [a] against the
+    predicate table [preds]. Genuine core predicates are left untouched: they
+    have no definition to derive a split from, so their [;] stays mandatory. *)
+let resolve_ins_outs (preds : (string, t) Hashtbl.t) (a : Asrt.atom) :
+    (Asrt.atom, string) result =
+  match a with
+  | Asrt.CorePred (cp_name, ins, outs) -> (
+      match Asrt.as_wand_name cp_name with
+      | Some lr -> resolve_wand preds lr ins outs
+      | None -> (
+          match Asrt.as_user_pred_name cp_name with
+          | Some name -> resolve_user_pred preds name ins outs
+          | None -> Ok a))
+  | _ -> Ok a
+
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =
     (* Step 1 - Extract all the program variables used in the definition

@@ -275,7 +275,15 @@ module Make (Annot : Annot.S) = struct
 
   let eprog_to_prog ?prog_path ~other_imports ext_program =
     let open Prog in
-    let+ () = resolve_imports ?prog_path ext_program other_imports in
+    let* () = resolve_imports ?prog_path ext_program other_imports in
+    (* The predicate table is complete only now that the imports have been
+       merged, so this is the first (and only universal) point at which the
+       in/out split of every predicate application can be derived from its
+       definition. *)
+    let+ () =
+      Gillian_result.try_ (fun () ->
+          Ok (Prog.resolve_pred_ins_outs ext_program))
+    in
     let proc_of_ext_proc (proc : (annot, string) Proc.t) :
         (annot, int) Proc.t * (string * int * int * int) list =
       let open Proc in

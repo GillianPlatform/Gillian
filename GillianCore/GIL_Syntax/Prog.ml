@@ -277,3 +277,68 @@ let make_callgraph (prog : ('a, 'b) t) =
                     Call_graph.add_proc_call call_graph caller callee
                 | None -> ()));
   call_graph
+
+(** {2 Resolving the in/out split of every predicate application}
+
+    A predicate application carries its own [(ins; outs)] split, which the
+    engine trusts. Since the split is a fixed property of the predicate's
+    {e definition}, this pass derives it from [prog.preds] wherever the
+    application left it unsplit, and rejects an application whose explicit [;]
+    disagrees with the definition. See {!Pred.resolve_ins_outs}.
+
+    It must run once the predicate table is complete — i.e. after imports have
+    been resolved — and before any analysis. It is idempotent. *)
+exception Resolution_error of string
+
+let resolve_pred_ins_outs (prog : ('a, 'b) t) : unit =
+  (* Snapshot the table: [Hashtbl.filter_map_inplace] below rewrites the very
+     hashtable the resolver reads from, and the stdlib leaves that
+     unspecified. *)
+  let preds = Hashtbl.copy prog.preds in
+  let resolver =
+    object
+      inherit [_] Visitors.endo as super
+
+      method! visit_assertion_atom () a =
+        match Pred.resolve_ins_outs preds a with
+        | Ok a -> super#visit_assertion_atom () a
+        | Error msg -> raise (Resolution_error msg)
+    end
+  in
+  let run ?in_target ?loc f x =
+    try f x
+    with Resolution_error msg ->
+      raise
+        (Gillian_result.Exc.analysis_failure ~is_preprocessing:true ?in_target
+           ?loc msg)
+  in
+  Hashtbl.filter_map_inplace
+    (fun _ (pred : Pred.t) ->
+      Some
+        (run ~in_target:pred.pred_name ?loc:pred.pred_loc
+           (resolver#visit_pred ()) pred))
+    prog.preds;
+  Hashtbl.filter_map_inplace
+    (fun _ (proc : ('a, 'b) Proc.t) ->
+      Some (run ~in_target:proc.proc_name (resolver#visit_proc ()) proc))
+    prog.procs;
+  Hashtbl.filter_map_inplace
+    (fun _ (lemma : Lemma.t) ->
+      Some
+        (run ~in_target:lemma.lemma_name ?loc:lemma.lemma_location
+           (resolver#visit_lemma ()) lemma))
+    prog.lemmas;
+  Hashtbl.filter_map_inplace
+    (fun _ (spec : Spec.t) ->
+      Some
+        (run ~in_target:spec.spec_name ?loc:spec.spec_location
+           (resolver#visit_spec ()) spec))
+    prog.only_specs;
+  Hashtbl.filter_map_inplace
+    (fun _ (bispec : BiSpec.t) ->
+      Some (run ~in_target:bispec.bispec_name (resolver#visit_bispec ()) bispec))
+    prog.bi_specs;
+  Hashtbl.filter_map_inplace
+    (fun _ (macro : Macro.t) ->
+      Some (run ~in_target:macro.macro_name (resolver#visit_macro ()) macro))
+    prog.macros
