@@ -786,13 +786,11 @@ module Pred : sig
   (** [resolve_ins_outs preds a] normalises the in/out split of the predicate
       application [a] against the predicate table [preds].
 
-      An application whose outs are empty is taken to be {e unsplit} — the
-      surface forms [p(a, b)] and [p(a, b;)] are indistinguishable after
-      parsing — and is re-split at the definition's [ins_number], so that
-      writing the [;] at a use site is optional. An application that does carry
-      outs must agree with the definition, otherwise its [;] is misplaced and an
-      error is returned. Magic wands are resolved through their right-hand
-      predicate.
+      The parsers only ever produce {e unsplit} applications — a [;] in an
+      application is a syntax error — which are split at the definition's
+      [ins_number]. An already-split one is checked against the definition and
+      returned unchanged, which is what makes this idempotent. Magic wands are
+      resolved through their right-hand predicate.
 
       Genuine core predicates are returned unchanged: they have no definition to
       derive a split from, so their [;] remains mandatory.

@@ -135,11 +135,12 @@ let pp fmt pred =
     it is pure burden. {!resolve_ins_outs} derives the split from the predicate
     table, so that writing the [;] in an application becomes optional.
 
-    An application whose [outs] are empty is taken to be {e unsplit} (the
-    surface syntax [p(a, b)] and [p(a, b;)] are indistinguishable after
-    parsing), and is re-split at the definition's [ins_number]. An application
-    that {e does} carry outs must agree with the definition, otherwise the [;]
-    is misplaced and we report it.
+    The parsers only ever produce {e unsplit} applications (a [;] in an
+    application is a syntax error), which are split at the definition's
+    [ins_number]. An already-split one is checked against the definition and
+    returned unchanged -- which is what makes the function idempotent, and what
+    catches an OCaml-constructed application whose split has drifted from the
+    predicate it names.
 
     The function is total and idempotent: applying it to an already-resolved
     atom returns it unchanged. *)
@@ -167,9 +168,9 @@ let resolve_user_pred
         Ok (Asrt.pred name ins outs)
       else
         Fmt.error
-          "Misplaced ';' in the application of predicate %s: it has %i \
-           in-parameter(s), but the application declares %i."
-          name pred.ins_number (List.length ins)
+          "The application of predicate %s splits its arguments after %i of \
+           them, but %s has %i in-parameter(s)."
+          name (List.length ins) name pred.ins_number
 
 let resolve_wand
     (preds : (string, t) Hashtbl.t)
@@ -197,9 +198,9 @@ let resolve_wand
         else if List.length outs = n_routs then unresolved
         else
           Fmt.error
-            "Misplaced ';' in the magic wand %s -* %s: %s has %i \
-             out-parameter(s), but the application declares %i."
-            lname rname rname n_routs (List.length outs)
+            "The magic wand %s -* %s is split with %i out-argument(s), but %s \
+             has %i out-parameter(s)."
+            lname rname (List.length outs) rname n_routs
   | _ -> unresolved
 
 (** [resolve_ins_outs preds a] normalises the in/out split of [a] against the

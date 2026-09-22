@@ -576,19 +576,18 @@ lvar_or_pvar:
    that the two are one reduction and stay conflict-free. *)
 pred_call:
   | lpr = IDENTIFIER; LBRACE;
-    ins = separated_list(COMMA, logic_expression);
-    outs = outs(logic_expression);
+    args = separated_list(COMMA, logic_expression);
     lend = RBRACE
     { let (lstart, pr) = lpr in
-      (pr, ins, outs, lstart, lend) }
+      (pr, args, lstart, lend) }
 
 wand:
   | lhs = pred_call; WAND; rhs = pred_call
     {
-      let (lname, lins, louts, lstart, _) = lhs in
-      let (rname, rins, routs, _, lend) = rhs in
+      let (lname, largs, lstart, _) = lhs in
+      let (rname, rargs, _, lend) = rhs in
       let loc = CodeLoc.merge lstart lend in
-      ((lname, lins @ louts), (rname, rins @ routs), loc)
+      ((lname, largs), (rname, rargs), loc)
     }
 
 logic_expression_with_permission:
@@ -606,8 +605,8 @@ logic_assertion:
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
   | pcall = pred_call
-    { let (pr, ins, outs, lstart, lend) = pcall in
-      let bare_assert = WLAssert.LPred (pr, ins, outs) in
+    { let (pr, args, lstart, lend) = pcall in
+      let bare_assert = WLAssert.LPred (pr, args, []) in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
   | loc = EMP

@@ -236,9 +236,10 @@ let make_pure (a : t) : Expr.t =
 (** GIL logic assertions *)
 let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
   let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
-  (* The [;] is only printed when there are outs to separate: an application
-     with none is written flat, which is how it is now read back (the split is
-     derived from the definition by [Prog.resolve_pred_ins_outs]). *)
+  (* Only a genuine core predicate prints its [;]: there is no definition to
+     recover its split from. A user predicate's application is printed flat --
+     which is also the only form the parsers accept -- and the split is derived
+     back from the definition by [Prog.resolve_pred_ins_outs]. *)
   let pp_ins_outs fmt' (ins, outs) =
     match outs with
     | [] -> pp_e_l fmt' ins
@@ -267,9 +268,9 @@ let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
       | None -> Fmt.pf fmt "@[<h><%s>(%a)@]" a pp_ins_outs (ins, outs))
   | CorePred (a, ins, outs) when Option.is_some (as_user_pred_name a) ->
       let pred_name = Option.get (as_user_pred_name a) in
-      (* A user-defined predicate: printed [name(ins; outs)]. *)
+      (* A user-defined predicate: printed flat, as [name(args)]. *)
       let pred_name = Pp_utils.maybe_quote_ident pred_name in
-      Fmt.pf fmt "@[<h>%s(%a)@]" pred_name pp_ins_outs (ins, outs)
+      Fmt.pf fmt "@[<h>%s(%a)@]" pred_name pp_e_l (ins @ outs)
   | CorePred (a, ins, outs) ->
       (* A genuine core predicate: printed [<name>(ins; outs)]. *)
       Fmt.pf fmt "@[<h><%s>(%a)@]" a pp_ins_outs (ins, outs)
