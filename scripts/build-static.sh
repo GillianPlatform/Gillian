@@ -29,13 +29,19 @@ if [ "$(uname -m)" = x86_64 ]; then
 fi
 
 bins="wisl wislf gillian-c2 gillian-js"
-# CompCert is x86_64-only, so gillian-c is not shipped elsewhere.
-[ "$(uname -m)" = x86_64 ] && bins="$bins gillian-c"
+# CompCert is x86_64-only, so gillian-c and transformers are not shipped elsewhere.
+if [ "$(uname -m)" = x86_64 ]; then
+  bins="$bins gillian-c"
+  for t in transformers t_c t_c_a t_c_s t_js t_js_a t_js_s t_js_as t_wisl t_wisl_a t_wisl_s \
+    t_wislf t_wislf_a t_wislf_s c_bi_abd; do
+    bins="$bins transformers/$t"
+  done
+fi
 rm -rf _static/dist
-mkdir -p _static/dist
+mkdir -p _static/dist/transformers
 for b in $bins; do
-  cp "$DUNE_BUILD_DIR/install/default/bin/$b" _static/dist/
+  cp "$DUNE_BUILD_DIR/install/default/bin/${b#transformers/}" "_static/dist/$b"
   file "_static/dist/$b" | grep -q "statically linked" \
     || { file "_static/dist/$b"; echo "error: $b is not statically linked"; exit 1; }
 done
-file _static/dist/*
+find _static/dist -type f -exec file {} +
