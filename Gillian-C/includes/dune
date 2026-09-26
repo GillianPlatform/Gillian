@@ -1,9 +1,0 @@
-(install
- (section
-  (site
-   (gillian-c c_includes)))
- (files
-  (gillian-c.h as gillian-c/gillian-c.h)
-  (stdlib.h as stdlib.h)
-  (string.h as string.h))
- (package gillian-c))

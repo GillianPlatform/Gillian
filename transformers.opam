@@ -11,7 +11,6 @@ depends: [
   "gillian" {= version}
   "gillian-c" {= version}
   "gillian-js" {= version}
-  "dune-site"
   "printbox-text"
   "odoc" {with-doc}
 ]
@@ -24,11 +23,9 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"

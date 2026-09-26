@@ -14,13 +14,22 @@
   compcert
   printbox-text
   gillian.ppx_sat.runtime
-  ppx_deriving_yojson.runtime
-  dune-site)
+  ppx_deriving_yojson.runtime)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat))
  (instrumentation
   (backend landmarks --auto)))
 
-(generate_sites_module
- (module runtime_sites)
- (sites gillian-c))
+(rule
+ (target runtime_files.ml)
+ (deps
+  (source_tree ../runtime))
+ (action
+  (run ocaml-crunch -s -m plain -e gil ../runtime -o %{target})))
+
+(rule
+ (target include_files.ml)
+ (deps
+  (source_tree ../includes))
+ (action
+  (run ocaml-crunch -s -m plain -e h ../includes -o %{target})))
