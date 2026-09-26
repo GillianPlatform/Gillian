@@ -10,6 +10,9 @@ endif
 build:
 	$(OPAM_EXEC) dune build @all
 
+check:
+	$(OPAM_EXEC) dune build @check
+
 fmt:
 	$(OPAM_EXEC) dune fmt
 
@@ -38,7 +41,7 @@ uninstall:
 	opam remove gillian gillian-c gillian-js wisl gillian-c2 transformers -y
 
 watch:
-	$(OPAM_EXEC) dune build --watch
+	$(OPAM_EXEC) dune build @ocaml-index --watch
 
 c-init-env:
 	./Gillian-C/scripts/setup_environment.sh
