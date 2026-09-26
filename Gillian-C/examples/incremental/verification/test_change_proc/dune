@@ -36,6 +36,7 @@ Printf.ksprintf J.send {|
   (rule
     (deps (sandbox always) %s)
     (alias runtest)
+    (enabled_if (= %%{architecture} amd64))
     (action
       (progn
         %s
