@@ -18,11 +18,54 @@ env:
   DOCKER_IMG_PRE: ghcr.io/gillianplatform/
 
 jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Cache
+        uses: actions/cache@v4
+        with:
+          path: _static/opam
+          key: alpine-${{ matrix.arch }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
+      # Not a job-level `container:`: JS actions don't run in Alpine containers on arm64.
+      - name: Build and test static binaries
+        run: docker run --rm -v "$PWD:/src" -w /src alpine:3.22 scripts/build-static.sh
+      - name: Upload wisl
+        uses: actions/upload-artifact@v4
+        with: { name: "wisl-linux-${{ matrix.arch }}", path: _static/dist/wisl }
+      - name: Upload wislf
+        uses: actions/upload-artifact@v4
+        with: { name: "wislf-linux-${{ matrix.arch }}", path: _static/dist/wislf }
+      - name: Upload gillian-c2
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-c2-linux-${{ matrix.arch }}", path: _static/dist/gillian-c2 }
+      - name: Upload gillian-js
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-js-linux-${{ matrix.arch }}", path: _static/dist/gillian-js }
+      - name: Upload gillian-c
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-c-linux-${{ matrix.arch }}", path: _static/dist/gillian-c }
+      - name: Upload API docs
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: _docs/gillian/Gillian
+
   build:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [macos-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
       - &SETUP_Z3
@@ -64,15 +107,6 @@ jobs:
         with:
           name: gillian-${{ runner.os }}
           path: _dist
-      - name: Building API docs
-        run: make docs
-        if: runner.os == 'Linux'
-      - name: Sending docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-docs
-          path: _docs/gillian/Gillian
-        if: runner.os == 'Linux'
       - name: Setting dependency cache
         run: opam clean
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -82,20 +116,20 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - &DOWNLOAD_ARTIFACT
-        name: Download artifact
+      - &DOWNLOAD_GILLIAN_C
+        name: Download gillian-c
         uses: actions/download-artifact@v4
         with:
-          name: gillian-${{ runner.os }}
-          path: _dist
-      - &INSTALL_ARTIFACT
-        name: Install Gillian
+          name: gillian-c-linux-x86_64
+          path: ~/.local/bin
+      - &INSTALL_BINARIES
+        name: Install binaries
         run: |
-          sudo rsync -a --chmod=a+rx _dist/ /usr/local
-          rm -rf _dist
+          chmod +x ~/.local/bin/*
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C/scripts/setup_environment.sh"
@@ -111,11 +145,16 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - &DOWNLOAD_GILLIAN_JS
+        name: Download gillian-js
+        uses: actions/download-artifact@v4
+        with:
+          name: gillian-js-linux-x86_64
+          path: ~/.local/bin
+      - *INSTALL_BINARIES
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-JS/scripts/setup_environment.sh"
@@ -131,7 +170,7 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
       - name: install CBMC
@@ -139,8 +178,12 @@ jobs:
           curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-6.9.0/ubuntu-24.04-cbmc-6.9.0-Linux.deb
           sudo dpkg -i cbmc.deb
           rm cbmc.deb
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - name: Download gillian-c2
+        uses: actions/download-artifact@v4
+        with:
+          name: gillian-c2-linux-x86_64
+          path: ~/.local/bin
+      - *INSTALL_BINARIES
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C2/scripts/setup_environment.sh"
@@ -154,11 +197,11 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - *DOWNLOAD_GILLIAN_JS
+      - *INSTALL_BINARIES
       - name: Checkout javert-test262
         uses: actions/checkout@v4
         with:
@@ -174,11 +217,11 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - *DOWNLOAD_GILLIAN_C
+      - *INSTALL_BINARIES
       - name: Checkout collections-c-for-gillian
         uses: actions/checkout@v4
         with:
@@ -318,7 +361,7 @@ jobs:
   deploy-docs:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build-linux]
     strategy:
       fail-fast: false
       matrix:

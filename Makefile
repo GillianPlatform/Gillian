@@ -54,6 +54,10 @@ js-init-env:
 
 docs:
 	$(OPAM_EXEC) dune build @doc
-	$(OPAM_EXEC) odoc html-generate --as-json -o _docs ./_build/default/_doc/_odocls/gillian/gillian.odocl
+	$(OPAM_EXEC) odoc html-generate --as-json -o _docs $(or $(DUNE_BUILD_DIR),_build)/default/_doc/_odocls/gillian/gillian.odocl
 
-.PHONY: init-dev watch docs build c-init-env wisl-init-env js-init-env docs githooks switch deps opam
+DOCKER ?= docker
+static-linux:
+	$(DOCKER) run --rm -v "$$PWD:/src" -w /src alpine:3.22 scripts/build-static.sh
+
+.PHONY: static-linux init-dev watch docs build c-init-env wisl-init-env js-init-env docs githooks switch deps opam
