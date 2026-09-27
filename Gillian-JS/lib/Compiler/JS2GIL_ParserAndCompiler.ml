@@ -129,7 +129,7 @@ let parse_and_compile_files paths =
 
 let other_imports = [ ("jsil", parse_and_compile_jsil) ]
 let import_paths = Javert_utils.Js_config.import_paths
-let default_import_paths = Some Runtime_sites.Sites.runtime
+let default_import_paths = Some [ Javert_utils.Js_config.runtime_dir ]
 
 let initialize exec_mode =
   let open Exec_mode in

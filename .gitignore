@@ -31,6 +31,7 @@ _build
 *.merlin
 _opam
 _dist
+_static
 
 # Mac rubbish
 .DS_Store

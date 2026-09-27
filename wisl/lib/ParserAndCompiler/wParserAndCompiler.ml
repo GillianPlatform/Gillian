@@ -54,7 +54,15 @@ let parse_and_compile_files files =
 
 let other_imports = []
 let initialize _ = ()
-let default_import_paths = Some Runtime_sites.Sites.runtime
+
+let default_import_paths =
+  Some
+    [
+      Utils.Embedded.dir ~name:"wisl-runtime"
+        (List.map
+           (fun f -> (f, Option.get (Runtime_files.read f)))
+           Runtime_files.file_list);
+    ]
 
 module TargetLangOptions = struct
   open Cmdliner

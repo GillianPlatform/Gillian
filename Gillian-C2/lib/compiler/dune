@@ -7,15 +7,7 @@
 
 (library
  (name gillian_C2_compiler)
- (libraries
-  gillian
-  yojson
-  irep_lib
-  kutils
-  goto_lib
-  kcommons
-  memory_model
-  dune-site)
+ (libraries gillian yojson irep_lib kutils goto_lib kcommons memory_model)
  (flags :standard -open Goto_lib -open Kcommons)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson)))
@@ -29,6 +21,16 @@
    %{target}
    (bash "echo let expected = \\\"$(cat %{deps})\\\""))))
 
-(generate_sites_module
- (module runtime_sites)
- (sites gillian-c2))
+(rule
+ (target runtime_files.ml)
+ (deps
+  (source_tree ../../runtime))
+ (action
+  (run ocaml-crunch -s -m plain -e gil ../../runtime -o %{target})))
+
+(rule
+ (target include_files.ml)
+ (deps
+  (source_tree ../../includes))
+ (action
+  (run ocaml-crunch -s -m plain -e h ../../includes -o %{target})))

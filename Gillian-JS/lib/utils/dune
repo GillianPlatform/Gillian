@@ -1,8 +1,27 @@
 (library
  (name javert_utils)
  (public_name gillian-js.javert_utils)
- (libraries gillian dune-site))
+ (libraries gillian))
 
-(generate_sites_module
- (module runtime_sites)
- (sites gillian-js))
+(rule
+ (target runtime_files.ml)
+ (deps
+  (source_tree ../../runtime))
+ (action
+  (run
+   ocaml-crunch
+   -s
+   -m
+   plain
+   -e
+   jsil
+   -e
+   js
+   -e
+   gil
+   ../../runtime/JS2JSIL
+   ../../runtime/JSLogic
+   ../../runtime/ES5
+   ../../runtime/JS2JSIL_BI
+   -o
+   %{target})))

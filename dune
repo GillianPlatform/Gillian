@@ -9,6 +9,11 @@
  ppx_sat)
 
 (env
+ (static
+  (flags
+   (:standard -w -67 -w -69 -w -70))
+  (link_flags
+   (:standard -ccopt -static)))
  (opt
   (ocamlopt_flags
    (:standard -O3)))
