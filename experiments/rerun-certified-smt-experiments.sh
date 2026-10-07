@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="${GILLIAN_ROOT:-/Users/st621/dev/Gillian}"
+ROOT="${GILLIAN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 TIMEOUT_SECONDS="${CERTIFIED_SMT_TIMEOUT_SECONDS:-120}"
 cd "$ROOT"
+
+# Build up front, so that no case's timeout is spent building.
+dune build
 
 # The verifier appends to the experiment log, so a rerun that did not start
 # from an empty file would mix this corpus with whatever ran before it. Clear
