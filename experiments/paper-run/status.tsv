@@ -1,32 +1,32 @@
-00-js-JaVerT-BST 0
-01-js-JaVerT-DLL 0
-02-js-JaVerT-ExprEval 0
-03-js-JaVerT-IDGen 0
-04-js-JaVerT-PriQ 0
-05-js-JaVerT-SLL 0
-06-js-JaVerT-Sort 0
-07-js-JaVerT-annotated-SLL 0
-08-js-JaVerT-switch-01 0
-09-js-JaVerT-switch-02 0
-10-js-JaVerT-try-catch-01 1
-11-js-JaVerT-try-catch-02 0
-12-js-JaVerT-try-catch-03 0
-13-js-Amazon-main 124
-14-js-Amazon-pp-bug 125
-15-js-Amazon-frozen-bug 125
-16-c-verification-dll 0
-17-c-verification-priQ 0
-18-c-verification-sll 0
-19-c-verification-sort 0
-20-c-verification-vector 0
-21-c-Amazon-main 124
-22-c-Amazon-byte-cursor-ub 1
-23-wisl-DLL_recursive 0
-24-wisl-SLL_iterative 0
-25-wisl-SLL_recursive 0
-26-wisl-concurrent_binary_tree 0
-27-wisl-floating_point 0
-28-wisl-lambda_terms 1
-29-wisl-simple_concurrency 1
-30-wisl-wildcard 1
-31-wisl-sll_cc 1
+00-js-JaVerT-BST	0	0	5
+01-js-JaVerT-DLL	0	0	3
+02-js-JaVerT-ExprEval	0	0	4
+03-js-JaVerT-IDGen	0	0	1
+04-js-JaVerT-PriQ	0	0	5
+05-js-JaVerT-SLL	0	0	2
+06-js-JaVerT-Sort	0	0	2
+07-js-JaVerT-annotated-SLL	0	0	2
+08-js-JaVerT-switch-01	0	0	1
+09-js-JaVerT-switch-02	0	0	1
+10-js-JaVerT-try-catch-01	1	1	0
+11-js-JaVerT-try-catch-02	0	0	0
+12-js-JaVerT-try-catch-03	0	0	1
+13-js-Amazon-main	0	0|124	98
+14-js-Amazon-pp-bug	125	125	0
+15-js-Amazon-frozen-bug	125	125	1
+16-c-verification-dll	0	0	37
+17-c-verification-priQ	0	0	4
+18-c-verification-sll	0	0	2
+19-c-verification-sort	0	0	2
+20-c-verification-vector	0	0	3
+21-c-Amazon-main	124	0|124	120
+22-c-Amazon-byte-cursor-ub	1	1	1
+23-wisl-DLL_recursive	0	0	1
+24-wisl-SLL_iterative	0	0	2
+25-wisl-SLL_recursive	0	0	1
+26-wisl-concurrent_binary_tree	0	0	1
+27-wisl-floating_point	0	0	0
+28-wisl-lambda_terms	1	1	4
+29-wisl-simple_concurrency	1	1	0
+30-wisl-wildcard	1	1	1
+31-wisl-sll_cc	1	1	0

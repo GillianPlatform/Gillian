@@ -60,7 +60,7 @@ A query passes through three stages on the verified side:
 2. **encoded**: the extracted encoder (`GillianCore/cse/`) produced SMT-LIB for it.
 3. **answered**: both backends' solver calls returned `sat` or `unsat`.
 
-Two differences between the languages show up in the comparison:
+The differences between Gillian's language and CSE's show up as follows:
 
 - **Disagreements.** All are `sat` from Gillian and `unsat` from the verified
   encoder, on a query that uses Gillian's integer-to-number cast `IntToNum`.
@@ -74,6 +74,14 @@ Two differences between the languages show up in the comparison:
   the comparison would measure that difference rather than the encoders.
   Leaving out assertions weakens a query, so an `unsat` without them is still
   `unsat` with them.
+- **Numbers that are not positive.** For the same reason, the bridge translates
+  Gillian's number literals that are not positive (almost always `0.`), which
+  CSE does not have: the encoder handles them as any rational, with Gillian's
+  meaning. Negative *integer* literals are not translated: CSE's integers are
+  naturals, and the extracted encoder cannot represent a negative one.
+- **Ill-typed expressions.** Gillian compares integers with numbers
+  (`l-len #view < 22.`), which Z3 accepts; in CSE that is ill-typed, and the
+  verified encoder declines it: such a query is translated but not encoded.
 
 `GillianCore/cse/` is CSE's extracted library plus a small, additions-only
 patch for Gillian's values; `scripts/vendor-cse/vendor.sh --check` confirms it.
