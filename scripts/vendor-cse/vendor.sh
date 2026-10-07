@@ -2,58 +2,157 @@
 # Re-vendor CSE's OCaml library into GillianCore/cse.
 #
 # CSE (default ~/dev/CSE) is the source of truth for the verified encoder.  This
-# copies its hand-written libraries and its *generated* extraction over the top
-# of GillianCore/cse, then re-applies Gillian's local additions.
+# copies its hand-written libraries and its *generated* extraction, applies
+# Gillian's additions from gillian.patch, and installs the result over the
+# sources in GillianCore/cse.
 #
 # Gillian's own build wiring is deliberately preserved: the dune files here
 # differ from CSE's (different library and public names, and the extraction is
-# checked in rather than produced by a rocq rule), so they are never copied.
+# checked in rather than produced by a rocq rule), so they are never touched.
 #
-# Usage: scripts/vendor-cse/vendor.sh [path-to-CSE]
+# Usage: scripts/vendor-cse/vendor.sh [--check | --update-patch] [path-to-CSE]
+#
+#   (default)       re-vendor: GillianCore/cse := CSE + gillian.patch
+#   --check         change nothing; fail unless GillianCore/cse is exactly
+#                   CSE + gillian.patch
+#   --update-patch  regenerate gillian.patch from GillianCore/cse, after
+#                   editing Gillian's additions there
 
 set -euo pipefail
+
+MODE=vendor
+case "${1:-}" in
+  --check)        MODE=check;        shift ;;
+  --update-patch) MODE=update-patch; shift ;;
+  -*)             echo "error: unknown option $1" >&2; exit 2 ;;
+esac
 
 CSE="${1:-$HOME/dev/CSE}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$(cd "$HERE/../.." && pwd)/GillianCore/cse"
+PATCH="$HERE/gillian.patch"
 
 LIBS=(smt smtlib syntax utils)
+DIRS=("${LIBS[@]}" extracted)
 
 [ -d "$CSE/lib" ] || { echo "error: no CSE checkout at $CSE" >&2; exit 1; }
 [ -d "$DEST" ]    || { echo "error: no vendored tree at $DEST" >&2; exit 1; }
 
-# The extraction is a build artefact, so CSE must have been built.
+# The extraction is a build artefact. Always build: dune does nothing if it is
+# up to date, and an old _build would otherwise be vendored silently.
+echo "==> building CSE's extraction in $CSE"
+(cd "$CSE" && { ! command -v opam >/dev/null || eval "$(opam env)"; } && dune build lib/)
 EXTRACTED="$CSE/_build/default/lib/extracted"
-if [ ! -f "$EXTRACTED/extracted.ml" ]; then
-  echo "==> building CSE's extraction (not present in $CSE/_build)"
-  (cd "$CSE" && eval "$(opam env)" && dune build lib/)
-fi
 [ -f "$EXTRACTED/extracted.ml" ] || {
   echo "error: $EXTRACTED/extracted.ml missing after build" >&2; exit 1; }
 
-echo "==> vendoring $CSE -> $DEST"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
-# 1. Hand-written libraries: sources only, never dune files.
-for lib in "${LIBS[@]}"; do
-  for f in "$CSE/lib/$lib"/*.ml "$CSE/lib/$lib"/*.mli; do
-    [ -e "$f" ] || continue
-    cp "$f" "$DEST/$lib/$(basename "$f")"
+# copy_sources SRC DST: the .ml/.mli files of the vendored directories.
+copy_sources() {
+  for d in "${DIRS[@]}"; do
+    mkdir -p "$2/$d"
+    for f in "$1/$d"/*.ml "$1/$d"/*.mli; do
+      [ -e "$f" ] && cp "$f" "$2/$d/"
+    done
   done
-  echo "  $lib/"
+  return 0
+}
+
+# CSE as it is, without Gillian's additions. Extraction.v stays in CSE; it is
+# the recipe, and Gillian consumes the output.
+mkdir -p "$WORK/cse"
+for lib in "${LIBS[@]}"; do
+  mkdir -p "$WORK/cse/$lib"
+  cp "$CSE/lib/$lib"/*.ml "$CSE/lib/$lib"/*.mli "$WORK/cse/$lib/"
 done
+mkdir -p "$WORK/cse/extracted"
+cp "$EXTRACTED/extracted.ml" "$EXTRACTED/extracted.mli" "$WORK/cse/extracted/"
 
-# 2. The generated extraction. Extraction.v stays in CSE; it is the recipe, and
-#    Gillian consumes the output.
-cp "$EXTRACTED/extracted.ml" "$EXTRACTED/extracted.mli" "$DEST/extracted/"
-echo "  extracted/ (generated)"
+# The tree Gillian currently has.
+copy_sources "$DEST" "$WORK/gillian"
 
-# 3. Gillian's local additions.
-echo "==> re-applying Gillian's local additions"
-python3 "$HERE/local_additions.py" "$DEST"
+# CSE with gillian.patch applied. -F0: the context must match exactly, so a
+# patch that no longer fits CSE fails rather than landing approximately.
+apply_patch() {
+  cp -R "$WORK/cse" "$WORK/patching"
+  if ! patch -s -p1 -F0 -d "$WORK/patching" < "$PATCH"; then
+    echo "error: gillian.patch does not apply to $CSE" >&2
+    echo "  Re-apply the additions by hand in GillianCore/cse, then run" >&2
+    echo "  $0 --update-patch" >&2
+    exit 1
+  fi
+  copy_sources "$WORK/patching" "$WORK/patched"
+}
 
-cat <<'MSG'
+# The same file names on both sides, so that a unified diff of the two trees
+# says everything.
+same_files() {
+  if ! diff <(cd "$1" && find . -type f | LC_ALL=C sort) \
+            <(cd "$2" && find . -type f | LC_ALL=C sort) >&2; then
+    echo "error: $3" >&2
+    exit 1
+  fi
+}
+
+case "$MODE" in
+  vendor)
+    apply_patch
+    echo "==> vendoring $CSE -> $DEST"
+    for d in "${DIRS[@]}"; do
+      rm -f "$DEST/$d"/*.ml "$DEST/$d"/*.mli
+    done
+    copy_sources "$WORK/patched" "$DEST"
+    cat <<'MSG'
 ==> done. Next:
       dune build @check      # or: dune build GillianCore
     Review with:
-      git -C . diff --stat GillianCore/cse
+      git diff --stat GillianCore/cse
 MSG
+    ;;
+
+  check)
+    apply_patch
+    same_files "$WORK/patched" "$WORK/gillian" \
+      "GillianCore/cse and CSE + gillian.patch have different files"
+    if diff -r "$WORK/patched" "$WORK/gillian" >/dev/null; then
+      echo "==> OK: GillianCore/cse is exactly $CSE + gillian.patch"
+    else
+      echo "==> MISMATCH: GillianCore/cse is not $CSE + gillian.patch:" >&2
+      (cd "$WORK" && diff -ru patched gillian) >&2 || true
+      exit 1
+    fi
+    ;;
+
+  update-patch)
+    same_files "$WORK/cse" "$WORK/gillian" \
+      "GillianCore/cse and CSE have different files; vendor first"
+    {
+      cat <<'HEADER'
+Gillian's additions to CSE's OCaml library.
+
+GillianCore/cse is CSE's lib/ (hand-written) and lib/extracted (generated by
+extraction), plus exactly this patch. Every hunk is an addition:
+
+  * none, empty and loc, the three GIL values with no counterpart in CSE's
+    verified value language, as constructors of the SMT Val datatype, with
+    their type tests and coercions (extracted/, syntax/, smt/smt.ml);
+  * `open Extraction_utils`, where Gillian's build renames CSE's utils library.
+
+Generated by `scripts/vendor-cse/vendor.sh --update-patch`; do not edit by hand.
+Check it with `scripts/vendor-cse/vendor.sh --check`.
+
+HEADER
+      (cd "$WORK" && find cse -type f | sed 's|^cse/||' | LC_ALL=C sort |
+        while read -r f; do
+          diff -u --label "a/$f" --label "b/$f" "cse/$f" "gillian/$f" || [ $? -eq 1 ]
+        done)
+    } > "$PATCH"
+    echo "==> wrote $PATCH" \
+         "($(awk '/^\+/ && !/^\+\+\+ /' "$PATCH" | wc -l | tr -d ' ') added lines," \
+         "$(awk '/^-/ && !/^--- /' "$PATCH" | wc -l | tr -d ' ') removed)"
+    # The patch must reproduce the tree it was taken from.
+    exec "$0" --check "$CSE"
+    ;;
+esac

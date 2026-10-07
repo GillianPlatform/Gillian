@@ -10,8 +10,16 @@ dune build @check
 git diff --stat GillianCore/cse
 ```
 
-`vendor.sh` copies CSE's hand-written libraries and its *generated* extraction,
-then runs `local_additions.py` to re-apply Gillian's additions.
+`vendor.sh` builds CSE's extraction, copies CSE's hand-written libraries and the
+*generated* extraction, applies [`gillian.patch`](gillian.patch), and installs
+the result over the `.ml`/`.mli` sources in `GillianCore/cse`.
+
+To check, without changing anything, that `GillianCore/cse` is exactly CSE plus
+the patch:
+
+```sh
+scripts/vendor-cse/vendor.sh --check [path-to-CSE]
+```
 
 ## What is local to Gillian, and why
 
@@ -27,46 +35,49 @@ coercions:
 | `smt/smt.ml` | the three `declare-datatype` entries that announce them to the solver |
 
 These are additions to *extracted* code, so they cannot be source edits in CSE
-and extraction will never regenerate them. That is why they are re-applied by a
-script rather than merged by hand: doing it by hand once per re-vendor is how
-they drift.
+and extraction will never regenerate them. They live in `gillian.patch`, which
+only adds lines: it removes or changes nothing of CSE's.
 
 Two further differences are pure build wiring, and are **not** additions:
 
 - CSE builds its utility library as `utils` (module `Utils`). Gillian must
   rename it to `extraction_utils`, because `GillianCore/utils` already claims
-  `utils`; dune then wraps it as `Extraction_utils.Utils`. `local_additions.py`
-  prepends `open Extraction_utils` to every copied `.ml` that refers to
-  `Utils.`, which restores the prefix the copied sources use.
+  `utils`; dune then wraps it as `Extraction_utils.Utils`. The patch adds
+  `open Extraction_utils` to every copied `.ml` that refers to `Utils.`, which
+  restores the prefix the copied sources use.
 - The `dune` files here differ from CSE's (different library and public names,
   and the extraction is checked in rather than produced by a rocq rule).
   `vendor.sh` never copies a `dune` file.
 
-## How the additions are anchored
+## Changing the additions
 
-Every Gillian value added here is a sibling of `null`, so every edit is
-anchored on the corresponding `null` declaration — `let c_null_val =`,
-`| TNull -> is_null_val t`, and so on. Those names are stable across CSE
-releases, which makes the edits robust to unrelated churn in the generated
-code.
+`gillian.patch` is generated; do not edit it by hand. Edit the additions in
+`GillianCore/cse` itself, then regenerate the patch, which also checks that it
+reproduces the tree:
 
-An anchor that does not match **exactly once** is a hard error: the tool
-refuses to guess, and refuses to run at all on a file that already contains
-additions. After applying, it checks that every expected identifier is present.
-So a re-vendor either lands completely or fails loudly; it never
-half-applies.
+```sh
+scripts/vendor-cse/vendor.sh --update-patch [path-to-CSE]
+```
 
-If CSE moves an anchor, the fix is to re-roll that one edit: find the new
-sibling declaration, update the `anchor` field, and re-run.
+The patch is applied with no fuzz (`patch -F0`), in a scratch copy. If CSE has
+changed under a hunk, the re-vendor fails and leaves `GillianCore/cse`
+untouched. Then re-vendor by hand (copy CSE over the sources, re-apply the
+additions, build), and run `--update-patch`.
 
 ### The limit of that guarantee
 
-The post-conditions check that the additions *landed*, not that the code they
-call still *means* the same thing. `to_gillian_value` is a hand-written variant
-of the generated `to_null` — it maps into `Val` rather than unwrapping to
-`Null` — so if CSE changes the shape of its coercions, that payload has to be
-re-derived by hand. It will still compile. Re-run the experiments after a
-re-vendor; do not trust the build alone.
+A patch that applies is not a patch that is still right. Two ways it can apply
+and be wrong:
+
+- the additions name CSE's generated constructors (`IdSimple`, `PVNull`, ...).
+  If CSE renames one outside a hunk's context, the patch applies and the build
+  fails;
+- `to_gillian_value` is a hand-written variant of the generated `to_null`, which
+  maps into `Val` rather than unwrapping to `Null`. If CSE changes the shape of
+  its coercions, that addition has to be re-derived by hand, and it will still
+  compile.
+
+So after a re-vendor, build *and* re-run the experiments.
 
 ## Formatting
 
