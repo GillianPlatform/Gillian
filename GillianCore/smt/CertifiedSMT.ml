@@ -33,7 +33,11 @@ module C : Cse.Smt.Coerce with type exp = Expr.t and type typ = Type.t = struct
     | Empty -> Some Cse.Val.Empty
     | Loc l -> Some (Cse.Val.Loc (Hashtbl.hash l))
     | Bool b -> Some (Cse.Val.Bool b)
-    | Int i -> Some (Cse.Val.Nat (Z.to_int i))
+    (* CSE's integers are naturals. A negative literal has no CSE value, and
+       the extracted encoder assumes it never sees one. *)
+    | Int i when Z.sign i >= 0 && Z.fits_int i ->
+        Some (Cse.Val.Nat (Z.to_int i))
+    | Int _ -> None
     | Num n -> (
         match Float.classify_float n with
         | FP_nan | FP_infinite -> None
@@ -55,7 +59,15 @@ module C : Cse.Smt.Coerce with type exp = Expr.t and type typ = Type.t = struct
 
   let rec diagnose_val (v : Literal.t) : string option =
     match v with
-    | Null | Nono | Empty | Loc _ | Bool _ | Int _ | String _ -> None
+    | Null | Nono | Empty | Loc _ | Bool _ | String _ -> None
+    | Int i when Z.sign i < 0 ->
+        Some
+          (Fmt.str "unsupported negative integer literal %s: CSE has naturals"
+             (Z.to_string i))
+    | Int i when not (Z.fits_int i) ->
+        Some
+          (Fmt.str "unsupported integer literal %s: too large" (Z.to_string i))
+    | Int _ -> None
     | Num n -> (
         match Float.classify_float n with
         | FP_nan -> Some "unsupported NaN number literal"

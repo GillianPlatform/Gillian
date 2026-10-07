@@ -248,11 +248,13 @@ module Pos =
 
   (** val of_succ_nat : int -> positive **)
 
-  let rec of_succ_nat n0 =
-    (fun fO fS n -> if n=0 then fO () else fS (n-1))
-      (fun _ -> XH)
-      (fun x -> succ (of_succ_nat x))
-      n0
+  let rec of_succ_nat = (fun n ->
+     if n < 0 then invalid_arg "Pos.of_succ_nat: negative natural";
+     let rec go m =
+       if m = 1 then XH
+       else if m land 1 = 0 then XO (go (m lsr 1))
+       else XI (go (m lsr 1)) in
+     go (n + 1))
  end
 
 module Coq_Pos =
