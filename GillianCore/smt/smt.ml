@@ -20,6 +20,18 @@ let () = Sys.(set_signal sigpipe Signal_ignore)
 exception SMT_unknown
 
 let pp_sexp = Sexplib.Sexp.pp_hum
+
+(* SMT-LIB text of a command, with atoms printed verbatim. Simple_smt prints
+   with Sexplib, which escapes an atom containing a double quote OCaml-style:
+   the verified encoder's string literals, whose atom is the quoted SMT-LIB text
+   ("long", quotes included), would reach the solver as "\"long\"", which is
+   not SMT-LIB. The unverified encoder never emits a string literal. *)
+let rec pp_smtlib ft = function
+  | Sexplib.Sexp.Atom a -> Format.pp_print_string ft a
+  | Sexplib.Sexp.List l ->
+      Fmt.pf ft "@[<hv 1>(%a)@]" Fmt.(list ~sep:sp pp_smtlib) l
+
+let smtlib_to_string = Fmt.str "%a" pp_smtlib
 let init_decls : sexp list ref = ref []
 let builtin_funcs : sexp list ref = ref []
 
@@ -34,6 +46,12 @@ let solver =
     }
 
 let cmd s = ack_command !solver s
+
+(* [cmd], sending [s] as [smtlib_to_string] prints it. *)
+let cmd_smtlib s =
+  match !solver.raw_command (smtlib_to_string s) with
+  | Sexplib.Sexp.Atom "success" -> ()
+  | ans -> raise (UnexpectedSolverResponse ans)
 
 let rec init_solver () =
   let z3 = new_solver z3 in
@@ -1001,8 +1019,9 @@ module Certified_experiment = struct
     | Some time -> `Float time
     | None -> `Null
 
+  (* [query] is the text sent to the solver, one string per command. *)
   let json_of_query = function
-    | Some query -> sexps_to_yojson query
+    | Some query -> `List (List.map (fun s -> `String s) query)
     | None -> `Null
 
   let json_of_diagnostic diagnostic =
@@ -1082,7 +1101,7 @@ let reset_solver ~use_certified () =
   cmd (pop 1);
   RepeatCache.clear ();
   cmd (push 1);
-  if use_certified then CertifiedSMT.Smt.decls |> List.iter cmd
+  if use_certified then CertifiedSMT.Smt.decls |> List.iter cmd_smtlib
   else
     let decls = List.rev !init_decls in
     decls |> List.iter cmd
@@ -1103,7 +1122,9 @@ let query_of_assertions ~use_certified encoded_assertions =
 let run_encoded_assertions ~use_certified encoded_assertions =
   let () = reset_solver ~use_certified () in
   let () = if not use_certified then List.iter cmd !builtin_funcs in
-  let () = List.iter cmd encoded_assertions in
+  let () =
+    List.iter (if use_certified then cmd_smtlib else cmd) encoded_assertions
+  in
   L.verbose (fun fmt -> fmt "Reached SMT.");
   let start = Unix.gettimeofday () in
   let result = check !solver in
@@ -1168,7 +1189,9 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
       in
       let unverified_json =
         Certified_experiment.backend_json ~result:(Some unverified_run.result)
-          ~time:(Some unverified_run.elapsed) ~query:(Some unverified_query) ()
+          ~time:(Some unverified_run.elapsed)
+          ~query:(Some (List.map Sexplib.Sexp.to_string_hum unverified_query))
+          ()
       in
       let verified_json =
         Certified_experiment.backend_json ~coerced:verified_encoding.coerced
@@ -1178,7 +1201,8 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
             (verified_encoding.encoding_failures @ solve_failures)
           ~result:(Option.map (fun run -> run.result) verified_run)
           ~time:(Option.map (fun run -> run.elapsed) verified_run)
-          ~query:verified_query ()
+          ~query:(Option.map (List.map smtlib_to_string) verified_query)
+          ()
       in
       Certified_experiment.record ~fs ~gamma ~unverified:unverified_json
         ~verified:verified_json;
