@@ -6,7 +6,7 @@ type t =
      symbol whose sort the arguments do not determine — [seq.empty] is the
      only one the encoder emits — is ill-formed without it. *)
   | App of (Sexplib.Sexp.t * Sort.t option * t list)
-  | Fun of (string * Sort.t * t)
+  | Lambda of (string * Sort.t * t)
   | Exists of (string * Sort.t * t)
   | Forall of (string * Sort.t * t)
   | Let of ((string * t) list * t)
@@ -25,11 +25,11 @@ let rec from_extracted (t : Extracted.term) : t =
        (Utils.sexp_of_identifier f,
         Option.map Sort.from_extracted s,
         (List.map from_extracted ts))
-  | TFun (s, t) ->
+  | TLambda (s, t) ->
      let s' = Sort.from_extracted s in
      let x = Extracted.fresh_string_of_set binder_seed (Extracted.fv t) in
      let t' = Extracted.term_open 0 [Extracted.TFVar x] t in
-     Fun (Utils.string_from_char_list x, s', from_extracted t')
+     Lambda (Utils.string_from_char_list x, s', from_extracted t')
   | TExists (s, t) ->
      let s' = Sort.from_extracted s in
      let x = Extracted.fresh_string_of_set binder_seed (Extracted.fv t) in
@@ -82,7 +82,7 @@ let rec to_sexp t =
     (match ts with
      | [] -> head
      | _ -> Sexp.List (head :: (List.map to_sexp ts)))
-  | Fun (x, s, t) ->
+  | Lambda (x, s, t) ->
      let binder = Sexp.List [Sexp.Atom (sanitise_var x); Sort.to_sexp s] in
      let binders = Sexp.List [binder] in
      Sexp.List [Sexp.Atom "lambda"; binders; to_sexp t]

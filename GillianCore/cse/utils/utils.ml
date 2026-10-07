@@ -12,8 +12,8 @@ let string_from_index (i : Extracted.index) =
 
 let string_from_identifier (id : Extracted.identifier) =
   match id with
-  | IdSym s -> string_from_char_list s
-  | IdSymWithIndices (s, idx) ->
+  | IdSimple s -> string_from_char_list s
+  | IdIndexed (s, idx) ->
       let head = string_from_char_list s in
       String.concat " " (head :: List.map string_from_index idx)
 
@@ -86,12 +86,12 @@ let sexp_of_literal_symbol s =
 
 let sexp_of_identifier (id : Extracted.identifier) =
   match id with
-  | IdSym s -> (
+  | IdSimple s -> (
       let s = string_from_char_list s in
       match sexp_of_literal_symbol s with
       | Some literal -> literal
       | None -> Sexplib.Sexp.Atom s)
-  | IdSymWithIndices (s, idx) ->
+  | IdIndexed (s, idx) ->
       Sexplib.Sexp.List
         (Sexplib.Sexp.Atom "_"
          :: Sexplib.Sexp.Atom (string_from_char_list s)

@@ -852,8 +852,8 @@ val index_eq_decision : (index, index) relDecision
 val index_countable : index countable
 
 type identifier =
-| IdSym of char list
-| IdSymWithIndices of char list * index list
+| IdSimple of char list
+| IdIndexed of char list * index list
 
 val identifier_eq_decision : (identifier, identifier) relDecision
 
@@ -891,7 +891,7 @@ type term =
 | TFVar of char list
 | TBVar of int * int
 | TApp of identifier * sort option * term list
-| TFun of sort * term
+| TLambda of sort * term
 | TExists of sort * term
 | TForall of sort * term
 | TLet of term list * term

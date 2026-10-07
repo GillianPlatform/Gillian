@@ -3636,21 +3636,21 @@ let index_countable =
     | Inr s -> Some (IdxSym s))
 
 type identifier =
-| IdSym of char list
-| IdSymWithIndices of char list * index list
+| IdSimple of char list
+| IdIndexed of char list * index list
 
 (** val identifier_eq_decision : (identifier, identifier) relDecision **)
 
 let identifier_eq_decision x y =
   match x with
-  | IdSym s ->
+  | IdSimple s ->
     (match y with
-     | IdSym s0 -> decide_rel String.eq_dec s s0
-     | IdSymWithIndices (_, _) -> false)
-  | IdSymWithIndices (s, idx) ->
+     | IdSimple s0 -> decide_rel String.eq_dec s s0
+     | IdIndexed (_, _) -> false)
+  | IdIndexed (s, idx) ->
     (match y with
-     | IdSym _ -> false
-     | IdSymWithIndices (s0, idx0) ->
+     | IdSimple _ -> false
+     | IdIndexed (s0, idx0) ->
        if decide_rel String.eq_dec s s0
        then decide_rel (Coq_list.list_eq_dec index_eq_decision) idx idx0
        else false)
@@ -3668,17 +3668,17 @@ let identifier_countable =
         (list_countable index_eq_decision index_countable)))
     identifier_eq_decision (fun i ->
     match i with
-    | IdSym s -> Inl s
-    | IdSymWithIndices (s, idx) -> Inr (s, idx)) (fun code ->
+    | IdSimple s -> Inl s
+    | IdIndexed (s, idx) -> Inr (s, idx)) (fun code ->
     match code with
-    | Inl s -> Some (IdSym s)
-    | Inr p -> let (s, idx) = p in Some (IdSymWithIndices (s, idx)))
+    | Inl s -> Some (IdSimple s)
+    | Inr p -> let (s, idx) = p in Some (IdIndexed (s, idx)))
 
 (** val identifier_add_prefix : char list -> identifier -> identifier **)
 
 let identifier_add_prefix prefix = function
-| IdSym s -> IdSym (append prefix s)
-| IdSymWithIndices (s, idx) -> IdSymWithIndices ((append prefix s), idx)
+| IdSimple s -> IdSimple (append prefix s)
+| IdIndexed (s, idx) -> IdIndexed ((append prefix s), idx)
 
 type sort =
 | SParam of identifier
@@ -3738,7 +3738,7 @@ let sort_countable =
 (** val s_bool : identifier **)
 
 let s_bool =
-  IdSym ('B'::('o'::('o'::('l'::[]))))
+  IdSimple ('B'::('o'::('o'::('l'::[]))))
 
 (** val _UU03c3__bool : sort **)
 
@@ -3792,7 +3792,7 @@ type term =
 | TFVar of char list
 | TBVar of int * int
 | TApp of identifier * sort option * term list
-| TFun of sort * term
+| TLambda of sort * term
 | TExists of sort * term
 | TForall of sort * term
 | TLet of term list * term
@@ -3825,11 +3825,11 @@ let rec term_eq_decision = function
            else false
       else false
     | _ -> false)
-| TFun (_UU03c3_, t) ->
+| TLambda (_UU03c3_, t) ->
   let h = term_eq_decision t in
   (fun x0 ->
   match x0 with
-  | TFun (_UU03c3_0, t0) ->
+  | TLambda (_UU03c3_0, t0) ->
     if decide_rel sort_eq_decision _UU03c3_ _UU03c3_0 then h t0 else false
   | _ -> false)
 | TExists (_UU03c3_, t) ->
@@ -3880,7 +3880,7 @@ let rec term_encode = function
     (mbind (Obj.magic (fun _ _ -> Coq0_list.list_bind)) term_encode
       (Obj.magic ts))
     ((Inl (Inr (Inl (((length ts), f), _UU03c3_)))) :: [])
-| TFun (_UU03c3_, t0) ->
+| TLambda (_UU03c3_, t0) ->
   app (term_encode t0) ((Inl (Inr (Inr _UU03c3_))) :: [])
 | TExists (_UU03c3_, t0) ->
   app (term_encode t0) ((Inr (Inl (Inl _UU03c3_))) :: [])
@@ -3926,7 +3926,7 @@ let rec term_decode stack = function
          | Inr _UU03c3_ ->
            mbind (Obj.magic (fun _ _ -> option_bind)) (fun t ->
              let stack' = tl stack in
-             term_decode ((TFun (_UU03c3_, t)) :: stack') code')
+             term_decode ((TLambda (_UU03c3_, t)) :: stack') code')
              (hd_error stack)))
    | Inr s0 ->
      (match s0 with
@@ -4034,7 +4034,7 @@ let rec fv = function
 | TApp (_, _, ts) ->
   union_list (gset_empty String.eq_dec String.countable)
     (gset_union String.eq_dec String.countable) (map fv ts)
-| TFun (_, t0) -> fv t0
+| TLambda (_, t0) -> fv t0
 | TExists (_, t0) -> fv t0
 | TForall (_, t0) -> fv t0
 | TLet (ts, t0) ->
@@ -4053,8 +4053,8 @@ let rec term_open k us t = match t with
 | TBVar (i, j) ->
   if decide (decide_rel Coq_Nat.eq_dec i k) then nth j us t else t
 | TApp (f, _UU03c3_, ts) -> TApp (f, _UU03c3_, (map (term_open k us) ts))
-| TFun (_UU03c4_, t0) ->
-  TFun (_UU03c4_, (term_open (Stdlib.Int.succ k) us t0))
+| TLambda (_UU03c4_, t0) ->
+  TLambda (_UU03c4_, (term_open (Stdlib.Int.succ k) us t0))
 | TExists (_UU03c4_, t0) ->
   TExists (_UU03c4_, (term_open (Stdlib.Int.succ k) us t0))
 | TForall (_UU03c4_, t0) ->
@@ -4079,8 +4079,8 @@ let rec term_close ys k = function
    | None -> TFVar x)
 | TBVar (i, j) -> TBVar (i, j)
 | TApp (f, _UU03c3_, ts) -> TApp (f, _UU03c3_, (map (term_close ys k) ts))
-| TFun (_UU03c4_, t0) ->
-  TFun (_UU03c4_, (term_close ys (Stdlib.Int.succ k) t0))
+| TLambda (_UU03c4_, t0) ->
+  TLambda (_UU03c4_, (term_close ys (Stdlib.Int.succ k) t0))
 | TExists (_UU03c4_, t0) ->
   TExists (_UU03c4_, (term_close ys (Stdlib.Int.succ k) t0))
 | TForall (_UU03c4_, t0) ->
@@ -4104,7 +4104,7 @@ let rec term_subst subst = function
    | None -> TFVar x)
 | TBVar (i, j) -> TBVar (i, j)
 | TApp (f, _UU03c3_, ts) -> TApp (f, _UU03c3_, (map (term_subst subst) ts))
-| TFun (_UU03c4_, t0) -> TFun (_UU03c4_, (term_subst subst t0))
+| TLambda (_UU03c4_, t0) -> TLambda (_UU03c4_, (term_subst subst t0))
 | TExists (_UU03c4_, t0) -> TExists (_UU03c4_, (term_subst subst t0))
 | TForall (_UU03c4_, t0) -> TForall (_UU03c4_, (term_subst subst t0))
 | TLet (ts, t0) ->
@@ -4119,37 +4119,37 @@ let rec term_subst subst = function
 (** val f_true : identifier **)
 
 let f_true =
-  IdSym ('t'::('r'::('u'::('e'::[]))))
+  IdSimple ('t'::('r'::('u'::('e'::[]))))
 
 (** val f_false : identifier **)
 
 let f_false =
-  IdSym ('f'::('a'::('l'::('s'::('e'::[])))))
+  IdSimple ('f'::('a'::('l'::('s'::('e'::[])))))
 
 (** val f_not : identifier **)
 
 let f_not =
-  IdSym ('n'::('o'::('t'::[])))
+  IdSimple ('n'::('o'::('t'::[])))
 
 (** val f_impl : identifier **)
 
 let f_impl =
-  IdSym ('='::('>'::[]))
+  IdSimple ('='::('>'::[]))
 
 (** val f_and : identifier **)
 
 let f_and =
-  IdSym ('a'::('n'::('d'::[])))
+  IdSimple ('a'::('n'::('d'::[])))
 
 (** val f_eq : identifier **)
 
 let f_eq =
-  IdSym ('='::[])
+  IdSimple ('='::[])
 
 (** val f_ite : identifier **)
 
 let f_ite =
-  IdSym ('i'::('t'::('e'::[])))
+  IdSimple ('i'::('t'::('e'::[])))
 
 (** val true_ : term **)
 
@@ -4200,7 +4200,7 @@ let ite_ t1 t2 t3 =
 (** val s_int : identifier **)
 
 let s_int =
-  IdSym ('I'::('n'::('t'::[])))
+  IdSimple ('I'::('n'::('t'::[])))
 
 (** val _UU03c3__int : sort **)
 
@@ -4210,7 +4210,7 @@ let _UU03c3__int =
 (** val s_real : identifier **)
 
 let s_real =
-  IdSym ('R'::('e'::('a'::('l'::[]))))
+  IdSimple ('R'::('e'::('a'::('l'::[]))))
 
 (** val _UU03c3__real : sort **)
 
@@ -4220,67 +4220,67 @@ let _UU03c3__real =
 (** val f_minus : identifier **)
 
 let f_minus =
-  IdSym ('-'::[])
+  IdSimple ('-'::[])
 
 (** val f_plus : identifier **)
 
 let f_plus =
-  IdSym ('+'::[])
+  IdSimple ('+'::[])
 
 (** val f_times : identifier **)
 
 let f_times =
-  IdSym ('*'::[])
+  IdSimple ('*'::[])
 
 (** val f_idiv : identifier **)
 
 let f_idiv =
-  IdSym ('d'::('i'::('v'::[])))
+  IdSimple ('d'::('i'::('v'::[])))
 
 (** val f_div : identifier **)
 
 let f_div =
-  IdSym ('/'::[])
+  IdSimple ('/'::[])
 
 (** val f_mod : identifier **)
 
 let f_mod =
-  IdSym ('m'::('o'::('d'::[])))
+  IdSimple ('m'::('o'::('d'::[])))
 
 (** val f_leq : identifier **)
 
 let f_leq =
-  IdSym ('<'::('='::[]))
+  IdSimple ('<'::('='::[]))
 
 (** val f_lt : identifier **)
 
 let f_lt =
-  IdSym ('<'::[])
+  IdSimple ('<'::[])
 
 (** val f_geq : identifier **)
 
 let f_geq =
-  IdSym ('>'::('='::[]))
+  IdSimple ('>'::('='::[]))
 
 (** val f_to_real : identifier **)
 
 let f_to_real =
-  IdSym ('t'::('o'::('_'::('r'::('e'::('a'::('l'::[])))))))
+  IdSimple ('t'::('o'::('_'::('r'::('e'::('a'::('l'::[])))))))
 
 (** val f_to_int : identifier **)
 
 let f_to_int =
-  IdSym ('t'::('o'::('_'::('i'::('n'::('t'::[]))))))
+  IdSimple ('t'::('o'::('_'::('i'::('n'::('t'::[]))))))
 
 (** val f_is_int : identifier **)
 
 let f_is_int =
-  IdSym ('i'::('s'::('_'::('i'::('n'::('t'::[]))))))
+  IdSimple ('i'::('s'::('_'::('i'::('n'::('t'::[]))))))
 
 (** val f_int_literal : z -> identifier **)
 
 let f_int_literal i =
-  IdSym
+  IdSimple
     (append
       ('i'::('n'::('t'::('_'::('l'::('i'::('t'::('e'::('r'::('a'::('l'::('_'::[]))))))))))))
       (pretty0 pretty_Z i))
@@ -4288,7 +4288,7 @@ let f_int_literal i =
 (** val f_decimal_literal : qc -> identifier **)
 
 let f_decimal_literal q0 =
-  IdSym
+  IdSimple
     (append
       ('d'::('e'::('c'::('i'::('m'::('a'::('l'::('_'::('l'::('i'::('t'::('e'::('r'::('a'::('l'::('_'::[]))))))))))))))))
       (append (pretty0 pretty_Z q0.qnum)
@@ -4377,7 +4377,7 @@ let zero_real =
 (** val s_string : identifier **)
 
 let s_string =
-  IdSym ('S'::('t'::('r'::('i'::('n'::('g'::[]))))))
+  IdSimple ('S'::('t'::('r'::('i'::('n'::('g'::[]))))))
 
 (** val _UU03c3__string : sort **)
 
@@ -4592,12 +4592,12 @@ let f_string_literal s =
 (** val string_literal : char list -> term **)
 
 let string_literal s =
-  TApp ((IdSym (f_string_literal s)), None, [])
+  TApp ((IdSimple (f_string_literal s)), None, [])
 
 (** val s_seq : identifier **)
 
 let s_seq =
-  IdSym ('S'::('e'::('q'::[])))
+  IdSimple ('S'::('e'::('q'::[])))
 
 (** val _UU03c4__seq : sort -> sort **)
 
@@ -4607,38 +4607,38 @@ let _UU03c4__seq _UU03c4_ =
 (** val f_seq_empty : identifier **)
 
 let f_seq_empty =
-  IdSym ('s'::('e'::('q'::('.'::('e'::('m'::('p'::('t'::('y'::[])))))))))
+  IdSimple ('s'::('e'::('q'::('.'::('e'::('m'::('p'::('t'::('y'::[])))))))))
 
 (** val f_seq_unit : identifier **)
 
 let f_seq_unit =
-  IdSym ('s'::('e'::('q'::('.'::('u'::('n'::('i'::('t'::[]))))))))
+  IdSimple ('s'::('e'::('q'::('.'::('u'::('n'::('i'::('t'::[]))))))))
 
 (** val f_seq_concat : identifier **)
 
 let f_seq_concat =
-  IdSym ('s'::('e'::('q'::('.'::('+'::('+'::[]))))))
+  IdSimple ('s'::('e'::('q'::('.'::('+'::('+'::[]))))))
 
 (** val f_seq_len : identifier **)
 
 let f_seq_len =
-  IdSym ('s'::('e'::('q'::('.'::('l'::('e'::('n'::[])))))))
+  IdSimple ('s'::('e'::('q'::('.'::('l'::('e'::('n'::[])))))))
 
 (** val f_seq_nth : identifier **)
 
 let f_seq_nth =
-  IdSym ('s'::('e'::('q'::('.'::('n'::('t'::('h'::[])))))))
+  IdSimple ('s'::('e'::('q'::('.'::('n'::('t'::('h'::[])))))))
 
 (** val f_seq_contains : identifier **)
 
 let f_seq_contains =
-  IdSym
+  IdSimple
     ('s'::('e'::('q'::('.'::('c'::('o'::('n'::('t'::('a'::('i'::('n'::('s'::[]))))))))))))
 
 (** val f_seq_map : identifier **)
 
 let f_seq_map =
-  IdSym ('s'::('e'::('q'::('.'::('m'::('a'::('p'::[])))))))
+  IdSimple ('s'::('e'::('q'::('.'::('m'::('a'::('p'::[])))))))
 
 (** val seq_empty : sort -> term **)
 
@@ -4678,7 +4678,7 @@ let seq_map t1 t2 =
 (** val s_null : identifier **)
 
 let s_null =
-  IdSym ('N'::('u'::('l'::('l'::[]))))
+  IdSimple ('N'::('u'::('l'::('l'::[]))))
 
 (** val _UU03c3__null : sort **)
 
@@ -4688,7 +4688,7 @@ let _UU03c3__null =
 (** val s_val : identifier **)
 
 let s_val =
-  IdSym ('V'::('a'::('l'::[])))
+  IdSimple ('V'::('a'::('l'::[])))
 
 (** val _UU03c3__val : sort **)
 
@@ -4698,7 +4698,7 @@ let _UU03c3__val =
 (** val s_maybe_val : identifier **)
 
 let s_maybe_val =
-  IdSym ('M'::('a'::('y'::('b'::('e'::('V'::('a'::('l'::[]))))))))
+  IdSimple ('M'::('a'::('y'::('b'::('e'::('V'::('a'::('l'::[]))))))))
 
 (** val _UU03c3__maybe_val : sort **)
 
@@ -4708,7 +4708,7 @@ let _UU03c3__maybe_val =
 (** val s_adt : char list -> identifier **)
 
 let s_adt _UU03b4_ =
-  IdSym
+  IdSimple
     (append ('D'::('a'::('t'::('a'::('t'::('y'::('p'::('e'::[]))))))))
       _UU03b4_)
 
@@ -4740,22 +4740,23 @@ let rec encode_type = function
 (** val f_repr_nat : identifier **)
 
 let f_repr_nat =
-  IdSym ('r'::('e'::('p'::('r'::('N'::('a'::('t'::[])))))))
+  IdSimple ('r'::('e'::('p'::('r'::('N'::('a'::('t'::[])))))))
 
 (** val f_repr_rat : identifier **)
 
 let f_repr_rat =
-  IdSym ('r'::('e'::('p'::('r'::('R'::('a'::('t'::[])))))))
+  IdSimple ('r'::('e'::('p'::('r'::('R'::('a'::('t'::[])))))))
 
 (** val f_repr_val : identifier **)
 
 let f_repr_val =
-  IdSym ('r'::('e'::('p'::('r'::('V'::('a'::('l'::[])))))))
+  IdSimple ('r'::('e'::('p'::('r'::('V'::('a'::('l'::[])))))))
 
 (** val f_repr_adt : char list -> identifier **)
 
 let f_repr_adt _UU03b4_ =
-  IdSym (append ('r'::('e'::('p'::('r'::('A'::('D'::('T'::[]))))))) _UU03b4_)
+  IdSimple
+    (append ('r'::('e'::('p'::('r'::('A'::('D'::('T'::[]))))))) _UU03b4_)
 
 (** val repr_nat : term -> term **)
 
@@ -4780,12 +4781,12 @@ let repr_adt _UU03b4_ t =
 (** val f_lfunc : char list -> identifier **)
 
 let f_lfunc f =
-  IdSym (append ('l'::('f'::('u'::('n'::('c'::[]))))) f)
+  IdSimple (append ('l'::('f'::('u'::('n'::('c'::[]))))) f)
 
 (** val f_lfunc_pre : char list -> identifier **)
 
 let f_lfunc_pre f =
-  IdSym
+  IdSimple
     (append ('p'::('r'::('e'::('_'::('l'::('f'::('u'::('n'::('c'::[])))))))))
       f)
 
@@ -4802,7 +4803,7 @@ let lfunc_pre_ f ts x =
 (** val c_null : identifier **)
 
 let c_null =
-  IdSym ('n'::('u'::('l'::('l'::[]))))
+  IdSimple ('n'::('u'::('l'::('l'::[]))))
 
 (** val null : term **)
 
@@ -4812,52 +4813,52 @@ let null =
 (** val c_null_val : identifier **)
 
 let c_null_val =
-  IdSym ('n'::('u'::('l'::('l'::('V'::('a'::('l'::[])))))))
+  IdSimple ('n'::('u'::('l'::('l'::('V'::('a'::('l'::[])))))))
 
 (** val c_gillian_none_val : identifier **)
 
 let c_gillian_none_val =
-  IdSym ('n'::('o'::('n'::('e'::[]))))
+  IdSimple ('n'::('o'::('n'::('e'::[]))))
 
 (** val c_gillian_empty_val : identifier **)
 
 let c_gillian_empty_val =
-  IdSym ('e'::('m'::('p'::('t'::('y'::[])))))
+  IdSimple ('e'::('m'::('p'::('t'::('y'::[])))))
 
 (** val c_gillian_loc_val : identifier **)
 
 let c_gillian_loc_val =
-  IdSym ('l'::('o'::('c'::[])))
+  IdSimple ('l'::('o'::('c'::[])))
 
 (** val c_bool_val : identifier **)
 
 let c_bool_val =
-  IdSym ('b'::('o'::('o'::('l'::[]))))
+  IdSimple ('b'::('o'::('o'::('l'::[]))))
 
 (** val c_nat_val : identifier **)
 
 let c_nat_val =
-  IdSym ('n'::('a'::('t'::[])))
+  IdSimple ('n'::('a'::('t'::[])))
 
 (** val c_rat_val : identifier **)
 
 let c_rat_val =
-  IdSym ('r'::('a'::('t'::[])))
+  IdSimple ('r'::('a'::('t'::[])))
 
 (** val c_string_val : identifier **)
 
 let c_string_val =
-  IdSym ('s'::('t'::('r'::('i'::('n'::('g'::[]))))))
+  IdSimple ('s'::('t'::('r'::('i'::('n'::('g'::[]))))))
 
 (** val c_list_val : identifier **)
 
 let c_list_val =
-  IdSym ('l'::('i'::('s'::('t'::[]))))
+  IdSimple ('l'::('i'::('s'::('t'::[]))))
 
 (** val c_adt_val : char list -> identifier **)
 
 let c_adt_val _UU03b4_ =
-  IdSym (append ('a'::('d'::('t'::[]))) _UU03b4_)
+  IdSimple (append ('a'::('d'::('t'::[]))) _UU03b4_)
 
 (** val null_val_of : term -> term **)
 
@@ -4917,12 +4918,12 @@ let adt_val _UU03b4_ t =
 (** val c_some_val : identifier **)
 
 let c_some_val =
-  IdSym ('S'::('o'::('m'::('e'::[]))))
+  IdSimple ('S'::('o'::('m'::('e'::[]))))
 
 (** val c_constructor_adt : char list -> identifier **)
 
 let c_constructor_adt c =
-  IdSym
+  IdSimple
     (append
       ('c'::('o'::('n'::('s'::('t'::('r'::('u'::('c'::('t'::('o'::('r'::[])))))))))))
       c)
@@ -4963,42 +4964,42 @@ let constructors_for_adt_sort_map =
 (** val g_null_val : identifier **)
 
 let g_null_val =
-  IdSym ('g'::('e'::('t'::('N'::('u'::('l'::('l'::[])))))))
+  IdSimple ('g'::('e'::('t'::('N'::('u'::('l'::('l'::[])))))))
 
 (** val g_gillian_loc_val : identifier **)
 
 let g_gillian_loc_val =
-  IdSym ('g'::('e'::('t'::('L'::('o'::('c'::[]))))))
+  IdSimple ('g'::('e'::('t'::('L'::('o'::('c'::[]))))))
 
 (** val g_bool_val : identifier **)
 
 let g_bool_val =
-  IdSym ('g'::('e'::('t'::('B'::('o'::('o'::('l'::[])))))))
+  IdSimple ('g'::('e'::('t'::('B'::('o'::('o'::('l'::[])))))))
 
 (** val g_nat_val : identifier **)
 
 let g_nat_val =
-  IdSym ('g'::('e'::('t'::('N'::('a'::('t'::[]))))))
+  IdSimple ('g'::('e'::('t'::('N'::('a'::('t'::[]))))))
 
 (** val g_rat_val : identifier **)
 
 let g_rat_val =
-  IdSym ('g'::('e'::('t'::('R'::('a'::('t'::[]))))))
+  IdSimple ('g'::('e'::('t'::('R'::('a'::('t'::[]))))))
 
 (** val g_string_val : identifier **)
 
 let g_string_val =
-  IdSym ('g'::('e'::('t'::('S'::('t'::('r'::[]))))))
+  IdSimple ('g'::('e'::('t'::('S'::('t'::('r'::[]))))))
 
 (** val g_list_val : identifier **)
 
 let g_list_val =
-  IdSym ('g'::('e'::('t'::('L'::('i'::('s'::('t'::[])))))))
+  IdSimple ('g'::('e'::('t'::('L'::('i'::('s'::('t'::[])))))))
 
 (** val g_adt_val : char list -> identifier **)
 
 let g_adt_val _UU03b4_ =
-  IdSym (append ('g'::('e'::('t'::('A'::('D'::('T'::[])))))) _UU03b4_)
+  IdSimple (append ('g'::('e'::('t'::('A'::('D'::('T'::[])))))) _UU03b4_)
 
 (** val get_null_val : term -> term **)
 
@@ -5038,7 +5039,7 @@ let get_adt_val _UU03b4_ t =
 (** val g_some_val : identifier **)
 
 let g_some_val =
-  IdSym ('g'::('e'::('t'::('S'::('o'::('m'::('e'::[])))))))
+  IdSimple ('g'::('e'::('t'::('S'::('o'::('m'::('e'::[])))))))
 
 (** val get_some_val : term -> term **)
 
@@ -5302,7 +5303,7 @@ let rec to_val_curried t _UU03c3_ _UU03a6_ =
        (match l with
         | [] ->
           if decide
-               (decide_rel identifier_eq_decision s (IdSym
+               (decide_rel identifier_eq_decision s (IdSimple
                  ('S'::('e'::('q'::[])))))
           then let x =
                  fresh_string_of_set []
@@ -5314,7 +5315,7 @@ let rec to_val_curried t _UU03c3_ _UU03a6_ =
                mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
                  let (y, _) = enc in
                  let (to_val_elem, _) = y in
-                 let elem_to_val = TFun (_UU03c3_0,
+                 let elem_to_val = TLambda (_UU03c3_0,
                    (term_close (x :: []) 0 to_val_elem))
                  in
                  Some (((list_val (seq_map elem_to_val t)), _UU03c3__val),
@@ -5625,14 +5626,14 @@ let rec to_type_curried _UU03c4_ t _UU03c3_ _UU03a6_ =
        (match _UU03c4_s with
         | [] ->
           if decide
-               (decide_rel identifier_eq_decision s (IdSym
+               (decide_rel identifier_eq_decision s (IdSimple
                  ('V'::('a'::('l'::[])))))
           then let x = to_type_curried_list_binder _UU03a6_ t in
                let elem = TFVar x in
                mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
                  let (y, _UU03a6__elem) = enc in
                  let (to_type_elem, _) = y in
-                 let elem_to_type = TFun (_UU03c3__val,
+                 let elem_to_type = TLambda (_UU03c3__val,
                    (term_close (x :: []) 0 to_type_elem))
                  in
                  let val_list = get_list_val t in
@@ -5657,7 +5658,7 @@ let rec to_type_curried _UU03c4_ t _UU03c3_ _UU03a6_ =
                     mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
                       let (y, _UU03a6__elem) = enc in
                       let (to_type_elem, _) = y in
-                      let elem_to_type = TFun (_UU03c3__val,
+                      let elem_to_type = TLambda (_UU03c3__val,
                         (term_close (x :: []) 0 to_type_elem))
                       in
                       let val_list = get_list_val t_some in
@@ -5691,7 +5692,7 @@ let rec to_type_curried _UU03c4_ t _UU03c3_ _UU03a6_ =
                     mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
                       let (y, _UU03a6__elem) = enc in
                       let (to_type_elem, _) = y in
-                      let elem_to_type = TFun (_UU03c3_',
+                      let elem_to_type = TLambda (_UU03c3_',
                         (term_close (x :: []) 0 to_type_elem))
                       in
                       Some (((seq_map elem_to_type t),
@@ -5704,7 +5705,7 @@ let rec to_type_curried _UU03c4_ t _UU03c3_ _UU03a6_ =
                       (to_type_curried t0 elem _UU03c3_' _UU03a6_))
                (guard_or () (Obj.magic (fun _ -> option_mfail))
                  (Obj.magic (fun _ -> option_ret))
-                 (decide_rel identifier_eq_decision s (IdSym
+                 (decide_rel identifier_eq_decision s (IdSimple
                    ('S'::('e'::('q'::[]))))))
            | _ :: _ -> None)))
 

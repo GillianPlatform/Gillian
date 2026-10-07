@@ -4,7 +4,7 @@ type t =
      symbol whose sort the arguments do not determine — [seq.empty] is the
      only one the encoder emits — is ill-formed without it. *)
   | App of (Sexplib.Sexp.t * Sort.t option * t list)
-  | Fun of (string * Sort.t * t)
+  | Lambda of (string * Sort.t * t)
   | Exists of (string * Sort.t * t)
   | Forall of (string * Sort.t * t)
   | Let of ((string * t) list * t)
