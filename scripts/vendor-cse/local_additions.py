@@ -167,17 +167,17 @@ val to_gillian_loc :
         """(** val c_gillian_none_val : identifier **)
 
 let c_gillian_none_val =
-  IdSym ('n'::('o'::('n'::('e'::[]))))
+  IdSimple ('n'::('o'::('n'::('e'::[]))))
 
 (** val c_gillian_empty_val : identifier **)
 
 let c_gillian_empty_val =
-  IdSym ('e'::('m'::('p'::('t'::('y'::[])))))
+  IdSimple ('e'::('m'::('p'::('t'::('y'::[])))))
 
 (** val c_gillian_loc_val : identifier **)
 
 let c_gillian_loc_val =
-  IdSym ('l'::('o'::('c'::[])))
+  IdSimple ('l'::('o'::('c'::[])))
 """,
     ),
     (
@@ -209,7 +209,7 @@ let gillian_loc_val t =
         """(** val g_gillian_loc_val : identifier **)
 
 let g_gillian_loc_val =
-  IdSym ('g'::('e'::('t'::('L'::('o'::('c'::[]))))))
+  IdSimple ('g'::('e'::('t'::('L'::('o'::('c'::[]))))))
 """,
     ),
     (
