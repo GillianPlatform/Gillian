@@ -1004,9 +1004,13 @@ module Certified_experiment = struct
     in
     aux path
 
+  (* GILLIAN_CERTIFIED_SMT_LOG, or a path under experiments/results/, which is
+     not tracked: a run must not append to the paper's recorded run. *)
   let log_path () =
     let path =
-      Filename.concat (Sys.getcwd ()) "experiments/certified-smt.jsonl"
+      match Sys.getenv_opt "GILLIAN_CERTIFIED_SMT_LOG" with
+      | Some path when path <> "" -> path
+      | _ -> Filename.concat (Sys.getcwd ()) "experiments/results/queries.jsonl"
     in
     ensure_dir (Filename.dirname path);
     path
