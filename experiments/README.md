@@ -86,6 +86,40 @@ The differences between Gillian's language and CSE's show up as follows:
 `GillianCore/cse/` is CSE's extracted library plus a small, additions-only
 patch for Gillian's values; `scripts/vendor-cse/vendor.sh --check` confirms it.
 
+### Solver time
+
+The two encodings take comparable time on most queries: in the paper's run,
+the median check-sat is 0.09 ms with Gillian's encoding and 0.16 ms with the
+verified one. The exception is a tail of 67 of the 4,341 answered queries that
+take over 100 ms with the verified encoding, up to 7.3 s, where Gillian's
+encoding takes at most 1.3 ms. All 67 come from the two Amazon case studies,
+all are `sat`, and all combine a list's length with a cast or a
+multiplication. CSE gained those operators after the submitted paper; before,
+the bridge could not translate these queries at all.
+
+The cause is how the encoders encode a list's length:
+
+- **The verified encoder** encodes it exactly, as `seq.len` of an SMT-LIB
+  sequence. To answer `sat`, Z3 must build the lists themselves: in the
+  slowest query, `96 * len(c) = len(l)` with `len(c) >= 1` makes it construct
+  a list of at least 96 values.
+- **Gillian's encoder** abstracts it (`GillianCore/smt/smt.ml`, `encode_unop`):
+  a list variable that appears only under length gets an uninterpreted length,
+  `l-len(x)`, and no list is built.
+
+The abstraction never turns a satisfiable query unsatisfiable, so an `unsat`
+from it is always right. A `sat` is right when the query also says
+`0 <= l-len(x)` and no such list is bound by a quantifier: then any list of
+that length is a witness. Both conditions hold for every query in the paper's
+run (3,170 use the abstraction), but Gillian's symbolic engine maintains them,
+not its encoder; an under-approximate (UX) analysis relies on them.
+
+`analysis.ipynb` checks the explanation: with Gillian's abstraction applied to
+the 67 verified queries, each gives the same answer, and they take as long as
+the rest. Solving them again, each in a fresh `z3`, is also faster than the
+times the run recorded: Gillian keeps one solver process for a whole case,
+which slows these queries further.
+
 ## `queries.jsonl`
 
 One JSON record per SMT query:
