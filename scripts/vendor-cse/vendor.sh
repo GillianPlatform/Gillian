@@ -69,6 +69,8 @@ for lib in "${LIBS[@]}"; do
 done
 mkdir -p "$WORK/cse/extracted"
 cp "$EXTRACTED/extracted.ml" "$EXTRACTED/extracted.mli" "$WORK/cse/extracted/"
+# dune's _build is read-only, and the copies would be too.
+chmod -R u+w "$WORK/cse"
 
 # The tree Gillian currently has.
 copy_sources "$DEST" "$WORK/gillian"
