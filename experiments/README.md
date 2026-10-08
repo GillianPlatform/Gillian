@@ -14,7 +14,7 @@ backend only observes; it cannot change a proof's outcome.
 | | |
 | --- | --- |
 | `paper-run/` | the run in the paper |
-| `report.py` | a run's numbers: Fig. 9 and the appendix table |
+| `report.py` | a run's numbers: the paper's Fig. 9, and the backend evaluation table in its Appendix D |
 | `analysis.ipynb` | the same, with the plot, the disagreements, and what is not covered |
 | `run.sh` | re-run the 32 cases; writes `results/` |
 | `compare.py` | check a re-run against `paper-run/`, query by query |
@@ -23,7 +23,7 @@ backend only observes; it cannot change a proof's outcome.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python report.py              # Fig. 9's table, the timings, the disagreements
+.venv/bin/python report.py              # the paper's Fig. 9 table, its timings, the disagreements
 .venv/bin/python report.py --tsv DIR    # also the scatter plot's data, as the paper reads it
 .venv/bin/jupyter lab analysis.ipynb
 ```
@@ -68,7 +68,7 @@ The differences between Gillian's language and CSE's show up as follows:
   undefined at 0, and its encoding asserts that the argument is positive.
   `analysis.ipynb` shows this, and checks it: without those side conditions,
   every disagreeing query is `sat`.
-- **Representability guards.** The paper's satisfiability check (Sec. 6) also
+- **Representability guards.** The paper's satisfiability check (its Sec. 6) also
   asserts, for each variable, that its value is one CSE has. The bridge leaves
   them out: Gillian's numbers include 0 and the negatives, and with the guards
   the comparison would measure that difference rather than the encoders.
