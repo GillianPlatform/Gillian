@@ -24,9 +24,8 @@ scripts/vendor-cse/vendor.sh --check [path-to-CSE]
 ## What is local to Gillian, and why
 
 GIL has four values with no counterpart in CSE's verified value language:
-`none`, `empty`, and object locations (`loc`). Gillian adds them as
-constructors of the SMT `Val` datatype, with the matching type tests and
-coercions:
+`none`, `empty`, and object locations (`loc`). Gillian adds them as constructors
+of the SMT `Val` datatype, with the matching type tests and coercions:
 
 | Where | Addition |
 | --- | --- |
@@ -90,10 +89,10 @@ wasn't). If CI ever enforces `dune fmt` here, add `GillianCore/cse` to
 
 The encoder names integer and rational literals with prefixed function symbols
 (`int_literal_5`, `decimal_literal_3/2`) so that the metatheory can tell a
-literal apart from other function symbols by name. SMT-LIB has no such
-symbols, so CSE's printer (`lib/utils/utils.ml`, `sexp_of_identifier`) renders
-them as the literals themselves -- `5`, `(/ 3.0 2.0)` -- in the same layer that
-already prints a string literal's symbol as the quoted SMT text.
+literal apart from other function symbols by name. SMT-LIB has no such symbols,
+so CSE's printer (`lib/utils/utils.ml`, `sexp_of_identifier`) renders them as
+the literals themselves -- `5`, `(/ 3.0 2.0)` -- in the same layer that already
+prints a string literal's symbol as the quoted SMT text.
 
 That mapping is keyed on the two prefixes. If they ever change in
 `smt_theories/Theory/Reals_Ints.v`, the printer stops matching and the symbols
