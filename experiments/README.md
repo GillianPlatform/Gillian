@@ -106,28 +106,41 @@ are `sat`, and all combine a list's length with a cast or a multiplication. CSE
 gained those operators after the submitted paper; before, the bridge could not
 translate these queries at all.
 
-The cause is how the encoders encode a list's length:
+The cause is how the encoders encode a list's length. An encoder can encode it
+in one of two ways:
 
-- **The verified encoder** encodes it exactly, as `seq.len` of an SMT-LIB
-  sequence. To answer `sat`, Z3 must build the lists themselves: in the slowest
-  query, `96 * len(c) = len(l)` with `len(c) >= 1` makes it construct a list of
-  at least 96 values.
-- **Gillian's encoder** abstracts it (`GillianCore/smt/smt.ml`, `encode_unop`):
-  a list variable that appears only under length gets an uninterpreted length,
-  `l-len(x)`, and no list is built.
+- *exactly*, as `seq.len` of the SMT-LIB sequence that encodes the list: to
+  answer `sat`, the solver must find the list itself;
+- *abstractly*, as `l-len(x)`, an uninterpreted function of the list: the
+  solver may choose its value freely, and builds no list.
 
-The abstraction never turns a satisfiable query unsatisfiable, so an `unsat`
-from it is always right. A `sat` is right when the query also says
-`0 <= l-len(x)` and no such list is bound by a quantifier: then any list of that
-length is a witness. Both conditions hold for every query in the revised paper's
-run (3,170 use the abstraction), but Gillian's symbolic engine maintains them,
-not its encoder; an under-approximate (UX) analysis relies on them.
+The two encoders differ in which they use:
 
-`analysis.ipynb` checks the explanation: with Gillian's abstraction applied to
-the 67 verified queries, each gives the same answer, and they take as long as
-the rest. Solving them again, each in a fresh `z3`, is also faster than the
-times the run recorded: Gillian keeps one solver process for a whole case, which
-slows these queries further.
+- **The verified encoder** always encodes a length exactly. To answer `sat`, Z3
+  must build the lists themselves: in the slowest query, `96 * len(c) = len(l)`
+  with `len(c) >= 1` makes it construct a list of at least 96 values.
+- **Gillian's encoder** encodes a length abstractly when its argument is a list
+  *variable* that appears nowhere else in the query, only as the argument of
+  length (`GillianCore/smt/smt.ml`, `lvars_only_in_llen` and `encode_unop`).
+  Every other length it encodes exactly, with `seq.len`, including that of a
+  list literal such as `[1; 2; 3]`.
+
+The abstract encoding never turns a satisfiable query unsatisfiable: a model of
+the exact query is one of the abstract query, with `l-len` as the length. So an
+`unsat` from it is always right. A `sat` is right when the query also says
+`0 <= l-len(x)`, since an uninterpreted length may otherwise be negative, and
+`x` is not bound by a quantifier. Then the query constrains `x` only through its
+length, so any list of the length the solver chose is a witness. Both
+conditions hold for every query in the revised paper's run (3,170 use the
+abstract encoding), but Gillian's symbolic engine maintains them, not its
+encoder; an under-approximate (UX) analysis relies on them, since a wrong `sat`
+would report a path as reachable when it is not.
+
+`analysis.ipynb` checks the explanation: with lengths encoded abstractly, as
+Gillian's encoder does, the 67 verified queries each give the same answer, and
+they take as long as the rest. Solving them again, each in a fresh `z3`, is also
+faster than the times the run recorded: Gillian keeps one solver process for a
+whole case, which slows these queries further.
 
 ## `queries.jsonl`
 
