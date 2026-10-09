@@ -11,20 +11,28 @@ backends and records both:
 Gillian's verification continues on its own encoder's answer, so the verified
 backend only observes; it cannot change a proof's outcome.
 
-| | |
-| --- | --- |
-| `paper-run/` | the run in the paper |
-| `report.py` | a run's numbers: the paper's Fig. 9, and the backend evaluation table in its Appendix D |
-| `analysis.ipynb` | the same, with the plot, the disagreements, and what is not covered |
-| `run.sh` | re-run the 32 cases; writes `results/` |
-| `compare.py` | check a re-run against `paper-run/`, query by query |
+**These numbers are not the submitted paper's.** Since the paper was submitted,
+CSE's expression language has gained the operators Gillian's queries need most
+(casts between naturals and rationals, multiplication, and list concatenation
+and indexing), so the bridge translates far more queries, and we re-ran the
+experiment. `paper-run/` is that re-run, which the revised paper will report:
+4,390 of 5,820 queries translated, of which both backends answer 4,341, where
+the submitted paper has 811 of 2,090. The CSE artefact's `README.md`
+("Differences from the submitted paper") explains the differences.
 
-## Reading the paper's run
+|                  |                                                                                         |
+|------------------|-----------------------------------------------------------------------------------------|
+| `paper-run/`     | the run the revised paper reports                                                       |
+| `report.py`      | a run's numbers: the paper's Fig. 9, and the backend evaluation table in its Appendix D |
+| `analysis.ipynb` | the same, with the plot, the disagreements, and what is not covered                     |
+| `run.sh`         | re-run the 32 cases; writes `results/`                                                  |
+| `compare.py`     | check a re-run against `paper-run/`, query by query                                     |
+
+## Reading the revised paper's run
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python report.py              # the paper's Fig. 9 table, its timings, the disagreements
-.venv/bin/python report.py --tsv DIR    # also the scatter plot's data, as the paper reads it
 .venv/bin/jupyter lab analysis.ipynb
 ```
 
@@ -89,10 +97,10 @@ for Gillian's values; `scripts/vendor-cse/vendor.sh --check` confirms it.
 
 ### Solver time
 
-The two encodings take comparable time on most queries: in the paper's run, the
-median check-sat is 0.09 ms with Gillian's encoding and 0.16 ms with the
-verified one. The exception is a tail of 67 of the 4,341 answered queries that
-take over 100 ms with the verified encoding, up to 7.3 s, where Gillian's
+The two encodings take comparable time on most queries: in the revised paper's
+run, the median check-sat is 0.09 ms with Gillian's encoding and 0.16 ms with
+the verified one. The exception is a tail of 67 of the 4,341 answered queries
+that take over 100 ms with the verified encoding, up to 7.3 s, where Gillian's
 encoding takes at most 1.3 ms. All 67 come from the two Amazon case studies, all
 are `sat`, and all combine a list's length with a cast or a multiplication. CSE
 gained those operators after the submitted paper; before, the bridge could not
@@ -111,9 +119,9 @@ The cause is how the encoders encode a list's length:
 The abstraction never turns a satisfiable query unsatisfiable, so an `unsat`
 from it is always right. A `sat` is right when the query also says
 `0 <= l-len(x)` and no such list is bound by a quantifier: then any list of that
-length is a witness. Both conditions hold for every query in the paper's run
-(3,170 use the abstraction), but Gillian's symbolic engine maintains them, not
-its encoder; an under-approximate (UX) analysis relies on them.
+length is a witness. Both conditions hold for every query in the revised paper's
+run (3,170 use the abstraction), but Gillian's symbolic engine maintains them,
+not its encoder; an under-approximate (UX) analysis relies on them.
 
 `analysis.ipynb` checks the explanation: with Gillian's abstraction applied to
 the 67 verified queries, each gives the same answer, and they take as long as
@@ -125,11 +133,15 @@ slows these queries further.
 
 One JSON record per SMT query:
 
-| field | |
-| --- | --- |
-| `argv`, `query_id` | the Gillian command, and the query's number within it |
-| `expressions`, `gamma` | the query: Gillian expressions, and their typing context |
-| `unverified` | Gillian's encoder: `sat_result`, `time_seconds`, `smt_query` (the SMT-LIB sent) |
-| `verified` | the verified encoder: the same, plus `coerced` (translated), `encoded`, and `coercion_failures` / `encoding_failures` saying why a query went no further |
+| field                  |                                                                                 |
+|------------------------|---------------------------------------------------------------------------------|
+| `argv`, `query_id`     | the Gillian command, and the query's number within it                           |
+| `expressions`, `gamma` | the query: Gillian expressions, and their typing context                        |
+| `unverified`           | Gillian's encoder: `sat_result`, `time_seconds`, `smt_query` (the SMT-LIB sent) |
+| `verified`             | the verified encoder: the same, and the fields below                            |
+
+`verified` also says how far the query got: `coerced` (whether the bridge
+translated it) and `encoded`, and if it stopped, why, in `coercion_failures` or
+`encoding_failures`.
 
 `status.tsv` gives each case's exit code, and `logs/` its output.
