@@ -1,8 +1,8 @@
 type t =
 | Not
 | Length
-| IsInt
-| AsInt
-| AsNum
+| IsNat
+| RatToNat
+| NatToRat
 
 val to_extracted : t -> Extracted.op1

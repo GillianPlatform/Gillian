@@ -101,9 +101,9 @@ module C : Cse.Smt.Coerce with type exp = Expr.t and type typ = Type.t = struct
     match op with
     | Not -> Some Cse.Unop.Not
     | LstLen -> Some Cse.Unop.Length
-    | IsInt -> Some Cse.Unop.IsInt
-    | NumToInt -> Some Cse.Unop.AsInt
-    | IntToNum -> Some Cse.Unop.AsNum
+    | IsInt -> Some Cse.Unop.IsNat
+    | NumToInt -> Some Cse.Unop.RatToNat
+    | IntToNum -> Some Cse.Unop.NatToRat
     | _ -> None
 
   let diagnose_unop op =

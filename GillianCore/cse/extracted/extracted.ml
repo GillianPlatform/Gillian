@@ -3442,9 +3442,9 @@ type val0 = preval
 type op1 =
 | Op1Not
 | Op1Length
-| Op1IsInt
-| Op1AsInt
-| Op1AsNum
+| Op1IsNat
+| Op1RatToNat
+| Op1NatToRat
 
 type op2 =
 | Op2Eq
@@ -5829,17 +5829,17 @@ let encode_op1 op enc =
       let (y, _UU03a6_) = enc' in
       let (t, _) = y in Some (((seq_len t), _UU03c3__int), _UU03a6_))
       (to_list TVal enc)
-  | Op1IsInt ->
+  | Op1IsNat ->
     mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc' ->
       let (y, _UU03a6_) = enc' in
       let (t, _) = y in Some (((is_int t), _UU03c3__bool), _UU03a6_))
       (to_rat enc)
-  | Op1AsInt ->
+  | Op1RatToNat ->
     mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc' ->
       let (y, _UU03a6_) = enc' in
       let (t, _) = y in Some (((to_int t), _UU03c3__int), _UU03a6_))
       (to_rat enc)
-  | Op1AsNum ->
+  | Op1NatToRat ->
     mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc' ->
       let (y, _UU03a6_) = enc' in
       let (t, _) = y in

@@ -764,9 +764,9 @@ type val0 = preval
 type op1 =
 | Op1Not
 | Op1Length
-| Op1IsInt
-| Op1AsInt
-| Op1AsNum
+| Op1IsNat
+| Op1RatToNat
+| Op1NatToRat
 
 type op2 =
 | Op2Eq

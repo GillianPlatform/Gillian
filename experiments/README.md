@@ -65,8 +65,8 @@ The differences between Gillian's language and CSE's show up as follows:
 
 - **Disagreements.** All are `sat` from Gillian and `unsat` from the verified
   encoder, on a query that uses Gillian's integer-to-number cast `IntToNum`.
-  CSE's numbers are the strictly positive rationals, so its cast `AsNum` is
-  undefined at 0, and its encoding asserts that the argument is positive.
+  CSE's numbers are the strictly positive rationals, so its cast `NatToRat`
+  is undefined at 0, and its encoding asserts that the argument is positive.
   `analysis.ipynb` shows this, and checks it: without those side conditions,
   every disagreeing query is `sat`.
 - **Representability guards.** The paper's satisfiability check (its Sec. 6)

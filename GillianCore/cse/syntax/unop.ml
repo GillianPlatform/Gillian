@@ -1,13 +1,13 @@
 type t =
 | Not
 | Length
-| IsInt
-| AsInt
-| AsNum
+| IsNat
+| RatToNat
+| NatToRat
 
 let to_extracted op = match op with
   | Not -> Extracted.Op1Not
   | Length -> Extracted.Op1Length
-  | IsInt -> Extracted.Op1IsInt
-  | AsInt -> Extracted.Op1AsInt
-  | AsNum -> Extracted.Op1AsNum
+  | IsNat -> Extracted.Op1IsNat
+  | RatToNat -> Extracted.Op1RatToNat
+  | NatToRat -> Extracted.Op1NatToRat
