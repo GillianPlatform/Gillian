@@ -17,7 +17,7 @@
   stdlib_archi64.gil
   stdlib_archi64_verif.gil
   stdlib_archi64_non_verif.gil
-  string.gil
+  internal_string.gil
   unops_common.gil
   global_environment_common.gil
   global_environment_non_bi.gil

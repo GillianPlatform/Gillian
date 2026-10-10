@@ -41,7 +41,7 @@ module Imports = struct
       { file = "internals.gil"; arch = any_arch; exec = all_exec };
       { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
-      { file = "string.gil"; arch = any_arch; exec = all_exec };
+      { file = "internal_string.gil"; arch = any_arch; exec = all_exec };
       (* Global environment *)
       {
         file = "global_environment_common.gil";
