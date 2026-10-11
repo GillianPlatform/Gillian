@@ -18,6 +18,9 @@ module type FracA_S = sig
   val _1 : t
   val is_1 : t -> Expr.t
   val is_concrete : t -> bool
+
+  (* What can be learned of a fraction held in a well-formed state *)
+  val learn_wf : t -> Expr.t list
 end
 
 module Classic_fracA = struct
@@ -43,6 +46,7 @@ module Classic_fracA = struct
     Delayed.return ~learned:[ left +. right <=. _1 ] (left +. right)
 
   let is_1 q = q == _1
+  let learn_wf q = [ _0 <. q ]
 end
 
 module Frac_with_wildcard : FracA_S = struct
@@ -87,6 +91,10 @@ module Frac_with_wildcard : FracA_S = struct
   let is_1 = function
     | Wildcard -> Expr.false_
     | Q q -> Classic_fracA.is_1 q
+
+  let learn_wf = function
+    | Wildcard -> []
+    | Q q -> Classic_fracA.learn_wf q
 end
 
 let assertions_others _ = []
@@ -147,7 +155,9 @@ module Make (FracA : FracA_S) = struct
     let open Expr.Infix in
     let open Delayed.Syntax in
     match (core_pred, s, args) with
-    | Frac, None, [ q'; v' ] -> Delayed.return (Some (v', FracA.of_expr q'))
+    | Frac, None, [ q'; v' ] ->
+        let q' = FracA.of_expr q' in
+        Delayed.return ~learned:(FracA.learn_wf q') (Some (v', q'))
     | Frac, Some (v, q), [ q'; v' ] ->
         let* new_q = FracA.add q (FracA.of_expr q') in
         Delayed.return ~learned:[ v == v' ] (Some (v, new_q))
