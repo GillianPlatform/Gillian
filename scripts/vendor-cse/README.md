@@ -1,11 +1,11 @@
 # Re-vendoring CSE
 
-CSE (`~/dev/CSE`) is the source of truth for the verified SMT encoder.
+CSE is the source of truth for the verified SMT encoder.
 `GillianCore/cse/` is a vendored copy of its `lib/`, plus a small set of
 Gillian-specific additions that deliberately do **not** live in CSE.
 
 ```sh
-scripts/vendor-cse/vendor.sh [path-to-CSE]   # default ~/dev/CSE
+scripts/vendor-cse/vendor.sh path-to-CSE
 dune build @check
 git diff --stat GillianCore/cse
 ```
@@ -18,20 +18,22 @@ To check, without changing anything, that `GillianCore/cse` is exactly CSE plus
 the patch:
 
 ```sh
-scripts/vendor-cse/vendor.sh --check [path-to-CSE]
+scripts/vendor-cse/vendor.sh --check path-to-CSE
 ```
 
 ## What is local to Gillian, and why
 
-GIL has four values with no counterpart in CSE's verified value language:
+GIL has three values with no counterpart in CSE's verified value language:
 `none`, `empty`, and object locations (`loc`). Gillian adds them as constructors
 of the SMT `Val` datatype, with the matching type tests and coercions:
 
-| Where | Addition |
-| --- | --- |
-| `extracted/extracted.{ml,mli}` | `PVGillian*` / `TGillian*` constructors, the `c_/g_/p_/is_/to_gillian_*` helpers, and the corresponding arms of `encode_type`, `is_type`, `to_type_curried` and `encode_preval` |
-| `syntax/type.{ml,mli}`, `syntax/val.{ml,mli}` | the `None` / `Empty` / `Loc` constructors and their `to_extracted` arms |
-| `smt/smt.ml` | the three `declare-datatype` entries that announce them to the solver |
+- in `extracted/extracted.{ml,mli}`, the `PVGillian*` and `TGillian*`
+  constructors, the `c_/g_/p_/is_/to_gillian_*` helpers, and the corresponding
+  arms of `encode_type`, `is_type`, `to_type_curried` and `encode_preval`;
+- in `syntax/type.{ml,mli}` and `syntax/val.{ml,mli}`, the `None`, `Empty` and
+  `Loc` constructors and their `to_extracted` arms;
+- in `smt/smt.ml`, the three `declare-datatype` entries that announce them to
+  the solver.
 
 These are additions to *extracted* code, so they cannot be source edits in CSE
 and extraction will never regenerate them. They live in `gillian.patch`, which
@@ -55,7 +57,7 @@ Two further differences are pure build wiring, and are **not** additions:
 reproduces the tree:
 
 ```sh
-scripts/vendor-cse/vendor.sh --update-patch [path-to-CSE]
+scripts/vendor-cse/vendor.sh --update-patch path-to-CSE
 ```
 
 The patch is applied with no fuzz (`patch -F0`), in a scratch copy. If CSE has

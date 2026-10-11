@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Re-vendor CSE's OCaml library into GillianCore/cse.
 #
-# CSE (default ~/dev/CSE) is the source of truth for the verified encoder.  This
-# copies its hand-written libraries and its *generated* extraction, applies
-# Gillian's additions from gillian.patch, and installs the result over the
-# sources in GillianCore/cse.
+# CSE is the source of truth for the verified encoder.  This copies its
+# hand-written libraries and its *generated* extraction, applies Gillian's
+# additions from gillian.patch, and installs the result over the sources in
+# GillianCore/cse.
 #
 # Gillian's own build wiring is deliberately preserved: the dune files here
 # differ from CSE's (different library and public names, and the extraction is
 # checked in rather than produced by a rocq rule), so they are never touched.
 #
-# Usage: scripts/vendor-cse/vendor.sh [--check | --update-patch] [path-to-CSE]
+# Usage: scripts/vendor-cse/vendor.sh [--check | --update-patch] path-to-CSE
 #
 #   (default)       re-vendor: GillianCore/cse := CSE + gillian.patch
 #   --check         change nothing; fail unless GillianCore/cse is exactly
@@ -27,7 +27,11 @@ case "${1:-}" in
   -*)             echo "error: unknown option $1" >&2; exit 2 ;;
 esac
 
-CSE="${1:-$HOME/dev/CSE}"
+if [ $# -ne 1 ]; then
+  echo "usage: $0 [--check | --update-patch] path-to-CSE" >&2
+  exit 2
+fi
+CSE="$1"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$(cd "$HERE/../.." && pwd)/GillianCore/cse"
 PATCH="$HERE/gillian.patch"
