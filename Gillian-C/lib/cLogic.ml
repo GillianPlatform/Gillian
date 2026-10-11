@@ -344,6 +344,7 @@ module CPred = struct
     definitions : (assert_annot option * CAssert.t) list;
     ins_number : int;
     no_unfold : bool;
+    facts : CFormula.t option;  (** Facts that hold for every definition *)
   }
 
   (* Prints params as [in1, ..., ink; out1, ..., outm] *)
@@ -371,13 +372,15 @@ module CPred = struct
       | true -> Fmt.pf f "pure "
       | false -> ()
     in
-    Format.fprintf fmt "@[<v 2>%apred %s %s(%a) {@\n%a@]@\n}" pp_pure pred.pure
-      pred.name
+    Format.fprintf fmt "@[<v 2>%apred %s %s(%a) {@\n%a@]@\n}%a" pp_pure
+      pred.pure pred.name
       (if pred.no_unfold then "nounfold" else "")
       pp_params
       (pred.params, pred.ins_number)
       (pp_list ~sep:(Fmt.any ";@\n") pp_def)
       pred.definitions
+      (Fmt.option (fun fmt f -> Fmt.pf fmt " facts: %a" CFormula.pp f))
+      pred.facts
 end
 
 module CSpec = struct

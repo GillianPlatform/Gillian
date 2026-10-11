@@ -682,8 +682,25 @@ let trans_pred ~ann ~filepath cl_pred =
           ins_number;
           no_unfold;
           pure = pred_pure;
+          facts;
         } =
     cl_pred
+  in
+  let pred_facts =
+    match facts with
+    | None -> []
+    | Some f -> (
+        match trans_form f with
+        | [], [], e ->
+            let rec split = function
+              | Expr.BinOp (e1, And, e2) -> split e1 @ split e2
+              | e -> [ e ]
+            in
+            split e
+        | _ ->
+            failwith
+              (Fmt.str "The facts of predicate %s must be pure expressions"
+                 pred_name))
   in
   let pred_num_params = List.length pred_params in
   let pred_definitions =
@@ -706,8 +723,7 @@ let trans_pred ~ann ~filepath cl_pred =
       pred_params;
       ins_number;
       pred_definitions;
-      (* FIXME: ADD SUPPORT FOR FACTS *)
-      pred_facts = [];
+      pred_facts;
       pred_guard = None;
       pred_pure;
       pred_abstract = false;
