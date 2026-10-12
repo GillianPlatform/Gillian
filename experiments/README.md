@@ -18,7 +18,7 @@ and indexing), so the bridge translates far more queries, and we re-ran the
 experiment. `paper-run/` is that re-run, which the revised paper will report:
 4,390 of 5,820 queries translated, of which both backends answer 4,341, where
 the submitted paper has 811 of 2,090. The CSE artefact's `README.md`
-("Differences from the submitted paper") explains the differences.
+("Progress since the submitted paper") explains the differences.
 
 |                  |                                                                                         |
 |------------------|-----------------------------------------------------------------------------------------|
@@ -28,20 +28,23 @@ the submitted paper has 811 of 2,090. The CSE artefact's `README.md`
 | `run.sh`         | re-run the 32 cases; writes `results/`                                                  |
 | `compare.py`     | check a re-run against `paper-run/`, query by query                                     |
 
+Run the commands below from the root of the Gillian repository.
+
 ## Reading the revised paper's run
 
 ```sh
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python report.py              # the paper's Fig. 9 table, its timings, the disagreements
-.venv/bin/jupyter lab analysis.ipynb
+python3 -m venv experiments/.venv
+experiments/.venv/bin/pip install -r experiments/requirements.txt
+experiments/.venv/bin/python experiments/report.py    # the paper's Fig. 9 table, its timings, the disagreements
+experiments/.venv/bin/jupyter lab experiments/analysis.ipynb
 ```
 
 ## Re-running
 
 ```sh
-experiments/run.sh                      # all 32 cases, a few minutes; run.sh 25 runs one
-.venv/bin/python compare.py             # results/ against paper-run/
-.venv/bin/python report.py results
+experiments/run.sh                                    # all 32 cases, a few minutes; run.sh 25 runs one
+experiments/.venv/bin/python experiments/compare.py   # results/ against paper-run/
+experiments/.venv/bin/python experiments/report.py experiments/results
 ```
 
 `run.sh` builds Gillian, then runs each case under a 120-second timeout (`-t`

@@ -4,8 +4,8 @@
 
 | | |
 | --- | --- |
-| Gillian | `cse4-popl27` at `5d9c531` |
-| CSE | `cse4-popl27` at `b5b4b4e0` (vendored in `GillianCore/cse`) |
+| Gillian | commit `5d9c531` |
+| CSE | commit `b5b4b4e0` (vendored in `GillianCore/cse`) |
 | Z3 | 4.15.4 |
 | OCaml | 5.3.0 |
 | Machine | Apple M5 (10 cores, 16 GB), macOS 27.0.1 |
