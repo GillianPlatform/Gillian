@@ -17,18 +17,13 @@ module Make (Debugger : Debugger.S) = struct
       (module Launch_command)
       (fun (launch_args : Launch_command.Arguments.t) ->
         prevent_reenter ();
-        let r =
-          try Debugger.launch launch_args.program launch_args.procedure_name
-          with e -> Gillian_result.internal_error (Printexc.to_string e)
-        in
-        let%lwt () =
-          match r with
-          | Ok dbg ->
-              Lwt.wakeup_later resolver (launch_args, dbg);
-              Lwt.return_unit
-          | Error e -> raise (Gillian_result.Exc.Gillian_error e)
-        in
-        Lwt.return_unit);
+        match
+          Debugger.launch launch_args.program launch_args.procedure_name
+        with
+        | Ok dbg ->
+            Lwt.wakeup_later resolver (launch_args, dbg);
+            Lwt.return_unit
+        | Error e -> raise (Gillian_result.Exc.Gillian_error e));
     DL.set_rpc_command_handler rpc ~name:"Attach"
       (module Attach_command)
       (fun _ ->

@@ -35,9 +35,11 @@ rule read =
   | "new"    { NEW (curr lexbuf) }
   | "free"   { DELETE (curr lexbuf) }
   | "dispose"{ DELETE (curr lexbuf) }
+  | "pure" { PURE (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
   | "par"    { PAR (curr lexbuf) }
   | "predicate" { PREDICATE (curr lexbuf) }
+  | "datatype" { DATATYPE (curr lexbuf) }
   | "invariant" { INVARIANT (curr lexbuf) }
   | "return" { RETURN (curr lexbuf) }
   | "fold"   { FOLD (curr lexbuf) }
@@ -56,12 +58,14 @@ rule read =
   | "forall" { FORALL (curr lexbuf) }
   | "bind" { BIND (curr lexbuf) }
   | "spec" { SPEC (curr lexbuf) }
+  | "case"  { CASE (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }
   | "Bool" { TBOOL (curr lexbuf) }
   | "String" { TSTRING (curr lexbuf) }
   | "Float" { TFLOAT (curr lexbuf) }
+  | "Any" { TANY (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }
@@ -88,6 +92,7 @@ rule read =
   | ','      { COMMA (curr lexbuf) }
   | "."      { DOT (curr lexbuf) }
   | ';'      { SCOLON (curr lexbuf) }
+  | '\''     { QUOTE (curr lexbuf) }
   | "|-"     { VDASH (curr lexbuf) }
   (* binary operators *)
   | "::"     { LSTCONS }

@@ -101,6 +101,11 @@ module Hashtbl = struct
       `List [ key_to_yojson k; val_to_yojson v ]
     in
     `List (hashtbl |> to_seq |> Seq.map kv_to_yojson |> List.of_seq)
+
+  let memoize ?(size = 1) f =
+    let cache = create size in
+    let f' x = find_or_else_add cache x (fun () -> f x) in
+    f'
 end
 
 (** Extension of Map with functions to serialize to and deserialize from yojson
@@ -180,6 +185,8 @@ module Hashset = struct
 
   (** Applies [f] to each element of the set *)
   let iter f set = Hashtbl.iter (fun x () -> f x) set
+
+  let fold f tbl acc = Hashtbl.fold (fun k _ acc -> f k acc) tbl acc
 
   (** Filters the set in-place *)
   let filter_in_place (h : 'a t) (f : 'a -> bool) =

@@ -9,8 +9,23 @@ let initialize _ =
     (fun kstats_file -> at_exit (fun () -> Stats.report kstats_file))
     !Kconfig.kstats_file
 
-let default_import_paths = Some Runtime_sites.Sites.runtime
-let default_include_dirs = Runtime_sites.Sites.c_includes
+let default_import_paths =
+  Some
+    [
+      Utils.Embedded.dir ~name:"gillian-c2-runtime"
+        (List.map
+           (fun f -> (f, Option.get (Runtime_files.read f)))
+           Runtime_files.file_list);
+    ]
+
+let default_include_dirs =
+  [
+    Utils.Embedded.dir ~name:"gillian-c2-includes"
+      (List.map
+         (fun f -> (f, Option.get (Include_files.read f)))
+         Include_files.file_list);
+  ]
+
 let other_imports = []
 
 type init_data = unit

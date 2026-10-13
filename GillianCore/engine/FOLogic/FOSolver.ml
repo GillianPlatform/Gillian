@@ -38,7 +38,8 @@ let simplify_pfs_and_gamma
 let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Smt.check_sat fs (Type_env.as_hashtbl gamma) in
+  let gamma_tbl = Type_env.as_hashtbl gamma in
+  let model = Smt.check_sat fs gamma_tbl in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -62,7 +63,7 @@ let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
   | None -> None
   | Some model -> (
       try
-        Smt.lift_model model (Type_env.as_hashtbl gamma) update smt_vars;
+        Smt.lift_model model gamma_tbl update smt_vars;
         Some subst
       with e ->
         let () =
@@ -200,7 +201,7 @@ let check_entailment
       let model =
         Smt.check_sat
           (Expr.Set.of_list (PFS.to_list formulae))
-          (Type_env.as_hashtbl gamma_left)
+          (Type_env.as_hashtbl gamma)
       in
       let ret = Option.is_none model in
       L.(verbose (fun m -> m "Entailment returned %b" ret));

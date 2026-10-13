@@ -40,6 +40,12 @@ module Containers = struct
   include Containers
 end
 
+(** @canonical Gillian.Utils.Embedded *)
+module Embedded = struct
+  (** @inline *)
+  include Embedded
+end
+
 (** @canonical Gillian.Utils.Exceptions *)
 module Exceptions = struct
   (** @inline *)
@@ -123,6 +129,8 @@ module Gillian_result = struct
   (** @inline *)
   include Gillian_result
 end
+
+module Tarjan = Tarjan
 
 (**/**)
 

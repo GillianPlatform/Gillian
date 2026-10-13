@@ -9,6 +9,7 @@ type t =
   | WFloat
   | WAny
   | WSet
+  | WDatatype of string
 
 (** Are types t1 and t2 compatible *)
 let compatible t1 t2 =
@@ -38,6 +39,7 @@ let pp fmt t =
   | WFloat -> s "Float"
   | WAny -> s "Any"
   | WSet -> s "Set"
+  | WDatatype t -> s t
 
 let to_gil : t -> Gil_syntax.Type.t = function
   | WList -> ListType

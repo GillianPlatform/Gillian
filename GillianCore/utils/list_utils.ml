@@ -264,3 +264,11 @@ let[@tail_mod_cons] rec drop n = function
 let get_single = function
   | [ x ] -> Some x
   | _ -> None
+
+let lengths_eq a b = List.length a = List.length b
+
+let rec split3 = function
+  | [] -> ([], [], [])
+  | (x, y, z) :: l ->
+      let rx, ry, rz = split3 l in
+      (x :: rx, y :: ry, z :: rz)
