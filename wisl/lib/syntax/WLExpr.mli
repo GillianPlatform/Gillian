@@ -7,7 +7,11 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
+  | LPureFunApp of string * t list
+  | LConstructorApp of string * t list
+  | LCases of t * case list
 
+and case = { constructor : string; binders : string list; lexpr : t }
 and t
 
 val get : t -> tt

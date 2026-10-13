@@ -71,7 +71,7 @@ let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
   | None -> None
   | Some model -> (
       try
-        Smt.lift_model model (Type_env.as_hashtbl gamma) update smt_vars;
+        Smt.lift_model model gamma_tbl update smt_vars;
         Some subst
       with e ->
         let () =
@@ -213,13 +213,14 @@ let check_entailment
         match
           Smt.check_sat
             (Expr.Set.of_list (PFS.to_list formulae))
-            (Type_env.as_hashtbl gamma_left)
+            (Type_env.as_hashtbl gamma)
         with
         | model ->
             let () =
               model
               |> Option.iter (fun model ->
-                     L.tmi (fun m -> m "Here's the model:\n%a" Smt.pp_sexp model))
+                     L.tmi (fun m ->
+                         m "Here's the model:\n%a" Smt.pp_sexp model))
             in
             Option.is_none model
         | exception (Smt.SMT_error _ | Smt.SMT_unknown) ->

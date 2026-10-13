@@ -120,13 +120,13 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     | S2 s1, S2 s2 ->
         let+ s' = S2.compose s1 s2 in
         S2 s'
-    | S1 _, S2 _ | S2 _, S1 _ -> failwith "Sum.compose: mismatched arguments"
+    | S1 _, S2 _ | S2 _, S1 _ -> Delayed.vanish ()
 
   let is_exclusively_owned s e =
     match s with
     | S1 s1 -> S1.is_exclusively_owned s1 e
     | S2 s2 -> S2.is_exclusively_owned s2 e
-    | None -> Delayed.return true
+    | None -> Delayed.return false
 
   let is_empty = function
     (* Technically these two branches aren't needed because we automatically switch to None if

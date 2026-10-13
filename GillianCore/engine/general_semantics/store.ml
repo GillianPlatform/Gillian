@@ -28,7 +28,7 @@ module type S = sig
   val get : t -> Var.t -> vt option
 
   (** Return value of a given variable or throw *)
-  val get_unsafe : t -> Var.t -> vt
+  val get_exn : t -> Var.t -> vt
 
   (** Store constructor, with a list of bindings of the form (variable, value)
   *)
@@ -101,10 +101,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       @param x Target variable
       @raise Failure Variable not found in the store
       @return Value of the variable in the store *)
-  let get_unsafe (store : t) (v : Var.t) : vt =
+  let get_exn (store : t) (v : Var.t) : vt =
     match get store v with
     | Some result -> result
-    | None -> Fmt.failwith "Store.get_unsafe: variable %s not found in store" v
+    | None -> Fmt.failwith "Store.get_exn: variable %s not found in store" v
 
   (** Store update (in-place)
 

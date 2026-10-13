@@ -69,6 +69,7 @@ struct
     source_file : string;
     source_files : SourceFiles.t option;
     prog : Verification.prog_t;
+    prog_env : Prog_env.t;
     tl_ast : tl_ast option;
     main_proc_name : string;
     report_state_base : L.Report_state.t;
@@ -165,6 +166,8 @@ struct
     type proc_state = proc_state_ext base_proc_state
     type debug_state = debug_state_ext base_debug_state
     type t = (proc, debug_state) state
+
+    let with_prog_env state = Prog_env.using state.debug_state.prog_env
 
     let get_root_proc_name_of_id id =
       let content, type_ =
@@ -629,6 +632,7 @@ struct
         `Assoc status
 
       let get_map_update state =
+        with_prog_env state @@ fun () ->
         let nodes = get_changed_nodes ~clear:true state in
         let roots = get_roots state in
         let current_steps = Some (get_current_steps state) in
@@ -636,6 +640,7 @@ struct
         Map_update_event_body.make ~nodes ~roots ~current_steps ~ext ()
 
       let get_full_map state =
+        with_prog_env state @@ fun () ->
         let nodes = get_all_nodes state in
         let roots = get_roots state in
         let current_steps = Some (get_current_steps state) in
@@ -679,7 +684,8 @@ struct
       }
       [@@deriving yojson]
 
-      let dump_state ({ debug_state; procs } : t) : Yojson.Safe.t =
+      let dump_state ({ debug_state; procs } as state) : Yojson.Safe.t =
+        with_prog_env state @@ fun () ->
         let procs =
           Hashtbl.fold
             (fun proc_name (proc : proc) acc ->
@@ -1082,6 +1088,7 @@ struct
         stop_reason
 
       let lifter_call_with_id ?interaction state lifter_func =
+        with_prog_env state @@ fun () ->
         let proc_state = get_proc_state_exn state in
         let { cur_report_id; lifter_state; _ } = proc_state in
         let id = Option.get cur_report_id in
@@ -1098,6 +1105,7 @@ struct
         lifter_call_with_id ~interaction:Step_out state Lifter.step_out
 
       let step_specific case id state =
+        with_prog_env state @@ fun () ->
         let proc_state = get_proc_state_exn ~cmd_id:id state in
         let { lifter_state; _ } = proc_state in
         let f () = Lifter.step_branch lifter_state id case in
@@ -1119,6 +1127,7 @@ struct
           Lifter.continue_back
 
       let jump id state =
+        with_prog_env state @@ fun () ->
         let cmd_id, matches = L.Log_queryer.resolve_command_and_matches id in
         let** proc_state = get_proc_state ~cmd_id state in
         let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
@@ -1164,6 +1173,7 @@ struct
         Lifter.init_exn ~proc_name ~all_procs:proc_names tl_ast prog
 
       let f proc_name ~entrypoint state =
+        with_prog_env state @@ fun () ->
         let { debug_state; _ } = state in
         let report_state = L.Report_state.clone debug_state.report_state_base in
         report_state
@@ -1215,6 +1225,7 @@ struct
           process_files ~proc_name ~outfile ~no_unfold ~already_compiled
             [ file_name ]
         in
+        let prog_env = Prog_env.make prog in
         let proc_names =
           prog.procs |> Hashtbl.to_seq
           |> Seq.filter_map (fun (name, proc) ->
@@ -1225,8 +1236,8 @@ struct
         let cfg =
           let make ext =
             make_base_debug_state ~source_file:file_name ?source_files ~prog
-              ?tl_ast ~main_proc_name:proc_name ~report_state_base ~init_data
-              ~proc_names ~cur_proc:(proc_name, 0) ~ext ()
+              ~prog_env ?tl_ast ~main_proc_name:proc_name ~report_state_base
+              ~init_data ~proc_names ~cur_proc:(proc_name, 0) ~ext ()
           in
           let ext = Debugger_impl.init (make ()) in
           make ext
@@ -1255,6 +1266,7 @@ struct
     let launch = Launch.f
 
     let start_proc proc_name state =
+      with_prog_env state @@ fun () ->
       let { debug_state; procs } = state in
       let++ proc_states, stop_reason =
         launch_proc proc_name ~entrypoint:proc_name state
@@ -1264,12 +1276,14 @@ struct
       stop_reason
 
     let terminate state =
+      with_prog_env state @@ fun () ->
       L.Report_state.(activate global_state);
       Verification.postprocess_files state.debug_state.source_files;
       if !Config.stats then L.Statistics.print_statistics ();
       Usage_logs.Debug.stop ()
 
     let get_frames state =
+      with_prog_env state @@ fun () ->
       let { frames; _ } = get_proc_state_exn state in
       frames
 
@@ -1285,15 +1299,18 @@ struct
           proc_state.variables <- Some vs;
           vs
 
-    let get_scopes state = fst (get_scopes_and_variables state)
+    let get_scopes state =
+      with_prog_env state @@ fun () -> fst (get_scopes_and_variables state)
 
     let get_variables (var_ref : int) state : Variable.t list =
+      with_prog_env state @@ fun () ->
       let variables = snd (get_scopes_and_variables state) in
       match Hashtbl.find_opt variables var_ref with
       | None -> []
       | Some vars -> vars
 
     let get_exception_info state =
+      with_prog_env state @@ fun () ->
       let proc_state = get_proc_state_exn state in
       let error = List.hd proc_state.errors in
       let non_mem_exception_info =
@@ -1310,6 +1327,7 @@ struct
       | _ -> non_mem_exception_info
 
     let set_breakpoints source bp_list state =
+      with_prog_env state @@ fun () ->
       match source with
       (* We can't set the breakpoints if we do not know the source file *)
       | None -> ()
