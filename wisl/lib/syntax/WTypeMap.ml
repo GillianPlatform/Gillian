@@ -110,6 +110,14 @@ let rec infer_logic_expr knownp lexpr =
       TypeMap.add bare_lexpr WList (List.fold_left infer_logic_expr knownp lel)
   | LESet lel ->
       TypeMap.add bare_lexpr WSet (List.fold_left infer_logic_expr knownp lel)
+  | LPureFunApp (_, lel) -> List.fold_left infer_logic_expr knownp lel
+  | LConstructorApp (n, lel) ->
+      TypeMap.add bare_lexpr (WDatatype n)
+        (List.fold_left infer_logic_expr knownp lel)
+  | LCases (le, cs) ->
+      let lel = List.map (fun (c : case) -> c.lexpr) cs in
+      let inferred = infer_logic_expr knownp le in
+      List.fold_left infer_logic_expr inferred lel
 
 (** Single step of inference for that gets a TypeMap from a single assertion *)
 let rec infer_single_assert_step asser known =
@@ -182,3 +190,23 @@ let infer_types_pred (params : (string * WType.t option) list) assert_list =
     TypeMap.merge join_params_and_asserts infers_on_params infers_on_asserts
   in
   result
+
+let infer_types_pure_fun (params : (string * WType.t option) list) pure_fun_def
+    =
+  let join _ param_t inferred_t =
+    match (param_t, inferred_t) with
+    | Some param_t, Some inferred_t when param_t = inferred_t -> Some param_t
+    | Some param_t, None when param_t <> WAny -> Some param_t
+    | None, Some inferred_t when inferred_t <> WAny -> Some inferred_t
+    | _ -> None
+  in
+  let infers_on_params =
+    List.fold_left
+      (fun (map : 'a TypeMap.t) (x, ot) ->
+        match ot with
+        | None -> map
+        | Some t -> TypeMap.add (PVar x) t map)
+      TypeMap.empty params
+  in
+  let infer_on_def = infer_logic_expr TypeMap.empty pure_fun_def in
+  TypeMap.merge join infers_on_params infer_on_def

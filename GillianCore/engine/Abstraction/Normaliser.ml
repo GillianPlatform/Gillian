@@ -160,7 +160,7 @@ module Make (SPState : PState.S) = struct
                   match nle1 with
                   | Lit llit -> Lit (Type (Literal.type_of llit))
                   | LVar lvar -> (
-                      try Lit (Type (Type_env.get_unsafe gamma lvar))
+                      try Lit (Type (Type_env.get_exn gamma lvar))
                       with _ ->
                         UnOp (TypeOf, LVar lvar)
                         (* raise (Failure (Printf.sprintf "Logical variables always have a type, in particular: %s." lvar))) *)
@@ -171,10 +171,15 @@ module Make (SPState : PState.S) = struct
                         (Exceptions.Impossible
                            "normalise_lexpr: program variable in normalised \
                             expression")
-                  | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
+                  | BinOp (_, _, _) | UnOp (_, _) | FuncApp _ | Cases _ ->
+                      UnOp (TypeOf, nle1)
                   | Exists _ | ForAll _ -> Lit (Type BooleanType)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
-                  | NOp (_, _) | ESet _ -> Lit (Type SetType))
+                  | NOp (_, _) | ESet _ -> Lit (Type SetType)
+                  | ConstructorApp (n, _) as c -> (
+                      match Prog_env.Datatype_env.get_constructor_type n with
+                      | Some t -> Lit (Type t)
+                      | None -> UnOp (TypeOf, c)))
               | _ -> UnOp (uop, nle1)))
       | EList le_list ->
           let n_le_list = List.map f le_list in
@@ -224,6 +229,10 @@ module Make (SPState : PState.S) = struct
           | _, Exists _ -> Exists (bt, ne)
           | _, ForAll _ -> ForAll (bt, ne)
           | _, _ -> failwith "Impossible")
+      | ConstructorApp (n, les) -> ConstructorApp (n, List.map f les)
+      | FuncApp (n, les) -> FuncApp (n, List.map f les)
+      | Cases (le, cs) ->
+          Cases (f le, List.map (fun (c, bs, le) -> (c, bs, f le)) cs)
     in
 
     if not no_types then Typing.infer_types_expr gamma result;

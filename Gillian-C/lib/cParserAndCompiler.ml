@@ -492,7 +492,15 @@ let parse_and_compile_files paths =
   Ok (create_compilation_result all_progs genv)
 
 let other_imports = []
-let default_import_paths = Some Runtime_sites.Sites.runtime
+
+let default_import_paths =
+  Some
+    [
+      Gillian.Utils.Embedded.dir ~name:"gillian-c-runtime"
+        (List.map
+           (fun f -> (f, Option.get (Runtime_files.read f)))
+           Runtime_files.file_list);
+    ]
 
 let init_compcert () =
   Frontend.init ();
