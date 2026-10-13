@@ -302,9 +302,11 @@ module Make (Annot : Annot.S) = struct
           (proc :: procs, new_predecessors @ predecessors))
         ext_program.procs ([], [])
     in
-    Prog.make_indexed ~lemmas:ext_program.lemmas ~preds:ext_program.preds
-      ~only_specs:ext_program.only_specs ~procs ~predecessors
-      ~macros:ext_program.macros ~bi_specs:ext_program.bi_specs ()
+    let { lemmas; preds; only_specs; funcs; macros; bi_specs; datatypes; _ } =
+      ext_program
+    in
+    Prog.make_indexed ~lemmas ~preds ~only_specs ~procs ~predecessors ~funcs
+      ~macros ~bi_specs ~datatypes ()
 
   let parse_literal lexbuf = parse GIL_Parser.lit_target lexbuf
   let parse_expression lexbuf = parse GIL_Parser.top_level_expr_target lexbuf

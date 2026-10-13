@@ -1,5 +1,5 @@
 (library
  (name wSyntax)
  (public_name wisl.syntax)
- (libraries wUtils)
+ (libraries wUtils gillian)
  (flags :standard -open WUtils))

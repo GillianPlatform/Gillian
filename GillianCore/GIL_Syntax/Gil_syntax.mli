@@ -48,7 +48,7 @@ end
 module Type : sig
   (** GIL Types *)
 
-  type t =
+  type t = TypeDef__.typ =
     | UndefinedType  (** Type of Undefined *)
     | NullType  (** Type of Null *)
     | EmptyType  (** Type of Empty *)
@@ -61,6 +61,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
+    | DatatypeType of string
   [@@deriving yojson, eq, show]
 
   (** Printer *)
@@ -250,6 +251,9 @@ module Expr : sig
     | Exists of (string * Type.t option) list * t
         (** Existential quantification. *)
     | ForAll of (string * Type.t option) list * t
+    | ConstructorApp of string * t list
+    | FuncApp of string * t list
+    | Cases of t * (string * string list * t) list
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -803,6 +807,39 @@ module Lemma : sig
   val add_param_bindings : t -> t
 end
 
+module Datatype : sig
+  type t = TypeDef__.datatype = {
+    datatype_name : string;
+    datatype_source_path : string option;
+    datatype_loc : Location.t option;
+    datatype_constructors : Constructor.t list;
+  }
+  [@@deriving yojson]
+end
+
+module Func : sig
+  type t = {
+    func_name : string;
+    func_source_path : string option;
+    func_loc : Location.t option;
+    func_num_params : int;
+    func_params : (string * Type.t option) list;
+    func_definition : Expr.t;
+  }
+end
+
+module Constructor : sig
+  type t = TypeDef__.constructor = {
+    constructor_name : string;
+    constructor_source_path : string option;
+    constructor_loc : Location.t option;
+    constructor_num_fields : int;
+    constructor_fields : Type.t option list;
+    constructor_datatype : string;
+  }
+  [@@deriving yojson]
+end
+
 (** @canonical Gillian.Gil_syntax.Macro *)
 module Macro : sig
   (** GIL Macros *)
@@ -1054,6 +1091,8 @@ module Prog : sig
         (** List of imported GIL files, and whether each has to be verified *)
     lemmas : (string, Lemma.t) Hashtbl.t;  (** Lemmas *)
     preds : (string, Pred.t) Hashtbl.t;  (** Predicates *)
+    funcs : (string, Func.t) Hashtbl.t;  (** Predicates *)
+    datatypes : (string, Datatype.t) Hashtbl.t;
     only_specs : (string, Spec.t) Hashtbl.t;
         (** Specs without function definitions *)
     procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Procedures *)
@@ -1069,6 +1108,8 @@ module Prog : sig
     imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
+    funcs:(string, Func.t) Hashtbl.t ->
+    datatypes:(string, Datatype.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     procs:(string, ('annot, 'label) Proc.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
@@ -1085,6 +1126,8 @@ module Prog : sig
     imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
+    funcs:(string, Func.t) Hashtbl.t ->
+    datatypes:(string, Datatype.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
@@ -1099,6 +1142,8 @@ module Prog : sig
     predecessors:(string * int * int * int) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
+    funcs:(string, Func.t) Hashtbl.t ->
+    datatypes:(string, Datatype.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
@@ -1210,6 +1255,45 @@ module Prog : sig
   val make_callgraph : ('a, 'b) t -> Call_graph.t
 end
 
+module Prog_env : sig
+  module Datatype_env : sig
+    type t
+
+    val make : ('a, 'b) Prog.t -> t
+    val make' : (string, Datatype.t) Hashtbl.t -> t
+    val using : t -> (unit -> 'a) -> 'a
+    val using_prog : ('a, 'b) Prog.t -> (unit -> 'c) -> 'c
+    val get_datatype : string -> Datatype.t option
+    val get_datatype_exn : string -> Datatype.t
+    val get_datatypes : unit -> Datatype.t Containers.StringMap.t
+    val get_datatype_cycle : string -> SS.t
+    val get_constructor : string -> Constructor.t option
+    val get_constructor_exn : string -> Constructor.t
+    val get_constructor_type : string -> Type.t option
+    val get_constructor_type_exn : string -> Type.t
+    val get_constructor_field_types : string -> Type.t option list option
+    val get_constructor_field_types_exn : string -> Type.t option list
+  end
+
+  module Function_env : sig
+    type t
+
+    val make' : (string, Func.t) Hashtbl.t -> t
+    val make : ('a, 'b) Prog.t -> t
+    val using : t -> (unit -> 'a) -> 'a
+    val using_prog : ('a, 'b) Prog.t -> (unit -> 'c) -> 'c
+    val get_function : string -> Func.t option
+    val get_function_param_types : string -> Type.t option list option
+    val get_functions : unit -> Func.t Containers.StringMap.t
+  end
+
+  type t
+
+  val make : ('a, 'b) Prog.t -> t
+  val using : t -> (unit -> 'a) -> 'a
+  val using_prog : ('a, 'b) Prog.t -> (unit -> 'c) -> 'c
+end
+
 (** @canonical Gillian.Gil_syntax.Visitors *)
 module Visitors : sig
   (** Classes for traversing the GIL AST *)
@@ -1248,8 +1332,16 @@ module Visitors : sig
          ; visit_Call :
              'c -> 'f Cmd.t -> Cmd.function_call -> 'f option -> 'f Cmd.t
          ; visit_Car : 'c -> UnOp.t -> UnOp.t
+         ; visit_Cases :
+             'c ->
+             Expr.t ->
+             Expr.t ->
+             (string * string list * Expr.t) list ->
+             Expr.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
          ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
+         ; visit_ConstructorApp :
+             'c -> Expr.t -> string -> Expr.t list -> Expr.t
          ; visit_ECall :
              'c ->
              'f Cmd.t ->
@@ -1275,6 +1367,7 @@ module Visitors : sig
          ; visit_FMod : 'c -> BinOp.t -> BinOp.t
          ; visit_ForAll :
              'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+         ; visit_FuncApp : 'c -> Expr.t -> string -> Expr.t list -> Expr.t
          ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
          ; visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
@@ -1294,6 +1387,7 @@ module Visitors : sig
              Expr.t list ->
              Expr.t list ->
              Asrt.atom
+         ; visit_DatatypeType : 'c -> Type.t -> string -> Type.t
          ; visit_Wand :
              'c ->
              Asrt.atom ->
@@ -1445,8 +1539,11 @@ module Visitors : sig
          ; visit_position : 'c -> Location.position -> Location.position
          ; visit_location : 'c -> Location.t -> Location.t
          ; visit_constant : 'c -> Constant.t -> Constant.t
+         ; visit_constructor : 'c -> Constructor.t -> Constructor.t
+         ; visit_datatype : 'c -> Datatype.t -> Datatype.t
          ; visit_expr : 'c -> Expr.t -> Expr.t
          ; visit_flag : 'c -> Flag.t -> Flag.t
+         ; visit_func : 'c -> Func.t -> Func.t
          ; visit_lcmd : 'c -> LCmd.t -> LCmd.t
          ; visit_lemma : 'c -> Lemma.t -> Lemma.t
          ; visit_lemma_spec : 'c -> Lemma.spec -> Lemma.spec
@@ -1499,8 +1596,15 @@ module Visitors : sig
       'c -> 'f Cmd.t -> Cmd.function_call -> 'f option -> 'f Cmd.t
 
     method visit_Car : 'c -> UnOp.t -> UnOp.t
+
+    method visit_Cases :
+      'c -> Expr.t -> Expr.t -> (string * string list * Expr.t) list -> Expr.t
+
     method visit_Cdr : 'c -> UnOp.t -> UnOp.t
     method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
+
+    method visit_ConstructorApp :
+      'c -> Expr.t -> string -> Expr.t list -> Expr.t
 
     method visit_ECall :
       'c -> 'f Cmd.t -> string -> Expr.t -> Expr.t list -> 'f option -> 'f Cmd.t
@@ -1522,6 +1626,7 @@ module Visitors : sig
     method visit_FLessThanEqual : 'c -> BinOp.t -> BinOp.t
     method visit_FMinus : 'c -> BinOp.t -> BinOp.t
     method visit_FMod : 'c -> BinOp.t -> BinOp.t
+    method visit_FuncApp : 'c -> Expr.t -> string -> Expr.t list -> Expr.t
     method visit_FPlus : 'c -> BinOp.t -> BinOp.t
     method visit_FTimes : 'c -> BinOp.t -> BinOp.t
     method visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
@@ -1541,6 +1646,8 @@ module Visitors : sig
 
     method visit_CorePred :
       'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
+
+    method visit_DatatypeType : 'c -> Type.t -> string -> Type.t
 
     method visit_Wand :
       'c ->
@@ -1706,8 +1813,11 @@ module Visitors : sig
     method visit_position : 'c -> Location.position -> Location.position
     method visit_location : 'c -> Location.t -> Location.t
     method visit_constant : 'c -> Constant.t -> Constant.t
+    method visit_constructor : 'c -> Constructor.t -> Constructor.t
+    method visit_datatype : 'c -> Datatype.t -> Datatype.t
     method visit_expr : 'c -> Expr.t -> Expr.t
     method visit_flag : 'c -> Flag.t -> Flag.t
+    method visit_func : 'c -> Func.t -> Func.t
     method private visit_float : 'env. 'env -> float -> float
     method private visit_int : 'env. 'env -> int -> int
     method private visit_int32 : 'env. 'env -> int32 -> int32
@@ -1785,8 +1895,11 @@ module Visitors : sig
          ; visit_Bug : 'c -> 'f
          ; visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
          ; visit_Car : 'c -> 'f
+         ; visit_Cases :
+             'c -> Expr.t -> (string * string list * Expr.t) list -> 'f
          ; visit_Cdr : 'c -> 'f
          ; visit_Constant : 'c -> Constant.t -> 'f
+         ; visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
          ; visit_IDiv : 'c -> 'f
          ; visit_FDiv : 'c -> 'f
          ; visit_ECall :
@@ -1810,6 +1923,7 @@ module Visitors : sig
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
          ; visit_function_call : 'c -> Cmd.function_call -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+         ; visit_DatatypeType : 'c -> string -> 'f
          ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
          ; visit_Goto : 'c -> 'g -> 'f
@@ -1902,6 +2016,7 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> 'f
          ; visit_Skip : 'c -> 'f
          ; visit_FreshSVar : 'c -> string -> 'f
+         ; visit_FuncApp : 'c -> string -> Expr.t list -> 'f
          ; visit_StrCat : 'c -> 'f
          ; visit_StrLen : 'c -> 'f
          ; visit_StrLess : 'c -> 'f
@@ -1951,8 +2066,11 @@ module Visitors : sig
          ; visit_position : 'c -> Location.position -> 'f
          ; visit_location : 'c -> Location.t -> 'f
          ; visit_constant : 'c -> Constant.t -> 'f
+         ; visit_constructor : 'c -> Constructor.t -> 'f
+         ; visit_datatype : 'c -> Datatype.t -> 'f
          ; visit_expr : 'c -> Expr.t -> 'f
          ; visit_flag : 'c -> Flag.t -> 'f
+         ; visit_func : 'c -> Func.t -> 'f
          ; visit_lcmd : 'c -> LCmd.t -> 'f
          ; visit_lemma : 'c -> Lemma.t -> 'f
          ; visit_lemma_spec : 'c -> Lemma.spec -> 'f
@@ -1998,8 +2116,13 @@ module Visitors : sig
     method visit_Bug : 'c -> 'f
     method visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
     method visit_Car : 'c -> 'f
+
+    method visit_Cases :
+      'c -> Expr.t -> (string * string list * Expr.t) list -> 'f
+
     method visit_Cdr : 'c -> 'f
     method visit_Constant : 'c -> Constant.t -> 'f
+    method visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
     method visit_IDiv : 'c -> 'f
     method visit_FDiv : 'c -> 'f
 
@@ -2027,6 +2150,7 @@ module Visitors : sig
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
     method visit_function_call : 'c -> Cmd.function_call -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+    method visit_DatatypeType : 'c -> string -> 'f
     method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
     method visit_Goto : 'c -> 'g -> 'f
@@ -2119,6 +2243,7 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> 'f
     method visit_Skip : 'c -> 'f
     method visit_FreshSVar : 'c -> string -> 'f
+    method visit_FuncApp : 'c -> string -> Expr.t list -> 'f
     method visit_StrCat : 'c -> 'f
     method visit_StrLen : 'c -> 'f
     method visit_StrLess : 'c -> 'f
@@ -2166,8 +2291,11 @@ module Visitors : sig
     method visit_position : 'c -> Location.position -> 'f
     method visit_location : 'c -> Location.t -> 'f
     method visit_constant : 'c -> Constant.t -> 'f
+    method visit_constructor : 'c -> Constructor.t -> 'f
+    method visit_datatype : 'c -> Datatype.t -> 'f
     method visit_expr : 'c -> Expr.t -> 'f
     method visit_flag : 'c -> Flag.t -> 'f
+    method visit_func : 'c -> Func.t -> 'f
     method visit_lcmd : 'c -> LCmd.t -> 'f
     method visit_lemma : 'c -> Lemma.t -> 'f
     method visit_lemma_spec : 'c -> Lemma.spec -> 'f
@@ -2215,8 +2343,11 @@ module Visitors : sig
          ; visit_Bug : 'c -> unit
          ; visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
          ; visit_Car : 'c -> unit
+         ; visit_Cases :
+             'c -> Expr.t -> (string * string list * Expr.t) list -> unit
          ; visit_Cdr : 'c -> unit
          ; visit_Constant : 'c -> Constant.t -> unit
+         ; visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
          ; visit_ECall :
              'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
          ; visit_EList : 'c -> Expr.t list -> unit
@@ -2246,6 +2377,7 @@ module Visitors : sig
              unit
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
+         ; visit_DatatypeType : 'c -> string -> unit
          ; visit_Wand :
              'c -> string * Expr.t list -> string * Expr.t list -> unit
          ; visit_GUnfold : 'c -> string -> unit
@@ -2337,6 +2469,7 @@ module Visitors : sig
          ; visit_SignedRightShiftF : 'c -> unit
          ; visit_Skip : 'c -> unit
          ; visit_FreshSVar : 'c -> string -> unit
+         ; visit_FuncApp : 'c -> string -> Expr.t list -> unit
          ; visit_StrCat : 'c -> unit
          ; visit_StrLen : 'c -> unit
          ; visit_StrLess : 'c -> unit
@@ -2381,8 +2514,11 @@ module Visitors : sig
          ; visit_position : 'c -> Location.position -> unit
          ; visit_location : 'c -> Location.t -> unit
          ; visit_constant : 'c -> Constant.t -> unit
+         ; visit_constructor : 'c -> Constructor.t -> unit
+         ; visit_datatype : 'c -> Datatype.t -> unit
          ; visit_expr : 'c -> Expr.t -> unit
          ; visit_flag : 'c -> Flag.t -> unit
+         ; visit_func : 'c -> Func.t -> unit
          ; visit_lcmd : 'c -> LCmd.t -> unit
          ; visit_lemma : 'c -> Lemma.t -> unit
          ; visit_lemma_spec : 'c -> Lemma.spec -> unit
@@ -2427,8 +2563,13 @@ module Visitors : sig
     method visit_Bug : 'c -> unit
     method visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
     method visit_Car : 'c -> unit
+
+    method visit_Cases :
+      'c -> Expr.t -> (string * string list * Expr.t) list -> unit
+
     method visit_Cdr : 'c -> unit
     method visit_Constant : 'c -> Constant.t -> unit
+    method visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
 
     method visit_ECall :
       'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
@@ -2462,6 +2603,7 @@ module Visitors : sig
 
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
+    method visit_DatatypeType : 'c -> string -> unit
 
     method visit_Wand :
       'c -> string * Expr.t list -> string * Expr.t list -> unit
@@ -2555,6 +2697,7 @@ module Visitors : sig
     method visit_SignedRightShiftF : 'c -> unit
     method visit_Skip : 'c -> unit
     method visit_FreshSVar : 'c -> string -> unit
+    method visit_FuncApp : 'c -> string -> Expr.t list -> unit
     method visit_StrCat : 'c -> unit
     method visit_StrLen : 'c -> unit
     method visit_StrLess : 'c -> unit
@@ -2609,8 +2752,11 @@ module Visitors : sig
     method visit_position : 'c -> Location.position -> unit
     method visit_location : 'c -> Location.t -> unit
     method visit_constant : 'c -> Constant.t -> unit
+    method visit_constructor : 'c -> Constructor.t -> unit
+    method visit_datatype : 'c -> Datatype.t -> unit
     method visit_expr : 'c -> Expr.t -> unit
     method visit_flag : 'c -> Flag.t -> unit
+    method visit_func : 'c -> Func.t -> unit
     method private visit_float : 'env. 'env -> float -> unit
     method private visit_int : 'env. 'env -> int -> unit
     method private visit_int32 : 'env. 'env -> int32 -> unit
