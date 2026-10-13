@@ -8,6 +8,8 @@ module Public : sig
     type t = (string * Yojson.Safe.t) list
   end
 
+  exception FailureJson of string * JsonMap.t
+
   (** Sends a log message to the debugger frontend via a custom event.
       Optionally includes some accompanying JSON.
 

@@ -119,6 +119,7 @@ module Make
             (Prog.pp_indexed ?pp_annot:None)
             prog)
     in
+    Prog_env.using_prog prog @@ fun () ->
     Verification.verify_prog ~init_data prog incremental source_files_opt
 
   let verify_once

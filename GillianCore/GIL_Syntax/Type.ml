@@ -13,6 +13,7 @@ type t = TypeDef__.typ =
   | ListType  (** Type of lists *)
   | TypeType  (** Type of types *)
   | SetType  (** Type of sets *)
+  | DatatypeType of string  (** User-defined datatypes *)
 [@@deriving yojson, eq, ord, show]
 
 (** Print *)
@@ -30,6 +31,7 @@ let str (x : t) =
   | ListType -> "List"
   | TypeType -> "Type"
   | SetType -> "Set"
+  | DatatypeType s -> s
 
 module Set = Set.Make (struct
   type nonrec t = t

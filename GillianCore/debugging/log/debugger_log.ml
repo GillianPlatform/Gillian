@@ -156,5 +156,5 @@ let try' ~name f x =
       Lwt.reraise err
 
 let set_rpc_command_handler rpc ?name ?(catchall = true) module_ f =
-  let f x = if catchall then try' ~name f x else f x in
+  let f = if catchall then try' ~name f else f in
   Debug_rpc.set_command_handler rpc module_ f

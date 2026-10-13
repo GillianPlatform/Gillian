@@ -29,6 +29,7 @@ let compile_type t =
     | WInt -> Some Type.IntType
     | WFloat -> Some Type.NumberType
     | WSet -> Some Type.SetType
+    | WDatatype n -> Some (Type.DatatypeType n)
     | WAny -> None)
 
 let invert_binop : WBinOp.t -> bool = function
@@ -168,9 +169,11 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
 (* compile_lexpr : WLExpr.t -> (string list * Asrt.t list * Expr.t)
     compiles a WLExpr into an output expression and a list of Global Assertions.
     the string list contains the name of the variables that are generated. They are existentials. *)
-let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
-    string list * Asrt.t * Expr.t =
-  let compile_lexpr = compile_lexpr ~fname in
+let rec compile_lexpr
+    ?(fname = "main")
+    ?(is_pure_fun_def = false)
+    (lexpr : WLExpr.t) : string list * Asrt.t * Expr.t =
+  let compile_lexpr = compile_lexpr ~fname ~is_pure_fun_def in
   let expr_pname_of_binop b =
     WBinOp.(
       match b with
@@ -195,10 +198,14 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
   WLExpr.(
     match get lexpr with
     | LVal v -> ([], [], Expr.Lit (compile_val v))
+    | PVar x when is_pure_fun_def -> ([], [], Expr.LVar x)
     | PVar x -> ([], [], Expr.PVar x)
     | LVar x -> ([], [], Expr.LVar x)
-    | LBinOp (e1, b, e2) when is_internal_pred b ->
+    | LBinOp (e1, b, e2) when is_internal_pred b && Stdlib.not is_pure_fun_def
+      ->
         (* Operator corresponds to pointer arithmetics *)
+        (* Functions are pure, so can't create global assertions *)
+        (* TODO: functions don't support pointer arithmetic *)
         let lout = Utils.Generators.fresh_lvar () in
         let internal_pred = expr_pname_of_binop b in
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
@@ -246,7 +253,29 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)
         in
-        (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs))
+        (List.concat gvars, List.concat asrtsl, Expr.ESet comp_exprs)
+    | LConstructorApp (n, l) ->
+        let gvars, asrtsl, comp_exprs =
+          list_split_3 (List.map compile_lexpr l)
+        in
+        ( List.concat gvars,
+          List.concat asrtsl,
+          Expr.ConstructorApp (n, comp_exprs) )
+    | LPureFunApp (n, l) ->
+        let gvars, asrtsl, comp_exprs =
+          list_split_3 (List.map compile_lexpr l)
+        in
+        (List.concat gvars, List.concat asrtsl, Expr.FuncApp (n, comp_exprs))
+    | LCases (le, cs) ->
+        let compile_case { constructor; binders; lexpr } =
+          let gvars, asrtsl, comp_lexpr = compile_lexpr lexpr in
+          (gvars, asrtsl, (constructor, binders, comp_lexpr))
+        in
+        let gvar, asrtl, comp_le = compile_lexpr le in
+        let gvars, asrtsl, comp_cs = list_split_3 (List.map compile_case cs) in
+        ( List.concat (gvar :: gvars),
+          List.concat (asrtl :: asrtsl),
+          Expr.Cases (comp_le, comp_cs) ))
 
 let compile_lexpr_perm ?fname lexpr =
   match lexpr with
@@ -1007,6 +1036,33 @@ let compile_pred filepath pred =
       pred_nounfold = pred.pred_nounfold;
     }
 
+let compile_pure_fun
+    filepath
+    WPureFun.
+      { pure_fun_name; pure_fun_params; pure_fun_definition; pure_fun_loc } =
+  let types =
+    WTypeMap.infer_types_pure_fun pure_fun_params pure_fun_definition
+  in
+  let get_wisl_type x = (x, WTypeMap.type_of_variable x types) in
+  let param_wisl_types =
+    List.map (fun (x, _) -> get_wisl_type x) pure_fun_params
+  in
+  let get_gil_type (x, t) = (x, Option.join (Option.map compile_type t)) in
+  let comp_func_params = List.map get_gil_type param_wisl_types in
+  let _, _, comp_func_def =
+    compile_lexpr ~is_pure_fun_def:true pure_fun_definition
+  in
+  let comp_func_loc = Some (CodeLoc.to_location pure_fun_loc) in
+  Func.
+    {
+      func_name = pure_fun_name;
+      func_source_path = Some filepath;
+      func_loc = comp_func_loc;
+      func_num_params = List.length comp_func_params;
+      func_params = comp_func_params;
+      func_definition = comp_func_def;
+    }
+
 let rec compile_function
     filepath
     WFun.{ name; params; body; spec; return_expr; loop_body_of; _ } =
@@ -1183,7 +1239,47 @@ let compile_lemma
       lemma_location;
     }
 
-let compile ~filepath WProg.{ context; predicates; lemmas } =
+let compile_constructor
+    filepath
+    WConstructor.
+      {
+        constructor_name;
+        constructor_fields;
+        constructor_loc;
+        constructor_datatype;
+        _;
+      } =
+  let comp_fields = List.map compile_type constructor_fields in
+  let constructor_loc = Some (CodeLoc.to_location constructor_loc) in
+  let constructor_num_fields = List.length comp_fields in
+  Constructor.
+    {
+      constructor_name;
+      constructor_source_path = Some filepath;
+      constructor_loc;
+      constructor_num_fields;
+      constructor_fields = comp_fields;
+      constructor_datatype;
+    }
+
+let compile_datatype
+    filepath
+    WDatatype.{ datatype_name; datatype_constructors; datatype_loc; _ } =
+  let comp_constructors =
+    List.map (compile_constructor filepath) datatype_constructors
+  in
+  let datatype_loc = Some (CodeLoc.to_location datatype_loc) in
+  Datatype.
+    {
+      datatype_name;
+      datatype_source_path = Some filepath;
+      datatype_loc;
+      datatype_constructors = comp_constructors;
+    }
+
+let compile
+    ~filepath
+    WProg.{ context; predicates; lemmas; datatypes; pure_functions } =
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in
@@ -1195,6 +1291,8 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
   let get_proc_name proc = proc.Proc.proc_name in
   let get_pred_name pred = pred.Pred.pred_name in
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
+  let get_func_name func = func.Func.func_name in
+  let get_datatype_name datatype = datatype.Datatype.datatype_name in
   (* compile everything *)
   let comp_context = List.map (compile_function filepath) context in
   let comp_preds = List.map (compile_pred filepath) predicates in
@@ -1203,10 +1301,14 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
       (fun lemma -> compile_lemma filepath (preprocess_lemma lemma))
       lemmas
   in
+  let comp_funcs = List.map (compile_pure_fun filepath) pure_functions in
+  let comp_datatypes = List.map (compile_datatype filepath) datatypes in
   (* build the hashtables *)
   let gil_procs = make_hashtbl get_proc_name (List.concat comp_context) in
   let gil_preds = make_hashtbl get_pred_name comp_preds in
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
+  let gil_funcs = make_hashtbl get_func_name comp_funcs in
+  let gil_datatypes = make_hashtbl get_datatype_name comp_datatypes in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
   let bi_specs = Hashtbl.create 1 in
   if Gillian.Utils.(Exec_mode.is_biabduction_exec !Config.current_exec_mode)
@@ -1234,4 +1336,5 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
     ~imports:(List.map (fun imp -> (imp, false)) WislConstants.internal_imports)
     ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
     ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
-    ~predecessors:(Hashtbl.create 1) ()
+    ~predecessors:(Hashtbl.create 1) () (* TODO *)
+    ~datatypes:gil_datatypes ~funcs:gil_funcs

@@ -16,6 +16,9 @@ type t = TypeDef__.expr =
       (** Existential quantification. *)
   | ForAll of (string * Type.t option) list * t
       (** Universal quantification. *)
+  | ConstructorApp of string * t list  (** Datatype constructor *)
+  | FuncApp of string * t list  (** Function application *)
+  | Cases of t * (string * string list * t) list
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -378,6 +381,18 @@ let rec map_opt
             match map_e e with
             | Some e' -> Some (ForAll (bt, e'))
             | _ -> None)
+        | ConstructorApp (n, les) ->
+            aux les (fun les -> ConstructorApp (n, les))
+        | FuncApp (n, les) -> aux les (fun les -> FuncApp (n, les))
+        | Cases (e, cs) ->
+            let cs =
+              List_utils.flaky_map
+                (fun (c, bs, e) ->
+                  let e = map_e e in
+                  Option.map (fun e -> (c, bs, e)) e)
+                cs
+            in
+            Option.map (fun cs -> Cases (e, cs)) cs
       in
       Option.map f_after mapped_expr
 
@@ -415,6 +430,25 @@ let pp_custom ~pp ft =
       Fmt.pf ft "(forall %a . %a)"
         (Fmt.list ~sep:Fmt.comma pp_var_with_type)
         bt pp e
+  | ConstructorApp (n, ll) ->
+      Fmt.pf ft "'%s(%a)" n (Fmt.list ~sep:Fmt.comma pp) ll
+  | FuncApp (n, ll) -> Fmt.pf ft "%s(%a)" n (Fmt.list ~sep:Fmt.comma pp) ll
+  | Cases (scrutinee, branches) ->
+      Fmt.pf ft "@[<v 2>case %a {@," pp scrutinee;
+      List.iteri
+        (fun i (constructor, binders, expr) ->
+          Fmt.pf ft "  %s" constructor;
+          (match binders with
+          | [] -> ()
+          | _ ->
+              Fmt.pf ft "(";
+              Fmt.pf ft "%a" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) binders;
+              Fmt.pf ft ")");
+          Fmt.pf ft " -> %a" pp expr;
+          if i < List.length branches - 1 then Fmt.pf ft ";@,"
+          else Fmt.pf ft "@,")
+        branches;
+      Fmt.pf ft "}@]"
 
 let rec pp ft t = pp_custom ~pp ft t
 
@@ -479,6 +513,7 @@ let rec is_concrete (le : t) : bool =
   | BinOp (e1, _, e2) -> loop [ e1; e2 ]
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
+  | ConstructorApp (_, _) | FuncApp _ | Cases _ -> false
 
 let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z

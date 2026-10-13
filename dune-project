@@ -6,8 +6,6 @@
 
 (using cinaps 1.0)
 
-(using dune_site 0.1)
-
 (generate_opam_files)
 
 (license "BSD-3-Clause")
@@ -34,6 +32,7 @@
    (= 1.0.1))
   (cmdliner
    (>= 1.1.1))
+  crunch
   sedap
   (fmt
    (>= 0.8.8))
@@ -62,10 +61,7 @@
 
 (package
  (name gillian-js)
- (sites
-  (share runtime))
  (depends
-  dune-site
   flow_parser
   fpath
   (gillian
@@ -74,35 +70,24 @@
 
 (package
  (name gillian-c)
- (sites
-  (share runtime)
-  (share c_includes))
  (synopsis "Gillian instantiation for C")
  (depends
   (gillian
    (= :version))
   compcert
-  dune-site
   printbox-text))
 
 (package
  (name gillian-c2)
- (sites
-  (share runtime)
-  (share c_includes))
  (synopsis "Gillian instantiation for C based on CBMC as front-end")
  (depends
   (gillian
    (= :version))
-  dune-site
   printbox-text))
 
 (package
  (name wisl)
- (sites
-  (share runtime))
  (depends
-  dune-site
   (gillian
    (= :version)))
  (synopsis
@@ -110,8 +95,6 @@
 
 (package
  (name transformers)
- (sites
-  (share runtime))
  (synopsis
   "Gillian instantiation using state model transformers, à la Iris")
  (depends
@@ -121,5 +104,4 @@
    (= :version))
   (gillian-js
    (= :version))
-  dune-site
   printbox-text))

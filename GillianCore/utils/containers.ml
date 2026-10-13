@@ -68,3 +68,5 @@ module SN = struct
 
   include Set.Make (MyNumber)
 end
+
+module StringMap = Map.Make (String)
