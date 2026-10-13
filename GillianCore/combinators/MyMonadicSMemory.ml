@@ -179,8 +179,7 @@ module Make (Mem : S) (ID : ID) :
     let fixes = get_fixes e in
     List.map
       (List.map (function
-        | Fix.CorePred (p, ins, outs) ->
-            Asrt.CorePred (pred_to_str p, ins, outs)
+        | Fix.CorePred (p, ins, outs) -> Asrt.CorePred (pred_to_str p, ins, outs)
         | Fix.Types tys -> Asrt.Types tys))
       fixes
 

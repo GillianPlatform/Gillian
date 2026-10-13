@@ -1,9 +1,9 @@
 open Gil_syntax
 
 (** A fix is a list of atoms to produce onto a state in order to repair a
-    missing-resource error. Besides core predicates, an atom may carry the
-    types of the logical variables the fix introduces: without them, every
-    later use of an abduced value has to ask the solver what its type is. *)
+    missing-resource error. Besides core predicates, an atom may carry the types
+    of the logical variables the fix introduces: without them, every later use
+    of an abduced value has to ask the solver what its type is. *)
 type 'cp atom =
   | CorePred of 'cp * Expr.t list * Expr.t list
   | Types of (Expr.t * Type.t) list
