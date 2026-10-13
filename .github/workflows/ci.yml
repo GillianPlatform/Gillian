@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master]
+    tags: ["release/**", "v[0-9]*"]
   pull_request:
     branches: [master]
   merge_group:
@@ -14,16 +15,70 @@ on:
 
 env:
   NODE_VERSION: 18
-  LOCAL_DOCKER_IMG: gillian-build:local
   DOCKER_IMG_PRE: ghcr.io/gillianplatform/
 
 jobs:
-  build:
+  build-linux:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
-    runs-on: ${{ matrix.operating-system }}
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Cache
+        uses: actions/cache@v4
+        with:
+          path: _static/opam
+          key: alpine-${{ matrix.arch }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
+      # Not a job-level `container:`: JS actions don't run in Alpine containers on arm64.
+      - name: Build and test static binaries
+        run: docker run --rm -v "$PWD:/src" -w /src alpine:3.22 scripts/build-static.sh
+      - name: Upload wisl
+        uses: actions/upload-artifact@v4
+        with: { name: "wisl-linux-${{ matrix.arch }}", path: _static/dist/wisl }
+      - name: Upload wislf
+        uses: actions/upload-artifact@v4
+        with: { name: "wislf-linux-${{ matrix.arch }}", path: _static/dist/wislf }
+      - name: Upload gillian-c2
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-c2-linux-${{ matrix.arch }}", path: _static/dist/gillian-c2 }
+      - name: Upload gillian-js
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-js-linux-${{ matrix.arch }}", path: _static/dist/gillian-js }
+      - name: Upload gillian-c
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-c-linux-${{ matrix.arch }}", path: _static/dist/gillian-c }
+      - name: Upload transformers
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v4
+        with: { name: "transformers-linux-${{ matrix.arch }}", path: _static/dist/transformers }
+      - name: Upload API docs
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: _docs/gillian/Gillian
+
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    env:
+      # Set before setup-ocaml so the compiler and every dependency target it.
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      GMP_VERSION: 6.3.0
     steps:
       - &SETUP_Z3
         name: Setup Z3
@@ -31,48 +86,72 @@ jobs:
         uses: cda-tum/setup-z3@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Print Z3 version
-        run: z3 --version
       - uses: actions/checkout@v4
       - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: "5.3.0"
+          cache-prefix: macos-${{ env.MACOSX_DEPLOYMENT_TARGET }}
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v4
-        env:
-            cache-name: cache-ocaml
         with:
           path: _opam
-          key: ${{ runner.os }}-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
+          key: macos-${{ matrix.arch }}-target-${{ env.MACOSX_DEPLOYMENT_TARGET }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
+      # Homebrew's libgmp.a targets the runner's macOS, not the deployment target.
+      - name: Restore GMP
+        id: gmp-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/gmp
+          key: gmp-${{ env.GMP_VERSION }}-${{ matrix.arch }}-target-${{ env.MACOSX_DEPLOYMENT_TARGET }}
+      - name: Build GMP
+        if: steps.gmp-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz" | tar xJ -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/gmp-$GMP_VERSION"
+          # Fat build: runtime CPU dispatch instead of the runner's CPU.
+          ./configure --prefix="$RUNNER_TEMP/gmp" --disable-shared --enable-static --with-pic \
+            ${{ matrix.arch == 'x86_64' && '--enable-fat' || '' }}
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
       - name: Install dependencies
-        run: make init-ci
+        # zarith takes gmp from pkg-config; the prefix holds only libgmp.a.
+        run: PKG_CONFIG_PATH="$RUNNER_TEMP/gmp/lib/pkgconfig" make init-ci
       - name: Build Gillian
-        run: opam exec -- dune build @all
+        run: opam exec -- dune build @install
       - name: Basic tests
         run: opam exec -- dune test
       - name: Wisl checks
         run: opam exec -- dune exec -- bash ./wisl/scripts/quicktests.sh
-      - name: Format checking
-        run: opam exec -- dune fmt
-      - name: Build and compress binaries
+      - name: Check linking
         run: |
-          mkdir _dist
-          opam exec -- dune install --relocatable --prefix ./_dist
-      - name: Sending artifact
+          fail=0
+          for b in wisl wislf gillian-c2 gillian-js gillian-c; do
+            p=_build/install/default/bin/$b
+            otool -L "$p"
+            vtool -show-build "$p"
+            if otool -L "$p" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/usr/lib/|/System/)'; then
+              echo "error: $b links a non-system library"; fail=1
+            fi
+            vtool -show-build "$p" | grep -Eq "minos $MACOSX_DEPLOYMENT_TARGET\$" \
+              || { echo "error: $b minos is not $MACOSX_DEPLOYMENT_TARGET"; fail=1; }
+          done
+          exit $fail
+      - name: Upload wisl
         uses: actions/upload-artifact@v4
-        with:
-          name: gillian-${{ runner.os }}
-          path: _dist
-      - name: Building API docs
-        run: make docs
-        if: runner.os == 'Linux'
-      - name: Sending docs artifact
+        with: { name: "wisl-macos-${{ matrix.arch }}", path: _build/install/default/bin/wisl }
+      - name: Upload wislf
         uses: actions/upload-artifact@v4
-        with:
-          name: api-docs
-          path: _docs/gillian/Gillian
-        if: runner.os == 'Linux'
+        with: { name: "wislf-macos-${{ matrix.arch }}", path: _build/install/default/bin/wislf }
+      - name: Upload gillian-c2
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-c2-macos-${{ matrix.arch }}", path: _build/install/default/bin/gillian-c2 }
+      - name: Upload gillian-js
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-js-macos-${{ matrix.arch }}", path: _build/install/default/bin/gillian-js }
+      - name: Upload gillian-c
+        uses: actions/upload-artifact@v4
+        with: { name: "gillian-c-macos-${{ matrix.arch }}", path: _build/install/default/bin/gillian-c }
       - name: Setting dependency cache
         run: opam clean
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -82,20 +161,20 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - &DOWNLOAD_ARTIFACT
-        name: Download artifact
+      - &DOWNLOAD_GILLIAN_C
+        name: Download gillian-c
         uses: actions/download-artifact@v4
         with:
-          name: gillian-${{ runner.os }}
-          path: _dist
-      - &INSTALL_ARTIFACT
-        name: Install Gillian
+          name: gillian-c-linux-x86_64
+          path: ~/.local/bin
+      - &INSTALL_BINARIES
+        name: Install binaries
         run: |
-          sudo rsync -a --chmod=a+rx _dist/ /usr/local
-          rm -rf _dist
+          chmod +x ~/.local/bin/*
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C/scripts/setup_environment.sh"
@@ -111,11 +190,16 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - &DOWNLOAD_GILLIAN_JS
+        name: Download gillian-js
+        uses: actions/download-artifact@v4
+        with:
+          name: gillian-js-linux-x86_64
+          path: ~/.local/bin
+      - *INSTALL_BINARIES
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-JS/scripts/setup_environment.sh"
@@ -131,7 +215,7 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
       - name: install CBMC
@@ -139,8 +223,12 @@ jobs:
           curl -L -o cbmc.deb https://github.com/diffblue/cbmc/releases/download/cbmc-6.9.0/ubuntu-24.04-cbmc-6.9.0-Linux.deb
           sudo dpkg -i cbmc.deb
           rm cbmc.deb
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - name: Download gillian-c2
+        uses: actions/download-artifact@v4
+        with:
+          name: gillian-c2-linux-x86_64
+          path: ~/.local/bin
+      - *INSTALL_BINARIES
       - uses: actions/checkout@v4
       - name: init env
         run: "Gillian-C2/scripts/setup_environment.sh"
@@ -154,11 +242,11 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - *DOWNLOAD_GILLIAN_JS
+      - *INSTALL_BINARIES
       - name: Checkout javert-test262
         uses: actions/checkout@v4
         with:
@@ -174,11 +262,11 @@ jobs:
       matrix:
         operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
-    needs: build
+    needs: build-linux
     steps:
       - *SETUP_Z3
-      - *DOWNLOAD_ARTIFACT
-      - *INSTALL_ARTIFACT
+      - *DOWNLOAD_GILLIAN_C
+      - *INSTALL_BINARIES
       - name: Checkout collections-c-for-gillian
         uses: actions/checkout@v4
         with:
@@ -204,91 +292,35 @@ jobs:
   #     - name: Symbolic Testing Buckets.js
   #       run: "gillian-js cosette-bulk Gillian-JS/Examples/Cosette/Buckets --ci"
 
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo docker builder prune -a
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Restore Cache
-        id: restore-cache
-        uses: actions/cache@v4
-        env:
-            cache-name: cache-ocaml
-        with:
-          path: .docker_opam_cache
-          key: docker-${{ env.cache-name }}-ocaml-5.3.0-${{ hashFiles('**.opam') }}
-          restore-keys: |
-            docker-${{ env.cache-name }}-ocaml-5.3.0
-      - name: Build and export docker image
-        uses: docker/build-push-action@v4
-        with:
-          file: docker/Dockerfile.build
-          context: .
-          tags: ${{ env.LOCAL_DOCKER_IMG }}
-          outputs: type=docker, dest=${{ runner.temp }}/gillian-build-docker.tar
-      - name: Upload docker image
-        uses: actions/upload-artifact@v4
-        with:
-          name: gillian-build-docker
-          path: ${{ runner.temp }}/gillian-build-docker.tar
-      - name: Load image
-        run: |
-          docker load --input ${{ runner.temp }}/gillian-build-docker.tar
-          docker image ls -a
-      - name: Dune test
-        run: docker run --rm ${{ env.LOCAL_DOCKER_IMG }} opam exec -- dune test
-      - name: Extract cache
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: |
-          rm -rf .docker_opam_cache
-          docker run --name deps ${{ env.LOCAL_DOCKER_IMG }} bash -c "opam clean"
-          docker cp deps:/home/opam/.opam/5.3 ./.docker_opam_cache
-          docker rm deps
-
   docker-dist:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: build-linux
     strategy:
       matrix:
         include:
           - image: wisl
-            packages: wisl
+            bins: "wisl,wislf"
             no_cbmc: 1
           - image: gillian-lab
-            packages: "wisl gillian-c2"
+            bins: "wisl,wislf,gillian-c2"
             no_cbmc: ""
           - image: gillian
-            packages: "wisl gillian-c gillian-js gillian-c2"
+            bins: "wisl,wislf,gillian-c,gillian-js,gillian-c2"
             no_cbmc: ""
           - image: gillian-extra
-            packages: ""
+            bins: "wisl,wislf,gillian-c,gillian-js,gillian-c2,transformers"
             no_cbmc: ""
     env:
       DOCKER_TAG_RAW: ${{ github.event.inputs.docker-tag || (github.ref_name == 'master' && 'nightly' || github.ref_name) }}
     steps:
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo docker builder prune -a
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Download base image
+      - name: Download binaries
         uses: actions/download-artifact@v4
         with:
-          name: gillian-build-docker
-          path: ${{ runner.temp }}
-      - name: Load image
-        run: |
-          docker load --input ${{ runner.temp }}/gillian-build-docker.tar
-          docker image ls -a
+          pattern: "{${{ matrix.bins }}}-linux-x86_64"
+          merge-multiple: true
+          path: docker/bin
       - name: Login to GitHub Container Registry
         if: ${{ contains(fromJSON('["push", "workflow_dispatch", "release"]'), github.event_name) }}
         uses: docker/login-action@v3
@@ -301,12 +333,15 @@ jobs:
       - name: Build and export docker image
         uses: docker/build-push-action@v6
         with:
+          context: docker
           file: docker/Dockerfile.dist
           tags: ${{ env.DOCKER_IMG_PRE }}${{ matrix.image }}:${{ env.DOCKER_TAG }}
-          build-args: |
-            packages=${{ matrix.packages }}
-            no_cbmc=${{ matrix.no_cbmc }}
+          build-args: no_cbmc=${{ matrix.no_cbmc }}
           push: ${{ contains(fromJSON('["push", "workflow_dispatch", "release"]'), github.event_name) }}
+      - name: List binaries and size
+        run: |
+          docker run --rm ${{ env.DOCKER_IMG_PRE }}${{ matrix.image }}:${{ env.DOCKER_TAG }} ls -l /usr/local/bin
+          docker image ls ${{ env.DOCKER_IMG_PRE }}${{ matrix.image }}
       - name: Export docker image
         run: docker save ${{ env.DOCKER_IMG_PRE }}${{ matrix.image }}:${{ env.DOCKER_TAG }} > ${{ runner.temp }}/${{ matrix.image }}-docker.tar
       - name: Upload docker image
@@ -318,7 +353,7 @@ jobs:
   deploy-docs:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build-linux]
     strategy:
       fail-fast: false
       matrix:
@@ -345,3 +380,52 @@ jobs:
           else
             echo "No changes detected; not pushing."
           fi
+
+  release:
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/release/') || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-macos, gillian_c_tests, gillian_js_tests, gillian_c2_tests]
+    permissions:
+      contents: write
+    concurrency: release-${{ github.ref }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-{linux,macos}-*"
+          path: artifacts
+      - name: Package
+        run: |
+          case $GITHUB_REF in
+            refs/tags/release/*) version=${GITHUB_REF#refs/tags/release/} ;;
+            refs/tags/v*) version=${GITHUB_REF#refs/tags/v} ;;
+            *) version=nightly ;;
+          esac
+          scripts/package-release.sh "${version//\//-}" artifacts dist
+          ls -l dist
+      - name: Publish tag release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag=$GITHUB_REF_NAME
+          # actions/checkout turns annotated tags into lightweight ones.
+          git fetch --force origin "refs/tags/$tag:refs/tags/$tag"
+          { git tag -l --format='%(contents:subject)%0a%0a%(contents:body)' "$tag"
+            cat .github/release-notes-footer.md; } > notes.md
+          gh release create "$tag" --verify-tag --title "${tag#release/}" --notes-file notes.md dist/*
+      - name: Publish nightly
+        if: github.ref == 'refs/heads/master'
+        run: |
+          git tag -f nightly "$GITHUB_SHA"
+          git push -f origin refs/tags/nightly
+          { echo "Built from $GITHUB_SHA."; cat .github/release-notes-footer.md; } > notes.md
+          gh release view nightly > /dev/null 2>&1 \
+            || gh release create nightly --verify-tag --prerelease --title nightly --notes-file notes.md
+          gh release edit nightly --notes-file notes.md
+          gh release upload nightly --clobber dist/*
+          # Drop assets of binaries that are no longer built.
+          for asset in $(gh release view nightly --json assets -q '.assets[].name'); do
+            [ -e "dist/$asset" ] || gh release delete-asset nightly "$asset" -y
+          done

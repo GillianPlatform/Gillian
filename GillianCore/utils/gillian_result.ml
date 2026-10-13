@@ -138,6 +138,9 @@ module Exc = struct
 
   let analysis_failure ?(is_preprocessing = false) ?in_target ?loc msg =
     Gillian_error (make_analysis_failures ~is_preprocessing ?in_target ?loc msg)
+
+  let compilation_error ?(additional_data : Yojson.Safe.t option) ?loc msg =
+    Gillian_error (CompilationError { msg; loc; additional_data })
 end
 
 type 'a t = ('a, Error.t) result

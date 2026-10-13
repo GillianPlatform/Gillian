@@ -10,7 +10,6 @@ depends: [
   "dune" {>= "3.16"}
   "gillian" {= version}
   "compcert"
-  "dune-site"
   "printbox-text"
   "odoc" {with-doc}
 ]
@@ -23,14 +22,12 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/GillianPlatform/Gillian.git"
 pin-depends: [
-  ["compcert.~dev" "git+https://github.com/GillianPlatform/CompCert.git#312d268d484fe3834689e9db087449ff446fad3d"]
+  ["compcert.~dev" "git+https://github.com/GillianPlatform/CompCert.git#02ee3b5a9a7ad61dd3e5f7a9a0b2a0ec5ba8ff58"]
 ]

@@ -28,7 +28,13 @@ let amazon = ref false
 (** {2 Other config} *)
 let env_var_import_path = "GILLIAN_JS_RUNTIME_PATH"
 
+let runtime_dir =
+  Gillian.Utils.Embedded.dir ~name:"gillian-js-runtime"
+    (List.map
+       (fun f -> (f, Option.get (Runtime_files.read f)))
+       Runtime_files.file_list)
+
 let import_paths =
   (Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH"
   |> Option.value ~default:"" |> String.split_on_char ':')
-  @ Runtime_sites.Sites.runtime
+  @ [ runtime_dir ]
