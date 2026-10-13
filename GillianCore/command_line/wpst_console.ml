@@ -217,6 +217,7 @@ module Make
     in
     Printf.printf "Compilation time: %fs\n" (Unix.gettimeofday () -. t);
     let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
+    Prog_env.using_prog prog @@ fun () ->
     let prog' = MP.init_prog prog in
     run prog' init_data incremental source_files_opt
 

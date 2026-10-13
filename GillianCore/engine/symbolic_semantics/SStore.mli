@@ -8,7 +8,7 @@ type t [@@deriving yojson]
 val copy : t -> t
 val domain : t -> Containers.SS.t
 val get : t -> Var.t -> Expr.t option
-val get_unsafe : t -> Var.t -> Expr.t
+val get_exn : t -> Var.t -> Expr.t
 val init : (Var.t * Expr.t) list -> t
 val mem : t -> Var.t -> bool
 val partition : t -> (Expr.t -> bool) -> Var.Set.t * Var.Set.t

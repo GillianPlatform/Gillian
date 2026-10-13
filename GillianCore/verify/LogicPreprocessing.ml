@@ -676,42 +676,41 @@ let add_closing_tokens preds =
     guarded_predicates
 
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
-  let f (prog : ('a, int) Prog.t) unfold =
-    let procs = prog.procs in
-    let preds = prog.preds in
-    let lemmas = prog.lemmas in
-    let onlyspecs = prog.only_specs in
+  L.Phase.with_normal ~title:"Logic preprocessing" @@ fun () ->
+  Prog_env.using_prog prog @@ fun () ->
+  let procs = prog.procs in
+  let preds = prog.preds in
+  let lemmas = prog.lemmas in
+  let onlyspecs = prog.only_specs in
 
-    let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
+  let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
 
-    let () =
-      Hashtbl.filter_map_inplace
-        (fun _ lemma ->
-          let lemma = Lemma.add_param_bindings lemma in
-          Some lemma)
-        lemmas'
-    in
-
-    let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
-      match unfold with
-      | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
-      | true ->
-          let preds'', rec_info = unfold_preds preds' in
-          let procs'' = unfold_procs preds'' rec_info procs' in
-          let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in
-          let lemmas'' = unfold_lemmas preds'' rec_info lemmas' in
-          let onlyspecs' = unfold_specs preds'' rec_info onlyspecs in
-          (* create_partial_matches procs'';  *)
-          (preds'', procs'', bi_specs, lemmas'', onlyspecs')
-    in
-    add_closing_tokens preds'';
-    {
-      prog with
-      preds = preds'';
-      procs = procs'';
-      bi_specs;
-      lemmas = lemmas'';
-      only_specs = onlyspecs';
-    }
+  let () =
+    Hashtbl.filter_map_inplace
+      (fun _ lemma ->
+        let lemma = Lemma.add_param_bindings lemma in
+        Some lemma)
+      lemmas'
   in
-  L.Phase.with_normal ~title:"Logic preprocessing" (fun () -> f prog unfold)
+
+  let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
+    match unfold with
+    | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
+    | true ->
+        let preds'', rec_info = unfold_preds preds' in
+        let procs'' = unfold_procs preds'' rec_info procs' in
+        let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in
+        let lemmas'' = unfold_lemmas preds'' rec_info lemmas' in
+        let onlyspecs' = unfold_specs preds'' rec_info onlyspecs in
+        (* create_partial_matches procs'';  *)
+        (preds'', procs'', bi_specs, lemmas'', onlyspecs')
+  in
+  add_closing_tokens preds'';
+  {
+    prog with
+    preds = preds'';
+    procs = procs'';
+    bi_specs;
+    lemmas = lemmas'';
+    only_specs = onlyspecs';
+  }
