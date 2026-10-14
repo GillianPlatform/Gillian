@@ -19,6 +19,10 @@ let z3_config =
     ("auto_config", "true");
     ("timeout", try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000");
   ]
+  @
+  match Sys.getenv_opt "SMT_RANDOM_SEED" with
+  | Some seed -> [ ("smt.random_seed", seed) ]
+  | None -> []
 
 let () = Sys.(set_signal sigpipe Signal_ignore)
 
