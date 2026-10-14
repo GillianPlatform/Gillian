@@ -136,7 +136,6 @@ module type S = sig
   val unfolding_vals : t -> Expr.t list -> vt list
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
-  val clean_up : ?keep:Expr.Set.t -> t -> unit
   val match_assertion : t -> st -> MP.step -> (t, err_t) Res_list.t
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t, err_t) Res_list.t

@@ -12,7 +12,7 @@ module Gil_branch_case = Gillian.Gil_syntax.Branch_case
 module DL = Gillian.Debugger.Logging
 module Exec_map = Gillian.Debugger.Utils.Exec_map
 module Annot = C2_annot
-module SMemory = Memory_model.SMemory
+module SMemory = Memory_model.MonadicSMemory
 open Annot
 open Branch_case
 

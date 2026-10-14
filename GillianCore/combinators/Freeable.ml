@@ -138,11 +138,11 @@ module Make (S : MyMonadicSMemory.S) :
     let s, v = S.instantiate v in
     (SubState s, v)
 
-  let substitution_in_place sub s =
+  let substitution sub s =
     let open Delayed.Syntax in
     match s with
     | SubState s ->
-        let+ s' = S.substitution_in_place sub s in
+        let+ s' = S.substitution sub s in
         SubState s'
     | s -> Delayed.return s
 
@@ -178,11 +178,11 @@ module Make (S : MyMonadicSMemory.S) :
 
   let get_fixes = function
     | SubError e ->
-        S.get_fixes e |> MyUtils.deep_map lift_corepred
+        S.get_fixes e |> Fix.map_corepred lift_corepred
         (* Fix can either be inner fix, or if empty the memory is freed!
            But Gillian C/WISL doesn't implement this so we comment it out
            to have comparable performance *)
         (* @ [ [ (FreedPred, [], []) ] ]*)
-    | MissingFreed -> [ [ (FreedPred, [], []) ] ]
+    | MissingFreed -> [ [ Fix.CorePred (FreedPred, [], []) ] ]
     | _ -> failwith "Invalid fix call"
 end

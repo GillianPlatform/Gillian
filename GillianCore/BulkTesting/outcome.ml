@@ -86,5 +86,6 @@ end
 module Make_Concrete (CMemory : CMemory.S) =
   Make (CVal.M) (CVal.CESubst) (CStore) (CState.Make (CMemory))
 
-module Make_Symbolic (SMemory : SMemory.S) =
-  Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))
+module Make_Symbolic (SMemory : Monadic.MonadicSMemory.S) =
+  Make (SVal.M) (SVal.SESubst) (SStore)
+    (SState.Make (Monadic.MonadicSMemory.Lift (SMemory)))

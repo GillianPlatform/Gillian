@@ -1,4 +1,4 @@
-type match_kind =
+type match_kind = Matching_walker.match_kind =
   | Postcondition of string
   | Fold of string
   | FunctionCall of string
@@ -7,22 +7,77 @@ type match_kind =
   | PredicateGuard
 [@@deriving yojson]
 
-type recovery_tactic =
+type recovery_tactic = Matching_walker.recovery_tactic =
   | Try_fold of string * Expr.t list
   | Try_unfold of string * Expr.t list
 [@@deriving yojson]
 
+(** What the matching engine requires of a state. This is a strict subset of
+    {!SState.S}, spelled out so that this module does not depend on the [SState]
+    compilation unit — which lets [SState] itself instantiate {!Make}. *)
+module type MatchableState = sig
+  type t [@@deriving yojson]
+  type m_err_t
+  type err_t = (m_err_t, Expr.t) StateErr.t [@@deriving yojson, show]
+
+  val pp : Format.formatter -> t -> unit
+
+  val pp_by_need :
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Format.formatter ->
+    t ->
+    unit
+
+  val pp_err : Format.formatter -> err_t -> unit
+  val copy : t -> t
+  val get_store : t -> SStore.t
+  val set_store : t -> SStore.t -> t
+
+  val simplify :
+    ?save:bool ->
+    ?kill_new_lvars:bool ->
+    ?matching:bool ->
+    t ->
+    SVal.SESubst.t * t list
+
+  val simplify_val : t -> Expr.t -> Expr.t
+
+  val assume_a :
+    ?matching:bool ->
+    ?production:bool ->
+    ?time:string ->
+    t ->
+    Expr.t list ->
+    t option
+
+  val assume_t : t -> Expr.t -> Type.t -> t option
+  val assert_a : t -> Expr.t list -> bool
+  val get_type : t -> Expr.t -> Type.t option
+  val unfolding_vals : t -> Expr.t list -> Expr.t list
+  val can_fix : err_t -> bool
+  val get_recovery_tactic : t -> err_t list -> Expr.t Recovery_tactic.t
+
+  val execute_action :
+    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+
+  val consume_core_pred :
+    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+
+  val produce_core_pred : string -> t -> Expr.t list -> t list
+end
+
 module type S = sig
   type err_t
   type state_t
-  type t = state_t Pred_state.t
+  type t = state_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * SVal.SESubst.t * MP.t) list * err_t list
 
   module Logging : sig
     module AstateRec : sig
-      type t = { state : state_t; preds : Preds.t; wands : Wands.t }
-      [@@deriving yojson]
+      type t = { state : state_t } [@@deriving yojson]
     end
 
     module AssertionReport : sig
@@ -74,49 +129,17 @@ module type S = sig
     end
   end
 
-  type unfold_info_t = (string * string) list
-
   val produce_assertion :
     t -> SVal.SESubst.t -> Asrt.atom -> (t, err_t) Res_list.t
 
   val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
   val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
 
-  (** [unfold state name args unfold_info] returns a list of pairs (subst,
-      state), resulting from unfolding the predicate [name(..args..)] from the
-      given state. unfold_info contains information about how to bind new
-      variables. *)
-  val unfold :
-    ?additional_bindings:unfold_info_t ->
-    t ->
-    string ->
-    Expr.t list ->
-    (SVal.SESubst.t * t, err_t) Res_list.t
-
-  val rec_unfold :
-    ?fuel:int -> t -> string -> Expr.t list -> (t, err_t) Res_list.t
-
-  val unfold_all : t -> string -> (t, err_t) Res_list.t
-
-  (** Tries recovering from an error using the provided recovery tactic. *)
+  (** Tries recovering from an error using the provided recovery tactic, by
+      delegating to the predicate-carrying memory (through the reserved recover
+      action) and simplifying the recovered states. *)
   val try_recovering :
     t -> Expr.t Recovery_tactic.t -> (t list * recovery_tactic, string) result
-
-  (** Tries to unfold the given predicate in the state. If it manages, it
-      returns the new set of states and corresponding substitutions, otherwise,
-      it returns None. *)
-  val unfold_with_vals :
-    auto_level:[ `High | `Low ] ->
-    t ->
-    Expr.t list ->
-    (SVal.SESubst.t * t) list option
-
-  (** Unfolds 1 predicate for which all arguments are concrete.
-      - If it finds one:
-      - if it succeeds to unfold, it returns Some (Some subst, new_state )
-      - if it fails to unfold it returns None
-      - If it doesn't find one, it returns Some (None, input_state) *)
-  val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
   val match_assertion :
     ?no_auto_fold:bool ->
@@ -132,32 +155,7 @@ module type S = sig
     MP.t ->
     match_kind ->
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
-
-  (** Folds a predicate in the state, consuming its definition and producing the
-      folded predicate. If the predicate has a guard, the guard is produced. *)
-  val fold :
-    ?in_matching:bool ->
-    ?additional_bindings:(Expr.t * Expr.t) list ->
-    match_kind:match_kind ->
-    state:t ->
-    MP.pred ->
-    Expr.t list ->
-    (t, err_t) Res_list.t
-
-  (** Consumes a predicate from the state. If the predicate is not "verbatim" in
-      our set of preds, and it is not abstract and we are not in manual mode, we
-      attempt to fold it. *)
-  val consume_pred :
-    ?in_matching:bool ->
-    ?fold_outs_info:SVal.SESubst.t * MP.step * Expr.t list ->
-    ?no_auto_fold:bool ->
-    t ->
-    string ->
-    Expr.t option list ->
-    (t * Expr.t list, err_t) Res_list.t
-
-  val package_wand : t -> Wands.wand -> (t, err_t) List_res.t
 end
 
-module Make (State : SState.S) :
+module Make (State : MatchableState) :
   S with type state_t = State.t and type err_t = State.err_t

@@ -53,7 +53,7 @@ let[@inline] produce core_pred s args =
         (Fmt.list ~sep:Fmt.comma Expr.pp)
         args
 
-let substitution_in_place subst s =
+let substitution subst s =
   Option.map (Subst.subst_in_expr ~partial:true subst) s |> Delayed.return
 
 let compose s1 s2 =
@@ -103,4 +103,5 @@ let can_fix = function
   | MissingState -> true
 
 let get_fixes = function
-  | MissingState -> [ [ (Ag, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]
+  | MissingState ->
+      [ [ Fix.CorePred (Ag, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]

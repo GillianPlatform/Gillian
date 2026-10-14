@@ -44,13 +44,22 @@ module Make (Mem : MyMonadicSMemory.S) :
                   fixes);
             List.map Delayed.return fixes |> Delayed.branches
           in
+          let types, core_preds =
+            List.partition_map
+              (function
+                | Fix.Types types -> Left types
+                | Fix.CorePred (cp, ins, outs) -> Right (cp, ins, outs))
+              cp_list
+          in
+          (* produce types first to avoid querying for them when producing core predicates *)
+          let* () = Delayed.assume_types (List.concat types) in
           let* state' =
             List.fold_left
               (fun state (pred, ins, outs) ->
                 let* state = state in
                 Mem.produce pred state (ins @ outs))
               (Delayed.return state.state)
-              cp_list
+              core_preds
           in
           let anti_frame = cp_list @ state.anti_frame in
           (* We produce that fix in our current state *)
@@ -82,9 +91,9 @@ module Make (Mem : MyMonadicSMemory.S) :
     let open Utils.Containers in
     Mem.alocs s.state |> SS.union (Fix.alocs s.anti_frame)
 
-  let substitution_in_place subst s =
+  let substitution subst s =
     let open Monadic.Delayed.Syntax in
-    let+ state = Mem.substitution_in_place subst s.state in
+    let+ state = Mem.substitution subst s.state in
     let anti_frame = Fix.subst subst s.anti_frame in
     { state; anti_frame }
 

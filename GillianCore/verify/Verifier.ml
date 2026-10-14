@@ -7,12 +7,9 @@ module type S = sig
   type m_err
   type annot
 
-  module SPState : PState.S with type heap_t = heap_t and type m_err_t = m_err
+  module State : SState.S with type heap_t = heap_t and type m_err_t = m_err
 
-  type state = SPState.t
-
-  module SState :
-    SState.S with type t = SPState.state_t and type heap_t = heap_t
+  type state = State.t
 
   module SAInterpreter :
     G_interpreter.S
@@ -21,10 +18,10 @@ module type S = sig
        and type store_t = SStore.t
        and type state_t = state
        and type heap_t = heap_t
-       and type state_err_t = SPState.err_t
+       and type state_err_t = State.err_t
        and type annot = annot
 
-  module SMatcher : Matcher.S with type state_t = SPState.state_t
+  module SMatcher : Matcher.S with type state_t = State.t
 
   type t
   type prog_t = (annot, int) Prog.t
@@ -34,14 +31,14 @@ module type S = sig
   val reset : unit -> unit
 
   val verify_prog :
-    init_data:SPState.init_data ->
+    init_data:State.init_data ->
     prog_t ->
     bool ->
     SourceFiles.t option ->
     unit Gillian_result.t
 
   val init_proc :
-    init_data:SPState.init_data ->
+    init_data:State.init_data ->
     prog_t ->
     string ->
     SAInterpreter.result_t SAInterpreter.cont_func list
@@ -50,7 +47,7 @@ module type S = sig
 
   module Debug : sig
     val get_tests_for_prog :
-      init_data:SPState.init_data -> prog_t -> MP.preds_tbl_t * proc_tests
+      init_data:State.init_data -> prog_t -> MP.preds_tbl_t * proc_tests
 
     val analyse_result :
       t -> Logging.Report_id.t -> SAInterpreter.result_t -> bool
@@ -58,35 +55,46 @@ module type S = sig
 end
 
 module Make
-    (SState :
-      SState.S
-        with type vt = SVal.M.t
-         and type st = SVal.SESubst.t
-         and type store_t = SStore.t)
-    (SPState :
-      PState.S
-        with type state_t = SState.t
-         and type init_data = SState.init_data)
+    (State : SState.S)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) =
 struct
   module L = Logging
   module SSubst = SVal.SESubst
-  module SState = SState
-  module SPState = SPState
+  module State = State
 
   module SAInterpreter =
-    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (PC)
-      (External)
+    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (State) (PC) (External)
 
-  module Normaliser = Normaliser.Make (SPState)
+  module Normaliser = Normaliser.Make (State)
 
-  type state = SPState.t
-  type heap_t = SPState.heap_t
-  type m_err = SPState.m_err_t
+  type state = State.t
+  type heap_t = State.heap_t
+  type m_err = State.m_err_t
   type annot = PC.Annot.t
 
-  module SMatcher = SPState.SMatcher
+  module SMatcher = Matcher.Make (State)
+
+  (* Ported from the late PState: check whether a state fully matches a
+     matching plan (used for postconditions). *)
+  let matches (state : State.t) subst mp (match_type : Matcher.match_kind) :
+      bool option =
+    if !Config.under_approximation then
+      failwith
+        "WE CAN'T CHECK IF SOMETHING FULLY MATCHES IN UNDER-APPROXIMATION MODE";
+    let matching_results = SMatcher.match_ state subst mp match_type in
+    match matching_results with
+    | [] ->
+        let () =
+          L.verbose (fun fmt -> fmt "Verifier.matches: vacuously successful")
+        in
+        None
+    | _ ->
+        let success = List.for_all Result.is_ok matching_results in
+        let () =
+          L.verbose (fun fmt -> fmt "Verifier.matches: Success: %b" success)
+        in
+        Some success
 
   let print_success_or_failure success =
     (if success then Fmt.(pr "%a" (styled `Green string) "Success\n")
@@ -104,7 +112,7 @@ struct
     name : string;
     id : int * int;
     params : string list;
-    pre_state : SPState.t;
+    pre_state : State.t;
     post_mp : MP.t;
     post_loc : Location.t option;
     flag : Flag.t option;
@@ -128,7 +136,7 @@ struct
     SAInterpreter.reset_call_graph ()
 
   let testify
-      ~(init_data : SPState.init_data)
+      ~(init_data : State.init_data)
       (func_or_lemma_name : string)
       (preds : (string, MP.pred) Hashtbl.t)
       (name : string)
@@ -179,7 +187,7 @@ struct
                   Fmt.pf ft "[ %s; %a ]" s (iter ~sep:comma SS.iter string) e))
             label
             Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
-            spec_vars Asrt.pp (fst pre) SPState.pp ss_pre SSubst.pp subst
+            spec_vars Asrt.pp (fst pre) State.pp ss_pre SSubst.pp subst
             (List.length posts)
             Fmt.(list ~sep:(any "@\n") Asrt.pp)
             (List.map fst posts));
@@ -200,7 +208,7 @@ struct
           posts
       in
       if not to_verify then
-        let pre' = SPState.to_assertions ss_pre in
+        let pre' = State.to_assertions ss_pre in
         (None, Some ((pre', snd pre), posts))
       else
         (* Step 4 - create a matching plan for the postconditions and s_test *)
@@ -251,13 +259,13 @@ struct
             in
             raise exc
         | Ok post_mp ->
-            let pre' = SPState.to_assertions ss_pre in
+            let pre' = State.to_assertions ss_pre in
             let ss_pre =
               match flag with
               (* Lemmas should not have stores when being proven *)
               | None ->
                   let empty_store = SStore.init [] in
-                  SPState.set_store ss_pre empty_store
+                  State.set_store ss_pre empty_store
               | Some _ -> ss_pre
             in
             let post_loc =
@@ -425,10 +433,10 @@ struct
     in
     (tests, { lemma with lemma_specs = specs })
 
-  let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) :
+  let analyse_result (subst : SSubst.t) (test : t) (state : State.t) :
       bool option =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
-    let _, states = SPState.simplify state in
+    let _, states = State.simplify state in
     match states with
     | [] ->
         L.normal (fun m -> m "Analysis result: vanished during simplification");
@@ -442,15 +450,13 @@ struct
           (fun x ->
             if not (SSubst.mem subst (LVar x)) then
               SSubst.add subst (LVar x) (LVar x))
-          (SS.elements (SPState.get_spec_vars state));
+          (SS.elements (State.get_spec_vars state));
 
         L.verbose (fun m ->
             m "Analyse result: About to match one postcondition of %s. post: %a"
               test.name MP.pp test.post_mp);
 
-        match
-          SPState.matches state subst test.post_mp (Postcondition test.name)
-        with
+        match matches state subst test.post_mp (Postcondition test.name) with
         | None ->
             let () =
               L.normal (fun m ->
@@ -468,11 +474,11 @@ struct
               matching_result;
             Some matching_result)
 
-  let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
+  let make_post_subst (test : t) (post_state : State.t) : SSubst.t =
     let subst_lst =
       List.map (fun e -> (e, e)) (Expr.Set.elements test.spec_vars)
     in
-    let params_subst_lst = SStore.bindings (SPState.get_store post_state) in
+    let params_subst_lst = SStore.bindings (State.get_store post_state) in
     let params_subst_lst =
       List.map (fun (x, v) -> (Expr.PVar x, v)) params_subst_lst
     in
@@ -530,7 +536,7 @@ struct
                %a@]@\n"
               proc proc_idx test.name
               (Fmt.Dump.pair Fmt.int Fmt.int)
-              test.id SPState.pp error_state
+              test.id State.pp error_state
               Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
               errors);
         Fmt.pr "f @?";
@@ -565,7 +571,7 @@ struct
                 (Fmt.option L.Report_id.pp)
                 parent_id);
           L.Parent.with_id parent_id @@ fun () ->
-          let store = SPState.get_store final_state in
+          let store = State.get_store final_state in
           let () =
             SStore.filter_map_inplace store (fun x v ->
                 if x = Names.return_variable then Some v else None)
@@ -592,7 +598,7 @@ struct
       print_success_or_failure (Result.is_ok result);
       result
 
-  let analyse_lemma_results (test : t) (rets : SPState.t list) :
+  let analyse_lemma_results (test : t) (rets : State.t list) :
       unit Gillian_result.t =
     if rets = [] then (
       print_vanish ();
@@ -602,7 +608,7 @@ struct
         rets
         |> List.filter_map @@ fun final_state ->
            let empty_store = SStore.init [] in
-           let final_state = SPState.set_store final_state empty_store in
+           let final_state = State.set_store final_state empty_store in
            match analyse_final_state test final_state with
            | Ok () -> None
            | Error e -> Some e
@@ -666,7 +672,7 @@ struct
                 let errors =
                   errors
                   |> List.map @@ fun e ->
-                     let msg = Fmt.str "%a" SPState.pp_err e in
+                     let msg = Fmt.str "%a" State.pp_err e in
                      Gillian_result.Error.make_analysis_failure msg
                 in
                 print_success_or_failure false;
@@ -772,7 +778,7 @@ struct
     | Ok preds ->
         (* The predicate table is ambient for the whole verification via the
            [Get_pred_defs] effect. Testify (below) reads it through
-           [PState.to_assertions]/[produce], so install it here. *)
+           [State.to_assertions]/[produce], so install it here. *)
         MP.with_pred_table preds @@ fun () ->
         (* STEP 1: Get the specs to verify *)
         Fmt.pr "Obtaining specs to verify...\n@?";
@@ -849,7 +855,7 @@ struct
         (prog', tests', tests)
 
   let verify_procs
-      ~(init_data : SPState.init_data)
+      ~(init_data : State.init_data)
       ?(prev_results : VerificationResults.t option)
       (prog : prog_t)
       (pnames_to_verify : SS.t)
@@ -901,7 +907,7 @@ struct
     let ls = SS.diff ls !C.things_to_exclude in
     (ps, ls)
 
-  let init_proc ~(init_data : SPState.init_data) (prog : prog_t) proc_name :
+  let init_proc ~(init_data : State.init_data) (prog : prog_t) proc_name :
       SAInterpreter.result_t SAInterpreter.cont_func list =
     L.Phase.with_normal ~title:"Program verification" @@ fun () ->
     (* Analyse all procedures and lemmas *)
@@ -934,7 +940,7 @@ struct
       global_results
 
   let verify_prog
-      ~(init_data : SPState.init_data)
+      ~(init_data : State.init_data)
       (prog : prog_t)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit Gillian_result.t =
@@ -1015,7 +1021,7 @@ struct
       let open Syntaxes.Option in
       let ipreds = MP.init_preds prog.preds in
       let preds = Result.get_ok ipreds in
-      (* Testify reads the predicate table via [PState.to_assertions], so install
+      (* Testify reads the predicate table via [State.to_assertions], so install
          it here; the returned table is also handed to the debugger, which
          re-installs it while stepping and matching. *)
       MP.with_pred_table preds @@ fun () ->
@@ -1049,17 +1055,4 @@ struct
     let analyse_result test parent_id result =
       analyse_proc_result test Normal ~parent_id result |> Result.is_ok
   end
-end
-
-module From_scratch
-    (SMemory : SMemory.S)
-    (PC : ParserAndCompiler.S)
-    (External : External.T(PC.Annot).S) =
-struct
-  module INTERNAL__ = struct
-    module SState = SState.Make (SMemory)
-  end
-
-  include
-    Make (INTERNAL__.SState) (PState.Make (INTERNAL__.SState)) (PC) (External)
 end

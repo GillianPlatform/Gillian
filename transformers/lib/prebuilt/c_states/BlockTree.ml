@@ -5,6 +5,7 @@ module DR = Delayed_result
 module DO = Delayed_option
 module SS = Gillian.Utils.Containers.SS
 module CoreP = Constr.Core
+module Fix = Gillian.Combinators.Fix
 
 (* Import from Cgil lib: *)
 module CConstants = Cgil_lib.CConstants
@@ -900,12 +901,15 @@ module Tree = struct
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
-    let replace_node _ = sarr_leaf ~low ~chunk ~array ~size ~perm in
-    let rebuild_parent = of_children in
-    let range = Range.of_low_chunk_and_size low chunk size in
-    let** _, t = frame_range t ~replace_node ~rebuild_parent range in
-    let+ () = SVArr.learn_chunk ~chunk ~size array in
-    Ok t
+    let open Expr.Infix in
+    if%sat size == Expr.zero_i then DR.ok t
+    else
+      let replace_node _ = sarr_leaf ~low ~chunk ~array ~size ~perm in
+      let rebuild_parent = of_children in
+      let range = Range.of_low_chunk_and_size low chunk size in
+      let** _, t = frame_range t ~replace_node ~rebuild_parent range in
+      let+ () = SVArr.learn_chunk ~chunk ~size array in
+      Ok t
 
   let cons_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
       (SVal.t * Perm.t option * t, err) DR.t =
@@ -1651,7 +1655,7 @@ module M = struct
         else Delayed.return false
     | _ -> Delayed.return false
 
-  let substitution_in_place subst s =
+  let substitution subst s =
     let le_subst = Subst.subst_in_expr subst ~partial:true in
     let sval_subst = SVal.substitution ~le_subst in
     let svarr_subst = SVal.SVArray.subst ~le_subst in
@@ -1690,22 +1694,33 @@ module M = struct
               in
               let null_ptr = Expr.EList [ null_typ; Expr.int 0 ] in
               [
-                [ (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]) ];
                 [
-                  (Single, [ ofs; chunk_as_expr ], [ null_ptr; freeable_perm ]);
+                  Fix.CorePred
+                    (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]);
+                  Fix.Types [ (new_var2, Type.IntType) ];
+                ];
+                [
+                  Fix.CorePred
+                    (Single, [ ofs; chunk_as_expr ], [ null_ptr; freeable_perm ]);
                 ];
               ]
           | _ ->
-              let type_str =
+              let type_str, type_gil =
                 match chunk with
-                | Chunk.Mfloat32 -> single_type
-                | Chunk.Mfloat64 -> float_type
-                | Chunk.Mint64 -> long_type
-                | _ -> int_type
+                | Chunk.Mfloat32 -> (single_type, Type.NumberType)
+                | Chunk.Mfloat64 -> (float_type, Type.NumberType)
+                | Chunk.Mint64 -> (long_type, Type.IntType)
+                | _ -> (int_type, Type.IntType)
               in
               let new_var = Expr.LVar (LVar.alloc ()) in
               let value = Expr.EList [ Expr.string type_str; new_var ] in
-              [ [ (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]) ] ]
+              [
+                [
+                  Fix.CorePred
+                    (Single, [ ofs; chunk_as_expr ], [ value; freeable_perm ]);
+                  Fix.Types [ (new_var, type_gil) ];
+                ];
+              ]
         in
         (* Additional fix for store operation to handle case of unitialized memory *)
         if is_store then
@@ -1716,7 +1731,10 @@ module M = struct
           in
           let uninit =
             [
-              [ (Hole, [ ofs; offset_by_chunk ofs chunk ], [ freeable_perm ]) ];
+              [
+                Fix.CorePred
+                  (Hole, [ ofs; offset_by_chunk ofs chunk ], [ freeable_perm ]);
+              ];
             ]
           in
           uninit @ fixes

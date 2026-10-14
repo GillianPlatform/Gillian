@@ -73,6 +73,12 @@ let as_wand_name (name : string) : (string * string) option =
         Some (lname, rname)
   else None
 
+let wand_to_core_pred
+    ((lname, largs) : string * Expr.t list)
+    ((rname, r_ins) : string * Expr.t list)
+    (r_outs : Expr.t list) : string * Expr.t list * Expr.t list =
+  (wand_name lname rname, largs @ r_ins, r_outs)
+
 (** Builds a magic-wand assertion atom. A wand's semantic {b ins} are the lhs
     args together with the {e in}-arguments of the rhs; its {b outs} are
     {e only} the {e out}-arguments of the rhs. The encoding therefore stores
@@ -81,7 +87,8 @@ let wand
     ((lname, largs) : string * Expr.t list)
     ((rname, r_ins) : string * Expr.t list)
     (r_outs : Expr.t list) : atom =
-  CorePred (wand_name lname rname, largs @ r_ins, r_outs)
+  let n, i, o = wand_to_core_pred (lname, largs) (rname, r_ins) r_outs in
+  CorePred (n, i, o)
 
 (** [as_wand ~rhs_ins_number a] returns [Some (lhs, rhs)] when [a] is a
     wand-encoding {!CorePred}, recovering the raw [lhs = (lname, largs)] and

@@ -29,12 +29,7 @@ module Make (S : SMemory.S) = struct
   let[@inline] consume p = m3 (Format.asprintf "consume/%s" p) (consume p)
   let[@inline] produce p = m3 (Format.asprintf "produce/%s" p) (produce p)
   let is_overlapping_asrt = m1 "is_overlapping_asrt" is_overlapping_asrt
-  let copy = m1 "copy" copy
-
-  let substitution_in_place ~pfs ~gamma =
-    m2 "substitution_in_place" (substitution_in_place ~pfs ~gamma)
-
-  let clean_up ?keep = m1 "clean_up" (clean_up ?keep)
+  let substitution ~pfs ~gamma = m2 "substitution" (substitution ~pfs ~gamma)
   let lvars = m1 "lvars" lvars
   let alocs = m1 "alocs" alocs
   let assertions ?to_keep = m1 "assertions" (assertions ?to_keep)

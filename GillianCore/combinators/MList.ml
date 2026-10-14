@@ -167,11 +167,11 @@ module Make (S : MyMonadicSMemory.S) :
         ((b, Some n), [ Expr.zero_i ])
     | [] -> failwith "Invalid arguments for list instantiation"
 
-  let substitution_in_place sub (b, n) =
+  let substitution sub (b, n) =
     let open Delayed.Syntax in
     let subst = Subst.subst_in_expr sub ~partial:true in
     let mapper (idx, s) =
-      let+ s' = S.substitution_in_place sub s in
+      let+ s' = S.substitution sub s in
       let idx' = subst idx in
       (idx', s')
     in
@@ -235,9 +235,9 @@ module Make (S : MyMonadicSMemory.S) :
     | OutOfBounds _ -> false
 
   let get_fixes = function
-    | SubError (idx, e) -> S.get_fixes e |> MyUtils.deep_map (lift_corepred idx)
+    | SubError (idx, e) -> S.get_fixes e |> Fix.map_corepred (lift_corepred idx)
     | MissingLength ->
         let lvar = Expr.LVar (LVar.alloc ()) in
-        [ [ (Length, [], [ lvar ]) ] ]
+        [ [ Fix.CorePred (Length, [], [ lvar ]) ] ]
     | _ -> failwith "Called get_fixes on unfixable error"
 end

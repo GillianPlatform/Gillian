@@ -19,7 +19,7 @@ module type PMapImpl = sig
   val fold : (Expr.t -> Entry.t -> 'a -> 'a) -> t -> 'a -> 'a
   val for_all : (Entry.t -> bool) -> t -> bool
   val compose : t -> t -> t Delayed.t
-  val substitution_in_place : Engine.Symbolic.Subst.t -> t -> t Delayed.t
+  val substitution : Engine.Symbolic.Subst.t -> t -> t Delayed.t
 end
 
 module type OpenPMapType = sig

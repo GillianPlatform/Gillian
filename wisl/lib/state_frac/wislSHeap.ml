@@ -91,17 +91,23 @@ module Block = struct
           (Option.fold ~none:SS.empty ~some:(fun (_, p) -> Expr.alocs p) bound)
 end
 
-type t = (string, Block.t) Hashtbl.t [@@deriving yojson]
+module SMap = Gillian.Utils.Prelude.Map.Make (struct
+  include String
 
-(* A symbolic heap is a map from location and offset to symbolic values *)
+  let of_yojson = function
+    | `String s -> Ok s
+    | _ -> Error "string_of_yojson: expected string"
 
-let init () = Hashtbl.create 1
+  let to_yojson s = `String s
+end)
+
+type t = Block.t SMap.t [@@deriving yojson]
+
+(* A symbolic heap is an immutable map from location and offset to symbolic values *)
+
+let init () = SMap.empty
 
 (* Simply initializes an empty heap *)
-
-(****** Standard stuff about hashtbls ********)
-
-let copy heap = Hashtbl.copy heap
 
 (***** Implementation of local actions *****)
 
@@ -119,11 +125,10 @@ let alloc (heap : t) size =
   let block =
     Block.Allocated { data = sfvl; bound = Some (size, Lit (Num 1.0)) }
   in
-  let () = Hashtbl.replace heap loc block in
-  loc
+  (SMap.add loc block heap, loc)
 
 let dispose (heap : t) loc =
-  match Hashtbl.find_opt heap loc with
+  match SMap.find_opt loc heap with
   | None -> error (MissingResource (Cell, loc, None))
   | Some Freed -> error (DoubleFree loc)
   | Some (Allocated { data = _; bound = None; _ }) ->
@@ -145,7 +150,7 @@ let dispose (heap : t) loc =
                   else aux (n - 1))
         in
         let++ () = aux i in
-        Hashtbl.replace heap loc Block.Freed
+        SMap.add loc Block.Freed heap
 
 (* Helper function: Checks if the offset exists in the SFVL first by performing a performance efficient check
    and then using the solver. If an entry is found, it applies the success_case function, otherwise the none_case *)
@@ -167,7 +172,7 @@ let check_sfvl ofs data none_case success_case =
       but not for regular load operations.
 *)
 let access_cell heap loc ofs permission_check =
-  match Hashtbl.find_opt heap loc with
+  match SMap.find_opt loc heap with
   | None -> error (MissingResource (Cell, loc, Some ofs))
   | Some Block.Freed -> error (UseAfterFree loc)
   | Some (Allocated { data; bound }) ->
@@ -206,7 +211,7 @@ let get_cell heap loc ofs out_perm =
    operations and applies the "block_missing" operation if the block cannot be found
    in the heap "in_bounds" operation if the access to the allocated cell is within bounds *)
 let overwrite_cell heap loc_name ofs block_missing in_bounds =
-  match Hashtbl.find_opt heap loc_name with
+  match SMap.find_opt loc_name heap with
   | None -> block_missing ()
   | Some Block.Freed -> error (UseAfterFree loc_name)
   | Some (Allocated { data; bound = None }) -> in_bounds data None
@@ -222,9 +227,8 @@ let extend_block heap loc_name ofs value data bound permission =
   let data =
     SFVL.add_with_test ~equality_test ofs SFVL.{ value; permission } data
   in
-  let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound }) in
   let fl = Expr.Infix.(permission >. Expr.num 0.0) in
-  ok ~learned:[ fl ] ()
+  ok ~learned:[ fl ] (SMap.add loc_name (Block.Allocated { data; bound }) heap)
 
 let store heap loc_name ofs v =
   let block_missing () = error (MissingResource (Cell, loc_name, Some ofs)) in
@@ -236,8 +240,8 @@ let store heap loc_name ofs v =
         let missing_permission = Expr.Infix.(full_perm -. permission) in
         error (MissingResource (Cell, loc_name, Some missing_permission))
       else
-        let++ () = extend_block heap loc_name ofs v data bound permission in
-        (Expr.loc_from_loc_name loc_name, ofs)
+        let++ heap = extend_block heap loc_name ofs v data bound permission in
+        (heap, Expr.loc_from_loc_name loc_name, ofs)
     in
     check_sfvl ofs data none_case some_case
   in
@@ -249,23 +253,23 @@ let set_cell heap loc_name ofs v out_perm =
       SFVL.add ofs SFVL.{ value = v; permission = out_perm } SFVL.empty
     in
     let bound = None in
-    let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound }) in
-    ok ()
+    ok (SMap.add loc_name (Block.Allocated { data; bound }) heap)
   in
   let in_bounds data bound =
     let none_case () = extend_block heap loc_name ofs v data bound out_perm in
     let some_case ofs value permission =
       let new_perm = Expr.Infix.(permission +. out_perm) in
       let data = SFVL.add ofs SFVL.{ value = v; permission = new_perm } data in
-      Hashtbl.replace heap loc_name (Block.Allocated { data; bound });
-      ok ~learned:[ Expr.Infix.(value == v && new_perm <=. Expr.num 1.0) ] ()
+      ok
+        ~learned:[ Expr.Infix.(value == v && new_perm <=. Expr.num 1.0) ]
+        (SMap.add loc_name (Block.Allocated { data; bound }) heap)
     in
     check_sfvl ofs data none_case some_case
   in
   overwrite_cell heap loc_name ofs block_missing in_bounds
 
 let rem_cell heap loc offset out_perm =
-  match Hashtbl.find_opt heap loc with
+  match SMap.find_opt loc heap with
   | None -> error (MissingResource (Cell, loc, Some offset))
   | Some Block.Freed -> error (UseAfterFree loc)
   | Some (Allocated { data; bound }) -> (
@@ -281,11 +285,10 @@ let rem_cell heap loc offset out_perm =
               Delayed.return
               @@ SFVL.add offset SFVL.{ value; permission = new_perm } data
           in
-          let () = Hashtbl.replace heap loc (Allocated { data; bound }) in
-          ok ())
+          ok (SMap.add loc (Block.Allocated { data; bound }) heap))
 
 let get_bound heap loc out_perm =
-  match Hashtbl.find_opt heap loc with
+  match SMap.find_opt loc heap with
   | Some Block.Freed -> error (UseAfterFree loc)
   | None -> error (MissingResource (Cell, loc, None))
   | Some (Allocated { bound = None; _ }) ->
@@ -297,27 +300,25 @@ let get_bound heap loc out_perm =
       else ok bound
 
 let set_bound heap loc b out_perm =
-  let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
+  let prev = Option.value ~default:Block.empty (SMap.find_opt loc heap) in
   match prev with
   | Freed -> error (UseAfterFree loc)
   | Allocated { data; bound = None } ->
-      let () =
-        Hashtbl.replace heap loc
-          (Block.Allocated { data; bound = Some (b, out_perm) })
-      in
-      ok ()
+      ok
+        (SMap.add loc
+           (Block.Allocated { data; bound = Some (b, out_perm) })
+           heap)
   | Allocated { data; bound = Some (_, permission) } ->
       let full_perm = Expr.num 1.0 in
       let new_perm = Expr.Infix.(permission +. out_perm) in
       let fl = Expr.Infix.(new_perm <=. full_perm) in
-      let () =
-        Hashtbl.replace heap loc
-          (Block.Allocated { data; bound = Some (b, new_perm) })
-      in
-      ok ~learned:[ fl ] ()
+      ok ~learned:[ fl ]
+        (SMap.add loc
+           (Block.Allocated { data; bound = Some (b, new_perm) })
+           heap)
 
 let rem_bound heap loc out_perm =
-  match Hashtbl.find_opt heap loc with
+  match SMap.find_opt loc heap with
   | Some Block.Freed -> error (UseAfterFree loc)
   | None -> error (MissingResource (Cell, loc, None))
   | Some (Allocated { bound = None; _ }) ->
@@ -328,39 +329,34 @@ let rem_bound heap loc out_perm =
         if%sat Expr.Infix.(new_perm == Expr.num 0.0) then Delayed.return None
         else Delayed.return (Some (n, new_perm))
       in
-      let () = Hashtbl.replace heap loc (Allocated { data; bound }) in
-      ok ()
+      ok (SMap.add loc (Block.Allocated { data; bound }) heap)
 
 let get_freed heap loc =
-  match Hashtbl.find_opt heap loc with
+  match SMap.find_opt loc heap with
   | Some Block.Freed -> ok ()
   | Some _ -> error MemoryLeak
   | None -> error (MissingResource (Freed, loc, None))
 
-let set_freed heap loc =
-  Hashtbl.replace heap loc Block.Freed;
-  Delayed.return ()
+let set_freed heap loc = Delayed.return (SMap.add loc Block.Freed heap)
 
 let rem_freed heap loc =
-  match Hashtbl.find_opt heap loc with
-  | Some Block.Freed ->
-      Hashtbl.remove heap loc;
-      ok ()
+  match SMap.find_opt loc heap with
+  | Some Block.Freed -> ok (SMap.remove loc heap)
   | None -> error (MissingResource (Freed, loc, None))
   | Some _ -> error MemoryLeak
 
 (***** Some things specific to symbolic heaps ********)
 
-let merge_loc (heap : t) new_loc old_loc : unit =
+let merge_loc (heap : t) new_loc old_loc : t =
   let old_block, new_block =
-    (Hashtbl.find_opt heap old_loc, Hashtbl.find_opt heap new_loc)
+    (SMap.find_opt old_loc heap, SMap.find_opt new_loc heap)
   in
   match (old_block, new_block) with
-  | Some Block.Freed, Some Block.Freed -> Hashtbl.remove heap old_loc
-  | None, Some Block.Freed -> ()
+  | Some Block.Freed, Some Block.Freed -> SMap.remove old_loc heap
+  | None, Some Block.Freed -> heap
   | Some Block.Freed, None ->
-      Hashtbl.replace heap new_loc Block.Freed;
-      Hashtbl.remove heap old_loc
+      let heap = SMap.add new_loc Block.Freed heap in
+      SMap.remove old_loc heap
   | _, _ -> (
       let old_block = Option.value ~default:Block.empty old_block in
       let new_block = Option.value ~default:Block.empty new_block in
@@ -372,17 +368,12 @@ let merge_loc (heap : t) new_loc old_loc : unit =
           let bound =
             if Option.is_some new_bound then new_bound else old_bound
           in
-          let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
-          Hashtbl.remove heap old_loc)
+          let heap = SMap.add new_loc (Block.Allocated { data; bound }) heap in
+          SMap.remove old_loc heap)
 
-let substitution_in_place subst heap =
+let substitution subst heap =
   (* First we replace in the offset and values using fvl *)
-  let () =
-    Hashtbl.iter
-      (fun loc block ->
-        Hashtbl.replace heap loc (Block.substitution ~partial:true subst block))
-      heap
-  in
+  let heap = SMap.map (Block.substitution ~partial:true subst) heap in
   (* Then we replace within the locations themselves *)
   let aloc_subst =
     Subst.filter subst (fun var _ ->
@@ -390,33 +381,36 @@ let substitution_in_place subst heap =
         | ALoc _ -> true
         | _ -> false)
   in
-  Subst.iter aloc_subst (fun aloc new_loc ->
-      let aloc =
-        match aloc with
-        | ALoc loc -> loc
-        | _ -> failwith "Impossible by construction"
-      in
-      let new_loc_str =
-        match new_loc with
-        | Expr.Lit (Loc loc) -> loc
-        | Expr.ALoc loc -> loc
-        | _ -> Fmt.failwith "Heap substitution fail for loc: %a" Expr.pp new_loc
-      in
-      merge_loc heap new_loc_str aloc);
+  let heap =
+    Subst.fold aloc_subst
+      (fun aloc new_loc heap ->
+        let aloc =
+          match aloc with
+          | ALoc loc -> loc
+          | _ -> failwith "Impossible by construction"
+        in
+        let new_loc_str =
+          match new_loc with
+          | Expr.Lit (Loc loc) -> loc
+          | Expr.ALoc loc -> loc
+          | _ ->
+              Fmt.failwith "Heap substitution fail for loc: %a" Expr.pp new_loc
+        in
+        merge_loc heap new_loc_str aloc)
+      heap
+  in
   Delayed.return heap
 
-let is_empty t = Hashtbl.to_seq_values t |> Seq.for_all Block.is_empty
+let is_empty t = SMap.for_all (fun _ block -> Block.is_empty block) t
 
 let assertions heap =
-  Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
+  SMap.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
 
 let lvars heap : SS.t =
-  Hashtbl.fold
-    (fun _ block acc -> SS.union (Block.lvars block) acc)
-    heap SS.empty
+  SMap.fold (fun _ block acc -> SS.union (Block.lvars block) acc) heap SS.empty
 
 let alocs heap : SS.t =
-  Hashtbl.fold
+  SMap.fold
     (fun loc block acc ->
       SS.union
         (SS.union (Block.alocs block) acc)
@@ -426,7 +420,7 @@ let alocs heap : SS.t =
     heap SS.empty
 
 let to_seq (heap : t) =
-  Hashtbl.to_seq heap
+  SMap.to_seq heap
   |> Seq.map (fun (loc, block) ->
          match block with
          | Block.Freed -> (loc, None)
@@ -438,7 +432,7 @@ let to_seq (heap : t) =
 
 let pp fmt heap =
   Fmt.pf fmt "@[<v>%a@]"
-    ( Fmt.iter_bindings ~sep:(Fmt.any "@\n@\n") Hashtbl.iter @@ fun ft (l, b) ->
+    ( Fmt.iter_bindings ~sep:(Fmt.any "@\n@\n") SMap.iter @@ fun ft (l, b) ->
       Block.pp ~loc:l ft b )
     heap
 
@@ -493,7 +487,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
            in
            Variable.create_leaf offset_str (vstr value) ())
   in
-  smemory |> Hashtbl.to_seq
+  smemory |> SMap.to_seq
   |> Seq.map (fun (loc, blocks) ->
          match blocks with
          | Block.Freed -> Variable.create_leaf loc "freed" ()
@@ -536,46 +530,3 @@ let add_debugger_variables
       scopes vars
   in
   scopes
-
-(***** Clean-up *****)
-
-let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
-  let forgettables =
-    Hashtbl.fold
-      (fun (aloc : string) (block : Block.t) forgettables ->
-        match block with
-        | Freed -> forgettables
-        | Allocated { data; bound; _ } -> (
-            match
-              (SFVL.is_empty data, bound, Expr.Set.mem (ALoc aloc) keep)
-            with
-            | true, None, false ->
-                let () = Hashtbl.remove heap aloc in
-                Expr.Set.add (Expr.ALoc aloc) forgettables
-            | _ -> forgettables))
-      heap Expr.Set.empty
-  in
-  let keep =
-    Hashtbl.fold
-      (fun (aloc : string) (block : Block.t) keep ->
-        let keep = Expr.Set.add (ALoc aloc) keep in
-        match block with
-        | Freed -> keep
-        | Allocated { data; _ } ->
-            let data_alocs =
-              Expr.Set.of_list
-                (List.map
-                   (fun x -> Expr.ALoc x)
-                   (SS.elements (SFVL.alocs data)))
-            in
-            let data_lvars =
-              Expr.Set.of_list
-                (List.map
-                   (fun x -> Expr.LVar x)
-                   (SS.elements (SFVL.lvars data)))
-            in
-            Expr.Set.union keep (Expr.Set.union data_alocs data_lvars))
-      heap keep
-  in
-  let forgettables = Expr.Set.diff forgettables keep in
-  (forgettables, keep)

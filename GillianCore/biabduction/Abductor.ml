@@ -20,7 +20,7 @@ module type SimplifiedSState =
      and type store_t = SStore.t
 
 module type BiProcessingS = sig
-  module NonBiPState : PState.S
+  module NonBiState : SState.S
 
   type annot
   type init_data
@@ -35,7 +35,7 @@ module type BiProcessingS = sig
     Asrt.t ->
     state_t list
 
-  val bistate_to_pstate_and_af : state_t -> NonBiPState.t * Asrt.t
+  val bistate_to_state_and_af : state_t -> NonBiState.t * Asrt.t
 end
 
 (* A bit of hack around as the legacy hardcoded BiState and the new,
@@ -55,7 +55,6 @@ struct
 
   module Interp =
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (State) (PC) (External)
-  (* module Normaliser = Normaliser.Make (SPState) *)
 
   type state_t = Interp.state_t
   type result_t = Interp.result_t
@@ -95,8 +94,8 @@ struct
 
       (* HMMMMM *)
       (* let _              = SBAState.simplify ~kill_new_lvars:true bi_state_f in *)
-      let state_i, _ = BiProcess.bistate_to_pstate_and_af bi_state_i in
-      let state_f, af_asrt = BiProcess.bistate_to_pstate_and_af bi_state_f in
+      let state_i, _ = BiProcess.bistate_to_state_and_af bi_state_i in
+      let state_f, af_asrt = BiProcess.bistate_to_state_and_af bi_state_f in
       let pvars = SS.of_list (Names.return_variable :: params) in
 
       L.verbose (fun m ->
@@ -105,34 +104,34 @@ struct
              @[<v 0>@[<v 2>AF:@ %a@] @[<v 2>Final STATE: %a@]@]"
             name
             Fmt.(list ~sep:comma string)
-            params Asrt.pp af_asrt BiProcess.NonBiPState.pp state_f);
+            params Asrt.pp af_asrt BiProcess.NonBiState.pp state_f);
       (* Drop all pvars except ret/err from the state *)
       let () =
-        SStore.filter_map_inplace (BiProcess.NonBiPState.get_store state_f)
+        SStore.filter_map_inplace (BiProcess.NonBiState.get_store state_f)
           (fun x v -> if x = Names.return_variable then Some v else None)
       in
       let* post =
         let _, finals_simplified =
-          BiProcess.NonBiPState.simplify ~kill_new_lvars:true state_f
+          BiProcess.NonBiState.simplify ~kill_new_lvars:true state_f
         in
         let+ final_simplified = finals_simplified in
         List.sort Asrt.compare
-          (BiProcess.NonBiPState.to_assertions ~to_keep:pvars final_simplified)
+          (BiProcess.NonBiState.to_assertions ~to_keep:pvars final_simplified)
       in
 
       let+ pre =
         let af_subst = make_id_subst af_asrt in
         let* af_produce_res =
-          BiProcess.NonBiPState.produce state_i af_subst af_asrt
+          BiProcess.NonBiState.produce state_i af_subst af_asrt
         in
         match af_produce_res with
         | Ok state_i' ->
             let _, simplifieds =
-              BiProcess.NonBiPState.simplify ~kill_new_lvars:true state_i'
+              BiProcess.NonBiState.simplify ~kill_new_lvars:true state_i'
             in
             let+ simplified = simplifieds in
             List.sort Asrt.compare
-              (BiProcess.NonBiPState.to_assertions ~to_keep:pvars simplified)
+              (BiProcess.NonBiState.to_assertions ~to_keep:pvars simplified)
         | Error _ ->
             L.verbose (fun m -> m "Failed to produce anti-frame");
             []
@@ -563,13 +562,13 @@ struct
 end
 
 module Make
-    (SPState : PState.S)
-    (PC : ParserAndCompiler.S with type init_data = SPState.init_data)
+    (State : SState.S)
+    (PC : ParserAndCompiler.S with type init_data = State.init_data)
     (External : External.T(PC.Annot).S) :
   S with type annot = PC.Annot.t and type init_data = PC.init_data = struct
   module Pre_constructions = struct
-    module Normaliser = Normaliser.Make (SPState)
-    module SBAState = BiState.Make (SPState)
+    module Normaliser = Normaliser.Make (State)
+    module SBAState = BiState.Make (State)
     module SSubst = SVal.SESubst
     module L = Logging
 
@@ -578,7 +577,7 @@ module Make
       type init_data = SBAState.init_data
       type annot = PC.Annot.t
 
-      module NonBiPState = SPState
+      module NonBiState = State
 
       let normalise_assertion
           ~(init_data : init_data)
@@ -596,9 +595,9 @@ module Make
         in
         SBAState.make ~state:ss_pre ~init_data
 
-      let bistate_to_pstate_and_af bistate =
+      let bistate_to_state_and_af bistate =
         let post, af = SBAState.get_components bistate in
-        (post, NonBiPState.to_assertions af)
+        (post, NonBiState.to_assertions af)
     end
   end
 
@@ -608,7 +607,11 @@ module Make
 end
 
 module From_scratch
-    (SMemory : SMemory.S)
+    (SMemory : Monadic.MonadicSMemory.S)
     (PC : ParserAndCompiler.S with type init_data = SMemory.init_data)
     (External : External.T(PC.Annot).S) =
-  Make (PState.Make (SState.Make (SMemory))) (PC) (External)
+  Make
+    (SState.Make
+       (Monadic.MonadicSMemory.Lift
+          (Combinators.Abstraction.Make (SMemory)))) (PC)
+          (External)

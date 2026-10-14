@@ -5,20 +5,35 @@ module Reduction = Engine.Reduction
 module Expr = Gil_syntax.Expr
 module Typing = Engine.Typing
 
-(** FIXME: optimization? *)
-let build_full_pfs (pc : Pc.t) =
-  if Expr.Set.is_empty pc.learned then pc.pfs
+let materialize (pc : Pc.t) =
+  if Expr.Set.is_empty pc.learned && pc.learned_types = [] then
+    (pc.pfs, pc.gamma)
   else
-    let copied = PFS.copy pc.pfs in
-    Expr.Set.iter (PFS.extend copied) pc.learned;
-    copied
+    match pc.materialized with
+    | Some full -> full
+    | None ->
+        let pfs =
+          if Expr.Set.is_empty pc.learned then pc.pfs
+          else
+            let copied = PFS.copy pc.pfs in
+            Expr.Set.iter (PFS.extend copied) pc.learned;
+            copied
+        in
+        let gamma =
+          if pc.learned_types = [] then pc.gamma
+          else
+            let copied = Type_env.copy pc.gamma in
+            List.iter
+              (fun (x, t) -> Type_env.update copied x t)
+              pc.learned_types;
+            copied
+        in
+        let full = (pfs, gamma) in
+        pc.materialized <- Some full;
+        full
 
-let build_full_gamma (pc : Pc.t) =
-  if pc.learned_types = [] then pc.gamma
-  else
-    let copied = Type_env.copy pc.gamma in
-    List.iter (fun (x, t) -> Type_env.update copied x t) pc.learned_types;
-    copied
+let build_full_pfs (pc : Pc.t) = fst (materialize pc)
+let build_full_gamma (pc : Pc.t) = snd (materialize pc)
 
 let sat ~(pc : Pc.t) formula =
   Logging.tmi (fun m ->

@@ -5,7 +5,7 @@ module type Gil_lifter_with_state = sig
 end
 
 module type Make = functor
-  (SMemory : SMemory.S)
+  (SMemory : Monadic.MonadicSMemory.S)
   (PC : ParserAndCompiler.S)
   (TLLifter : functor
      (Gil : Gil_lifter_with_state with type Lifter.memory = SMemory.t)

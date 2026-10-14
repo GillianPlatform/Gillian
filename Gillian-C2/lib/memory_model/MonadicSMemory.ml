@@ -80,7 +80,6 @@ module Mem = struct
   let to_yojson map = SMap.to_yojson SHeapTree.to_yojson map
   let map_lift_err loc res = DR.map_error res (lift_sheaptree_err loc)
   let empty = SMap.empty
-  let copy x = x
 
   let get_tree_res map loc_name =
     DR.of_option ~none:(MissingLocResource loc_name)
@@ -430,7 +429,6 @@ let make_branch ~heap ?(rets = []) () = (heap, rets)
 
 let init () = { genv = GEnv.empty; mem = Mem.empty }
 let clear h = { h with mem = Mem.empty }
-let copy h = h
 
 let sure_is_nonempty _ =
   (* TODO: Implementing this would require filtering functions
@@ -911,7 +909,7 @@ let execute_action ~action_name heap params =
 (* Interface static *)
 
 (* Serialization and operations *)
-let substitution_in_place subst heap =
+let substitution subst heap =
   let open Delayed.Syntax in
   let { mem; genv } = heap in
   let genv = GEnv.substitution subst genv in
@@ -926,10 +924,6 @@ let substitution_in_place subst heap =
    heap := { mem = nmem; genv = ngenv } *)
 
 let fresh_val _ = Expr.LVar (LVar.alloc ())
-
-let clean_up ?(keep = Expr.Set.empty) _ : Expr.Set.t * Expr.Set.t =
-  (Expr.Set.empty, keep)
-
 let lvars heap = Mem.lvars heap.mem
 let alocs heap = Mem.alocs heap.mem
 

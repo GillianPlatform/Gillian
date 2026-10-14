@@ -1,5 +1,5 @@
 open Gillian
-module SMemory = Monadic.MonadicSMemory.Lift (MonadicSMemory)
+module SMemory = MonadicSMemory
 
 module Outcome =
   Bulk.Outcome.Make_Symbolic (SMemory) (CParserAndCompiler)

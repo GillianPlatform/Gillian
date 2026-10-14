@@ -35,23 +35,19 @@ module type S = sig
   val produce : string -> t -> Gpc.t -> vt list -> t Symex.t
   val is_overlapping_asrt : string -> bool
 
-  (** State Copy *)
-  val copy : t -> t
-
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 
-  val substitution_in_place :
+  val substitution :
     pfs:PFS.t ->
     gamma:Type_env.t ->
     st ->
     t ->
     (t * Expr.Set.t * (string * Type.t) list) list
 
-  val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
@@ -98,12 +94,10 @@ module Dummy : S with type init_data = unit = struct
   let consume _ _ _ _ = failwith "Please implement SMemory"
   let produce _ _ _ _ = failwith "Please implement SMemory"
   let is_overlapping_asrt _ = failwith "Please implement SMemory"
-  let copy () = ()
   let pp _ _ = ()
   let pp_by_need _ _ _ = ()
   let get_print_info _ _ = failwith "Please implement SMemory"
-  let substitution_in_place ~pfs:_ ~gamma:_ _ _ = []
-  let clean_up ?keep:_ _ = failwith "Please implement SMemory"
+  let substitution ~pfs:_ ~gamma:_ _ _ = []
   let lvars _ = failwith "Please implement SMemory"
   let alocs _ = failwith "Please implement SMemory"
   let assertions ?to_keep:_ _ = failwith "Please implement SMemory"

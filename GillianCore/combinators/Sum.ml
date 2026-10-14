@@ -145,14 +145,14 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
     (S1 s1, v)
   (* TODO: does it even make sense? forbid? *)
 
-  let substitution_in_place st =
+  let substitution st =
     let open Delayed.Syntax in
     function
     | S1 t1 ->
-        let+ t1' = S1.substitution_in_place st t1 in
+        let+ t1' = S1.substitution st t1 in
         S1 t1'
     | S2 t2 ->
-        let+ t2' = S2.substitution_in_place st t2 in
+        let+ t2' = S2.substitution st t2 in
         S2 t2'
     | None -> Delayed.return None
 
@@ -192,7 +192,7 @@ module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
 
   let get_fixes e =
     match e with
-    | E1 e1 -> S1.get_fixes e1 |> MyUtils.deep_map lift_corepred_1
-    | E2 e2 -> S2.get_fixes e2 |> MyUtils.deep_map lift_corepred_2
+    | E1 e1 -> S1.get_fixes e1 |> Fix.map_corepred lift_corepred_1
+    | E2 e2 -> S2.get_fixes e2 |> Fix.map_corepred lift_corepred_2
     | _ -> failwith "get_fixes: invalid error"
 end
