@@ -1737,4 +1737,4 @@ module M = struct
     }
 end
 
-module MT : States.MyMonadicSMemory.S = M
+module MT : Gillian.Combinators.MyMonadicSMemory.S = M

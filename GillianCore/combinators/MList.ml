@@ -1,6 +1,6 @@
-open Gillian.Utils
-open Gillian.Monadic
-open Gillian.Symbolic
+open Utils
+open Monadic
+open Engine.Symbolic
 open Gil_syntax
 module DR = Delayed_result
 module ExpMap = MyUtils.ExpMap
@@ -222,12 +222,12 @@ module Make (S : MyMonadicSMemory.S) :
         let sub_recover =
           match ExpMap.find_opt idx (fst st) with
           | Some codom -> S.get_recovery_tactic codom e
-          | None -> Gillian.General.Recovery_tactic.none
+          | None -> Engine.General.Recovery_tactic.none
         in
-        Gillian.General.Recovery_tactic.merge
-          (Gillian.General.Recovery_tactic.try_unfold [ idx ])
+        Engine.General.Recovery_tactic.merge
+          (Engine.General.Recovery_tactic.try_unfold [ idx ])
           sub_recover
-    | _ -> Gillian.General.Recovery_tactic.none
+    | _ -> Engine.General.Recovery_tactic.none
 
   let can_fix = function
     | SubError (_, e) -> S.can_fix e

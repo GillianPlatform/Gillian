@@ -33,8 +33,8 @@ module M : MyMonadicSMemory =
       let empty () : t =
         Cgil_lib.String_map.fold
           (fun k v acc ->
-            States.MyUtils.SMap.add k
+            Gillian.Combinators.MyUtils.SMap.add k
               (Some (Expr.Lit (Global_env.serialize_def v)))
               acc)
-          !init_data States.MyUtils.SMap.empty
+          !init_data Gillian.Combinators.MyUtils.SMap.empty
     end)

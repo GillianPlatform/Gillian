@@ -1,5 +1,5 @@
-open Gillian.Utils
-open Gillian.Monadic
+open Utils
+open Monadic
 open Gil_syntax
 
 module type IDs = sig
@@ -153,7 +153,7 @@ let get_loc =
           some ~learned:[ e == ALoc loc_name ] loc_name)
   | _ -> none ()
 
-module SMap = Gillian.Utils.Prelude.Map.Make (struct
+module SMap = Utils.Prelude.Map.Make (struct
   include String
 
   let of_yojson = function

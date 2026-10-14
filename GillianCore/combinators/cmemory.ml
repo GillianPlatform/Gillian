@@ -1,8 +1,8 @@
-open Gillian.Concrete
-module Expr = Gillian.Gil_syntax.Expr
+open Engine.Concrete
+module Expr = Gil_syntax.Expr
 
-module Make (InitData : Gillian.General.Init_data.S) :
-  Gillian.Concrete.Memory_S with type init_data = InitData.t = struct
+module Make (InitData : Engine.General.Init_data.S) :
+  Engine.Concrete.Memory_S with type init_data = InitData.t = struct
   type vt = Values.t
   type st = Subst.t
   type err_t = unit [@@deriving yojson, show]

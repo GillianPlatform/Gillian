@@ -1,5 +1,5 @@
 open Gil_syntax
-open Gillian.Monadic
+open Monadic
 open Delayed.Syntax
 open Delayed_result.Syntax
 

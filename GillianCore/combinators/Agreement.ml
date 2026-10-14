@@ -1,9 +1,9 @@
-open Gillian.Utils
-open Gillian.Monadic
-open Gillian.Symbolic
+open Utils
+open Monadic
+open Engine.Symbolic
 open Gil_syntax
 module DR = Delayed_result
-module Recovery_tactic = Gillian.General.Recovery_tactic
+module Recovery_tactic = Engine.General.Recovery_tactic
 
 type t = Expr.t option [@@deriving yojson]
 type err_t = MissingState [@@deriving show, yojson]

@@ -54,18 +54,19 @@ module ExtendMemory (S : OpenPMapType with module Entry = BaseBlock) = struct
             let**^ s, _, src = S.get s src_loc in
             let**^ s, dst_loc', dest = S.get s dst_loc in
             match (src, dest) with
-            | States.Freeable.None, _ | _, States.Freeable.None ->
-                DR.error MoveOnMissing
-            | States.Freeable.Freed, _ | _, States.Freeable.Freed ->
-                DR.error MoveOnFreed
-            | States.Freeable.SubState src, States.Freeable.SubState dest ->
+            | Gillian.Combinators.Freeable.None, _
+            | _, Gillian.Combinators.Freeable.None -> DR.error MoveOnMissing
+            | Gillian.Combinators.Freeable.Freed, _
+            | _, Gillian.Combinators.Freeable.Freed -> DR.error MoveOnFreed
+            | ( Gillian.Combinators.Freeable.SubState src,
+                Gillian.Combinators.Freeable.SubState dest ) ->
                 let** dest =
                   DR.map_error (BlockTree.move dest dst_ofs src src_ofs size)
                     (fun e -> BlockTreeErr (src_loc, dst_loc, e))
                 in
                 let s' =
                   S.set ~idx:dst_loc ~idx':dst_loc'
-                    (States.Freeable.SubState dest) s
+                    (Gillian.Combinators.Freeable.SubState dest) s
                 in
                 DR.ok (s', []))
       | _ -> failwith "Invalid arguments for mem_move"
@@ -86,7 +87,7 @@ module ExtendMemory (S : OpenPMapType with module Entry = BaseBlock) = struct
       | _ -> false
 
     let map_fixes mapper =
-      States.MyUtils.deep_map (fun (p, i, o) -> (mapper p, i, o))
+      Gillian.Combinators.MyUtils.deep_map (fun (p, i, o) -> (mapper p, i, o))
 
     let get_fixes = function
       | BaseError e -> S.get_fixes e |> map_fixes S.pred_to_str

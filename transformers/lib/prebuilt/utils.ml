@@ -1,4 +1,4 @@
-open States
+open Gillian.Combinators
 
 (* Typings *)
 module type ActionAddition = ActionAdder.ActionAddition

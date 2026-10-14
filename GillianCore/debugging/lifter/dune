@@ -9,6 +9,7 @@
   sedap.types
   debugger_log
   debugger_utils
+  verify
   parserAndCompiler)
  (flags
   :standard
@@ -18,6 +19,8 @@
   Gil_syntax
   -open
   Engine
+  -open
+  Verify
   -open
   Utils
   -open

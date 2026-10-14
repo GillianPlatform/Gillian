@@ -2,7 +2,10 @@ open Config
 open Location
 module L = Logging
 
-let unfolded_preds : (string, Pred.t) Hashtbl.t = Hashtbl.create small_tbl_size
+(* [unfolded_preds] lives in the engine (as {!Unfolded_preds.tbl}) so that the
+   engine's {!Matcher} can read what this module — now in the [verify] library —
+   writes, without an engine→verify cycle. *)
+let unfolded_preds = Unfolded_preds.tbl
 
 (*
  *  Auto-Unfolding Non-recursive Predicates in Assertions

@@ -184,6 +184,10 @@ jobs:
       - name: Test Amazon
         run: "make"
         working-directory: "Gillian-C/examples/amazon/"
+        # Z3 5.x times out on some of parse_edk's sequence queries with the
+        # default seed (4.16 decides them instantly with any seed).
+        env:
+          SMT_RANDOM_SEED: 1
 
   gillian_js_tests:
     strategy:

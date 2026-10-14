@@ -1,0 +1,20 @@
+(library
+ (name biabduction)
+ (public_name gillian.biabduction)
+ (libraries engine monadic combinators utils gil_syntax incrementalAnalysis)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto))
+ (flags
+  :standard
+  -open
+  Utils
+  -open
+  Gil_syntax
+  -open
+  Utils.Prelude
+  -open
+  IncrementalAnalysis
+  -open
+  Engine))

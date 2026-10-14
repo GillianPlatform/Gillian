@@ -1,5 +1,5 @@
-open Gillian.Monadic
-module Containers = Gillian.Utils.Containers
+open Monadic
+module Containers = Utils.Containers
 open MyUtils
 
 module Make (IDs : IDs) (S1 : MyMonadicSMemory.S) (S2 : MyMonadicSMemory.S) :
