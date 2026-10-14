@@ -47,7 +47,7 @@ DLL* listConcat(DLL *x, DLL *y) {
         } else {
             __GILLIAN(
                 "assert [[bind #vx, #px, #nx, #gamma]] "
-                "(x -m> struct dln {#vx; #px; #nx}) * DLL(#nx; #gamma) * "
+                "(x -m> struct dln {#vx; #px; #nx}) * DLL(#nx, #gamma) * "
                 "(#alpha == #h :: #gamma)");
             __GILLIAN("unfold DLL(#nx, #gamma)");
             if (x->next == NULL) {
