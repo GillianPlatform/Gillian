@@ -1193,7 +1193,7 @@ struct
         (* Invariant being revisited *)
         | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
             (* let () = Fmt.pr "\nRe-establishing invariant... @?" in *)
-            let _ = State.match_invariant prog true state a binders in
+            let _ = State.match_invariant true state a binders in
             let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
             (* let () = Fmt.pr "\nInvariant re-established. @?" in *)
             []
@@ -1201,7 +1201,7 @@ struct
             assert (loop_action = FrameOff (List.hd loop_ids));
             (* let () = Fmt.pr "\nEstablishing invariant... @?" in *)
             let frames_and_states =
-              State.match_invariant prog false state a binders
+              State.match_invariant false state a binders
             in
             (* let () = Fmt.pr "\nSuccessfully established invariant. @?" in *)
             List.map

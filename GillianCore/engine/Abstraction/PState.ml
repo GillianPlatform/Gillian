@@ -371,7 +371,7 @@ module Make (State : SState.S) :
       preds_list;
     Pred_state.{ state; preds; wands = Wands.init [] }
 
-  let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
+  let consume astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
       failwith "Binding of pure variables in *-assert.";
     let store = State.get_store astate.Pred_state.state in
@@ -397,18 +397,7 @@ module Make (State : SState.S) :
     in
     let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
-    let pred_ins =
-      Hashtbl.fold
-        (fun name (pred : Pred.t) pred_ins ->
-          Hashtbl.add pred_ins name (Pred.ins_indexes pred);
-          pred_ins)
-        prog.prog.preds
-        (Hashtbl.create Config.medium_tbl_size)
-    in
-
-    let mp =
-      MP.init known_matchables Expr.Set.empty pred_ins [ (a, (None, None)) ]
-    in
+    let mp = MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ] in
     let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
     if not (SS.is_empty vars_to_forget) then (
       let oblivion_subst = fresh_subst vars_to_forget in
@@ -538,7 +527,6 @@ module Make (State : SState.S) :
     Ok (copy_with_state new_astate new_state)
 
   let match_invariant
-      (prog : 'a MP.prog)
       (revisited : bool)
       (astate : t)
       (a : Asrt.t)
@@ -571,17 +559,9 @@ module Make (State : SState.S) :
     let known_matchables =
       Expr.Set.of_list (known_pvars @ known_lvars @ asrt_alocs)
     in
-    let pred_ins =
-      Hashtbl.fold
-        (fun name (pred : Pred.t) pred_ins ->
-          Hashtbl.add pred_ins name (Pred.ins_indexes pred);
-          pred_ins)
-        prog.prog.preds
-        (Hashtbl.create Config.medium_tbl_size)
-    in
     let mp =
       (* FIXME: UNDERSTAND IF THE OX SHOULD BE [] *)
-      MP.init known_matchables Expr.Set.empty pred_ins [ (a, (None, None)) ]
+      MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ]
     in
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
@@ -926,18 +906,8 @@ module Make (State : SState.S) :
           in
           let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
-          let pred_ins =
-            Hashtbl.fold
-              (fun name (pred : Pred.t) pred_ins ->
-                Hashtbl.add pred_ins name (Pred.ins_indexes pred);
-                pred_ins)
-              prog.prog.preds
-              (Hashtbl.create Config.medium_tbl_size)
-          in
-
           let mp =
-            MP.init known_matchables Expr.Set.empty pred_ins
-              [ (a, (None, None)) ]
+            MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ]
           in
           let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
           if not (SS.is_empty vars_to_forget) then (
@@ -1055,7 +1025,7 @@ module Make (State : SState.S) :
               in
               L.print_to_all msg;
               Res_list.error_with (StateErr.EPure fail_pfs))
-      | Consume (asrt, binders) -> consume ~prog astate asrt binders
+      | Consume (asrt, binders) -> consume astate asrt binders
       | Produce asrt -> produce astate asrt
       | ApplyLem (lname, args, binders) ->
           if not (List.for_all Names.is_lvar_name binders) then

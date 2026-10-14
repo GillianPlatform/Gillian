@@ -4,8 +4,6 @@ type atom = TypeDef__.assertion_atom =
   | Pure of Expr.t  (** Pure formula *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion *)
   | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
-  | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
-      (** Magic wand of the form [P(...) -* Q(...)] *)
 [@@deriving eq]
 
 type t = TypeDef__.assertion [@@deriving eq]
@@ -36,6 +34,85 @@ let as_user_pred_name (name : string) : string option =
 (** Builds a user-predicate assertion (a {!CorePred} with the encoded name). *)
 let pred (name : string) (ins : Expr.t list) (outs : Expr.t list) : atom =
   CorePred (user_pred_name name, ins, outs)
+
+(** Magic wands in GIL are simply core predicates whose name encodes the wand's
+    left-hand and right-hand predicate names as
+    [wand_prefix ^ lname ^ wand_sep ^ rname]. *)
+let wand_prefix = "GILLIAN_WAND__"
+
+let wand_sep = "___INTO___"
+
+(** Index of the first occurrence of [sub] in [s], if any. *)
+let string_find ~(sub : string) (s : string) : int option =
+  let n = String.length s and m = String.length sub in
+  let rec aux i =
+    if i + m > n then None
+    else if String.sub s i m = sub then Some i
+    else aux (i + 1)
+  in
+  aux 0
+
+(** [wand_name lname rname] is the core-predicate name that encodes the magic
+    wand [lname(...) -* rname(...)]. *)
+let wand_name (lname : string) (rname : string) : string =
+  wand_prefix ^ lname ^ wand_sep ^ rname
+
+(** [as_wand_name s] returns [Some (lname, rname)] when the core-predicate name
+    [s] encodes a magic wand (i.e. [s = wand_name lname rname]), and [None]
+    otherwise. The split is on the first [wand_sep] after the prefix. *)
+let as_wand_name (name : string) : (string * string) option =
+  let np = String.length wand_prefix in
+  if String.length name >= np && String.sub name 0 np = wand_prefix then
+    let rest = String.sub name np (String.length name - np) in
+    match string_find ~sub:wand_sep rest with
+    | None -> None
+    | Some i ->
+        let lname = String.sub rest 0 i in
+        let ns = String.length wand_sep in
+        let rname = String.sub rest (i + ns) (String.length rest - i - ns) in
+        Some (lname, rname)
+  else None
+
+(** Builds a magic-wand assertion atom. A wand's semantic {b ins} are the lhs
+    args together with the {e in}-arguments of the rhs; its {b outs} are
+    {e only} the {e out}-arguments of the rhs. The encoding therefore stores
+    [largs @ r_ins] as the core-predicate ins and [r_outs] as its outs. *)
+let wand
+    ((lname, largs) : string * Expr.t list)
+    ((rname, r_ins) : string * Expr.t list)
+    (r_outs : Expr.t list) : atom =
+  CorePred (wand_name lname rname, largs @ r_ins, r_outs)
+
+(** [as_wand ~rhs_ins_number a] returns [Some (lhs, rhs)] when [a] is a
+    wand-encoding {!CorePred}, recovering the raw [lhs = (lname, largs)] and
+    [rhs = (rname, rargs)]. Since the stored ins are [largs @ r_ins] (with
+    [r_ins] the last [rhs_ins_number] of them) and the stored outs are [r_outs],
+    reconstructing [rargs = r_ins @ r_outs] requires the rhs predicate's number
+    of in-parameters. *)
+let as_wand ~(rhs_ins_number : int) (a : atom) :
+    ((string * Expr.t list) * (string * Expr.t list)) option =
+  match a with
+  | CorePred (name, ins, outs) -> (
+      match as_wand_name name with
+      | Some (lname, rname) ->
+          let n = List.length ins - rhs_ins_number in
+          let largs = List.filteri (fun i _ -> i < n) ins in
+          let r_ins = List.filteri (fun i _ -> i >= n) ins in
+          Some ((lname, largs), (rname, r_ins @ outs))
+      | None -> None)
+  | _ -> None
+
+(** Effect that looks up a predicate's number of in-parameters. Used only by the
+    printer, to reconstruct a wand's surface form from its (semantic) ins/outs.
+    Handled by {!Engine.MP.with_pred_table}; outside its scope,
+    {!pred_ins_number} returns [None] and the printer falls back to the raw
+    core-predicate form. *)
+type _ Effect.t += Pred_ins_number : string -> int option Effect.t
+
+let pred_ins_number (name : string) : int option =
+  match Effect.perform (Pred_ins_number name) with
+  | v -> v
+  | exception Effect.Unhandled _ -> None
 
 let compare x y =
   let cmp = Stdlib.compare in
@@ -94,13 +171,7 @@ let map (f_e : Expr.t -> Expr.t) : t -> t =
     | Emp -> Emp
     | Pure form -> Pure (f_e form)
     | Types lt -> Types (List.map (fun (exp, typ) -> (f_e exp, typ)) lt)
-    | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2)
-    | Wand { lhs = lhs_pred, lhs_args; rhs = rhs_pred, rhs_args } ->
-        Wand
-          {
-            lhs = (lhs_pred, List.map f_e lhs_args);
-            rhs = (rhs_pred, List.map f_e rhs_args);
-          })
+    | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2))
 
 (* Get all the logical variables in --a-- *)
 let lvars : t -> SS.t =
@@ -141,7 +212,7 @@ let pure_asrts : t -> Expr.t list =
 
 (* Check if --a-- is a pure assertion *)
 let is_pure_asrt : atom -> bool = function
-  | CorePred _ | Wand _ -> false
+  | CorePred _ -> false
   | _ -> true
 
 (* Eliminate Emp assertions.
@@ -157,30 +228,36 @@ let make_pure (a : t) : Expr.t =
 
 (** GIL logic assertions *)
 let _pp_atom ?(e_pp : Format.formatter -> Expr.t -> unit = Expr.pp) fmt =
+  let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
   function
   | Emp -> Fmt.string fmt "emp"
   | Types tls ->
       let pp_tl f (e, t) = Fmt.pf f "%a : %s" e_pp e (Type.str t) in
       Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls
   | Pure f -> e_pp fmt f
-  | CorePred (a, ins, outs) -> (
-      let pp_e_l = Fmt.list ~sep:Fmt.comma e_pp in
-      match as_user_pred_name a with
-      | Some pred_name ->
-          (* A user-defined predicate: printed [name(ins; outs)]. *)
-          let pred_name = Pp_utils.maybe_quote_ident pred_name in
-          Fmt.pf fmt "@[<h>%s(%a; %a)@]" pred_name pp_e_l ins pp_e_l outs
-      | None ->
-          (* A genuine core predicate: printed [<name>(ins; outs)]. *)
-          Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs)
-  | Wand { lhs = lname, largs; rhs = rname, rargs } ->
-      let lname = Pp_utils.maybe_quote_ident lname in
-      let rname = Pp_utils.maybe_quote_ident rname in
-      Fmt.pf fmt "(%s(%a) -* %s(%a))" lname
-        (Fmt.list ~sep:Fmt.comma e_pp)
-        largs rname
-        (Fmt.list ~sep:Fmt.comma e_pp)
-        rargs
+  | CorePred (a, ins, outs) when Option.is_some (as_wand_name a) -> (
+      let lname, rname = Option.get (as_wand_name a) in
+      (* A magic wand: reconstruct and print in surface syntax
+         [(lname(largs) -* rname(rargs))]. This needs the rhs predicate's number
+         of in-parameters (to split the stored [largs @ r_ins] ins); when no
+         predicate table is ambient, fall back to the raw core-predicate form. *)
+      match pred_ins_number rname with
+      | Some rhs_ins_number ->
+          let (_, largs), (_, rargs) =
+            Option.get (as_wand ~rhs_ins_number (CorePred (a, ins, outs)))
+          in
+          let lname = Pp_utils.maybe_quote_ident lname in
+          let rname = Pp_utils.maybe_quote_ident rname in
+          Fmt.pf fmt "(%s(%a) -* %s(%a))" lname pp_e_l largs rname pp_e_l rargs
+      | None -> Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs)
+  | CorePred (a, ins, outs) when Option.is_some (as_user_pred_name a) ->
+      let pred_name = Option.get (as_user_pred_name a) in
+      (* A user-defined predicate: printed [name(ins; outs)]. *)
+      let pred_name = Pp_utils.maybe_quote_ident pred_name in
+      Fmt.pf fmt "@[<h>%s(%a; %a)@]" pred_name pp_e_l ins pp_e_l outs
+  | CorePred (a, ins, outs) ->
+      (* A genuine core predicate: printed [<name>(ins; outs)]. *)
+      Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
 
 let _pp ~(e_pp : Format.formatter -> Expr.t -> unit) (fmt : Format.formatter) :
     t -> unit =

@@ -58,20 +58,13 @@ val learn_expr :
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 val simplify_asrts : ?sorted:bool -> Asrt.t -> Asrt.t
-
-val s_init_atoms :
-  preds:(string, int list) Hashtbl.t ->
-  KB.t ->
-  Asrt.t ->
-  (step list, Asrt.t) result
-
+val s_init_atoms : KB.t -> Asrt.t -> (step list, Asrt.t) result
 val of_step_list : ?post:post -> ?label:label -> step list -> t
 
 val init :
   ?use_params:bool ->
   KB.t ->
   KB.t ->
-  (string, int list) Hashtbl.t ->
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list) result
 
