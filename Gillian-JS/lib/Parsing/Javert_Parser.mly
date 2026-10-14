@@ -496,11 +496,12 @@ assertion_target:
   | LMETADATA; LBRACE; eo = expr_target; COMMA; em = expr_target; RBRACE
     { Asrt.MetaData (eo, em) }
   | LEMP; { Asrt.Emp }
+(* Applications are written flat: the in/out split is a property of the
+   definition and is derived from there. A `;` here is a syntax error. *)
   | name = VAR; LBRACE;
-    ins = separated_list(COMMA, expr_target);
-    outs = outs(expr_target);
+    args = separated_list(COMMA, expr_target);
     RBRACE
-    { Asrt.Pred (name, ins, outs) }
+    { Asrt.Pred (name, args, []) }
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
     { Asrt.Types type_pairs }
   | EMPTYFIELDS; LBRACE; le=expr_target; COLON; domain=expr_target; RBRACE
@@ -1069,11 +1070,12 @@ js_assertion_target:
   | SCHAIN; LBRACE; fid=VAR; COLON; le=js_lexpr_target; RBRACE
     { JSAsrt.SChain (fid, le) }
 (* x(e1, ..., en) *)
+(* Applications are written flat: the in/out split is a property of the
+   definition and is derived from there. A `;` here is a syntax error. *)
   | name = VAR; LBRACE;
-    ins = separated_list(COMMA, js_lexpr_target);
-    outs = outs(js_lexpr_target);
+    args = separated_list(COMMA, js_lexpr_target);
     RBRACE
-    { JSAsrt.Pred (name, ins, outs) }
+    { JSAsrt.Pred (name, args, []) }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, js_type_env_pair_target); RBRACE
     { JSAsrt.Types type_pairs }

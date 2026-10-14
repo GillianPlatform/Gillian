@@ -17,7 +17,7 @@ function read(x, p) {
     };
     return r
 }
-{ is_zero(#v; ret) * (#x -> (#p: #v)) }
+{ is_zero(#v, ret) * (#x -> (#p: #v)) }
 
 { (x == #x) * (v == #v) * (#x -> (1.0: #y))}
 function write(x, v) {

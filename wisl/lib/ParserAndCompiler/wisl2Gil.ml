@@ -211,7 +211,7 @@ let rec compile_lexpr
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
         let pred_i_plus =
-          Asrt.pred internal_pred [ comp_expr1; comp_expr2 ] [ Expr.LVar lout ]
+          Asrt.pred internal_pred [ comp_expr1; comp_expr2; Expr.LVar lout ] []
         in
         ( gvars1 @ gvars2 @ [ lout ],
           asrtl1 @ asrtl2 @ [ pred_i_plus ],
@@ -281,12 +281,6 @@ let compile_lexpr_perm ?fname lexpr =
   match lexpr with
   | Some lexpr -> compile_lexpr ?fname lexpr
   | None -> ([], [], Expr.num 1.0)
-
-(* Maps each WISL predicate name to its number of in-parameters. A magic wand
-   stores flat rhs args, so to build the GIL wand encoding (whose outs are only
-   the rhs out-args) the compiler must split those args by this count. Populated
-   by [compile] before any assertion is compiled. *)
-let pred_ins_counts : (string, int) Hashtbl.t = Hashtbl.create 32
 
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
@@ -395,14 +389,9 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
       let exs = List.concat (exs1 @ exs2) in
       let al = List.concat (al1 @ al2) in
-      (* Split the (ins-first) rhs args into ins/outs by the rhs predicate's
-         number of in-parameters, so the wand's outs are only the rhs outs. *)
-      let k =
-        Option.value ~default:0 (Hashtbl.find_opt pred_ins_counts rname)
-      in
-      let r_ins = List.filteri (fun i _ -> i < k) el2 in
-      let r_outs = List.filteri (fun i _ -> i >= k) el2 in
-      (exs, Asrt.wand (lname, el1) (rname, r_ins) r_outs :: al)
+      (* Emit the rhs args flat: [Prog.resolve_pred_ins_outs] splits them at the
+         rhs predicate's [ins_number]. *)
+      (exs, Asrt.wand (lname, el1) (rname, el2) [] :: al)
   | LPure lf ->
       let _, al, e = compile_lexpr lf in
       let e =
@@ -1293,15 +1282,6 @@ let compile_datatype
 let compile
     ~filepath
     WProg.{ context; predicates; lemmas; datatypes; pure_functions } =
-  (* Record each predicate's in-parameter count before compiling any assertion,
-     so magic-wand compilation can split rhs args into ins/outs. *)
-  let () = Hashtbl.reset pred_ins_counts in
-  let () =
-    List.iter
-      (fun (p : WPred.t) ->
-        Hashtbl.replace pred_ins_counts p.pred_name (List.length p.pred_ins))
-      predicates
-  in
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in

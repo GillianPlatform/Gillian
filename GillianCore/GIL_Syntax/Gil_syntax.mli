@@ -787,6 +787,22 @@ module Pred : sig
   (** Infers parameter types and makes them explicit in the assertions *)
   val explicit_param_types : (string, t) Hashtbl.t -> t -> (t, string) result
 
+  (** [resolve_ins_outs preds a] normalises the in/out split of the predicate
+      application [a] against the predicate table [preds].
+
+      The parsers only ever produce {e unsplit} applications — a [;] in an
+      application is a syntax error — which are split at the definition's
+      [ins_number]. An already-split one is checked against the definition and
+      returned unchanged, which is what makes this idempotent. Magic wands are
+      resolved through their right-hand predicate.
+
+      Genuine core predicates are returned unchanged: they have no definition to
+      derive a split from, so their [;] remains mandatory.
+
+      The function is total and idempotent. *)
+  val resolve_ins_outs :
+    (string, t) Hashtbl.t -> Asrt.atom -> (Asrt.atom, string) result
+
   (** Combines a list of ins and a list of outs putting them in the right order
       according to a given predicate. *)
   val combine_ins_outs : t -> 'a list -> 'a list -> 'a list
@@ -1149,6 +1165,14 @@ module Prog : sig
     predecessors : (string * int * int, int) Hashtbl.t;
         (** Table used for Phi-assignment *)
   }
+
+  (** Resolves the in/out split of every predicate application in the program,
+      against [prog.preds], in place. See {!Pred.resolve_ins_outs}.
+
+      Must run once the predicate table is complete (i.e. after imports have
+      been resolved) and before any analysis. Raises a Gillian analysis failure
+      if an application's explicit [;] disagrees with the definition. *)
+  val resolve_pred_ins_outs : ('annot, 'label) t -> unit
 
   (** Makes a full program *)
   val make :

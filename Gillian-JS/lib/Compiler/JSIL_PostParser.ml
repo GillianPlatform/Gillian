@@ -182,13 +182,14 @@ let scope_info_to_assertion
                 let fun_obj_asrt =
                   Asrt.Pred
                     ( "JSFunctionObject",
-                      [ x_val ],
                       [
+                        x_val;
                         Lit (String proc_x.name);
                         proc_x_sc;
                         Lit (Num (float_of_int (List.length proc_x.params)));
                         proc_x_prototype;
-                      ] )
+                      ],
+                      [] )
                 in
                 let proto_asrt =
                   Asrt.Pred ("JSObject", [ proc_x_prototype ], [])
@@ -250,13 +251,14 @@ let create_pre_scope_pred
                 let fun_obj_asrt =
                   Asrt.Pred
                     ( "JSFunctionObject",
-                      [ PVar x ],
                       [
+                        PVar x;
                         Lit (String proc_x.name);
                         proc_x_sc;
                         Lit (Num (float_of_int (List.length proc_x.params)));
                         proc_x_prototype;
-                      ] )
+                      ],
+                      [] )
                 in
                 let proto_asrt =
                   Asrt.Pred ("JSObject", [ proc_x_prototype ], [])
@@ -300,13 +302,14 @@ let create_function_predicate
   let fo_asrt =
     Asrt.Pred
       ( "JSFunctionObject",
-        [ PVar x ],
         [
+          PVar x;
           Lit (String fid);
           fid_x_sc;
           Lit (Num (float_of_int (List.length fparams)));
           fid_prototype;
-        ] )
+        ],
+        [] )
   in
   let proto_asrt = Asrt.Pred ("JSObject", [ fid_prototype ], []) in
 
@@ -389,12 +392,11 @@ let create_post_scope_pred
     [ mtdt_er_a; ef_er_a; (* args_a; *) md_md_a; ef_md_a; er_fl_a ]
   in
 
-  (* The pre-scope predicate has a single in-parameter (the scope chain). *)
-  let pre_scope_ins = [ Expr.PVar JS2JSIL_Helpers.var_scope ] in
-  let pre_scope_outs = List.map (fun x -> Expr.PVar x) out_params in
-  let pre_scope_asrt =
-    Asrt.Pred (pre_scope_prefix ^ fid, pre_scope_ins, pre_scope_outs)
+  let pre_scope_args =
+    Expr.PVar JS2JSIL_Helpers.var_scope
+    :: List.map (fun x -> Expr.PVar x) out_params
   in
+  let pre_scope_asrt = Asrt.Pred (pre_scope_prefix ^ fid, pre_scope_args, []) in
 
   {
     name = post_scope_prefix ^ fid;

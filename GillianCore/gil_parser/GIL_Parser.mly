@@ -813,12 +813,15 @@ g_sspec_target:
 top_level_g_assertion_target:
   a = g_assertion_target; EOF { a }
 
+(* A predicate application is written flat: the in/out split is a property of
+   the definition, and [Prog.resolve_pred_ins_outs] derives it from there. A
+   `;` here is a syntax error -- unlike in a definition head, or in a genuine
+   core predicate, which has no definition to derive a split from. *)
 predicate_call:
   name = proc_name; LBRACE;
-  ins = separated_list(COMMA, expr_target);
-  outs = outs(expr_target);
+  args = separated_list(COMMA, expr_target);
   RBRACE
-  { (name, ins, outs) }
+  { (name, args) }
 
 g_assertion_target:
 (* (pure) /\ (pure) *)
@@ -832,10 +835,8 @@ g_assertion_target:
   | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { left_ass @ right_ass } %prec separating_conjunction
   | lhs = predicate_call; WAND; rhs = predicate_call
-    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
-      (* The lhs is fully consumed (all ins); the rhs [ins; outs] split comes
-         from the surface syntax. *)
-      [ Asrt.wand (ln, li @ lo) (rn, ri) ro ] }
+    { let (ln, largs) = lhs and (rn, rargs) = rhs in
+      [ Asrt.wand (ln, largs) (rn, rargs) [] ] }
 (* <CorePred>(es; es) *)
   | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); es2=outs(expr_target); RBRACE
     { [ Asrt.CorePred (v, es1, es2) ] }
@@ -845,8 +846,8 @@ g_assertion_target:
 (* x(e1, ..., en) *)
   | pcall = predicate_call
     {
-      let (name, ins, outs) = pcall in
-      [ Asrt.pred name ins outs ]
+      let (name, args) = pcall in
+      [ Asrt.pred name args [] ]
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
@@ -885,8 +886,8 @@ g_logic_cmd_target:
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
-    { let (ln, li, lo) = lhs and (rn, ri, ro) = rhs in
-      LCmd.SL (Package { lhs = (ln, li @ lo); rhs = (rn, ri @ ro) })}
+    { let (ln, largs) = lhs and (rn, rargs) = rhs in
+      LCmd.SL (Package { lhs = (ln, largs); rhs = (rn, rargs) })}
 
 (* unfold_all x *)
   | UNFOLDALL; name = proc_name
