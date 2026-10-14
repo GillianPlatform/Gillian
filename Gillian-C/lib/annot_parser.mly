@@ -49,6 +49,7 @@
 %token VERIFY
 %token IMPORT
 %token NOUNFOLD
+%token FACTS
 %token IF
 %token ELSE
 %token PREDICATE
@@ -298,6 +299,7 @@ predicate:
     RBRACE; LCBRACE;
     defs = separated_nonempty_list(SCOLON, pred_definition);
     RCBRACE;
+    facts = option(preceded(FACTS, preceded(COLON, formula)));
     {
       let params = ins @ outs in
       let ins_number = List.length ins in
@@ -308,6 +310,7 @@ predicate:
         definitions = defs;
         no_unfold = Option.is_some(no_unfold);
         pure = Option.is_some(pure);
+        facts;
       }
     }
 

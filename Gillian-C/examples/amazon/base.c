@@ -32,7 +32,7 @@
     pred nounfold optBytes(bytes, length; content) {
         (length == 0) * (content == nil);
         (0 <# length) * ARRAY(bytes, char, length, content)
-    }
+    } facts: (0 <=# length)
 
     lemma optBytesConcat(lptr, llength, rptr, rlength) {
         hypothesis:
