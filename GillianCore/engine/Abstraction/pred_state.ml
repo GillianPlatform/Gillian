@@ -1,9 +1,4 @@
-type 'a t = {
-  state : 'a;
-  preds : Preds.t;
-  wands : Wands.t;
-  pred_defs : MP.preds_tbl_t;
-}
+type 'a t = { state : 'a; preds : Preds.t; wands : Wands.t }
 
 let pp pp_state fmt (astate : 'a t) : unit =
   let { state; preds; wands; _ } = astate in
@@ -14,8 +9,7 @@ let of_yojson state_of_yojson (yojson : Yojson.Safe.t) : ('a t, string) result =
   (* TODO: Deserialize other components of pstate *)
   let open Syntaxes.Result in
   let rec aux = function
-    | Some state, Some preds, Some wands, [] ->
-        Ok { state; preds; pred_defs = MP.init_pred_defs (); wands }
+    | Some state, Some preds, Some wands, [] -> Ok { state; preds; wands }
     | None, preds, wands, ("state", state_yojson) :: rest ->
         let* state = state_of_yojson state_yojson in
         aux (Some state, preds, wands, rest)
@@ -42,7 +36,8 @@ let to_yojson state_to_yojson pstate =
     ]
 
 let clear_resource clear_state_resource (astate : 'a t) : 'a t =
-  let { state; preds; wands = _; pred_defs } = astate in
+  let { state; preds; wands = _ } = astate in
+  let pred_defs = MP.get_pred_defs () in
   let state = clear_state_resource state in
   let preds_list = Preds.to_list preds in
   List.iter
@@ -55,12 +50,7 @@ let clear_resource clear_state_resource (astate : 'a t) : 'a t =
         in
         ())
     preds_list;
-  { state; preds; wands = Wands.init []; pred_defs }
+  { state; preds; wands = Wands.init [] }
 
 let copy_with_state (astate : 'a t) (state : 'a) : 'a t =
-  {
-    state;
-    preds = Preds.copy astate.preds;
-    wands = Wands.copy astate.wands;
-    pred_defs = astate.pred_defs;
-  }
+  { state; preds = Preds.copy astate.preds; wands = Wands.copy astate.wands }

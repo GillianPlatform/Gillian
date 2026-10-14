@@ -84,6 +84,15 @@ val init_preds :
 val pp : Format.formatter -> t -> unit
 val get_pred_def : preds_tbl_t -> string -> pred
 val init_pred_defs : unit -> preds_tbl_t
+
+(** Retrieve the ambient predicate-definition table. Must be called within the
+    extent of a {!with_pred_table}, otherwise raises [Effect.Unhandled]. *)
+val get_pred_defs : unit -> preds_tbl_t
+
+(** [with_pred_table tbl f] runs [f] with [tbl] as the ambient predicate table,
+    so that any {!get_pred_defs} performed by [f] returns [tbl]. *)
+val with_pred_table : preds_tbl_t -> (unit -> 'a) -> 'a
+
 val pp_pred_defs : Format.formatter -> preds_tbl_t -> unit
 val get_procs : 'a prog -> ('a, int) Proc.t list
 val get_bispecs : 'a prog -> BiSpec.t list

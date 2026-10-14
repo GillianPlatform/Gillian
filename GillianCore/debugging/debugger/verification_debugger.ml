@@ -25,6 +25,7 @@ struct
     type debug_state_ext = {
       mutable match_maps : (L.Report_id.t * Match_map.t) list;
       tests : (string * Verification.t) list;
+      pred_defs : MP.preds_tbl_t;
     }
 
     let preprocess_prog ~no_unfold prog =
@@ -33,10 +34,15 @@ struct
     let init (debug_state : unit base_debug_state) =
       let { init_data; prog; main_proc_name; _ } = debug_state in
       Config.Verification.set_procs_to_verify [ main_proc_name ];
-      let tests = Verification.Debug.get_tests_for_prog ~init_data prog in
-      { tests; match_maps = [] }
+      let pred_defs, tests =
+        Verification.Debug.get_tests_for_prog ~init_data prog
+      in
+      { tests; match_maps = []; pred_defs }
 
     let init_proc _ _ = ()
+
+    let with_pred_table (debug_state : debug_state_ext base_debug_state) f =
+      MP.with_pred_table debug_state.ext.pred_defs f
 
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =

@@ -10,7 +10,6 @@ module type S = sig
   include SState.S with type t := t
 
   val make_p :
-    preds:MP.preds_tbl_t ->
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
@@ -20,7 +19,6 @@ module type S = sig
     t
 
   val make_p_from_heap :
-    pred_defs:MP.preds_tbl_t ->
     store:store_t ->
     heap:heap_t ->
     spec_vars:SS.t ->
@@ -29,8 +27,6 @@ module type S = sig
     pfs:PFS.t ->
     gamma:Type_env.t ->
     t
-
-  val init_with_pred_table : MP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> Preds.t
@@ -81,23 +77,12 @@ module Make (State : SState.S) :
 
   type action_ret = (t * vt list, err_t) Res_list.t
 
-  let init_with_pred_table pred_defs init_data =
-    Pred_state.
-      {
-        state = State.init init_data;
-        preds = Preds.init [];
-        wands = Wands.init [];
-        pred_defs;
-      }
-
   let init init_data =
-    let empty_pred_defs : MP.preds_tbl_t = MP.init_pred_defs () in
     Pred_state.
       {
         state = State.init init_data;
         preds = Preds.init [];
         wands = Wands.init [];
-        pred_defs = empty_pred_defs;
       }
 
   let get_init_data astate = State.get_init_data astate.Pred_state.state
@@ -107,7 +92,6 @@ module Make (State : SState.S) :
     Pred_state.copy_with_state astate state
 
   let make_p
-      ~(preds : MP.preds_tbl_t)
       ~(init_data : init_data)
       ~(store : store_t)
       ~(pfs : PFS.t)
@@ -115,22 +99,14 @@ module Make (State : SState.S) :
       ~(spec_vars : SS.t)
       () : t =
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
-    { state; preds = Preds.init []; wands = Wands.init []; pred_defs = preds }
+    { state; preds = Preds.init []; wands = Wands.init [] }
 
   let make_s_from_heap ~heap:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ =
     failwith "Calling make_s_from_heap on SState"
 
-  let make_p_from_heap
-      ~pred_defs
-      ~store
-      ~heap
-      ~spec_vars
-      ~wands
-      ~preds
-      ~pfs
-      ~gamma =
+  let make_p_from_heap ~store ~heap ~spec_vars ~wands ~preds ~pfs ~gamma =
     let sstate = State.make_s_from_heap ~store ~heap ~spec_vars ~pfs ~gamma in
-    Pred_state.{ state = sstate; preds; wands; pred_defs }
+    Pred_state.{ state = sstate; preds; wands }
 
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
@@ -213,12 +189,11 @@ module Make (State : SState.S) :
     State.get_type astate.state v
 
   let copy (astate : t) : t =
-    let Pred_state.{ state; preds; wands; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands } = astate in
     {
       state = State.copy state;
       preds = Preds.copy preds;
       wands = Wands.copy wands;
-      pred_defs;
     }
 
   let simplify_val (astate : t) (v : Expr.t) : Expr.t =
@@ -242,7 +217,8 @@ module Make (State : SState.S) :
     |> SS.union (Wands.get_lvars wands)
 
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t =
-    let Pred_state.{ state; preds; wands; pred_defs; _ } = astate in
+    let Pred_state.{ state; preds; wands; _ } = astate in
+    let pred_defs = MP.get_pred_defs () in
     let s_asrts = State.to_assertions ?to_keep state in
     let split_ins_outs name args =
       let pred = (MP.get_pred_def pred_defs name).pred in
@@ -254,18 +230,12 @@ module Make (State : SState.S) :
 
   let substitution_in_place ?(subst_all = false) (subst : st) (astate : t) :
       t list =
-    let Pred_state.{ state; preds; wands; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands } = astate in
     Preds.substitution_in_place subst preds;
     Wands.substitution_in_place subst wands;
     List.map
       (fun state ->
-        Pred_state.
-          {
-            state;
-            preds = Preds.copy preds;
-            wands = Wands.copy wands;
-            pred_defs;
-          })
+        Pred_state.{ state; preds = Preds.copy preds; wands = Wands.copy wands })
       (State.substitution_in_place ~subst_all subst state)
 
   let update_store (state : t) (x : string option) (v : Expr.t) : t =
@@ -386,7 +356,8 @@ module Make (State : SState.S) :
     SVal.SESubst.init subst_lst
 
   let clear_resource (astate : t) =
-    let Pred_state.{ state; preds; wands = _; pred_defs } = astate in
+    let Pred_state.{ state; preds; wands = _ } = astate in
+    let pred_defs = MP.get_pred_defs () in
     let state = State.clear_resource state in
     let preds_list = Preds.to_list preds in
     List.iter
@@ -398,7 +369,7 @@ module Make (State : SState.S) :
           in
           ())
       preds_list;
-    Pred_state.{ state; preds; wands = Wands.init []; pred_defs }
+    Pred_state.{ state; preds; wands = Wands.init [] }
 
   let consume ~(prog : 'a MP.prog) astate (a : Asrt.t) binders =
     if not (List.for_all Names.is_lvar_name binders) then
@@ -817,9 +788,10 @@ module Make (State : SState.S) :
       ([Fold]/[Unfold]/[GUnfold]/[Package]). These are no longer reached through
       [evaluate_slcmd]: the interpreter issues them as calls to reserved memory
       actions, which [execute_action] (below) catches and forwards here. The
-      predicate table is read from [astate.pred_defs] (identical to
+      predicate table is read from the ambient {!MP.get_pred_defs} (identical to
       [prog.preds]), so no [prog] argument is needed. *)
   let eval_pred_slcmd (lcmd : SLCmd.t) (astate : t) : (t, err_t) Res_list.t =
+    let pred_defs = MP.get_pred_defs () in
     let eval_expr e =
       try State.eval_expr astate.state e
       with State.Internal_State_Error (errs, _) ->
@@ -830,7 +802,7 @@ module Make (State : SState.S) :
       match lcmd with
       | Fold (pname, les, fold_info) ->
           let vs = List.map eval_expr les in
-          let pred = MP.get_pred_def astate.pred_defs pname in
+          let pred = MP.get_pred_def pred_defs pname in
           let additional_bindings =
             Option.fold
               ~some:(fun (_, bindings) ->
@@ -845,7 +817,7 @@ module Make (State : SState.S) :
              and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
           (* 1) We retrieve the definition of the predicate to unfold and make sure
              it is not abstract and hence can be unfolded. *)
-          let pred = MP.get_pred_def astate.pred_defs pname in
+          let pred = MP.get_pred_def pred_defs pname in
           if pred.pred.pred_abstract then
             Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
           (* 2) We evaluate the arguments, filter to keep only the in-parameters

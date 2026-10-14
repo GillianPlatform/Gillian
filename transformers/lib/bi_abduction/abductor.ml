@@ -62,7 +62,7 @@ struct
         SPState.get_heap bi_state
       in
       let current =
-        NonBiPState.make_p_from_heap ~pred_defs:bi_state.pred_defs
+        NonBiPState.make_p_from_heap
           ~store:(SPState.get_store bi_state)
           ~heap:state ~pfs:(SPState.get_pfs bi_state)
           ~gamma:(SPState.get_typ_env bi_state)
