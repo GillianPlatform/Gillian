@@ -84,6 +84,10 @@ jobs:
         name: Setup Z3
         id: z3
         uses: cda-tum/setup-z3@v1
+        # Pinned: Z3 5.x fails some of the Amazon case study's (parse_edk)
+        # sequence queries, which 4.16 decides instantly.
+        with:
+          version: "4.16.0"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v4
@@ -184,10 +188,6 @@ jobs:
       - name: Test Amazon
         run: "make"
         working-directory: "Gillian-C/examples/amazon/"
-        # Z3 5.x times out on some of parse_edk's sequence queries with the
-        # default seed (4.16 decides them instantly with any seed).
-        env:
-          SMT_RANDOM_SEED: 1
 
   gillian_js_tests:
     strategy:

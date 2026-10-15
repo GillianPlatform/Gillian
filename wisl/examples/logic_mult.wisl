@@ -1,0 +1,21 @@
+// [*] is multiplication inside a logic expression and separating conjunction
+// between assertions.
+
+predicate cell(x; v) {
+  (x -> v)
+}
+
+{ (x == #x) * (y == #y) }
+function mul(x, y) {
+  r := x * y;
+  return r
+}
+{ ret == #x * #y }
+
+{ (x == #x) * (#x -> #v) }
+function scale(x) {
+  v := [x];
+  [x] := v * 2;
+  return v
+}
+{ (ret == #v) * cell(#x, #v * 2) * (#v * 2 == ret + ret) }

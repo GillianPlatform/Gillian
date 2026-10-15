@@ -258,7 +258,7 @@ size_t aws_array_list_length(const struct aws_array_list *list) {
     ensures:
               (#length == len #content) * (#index <# #length) *
               (#new_content == #fp @ [ #edk ] @ #sp) *
-              (#fp == lsub(#content, 0, #index - 1)) *
+              (#fp == lsub(#content, 0, #index)) *
               (#sp == lsub(#content, #index + 1, (len #content) - #index - 1 )) *
               valid_edk_array_list_ptr(#list, #alloc, #new_content) *
               valid_aws_cryptosdk_edk_ptr(#val, #alloc, #edk) *
