@@ -2,11 +2,11 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (Verification :
-      Verifier.S with type SPState.init_data = ID.t and type annot = PC.Annot.t)
+      Verifier.S with type State.init_data = ID.t and type annot = PC.Annot.t)
     (Lifter :
       Debugger_lifter.S
         with type memory = Verification.SAInterpreter.heap_t
-         and type memory_error = Verification.SPState.m_err_t
+         and type memory_error = Verification.State.m_err_t
          and type tl_ast = PC.tl_ast
          and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
          and type annot = PC.Annot.t
@@ -17,15 +17,27 @@ struct
 
   module Impl : Debugger_impl = struct
     type proc_state_ext = unit
-    type debug_state_ext = unit
+
+    (* Despite the name, this debugger steps the verification interpreter
+       ([module State] = [Verification.State], over the predicate-carrying
+       memory), so stepping through a session whose program uses predicates
+       performs [Get_pred_defs] (matching, fold/unfold). We compile the
+       predicate table once and install it around every step. *)
+    type debug_state_ext = MP.preds_tbl_t
 
     let preprocess_prog ~no_unfold:_ prog = prog
-    let init _ = ()
+
+    let init (debug_state : unit base_debug_state) =
+      MP.init_preds debug_state.prog.preds |> Result.get_ok
+
     let init_proc _ _ = ()
+
+    let with_pred_table (debug_state : debug_state_ext base_debug_state) f =
+      MP.with_pred_table debug_state.ext f
 
     let launch_proc ~proc_name (debug_state : debug_state_ext base_debug_state)
         =
-      let prog = MP.init_prog debug_state.prog in
+      let prog = MP.init_prog ~preds_tbl:debug_state.ext debug_state.prog in
       let cont_func =
         Verification.SAInterpreter.init_evaluate_proc
           (fun x -> x)

@@ -58,20 +58,13 @@ val learn_expr :
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 val simplify_asrts : ?sorted:bool -> Asrt.t -> Asrt.t
-
-val s_init_atoms :
-  preds:(string, int list) Hashtbl.t ->
-  KB.t ->
-  Asrt.t ->
-  (step list, Asrt.t) result
-
+val s_init_atoms : KB.t -> Asrt.t -> (step list, Asrt.t) result
 val of_step_list : ?post:post -> ?label:label -> step list -> t
 
 val init :
   ?use_params:bool ->
   KB.t ->
   KB.t ->
-  (string, int list) Hashtbl.t ->
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list) result
 
@@ -84,6 +77,15 @@ val init_preds :
 val pp : Format.formatter -> t -> unit
 val get_pred_def : preds_tbl_t -> string -> pred
 val init_pred_defs : unit -> preds_tbl_t
+
+(** Retrieve the ambient predicate-definition table. Must be called within the
+    extent of a {!with_pred_table}, otherwise raises [Effect.Unhandled]. *)
+val get_pred_defs : unit -> preds_tbl_t
+
+(** [with_pred_table tbl f] runs [f] with [tbl] as the ambient predicate table,
+    so that any {!get_pred_defs} performed by [f] returns [tbl]. *)
+val with_pred_table : preds_tbl_t -> (unit -> 'a) -> 'a
+
 val pp_pred_defs : Format.formatter -> preds_tbl_t -> unit
 val get_procs : 'a prog -> ('a, int) Proc.t list
 val get_bispecs : 'a prog -> BiSpec.t list

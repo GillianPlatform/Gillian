@@ -67,7 +67,9 @@ struct
     node
 
   let add_memory_vars smemory get_new_scope_id (variables : Variable.ts) =
-    let sorted_locs_with_vals = Legacy_symbolic.sorted_locs_with_vals smemory in
+    let sorted_locs_with_vals =
+      Semantics.Symbolic.sorted_locs_with_vals smemory
+    in
     let value_nodes (loc, ((properties, domain), metadata)) : Variable.t =
       let () = ignore properties in
       let properties =
@@ -263,7 +265,7 @@ struct
       scopes
     else
       let sorted_locs_with_vals =
-        Legacy_symbolic.sorted_locs_with_vals memory
+        Semantics.Symbolic.sorted_locs_with_vals memory
       in
       let loc_to_scope_id = Hashtbl.create 0 in
       let () =

@@ -49,6 +49,7 @@
 %token VERIFY
 %token IMPORT
 %token NOUNFOLD
+%token FACTS
 %token IF
 %token ELSE
 %token PREDICATE
@@ -311,6 +312,7 @@ predicate:
     RBRACE; LCBRACE;
     defs = separated_nonempty_list(SCOLON, pred_definition);
     RCBRACE;
+    facts = option(preceded(FACTS, preceded(COLON, formula)));
     {
       let params = ins @ outs in
       let ins_number = List.length ins in
@@ -321,6 +323,7 @@ predicate:
         definitions = defs;
         no_unfold = Option.is_some(no_unfold);
         pure = Option.is_some(pure);
+        facts;
       }
     }
 
@@ -375,11 +378,12 @@ assertion:
     { CAssert.Undefs (ptr, size)}
   | MALLOCED; LBRACE; ptr = expression; COMMA; ofs = expression; RBRACE
     { CAssert.Malloced(ptr, ofs) }
+(* Applications are written flat: the in/out split is a property of the
+   definition and is derived from there. A `;` here is a syntax error. *)
   | pname = IDENTIFIER; LBRACE;
-    ins = separated_list(COMMA, expression);
-    outs = outs(expression);
+    args = separated_list(COMMA, expression);
     RBRACE
-    { CAssert.Pred (pname, ins, outs) }
+    { CAssert.Pred (pname, args, []) }
 
 formula:
   | LBRACE; formula; RBRACE { $2 }

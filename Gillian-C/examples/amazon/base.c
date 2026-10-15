@@ -32,15 +32,15 @@
     pred nounfold optBytes(bytes, length; content) {
         (length == 0) * (content == nil);
         (0 <# length) * ARRAY(bytes, char, length, content)
-    }
+    } facts: (0 <=# length)
 
     lemma optBytesConcat(lptr, llength, rptr, rlength) {
         hypothesis:
-            optBytes(#lptr, #llength; #lcont) * optBytes(#rptr, #rlength; #rcont) *
+            optBytes(#lptr, #llength, #lcont) * optBytes(#rptr, #rlength, #rcont) *
             (#rptr == #lptr p+ #llength)
 
         conclusions:
-            optBytes(#lptr, #llength + #rlength; #lcont @ #rcont)
+            optBytes(#lptr, #llength + #rlength, #lcont @ #rcont)
 
         proof:
             unfold optBytes(#lptr, #llength, #lcont);

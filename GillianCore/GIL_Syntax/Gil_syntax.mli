@@ -455,8 +455,6 @@ module Asrt : sig
     | Pure of Expr.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | CorePred of string * Expr.t list * Expr.t list  (** Core assertion *)
-    | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
-        (** Magic wand of the form [P(...) -* Q(...)] *)
   [@@deriving yojson, eq]
 
   type t = atom list [@@deriving yojson, eq]
@@ -475,6 +473,50 @@ module Asrt : sig
 
   (** [pred name ins outs] builds a user-predicate assertion atom. *)
   val pred : string -> Expr.t list -> Expr.t list -> atom
+
+  (** Prefix and separator encoding a magic wand [lname(..) -* rname(..)] as a
+      {!CorePred} name [wand_prefix ^ lname ^ wand_sep ^ rname]. Set once; never
+      hardcode elsewhere. *)
+  val wand_prefix : string
+
+  val wand_sep : string
+
+  (** [wand_name lname rname] is the core-predicate name encoding the wand
+      [lname(..) -* rname(..)]. *)
+  val wand_name : string -> string -> string
+
+  (** [as_wand_name s] is [Some (lname, rname)] when [s] encodes a magic wand,
+      and [None] otherwise. *)
+  val as_wand_name : string -> (string * string) option
+
+  val wand_to_core_pred :
+    string * Expr.t list ->
+    string * Expr.t list ->
+    Expr.t list ->
+    string * Expr.t list * Expr.t list
+
+  (** [wand (lname, largs) (rname, r_ins) r_outs] builds a magic-wand assertion
+      atom. A wand's semantic ins are [largs @ r_ins] and its outs are [r_outs]
+      (only the rhs out-arguments); these are stored as the {!CorePred}'s ins
+      and outs respectively. *)
+  val wand : string * Expr.t list -> string * Expr.t list -> Expr.t list -> atom
+
+  (** [as_wand ~rhs_ins_number a] recovers [Some (lhs, rhs)] when [a] is a
+      wand-encoding {!CorePred}, and [None] otherwise. [rhs_ins_number] is the
+      number of in-parameters of the rhs predicate, needed to split the stored
+      ins back into [largs] and [r_ins]. *)
+  val as_wand :
+    rhs_ins_number:int ->
+    atom ->
+    ((string * Expr.t list) * (string * Expr.t list)) option
+
+  (** Effect looking up a predicate's number of in-parameters. Performed by the
+      wand printer; handled by [Engine.MP.with_pred_table]. *)
+  type _ Effect.t += Pred_ins_number : string -> int option Effect.t
+
+  (** [pred_ins_number name] performs {!Pred_ins_number}, returning [None] when
+      no handler (predicate table) is installed. *)
+  val pred_ins_number : string -> int option
 
   (** Comparison of assertions *)
   val compare : atom -> atom -> int
@@ -567,6 +609,41 @@ module SLCmd : sig
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
+
+  (** {2 Predicate actions}
+
+      Some SLCmds are just syntactic sugar for special actions to be executed
+      from the memory. For legacy reason, we have an encoding and decoding from
+      one to the other.
+
+      We reserve these memory-action name: each carries
+      {!Asrt.user_pred_prefix}. The interpreter issues [Fold], [Unfold],
+      [GUnfold] and [Package] as calls to these actions instead of through
+      [evaluate_slcmd]. *)
+
+  val fold_action : string
+  val unfold_action : string
+  val gunfold_action : string
+  val package_action : string
+
+  (** Reserved action asking the predicate-carrying memory to recover from a
+      failure by folding/unfolding; its arguments encode a recovery tactic
+      ([fold values or none; unfold values or none; "low"/"high"]). It does not
+      correspond to any SL command. *)
+  val recover_action : string
+
+  (** [is_pred_action a] holds iff [a] is one of the reserved actions above. *)
+  val is_pred_action : string -> bool
+
+  (** [to_action c] encodes a predicate-manipulating command as
+      [(action_name, args)], or [None] for any other command (those are still
+      handled by [evaluate_slcmd]). The arguments are left {b unevaluated} (as
+      they are syntactically matched against later). *)
+  val to_action : t -> (string * Expr.t list) option
+
+  (** [of_action name args] is the inverse of {!to_action}: it rebuilds the
+      command for one of the four reserved action names, or [None] otherwise. *)
+  val of_action : string -> Expr.t list -> t option
 end
 
 (** @canonical Gillian.Gil_syntax.LCmd *)
@@ -709,6 +786,22 @@ module Pred : sig
 
   (** Infers parameter types and makes them explicit in the assertions *)
   val explicit_param_types : (string, t) Hashtbl.t -> t -> (t, string) result
+
+  (** [resolve_ins_outs preds a] normalises the in/out split of the predicate
+      application [a] against the predicate table [preds].
+
+      The parsers only ever produce {e unsplit} applications — a [;] in an
+      application is a syntax error — which are split at the definition's
+      [ins_number]. An already-split one is checked against the definition and
+      returned unchanged, which is what makes this idempotent. Magic wands are
+      resolved through their right-hand predicate.
+
+      Genuine core predicates are returned unchanged: they have no definition to
+      derive a split from, so their [;] remains mandatory.
+
+      The function is total and idempotent. *)
+  val resolve_ins_outs :
+    (string, t) Hashtbl.t -> Asrt.atom -> (Asrt.atom, string) result
 
   (** Combines a list of ins and a list of outs putting them in the right order
       according to a given predicate. *)
@@ -1073,6 +1166,14 @@ module Prog : sig
         (** Table used for Phi-assignment *)
   }
 
+  (** Resolves the in/out split of every predicate application in the program,
+      against [prog.preds], in place. See {!Pred.resolve_ins_outs}.
+
+      Must run once the predicate table is complete (i.e. after imports have
+      been resolved) and before any analysis. Raises a Gillian analysis failure
+      if an application's explicit [;] disagrees with the definition. *)
+  val resolve_pred_ins_outs : ('annot, 'label) t -> unit
+
   (** Makes a full program *)
   val make :
     imports:(string * bool) list ->
@@ -1358,12 +1459,6 @@ module Visitors : sig
              Expr.t list ->
              Asrt.atom
          ; visit_DatatypeType : 'c -> Type.t -> string -> Type.t
-         ; visit_Wand :
-             'c ->
-             Asrt.atom ->
-             string * Expr.t list ->
-             string * Expr.t list ->
-             Asrt.atom
          ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
          ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
          ; visit_GuardedGoto : 'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
@@ -1618,14 +1713,6 @@ module Visitors : sig
       'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
 
     method visit_DatatypeType : 'c -> Type.t -> string -> Type.t
-
-    method visit_Wand :
-      'c ->
-      Asrt.atom ->
-      string * Expr.t list ->
-      string * Expr.t list ->
-      Asrt.atom
-
     method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
     method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
     method visit_GuardedGoto : 'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
@@ -1894,7 +1981,6 @@ module Visitors : sig
          ; visit_function_call : 'c -> Cmd.function_call -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_DatatypeType : 'c -> string -> 'f
-         ; visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
          ; visit_GUnfold : 'c -> string -> 'f
          ; visit_Goto : 'c -> 'g -> 'f
          ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2121,7 +2207,6 @@ module Visitors : sig
     method visit_function_call : 'c -> Cmd.function_call -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_DatatypeType : 'c -> string -> 'f
-    method visit_Wand : 'c -> string * Expr.t list -> string * Expr.t list -> 'f
     method visit_GUnfold : 'c -> string -> 'f
     method visit_Goto : 'c -> 'g -> 'f
     method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2348,8 +2433,6 @@ module Visitors : sig
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_DatatypeType : 'c -> string -> unit
-         ; visit_Wand :
-             'c -> string * Expr.t list -> string * Expr.t list -> unit
          ; visit_GUnfold : 'c -> string -> unit
          ; visit_Goto : 'c -> 'f -> unit
          ; visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit
@@ -2574,10 +2657,6 @@ module Visitors : sig
     method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
     method visit_DatatypeType : 'c -> string -> unit
-
-    method visit_Wand :
-      'c -> string * Expr.t list -> string * Expr.t list -> unit
-
     method visit_GUnfold : 'c -> string -> unit
     method visit_Goto : 'c -> 'f -> unit
     method visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit

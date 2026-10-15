@@ -12,7 +12,7 @@ module Gil_branch_case = Gillian.Gil_syntax.Branch_case
 module DL = Gillian.Debugger.Logging
 module Exec_map = Gillian.Debugger.Utils.Exec_map
 module Annot = C2_annot
-module SMemory = Memory_model.SMemory
+module SMemory = Memory_model.MonadicSMemory
 open Annot
 open Branch_case
 
@@ -34,7 +34,7 @@ module Make
     (Gil :
       Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state
         with type Lifter.memory = SMemory.t)
-    (Verification : Engine.Verifier.S with type annot = C2_annot.t) =
+    (Verification : Verify.Verifier.S with type annot = C2_annot.t) =
 struct
   open Exec_map
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport

@@ -110,17 +110,12 @@ module type S = sig
 
   val evaluate_slcmd : 'a MP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
-  (** [match_invariant prog revisited state invariant binders] returns a list of
+  (** [match_invariant revisited state invariant binders] returns a list of
       pairs of states. In each pair, the first element is the framed off state,
       and the second one is the invariant, i.e. the state obtained by producing
       the invariant *)
   val match_invariant :
-    'a MP.prog ->
-    bool ->
-    t ->
-    Asrt.t ->
-    string list ->
-    (t * t, err_t) Res_list.t
+    bool -> t -> Asrt.t -> string list -> (t * t, err_t) Res_list.t
 
   val frame_on : t -> (string * t) list -> string list -> (t, err_t) Res_list.t
 
@@ -141,7 +136,6 @@ module type S = sig
   val unfolding_vals : t -> Expr.t list -> vt list
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
-  val clean_up : ?keep:Expr.Set.t -> t -> unit
   val match_assertion : t -> st -> MP.step -> (t, err_t) Res_list.t
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t, err_t) Res_list.t

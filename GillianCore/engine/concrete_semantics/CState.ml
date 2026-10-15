@@ -147,7 +147,7 @@ end = struct
       (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let match_invariant _ _ _ _ _ =
+  let match_invariant _ _ _ _ =
     raise (Failure "ERROR: match_invariant called for concrete execution")
 
   let frame_on _ _ _ =
@@ -157,8 +157,6 @@ end = struct
 
   let fresh_loc ?loc:_ (_ : t) =
     raise (Failure "fresh_loc not implemented in concrete state")
-
-  let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
 
   let match_assertion (_ : t) (_ : st) (_ : MP.step) =
     raise (Failure "Match assertion from concrete state.")

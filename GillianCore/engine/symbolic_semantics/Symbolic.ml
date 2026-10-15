@@ -56,11 +56,7 @@ module type Memory_S = SMemory.S
 (** @canonical Gillian.Symbolic.Dummy_memory *)
 module Dummy_memory = SMemory.Dummy
 
-(** @canonical Gillian.Symbolic.Legacy_s_memory *)
-module Legacy_s_memory = Legacy_s_memory
-
 (** @canonical Gillian.Symbolic.Store *)
 module Store = SStore
 
 module SState = SState
-module PState = PState

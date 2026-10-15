@@ -96,7 +96,15 @@ let get_alocs t =
     SS.empty !t
 
 let to_assertions (wands : t) =
-  let wand_to_asrt { lhs; rhs } = Asrt.Wand { lhs; rhs } in
+  let pred_defs = MP.get_pred_defs () in
+  let wand_to_asrt { lhs = lname, largs; rhs = rname, rargs } =
+    (* The wand's semantic outs are the rhs out-args; its ins are the lhs args
+       together with the rhs in-args. *)
+    let rpred = MP.get_pred_def pred_defs rname in
+    let r_ins = Pred.in_args rpred.pred rargs in
+    let r_outs = Pred.out_args rpred.pred rargs in
+    Asrt.wand (lname, largs) (rname, r_ins) r_outs
+  in
   List.map wand_to_asrt !wands
 
 let wand_ins_outs ~pred_defs { lhs = _, largs; rhs = rname, rargs } =

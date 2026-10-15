@@ -211,7 +211,7 @@ let rec compile_lexpr
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
         let pred_i_plus =
-          Asrt.pred internal_pred [ comp_expr1; comp_expr2 ] [ Expr.LVar lout ]
+          Asrt.pred internal_pred [ comp_expr1; comp_expr2; Expr.LVar lout ] []
         in
         ( gvars1 @ gvars2 @ [ lout ],
           asrtl1 @ asrtl2 @ [ pred_i_plus ],
@@ -389,7 +389,9 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
       let exs = List.concat (exs1 @ exs2) in
       let al = List.concat (al1 @ al2) in
-      (exs, Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) } :: al)
+      (* Emit the rhs args flat: [Prog.resolve_pred_ins_outs] splits them at the
+         rhs predicate's [ins_number]. *)
+      (exs, Asrt.wand (lname, el1) (rname, el2) [] :: al)
   | LPure lf ->
       let _, al, e = compile_lexpr lf in
       let e =

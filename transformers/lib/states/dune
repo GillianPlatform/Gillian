@@ -1,8 +1,0 @@
-(library
- (name states)
- (public_name transformers.states)
- (libraries gillian gillian.ppx_sat.runtime ppx_deriving_yojson.runtime)
- (preprocess
-  (pps ppx_deriving.show ppx_deriving_yojson gillian.ppx_sat))
- (instrumentation
-  (backend landmarks --auto)))

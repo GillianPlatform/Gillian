@@ -610,15 +610,25 @@ lvar_or_pvar:
   | x = IDENTIFIER { x }
   | lx = LVAR { lx }
 
+(* A wand operand [p(args)]. No [;]: the in/out split is derived from the
+   predicate's definition by the engine's [Prog.resolve_pred_ins_outs] pass.
+   Outside a wand, [p(args)] is parsed as a pure-function application and
+   coerced to a predicate call (see [logic_assertion]); the choice is a
+   single-token lookahead on [WAND]. *)
+pred_call:
+  | lpr = IDENTIFIER; LBRACE;
+    args = separated_list(COMMA, logic_expression);
+    lend = RBRACE
+    { let (lstart, pr) = lpr in
+      (pr, args, lstart, lend) }
+
 wand:
-  | lname = IDENTIFIER; LBRACE; lins = separated_list(COMMA, logic_expression); SCOLON; louts = separated_list(COMMA, logic_expression); RBRACE;
-    WAND;
-    rname = IDENTIFIER; LBRACE; rins = separated_list(COMMA, logic_expression); SCOLON; routs = separated_list(COMMA, logic_expression); lend = RBRACE
+  | lhs = pred_call; WAND; rhs = pred_call
     {
-      let (lstart, lname) = lname in
-      let (_, rname) = rname in
+      let (lname, largs, lstart, _) = lhs in
+      let (rname, rargs, _, lend) = rhs in
       let loc = CodeLoc.merge lstart lend in
-      ((lname, lins @ louts), (rname, rins @ routs), loc)
+      ((lname, largs), (rname, rargs), loc)
     }
 
 logic_assertion_top_level:
@@ -638,20 +648,6 @@ logic_assertion:
   | wand = wand
     { let (lhs, rhs, loc) = wand in
       WLAssert.make (LWand { lhs; rhs }) loc }
-  (* A predicate call with an explicit in/out separator [;].  The
-     semicolon-less form [p(a, b)] is instead parsed as a pure-function
-     application (a [logic_expression]) and turned into an (all-in) predicate
-     call by the coercion below; this avoids an unresolvable reduce/reduce
-     conflict between predicate calls and pure-function applications. *)
-  | lpr = IDENTIFIER; LBRACE;
-    ins = separated_list(COMMA, logic_expression);
-    SCOLON;
-    outs = separated_list(COMMA, logic_expression);
-    lend = RBRACE
-    { let (lstart, pr) = lpr in
-      let bare_assert = WLAssert.LPred (pr, ins, outs) in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
   | loc = EMP
     { let bare_assert = WLAssert.LEmp in
       WLAssert.make bare_assert loc }
@@ -691,7 +687,7 @@ logic_assertion:
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
   (* A bare (pure) logic expression is a pure assertion.  A bare
-     application [p(args)] denotes an all-in predicate call (pure functions
+     application [p(args)] denotes an unsplit predicate call (pure functions
      only appear as sub-expressions, never as a whole assertion).  This is the
      single place where pure expressions become assertions, so [TRUE], [FALSE]
      and a parenthesised pure expression [(e)] all go through here. *)

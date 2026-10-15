@@ -51,6 +51,7 @@ rule read =
   | "UNDEFS"   { UNDEFS }
   | "abstract" { ABSTRACT }
   | "pred"     { PREDICATE }
+  | "facts"    { FACTS }
   | "pure"     { PURE }
   | "lemma"    { LEMMA }
   | "hypothesis" { HYPOTHESIS }

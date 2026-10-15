@@ -637,7 +637,68 @@ struct
       | If (e, lcmds_t, lcmds_e) ->
           eval_if e lcmds_t lcmds_e prog annot state eval_expr
       | Branch fof -> eval_branch fof state
-      | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
+      | SL sl_cmd -> (
+          (* [Fold]/[Unfold]/[GUnfold]/[Package] are issued as calls to
+             reserved memory actions executed by the memory itself, so the
+             state stays predicate-unaware. The three store/state-level
+             concerns that used to live in the state's action shim are handled
+             here:
+             - the store-dependent sub-expressions are evaluated before
+               encoding ([Package] arguments stay raw, matching the legacy
+               behaviour); the evaluation is done on the structured command (so
+               each argument is re-encoded into a fresh [EList], never folded
+               into a literal list that [SLCmd.of_action] could not decode);
+             - the [Unfold] binders are registered as spec-vars;
+             - the result is simplified as the legacy engine did — with
+               [~matching:true] for [Unfold]/[GUnfold] (which unifies the
+               abstract locations an unfolding introduces), then a plain
+               simplification.
+             The other SL commands are still evaluated by [evaluate_slcmd]. *)
+          match SLCmd.to_action sl_cmd with
+          | None -> State.evaluate_slcmd prog sl_cmd state
+          | Some _ ->
+              let evaluated_sl_cmd =
+                match sl_cmd with
+                | SLCmd.Package _ -> sl_cmd
+                | _ ->
+                    SLCmd.map Fun.id
+                      (fun e -> Val.to_expr (State.eval_expr state e))
+                      sl_cmd
+              in
+              let action, args =
+                Option.get (SLCmd.to_action evaluated_sl_cmd)
+              in
+              let v_args =
+                List.map (fun e -> Option.get (Val.from_expr e)) args
+              in
+              let state =
+                match sl_cmd with
+                | SLCmd.Unfold (_, _, Some bindings, _) ->
+                    State.add_spec_vars state
+                      (Var.Set.of_list (List.map fst bindings))
+                | _ -> state
+              in
+              let matching =
+                match sl_cmd with
+                | SLCmd.Unfold _ | SLCmd.GUnfold _ -> true
+                | _ -> false
+              in
+              State.execute_action action state v_args
+              |> List.concat_map (function
+                   | Error _ as err -> [ err ]
+                   | Ok (state', _) ->
+                       let states =
+                         if matching then
+                           let _, states =
+                             State.simplify ~kill_new_lvars:true ~matching:true
+                               state'
+                           in
+                           List.concat_map
+                             (fun s -> snd (State.simplify s))
+                             states
+                         else snd (State.simplify state')
+                       in
+                       List.map Result.ok states))
 
     and eval_lcmds
         ?(top = false)
@@ -1179,7 +1240,7 @@ struct
         (* Invariant being revisited *)
         | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
             (* let () = Fmt.pr "\nRe-establishing invariant... @?" in *)
-            let _ = State.match_invariant prog true state a binders in
+            let _ = State.match_invariant true state a binders in
             let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
             (* let () = Fmt.pr "\nInvariant re-established. @?" in *)
             []
@@ -1187,7 +1248,7 @@ struct
             assert (loop_action = FrameOff (List.hd loop_ids));
             (* let () = Fmt.pr "\nEstablishing invariant... @?" in *)
             let frames_and_states =
-              State.match_invariant prog false state a binders
+              State.match_invariant false state a binders
             in
             (* let () = Fmt.pr "\nSuccessfully established invariant. @?" in *)
             List.map

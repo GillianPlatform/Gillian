@@ -143,8 +143,9 @@ let assert_of_member cenv members id typ =
       in
       let list_is_components = pvmember#==(Expr.list args_without_ins) in
       let ofs = Expr.Infix.(pvofs + fo) in
-      (* Struct predicates have the location and offset as their two ins. *)
-      let pred_call = Asrt.pred pred_name [ pvloc; ofs ] args_without_ins in
+      let pred_call =
+        Asrt.pred pred_name (pvloc :: ofs :: args_without_ins) []
+      in
       [ list_is_components; pred_call ]
   | Tarray (ty, n, _) ->
       let n = ValueTranslation.int_of_z n in
@@ -166,11 +167,11 @@ let assert_of_member cenv members id typ =
         let open Internal_Predicates in
         let open VTypes in
         match typ with
-        | Tint _ -> (mk int_type lvval, Asrt.pred int_get [ pvmember ] [ lvval ])
+        | Tint _ -> (mk int_type lvval, Asrt.pred int_get [ pvmember; lvval ] [])
         | Tlong _ ->
-            (mk long_type lvval, Asrt.pred long_get [ pvmember ] [ lvval ])
+            (mk long_type lvval, Asrt.pred long_get [ pvmember; lvval ] [])
         | Tfloat _ ->
-            (mk float_type lvval, Asrt.pred float_get [ pvmember ] [ lvval ])
+            (mk float_type lvval, Asrt.pred float_get [ pvmember; lvval ] [])
         | Tpointer _ -> (pvmember, Asrt.pred is_ptr_opt [ pvmember ] [])
         | _ ->
             failwith
@@ -448,7 +449,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   let tloc = types ObjectType in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
-  let ptr_call p l o = Asrt.pred Internal_Predicates.ptr_get [ p ] [ l; o ] in
+  let ptr_call p l o = Asrt.pred Internal_Predicates.ptr_get [ p; l; o ] [] in
   let sz = function
     | CSVal.Sint _ -> 4
     | Slong _ -> 8
@@ -545,7 +546,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         split3_expr_comp (List.map trans_expr el)
       in
       let pr =
-        Asrt.pred struct_pred [ locv; ofsv ] params_fields :: more_asrt
+        Asrt.pred struct_pred (locv :: ofsv :: params_fields) [] :: more_asrt
       in
       pr @ to_assert @ [ malloc_chunk siz ]
 
@@ -681,8 +682,25 @@ let trans_pred ~ann ~filepath cl_pred =
           ins_number;
           no_unfold;
           pure = pred_pure;
+          facts;
         } =
     cl_pred
+  in
+  let pred_facts =
+    match facts with
+    | None -> []
+    | Some f -> (
+        match trans_form f with
+        | [], [], e ->
+            let rec split = function
+              | Expr.BinOp (e1, And, e2) -> split e1 @ split e2
+              | e -> [ e ]
+            in
+            split e
+        | _ ->
+            failwith
+              (Fmt.str "The facts of predicate %s must be pure expressions"
+                 pred_name))
   in
   let pred_num_params = List.length pred_params in
   let pred_definitions =
@@ -705,8 +723,7 @@ let trans_pred ~ann ~filepath cl_pred =
       pred_params;
       ins_number;
       pred_definitions;
-      (* FIXME: ADD SUPPORT FOR FACTS *)
-      pred_facts = [];
+      pred_facts;
       pred_guard = None;
       pred_pure;
       pred_abstract = false;

@@ -18,7 +18,7 @@ fi
 
 if [ -n "$dune_checks" ]; then
   echo "[INFO] Running source code formatting"
-  $opam dune fmt
+  $opam dune build @fmt
 
   echo "[INFO] Running build"
   $opam dune build

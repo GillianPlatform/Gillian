@@ -35,42 +35,42 @@ end
 module Others = struct
   open Kcommons.Constants
 
-  (* The in/out split must match the runtime predicate definitions, since the
-     engine trusts the split carried by the assertion. *)
-  let pred name ins outs = Asrt.pred name ins outs
-  let pred_in name ins = Asrt.pred name ins []
+  (* Applications are built flat: [Prog.resolve_pred_ins_outs] derives the
+     in/out split from the runtime predicate definition, so no split needs to
+     be restated (nor kept in sync) here. *)
+  let pred name args = Asrt.pred name args []
 
   let malloced_abst ~ptr ~total_size =
-    pred Internal_Predicates.malloced [ ptr ] [ total_size ]
+    pred Internal_Predicates.malloced [ ptr; total_size ]
 
   let malloced ~ptr ~total_size =
     let loc, ofs = ptr in
     let size = Expr.int_z total_size in
-    pred Internal_Predicates.malloced [ Expr.list [ loc; ofs ] ] [ size ]
+    pred Internal_Predicates.malloced [ Expr.list [ loc; ofs ]; size ]
 
   let zeros_ptr_size ~ptr ~size =
-    pred_in Internal_Predicates.zeros_ptr_size [ ptr; size ]
+    pred Internal_Predicates.zeros_ptr_size [ ptr; size ]
 
   let undefs_ptr_size ~ptr ~size =
-    pred_in Internal_Predicates.undefs_ptr_size [ ptr; size ]
+    pred Internal_Predicates.undefs_ptr_size [ ptr; size ]
 
   let array_ptr ~ptr ~chunk ~size ~content =
     let chunk_str = Expr.string (Chunk.to_string chunk) in
-    pred Internal_Predicates.array_ptr [ ptr; size; chunk_str ] [ content ]
+    pred Internal_Predicates.array_ptr [ ptr; size; chunk_str; content ]
 
   let ptr_add ~ptr ~to_add ~res =
-    pred Internal_Predicates.ptr_add [ ptr; to_add ] [ res ]
+    pred Internal_Predicates.ptr_add [ ptr; to_add; res ]
 
   let fun_ptr ~ptr ~symb =
-    pred_in Internal_Predicates.fun_ptr [ Lit (String symb); ptr ]
+    pred Internal_Predicates.fun_ptr [ Lit (String symb); ptr ]
 
   let glob_fun ~symb ~fname =
-    pred_in Internal_Predicates.glob_fun [ Lit (String symb); fname ]
+    pred Internal_Predicates.glob_fun [ Lit (String symb); fname ]
 
   let glob_var_unallocated ~symb ~vname =
-    pred_in Internal_Predicates.glob_var_unallocated [ Expr.string symb; vname ]
+    pred Internal_Predicates.glob_var_unallocated [ Expr.string symb; vname ]
 
   let glob_var_unallocated_loc ~symb ~loc ~vname =
-    pred_in Internal_Predicates.glob_var_unallocated_loc
+    pred Internal_Predicates.glob_var_unallocated_loc
       [ Expr.string symb; loc; vname ]
 end

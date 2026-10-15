@@ -8,11 +8,12 @@ type id = L.Report_id.t [@@deriving yojson]
 
 module Make : Make =
 functor
-  (SMemory : SMemory.S)
+  (SMemory : Monadic.MonadicSMemory.S)
   (PC : ParserAndCompiler.S)
   (Verifier : Verifier.S with type annot = PC.Annot.t)
   ->
   struct
+    module SMemory = Monadic.MonadicSMemory.Lift (SMemory)
     open Exec_map
     module Annot = PC.Annot
 

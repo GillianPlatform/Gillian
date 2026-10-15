@@ -36,7 +36,7 @@ module type S = sig
 end
 
 module type Make = functor
-  (SMemory : SMemory.S)
+  (SMemory : Monadic.MonadicSMemory.S)
   (PC : ParserAndCompiler.S)
   (Verifier : Verifier.S with type annot = PC.Annot.t)
   ->

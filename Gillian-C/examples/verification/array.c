@@ -28,7 +28,7 @@ pred valid_array(ar; content) {
   (ar -> struct Array { #buffer; long(#capacity); long(#size) }) *
   (0 <# #capacity) *
   (#size <=# #capacity) *
-  OARRAY(#buffer, #size; content) *
+  OARRAY(#buffer, #size, content) *
   OUNINIT(#buffer p+ (#size * 4), (#capacity - #size) * 4) *
   MALLOCED(#buffer, #capacity * 4)
 }
@@ -36,8 +36,8 @@ pred valid_array(ar; content) {
 
 /*@ spec push(ar, value) {
   requires: (ar == #ar) * (value == int(#value)) *
-            valid_array(#ar; #content)
-  ensures:  valid_array(#ar; #content @ [#value])
+            valid_array(#ar, #content)
+  ensures:  valid_array(#ar, #content @ [#value])
 }*/
 void push(Array *ar, int value) {
     if (ar->size == ar->capacity) {
