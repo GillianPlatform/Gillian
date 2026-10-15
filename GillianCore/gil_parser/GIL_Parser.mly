@@ -255,24 +255,12 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token EOF
 
 (***** Precedence of operators *****)
-(* The later an operator is listed, the higher precedence it is given. *)
-(* Logic operators have lower precedence *)
-(* Program operators have higher precedence.*)
-(* Based on JavaScript:
-   https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Operators/Operator_Precedence *)
-%nonassoc DOT
-%left separating_conjunction
-%left LIMPLIES
-%left OR, LOR
-%left AND, LAND
-%nonassoc EQ
-%nonassoc FLT FLE FGT FGE ILT ILE IGT IGE SLT
-%left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
-%left BITWISEOR BITWISEXOR BITWISEAND BITWISEXORL BITWISEORL BITWISEANDL
-%left FPLUS FMINUS IPLUS IMINUS
-%left FTIMES FDIV FMOD ITIMES IDIV IMOD M_POW
-%left M_ATAN2 STRCAT SETDIFF
-%nonassoc SETMEM SETSUB
+(* Expression operator precedence is enforced structurally, through the
+   layered cascade of expression rules (atomic_expr_target, unary_expr,
+   set_op_expr, ..., implication_expr), so no precedence declarations are
+   needed for them. The only precedence still required is that of the
+   separating conjunction, which is left-associative. *)
+%left separating_conjunction FTIMES
 
 (***** Types and entry points *****)
 %type <Literal.t>    lit_target
@@ -298,12 +286,15 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (********* Common Stuff *********)
 (********************************)
 
-import_target:
-  IMPORT; imports = separated_nonempty_list(COMMA, STRING); SCOLON { imports }
-;
-
-import_verify_target:
-  IMPORT; VERIFY; imports = separated_nonempty_list(COMMA, STRING); SCOLON { imports }
+(* A single import line, either normal ([import "a", "b";]) or to-verify
+   ([import verify "c";]). Merging both into one rule (disambiguated by the
+   token following [import]) avoids the shift/reduce conflict that arose from
+   having two separately-optional import sections both starting with [import]. *)
+import_line_target:
+  | IMPORT; imports = separated_nonempty_list(COMMA, STRING); SCOLON
+    { List.map (fun path -> (path, false)) imports }
+  | IMPORT; VERIFY; imports = separated_nonempty_list(COMMA, STRING); SCOLON
+    { List.map (fun path -> (path, true)) imports }
 ;
 
 proc_name:
@@ -415,10 +406,6 @@ atomic_expr_target:
 (* Ignore variable *)
   | UNDERSCORE
     { Expr.LVar (LVar.alloc ()) }
-  | EXISTS; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
-    { Expr.Exists (vars, e) }
-  | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = expr_target
-    { Expr.ForAll (vars, e) }
 ;
 
 unary_expr:
@@ -549,8 +536,20 @@ implication_expr:
   | e1 = implication_expr; LIMPLIES; e2 = or_expr
     { Expr.BinOp (e1, Impl, e2) }
 
+(* Quantifiers bind the loosest: their body extends as far to the right as
+   possible. They live above the operator-precedence cascade, so a bare
+   quantifier is only accepted at the top of an expression (or, as everywhere
+   else, when parenthesised). *)
+quantified_expr:
+  | implication_expr { $1 }
+  | EXISTS; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = quantified_expr
+    { Expr.Exists (vars, e) }
+  | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; e = quantified_expr
+    { Expr.ForAll (vars, e) }
+;
+
 expr_target:
-    implication_expr { $1 }
+    quantified_expr { $1 }
 ;
 
 top_level_expr_target:
@@ -574,20 +573,14 @@ var_and_var_target:
 gmain_target:
   init_data = option(INIT_DATA);
   internal = option(INTERNAL_FILE);
-  imports = option(import_target);
-  imports_to_verify = option(import_verify_target);
+  imports = list(import_line_target);
   g_prog = gdeclaration_target;
   EOF
     {
       internal_file := Option.is_some internal;
       let init_data = Option.value init_data ~default:`Null in
-      let imports = List.map (fun path -> (path, false))
-        (Option.value ~default:[] imports)
-      in
-      let imports_to_verify = List.map (fun path -> (path, true))
-        (Option.value ~default:[] imports_to_verify)
-      in
-      (Prog.update_imports g_prog (imports @ imports_to_verify), init_data);
+      let imports = List.concat imports in
+      (Prog.update_imports g_prog imports, init_data);
     }
 ;
 
