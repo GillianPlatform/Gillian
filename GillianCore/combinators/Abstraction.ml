@@ -709,7 +709,13 @@ module Make (S : MonadicSMemory.S) = struct
       mstate list =
     match pred_from_str core_pred with
     | SubPred core_pred ->
-        resolve_with_matching ~matching:false ms
+        (* In matching mode, like [consume_dispatch]: production may learn
+           that two abstract locations are equal (e.g. re-producing a loop
+           frame's metadata for an object whose metadata an unfolded
+           invariant predicate produced afresh). Outside matching mode the
+           reduction turns that into [false] and the branch is pruned; the
+           legacy engine only checked it with [assume_a ~matching:true]. *)
+        resolve_with_matching ~matching:true ms
           (S.produce ~core_pred ms.st.mem vs)
         |> List.map (fun (mem', ms') ->
                { ms' with st = { ms'.st with mem = mem' } })
