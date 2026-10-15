@@ -81,16 +81,54 @@
 %token <CodeLoc.t> EMP LSTNIL
 %token <CodeLoc.t * string> LVAR
 
+%{
+(* [*] is both multiplication and separating conjunction. Logic expressions
+   parse it as multiplication; since a product is never a pure assertion, where
+   an expression is used as an assertion its top-level [*]s are split back
+   into separating conjunction. *)
+let rec factors e =
+  match WLExpr.get e with
+  | WLExpr.LBinOp (l, WBinOp.TIMES, r) -> factors l @ factors r
+  | _ -> [ e ]
+
+(* A bare application [p(args)] denotes an unsplit predicate call (pure
+   functions only appear as sub-expressions, never as a whole assertion). *)
+let atom e =
+  let bare_assert =
+    match WLExpr.get e with
+    | WLExpr.LPureFunApp (name, args) -> WLAssert.LPred (name, args, [])
+    | _ -> WLAssert.LPure e
+  in
+  WLAssert.make bare_assert (WLExpr.get_loc e)
+
+let star la1 la2 =
+  let loc = CodeLoc.merge (WLAssert.get_loc la1) (WLAssert.get_loc la2) in
+  WLAssert.make (WLAssert.LStar (la1, la2)) loc
+
+let stars = function
+  | la :: las -> List.fold_left star la las
+  | [] -> failwith "stars: empty"
+
+let assertion_of e = stars (List.map atom (factors e))
+
+(* [P(x) * y -> v]: the subject of [->] (or [:]) absorbed the preceding
+   factors, which are split off as conjuncts. *)
+let with_subject e mk =
+  match List.rev (factors e) with
+  | subject :: rev_conjuncts ->
+      stars (List.rev_map atom rev_conjuncts @ [ mk subject ])
+  | [] -> failwith "with_subject: no factors"
+%}
+
 (* Precedence.
    [separating_conjunction] is the lowest: the assertion [*] combines whole
    assertions.  [coerce_prec] is the precedence of the bare
    [logic_expression -> assertion] coercion; keeping it below [RBRACE] makes a
    parenthesised pure expression parse as an expression (and then coerce)
-   rather than ambiguously as an assertion.  [*] (TIMES) is separating
-   conjunction in the logic and is *not* an expression operator there (logic
-   expressions never multiply), so a bare pure expression followed by [*]
-   reduces to an assertion and the [*] separates.  Expression operators
-   otherwise use standard arithmetic precedence. *)
+   rather than ambiguously as an assertion, and keeping it below [TIMES] makes
+   an expression absorb a following [*] as multiplication (see [factors]
+   above for how it is split back).  Expression operators otherwise use
+   standard arithmetic precedence. *)
 %left separating_conjunction
 %nonassoc coerce_prec
 %nonassoc RBRACE
@@ -124,7 +162,6 @@
 %type <WExpr.t>                                 expression
 %type <WExpr.t list>                            expr_list
 %type <WLCmd.t>                                 logic_command
-%type <WLAssert.t>                              logic_assertion_top_level
 %type <WLAssert.t>                              logic_assertion
 %type <CodeLoc.t * WVal.t>                      value_with_loc
 %type <CodeLoc.t * WUnOp.t>                     unop_with_loc
@@ -153,7 +190,7 @@ prog:
     prog, configs }
 
 assert_only:
-  | la = logic_assertion_top_level; EOF { la }
+  | la = logic_assertion; EOF { la }
 
 definitions:
   | (* empty *) { ([], [], [], [], [], []) }
@@ -205,8 +242,8 @@ spec_bindings:
       (lstart, spec_name, variables) }
 
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion_top_level; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
-    post = logic_assertion_top_level; lend = RCBRACE
+  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+    post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
   | bindings = spec_bindings; LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
@@ -413,14 +450,6 @@ expression:
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       WExpr.make bare_expr loc }
-  (* [*] is only multiplication in program expressions (there is no separating
-     conjunction here), so it lives with the other binops. It is kept out of
-     [binop] because in the logic [*] means separating conjunction. *)
-  | e1 = expression; TIMES; e2 = expression
-    { let bare_expr = WExpr.BinOp (e1, WBinOp.TIMES, e2) in
-      let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
-      let loc = CodeLoc.merge lstart lend in
-      WExpr.make bare_expr loc }
   | e1 = expression; NEQ; e2 = expression
     { let bare_expr = WExpr.BinOp (e1, EQUAL, e2) in
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
@@ -436,9 +465,7 @@ expression:
       WExpr.make bare_expr loc } %prec unop_prec
 
 (* Inlined so each [e1 op e2] production inherits the precedence of its
-   operator token (see the precedence table above).  [TIMES] is deliberately
-   absent: in the logic it is separating conjunction, and in program
-   expressions it is handled by a dedicated production. *)
+   operator token (see the precedence table above). *)
 %inline binop:
   | EQUAL         { WBinOp.EQUAL }
   | LESSTHAN      { WBinOp.LESSTHAN }
@@ -451,6 +478,7 @@ expression:
   | FGREATEREQUAL { WBinOp.FGREATEREQUAL }
   | PLUS          { WBinOp.PLUS }
   | MINUS         { WBinOp.MINUS }
+  | TIMES         { WBinOp.TIMES }
   | DIV           { WBinOp.DIV }
   | MOD           { WBinOp.MOD }
   | FPLUS         { WBinOp.FPLUS }
@@ -483,7 +511,7 @@ lemma:
   | lstart = LEMMA; lname = IDENTIFIER; LCBRACE;
       STATEMENT; COLON;
       FORALL lemma_params = var_list; DOT;
-      lemma_hypothesis = logic_assertion_top_level; VDASH; lemma_conclusion = logic_assertion_top_level;
+      lemma_hypothesis = logic_assertion; VDASH; lemma_conclusion = logic_assertion;
       lemma_variant = option(variant_def);
       lemma_proof = option(proof_def);
       lend = RCBRACE
@@ -519,7 +547,7 @@ predicate:
     ins = separated_list(COMMA, pred_param);
     outs = outs(pred_param);
     RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SCOLON, logic_assertion_top_level);
+    pred_definitions = separated_nonempty_list(SCOLON, logic_assertion);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
       let pred_params = ins @ outs in
@@ -579,13 +607,13 @@ logic_command:
     { let bare_lcmd = WLCmd.LogicIf (g, thencmds, []) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
-  | lstart = ASSERT; lbopt = option(bindings_with_loc); a = logic_assertion_top_level;
+  | lstart = ASSERT; lbopt = option(bindings_with_loc); a = logic_assertion;
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
       let bare_lcmd = WLCmd.Assert (a, b) in
       WLCmd.make bare_lcmd loc }
-  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion_top_level; variant = option(with_variant_def);
+  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion; variant = option(with_variant_def);
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
@@ -631,31 +659,31 @@ wand:
       ((lname, largs), (rname, rargs), loc)
     }
 
-logic_assertion_top_level:
-  | la = logic_assertion; { la }
-
 logic_expression_with_permission:
   | LBRACE; perm = logic_expression; COLON; expr = logic_expression; RBRACE;
     { (Some perm, expr) }
   | expr = logic_expression;
-    { (None, expr) }
+    { (None, expr) } %prec coerce_prec
 
-logic_assertion:
+(* The assertions that can follow a [*] already absorbed by an expression. *)
+non_expr_assertion:
   | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
     { let bare_assert = WLAssert.get la in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-  | wand = wand
-    { let (lhs, rhs, loc) = wand in
-      WLAssert.make (LWand { lhs; rhs }) loc }
   | loc = EMP
     { let bare_assert = WLAssert.LEmp in
       WLAssert.make bare_assert loc }
+
+logic_assertion:
+  | la = non_expr_assertion { la }
+  | wand = wand
+    { let (lhs, rhs, loc) = wand in
+      WLAssert.make (LWand { lhs; rhs }) loc }
   | la1 = logic_assertion; TIMES; la2 = logic_assertion
-    { let bare_assert = WLAssert.LStar (la1, la2) in
-      let lstart, lend = WLAssert.get_loc la1, WLAssert.get_loc la2 in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc } %prec separating_conjunction
+    { star la1 la2 } %prec separating_conjunction
+  | le = logic_expression; TIMES; la = non_expr_assertion
+    { star (assertion_of le) la }
   | le1 = logic_expression; ARROW; le2 = separated_nonempty_list(COMMA, logic_expression_with_permission)
     { let rec get_lend lel =
         match lel with
@@ -663,11 +691,12 @@ logic_assertion:
         | [(_, a)] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
-      let bare_assert = WLAssert.LPointsTo (le1, le2) in
-      let lstart = WLExpr.get_loc le1 in
-      let lend = get_lend le2 in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
+      with_subject le1 (fun le1 ->
+        let bare_assert = WLAssert.LPointsTo (le1, le2) in
+        let lstart = WLExpr.get_loc le1 in
+        let lend = get_lend le2 in
+        let loc = CodeLoc.merge lstart lend in
+        WLAssert.make bare_assert loc) }
   | le1 = logic_expression; BLOCK_ARROW; le2 = separated_nonempty_list(COMMA, logic_expression_with_permission)
     { let rec get_lend lel =
         match lel with
@@ -675,29 +704,24 @@ logic_assertion:
         | [(_, a)] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
-      let bare_assert = WLAssert.LBlockPointsTo (le1, le2) in
-      let lstart = WLExpr.get_loc le1 in
-      let lend = get_lend le2 in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
+      with_subject le1 (fun le1 ->
+        let bare_assert = WLAssert.LBlockPointsTo (le1, le2) in
+        let lstart = WLExpr.get_loc le1 in
+        let lend = get_lend le2 in
+        let loc = CodeLoc.merge lstart lend in
+        WLAssert.make bare_assert loc) }
   | e = logic_expression; COLON; ty = type_target
     { let (ty, lend) = ty in
-      let bare_assert = WLAssert.LType (e, ty) in
-      let lstart = WLExpr.get_loc e in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
-  (* A bare (pure) logic expression is a pure assertion.  A bare
-     application [p(args)] denotes an unsplit predicate call (pure functions
-     only appear as sub-expressions, never as a whole assertion).  This is the
-     single place where pure expressions become assertions, so [TRUE], [FALSE]
-     and a parenthesised pure expression [(e)] all go through here. *)
+      with_subject e (fun e ->
+        let bare_assert = WLAssert.LType (e, ty) in
+        let lstart = WLExpr.get_loc e in
+        let loc = CodeLoc.merge lstart lend in
+        WLAssert.make bare_assert loc) }
+  (* A bare logic expression is an assertion (see [factors] and [atom]). This
+     is the single place where pure expressions become assertions, so [TRUE],
+     [FALSE] and a parenthesised pure expression [(e)] all go through here. *)
   | f = logic_expression
-    { let bare_assert =
-        match WLExpr.get f with
-        | WLExpr.LPureFunApp (name, args) -> WLAssert.LPred (name, args, [])
-        | _ -> WLAssert.LPure f
-      in
-      WLAssert.make bare_assert (WLExpr.get_loc f) } %prec coerce_prec
+    { assertion_of f } %prec coerce_prec
 
 logic_expression:
   | lstart = LBRACE; le = logic_expression; lend = RBRACE
@@ -766,8 +790,7 @@ logic_expression:
     }
 
 (* We also have lists in the logic.  Inlined (like [binop]) so each operator
-   keeps its own precedence.  Note there is no [*] here: in the logic [*] is
-   separating conjunction, never multiplication. *)
+   keeps its own precedence. *)
 %inline logic_binop:
   | b = binop { b }
   | LSTCONS { WBinOp.LSTCONS }
