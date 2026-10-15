@@ -1376,8 +1376,9 @@ let rec encode_logical_expression
       let>- le = f le in
       (* Convert to native *)
       let>- le_native = get_native_of_type constructors_t le in
-      (* Encoded as an ite chain rather than a [match]: Z3 4.16 segfaults on
-         [match] terms once the solver has been reset *)
+      (* FIXME: Encoded as an ite chain rather than a [match]: Z3 4.16
+         segfaults on [match] terms once the solver has been reset. Switch
+         back to [match] once that's fixed. *)
       let cs, encs =
         cs
         |> List.map (fun (cname, bs, e) ->
