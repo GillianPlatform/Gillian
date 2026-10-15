@@ -31,6 +31,7 @@ verify wisl/examples/loop.wisl
 verify wisl/examples/tree.wisl
 verify wisl/examples/SLL_ex_complete.wisl
 verify wisl/examples/SLL_ex_ongoing.wisl
+verify wisl/examples/adt.wisl
 
 echo "\n\n--- WISL: FRACTIONAL-PERMISSION VERIFICATION ---"
 verify_frac wisl/examples/frac/concurrent_binary_tree.wisl
