@@ -90,7 +90,7 @@ module Variant = struct
 
       let params =
         List.mapi
-          (fun i param_typ -> ("param-" ^ string_of_int i, param_typ))
+          (fun i param_typ -> (name ^ "-" ^ string_of_int i, param_typ))
           param_typs
 
       let num_params = List.length params
@@ -155,6 +155,8 @@ let datatype_cache :
 
 let constructor_cache : (string, SS.t * (module Variant.Nary)) Hashtbl.t =
   Hashtbl.create Config.medium_tbl_size
+
+let usr_functions : (SS.t * definition) option option ref = ref None
 
 let with_necessary_usr_datatypes (f : unit -> 'a) : 'a =
   let needed_usr_datatypes = ref SS.empty in
@@ -499,7 +501,8 @@ module Datatype_operations = struct
          | Some t ->
              let () =
                match t with
-               | Type.DatatypeType name -> ensure_encoded name
+               | Type.DatatypeType name when not (SS.mem name cycle) ->
+                   ensure_encoded name
                | _ -> ()
              in
              native_sort_of_type t
@@ -530,15 +533,23 @@ module Datatype_operations = struct
   let encode_datatype name =
     ensure_encoded name;
     let cycle, lit_variant, _ = Hashtbl.find datatype_cache name in
+    require_definition def_gil_literal;
     require_usr_datatypes cycle;
     lit_variant
 
   let encode_constructor cname =
     ensure_encoded_c cname;
     let cycle, variant = Hashtbl.find constructor_cache cname in
+    require_definition def_gil_literal;
     require_usr_datatypes cycle;
     variant
 end
+
+let native_sort_of_type = function
+  | Type.DatatypeType name as t ->
+      let _ = Datatype_operations.encode_datatype name in
+      native_sort_of_type t
+  | t -> native_sort_of_type t
 
 let seq_of ~typ xs =
   require_definition def_gil_literal;
@@ -1218,8 +1229,10 @@ let encode_bound_expr
   in
   let () =
     encoded.consts
-    |> Hashtbl.filter_map_inplace (fun c () ->
-           if List.mem c bound_vars then None else Some ())
+    |> Hashtbl.filter_map_inplace (fun (c, _) () ->
+           if List.exists (fun (x, _) -> sanitize_identifier x = c) bound_vars
+           then None
+           else Some ())
   in
   (bound_vars, bound_asrts, encoded)
 
@@ -1349,6 +1362,7 @@ let rec encode_logical_expression
       let>-- args = List.map f les in
       let>-- args = List.map2 extend_wrap_or_native param_types args in
       let args = List.map (fun arg -> arg.expr) args in
+      require_usr_functions ();
       extended_wrapped (app_ name args)
   | Cases (le, cs) ->
       (* Type checking should ensure that all constructors belong to the same datatype *)
@@ -1362,7 +1376,9 @@ let rec encode_logical_expression
       let>- le = f le in
       (* Convert to native *)
       let>- le_native = get_native_of_type constructors_t le in
-      (* Encode match cases *)
+      (* FIXME: Encoded as an ite chain rather than a [match]: Z3 4.16
+         segfaults on [match] terms once the solver has been reset. Switch
+         back to [match] once that's fixed. *)
       let cs, encs =
         cs
         |> List.map (fun (cname, bs, e) ->
@@ -1370,8 +1386,13 @@ let rec encode_logical_expression
                let (module V : Variant.Nary) =
                  Datatype_operations.encode_constructor cname
                in
-               let pat = PCon (cname, bs) in
                let bts = List.combine bs c.constructor_fields in
+               (* Untyped constructor fields hold GIL literals, as list elements do *)
+               let list_elem_vars =
+                 List.fold_left
+                   (fun acc (x, t) -> if t = None then SS.add x acc else acc)
+                   list_elem_vars bts
+               in
                (* TODO: How to handle extra aserts involving bound vars?? *)
                (* Using ite and mapping to undefined values when extra asrts are false cases queries to time out *)
                let _, _, encoded =
@@ -1379,12 +1400,19 @@ let rec encode_logical_expression
                    ~llen_lvars ~list_elem_vars bts e
                in
                let encoded = extend_wrap encoded in
-               ((pat, encoded.expr), encoded))
+               let fields =
+                 List.map2
+                   (fun b (acc, _) ->
+                     (sanitize_identifier b, atom acc <| le_native.expr))
+                   bs V.params
+               in
+               ((V.recognize le_native.expr, let_ fields encoded.expr), encoded))
         |> List.split
       in
-      let fallback = (PVar "_", (extend_wrap undefined_encoding).expr) in
+      let fallback = (extend_wrap undefined_encoding).expr in
       let>-- _ = encs in
-      extended_wrapped (match_datatype le_native.expr (cs @ [ fallback ]))
+      extended_wrapped
+        (List.fold_right (fun (is_c, e) acc -> ite is_c e acc) cs fallback)
   | ConstructorApp (cname, les) ->
       let c = Datatype_env.get_constructor_exn cname in
       let (module V : Variant.Nary) =
@@ -1400,6 +1428,69 @@ let rec encode_logical_expression
       let args = List.map (fun arg -> arg.expr) args in
       let sexp = V.construct args in
       sexp >- DatatypeType c.constructor_datatype
+
+(** All user functions are declared together in one [define-funs-rec], since
+    they may be mutually recursive. Encoding their bodies is itself effectful,
+    so it happens on first use and is cached along with the user datatypes the
+    bodies need. *)
+and require_usr_functions () =
+  match !usr_functions with
+  | Some (Some (datatypes, def)) ->
+      require_usr_datatypes datatypes;
+      require_definition def
+  | Some None -> (* A recursive call from within a function body *) ()
+  | None ->
+      usr_functions := Some None;
+      let datatypes = ref SS.empty in
+      let encode_function (f : Func.t) =
+        let gamma = Hashtbl.create 1 in
+        let params =
+          f.func_params
+          |> List.map @@ fun (x, t) ->
+             match t with
+             | Some t ->
+                 Hashtbl.replace gamma x t;
+                 (sanitize_identifier x, native_sort_of_type t)
+             | None -> (sanitize_identifier x, t_gil_ext_literal)
+        in
+        let enc =
+          Encoding.extend_wrap
+          @@ encode_logical_expression ~gamma ~llen_lvars:SS.empty
+               ~list_elem_vars:SS.empty f.func_definition
+        in
+        let body =
+          match enc.extra_asrts with
+          | [] -> enc.expr
+          | asrts ->
+              ite (bool_ands asrts) enc.expr
+                (Encoding.extend_wrap Encoding.undefined_encoding).expr
+        in
+        let params = List.map (fun (x, t) -> list [ atom x; t ]) params in
+        (list [ atom f.func_name; list params; t_gil_ext_literal ], body)
+      in
+      let (decls, bodies), needed =
+        with_necessary_definitions @@ fun () ->
+        match
+          Function_env.get_functions ()
+          |> Containers.StringMap.bindings
+          |> List.map (fun (_, f) -> encode_function f)
+          |> List.split
+        with
+        | x -> x
+        | exception e ->
+            usr_functions := None;
+            raise e
+        | effect Require_usr_datatypes ds, k ->
+            datatypes := SS.union !datatypes ds;
+            Effect.Deep.continue k ()
+      in
+      let def =
+        make_definition
+          ~depends_on:(Hashtbl.to_seq_values needed |> List.of_seq)
+          [ app_ "define-funs-rec" [ list decls; list bodies ] ]
+      in
+      usr_functions := Some (Some (!datatypes, def));
+      require_usr_functions ()
 
 let encode_assertion_top_level
     ~(gamma : typenv)

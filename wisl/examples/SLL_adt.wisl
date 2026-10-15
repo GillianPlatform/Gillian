@@ -79,7 +79,7 @@ lemma list_member_concat {
 //
 // Standard over-approximating SLL predicate with contents
 //
-predicate SLL(+x, vs) {
+predicate SLL(x; vs) {
   // Empty SLL
   (x == null) * (vs == 'Nil);
   // One SLL node and the rest

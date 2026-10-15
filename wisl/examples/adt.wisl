@@ -1,0 +1,33 @@
+datatype Tree {
+  Leaf(Int);
+  Node(Tree, Tree)
+}
+
+datatype Box {
+  Box(Any)
+}
+
+pure function size(t : Tree) {
+  case t {
+    Leaf(n)    -> 1;
+    Node(l, r) -> size(l) + size(r)
+  }
+}
+
+pure function unbox(b : Box) {
+  case b {
+    Box(v) -> v
+  }
+}
+
+{ (x == #x) * (y == #y) }
+function two_leaves(x, y) {
+  return 2
+}
+{ ret == size('Node('Leaf(#x), 'Leaf(#y))) }
+
+{ x == #x }
+function id(x) {
+  return x
+}
+{ ret == unbox('Box(#x)) }
