@@ -1,4 +1,4 @@
-open Prebuilt.Lib.C_Split
+open Prebuilt_c.Lib.C_Split
 
 module SMemory =
   Gillian.Combinators.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)

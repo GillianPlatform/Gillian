@@ -17,12 +17,21 @@ let z3_config =
     ("proof", "false");
     ("unsat_core", "false");
     ("auto_config", "true");
-    ("timeout", try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000");
   ]
-  @
-  match Sys.getenv_opt "SMT_RANDOM_SEED" with
-  | Some seed -> [ ("smt.random_seed", seed) ]
-  | None -> []
+
+(** Z3 is very sensitive to how a query is phrased: the order of assertions, the
+    names of variables or redundant facts can turn a query it decides in
+    milliseconds into one that takes seconds, or times out. Changing its random
+    seed has the same effect, and we exploit it: a query is first tried with a
+    short timeout, then retried with other seeds; only the last attempt gets the
+    full timeout. Each attempt is a pair of a random seed and a timeout (in ms).
+*)
+let attempts =
+  let seed =
+    Option.fold ~none:0 ~some:int_of_string (Sys.getenv_opt "SMT_RANDOM_SEED")
+  in
+  let timeout = try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000" in
+  [ (seed, "1000"); (seed + 1, "1000"); (seed + 2, timeout) ]
 
 let () = Sys.(set_signal sigpipe Signal_ignore)
 
@@ -249,6 +258,61 @@ and protected_command solver s =
       Logging.normal (fun m -> m "%s" msg);
       init_solver ();
       raise (internal_error msg)
+
+(** Sends commands that answer [success], like [cmd], but without waiting for
+    each answer before sending the next command: a round trip per command was
+    most of the time spent talking to the solver. The commands are sent in
+    batches, each followed by the same heartbeat as in [protected_command];
+    batches are small enough that the answers cannot fill the solver's output
+    pipe while we are still writing. As with [cmd], an answer other than
+    [success] raises [UnexpectedSolverResponse], once all the answers of the
+    batch have been read. *)
+let cmds =
+  let max_batch = 1000 in
+  let send_batch cs =
+    let open Sexplib in
+    let open Gillian_result.Exc in
+    let text = String.concat "\n" (List.map Sexp.to_string_hum cs) in
+    let res =
+      try
+        let first = !solver.raw_command (text ^ "\n(echo \"gillian\")") in
+        (* The following answers are already on their way: sending an empty
+           line only lets us read them. *)
+        let next () = !solver.raw_command "" in
+        let rec read_answers unexpected ans = function
+          | [] -> (
+              match ans with
+              | Sexp.Atom "gillian" -> Ok unexpected
+              | s ->
+                  Fmt.error "SMT heartbeat gave unexpected result: %a"
+                    Sexp.pp_hum s)
+          | _ :: cs ->
+              let unexpected =
+                match (unexpected, ans) with
+                | None, Sexp.Atom "success" -> None
+                | None, ans -> Some ans
+                | Some _, _ -> unexpected
+              in
+              read_answers unexpected (next ()) cs
+        in
+        read_answers None first cs
+      with Sys_error s -> Fmt.error "Error when calling SMT solver: %s" s
+    in
+    match res with
+    | Ok None -> ()
+    | Ok (Some ans) -> raise (UnexpectedSolverResponse ans)
+    | Error msg ->
+        Logging.normal (fun m -> m "%s" msg);
+        init_solver ();
+        raise (internal_error msg)
+  in
+  let rec loop = function
+    | [] -> ()
+    | cs ->
+        send_batch (List.take max_batch cs);
+        loop (List.drop max_batch cs)
+  in
+  loop
 
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
@@ -1658,6 +1722,14 @@ let reset_solver () =
   let () = RepeatCache.clear () in
   ()
 
+let attempt_options (seed, timeout) =
+  let seed = string_of_int seed in
+  [
+    set_option ":smt.random_seed" seed;
+    set_option ":sat.random_seed" seed;
+    set_option ":timeout" timeout;
+  ]
+
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () =
     L.verbose (fun m ->
@@ -1669,10 +1741,30 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   with_necessary_usr_datatypes @@ fun () ->
   let encoded_assertions, necessary_definitions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
-  let () = emit_definitions ~emit:cmd necessary_definitions in
-  let () = List.iter cmd encoded_assertions in
-  L.verbose (fun fmt -> fmt "Reached SMT.");
-  let result = check !solver in
+  let definitions =
+    let defs = ref [] in
+    let () =
+      emit_definitions ~emit:(fun d -> defs := d :: !defs) necessary_definitions
+    in
+    List.rev !defs
+  in
+  let rec try_attempts = function
+    | [] -> failwith "Smt: no attempts"
+    | attempt :: rest -> (
+        let () =
+          cmds (attempt_options attempt @ definitions @ encoded_assertions)
+        in
+        L.verbose (fun fmt -> fmt "Reached SMT.");
+        match check !solver with
+        | Unknown when rest <> [] ->
+            L.verbose (fun m ->
+                m "The solver returned unknown with seed %d, retrying"
+                  (fst attempt));
+            let () = cmd reset in
+            try_attempts rest
+        | result -> result)
+  in
+  let result = try_attempts attempts in
   L.verbose (fun m ->
       let r =
         match result with

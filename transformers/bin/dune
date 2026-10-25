@@ -1,19 +1,26 @@
+; One stanza per language, so that each binary only links the memory models of
+; its own language (see ../lib/prebuilt/dune).
+
 (executables
- (public_names
-  transformers
-  t_c
-  t_c_a
-  t_c_s
-  t_js
-  t_js_a
-  t_js_s
-  t_js_as
-  t_wisl
-  t_wisl_a
-  t_wisl_s
-  t_wislf
-  t_wislf_a
-  t_wislf_s
-  c_bi_abd)
+ (public_names t_wisl t_wisl_a t_wisl_s t_wislf t_wislf_a t_wislf_s)
+ (modules t_wisl t_wisl_a t_wisl_s t_wislf t_wislf_a t_wislf_s)
  (package transformers)
- (libraries prebuilt gillian transformers_abductor))
+ (libraries prebuilt_wisl gillian))
+
+(executables
+ (public_names t_js t_js_a t_js_s t_js_as)
+ (modules t_js t_js_a t_js_s t_js_as)
+ (package transformers)
+ (libraries prebuilt_js gillian))
+
+(executables
+ (public_names t_c t_c_a t_c_s c_bi_abd)
+ (modules t_c t_c_a t_c_s c_bi_abd)
+ (package transformers)
+ (libraries prebuilt_c gillian transformers_abductor))
+
+(executables
+ (public_names transformers)
+ (modules transformers)
+ (package transformers)
+ (libraries prebuilt gillian))
