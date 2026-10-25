@@ -17,12 +17,21 @@ let z3_config =
     ("proof", "false");
     ("unsat_core", "false");
     ("auto_config", "true");
-    ("timeout", try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000");
   ]
-  @
-  match Sys.getenv_opt "SMT_RANDOM_SEED" with
-  | Some seed -> [ ("smt.random_seed", seed) ]
-  | None -> []
+
+(** Z3 is very sensitive to how a query is phrased: the order of assertions, the
+    names of variables or redundant facts can turn a query it decides in
+    milliseconds into one that takes seconds, or times out. Changing its random
+    seed has the same effect, and we exploit it: a query is first tried with a
+    short timeout, then retried with other seeds; only the last attempt gets the
+    full timeout. Each attempt is a pair of a random seed and a timeout (in ms).
+*)
+let attempts =
+  let seed =
+    Option.fold ~none:0 ~some:int_of_string (Sys.getenv_opt "SMT_RANDOM_SEED")
+  in
+  let timeout = try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000" in
+  [ (seed, "1000"); (seed + 1, "1000"); (seed + 2, timeout) ]
 
 let () = Sys.(set_signal sigpipe Signal_ignore)
 
@@ -1658,6 +1667,12 @@ let reset_solver () =
   let () = RepeatCache.clear () in
   ()
 
+let set_attempt (seed, timeout) =
+  let seed = string_of_int seed in
+  cmd (set_option ":smt.random_seed" seed);
+  cmd (set_option ":sat.random_seed" seed);
+  cmd (set_option ":timeout" timeout)
+
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () =
     L.verbose (fun m ->
@@ -1669,10 +1684,23 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   with_necessary_usr_datatypes @@ fun () ->
   let encoded_assertions, necessary_definitions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
-  let () = emit_definitions ~emit:cmd necessary_definitions in
-  let () = List.iter cmd encoded_assertions in
-  L.verbose (fun fmt -> fmt "Reached SMT.");
-  let result = check !solver in
+  let rec try_attempts = function
+    | [] -> failwith "Smt: no attempts"
+    | attempt :: rest -> (
+        let () = set_attempt attempt in
+        let () = emit_definitions ~emit:cmd necessary_definitions in
+        let () = List.iter cmd encoded_assertions in
+        L.verbose (fun fmt -> fmt "Reached SMT.");
+        match check !solver with
+        | Unknown when rest <> [] ->
+            L.verbose (fun m ->
+                m "The solver returned unknown with seed %d, retrying"
+                  (fst attempt));
+            let () = cmd reset in
+            try_attempts rest
+        | result -> result)
+  in
+  let result = try_attempts attempts in
   L.verbose (fun m ->
       let r =
         match result with
