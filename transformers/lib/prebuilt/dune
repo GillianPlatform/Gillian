@@ -1,7 +1,7 @@
-; The prebuilt memory models are split into one library per language: Gillian
-; executables are linked with -linkall (required by dune-site), so a binary
-; depending on a library with every language would link and initialise all of
-; them (C's CompCert, JS's parser, ...), slowing down every start-up.
+; The prebuilt memory models are split into one library per language, and each
+; binary only depends on its own: a binary using a module that refers to every
+; language (such as the former Lib) links and initialises all of them (C's
+; CompCert, JS's parser, ...), slowing down every start-up.
 ; [prebuilt] re-exports them all, for binaries that need several languages.
 
 (library
