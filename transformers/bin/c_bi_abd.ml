@@ -1,4 +1,4 @@
-open Prebuilt.Lib.C_ALoc
+open Prebuilt_c.Lib.C_ALoc
 module SMemory = MonadicSMemory
 
 module Bi_cli =

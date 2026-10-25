@@ -1,4 +1,4 @@
-open Prebuilt.Lib.WISL_ALoc
+open Prebuilt_wisl.Lib.WISL_ALoc
 
 module SMemory =
   Gillian.Combinators.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)

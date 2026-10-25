@@ -1,0 +1,13 @@
+(library
+ (name prebuilt_wisl)
+ (public_name transformers.prebuilt_wisl)
+ (libraries
+  gillian
+  gillian.ppx_sat.runtime
+  prebuilt_utils
+  wisl.parserAndCompiler
+  ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto)))
