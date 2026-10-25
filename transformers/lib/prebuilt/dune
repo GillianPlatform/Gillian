@@ -1,17 +1,11 @@
-(include_subdirs qualified)
+; The prebuilt memory models are split into one library per language: Gillian
+; executables are linked with -linkall (required by dune-site), so a binary
+; depending on a library with every language would link and initialise all of
+; them (C's CompCert, JS's parser, ...), slowing down every start-up.
+; [prebuilt] re-exports them all, for binaries that need several languages.
 
 (library
  (name prebuilt)
  (public_name transformers.prebuilt)
- (libraries
-  gillian
-  gillian.ppx_sat.runtime
-  gillian-js.js2jsil_lib
-  gillian-js.semantics
-  gillian-c.cgil_lib
-  wisl.parserAndCompiler
-  ppx_deriving_yojson.runtime)
- (preprocess
-  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson))
- (instrumentation
-  (backend landmarks --auto)))
+ (modules prebuilt)
+ (libraries prebuilt_utils prebuilt_wisl prebuilt_js prebuilt_c))

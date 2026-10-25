@@ -1,0 +1,11 @@
+(library
+ (name prebuilt_utils)
+ (public_name transformers.prebuilt_utils)
+ (libraries
+  gillian
+  gillian.ppx_sat.runtime
+  ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto)))

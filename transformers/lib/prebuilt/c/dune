@@ -1,0 +1,15 @@
+(include_subdirs qualified)
+
+(library
+ (name prebuilt_c)
+ (public_name transformers.prebuilt_c)
+ (libraries
+  gillian
+  gillian.ppx_sat.runtime
+  prebuilt_utils
+  gillian-c.cgil_lib
+  ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson))
+ (instrumentation
+  (backend landmarks --auto)))
