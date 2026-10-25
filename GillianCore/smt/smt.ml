@@ -259,6 +259,61 @@ and protected_command solver s =
       init_solver ();
       raise (internal_error msg)
 
+(** Sends commands that answer [success], like [cmd], but without waiting for
+    each answer before sending the next command: a round trip per command was
+    most of the time spent talking to the solver. The commands are sent in
+    batches, each followed by the same heartbeat as in [protected_command];
+    batches are small enough that the answers cannot fill the solver's output
+    pipe while we are still writing. As with [cmd], an answer other than
+    [success] raises [UnexpectedSolverResponse], once all the answers of the
+    batch have been read. *)
+let cmds =
+  let max_batch = 1000 in
+  let send_batch cs =
+    let open Sexplib in
+    let open Gillian_result.Exc in
+    let text = String.concat "\n" (List.map Sexp.to_string_hum cs) in
+    let res =
+      try
+        let first = !solver.raw_command (text ^ "\n(echo \"gillian\")") in
+        (* The following answers are already on their way: sending an empty
+           line only lets us read them. *)
+        let next () = !solver.raw_command "" in
+        let rec read_answers unexpected ans = function
+          | [] -> (
+              match ans with
+              | Sexp.Atom "gillian" -> Ok unexpected
+              | s ->
+                  Fmt.error "SMT heartbeat gave unexpected result: %a"
+                    Sexp.pp_hum s)
+          | _ :: cs ->
+              let unexpected =
+                match (unexpected, ans) with
+                | None, Sexp.Atom "success" -> None
+                | None, ans -> Some ans
+                | Some _, _ -> unexpected
+              in
+              read_answers unexpected (next ()) cs
+        in
+        read_answers None first cs
+      with Sys_error s -> Fmt.error "Error when calling SMT solver: %s" s
+    in
+    match res with
+    | Ok None -> ()
+    | Ok (Some ans) -> raise (UnexpectedSolverResponse ans)
+    | Error msg ->
+        Logging.normal (fun m -> m "%s" msg);
+        init_solver ();
+        raise (internal_error msg)
+  in
+  let rec loop = function
+    | [] -> ()
+    | cs ->
+        send_batch (List.take max_batch cs);
+        loop (List.drop max_batch cs)
+  in
+  loop
+
 let sanitize_identifier =
   let pattern = Str.regexp "#" in
   Str.global_replace pattern "$$"
@@ -1667,11 +1722,13 @@ let reset_solver () =
   let () = RepeatCache.clear () in
   ()
 
-let set_attempt (seed, timeout) =
+let attempt_options (seed, timeout) =
   let seed = string_of_int seed in
-  cmd (set_option ":smt.random_seed" seed);
-  cmd (set_option ":sat.random_seed" seed);
-  cmd (set_option ":timeout" timeout)
+  [
+    set_option ":smt.random_seed" seed;
+    set_option ":sat.random_seed" seed;
+    set_option ":timeout" timeout;
+  ]
 
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   let () =
@@ -1684,12 +1741,19 @@ let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
   with_necessary_usr_datatypes @@ fun () ->
   let encoded_assertions, necessary_definitions = encode_assertions fs gamma in
   let () = if !Config.dump_smt then Dump.dump fs gamma encoded_assertions in
+  let definitions =
+    let defs = ref [] in
+    let () =
+      emit_definitions ~emit:(fun d -> defs := d :: !defs) necessary_definitions
+    in
+    List.rev !defs
+  in
   let rec try_attempts = function
     | [] -> failwith "Smt: no attempts"
     | attempt :: rest -> (
-        let () = set_attempt attempt in
-        let () = emit_definitions ~emit:cmd necessary_definitions in
-        let () = List.iter cmd encoded_assertions in
+        let () =
+          cmds (attempt_options attempt @ definitions @ encoded_assertions)
+        in
         L.verbose (fun fmt -> fmt "Reached SMT.");
         match check !solver with
         | Unknown when rest <> [] ->
