@@ -329,6 +329,7 @@ module Make (S : MonadicSMemory.S) = struct
 
   let concrete_unfolding_enabled () =
     (not !Config.under_approximation)
+    && (not !Config.manual_proof)
     && Exec_mode.is_verification_exec !Config.current_exec_mode
 
   (* Mirrors the pfs-based augmentation of [SState.get_recovery_tactic]. *)
