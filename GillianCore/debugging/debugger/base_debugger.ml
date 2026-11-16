@@ -1239,7 +1239,9 @@ struct
               ~prog_env ?tl_ast ~main_proc_name:proc_name ~report_state_base
               ~init_data ~proc_names ~cur_proc:(proc_name, 0) ~ext ()
           in
-          let ext = Debugger_impl.init (make ()) in
+          let ext =
+            Prog_env.using prog_env @@ fun () -> Debugger_impl.init (make ())
+          in
           make ext
         in
         (cfg, entrypoint)
