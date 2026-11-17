@@ -75,20 +75,41 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       - [MissingWand] ≙ [EPure false_];
       - [AsrtFailure] ≙ [EAsrt];
       - [OtherErr] ≙ [EOther];
-      - [SubError] ≙ [EMem]. *)
+      - [SubError] ≙ [EMem];
+      - [FoldFailed] stands for its [errs], which it only groups for reporting.
+  *)
   type err_t =
     | MissingUPred of { name : string; vs : Expr.t list }
+    | FoldFailed of {
+        name : string;
+        vs : Expr.t option list;
+        errs : err_t list;  (** Why each attempt at folding it failed *)
+      }  (** A predicate wasn't in the state, and auto-folding it failed *)
     | MissingWand of { lname : string; rname : string }
     | AsrtFailure of Expr.t list * Expr.t
     | OtherErr of string
     | SubError of S.err_t
   [@@deriving yojson]
 
-  let pp_err_t ft =
+  let rec pp_err_t ft =
     let pp_vs = Fmt.(list ~sep:comma P.pp_expr) in
     function
     | MissingUPred { name; vs } ->
         Fmt.pf ft "@[<h>Missing predicate %s(%a)@]" name pp_vs vs
+    | FoldFailed { name; vs; errs } ->
+        let errs =
+          errs
+          |> List.map (fun e -> (Fmt.str "%a" pp_err_t e, e))
+          |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a b)
+          |> List.map snd
+        in
+        Fmt.pf ft
+          "@[<v 2>@[<h>Missing predicate %s(%a), and couldn't fold it:@]%a@]"
+          name
+          Fmt.(list ~sep:comma (option ~none:(any "_") P.pp_expr))
+          vs
+          Fmt.(list ~sep:nop (cut ++ any "- " ++ pp_err_t))
+          errs
     | MissingWand { lname; rname } ->
         Fmt.pf ft "Missing wand %s -* %s" lname rname
     | AsrtFailure (_, f) -> Fmt.pf ft "Couldn't assert %a" P.pp_expr f
@@ -170,14 +191,16 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
 
   let get_def name = MP.get_pred_def (MP.get_pred_defs ()) name
 
-  let can_fix = function
+  let rec can_fix = function
+    | FoldFailed { errs; _ } -> List.exists can_fix errs
     | MissingUPred _ -> true
     | MissingWand _ -> false
     | AsrtFailure (_, pf) -> Reduction.reduce_lexpr pf <> Expr.false_
     | OtherErr _ -> false
     | SubError e -> S.can_fix e
 
-  let get_fixes = function
+  let rec get_fixes = function
+    | FoldFailed { errs; _ } -> List.concat_map get_fixes errs
     (* User predicates and wands are never abduced (the bi-abduction fix
        machinery refuses such fixes); an empty fix list makes the branch die,
        exactly like [EAsrt (vs, true_)] does today. *)
@@ -188,14 +211,20 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         | pf -> [ [ Asrt.Pure pf ] ])
     | SubError e -> S.get_fixes e
 
-  let get_recovery_tactic (s : t) (e : err_t) =
+  let rec get_recovery_tactic (s : t) (e : err_t) =
     match e with
+    | FoldFailed { errs; _ } ->
+        List.fold_left
+          (fun acc e -> Recovery_tactic.merge (get_recovery_tactic s e) acc)
+          Recovery_tactic.none errs
     | MissingUPred { vs; _ } -> Recovery_tactic.try_unfold vs
     | AsrtFailure (vs, _) -> Recovery_tactic.try_unfold vs
     | MissingWand _ | OtherErr _ -> Recovery_tactic.none
     | SubError e -> S.get_recovery_tactic s.mem e
 
-  let get_failing_constraint = function
+  let rec get_failing_constraint = function
+    | FoldFailed { errs; _ } ->
+        Expr.conjunct (List.map get_failing_constraint errs)
     | MissingUPred _ | MissingWand _ | AsrtFailure _ | OtherErr _ -> Expr.true_
     | SubError e -> S.get_failing_constraint e
 
@@ -670,14 +699,22 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
               fmt "Auto-folding predicate: %s\n" pred_def.pred_name)
         in
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
-        let open Res_list.Syntax in
         let vs_ins = Pred.in_args pred_def vs in
         let vs_ins = List.map Option.get vs_ins in
-        let** folded =
+        let folded, errs =
           fold ~in_matching:true ~state:ms ~match_kind:(W.Fold pname) pred
             vs_ins
+          |> Res_list.split
         in
-        consume_upred ~no_auto_fold folded pname vs
+        let consumed =
+          List.concat_map
+            (fun folded -> consume_upred ~no_auto_fold folded pname vs)
+            folded
+        in
+        (* One error for the whole fold, rather than one per failed attempt *)
+        if List.is_empty errs then consumed
+        else
+          consumed @ Res_list.error_with (FoldFailed { name = pname; vs; errs })
     | _ ->
         let values = List.filter_map Fun.id vs in
         Res_list.error_with (MissingUPred { name = pname; vs = values })

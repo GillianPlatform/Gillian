@@ -540,13 +540,17 @@ struct
               Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
               errors);
         Fmt.pr "f @?";
-        let errors =
+        (* One failing state is one failure: its errors are the reasons why,
+           often the same reason reached along several paths. *)
+        let msg =
           errors
-          |> List.map @@ fun e ->
-             let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
-             Gillian_result.Error.make_analysis_failure ?loc msg
+          |> List.map (Fmt.str "%a" SAInterpreter.Logging.pp_err)
+          |> List.sort_uniq String.compare
+          |> String.concat "\n"
         in
-        Error (Gillian_result.Error.AnalysisFailures errors)
+        Error
+          (Gillian_result.Error.AnalysisFailures
+             [ Gillian_result.Error.make_analysis_failure ?loc msg ])
     | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } -> (
         if Some fl <> test.flag then (
           let msg =
