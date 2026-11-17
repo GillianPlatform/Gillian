@@ -7,7 +7,9 @@
   utils
   parserAndCompiler
   incrementalAnalysis
-  monadic)
+  monadic
+  alcotest
+  str)
  (flags
   :standard
   -open

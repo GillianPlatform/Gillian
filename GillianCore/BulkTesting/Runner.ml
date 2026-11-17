@@ -7,19 +7,15 @@ module type S = sig
 end
 
 module Make
-    (Backend : functor
-      (Outcome : Outcome.S)
-      (Suite : Suite.S)
-      -> Backend.S with type category = Suite.category)
     (Outcome : Outcome.S)
     (Suite : Suite.S)
     (Expectations :
       Expectations.S
         with type info = Suite.info
          and type category = Suite.category
-         and type matcher = Backend(Outcome)(Suite).matcher
+         and type matcher = Checkers.Make(Outcome).matcher
          and type outcome = Outcome.t) : S = struct
-  module Backend = Backend (Outcome) (Suite)
+  module Checkers = Checkers.Make (Outcome)
   module PC = Outcome.ParserAndCompiler
 
   module Interpreter =
@@ -108,52 +104,71 @@ module Make
         | _ -> true)
     | None -> true
 
-  let execute_test
-      prev_results_opt
-      expect
-      (test : (Suite.info, Suite.category) Test.t) =
+  let execute_test prev_results_opt (test : (Suite.info, Suite.category) Test.t)
+      =
     let open Outcome in
-    let result = ref (Gillian_result.operation_error "Execution failure") in
-    let execute () =
-      let () = before_compilation test in
-      let filename = Filename.basename (Filename.chop_extension test.path) in
-      let res =
-        let* progs = PC.parse_and_compile_files [ test.path ] in
-        let e_progs = progs.gil_progs in
-        let () = Hashtbl.add cur_source_files filename progs.source_files in
-        let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
-        let e_prog = snd (List.hd e_progs) in
-        let* prog =
-          Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
-        in
-        if should_execute prog filename prev_results_opt then
-          let prog = MP.init_prog prog in
-          let () = before_execution () in
-          let ret =
-            Interpreter.evaluate_proc
-              (fun x -> x)
-              prog !Config.entry_point []
-              (State.init progs.init_data)
-          in
-          let call_graph = Interpreter.call_graph in
-          let copy = Call_graph.merge (Call_graph.make ()) call_graph in
-          let () = Hashtbl.add cur_call_graphs filename copy in
-          let () = tests_ran := filename :: !tests_ran in
-          Ok ret
-        else Ok []
-        (* TODO (Alexis): Persist and fetch actual execution summary *)
-      in
-      result := res
+    let () = before_compilation test in
+    let filename = Filename.basename (Filename.chop_extension test.path) in
+    let* progs = PC.parse_and_compile_files [ test.path ] in
+    let e_progs = progs.gil_progs in
+    let () = Hashtbl.add cur_source_files filename progs.source_files in
+    let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+    let e_prog = snd (List.hd e_progs) in
+    let* prog =
+      Gil_parsing.eprog_to_prog ~other_imports:PC.other_imports e_prog
     in
-    Backend.check_not_throw expect execute;
-    !result
+    if should_execute prog filename prev_results_opt then
+      let prog = MP.init_prog prog in
+      let () = before_execution () in
+      let ret =
+        Interpreter.evaluate_proc
+          (fun x -> x)
+          prog !Config.entry_point []
+          (State.init progs.init_data)
+      in
+      let call_graph = Interpreter.call_graph in
+      let copy = Call_graph.merge (Call_graph.make ()) call_graph in
+      let () = Hashtbl.add cur_call_graphs filename copy in
+      let () = tests_ran := filename :: !tests_ran in
+      Ok ret
+    else (* TODO (Alexis): Persist and fetch actual execution summary *)
+      Ok []
 
-  let register_expectations prev_results_opt =
-    Hashtbl.iter
-      (Backend.register_expectations_for_category
-         ~expectation:Expectations.expectation
-         ~test_runner:(execute_test prev_results_opt))
-      test_table
+  let sanitize_string s =
+    let slash = Str.regexp_string "/" in
+    let ws = Str.regexp {| +|} in
+    let dot = Str.regexp_string "." in
+    let no_slash = Str.global_replace slash "_" s in
+    let no_ws = Str.global_replace ws "_" no_slash in
+    Str.global_replace dot "_" no_ws
+
+  let alcotest_suites prev_results_opt =
+    Hashtbl.fold
+      (fun cat cat_tbl suites ->
+        if Suite.skip_category cat then suites
+        else
+          let tests =
+            Hashtbl.fold
+              (fun name test tests ->
+                Alcotest.test_case (sanitize_string name) `Quick (fun () ->
+                    Suite.beforeEach ();
+                    let result = execute_test prev_results_opt test in
+                    Expectations.expectation Checkers.custom_checkers test
+                      result)
+                :: tests)
+              cat_tbl []
+          in
+          (sanitize_string (Fmt.to_to_string Suite.pp_category cat), tests)
+          :: suites)
+      test_table []
+
+  module AlcotestCore = Alcotest.Core.Make (Alcotest.Monad.Identity)
+
+  let run_alcotest suites =
+    Fmt_tty.setup_std_outputs ();
+    AlcotestCore.run ~and_exit:true
+      (Printf.sprintf "Running %i test suites" (List.length suites))
+      suites
 
   let run_all ~test_suite_paths ~incremental =
     let () = Fmt.pr "Registering tests...\n@?" in
@@ -172,8 +187,7 @@ module Make
         Some { source_files; call_graphs }
       else None
     in
-    let () = register_expectations prev_results_opt in
-    let () = Backend.run () in
+    let () = run_alcotest (alcotest_suites prev_results_opt) in
     if is_wpst then
       ResultsDir.write_bulk_symbolic_results ~tests_ran:!tests_ran
         cur_source_files cur_call_graphs

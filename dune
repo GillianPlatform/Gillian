@@ -1,12 +1,4 @@
-(dirs
- wisl
- GillianCore
- Gillian-JS
- Gillian-C
- Gillian-C2
- transformers
- Gillian-Alcotest-Runner
- ppx_sat)
+(dirs wisl GillianCore Gillian-JS Gillian-C Gillian-C2 transformers ppx_sat)
 
 (env
  (static

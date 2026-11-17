@@ -6,8 +6,7 @@
   gillian
   js2jsil_lib
   ppx_deriving.runtime
-  str
-  gillian.alcotest-runner)
+  str)
  (preprocess
   (pps ppx_deriving.std))
  (flags :standard -open Javert_utils))

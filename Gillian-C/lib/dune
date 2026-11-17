@@ -10,7 +10,6 @@
  (public_name gillian-c.cgil_lib)
  (libraries
   gillian
-  gillian.alcotest-runner
   compcert
   printbox-text
   gillian.ppx_sat.runtime
