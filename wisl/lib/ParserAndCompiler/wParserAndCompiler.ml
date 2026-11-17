@@ -81,6 +81,8 @@ let fail_message (ctx : Command_line.ParserAndCompiler.fail_ctx) ~code params =
            l pp_val r)
   | _ -> None
 
+let pp_expr = Expr_pp.pp
+
 let default_import_paths =
   Some
     [

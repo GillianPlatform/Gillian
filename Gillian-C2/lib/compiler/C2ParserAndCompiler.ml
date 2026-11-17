@@ -329,3 +329,4 @@ let parse_and_compile_files files =
   create_compilation_result source_path goto_prog gil_prog
 
 let fail_message _ ~code:_ _ = None
+let pp_expr = Gillian.Gil_syntax.Expr.pp

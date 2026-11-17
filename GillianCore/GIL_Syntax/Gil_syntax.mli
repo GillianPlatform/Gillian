@@ -444,6 +444,11 @@ module Expr : sig
 
   (** [is_matchable x] returns whether or not the expression [e] is matchable *)
   val is_matchable : t -> bool
+
+  (** A target language's expression printer, for messages *)
+  module type Printer = sig
+    val pp_expr : t Fmt.t
+  end
 end
 
 (** @canonical Gillian.Gil_syntax.Asrt *)

@@ -35,7 +35,7 @@ module type S = sig
     t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
-module Make (SMemory : SMemory.S) :
+module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   S
     with type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t

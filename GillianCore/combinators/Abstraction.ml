@@ -62,7 +62,7 @@ let abs_of_yojson state_of_yojson (yojson : Yojson.Safe.t) :
   | `Assoc sections -> aux (None, None, None, sections)
   | _ -> Error "Cannot parse yojson into abstract state"
 
-module Make (S : MonadicSMemory.S) = struct
+module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
   type t = S.t abs [@@deriving yojson, show]
 
   (** Errors of the abstraction layer. Each abstraction-specific constructor
@@ -85,15 +85,13 @@ module Make (S : MonadicSMemory.S) = struct
   [@@deriving yojson]
 
   let pp_err_t ft =
-    let pp_vs = Fmt.(list ~sep:comma Expr.pp) in
+    let pp_vs = Fmt.(list ~sep:comma P.pp_expr) in
     function
     | MissingUPred { name; vs } ->
-        Fmt.pf ft "Missing predicate %s(%a)" name pp_vs vs
+        Fmt.pf ft "@[<h>Missing predicate %s(%a)@]" name pp_vs vs
     | MissingWand { lname; rname } ->
         Fmt.pf ft "Missing wand %s -* %s" lname rname
-    | AsrtFailure ([], f) -> Fmt.pf ft "Assertion failed: %a" Expr.pp f
-    | AsrtFailure (vs, f) ->
-        Fmt.pf ft "Assertion failed for %a: %a" pp_vs vs Expr.pp f
+    | AsrtFailure (_, f) -> Fmt.pf ft "Couldn't assert %a" P.pp_expr f
     | OtherErr msg -> Fmt.string ft msg
     | SubError e -> S.pp_err ft e
 
@@ -1893,5 +1891,6 @@ module Make (S : MonadicSMemory.S) = struct
     { mem; preds; wands }
 end
 
-module _ (S : MonadicSMemory.S) : MonadicSMemory.S with type t = S.t abs =
-  Make (S)
+module _ (S : MonadicSMemory.S) (P : Expr.Printer) :
+  MonadicSMemory.S with type t = S.t abs =
+  Make (S) (P)

@@ -520,3 +520,4 @@ let initialize exec_mode =
   | _ -> ()
 
 let fail_message _ ~code:_ _ = None
+let pp_expr = Gillian.Gil_syntax.Expr.pp

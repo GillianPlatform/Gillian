@@ -81,6 +81,9 @@ module type S = sig
   (** [fail_message ctx ~code params] is a readable message for reaching
       [fail [code](params)], or [None] for the default. *)
   val fail_message : fail_ctx -> code:string -> Expr.t list -> string option
+
+  (** Prints a GIL expression in the target language's syntax, for messages. *)
+  val pp_expr : Expr.t Fmt.t
 end
 
 (** Dummy ParserAndCompiler that will simply always fail. This is used when
@@ -116,4 +119,5 @@ struct
   let default_import_paths = None
   let initialize _ = ()
   let fail_message _ ~code:_ _ = None
+  let pp_expr = Expr.pp
 end

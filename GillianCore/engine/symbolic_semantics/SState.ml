@@ -49,7 +49,7 @@ module type S = sig
     t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
-module Make (SMemory : SMemory.S) :
+module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   S
     with type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t
@@ -667,7 +667,7 @@ module Make (SMemory : SMemory.S) :
           | _ -> acc)
         memory_tactic pfs
 
-  let pp_err = StateErr.pp_err SMemory.pp_err SVal.M.pp
+  let pp_err = StateErr.pp_err SMemory.pp_err P.pp_expr
   let can_fix = StateErr.can_fix SMemory.can_fix
 
   let get_failing_constraint (err : err_t) : Expr.t =

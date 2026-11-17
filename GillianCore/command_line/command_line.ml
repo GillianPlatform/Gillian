@@ -23,14 +23,14 @@ module Make
 struct
   module Gil_parsing = Gil_parsing.Make (PC.Annot)
   module CState = CState.Make (CMemory)
-  module AbsMemory = Combinators.Abstraction.Make (SMemory)
+  module AbsMemory = Combinators.Abstraction.Make (SMemory) (PC)
   module VSMemory = Monadic.MonadicSMemory.Lift (AbsMemory)
 
   module C_interpreter =
     G_interpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (PC) (External)
 
-  module VSState = SState.Make (VSMemory)
-  module SState = SState.Make (Monadic.MonadicSMemory.Lift (SMemory))
+  module VSState = SState.Make (VSMemory) (PC)
+  module SState = SState.Make (Monadic.MonadicSMemory.Lift (SMemory)) (PC)
 
   module S_interpreter =
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
