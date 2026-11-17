@@ -910,19 +910,11 @@ struct
   let init_proc ~(init_data : State.init_data) (prog : prog_t) proc_name :
       SAInterpreter.result_t SAInterpreter.cont_func list =
     L.Phase.with_normal ~title:"Program verification" @@ fun () ->
-    (* Analyse all procedures and lemmas *)
-    let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
-    let lemmas_to_verify = SS.of_list (Prog.get_noninternal_lemma_names prog) in
-    let procs_to_verify, lemmas_to_verify =
-      select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
+    (* Not filtered by the CLI's proc selection: the debugger also starts
+       procs it steps into, e.g. loop bodies. *)
+    let prog, _, tests =
+      get_tests_to_verify ~init_data prog (SS.singleton proc_name) SS.empty
     in
-    let prog, _, proc_tests =
-      get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
-    in
-    (* TODO: Verify All procedures. Currently we only verify the first
-               procedure (unless specified).
-               Assume there is at least one procedure*)
-    let tests = proc_tests |> List.filter (fun test -> test.name = proc_name) in
     if List.is_empty tests then
       Fmt.failwith "Couldn't find test for proc '%s'!" proc_name;
     tests
