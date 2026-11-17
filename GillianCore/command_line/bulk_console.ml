@@ -8,17 +8,17 @@ struct
   let make_bulk_console runner =
     let exec_mode = Runner.exec_mode runner in
     let path_t =
-      let doc = "Path of the test suite." in
+      let doc = "Paths of the test suite (files or directories)." in
       let docv = "PATH" in
-      Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
+      Arg.(non_empty & pos_all file [] & info [] ~docv ~doc)
     in
-    let run test_suite_path npaf incremental () =
+    let run test_suite_paths npaf incremental () =
       let () = Config.current_exec_mode := exec_mode in
       let () = Config.bulk_print_all_failures := not npaf in
       let () = PC.initialize exec_mode in
       let () = Logging.Mode.set_mode Disabled in
       let () = Printexc.record_backtrace false in
-      Runner.run_all runner ~test_suite_path ~incremental
+      Runner.run_all runner ~test_suite_paths ~incremental
     in
     let run_t = Term.(const run $ path_t $ no_print_failures $ incremental) in
     let run_info =
