@@ -47,9 +47,9 @@ module Error = struct
     AnalysisFailures
       [ make_analysis_failure ?is_preprocessing ?in_target ?loc msg ]
 
-  let pp' ?(brief = false) fmt e =
-    match (brief, e) with
-    | false, AnalysisFailures es ->
+  let pp fmt e =
+    match e with
+    | AnalysisFailures es ->
         let msgs =
           es
           |> List.mapi @@ fun i ({ msg; details; loc; _ } : analysis_failure) ->
@@ -71,16 +71,9 @@ module Error = struct
         Fmt.pf fmt "Analysis failures!\n%a\n"
           (Fmt.list ~sep:(Fmt.any "\n") Fmt.string)
           msgs
-    | true, AnalysisFailures es ->
-        let len = List.length es in
-        Fmt.pf fmt "%d analysis failure%s!\n%a" len
-          (if len > 1 then "s" else "")
-          (Fmt.Dump.list Yojson.Safe.pp)
-          (List.map analysis_failure_to_yojson es)
-    | true, CompilationError { msg; _ }
-    | false, CompilationError { msg; loc = None; _ } ->
+    | CompilationError { msg; loc = None; _ } ->
         Fmt.pf fmt "Error during compilation.\n%s" msg
-    | false, CompilationError { msg; loc; additional_data } ->
+    | CompilationError { msg; loc; additional_data } ->
         let () =
           Fmt.pf fmt "Error during compilation, at%a.\n%s" Location.pp_full loc
             msg
@@ -91,9 +84,8 @@ module Error = struct
           | None -> ()
         in
         ()
-    | _, OperationError o -> Fmt.pf fmt "%s" o
-    | true, InternalError { msg; _ } -> Fmt.pf fmt "Internal error!\n%s" msg
-    | false, InternalError { msg; backtrace; additional_data } ->
+    | OperationError o -> Fmt.pf fmt "%s" o
+    | InternalError { msg; backtrace; additional_data } ->
         let () = Fmt.pf fmt "Internal error!\n%s" msg in
         let () =
           match additional_data with
@@ -107,11 +99,7 @@ module Error = struct
         in
         ()
 
-  let show' ?brief = Fmt.to_to_string (pp' ?brief)
-  let pp = pp' ~brief:false
-  let show = show' ~brief:false
-  let pp_brief = pp' ~brief:true
-  let show_brief = show' ~brief:true
+  let show = Fmt.to_to_string pp
 
   let to_error_code = function
     | AnalysisFailures _ -> 1
@@ -144,7 +132,7 @@ module Exc = struct
 
   let () =
     Printexc.register_printer @@ function
-    | Gillian_error e -> Some (Error.show_brief e)
+    | Gillian_error e -> Some (Error.show e)
     | _ -> None
 
   let internal_error ?(additional_data : (string * Yojson.Safe.t) list = []) msg
