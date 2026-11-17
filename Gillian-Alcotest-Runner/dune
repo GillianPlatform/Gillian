@@ -1,5 +1,0 @@
-(library
- (name alcotest_runner)
- (public_name gillian.alcotest-runner)
- (libraries alcotest gillian str)
- (flags :standard -open Gillian.Bulk -open Gillian.Gil_syntax))
