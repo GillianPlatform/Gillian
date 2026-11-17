@@ -122,6 +122,7 @@ module Make (S : MonadicSMemory.S) = struct
     | GUnfold
     | Package
     | Recover
+    | UnfoldConcrete
     | SubAction of string
 
   let action_from_str str =
@@ -130,6 +131,7 @@ module Make (S : MonadicSMemory.S) = struct
     else if str = SLCmd.gunfold_action then GUnfold
     else if str = SLCmd.package_action then Package
     else if str = SLCmd.recover_action then Recover
+    else if str = SLCmd.unfold_concrete_action then UnfoldConcrete
     else SubAction str
 
   let action_to_str = function
@@ -138,6 +140,7 @@ module Make (S : MonadicSMemory.S) = struct
     | GUnfold -> SLCmd.gunfold_action
     | Package -> SLCmd.package_action
     | Recover -> SLCmd.recover_action
+    | UnfoldConcrete -> SLCmd.unfold_concrete_action
     | SubAction a -> a
 
   let pred_from_str str : pred =
@@ -493,23 +496,19 @@ module Make (S : MonadicSMemory.S) = struct
       | `Low -> [ strategy_1 ~ms ~values ~pred_defs; strategy_2 ~pred_defs ]
     in
     let strategies = List.map wrap_strategy strategies in
-    (* Candidates already tried by the enclosing retry loop are excluded from
-       selection (the legacy code popped them from its mutable predicate set);
-       the chosen one is removed from the FULL predicate list. *)
-    let selectable =
-      List.filter (fun pa -> not (List.mem pa exclude)) ms.st.preds
-    in
-    let preds_ref = Preds.init selectable in
+    (* Candidates already tried by the enclosing retry loop are dropped from
+       the state, as the legacy code popped them from its mutable predicate
+       set. Merely excluding them from selection leaves them consumable by
+       the retried match, which changes (and can blow up) the search. *)
+    let preds_ref = Preds.init ms.st.preds in
+    List.iter
+      (fun (cn, cargs) ->
+        ignore
+          (Preds.pop preds_ref (fun (n, args) ->
+               String.equal n cn && List.equal Expr.equal args cargs)))
+      exclude;
     List.find_map (Preds.strategic_choice ~consume:true preds_ref) strategies
-    |> Option.map (fun chosen ->
-           let remaining_ref = Preds.init ms.st.preds in
-           let popped =
-             Preds.pop remaining_ref (fun (n, args) ->
-                 let cn, cargs = chosen in
-                 String.equal n cn && List.equal Expr.equal args cargs)
-           in
-           assert (Option.is_some popped);
-           (chosen, Preds.to_list remaining_ref))
+    |> Option.map (fun chosen -> (chosen, Preds.to_list preds_ref))
 
   let select_guarded_predicate_to_fold (ms : mstate) (values : Expr.t list) :
       upred option =
@@ -1764,6 +1763,8 @@ module Make (S : MonadicSMemory.S) = struct
           | (Fold | Unfold | GUnfold | Package) as act ->
               execute_pred_action act ms args
           | Recover -> execute_recover ms args
+          (* The post-pass does the work. *)
+          | UnfoldConcrete -> [ Ok (ms, []) ]
         in
         results |> post_pass |> to_branches ~entry_pc:curr_pc)
 

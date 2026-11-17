@@ -173,12 +173,18 @@ let package_action = Asrt.user_pred_prefix ^ "package"
     meaningful when predicate reasoning lives in the memory. *)
 let recover_action = Asrt.user_pred_prefix ^ "recover"
 
+(** Reserved no-op action whose only effect is the memory's eager unfolding of
+    predicates with concrete ins (run by the state after producing a spec's
+    postcondition). *)
+let unfold_concrete_action = Asrt.user_pred_prefix ^ "unfold_concrete"
+
 let is_pred_action (a : string) : bool =
   String.equal a fold_action
   || String.equal a unfold_action
   || String.equal a gunfold_action
   || String.equal a package_action
   || String.equal a recover_action
+  || String.equal a unfold_concrete_action
 
 (* -- encoding -- *)
 

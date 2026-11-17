@@ -632,6 +632,10 @@ module SLCmd : sig
       correspond to any SL command. *)
   val recover_action : string
 
+  (** Reserved no-op action whose only effect is the memory's eager unfolding of
+      predicates with concrete ins. *)
+  val unfold_concrete_action : string
+
   (** [is_pred_action a] holds iff [a] is one of the reserved actions above. *)
   val is_pred_action : string -> bool
 
