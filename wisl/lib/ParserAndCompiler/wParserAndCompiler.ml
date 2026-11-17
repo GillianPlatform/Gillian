@@ -55,6 +55,32 @@ let parse_and_compile_files files =
 let other_imports = []
 let initialize _ = ()
 
+let fail_message (ctx : Command_line.ParserAndCompiler.fail_ctx) ~code params =
+  let pp_val ft v = Expr_pp.pp ft (ctx.simplify v) in
+  let pp_typed ft v =
+    match ctx.get_type v with
+    | Some t ->
+        Fmt.pf ft "%a (type %s)" pp_val v (Gillian.Gil_syntax.Type.str t)
+    | None -> Fmt.pf ft "%a (type unknown)" pp_val v
+  in
+  match (code, params) with
+  | "InvalidAddition", [ l; r ] ->
+      Some
+        (Fmt.str
+           "Can't add %a and %a: expected two numbers, or a pointer and a \
+            number"
+           pp_typed l pp_typed r)
+  | "InvalidPointer", [ v ] ->
+      Some (Fmt.str "Can't dereference %a: not a pointer" pp_typed v)
+  | "InvalidBlockPointer", [ v ] ->
+      Some
+        (Fmt.str "Can't free %a: not a pointer to the start of a block" pp_val v)
+  | "IncomparablePointers", [ l; r ] ->
+      Some
+        (Fmt.str "Can't compare pointers into different blocks %a and %a" pp_val
+           l pp_val r)
+  | _ -> None
+
 let default_import_paths =
   Some
     [

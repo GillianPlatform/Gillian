@@ -1675,7 +1675,25 @@ struct
         (* Explicit failure *)
         | Fail (fail_code, fail_params) ->
             let fail_params = List.map (State.eval_expr state) fail_params in
-            let err = Exec_err.EFailReached { fail_code; fail_params } in
+            let fail_msg =
+              let ctx : ParserAndCompiler.fail_ctx =
+                {
+                  simplify =
+                    (fun e ->
+                      match Val.from_expr e with
+                      | Some v -> Val.to_expr (State.simplify_val state v)
+                      | None -> e);
+                  get_type =
+                    (fun e ->
+                      Option.bind (Val.from_expr e) (State.get_type state));
+                }
+              in
+              PC.fail_message ctx ~code:fail_code
+                (List.map Val.to_expr fail_params)
+            in
+            let err =
+              Exec_err.EFailReached { fail_code; fail_params; fail_msg }
+            in
             raise (Interpreter_error ([ err ], state))
 
       let f cmd eval_state =

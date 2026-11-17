@@ -518,3 +518,5 @@ let initialize exec_mode =
       Gillian.Utils.Config.delay_entailment := true
   | Verification -> Gillian.Utils.Config.delay_entailment := true
   | _ -> ()
+
+let fail_message _ ~code:_ _ = None

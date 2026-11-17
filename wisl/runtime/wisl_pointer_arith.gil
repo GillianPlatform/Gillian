@@ -26,8 +26,7 @@ proc i__add (el, er) {
   nadd: ret := el i+ er;
         return;
         (* Incorrect types *)
-  err:  err_msg := "Addition: Incorrect Types";
-        fail [err_msg] (el, er)
+  err:  fail [InvalidAddition] (el, er)
 };
 
 proc i__minus (el, er) {
@@ -47,8 +46,7 @@ proc i__leq (el, er) {
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
         goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare pointers from different blocks";
-        fail [message] (locl, locr);
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := offsetl i<= offsetr;
@@ -62,8 +60,7 @@ proc i__lt (el, er) {
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
         goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
-        fail [message] (locl, locr);
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := offsetl i< offsetr;
@@ -77,8 +74,7 @@ proc i__geq (el, er) {
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
         goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
-        fail [message] (locl, locr);
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := not (offsetl i< offsetr);
@@ -92,8 +88,7 @@ proc i__gt (el, er) {
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
         goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
-        fail [message] (locl, locr);
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := not (offsetl i<= offsetr);

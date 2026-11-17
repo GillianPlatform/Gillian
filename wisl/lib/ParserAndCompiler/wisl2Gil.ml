@@ -805,7 +805,7 @@ let rec compile_stmt_list
             ctnlab,
             faillab )
       in
-      let failcmd = Cmd.Fail ("InvalidPointer", []) in
+      let failcmd = Cmd.Fail ("InvalidPointer", [ comp_e ]) in
       let lookupcmd =
         Cmd.LAction (v_get, load, [ nth comp_e 0; nth comp_e 1 ])
       in
