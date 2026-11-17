@@ -82,7 +82,22 @@ module Make (S : MonadicSMemory.S) = struct
     | AsrtFailure of Expr.t list * Expr.t
     | OtherErr of string
     | SubError of S.err_t
-  [@@deriving yojson, show]
+  [@@deriving yojson]
+
+  let pp_err_t ft =
+    let pp_vs = Fmt.(list ~sep:comma Expr.pp) in
+    function
+    | MissingUPred { name; vs } ->
+        Fmt.pf ft "Missing predicate %s(%a)" name pp_vs vs
+    | MissingWand { lname; rname } ->
+        Fmt.pf ft "Missing wand %s -* %s" lname rname
+    | AsrtFailure ([], f) -> Fmt.pf ft "Assertion failed: %a" Expr.pp f
+    | AsrtFailure (vs, f) ->
+        Fmt.pf ft "Assertion failed for %a: %a" pp_vs vs Expr.pp f
+    | OtherErr msg -> Fmt.string ft msg
+    | SubError e -> S.pp_err ft e
+
+  let show_err_t = Fmt.to_to_string pp_err_t
 
   type init_data = S.init_data
 
