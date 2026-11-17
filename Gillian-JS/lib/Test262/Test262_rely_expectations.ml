@@ -1,4 +1,4 @@
-type matcher = Alcotest_runner.AlcotestCheckers.Make(Test262_outcome).matcher
+type matcher = Bulk.Checkers.Make(Test262_outcome).matcher
 type outcome = Test262_outcome.t
 type category = Test262_suite.category
 type info = Test262_suite.info
