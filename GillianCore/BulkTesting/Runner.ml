@@ -3,7 +3,7 @@ open Syntaxes.Result
 module type S = sig
   val cmd_name : string
   val exec_mode : Exec_mode.t
-  val run_all : test_suite_path:string -> incremental:bool -> unit
+  val run_all : test_suite_paths:string list -> incremental:bool -> unit
 end
 
 module Make
@@ -155,11 +155,12 @@ module Make
          ~test_runner:(execute_test prev_results_opt))
       test_table
 
-  let run_all ~test_suite_path ~incremental =
+  let run_all ~test_suite_paths ~incremental =
     let () = Fmt.pr "Registering tests...\n@?" in
     let is_wpst = Exec_mode.is_symbolic_exec exec_mode in
     let list_files =
-      List.filter Suite.filter_source (Utils.Io_utils.get_files test_suite_path)
+      List.concat_map Utils.Io_utils.get_files test_suite_paths
+      |> List.filter Suite.filter_source
     in
     let () = Suite.init_suite list_files in
     let () = register_tests list_files in
