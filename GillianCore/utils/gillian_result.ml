@@ -1,6 +1,8 @@
 module Error = struct
   type analysis_failure = {
-    msg : string;
+    msg : string;  (** Brief, e.g. for a diagnostic *)
+    details : string option; [@default None]
+        (** The full message, if longer than [msg] *)
     loc : Location.t option;
     is_preprocessing : bool;
     in_target : string option;
@@ -32,9 +34,14 @@ module Error = struct
     | InternalError of internal_error  (** Something went very wrong! *)
   [@@deriving yojson]
 
-  let make_analysis_failure ?(is_preprocessing = false) ?in_target ?loc msg =
+  let make_analysis_failure
+      ?(is_preprocessing = false)
+      ?in_target
+      ?details
+      ?loc
+      msg =
     let in_target = Option_utils.coalesce in_target !current_target in
-    { msg; loc; is_preprocessing; in_target }
+    { msg; details; loc; is_preprocessing; in_target }
 
   let make_analysis_failures ?is_preprocessing ?in_target ?loc msg =
     AnalysisFailures
@@ -45,8 +52,21 @@ module Error = struct
     | false, AnalysisFailures es ->
         let msgs =
           es
-          |> List.mapi @@ fun i ({ msg; loc; _ } : analysis_failure) ->
-             Fmt.str "%d. %s%a" (i + 1) msg Location.pp_full loc
+          |> List.mapi @@ fun i ({ msg; details; loc; _ } : analysis_failure) ->
+             let lines =
+               String.split_on_char '\n' (Option.value ~default:msg details)
+             in
+             (* A multi-line message gets its location on a line of its own *)
+             let lines =
+               match
+                 (lines, String.trim (Fmt.str "%a" Location.pp_full loc))
+               with
+               | _, "" -> lines
+               | [ line ], loc -> [ line ^ " " ^ loc ]
+               | lines, loc -> lines @ [ loc ]
+             in
+             (* The box keeps a multi-line message's lines past the number *)
+             Fmt.str "%d. @[<v>%a@]" (i + 1) Fmt.(list ~sep:cut string) lines
         in
         Fmt.pf fmt "Analysis failures!\n%a\n"
           (Fmt.list ~sep:(Fmt.any "\n") Fmt.string)

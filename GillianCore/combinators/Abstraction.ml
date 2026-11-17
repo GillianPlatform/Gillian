@@ -103,12 +103,15 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
           |> List.sort_uniq (fun (a, _) (b, _) -> String.compare a b)
           |> List.map snd
         in
+        let pp_reasons =
+          Fmt.(any ":" ++ list ~sep:nop (cut ++ any "- " ++ pp_err_t))
+        in
         Fmt.pf ft
-          "@[<v 2>@[<h>Missing predicate %s(%a), and couldn't fold it:@]%a@]"
+          "@[<v 2>@[<h>Missing predicate %s(%a), and couldn't fold it@]%a@]"
           name
           Fmt.(list ~sep:comma (option ~none:(any "_") P.pp_expr))
           vs
-          Fmt.(list ~sep:nop (cut ++ any "- " ++ pp_err_t))
+          (Error_detail.pp_details pp_reasons)
           errs
     | MissingWand { lname; rname } ->
         Fmt.pf ft "Missing wand %s -* %s" lname rname

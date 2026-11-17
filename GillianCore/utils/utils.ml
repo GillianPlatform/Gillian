@@ -52,6 +52,12 @@ module Exceptions = struct
   include Exceptions
 end
 
+(** @canonical Gillian.Utils.Error_detail *)
+module Error_detail = struct
+  (** @inline *)
+  include Error_detail
+end
+
 (** @canonical Gillian.Utils.Exec_mode *)
 module Exec_mode = struct
   (** @inline *)

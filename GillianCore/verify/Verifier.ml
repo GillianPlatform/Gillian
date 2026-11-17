@@ -542,15 +542,19 @@ struct
         Fmt.pr "f @?";
         (* One failing state is one failure: its errors are the reasons why,
            often the same reason reached along several paths. *)
-        let msg =
+        let show () =
           errors
           |> List.map (Fmt.str "%a" SAInterpreter.Logging.pp_err)
-          |> List.sort_uniq String.compare
-          |> String.concat "\n"
+          |> List_utils.remove_duplicates |> String.concat "\n"
+        in
+        let msg = Error_detail.brief show in
+        let details =
+          let full = show () in
+          if full = msg then None else Some full
         in
         Error
           (Gillian_result.Error.AnalysisFailures
-             [ Gillian_result.Error.make_analysis_failure ?loc msg ])
+             [ Gillian_result.Error.make_analysis_failure ?loc ?details msg ])
     | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } -> (
         if Some fl <> test.flag then (
           let msg =
