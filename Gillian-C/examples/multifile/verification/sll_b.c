@@ -49,8 +49,8 @@ SLL *listCopy(SLL *x) {
         r = NULL;
     } else {
         SLL *t = listCopy(x->next);
-        __builtin_annot("unfold list (NULL, #beta)");
-        __builtin_annot("unfold list(t, #beta)");
+        __builtin_annot("unfold list (NULL)");
+        __builtin_annot("unfold list(t)");
         r = malloc(sizeof(SLL));
         r->data = x->data;
         r->next = t;

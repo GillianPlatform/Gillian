@@ -22,6 +22,12 @@ let get_progs_or_fail ~pp_err = function
       Fmt.pr "Error during compilation to GIL:\n%a" pp_err err;
       exit 1
 
+(** What {!S.fail_message} can ask of the state a [fail] was reached in. *)
+type fail_ctx = {
+  simplify : Expr.t -> Expr.t;  (** Simplifies a value in the state *)
+  get_type : Expr.t -> Type.t option;  (** A value's type, if known *)
+}
+
 module type S = sig
   module TargetLangOptions : sig
     (** Command line options specific to the target language. *)
@@ -71,6 +77,13 @@ module type S = sig
   (** Function that will be executed at initialisation. It will be passed the
       current execution mode as parameter *)
   val initialize : Exec_mode.t -> unit
+
+  (** [fail_message ctx ~code params] is a readable message for reaching
+      [fail [code](params)], or [None] for the default. *)
+  val fail_message : fail_ctx -> code:string -> Expr.t list -> string option
+
+  (** Prints a GIL expression in the target language's syntax, for messages. *)
+  val pp_expr : Expr.t Fmt.t
 end
 
 (** Dummy ParserAndCompiler that will simply always fail. This is used when
@@ -105,4 +118,6 @@ struct
   let other_imports = []
   let default_import_paths = None
   let initialize _ = ()
+  let fail_message _ ~code:_ _ = None
+  let pp_expr = Expr.pp
 end

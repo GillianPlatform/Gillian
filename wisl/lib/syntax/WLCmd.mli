@@ -1,8 +1,11 @@
 type tt =
-  | Fold of string * WLExpr.t list
+  | Fold of string * WLExpr.t option list
+      (** The in-parameters have to be given; the out-parameters may be dropped
+          altogether, or given one by one, [None] standing for an out-parameter
+          written as an underscore. *)
   | Unfold of {
       pred : string;
-      params : WLExpr.t list;
+      params : WLExpr.t option list;  (** Read as for {!Fold}. *)
       bindings : (string * string) list option;
     }
   | Package of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }

@@ -1,0 +1,73 @@
+predicate list(x; alpha) {
+    (x == null) * (alpha == nil);
+    (x -> #a, #z) * (alpha == #a :: #beta) * list(#z, #beta)
+}
+
+predicate cell2(x; a, b) {
+    (x -> #u, #v) * (a == #u) * (b == #v)
+}
+
+// Only the in-parameters need to be given.
+{ (x == #x) * list(#x, #alpha) }
+function ins_only(x) {
+    [[ unfold list(x) ]];
+    [[ fold list(x, #alpha) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }
+
+// An underscore in an out-parameter position ignores it.
+{ (x == #x) * list(#x, #alpha) }
+function all_ignored(x) {
+    [[ unfold list(x, _) ]];
+    [[ fold list(x, #alpha) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }
+
+// A fresh logical variable in an out-parameter position is bound.
+{ (x == #x) * list(#x, #alpha) }
+function binds_fresh(x) {
+    [[ unfold list(x, #vs) ]];
+    [[ assert (#vs == #alpha) ]];
+    [[ fold list(x, #alpha) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }
+
+// Ignore the first out-parameter, bind the second.
+{ (x == #x) * cell2(#x, #a, #b) }
+function mixed(x) {
+    [[ unfold cell2(x, _, #bb) ]];
+    [[ assert (#bb == #b) ]];
+    [[ fold cell2(x, #a, #b) ]];
+    return 0
+}
+{ (ret == 0) * cell2(#x, #a, #b) }
+
+// An out-parameter that the definition determines is asserted.
+{ (x == #x) * (#x == null) * list(#x, #alpha) }
+function asserts_known(x) {
+    [[ unfold list(x, []) ]];
+    [[ fold list(x, #alpha) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }
+
+// A fold needs only the in-parameters too.
+{ (x == #x) * list(#x, #alpha) }
+function fold_ins_only(x) {
+    [[ unfold list(x) ]];
+    [[ fold list(x) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }
+
+// An underscore leaves an out-parameter of a fold to be worked out.
+{ (x == #x) * cell2(#x, #a, #b) }
+function fold_mixed(x) {
+    [[ unfold cell2(x) ]];
+    [[ fold cell2(x, _, #b) ]];
+    return 0
+}
+{ (ret == 0) * cell2(#x, #a, #b) }

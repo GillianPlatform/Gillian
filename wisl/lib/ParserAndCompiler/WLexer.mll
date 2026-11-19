@@ -128,6 +128,7 @@ rule read =
   | "rev"    { REV (curr lexbuf) }
   | "sub"    { SUB (curr lexbuf) }
   | '!'      { NOT (curr lexbuf) }
+  | '_'      { UNDERSCORE (curr lexbuf) }
   (* identifiers *)
   | white    { read lexbuf }
   | newline  { new_line lexbuf; read lexbuf }

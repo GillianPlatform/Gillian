@@ -26,18 +26,14 @@ let get_recovery_tactic
 
 let pp_err
     (pp_m_err : Format.formatter -> 'a -> unit)
-    (pp_v : Format.formatter -> 'b -> unit)
+    (pp_expr : Expr.t Fmt.t)
     (fmt : Format.formatter)
     (err : ('a, 'b) t) : unit =
   match err with
   | EMem m_err -> pp_m_err fmt m_err
-  | EPure f -> Fmt.pf fmt "Pure assertion failed: %a" Expr.pp f
+  | EPure f -> Fmt.pf fmt "Pure assertion failed: %a" pp_expr f
   | EVar x -> Fmt.pf fmt "Undefined variable: %s" x
-  | EAsrt ([], f) -> Fmt.pf fmt "Assertion failed: %a" Expr.pp f
-  | EAsrt (vs, f) ->
-      Fmt.pf fmt "Assertion failed for %a: %a"
-        (Fmt.list ~sep:(Fmt.any ", ") pp_v)
-        vs Expr.pp f
+  | EAsrt (_, f) -> Fmt.pf fmt "Couldn't assert %a" pp_expr f
   | EOther msg -> Fmt.pf fmt "%s" msg
 
 let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) t) : bool =

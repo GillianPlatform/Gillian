@@ -88,10 +88,18 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | Pure f -> [ Pure (jsil2gil_expr f) ]
   | Types vts -> [ Types (List.map (fun (v, t) -> (fe v, t)) vts) ]
 
+(* An underscore in an out-parameter position of a fold/unfold means that the
+   parameter is to be ignored. *)
+let jsil2gil_pred_arg e =
+  match jsil2gil_expr e with
+  | Expr.LVar x when Javert_utils.Js_generators.is_anon_lvar x -> None
+  | e -> Some e
+
 let jsil2gil_slcmd (slcmd : SLCmd.t) : GSLCmd.t =
   match slcmd with
-  | Fold (pn, es, info) -> Fold (pn, List.map jsil2gil_expr es, info)
-  | Unfold (pn, es, info, b) -> Unfold (pn, List.map jsil2gil_expr es, info, b)
+  | Fold (pn, es, info) -> Fold (pn, List.map jsil2gil_pred_arg es, info)
+  | Unfold (pn, es, info, b) ->
+      Unfold (pn, List.map jsil2gil_pred_arg es, info, b)
   | GUnfold pn -> GUnfold pn
   | ApplyLem (x, es, xs) -> ApplyLem (x, List.map jsil2gil_expr es, xs)
   | SepAssert (a, xs) -> SepAssert (jsil2gil_asrt a, xs)

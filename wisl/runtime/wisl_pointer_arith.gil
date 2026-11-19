@@ -22,12 +22,11 @@ proc i__add (el, er) {
   rip:  ret := "i__ptr_add" (er, el);
         return;
         (* Both left and right are numbers *)
-  rinp: goto [((typeOf el) = Int) and ((typeOf el) = Int)] nadd err;
+  rinp: goto [((typeOf el) = Int) and ((typeOf er) = Int)] nadd err;
   nadd: ret := el i+ er;
         return;
         (* Incorrect types *)
-  err:  err_msg := "Addition: Incorrect Types";
-        fail [err_msg] (el, er)
+  err:  fail [InvalidAddition] (el, er)
 };
 
 proc i__minus (el, er) {
@@ -46,9 +45,8 @@ proc i__leq (el, er) {
         goto [(typeOf el) = List] lip linp;
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
-        goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare pointers from different blocks";
-        fail [message] (locl, locr);
+        goto [locl = locr] ok nok;
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := offsetl i<= offsetr;
@@ -61,9 +59,8 @@ proc i__lt (el, er) {
         goto [(typeOf el) = List] lip linp;
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
-        goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
-        fail [message] (locl, locr);
+        goto [locl = locr] ok nok;
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := offsetl i< offsetr;
@@ -76,9 +73,8 @@ proc i__geq (el, er) {
         goto [(typeOf el) = List] lip linp;
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
-        goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
-        fail [message] (locl, locr);
+        goto [locl = locr] ok nok;
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := not (offsetl i< offsetr);
@@ -91,9 +87,8 @@ proc i__gt (el, er) {
         goto [(typeOf el) = List] lip linp;
   lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0i);
-        goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
-        fail [message] (locl, locr);
+        goto [locl = locr] ok nok;
+  nok:  fail [IncomparablePointers] (locl, locr);
   ok:   offsetl := l-nth(el, 1i);
         offsetr := l-nth(er, 1i);
         ret := not (offsetl i<= offsetr);

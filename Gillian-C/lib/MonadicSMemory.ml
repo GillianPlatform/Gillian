@@ -852,8 +852,10 @@ let get_recovery_tactic _ err =
   in
   Recovery_tactic.try_unfold values
 
-let get_failing_constraint _e =
-  failwith "Bi-abduction TODO: implement function get_failing_constraint"
+(* The failing constraint is only used to build a nicer message for a failed
+   [sep_assert]; not knowing one is no reason to bring the analysis down, so we
+   say nothing about it, as the concrete state does. *)
+let get_failing_constraint _e = Expr.true_
 
 let offset_by_chunk low chunk =
   let open Expr.Infix in

@@ -137,3 +137,6 @@ let initialize exec_mode =
   Javert_utils.Js_config.cosette :=
     is_biabduction_exec exec_mode || is_symbolic_exec exec_mode;
   if is_concrete_exec exec_mode then Config.unfolding := false
+
+let fail_message _ ~code:_ _ = None
+let pp_expr = Gillian.Gil_syntax.Expr.pp

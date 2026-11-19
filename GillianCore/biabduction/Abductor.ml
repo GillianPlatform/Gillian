@@ -613,5 +613,6 @@ module From_scratch
   Make
     (SState.Make
        (Monadic.MonadicSMemory.Lift
-          (Combinators.Abstraction.Make (SMemory)))) (PC)
-          (External)
+          (Combinators.Abstraction.Make (SMemory) (PC))) (PC))
+          (PC)
+       (External)

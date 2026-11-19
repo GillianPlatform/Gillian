@@ -327,3 +327,6 @@ let parse_and_compile_files files =
   let gil_prog = combine_prog_with_lprog gil_prog gil_lprog in
   let source_path = Option.value ~default:path source_path in
   create_compilation_result source_path goto_prog gil_prog
+
+let fail_message _ ~code:_ _ = None
+let pp_expr = Gillian.Gil_syntax.Expr.pp

@@ -6,7 +6,12 @@ type ('value, 'state_err) t =
   | EState of 'state_err  (** Memory Error *)
   | ECleanUp
   | ELeak (* Memory leak *)
-  | EFailReached of { fail_code : string; fail_params : 'value list }
+  | EFailReached of {
+      fail_code : string;
+      fail_params : 'value list;
+      fail_msg : string option;
+          (** The frontend's [fail_message] for it, if any *)
+    }
 [@@deriving yojson]
 
 let pp pp_val pp_state_err ft err =
@@ -16,5 +21,7 @@ let pp pp_val pp_state_err ft err =
   | EState err -> (hbox pp_state_err) ft err
   | ECleanUp -> string ft "ECleanUp()"
   | ELeak -> string ft "MemoryLeak"
-  | EFailReached { fail_code; fail_params } ->
-      pf ft "@[<h>EFailReached(%s, %a)@]" fail_code (list pp_val) fail_params
+  | EFailReached { fail_msg = Some msg; _ } -> string ft msg
+  | EFailReached { fail_code; fail_params; fail_msg = None } ->
+      pf ft "@[<h>EFailReached(%s, %a)@]" fail_code (list ~sep:comma pp_val)
+        fail_params

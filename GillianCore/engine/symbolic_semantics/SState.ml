@@ -49,7 +49,7 @@ module type S = sig
     t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
-module Make (SMemory : SMemory.S) :
+module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   S
     with type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t
@@ -667,7 +667,7 @@ module Make (SMemory : SMemory.S) :
           | _ -> acc)
         memory_tactic pfs
 
-  let pp_err = StateErr.pp_err SMemory.pp_err SVal.M.pp
+  let pp_err = StateErr.pp_err SMemory.pp_err P.pp_expr
   let can_fix = StateErr.can_fix SMemory.can_fix
 
   let get_failing_constraint (err : err_t) : Expr.t =
@@ -861,10 +861,26 @@ module Make (SMemory : SMemory.S) :
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
-    (* Concrete-ins predicates are eagerly unfolded by the memory itself (as a
-       post-pass on its operations), so there is nothing left to unfold at the
-       state level here. *)
-    List.map (fun final_state -> Ok (final_state, fl)) final_states
+    (* Eagerly unfold concrete-ins predicates the posts produced, like the
+       legacy engine. The memory only does this as a post-pass on its actions
+       (not on produce), so ask it with a no-op action. *)
+    final_states
+    |> List.concat_map @@ fun final_state ->
+       let results =
+         execute_action SLCmd.unfold_concrete_action final_state []
+       in
+       let oks = List.filter_map Result.to_option results in
+       (* Errors only: the memory doesn't support this; keep the state. Zero
+          branches: an unfolding vanished, so the path dies. *)
+       let unfolded =
+         match (oks, results) with
+         | [], _ :: _ -> [ final_state ]
+         | _ ->
+             List.concat_map
+               (fun (st, _) -> snd (simplify ~matching:true st))
+               oks
+       in
+       List.map (fun final_state -> Ok (final_state, fl)) unfolded
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in

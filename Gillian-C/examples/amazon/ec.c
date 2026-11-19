@@ -204,13 +204,13 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         GILLIAN("unfold Elements(#buffer_content, 2 + #consumedLength, #togo, 2, #elementsDef, #restElements, #restEsLength)");
         GILLIAN(
             "if (#elementsDef = `Complete`) {"
-            "  unfold CElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength)"
+            "  unfold CElements(#buffer_content, 2 + #consumedLength, #togo, 2)"
             "    [[bind #kvPair: #element, #this_length: #eLength, #newRestElements: #restElements, #newRestEsLength: #restLength]];"
             "  assert [[bind #this_key, #this_value]] (#kvPair == [#this_key, #this_value]);"
             "  unfold CElement(#buffer_content, 2 + #consumedLength, 2, [#this_key, #this_value], #this_length)"
             "    [[bind #key_length: #fLength, #value_length: #restLength]]"
             "} else {"
-            "  unfold IElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength) "
+            "  unfold IElements(#buffer_content, 2 + #consumedLength, #togo, 2) "
             "    [[bind #maybePartialKvPair: #fList]];"
             "  if (#restElements = []) {"
             "    unfold IElement(#buffer_content, 2 + #consumedLength, 2, #maybePartialKvPair, #this_length)"

@@ -10,8 +10,13 @@ type unfold_info = (string * string) list [@@deriving yojson]
 
 (** {b GIL Separation Logic commands}. *)
 type t = TypeDef__.slcmd =
-  | Fold of string * Expr.t list * folding_info option  (** Fold *)
-  | Unfold of string * Expr.t list * unfold_info option * bool  (** Unfold *)
+  | Fold of string * Expr.t option list * folding_info option
+      (** Fold. See {!Unfold} for how the arguments are read. *)
+  | Unfold of string * Expr.t option list * unfold_info option * bool
+      (** Unfold. The arguments are positional: the in-parameters must all be
+          given, while the out-parameters may be omitted entirely (the list is
+          then just as long as there are ins) or given individually, [None]
+          standing for an out-parameter that is explicitly ignored. *)
   | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
       (** Magic wand packaging *)
   | GUnfold of string  (** Global Unfold *)
@@ -26,12 +31,14 @@ type t = TypeDef__.slcmd =
 [@@deriving yojson]
 
 let map (f_a : Asrt.t -> Asrt.t) (f_e : Expr.t -> Expr.t) : t -> t = function
-  | Fold (name, les, None) -> Fold (name, List.map f_e les, None)
+  | Fold (name, les, None) -> Fold (name, List.map (Option.map f_e) les, None)
   | Fold (name, les, Some (s, l)) ->
       Fold
-        (name, List.map f_e les, Some (s, List.map (fun (x, e) -> (x, f_e e)) l))
+        ( name,
+          List.map (Option.map f_e) les,
+          Some (s, List.map (fun (x, e) -> (x, f_e e)) l) )
   | Unfold (name, les, unfold_info, b) ->
-      Unfold (name, List.map f_e les, unfold_info, b)
+      Unfold (name, List.map (Option.map f_e) les, unfold_info, b)
   | GUnfold name -> GUnfold name
   | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map f_e l, existentials)
   | SepAssert (a, binders) -> SepAssert (f_a a, binders)
@@ -48,7 +55,9 @@ let fold = List.fold_left SS.union SS.empty
 let pvars (slcmd : t) : SS.t =
   let pvars_es es = fold (List.map Expr.pvars es) in
   match slcmd with
-  | Fold (_, es, _) | Unfold (_, es, _, _) | ApplyLem (_, es, _) -> pvars_es es
+  | ApplyLem (_, es, _) -> pvars_es es
+  | Fold (_, es, _) | Unfold (_, es, _, _) ->
+      pvars_es (List.filter_map Fun.id es)
   | GUnfold _ -> SS.empty
   | Package { lhs = _, les1; rhs = _, les2 } ->
       SS.union (pvars_es les1) (pvars_es les2)
@@ -67,8 +76,8 @@ let lvars (slcmd : t) : SS.t =
             let _, es = List.split les in
             fold (List.map Expr.lvars es)
       in
-      SS.union lvars_finfo (lvars_es es)
-  | Unfold (_, es, _, _) -> lvars_es es
+      SS.union lvars_finfo (lvars_es (List.filter_map Fun.id es))
+  | Unfold (_, es, _, _) -> lvars_es (List.filter_map Fun.id es)
   | Package { lhs = _, les1; rhs = _, les2 } ->
       SS.union (lvars_es les1) (lvars_es les2)
   | ApplyLem (_, es, _) -> lvars_es es
@@ -89,8 +98,8 @@ let locs (slcmd : t) : SS.t =
             let _, es = List.split les in
             fold (List.map Expr.locs es)
       in
-      SS.union lvars_finfo (locs_es es)
-  | Unfold (_, es, _, _) -> locs_es es
+      SS.union lvars_finfo (locs_es (List.filter_map Fun.id es))
+  | Unfold (_, es, _, _) -> locs_es (List.filter_map Fun.id es)
   | Package { lhs = _, les1; rhs = _, les2 } ->
       SS.union (locs_es les1) (locs_es les2)
   | ApplyLem (_, es, _) -> locs_es es
@@ -115,6 +124,11 @@ let pp_unfold_info =
 
 let pp fmt lcmd =
   let pp_args = Fmt.list ~sep:Fmt.comma Expr.pp in
+  (* An omitted out-parameter is printed back as the underscore that the
+     surface syntax uses for it. *)
+  let pp_pred_args =
+    Fmt.list ~sep:Fmt.comma (Fmt.option ~none:(Fmt.any "_") Expr.pp)
+  in
   let pp_binders f b =
     match b with
     | [] -> ()
@@ -122,10 +136,10 @@ let pp fmt lcmd =
   in
   match lcmd with
   | Fold (name, les, fold_info) ->
-      Fmt.pf fmt "fold %s(%a)%a" name pp_args les pp_folding_info fold_info
+      Fmt.pf fmt "fold %s(%a)%a" name pp_pred_args les pp_folding_info fold_info
   | Unfold (name, les, unfold_info, b) ->
       let keyword = if b then "unfold*" else "unfold" in
-      Fmt.pf fmt "@[%s %s%a %a@]" keyword name (Fmt.parens pp_args) les
+      Fmt.pf fmt "@[%s %s%a %a@]" keyword name (Fmt.parens pp_pred_args) les
         pp_unfold_info unfold_info
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
       let lname = Pp_utils.maybe_quote_ident lname in
@@ -173,12 +187,18 @@ let package_action = Asrt.user_pred_prefix ^ "package"
     meaningful when predicate reasoning lives in the memory. *)
 let recover_action = Asrt.user_pred_prefix ^ "recover"
 
+(** Reserved no-op action whose only effect is the memory's eager unfolding of
+    predicates with concrete ins (run by the state after producing a spec's
+    postcondition). *)
+let unfold_concrete_action = Asrt.user_pred_prefix ^ "unfold_concrete"
+
 let is_pred_action (a : string) : bool =
   String.equal a fold_action
   || String.equal a unfold_action
   || String.equal a gunfold_action
   || String.equal a package_action
   || String.equal a recover_action
+  || String.equal a unfold_concrete_action
 
 (* -- encoding -- *)
 
@@ -187,6 +207,17 @@ let enc_fold_info : folding_info option -> Expr.t = function
   | Some (id, bindings) ->
       let enc_binding (x, e) = Expr.EList [ Expr.string x; e ] in
       Expr.EList [ Expr.string id; Expr.EList (List.map enc_binding bindings) ]
+
+(* A fold/unfold argument list may contain holes (the out-parameters the user
+   chose to ignore). Each argument is wrapped so that a hole can never be
+   confused with a genuine expression such as [none]. *)
+let enc_pred_args (les : Expr.t option list) : Expr.t =
+  Expr.EList
+    (List.map
+       (function
+         | None -> Expr.Lit Nono
+         | Some e -> Expr.EList [ e ])
+       les)
 
 let enc_unfold_info : unfold_info option -> Expr.t = function
   | None -> Expr.Lit Nono
@@ -198,13 +229,13 @@ let to_action : t -> (string * Expr.t list) option = function
   | Fold (pname, les, fold_info) ->
       Some
         ( fold_action,
-          [ Expr.string pname; Expr.EList les; enc_fold_info fold_info ] )
+          [ Expr.string pname; enc_pred_args les; enc_fold_info fold_info ] )
   | Unfold (pname, les, unfold_info, b) ->
       Some
         ( unfold_action,
           [
             Expr.string pname;
-            Expr.EList les;
+            enc_pred_args les;
             enc_unfold_info unfold_info;
             Expr.bool b;
           ] )
@@ -220,6 +251,22 @@ let to_action : t -> (string * Expr.t list) option = function
           ] )
   | _ -> None
 
+(** The logical variables an [unfold] bound, which the action returns so that
+    the state above can keep them alive. *)
+let enc_bound_lvars (xs : string list) : Expr.t =
+  Expr.EList (List.map Expr.string xs)
+
+let dec_bound_lvars : Expr.t list -> string list = function
+  | [ Expr.EList xs ] ->
+      List.map
+        (function
+          | Expr.Lit (String x) -> x
+          | e ->
+              Fmt.failwith "SLCmd: malformed bound logical variable %a" Expr.pp
+                e)
+        xs
+  | _ -> []
+
 (* -- decoding -- *)
 
 let dec_str : Expr.t -> string = function
@@ -230,6 +277,18 @@ let dec_str : Expr.t -> string = function
 
 let dec_les : Expr.t -> Expr.t list = function
   | Expr.EList les -> les
+  | e -> Fmt.failwith "SLCmd.of_action: expected an EList, got %a" Expr.pp e
+
+let dec_pred_args : Expr.t -> Expr.t option list = function
+  | Expr.EList les ->
+      List.map
+        (function
+          | Expr.Lit Nono -> None
+          | Expr.EList [ e ] -> Some e
+          | e ->
+              Fmt.failwith "SLCmd.of_action: malformed predicate argument %a"
+                Expr.pp e)
+        les
   | e -> Fmt.failwith "SLCmd.of_action: expected an EList, got %a" Expr.pp e
 
 let dec_fold_info : Expr.t -> folding_info option = function
@@ -264,11 +323,14 @@ let dec_bool : Expr.t -> bool = function
 let of_action (action : string) (args : Expr.t list) : t option =
   match args with
   | [ pname; les; fold_info ] when String.equal action fold_action ->
-      Some (Fold (dec_str pname, dec_les les, dec_fold_info fold_info))
+      Some (Fold (dec_str pname, dec_pred_args les, dec_fold_info fold_info))
   | [ pname; les; unfold_info; b ] when String.equal action unfold_action ->
       Some
         (Unfold
-           (dec_str pname, dec_les les, dec_unfold_info unfold_info, dec_bool b))
+           ( dec_str pname,
+             dec_pred_args les,
+             dec_unfold_info unfold_info,
+             dec_bool b ))
   | [ pname ] when String.equal action gunfold_action ->
       Some (GUnfold (dec_str pname))
   | [ lname; largs; rname; rargs ] when String.equal action package_action ->

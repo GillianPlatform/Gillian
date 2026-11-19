@@ -25,13 +25,13 @@ struct
   module BiMemoryLegacy = Monadic.MonadicSMemory.Lift (BiMemoryMonadicLegacy)
 
   (* We lift it to Gillian states *)
-  module BiSState = SState.Make (BiMemoryLegacy)
+  module BiSState = SState.Make (BiMemoryLegacy) (PC)
 
   module NonBiMemory =
     Gillian.Combinators.MyMonadicSMemory.Make (SMemory) (Init_data)
 
   module NonBiMemoryLegacy = Monadic.MonadicSMemory.Lift (NonBiMemory)
-  module NonBiSState = SState.Make (NonBiMemoryLegacy)
+  module NonBiSState = SState.Make (NonBiMemoryLegacy) (PC)
 
   (* We define a helper to run functions under bi-abduction *)
 

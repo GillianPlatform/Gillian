@@ -540,13 +540,21 @@ struct
               Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
               errors);
         Fmt.pr "f @?";
-        let errors =
+        (* One failing state is one failure: its errors are the reasons why,
+           often the same reason reached along several paths. *)
+        let show () =
           errors
-          |> List.map @@ fun e ->
-             let msg = Fmt.str "%a" SAInterpreter.Logging.pp_err e in
-             Gillian_result.Error.make_analysis_failure ?loc msg
+          |> List.map (Fmt.str "%a" SAInterpreter.Logging.pp_err)
+          |> List_utils.remove_duplicates |> String.concat "\n"
         in
-        Error (Gillian_result.Error.AnalysisFailures errors)
+        let msg = Error_detail.brief show in
+        let details =
+          let full = show () in
+          if full = msg then None else Some full
+        in
+        Error
+          (Gillian_result.Error.AnalysisFailures
+             [ Gillian_result.Error.make_analysis_failure ?loc ?details msg ])
     | Exec_res.RSucc { flag = fl; final_state; last_report; loc; _ } -> (
         if Some fl <> test.flag then (
           let msg =
@@ -865,7 +873,7 @@ struct
     in
     (* STEP 6: Run the symbolic tests *)
     let cur_time = Unix.gettimeofday () in
-    Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
+    Fmt.pr "Running symbolic tests: %f@." (cur_time -. !start_time);
     let result =
       (* Interpretation, lemma proofs and post-condition matching all read the
          ambient predicate table via the [Get_pred_defs] effect. *)
@@ -888,7 +896,7 @@ struct
       if success then "All specs succeeded:" else "There were failures:"
     in
     let msg : string = Printf.sprintf "%s %f%!" msg (end_time -. !start_time) in
-    Printf.printf "%s\n" msg;
+    Fmt.pr "%s@." msg;
     L.normal (fun m -> m "%s" msg);
     result
 
@@ -910,19 +918,11 @@ struct
   let init_proc ~(init_data : State.init_data) (prog : prog_t) proc_name :
       SAInterpreter.result_t SAInterpreter.cont_func list =
     L.Phase.with_normal ~title:"Program verification" @@ fun () ->
-    (* Analyse all procedures and lemmas *)
-    let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
-    let lemmas_to_verify = SS.of_list (Prog.get_noninternal_lemma_names prog) in
-    let procs_to_verify, lemmas_to_verify =
-      select_procs_and_lemmas ~procs_to_verify ~lemmas_to_verify
+    (* Not filtered by the CLI's proc selection: the debugger also starts
+       procs it steps into, e.g. loop bodies. *)
+    let prog, _, tests =
+      get_tests_to_verify ~init_data prog (SS.singleton proc_name) SS.empty
     in
-    let prog, _, proc_tests =
-      get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
-    in
-    (* TODO: Verify All procedures. Currently we only verify the first
-               procedure (unless specified).
-               Assume there is at least one procedure*)
-    let tests = proc_tests |> List.filter (fun test -> test.name = proc_name) in
     if List.is_empty tests then
       Fmt.failwith "Couldn't find test for proc '%s'!" proc_name;
     tests

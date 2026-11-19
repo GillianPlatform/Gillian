@@ -9,7 +9,7 @@ module type S = sig
   end
 
   val launch : string -> string option -> t Gillian_result.t
-  val jump : Logging.Report_id.t -> t -> unit Gillian_result.t
+  val jump : Logging.Report_id.t -> t -> stop_reason Gillian_result.t
   val step_in : t -> stop_reason
   val step_over : t -> stop_reason
   val step_back : t -> stop_reason

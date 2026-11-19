@@ -11,6 +11,11 @@ exception SMT_error of string
 
 let exceptf fmt = Fmt.kstr (fun s -> raise (SMT_error s)) fmt
 
+let z3 =
+  match Sys.getenv_opt "Z3_EXEC" with
+  | Some exe -> { z3 with exe }
+  | None -> z3
+
 let z3_config =
   [
     ("model", "true");
@@ -222,7 +227,15 @@ let cmd s = ack_command !solver s
 let reset = list [ atom "reset" ]
 
 let rec init_solver () =
-  let z3 = new_solver z3 in
+  let z3 =
+    try new_solver z3
+    with Unix.Unix_error (e, _, _) ->
+      let msg =
+        Fmt.str "Couldn't start Z3 from '%s': %s (set Z3_EXEC to its path)"
+          z3.exe (Unix.error_message e)
+      in
+      raise (Gillian_result.Exc.Gillian_error (OperationError msg))
+  in
   let command = protected_command z3 in
   let () = solver := { z3 with command } in
   (* Configuration *)
@@ -1797,4 +1810,10 @@ let lift_model
          in
          v |> Option.iter (fun v -> subst_update x (Expr.Lit v)))
 
-let () = init_solver ()
+(* Started when the program loads, before any command-line handling, so a
+   missing Z3 is reported here *)
+let () =
+  try init_solver ()
+  with Gillian_result.Exc.Gillian_error e ->
+    Fmt.epr "%a@." Gillian_result.Error.pp e;
+    exit (Gillian_result.Error.to_error_code e)
