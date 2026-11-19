@@ -249,10 +249,6 @@ val singleton0 : ('a1, 'a2) singleton -> 'a1 -> 'a2
 val list_to_set :
   ('a1, 'a2) singleton -> 'a2 empty -> 'a2 union -> 'a1 list -> 'a2
 
-type ('a, 'b) filter = __ -> ('a -> decision) -> 'b -> 'b
-
-val filter0 : ('a1, 'a2) filter -> ('a1 -> decision) -> 'a2 -> 'a2
-
 type 'm mRet = __ -> __ -> 'm
 
 val mret : 'a1 mRet -> 'a2 -> 'a1
@@ -343,8 +339,6 @@ type qc = q
 
 val q2Qc : q -> qc
 
-val from_option : ('a1 -> 'a2) -> 'a2 -> 'a1 option -> 'a2
-
 val some_dec : 'a1 option -> 'a1 option
 
 val option_eq_dec :
@@ -390,8 +384,6 @@ type qp = qc
 
 module Coq_list :
  sig
-  val list_filter : ('a1 -> decision) -> 'a1 list -> 'a1 list
-
   val reverse : 'a1 list -> 'a1 list
 
   val list_elem_of_dec : ('a1, 'a1) relDecision -> ('a1, 'a1 list) relDecision
@@ -521,14 +513,6 @@ val search_infinite_go :
 val search_infinite : (int -> 'a1) -> ('a1, 'a1) relDecision -> 'a1 infinite
 
 val string_infinite : char list infinite
-
-val set_filter :
-  ('a1, 'a2) elements -> 'a2 empty -> ('a1, 'a2) singleton -> 'a2 union ->
-  ('a1 -> decision) -> 'a2 -> 'a2
-
-val set_map :
-  ('a1, 'a2) elements -> ('a3, 'a4) singleton -> 'a4 empty -> 'a4 union ->
-  ('a1 -> 'a3) -> 'a2 -> 'a4
 
 val set_bind :
   ('a1, 'a2) elements -> 'a3 empty -> 'a3 union -> ('a1 -> 'a3) -> 'a2 -> 'a3
@@ -1090,22 +1074,6 @@ val _UU03c3__list : sort
 
 val encode_type : type0 -> sort
 
-val f_repr_nat : identifier
-
-val f_repr_rat : identifier
-
-val f_repr_val : identifier
-
-val f_repr_adt : char list -> identifier
-
-val repr_nat : term -> term
-
-val repr_rat : term -> term
-
-val repr_val : term -> term
-
-val repr_adt : char list -> term -> term
-
 val f_lfunc : char list -> identifier
 
 val f_lfunc_pre : char list -> identifier
@@ -1165,8 +1133,6 @@ val c_some_val : identifier
 val c_constructor_adt : char list -> identifier
 
 val constructor_adt : char list -> sort option -> term list -> term
-
-val constructors_for_adt_sort_map : (identifier, identifier gset) gmap
 
 val g_null_val : identifier
 
@@ -1250,15 +1216,7 @@ val p_constructor_adt : char list -> identifier
 
 val is_constructor_adt : char list -> term -> term
 
-val tester_for_constructor_adt_map : (identifier, identifier) gmap
-
-val lookup_tester_for_constructor_adt : identifier -> identifier gset
-
 val is_type : type0 -> term -> term
-
-val repr_list_body : (term -> term) -> term -> term
-
-val repr_type_guard : type0 -> term -> term
 
 val to_val_base :
   term -> sort -> term gset -> ((term * sort) * term gset) option
@@ -1267,8 +1225,6 @@ val to_val_curried :
   term -> sort -> term gset -> ((term * sort) * term gset) option
 
 val to_val : ((term * sort) * term gset) -> ((term * sort) * term gset) option
-
-val guarded_val : term gset -> term -> term
 
 val residual_guard : term gset -> term
 
@@ -1337,8 +1293,8 @@ val encode_sexp_list :
 val encode_sexp_match_cases :
   (char list, type0) gmap -> char list -> term -> (pattern * sexp) list ->
   ((char list, type0) gmap -> sexp -> sexp -> __ -> __ ->
-  ((term * sort) * term gset) option) -> (((pattern0 * term)
-  list * (pattern0 * term) list) * term gset) option
+  ((term * sort) * term gset) option) -> ((pattern0 * term)
+  list * (pattern0 * term) list) option
 
 val encode_sexp :
   (char list, type0) gmap -> sexp -> ((term * sort) * term gset) option

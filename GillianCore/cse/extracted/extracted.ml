@@ -866,13 +866,6 @@ let rec list_to_set h h0 h1 = function
 | [] -> empty0 h0
 | x :: l0 -> union0 h1 (singleton0 h x) (list_to_set h h0 h1 l0)
 
-type ('a, 'b) filter = __ -> ('a -> decision) -> 'b -> 'b
-
-(** val filter0 : ('a1, 'a2) filter -> ('a1 -> decision) -> 'a2 -> 'a2 **)
-
-let filter0 filter1 h x =
-  filter1 __ h x
-
 type 'm mRet = __ -> __ -> 'm
 
 (** val mret : 'a1 mRet -> 'a2 -> 'a1 **)
@@ -1046,12 +1039,6 @@ type qc = q
 let q2Qc =
   qred
 
-(** val from_option : ('a1 -> 'a2) -> 'a2 -> 'a1 option -> 'a2 **)
-
-let from_option f y = function
-| Some x -> f x
-| None -> y
-
 (** val some_dec : 'a1 option -> 'a1 option **)
 
 let some_dec = function
@@ -1164,15 +1151,6 @@ type qp = qc
 
 module Coq_list =
  struct
-  (** val list_filter : ('a1 -> decision) -> 'a1 list -> 'a1 list **)
-
-  let rec list_filter x = function
-  | [] -> []
-  | x0 :: l0 ->
-    if decide (x x0)
-    then x0 :: (filter0 (fun _ -> list_filter) x l0)
-    else filter0 (fun _ -> list_filter) x l0
-
   (** val reverse : 'a1 list -> 'a1 list **)
 
   let reverse l =
@@ -2685,22 +2663,6 @@ let search_infinite f eqDecision0 xs =
 
 let string_infinite =
   search_infinite (pretty0 pretty_nat) String.eq_dec
-
-(** val set_filter :
-    ('a1, 'a2) elements -> 'a2 empty -> ('a1, 'a2) singleton -> 'a2 union ->
-    ('a1 -> decision) -> 'a2 -> 'a2 **)
-
-let set_filter h h0 h1 h2 h3 x =
-  list_to_set h1 h0 h2
-    (filter0 (fun _ -> Coq_list.list_filter) h3 (elements0 h x))
-
-(** val set_map :
-    ('a1, 'a2) elements -> ('a3, 'a4) singleton -> 'a4 empty -> 'a4 union ->
-    ('a1 -> 'a3) -> 'a2 -> 'a4 **)
-
-let set_map h h0 h1 h2 f x =
-  list_to_set (Obj.magic h0) h1 h2
-    (fmap (Obj.magic (fun _ _ -> Coq0_list.list_fmap)) f (elements0 h x))
 
 (** val set_bind :
     ('a1, 'a2) elements -> 'a3 empty -> 'a3 union -> ('a1 -> 'a3) -> 'a2 ->
@@ -4739,47 +4701,6 @@ let rec encode_type = function
 | TADT _UU03b4_ -> _UU03c3__adt _UU03b4_
 | TList _UU03c4_0 -> _UU03c4__seq (encode_type _UU03c4_0)
 
-(** val f_repr_nat : identifier **)
-
-let f_repr_nat =
-  IdSimple ('r'::('e'::('p'::('r'::('N'::('a'::('t'::[])))))))
-
-(** val f_repr_rat : identifier **)
-
-let f_repr_rat =
-  IdSimple ('r'::('e'::('p'::('r'::('R'::('a'::('t'::[])))))))
-
-(** val f_repr_val : identifier **)
-
-let f_repr_val =
-  IdSimple ('r'::('e'::('p'::('r'::('V'::('a'::('l'::[])))))))
-
-(** val f_repr_adt : char list -> identifier **)
-
-let f_repr_adt _UU03b4_ =
-  IdSimple
-    (append ('r'::('e'::('p'::('r'::('A'::('D'::('T'::[]))))))) _UU03b4_)
-
-(** val repr_nat : term -> term **)
-
-let repr_nat t =
-  TApp (f_repr_nat, None, (t :: []))
-
-(** val repr_rat : term -> term **)
-
-let repr_rat t =
-  TApp (f_repr_rat, None, (t :: []))
-
-(** val repr_val : term -> term **)
-
-let repr_val t =
-  TApp (f_repr_val, None, (t :: []))
-
-(** val repr_adt : char list -> term -> term **)
-
-let repr_adt _UU03b4_ t =
-  TApp ((f_repr_adt _UU03b4_), None, (t :: []))
-
 (** val f_lfunc : char list -> identifier **)
 
 let f_lfunc f =
@@ -4934,34 +4855,6 @@ let c_constructor_adt c =
 
 let constructor_adt c ts x =
   TApp ((c_constructor_adt c), ts, x)
-
-(** val constructors_for_adt_sort_map : (identifier, identifier gset) gmap **)
-
-let constructors_for_adt_sort_map =
-  let update = fun c pat m ->
-    let (_, _UU03b4_) = pat in
-    let s__UU03b4_ = s_adt _UU03b4_ in
-    let prev =
-      from_option (Obj.magic id)
-        (empty0 (gset_empty identifier_eq_decision identifier_countable))
-        (lookup0 (gmap_lookup identifier_eq_decision identifier_countable)
-          s__UU03b4_ m)
-    in
-    insert0
-      (map_insert
-        (Obj.magic gmap_partial_alter identifier_eq_decision
-          identifier_countable))
-      s__UU03b4_
-      (union0 (gset_union identifier_eq_decision identifier_countable) prev
-        (singleton0
-          (gset_singleton identifier_eq_decision identifier_countable)
-          (c_constructor_adt c)))
-      m
-  in
-  map_fold (fun _ -> gmap_fold String.eq_dec String.countable)
-    (Obj.magic update)
-    (empty0 (gmap_empty identifier_eq_decision identifier_countable))
-    (gmap_empty String.eq_dec String.countable)
 
 (** val g_null_val : identifier **)
 
@@ -5168,28 +5061,6 @@ let p_constructor_adt c =
 let is_constructor_adt c t =
   TApp ((p_constructor_adt c), None, (t :: []))
 
-(** val tester_for_constructor_adt_map : (identifier, identifier) gmap **)
-
-let tester_for_constructor_adt_map =
-  let update = fun c _ m ->
-    insert0
-      (map_insert
-        (gmap_partial_alter identifier_eq_decision identifier_countable))
-      (c_constructor_adt c) (p_constructor_adt c) m
-  in
-  map_fold (fun _ -> gmap_fold String.eq_dec String.countable) update
-    (empty0 (gmap_empty identifier_eq_decision identifier_countable))
-    (gmap_empty String.eq_dec String.countable)
-
-(** val lookup_tester_for_constructor_adt : identifier -> identifier gset **)
-
-let lookup_tester_for_constructor_adt c =
-  match lookup0 (gmap_lookup identifier_eq_decision identifier_countable) c
-          tester_for_constructor_adt_map with
-  | Some p ->
-    singleton0 (gset_singleton identifier_eq_decision identifier_countable) p
-  | None -> empty0 (gset_empty identifier_eq_decision identifier_countable)
-
 (** val is_type : type0 -> term -> term **)
 
 let rec is_type _UU03c4_ t =
@@ -5218,31 +5089,6 @@ let rec is_type _UU03c4_ t =
     let elem_type_check = impl_ in_bounds (is_type _UU03c4_' nth_elem) in
     and_ (is_list_val t) (TForall (_UU03c3__int,
       (term_close (fresh_var :: []) 0 elem_type_check)))
-
-(** val repr_list_body : (term -> term) -> term -> term **)
-
-let repr_list_body repr_elem t =
-  let i_var =
-    fresh0
-      (set_fresh (gset_elements String.eq_dec String.countable)
-        string_infinite)
-      (fv t)
-  in
-  let i = TFVar i_var in
-  let in_bounds = and_ (geq_ i zero_int) (lt_ i (seq_len t)) in
-  TForall (_UU03c3__int,
-  (term_close (i_var :: []) 0 (impl_ in_bounds (repr_elem (seq_nth t i)))))
-
-(** val repr_type_guard : type0 -> term -> term **)
-
-let rec repr_type_guard _UU03c4_ t =
-  match _UU03c4_ with
-  | TVal -> repr_val t
-  | TNat -> repr_nat t
-  | TRat -> repr_rat t
-  | TADT _UU03b4_ -> repr_adt _UU03b4_ t
-  | TList _UU03c4_0 -> repr_list_body (repr_type_guard _UU03c4_0) t
-  | _ -> true_
 
 (** val to_val_base :
     term -> sort -> term gset -> ((term * sort) * term gset) option **)
@@ -5330,15 +5176,6 @@ let rec to_val_curried t _UU03c3_ _UU03a6_ =
 
 let to_val = function
 | (p, _UU03a6_) -> let (t, _UU03c3_) = p in to_val_curried t _UU03c3_ _UU03a6_
-
-(** val guarded_val : term gset -> term -> term **)
-
-let guarded_val _UU03a6_ t =
-  ite_
-    (ands_
-      (elements0 (gset_elements term_eq_decision term_countable) _UU03a6_)
-      true_)
-    t null_val
 
 (** val residual_guard : term gset -> term **)
 
@@ -6128,24 +5965,22 @@ let rec encode_sexp_list t es encode0 =
 (** val encode_sexp_match_cases :
     (char list, type0) gmap -> char list -> term -> (pattern * sexp) list ->
     ((char list, type0) gmap -> sexp -> sexp -> __ -> __ ->
-    ((term * sort) * term gset) option) -> (((pattern0 * term)
-    list * (pattern0 * term) list) * term gset) option **)
+    ((term * sort) * term gset) option) -> ((pattern0 * term)
+    list * (pattern0 * term) list) option **)
 
 let rec encode_sexp_match_cases t _UU03b4_ t0 pes encode0 =
   match pes with
-  | [] ->
-    Some (([], []), (empty0 (gset_empty term_eq_decision term_countable)))
+  | [] -> Some ([], [])
   | p :: l ->
     let (p0, s) = p in
     (match p0 with
      | PatVar ->
-       let pts_res__UU03a6_s_opt =
+       let pts_res_opt =
          encode_sexp_match_cases t _UU03b4_ t0 l (fun t1 e e' _ _ ->
            encode0 t1 e e' __ __)
        in
-       mbind (Obj.magic (fun _ _ -> option_bind)) (fun pts_res__UU03a6_s ->
-         let (y, _UU03a6_s) = pts_res__UU03a6_s in
-         let (pts, residual_pts) = y in
+       mbind (Obj.magic (fun _ _ -> option_bind)) (fun pts_res ->
+         let (pts, residual_pts) = pts_res in
          let x =
            fresh0
              (set_fresh (gset_elements String.eq_dec String.countable)
@@ -6154,14 +5989,13 @@ let rec encode_sexp_match_cases t _UU03b4_ t0 pes encode0 =
          in
          let e' = sexp_open 0 ((SEFLVar x) :: []) s in
          mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
-           let (y0, _UU03a6__i) = enc in
-           let (t_i, _) = y0 in
-           let t_i' = term_close (x :: []) 0 (guarded_val _UU03a6__i t_i) in
+           let (y, _UU03a6__i) = enc in
+           let (t_i, _) = y in
+           let t_i' = term_close (x :: []) 0 t_i in
            let _UU03d5__i' =
              term_close (x :: []) 0 (residual_guard _UU03a6__i)
            in
-           Some ((((PVar, t_i') :: pts), ((PVar,
-           _UU03d5__i') :: residual_pts)), _UU03a6_s))
+           Some (((PVar, t_i') :: pts), ((PVar, _UU03d5__i') :: residual_pts)))
            (mbind (Obj.magic (fun _ _ -> option_bind)) (Obj.magic to_val)
              (Obj.magic encode0
                (insert0
@@ -6169,29 +6003,27 @@ let rec encode_sexp_match_cases t _UU03b4_ t0 pes encode0 =
                    (gmap_partial_alter String.eq_dec String.countable))
                  x (TADT _UU03b4_) t)
                s e' __ __)))
-         pts_res__UU03a6_s_opt
+         pts_res_opt
      | PatCtor ctor ->
-       let pts_res__UU03a6_s_opt =
+       let pts_res_opt =
          encode_sexp_match_cases t _UU03b4_ t0 l (fun t1 e e' _ _ ->
            encode0 t1 e e' __ __)
        in
-       mbind (Obj.magic (fun _ _ -> option_bind)) (fun pts_res__UU03a6_s ->
-         let (y, _UU03a6_s) = pts_res__UU03a6_s in
-         let (pts, residual_pts) = y in
+       mbind (Obj.magic (fun _ _ -> option_bind)) (fun pts_res ->
+         let (pts, residual_pts) = pts_res in
          mbind (Obj.magic (fun _ _ -> option_bind)) (fun decl ->
            let (_UU03c4_s, _UU03b4_') = decl in
            let xs = fresh_strings_of_set [] (length _UU03c4_s) (lV_sexp s) in
            let e' = sexp_open 0 (map (fun x -> SEFLVar x) xs) s in
            mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
-             let (y0, _UU03a6__i) = enc in
-             let (t_i, _) = y0 in
-             let t_i' = term_close xs 0 (guarded_val _UU03a6__i t_i) in
+             let (y, _UU03a6__i) = enc in
+             let (t_i, _) = y in
+             let t_i' = term_close xs 0 t_i in
              let _UU03d5__i' = term_close xs 0 (residual_guard _UU03a6__i) in
              mbind (Obj.magic (fun _ _ -> option_bind)) (fun _ -> Some
-               (((((PApp ((c_constructor_adt ctor), (length _UU03c4_s))),
+               ((((PApp ((c_constructor_adt ctor), (length _UU03c4_s))),
                t_i') :: pts), (((PApp ((c_constructor_adt ctor),
-               (length _UU03c4_s))), _UU03d5__i') :: residual_pts)),
-               _UU03a6_s))
+               (length _UU03c4_s))), _UU03d5__i') :: residual_pts)))
                (guard_or () (Obj.magic (fun _ -> option_mfail))
                  (Obj.magic (fun _ -> option_ret))
                  (decide_rel String.eq_dec _UU03b4_ _UU03b4_')))
@@ -6210,7 +6042,7 @@ let rec encode_sexp_match_cases t _UU03b4_ t0 pes encode0 =
                  s e' __ __)))
            (lookup0 (Obj.magic gmap_lookup String.eq_dec String.countable)
              ctor (gmap_empty String.eq_dec String.countable)))
-         pts_res__UU03a6_s_opt)
+         pts_res_opt)
 
 (** val encode_sexp :
     (char list, type0) gmap -> sexp -> ((term * sort) * term gset) option **)
@@ -6289,15 +6121,10 @@ let encode_sexp a b =
                  map (fun pat -> let (_, _UU03a6_) = pat in _UU03a6_) encs
                in
                let pre = lfunc_pre_ f None ts in
-               let call = lfunc_ f None ts in
-               Some ((call, (encode_type fdata.lfunc_ret_ty)),
+               Some (((lfunc_ f None ts), (encode_type fdata.lfunc_ret_ty)),
                (union0 (gset_union term_eq_decision term_countable)
-                 (union0 (gset_union term_eq_decision term_countable)
-                   (singleton0
-                     (gset_singleton term_eq_decision term_countable) pre)
-                   (singleton0
-                     (gset_singleton term_eq_decision term_countable)
-                     (repr_type_guard fdata.lfunc_ret_ty call)))
+                 (singleton0 (gset_singleton term_eq_decision term_countable)
+                   pre)
                  (union_list (gset_empty term_eq_decision term_countable)
                    (gset_union term_eq_decision term_countable) _UU03a6_s))))
                (Coq0_list.mapM (Obj.magic (fun _ _ -> option_bind))
@@ -6319,27 +6146,21 @@ let encode_sexp a b =
            encode_op2 op enc1 enc2) (encode_sexp0 t e2 __))
          (encode_sexp0 t e1 __)
      | SEIn (e, t0) ->
-       (match encode_sexp0 t e __ with
-        | Some enc ->
-          (match to_val enc with
-           | Some enc' ->
-             let (p, _UU03a6_) = enc' in
-             let (t1, _) = p in
-             if eval_type_wf t0
-             then Some
-                    (((ands_
-                        (elements0
-                          (gset_elements term_eq_decision term_countable)
-                          _UU03a6_)
-                        (is_type t0 t1)),
-                    _UU03c3__bool),
-                    (empty0 (gset_empty term_eq_decision term_countable)))
-             else Some ((false_, _UU03c3__bool),
-                    (empty0 (gset_empty term_eq_decision term_countable)))
-           | None ->
-             Some ((false_, _UU03c3__bool),
-               (empty0 (gset_empty term_eq_decision term_countable))))
-        | None -> None)
+       if eval_type_wf t0
+       then mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
+              let (y, _UU03a6_) = enc in
+              let (t1, _) = y in
+              Some
+              (((ands_
+                  (elements0 (gset_elements term_eq_decision term_countable)
+                    _UU03a6_)
+                  (is_type t0 t1)),
+              _UU03c3__bool),
+              (empty0 (gset_empty term_eq_decision term_countable))))
+              (mbind (Obj.magic (fun _ _ -> option_bind)) to_val
+                (encode_sexp0 t e __))
+       else Some ((false_, _UU03c3__bool),
+              (empty0 (gset_empty term_eq_decision term_countable)))
      | SEIsCtor (e, ctor) ->
        (match lookup0 (gmap_lookup String.eq_dec String.countable) ctor
                 (gmap_empty String.eq_dec String.countable) with
@@ -6371,12 +6192,10 @@ let encode_sexp a b =
          mbind (Obj.magic (fun _ _ -> option_bind)) (fun enc ->
            let (y, _UU03a6_) = enc in
            let (t0, _) = y in
-           mbind (Obj.magic (fun _ _ -> option_bind))
-             (fun pts_res__UU03a6_s ->
-             let (y0, _UU03a6_s) = pts_res__UU03a6_s in
-             let (pts, residual_pts) = y0 in
+           mbind (Obj.magic (fun _ _ -> option_bind)) (fun pts_res ->
+             let (pts, residual_pts) = pts_res in
              let pts' = app pts ((PVar, null_val) :: []) in
-             let residual_pts' = app residual_pts ((PVar, true_) :: []) in
+             let residual_pts' = app residual_pts ((PVar, false_) :: []) in
              let p_ctors =
                list_to_set
                  (Obj.magic gset_singleton identifier_eq_decision
@@ -6388,70 +6207,24 @@ let encode_sexp a b =
                    (fmap (Obj.magic (fun _ _ -> Coq0_list.list_fmap)) fst
                      pts'))
              in
-             mbind (Obj.magic (fun _ _ -> option_bind))
-               (fun _UU03b4__ctors ->
-               let missed_ctors =
-                 filter0 (fun _ ->
-                   set_filter
-                     (gset_elements identifier_eq_decision
-                       identifier_countable)
-                     (gset_empty identifier_eq_decision identifier_countable)
-                     (gset_singleton identifier_eq_decision
-                       identifier_countable)
-                     (gset_union identifier_eq_decision identifier_countable))
-                   (fun x0 ->
-                   not_dec
+             mbind (Obj.magic (fun _ _ -> option_bind)) (fun _ -> Some
+               (((TMatch (t0, pts')), _UU03c3__val),
+               (union0 (gset_union term_eq_decision term_countable) _UU03a6_
+                 (singleton0 (gset_singleton term_eq_decision term_countable)
+                   (TMatch (t0, residual_pts'))))))
+               (guard_or () (Obj.magic (fun _ -> option_mfail))
+                 (Obj.magic (fun _ -> option_ret))
+                 (or_dec
+                   (decide_rel bool_eq_dec
+                     (sexp_match_cases_has_patvar cases) true)
+                   (not_dec
                      (decide_rel
-                       (gset_elem_of_dec identifier_eq_decision
+                       (gset_eq_dec identifier_eq_decision
                          identifier_countable)
-                       x0 p_ctors))
-                   _UU03b4__ctors
-               in
-               let testers =
-                 set_bind
-                   (gset_elements identifier_eq_decision identifier_countable)
-                   (gset_empty identifier_eq_decision identifier_countable)
-                   (gset_union identifier_eq_decision identifier_countable)
-                   lookup_tester_for_constructor_adt missed_ctors
-               in
-               let not_missed_ctors =
-                 if sexp_match_cases_has_patvar cases
-                 then empty0 (gset_empty term_eq_decision term_countable)
-                 else set_map
-                        (gset_elements identifier_eq_decision
-                          identifier_countable)
-                        (gset_singleton term_eq_decision term_countable)
-                        (gset_empty term_eq_decision term_countable)
-                        (gset_union term_eq_decision term_countable)
-                        (fun p -> not_ (TApp (p, None, (t0 :: [])))) testers
-               in
-               mbind (Obj.magic (fun _ _ -> option_bind)) (fun _ -> Some
-                 (((TMatch (t0, pts')), _UU03c3__val),
-                 (union0 (gset_union term_eq_decision term_countable)
-                   (union0 (gset_union term_eq_decision term_countable)
-                     (union0 (gset_union term_eq_decision term_countable)
-                       _UU03a6_ _UU03a6_s)
-                     not_missed_ctors)
-                   (singleton0
-                     (gset_singleton term_eq_decision term_countable) (TMatch
-                     (t0, residual_pts'))))))
-                 (guard_or () (Obj.magic (fun _ -> option_mfail))
-                   (Obj.magic (fun _ -> option_ret))
-                   (or_dec
-                     (decide_rel bool_eq_dec
-                       (sexp_match_cases_has_patvar cases) true)
-                     (not_dec
-                       (decide_rel
-                         (gset_eq_dec identifier_eq_decision
-                           identifier_countable)
-                         p_ctors
-                         (empty0
-                           (gset_empty identifier_eq_decision
-                             identifier_countable)))))))
-               (lookup0
-                 (Obj.magic gmap_lookup identifier_eq_decision
-                   identifier_countable)
-                 (s_adt adt_t) constructors_for_adt_sort_map))
+                       p_ctors
+                       (empty0
+                         (gset_empty identifier_eq_decision
+                           identifier_countable)))))))
              (Obj.magic encode_sexp_match_cases t adt_t t0 cases
                (fun t1 _ e' _ _ -> encode_sexp0 t1 e' __)))
            (mbind (Obj.magic (fun _ _ -> option_bind)) (to_adt adt_t)
