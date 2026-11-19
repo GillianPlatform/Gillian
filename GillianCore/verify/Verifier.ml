@@ -873,7 +873,7 @@ struct
     in
     (* STEP 6: Run the symbolic tests *)
     let cur_time = Unix.gettimeofday () in
-    Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
+    Fmt.pr "Running symbolic tests: %f@." (cur_time -. !start_time);
     let result =
       (* Interpretation, lemma proofs and post-condition matching all read the
          ambient predicate table via the [Get_pred_defs] effect. *)
@@ -896,7 +896,7 @@ struct
       if success then "All specs succeeded:" else "There were failures:"
     in
     let msg : string = Printf.sprintf "%s %f%!" msg (end_time -. !start_time) in
-    Printf.printf "%s\n" msg;
+    Fmt.pr "%s@." msg;
     L.normal (fun m -> m "%s" msg);
     result
 
