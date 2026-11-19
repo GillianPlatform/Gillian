@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The numbers of the paper's Sec. 7.2 (its Fig. 9, and the backend evaluation
-table in its Appendix D), for one run of run.sh.
+"""The numbers of the paper's Sec. 7.2 (its Fig. 10, and the backend evaluation
+table in App. D.4 of its extended version), for one run of run.sh.
 
 Usage: report.py [RUN_DIR] [--tsv DIR]
 
@@ -89,10 +89,10 @@ def load_run(run_dir=HERE / "paper-run"):
 
 
 def coverage_table(df, cases):
-    """Fig. 9's table: how far the verified side gets, per language."""
+    """Fig. 10's table: how far the verified side gets, per language."""
     g = df.groupby("language")
     t = pd.DataFrame({
-        "files": cases.groupby("language").size(),
+        "runs": cases.groupby("language").size(),
         "queries": g.size(),
         "translated": g.stage.apply(lambda s: (s != "not translated").sum()),
         "encoded": g.stage.apply(lambda s: s.isin(["not answered", "answered"]).sum()),
@@ -145,13 +145,13 @@ def main():
     show = cov.copy()
     show["translated %"] = [pct(r.translated, r.queries) for r in cov.itertuples()]
     show["agree %"] = [pct(r.agree, r.answered) for r in cov.itertuples()]
-    print("Coverage and agreement (the paper's Fig. 9). Each column is a subset of the one before:")
+    print("Coverage and agreement (the paper's Fig. 10). Each column is a subset of the one before:")
     print("  translated: the bridge put the query in CSE's syntax")
     print("  encoded:    the verified encoder produced SMT-LIB for it")
     print("  answered:   both backends answered sat or unsat\n")
     print(show.to_string(), "\n")
 
-    print("Check-sat time, ms, median / 95th percentile, over answered queries (the paper's Appendix D):")
+    print("Check-sat time, ms, median / 95th percentile, over answered queries (App. D.4 of the paper's extended version):")
     t = timing_table(df)
     for lang, r in t.iterrows():
         print(f"  {lang:6} Gillian {r[('Gillian ms', 'median')]:.2f} / {r[('Gillian ms', 'p95')]:.2f}"
