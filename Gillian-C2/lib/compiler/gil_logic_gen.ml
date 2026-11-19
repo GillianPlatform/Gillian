@@ -562,7 +562,8 @@ let rec trans_lcmd ~ctx ~pvar_map lcmd =
       let ap, vs, gel = split3_expr_comp (List.map trans_expr params) in
       `Normal
         (make_assert ~bindings:vs ap
-        @ [ SL (Unfold (pred, gel, bindings, recursive)) ])
+        @ [ SL (Unfold (pred, List.map Option.some gel, bindings, recursive)) ]
+        )
   | Unfold_all pred_name -> `Normal [ SL (GUnfold pred_name) ]
   | Assert (a, ex) -> `Normal [ SL (SepAssert (trans_asrt ~ctx a, ex)) ]
   | Branch f ->

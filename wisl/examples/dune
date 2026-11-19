@@ -5,3 +5,9 @@
  (alias runtest)
  (action
   (run wisl verify -l disabled -R . DLL_recursive.wisl)))
+
+(rule
+ (deps wisl_core.gil wisl_pointer_arith.gil unfold_outs.wisl)
+ (alias runtest)
+ (action
+  (run wisl verify -l disabled -R . unfold_outs.wisl)))

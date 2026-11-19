@@ -240,6 +240,29 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     | SubPred core_pred, SubError err -> S.split_further s.mem core_pred ins err
     | _ -> None
 
+  let lvars (s : t) : Containers.SS.t =
+    let open Containers in
+    let pred_lvars =
+      List.fold_left
+        (fun ac (_, vs) ->
+          List.fold_left (fun ac e -> SS.union ac (Expr.lvars e)) ac vs)
+        SS.empty s.preds
+    in
+    let wand_lvars =
+      let lvars_val_list el =
+        List.fold_left
+          (fun acc expr -> SS.union acc (Expr.lvars expr))
+          SS.empty el
+      in
+      List.fold_left
+        (fun acc ({ lhs = _, largs; rhs = _, rargs } : wand) ->
+          acc
+          |> SS.union (lvars_val_list largs)
+          |> SS.union (lvars_val_list rargs))
+        SS.empty s.wands
+    in
+    S.lvars s.mem |> SS.union pred_lvars |> SS.union wand_lvars
+
   (* {2 The memory-level matching state}
 
      Everything below implements user-predicate and wand reasoning at the
@@ -1692,6 +1715,120 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
                if Pc.is_trivially_false ms.pc then None
                else Some (Branch.make ~pc:ms.pc ~value:ms.st)))
 
+  (** The arguments of an [unfold]: the in-parameters have to be given, as they
+      are what identifies the predicate to unfold, while the out-parameters are
+      optional — they may be dropped altogether (the argument list is then only
+      as long as there are ins) or given one by one, an underscore standing for
+      an out-parameter that is to be ignored. Returns the in-values together
+      with the out-expressions, padded to the number of out-parameters. *)
+  let unfold_args (pred : Pred.t) (pname : string) (les : Expr.t option list) :
+      Expr.t list * Expr.t option list =
+    let n_ins = pred.ins_number in
+    let n_params = pred.pred_num_params in
+    let n_given = List.length les in
+    let les =
+      if n_given = n_ins then les @ List.init (n_params - n_ins) (fun _ -> None)
+      else if n_given = n_params then les
+      else
+        Fmt.failwith
+          "Unfold of %s: expected %d argument(s) (the in-parameters) or %d \
+           (every parameter), but got %d"
+          pname n_ins n_params n_given
+    in
+    let in_params = Pred.in_params pred in
+    let vs_ins =
+      Pred.in_args pred les
+      |> List.mapi (fun i -> function
+           | Some e -> e
+           | None ->
+               Fmt.failwith
+                 "Unfold of %s: the in-parameter %s must be given, it cannot \
+                  be an underscore"
+                 pname (List.nth in_params i))
+    in
+    (vs_ins, Pred.out_args pred les)
+
+  (** The logical variables the state already knows something about. An
+      out-expression of an [unfold] made of one of those has to agree with the
+      predicate found, whereas one made of a variable nothing is known about yet
+      is free to be bound to it. Scanning the whole state for them is not cheap,
+      hence the [lazy]: most unfolds never need to know. *)
+  let known_lvars (ms : mstate) : Containers.SS.t Lazy.t =
+    lazy
+      (let open Containers in
+       lvars ms.st
+       |> SS.union (PFS.lvars (full_pfs ms.pc))
+       |> SS.union (Type_env.lvars (full_gamma ms.pc)))
+
+  (** The out-expressions an [unfold] was given are matched against the values
+      of the predicate that was found, once its definition has been produced
+      (what the definition says about those values is then available to the
+      equalities below). An out-expression that is a logical variable the state
+      knew nothing about is bound to the value found; any other out-expression
+      has to be equal to it. *)
+  let assert_unfold_outs
+      ~(known : Containers.SS.t Lazy.t)
+      (ms : mstate)
+      (pname : string)
+      (es_outs : Expr.t option list)
+      (vs_outs : Expr.t list) : (mstate, err_t) Res_list.t =
+    let learn ms f =
+      match assume_pure ~production:false ~time:"unfold outs" ms [ f ] with
+      | Some ms -> Res_list.return ms
+      (* The equality contradicts the state: this branch is unreachable. *)
+      | None -> Res_list.vanish
+    in
+    let fail e v =
+      Res_list.error_with
+        (OtherErr
+           (Fmt.str
+              "@[<h>Unfold of %s: the out-parameter %a was given, but the \
+               predicate found has %a there@]"
+              pname Expr.pp e Expr.pp v))
+    in
+    (* [bound] holds the variables an earlier out-expression has just bound;
+       they count as known for the ones that follow, so that the same name
+       given twice over means the two values agree. *)
+    let is_fresh bound x =
+      (not (Containers.SS.mem x bound))
+      && not (Containers.SS.mem x (Lazy.force known))
+    in
+    let rec aux ms bound es vs =
+      match (es, vs) with
+      | [], _ | _, [] -> Res_list.return ms
+      | None :: es, _ :: vs -> aux ms bound es vs
+      (* The usual case by far: the out-expression is literally the value the
+         predicate holds, and there is nothing to check. *)
+      | Some e :: es, v :: vs when Expr.equal e v -> aux ms bound es vs
+      | Some e :: es, v :: vs ->
+          let eq = Expr.BinOp (e, Equal, v) in
+          let fresh =
+            (* Only a bare, so-far-unknown logical variable may be bound: any
+               richer expression would constrain the value found rather than
+               just name it. *)
+            match e with
+            | Expr.LVar x when is_fresh bound x -> Some x
+            | _ -> None
+          in
+          let open Res_list.Syntax in
+          let** ms =
+            match fresh with
+            | Some _ -> learn ms eq
+            | None ->
+                if !Config.under_approximation then learn ms eq
+                else if assert_pure ms [ eq ] then Res_list.return ms
+                else fail e v
+          in
+          let bound =
+            Option.fold ~none:bound
+              ~some:(fun x -> Containers.SS.add x bound)
+              fresh
+          in
+          aux ms bound es vs
+    in
+    if List.for_all Option.is_none es_outs then Res_list.return ms
+    else aux ms Containers.SS.empty es_outs vs_outs
+
   (* The predicate-manipulating SL commands arrive as reserved actions with
      the [SLCmd] encoding; the state has already evaluated the
      store-dependent sub-expressions. *)
@@ -1716,9 +1853,12 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         let pred = get_def pname in
         if pred.pred.pred_abstract then
           Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
-        (* 2) The in-parameters are sufficient to trigger the unfold. *)
-        let vs_ins = Pred.in_args pred.pred les in
-        let vs = List.map Option.some les in
+        (* 2) The in-parameters are sufficient to trigger the unfold, so the
+           out-parameters may be left out entirely; those that are given are
+           kept around to be matched against the predicate we find. *)
+        let vs_ins, es_outs = unfold_args pred.pred pname les in
+        let vs = List.map Option.some vs_ins @ es_outs in
+        let known = known_lvars ms in
         (* 3) We consume the predicate from the state. *)
         let cons_res = consume_upred ~no_auto_fold:false ms pname vs in
         let () =
@@ -1734,10 +1874,17 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
             m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Expr.pp) vs');
         let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
         L.verbose (fun m -> m "@[<h>Unfold about to happen with rec %b@]" b);
-        if b then rec_unfold ms' pname vs |> no_rets
-        else
-          let** _, ms'' = unfold ?additional_bindings ms' pname vs in
-          Res_list.return (ms'', [])
+        let** ms'' =
+          if b then rec_unfold ms' pname vs
+          else
+            let** _, ms'' = unfold ?additional_bindings ms' pname vs in
+            Res_list.return ms''
+        in
+        (* 4) The out-expressions that were given are asserted equal to the
+           values of the predicate we found; an out-expression that is a
+           logical variable nothing was known about is thereby bound. *)
+        let++ ms'' = assert_unfold_outs ~known ms'' pname es_outs vs' in
+        (ms'', [])
     | Some (GUnfold pname) -> unfold_all ms pname |> no_rets
     | Some (Package { lhs; rhs }) ->
         let++ ms' = package_wand ms { lhs; rhs } |> Res_list.of_list_res in
@@ -1853,29 +2000,6 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     let upred_asrts = List.map (upred_to_asrt ~pred_defs) s.preds in
     let wand_asrts = List.map (wand_to_asrt ~pred_defs) s.wands in
     sub_asrt @ upred_asrts @ wand_asrts
-
-  let lvars (s : t) : Containers.SS.t =
-    let open Containers in
-    let pred_lvars =
-      List.fold_left
-        (fun ac (_, vs) ->
-          List.fold_left (fun ac e -> SS.union ac (Expr.lvars e)) ac vs)
-        SS.empty s.preds
-    in
-    let wand_lvars =
-      let lvars_val_list el =
-        List.fold_left
-          (fun acc expr -> SS.union acc (Expr.lvars expr))
-          SS.empty el
-      in
-      List.fold_left
-        (fun acc ({ lhs = _, largs; rhs = _, rargs } : wand) ->
-          acc
-          |> SS.union (lvars_val_list largs)
-          |> SS.union (lvars_val_list rargs))
-        SS.empty s.wands
-    in
-    S.lvars s.mem |> SS.union pred_lvars |> SS.union wand_lvars
 
   let alocs (s : t) : Containers.SS.t =
     let open Containers in

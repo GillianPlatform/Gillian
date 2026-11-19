@@ -70,7 +70,7 @@ PQN *insert(PQN *queue, PQN *node) {
         return node;
     } else {
         PQN *tmp = insert(queue->next, node);
-        __builtin_annot("unfold PriQ(tmp, #p, #qval, #qlen)");
+        __builtin_annot("unfold PriQ(tmp)");
         queue->next = tmp;
         return queue;
     };

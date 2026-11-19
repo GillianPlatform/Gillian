@@ -425,11 +425,13 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Fold (pname, params, None)) )
   | Unfold { pred; params; bindings } ->
-      let gvars, lasrts, params =
-        list_split_3 (List.map compile_lexpr params)
-      in
+      (* The out-parameters written as an underscore carry nothing to compile,
+         but keep their place in the argument list. *)
+      let compiled = List.map (Option.map compile_lexpr) params in
+      let gvars, lasrts, _ = list_split_3 (List.filter_map Fun.id compiled) in
       let existentials = List.concat gvars in
       let to_assert = List.concat lasrts in
+      let params = List.map (Option.map (fun (_, _, e) -> e)) compiled in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Unfold (pred, params, bindings, false)) )
   | Package { lhs = lname, largs; rhs = rname, rargs } ->

@@ -25,6 +25,29 @@ let get_loc startpos endpos : Location.t =
   }
 
 let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
+
+(* The underscore of the surface syntax stands for a value of no interest; it
+   is a logical variable like any other, but one we allocate in a namespace of
+   our own so that an [unfold] can tell that an out-parameter was deliberately
+   left out. *)
+let anon_lvar_prefix = Names.lvar_prefix ^ "anon_"
+
+module Anon_lvar =
+  Allocators.Make_with_prefix
+    (Allocators.Basic ())
+    (struct
+      let prefix = anon_lvar_prefix
+    end)
+
+let is_anon_lvar (x : string) : bool =
+  String.starts_with ~prefix:anon_lvar_prefix x
+
+(* The arguments of an [unfold]: an underscore in an out-parameter position
+   means that the parameter is to be ignored. *)
+let unfold_arg (e : Expr.t) : Expr.t option =
+  match e with
+  | Expr.LVar x when is_anon_lvar x -> None
+  | e -> Some e
 %}
 
 (***** Token definitions *****)
@@ -405,7 +428,7 @@ atomic_expr_target:
     { e }
 (* Ignore variable *)
   | UNDERSCORE
-    { Expr.LVar (LVar.alloc ()) }
+    { Expr.LVar (Anon_lvar.alloc ()) }
 ;
 
 unary_expr:
@@ -872,11 +895,11 @@ g_logic_cmd_target:
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | UNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { LCmd.SL (Unfold (name, les, unfold_info, false)) }
+    { LCmd.SL (Unfold (name, List.map unfold_arg les, unfold_info, false)) }
 
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | RECUNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { LCmd.SL (Unfold (name, les, unfold_info, true)) }
+    { LCmd.SL (Unfold (name, List.map unfold_arg les, unfold_info, true)) }
 
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
     { let (ln, largs) = lhs and (rn, rargs) = rhs in

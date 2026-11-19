@@ -447,7 +447,7 @@ expr_target:
   | STRNTH; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
      { Expr.BinOp (e1, StrNth, e2) }
   | LBRACE; e=expr_target; RBRACE { e }
-  | UNDERSCORE { Expr.LVar (Javert_utils.Js_generators.fresh_lvar ()) }
+  | UNDERSCORE { Expr.LVar (Javert_utils.Js_generators.fresh_anon_lvar ()) }
 
 
 lvar_type_target:
@@ -1002,7 +1002,7 @@ js_lexpr_target:
     { e }
 (* _ *)
   | UNDERSCORE
-    { JSExpr.LVar (Javert_utils.Js_generators.fresh_lvar ()) }
+    { JSExpr.LVar (Javert_utils.Js_generators.fresh_anon_lvar ()) }
 (* $$scope *)
   | SCOPELEXPR { JSExpr.Scope }
 

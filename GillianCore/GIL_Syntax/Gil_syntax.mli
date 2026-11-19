@@ -592,8 +592,11 @@ module SLCmd : sig
   type t =
     | Fold of string * Expr.t list * (string * (string * Expr.t) list) option
         (** Fold predicate *)
-    | Unfold of string * Expr.t list * (string * string) list option * bool
-        (** Unfold predicate *)
+    | Unfold of
+        string * Expr.t option list * (string * string) list option * bool
+        (** Unfold predicate. The in-parameters must all be given; the
+            out-parameters may be omitted altogether, or given individually,
+            with [None] for an out-parameter that is explicitly ignored. *)
     | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand packaging *)
     | GUnfold of string  (** Global Unfold *)
@@ -1588,7 +1591,7 @@ module Visitors : sig
              'c ->
              SLCmd.t ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * string) list option ->
              bool ->
              SLCmd.t
@@ -1849,7 +1852,7 @@ module Visitors : sig
       'c ->
       SLCmd.t ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * string) list option ->
       bool ->
       SLCmd.t
@@ -2113,7 +2116,7 @@ module Visitors : sig
          ; visit_Unfold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * string) list option ->
              bool ->
              'f
@@ -2338,7 +2341,12 @@ module Visitors : sig
     method visit_UndefinedType : 'c -> 'f
 
     method visit_Unfold :
-      'c -> string -> Expr.t list -> (string * string) list option -> bool -> 'f
+      'c ->
+      string ->
+      Expr.t option list ->
+      (string * string) list option ->
+      bool ->
+      'f
 
     method visit_Package :
       'c -> string * Expr.t list -> string * Expr.t list -> 'f
@@ -2558,7 +2566,7 @@ module Visitors : sig
          ; visit_Unfold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * string) list option ->
              bool ->
              unit
@@ -2783,7 +2791,7 @@ module Visitors : sig
     method visit_Unfold :
       'c ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * string) list option ->
       bool ->
       unit

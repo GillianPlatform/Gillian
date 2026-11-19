@@ -673,9 +673,24 @@ struct
               in
               let state =
                 match sl_cmd with
-                | SLCmd.Unfold (_, _, Some bindings, _) ->
+                | SLCmd.Unfold (pname, les, bindings, _) ->
+                    (* The binders, and the logical variables the given
+                       out-parameters are made of, must survive the
+                       simplification below: the unfold is what binds them. *)
+                    let binders =
+                      Option.fold ~none:[] ~some:(List.map fst) bindings
+                    in
+                    let out_lvars =
+                      match Hashtbl.find_opt prog.preds pname with
+                      | None -> SS.empty
+                      | Some pred ->
+                          Pred.out_args pred.pred les
+                          |> List.filter_map Fun.id |> List.map Expr.lvars
+                          |> List.fold_left SS.union SS.empty
+                          |> SS.filter Names.is_spec_var_name
+                    in
                     State.add_spec_vars state
-                      (Var.Set.of_list (List.map fst bindings))
+                      (Var.Set.union (Var.Set.of_list binders) out_lvars)
                 | _ -> state
               in
               let matching =

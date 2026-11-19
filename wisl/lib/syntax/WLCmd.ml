@@ -4,7 +4,7 @@ type tt =
   | Fold of string * WLExpr.t list
   | Unfold of {
       pred : string;
-      params : WLExpr.t list;
+      params : WLExpr.t option list;
       bindings : (string * string) list option;
     }
   | Package of { lhs : string * WLExpr.t list; rhs : string * WLExpr.t list }
@@ -44,8 +44,8 @@ let rec get_by_id id lcmd =
   let lassert_getter = WLAssert.get_by_id id in
   let aux lcmdp =
     match get lcmdp with
-    | Fold (_, lel) | Unfold { params = lel; _ } | ApplyLem (_, lel, _) ->
-        lexpr_list_visitor lel
+    | Fold (_, lel) | ApplyLem (_, lel, _) -> lexpr_list_visitor lel
+    | Unfold { params; _ } -> lexpr_list_visitor (List.filter_map Fun.id params)
     | Package { lhs = _, lel1; rhs = _, lel2 } ->
         lexpr_list_visitor lel1 |>> (lexpr_list_visitor, lel2)
     | LogicIf (le, lcmdl1, lcmdl2) ->
@@ -75,7 +75,9 @@ let pp fmt lcmd =
       Fmt.pf fmt "fold %s(%a)" pname (WPrettyUtils.pp_list WLExpr.pp) wlel
   | Unfold { pred; params; bindings } -> (
       let () =
-        Fmt.pf fmt "unfold %s(%a)" pred (WPrettyUtils.pp_list WLExpr.pp) params
+        Fmt.pf fmt "unfold %s(%a)" pred
+          (WPrettyUtils.pp_list (Fmt.option ~none:(Fmt.any "_") WLExpr.pp))
+          params
       in
       match bindings with
       | None -> ()
@@ -107,7 +109,7 @@ let rec substitution subst { wlcnode; wlcid; wlcloc } =
   let wlcnode =
     match wlcnode with
     | Fold (pname, les) -> Fold (pname, List.map fe les)
-    | Unfold u -> Unfold { u with params = List.map fe u.params }
+    | Unfold u -> Unfold { u with params = List.map (Option.map fe) u.params }
     | Package { lhs = lname, largs; rhs = rname, rargs } ->
         Package
           { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
