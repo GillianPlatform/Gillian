@@ -1,8 +1,8 @@
 # The verified SMT backend on Gillian's queries
 
 The experiment of Sec. 7.2 of *An End-to-end Theory for Compositional Symbolic
-Execution*. Gillian, run with `--certified-smt`, sends every SMT query to two
-backends and records both:
+Execution: From Expressive Specifications to SMT* (POPL'27). Gillian, run with
+`--certified-smt`, sends every SMT query to two backends and records both:
 
 - its own SMT encoder, as usual;
 - the encoder extracted from the paper's Rocq development, through a bridge that
@@ -11,31 +11,26 @@ backends and records both:
 Gillian's verification continues on its own encoder's answer, so the verified
 backend only observes; it cannot change a proof's outcome.
 
-**These numbers are not the submitted paper's.** Since the paper was submitted,
-CSE's expression language has gained the operators Gillian's queries need most
-(casts between naturals and rationals, multiplication, and list concatenation
-and indexing), so the bridge translates far more queries, and we re-ran the
-experiment. `paper-run/` is that re-run, which the revised paper will report:
-4,390 of 5,820 queries translated, of which both backends answer 4,341, where
-the submitted paper has 811 of 2,090. The CSE artefact's `README.md`
-("Progress since the submitted paper") explains the differences.
+`paper-run/` is the run the paper reports: 4,390 of 5,820 queries translated,
+of which both backends answer 4,341. Section and figure numbers below refer to
+the paper, and appendix numbers to its extended version.
 
-|                  |                                                                                         |
-|------------------|-----------------------------------------------------------------------------------------|
-| `paper-run/`     | the run the revised paper reports                                                       |
-| `report.py`      | a run's numbers: the paper's Fig. 9, and the backend evaluation table in its Appendix D |
-| `analysis.ipynb` | the same, with the plot, the disagreements, and what is not covered                     |
-| `run.sh`         | re-run the 32 cases; writes `results/`                                                  |
-| `compare.py`     | check a re-run against `paper-run/`, query by query                                     |
+|                  |                                                                             |
+|------------------|-----------------------------------------------------------------------------|
+| `paper-run/`     | the run the paper reports                                                   |
+| `report.py`      | a run's numbers: Fig. 10, and the backend evaluation table of App. D.4      |
+| `analysis.ipynb` | the same, with the plot, the disagreements, and what is not covered         |
+| `run.sh`         | re-run the 32 cases; writes `results/`                                      |
+| `compare.py`     | check a re-run against `paper-run/`, query by query                         |
 
 Run the commands below from the root of the Gillian repository.
 
-## Reading the revised paper's run
+## Reading the paper's run
 
 ```sh
 python3 -m venv experiments/.venv
 experiments/.venv/bin/pip install -r experiments/requirements.txt
-experiments/.venv/bin/python experiments/report.py    # the paper's Fig. 9 table, its timings, the disagreements
+experiments/.venv/bin/python experiments/report.py    # Fig. 10's table, the timings, the disagreements
 experiments/.venv/bin/jupyter lab experiments/analysis.ipynb
 ```
 
@@ -80,7 +75,7 @@ The differences between Gillian's language and CSE's show up as follows:
   is undefined at 0, and its encoding asserts that the argument is positive.
   `analysis.ipynb` shows this, and checks it: without those side conditions,
   every disagreeing query is `sat`.
-- **Representability guards.** The paper's satisfiability check (its Sec. 6)
+- **Representability guards.** The paper's satisfiability check (Sec. 6.6)
   also asserts, for each variable, that its value is one CSE has. The bridge
   leaves them out: Gillian's numbers include 0 and the negatives, and with the
   guards the comparison would measure that difference rather than the encoders.
@@ -100,14 +95,12 @@ for Gillian's values; `scripts/vendor-cse/vendor.sh --check` confirms it.
 
 ### Solver time
 
-The two encodings take comparable time on most queries: in the revised paper's
-run, the median check-sat is 0.09 ms with Gillian's encoding and 0.16 ms with
-the verified one. The exception is a tail of 67 of the 4,341 answered queries
+The two encodings take comparable time on most queries: in the paper's run, the
+median check-sat is 0.09 ms with Gillian's encoding and 0.16 ms with the
+verified one. The exception is a tail of 67 of the 4,341 answered queries
 that take over 100 ms with the verified encoding, up to 7.3 s, where Gillian's
 encoding takes at most 1.3 ms. All 67 come from the two Amazon case studies, all
-are `sat`, and all combine a list's length with a cast or a multiplication. CSE
-gained those operators after the submitted paper; before, the bridge could not
-translate these queries at all.
+are `sat`, and all use a list's length.
 
 The cause is how the encoders encode a list's length. An encoder can encode it
 in one of two ways:
@@ -134,7 +127,7 @@ the exact query is one of the abstract query, with `l-len` as the length. So an
 `0 <= l-len(x)`, since an uninterpreted length may otherwise be negative, and
 `x` is not bound by a quantifier. Then the query constrains `x` only through its
 length, so any list of the length the solver chose is a witness. Both
-conditions hold for every query in the revised paper's run (3,170 use the
+conditions hold for every query in the paper's run (3,170 use the
 abstract encoding), but Gillian's symbolic engine maintains them, not its
 encoder; an under-approximate (UX) analysis relies on them, since a wrong `sat`
 would report a path as reachable when it is not.
