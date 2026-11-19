@@ -1764,13 +1764,14 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       (what the definition says about those values is then available to the
       equalities below). An out-expression that is a logical variable the state
       knew nothing about is bound to the value found; any other out-expression
-      has to be equal to it. *)
+      has to be equal to it. Returns the variables that were bound, which the
+      state above has to keep alive. *)
   let assert_unfold_outs
       ~(known : Containers.SS.t Lazy.t)
       (ms : mstate)
       (pname : string)
       (es_outs : Expr.t option list)
-      (vs_outs : Expr.t list) : (mstate, err_t) Res_list.t =
+      (vs_outs : Expr.t list) : (mstate * Containers.SS.t, err_t) Res_list.t =
     let learn ms f =
       match assume_pure ~production:false ~time:"unfold outs" ms [ f ] with
       | Some ms -> Res_list.return ms
@@ -1794,7 +1795,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     in
     let rec aux ms bound es vs =
       match (es, vs) with
-      | [], _ | _, [] -> Res_list.return ms
+      | [], _ | _, [] -> Res_list.return (ms, bound)
       | None :: es, _ :: vs -> aux ms bound es vs
       (* The usual case by far: the out-expression is literally the value the
          predicate holds, and there is nothing to check. *)
@@ -1825,7 +1826,8 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
           in
           aux ms bound es vs
     in
-    if List.for_all Option.is_none es_outs then Res_list.return ms
+    if List.for_all Option.is_none es_outs then
+      Res_list.return (ms, Containers.SS.empty)
     else aux ms Containers.SS.empty es_outs vs_outs
 
   (* The predicate-manipulating SL commands arrive as reserved actions with
@@ -1881,9 +1883,11 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         in
         (* 4) The out-expressions that were given are asserted equal to the
            values of the predicate we found; an out-expression that is a
-           logical variable nothing was known about is thereby bound. *)
-        let++ ms'' = assert_unfold_outs ~known ms'' pname es_outs vs' in
-        (ms'', [])
+           logical variable nothing was known about is thereby bound. Those
+           bindings are what the action returns, as they are only of use to the
+           state above, which has to keep them from being simplified away. *)
+        let++ ms'', bound = assert_unfold_outs ~known ms'' pname es_outs vs' in
+        (ms'', [ SLCmd.enc_bound_lvars (Containers.SS.elements bound) ])
     | Some (GUnfold pname) -> unfold_all ms pname |> no_rets
     | Some (Package { lhs; rhs }) ->
         let++ ms' = package_wand ms { lhs; rhs } |> Res_list.of_list_res in

@@ -251,6 +251,22 @@ let to_action : t -> (string * Expr.t list) option = function
           ] )
   | _ -> None
 
+(** The logical variables an [unfold] bound, which the action returns so that
+    the state above can keep them alive. *)
+let enc_bound_lvars (xs : string list) : Expr.t =
+  Expr.EList (List.map Expr.string xs)
+
+let dec_bound_lvars : Expr.t list -> string list = function
+  | [ Expr.EList xs ] ->
+      List.map
+        (function
+          | Expr.Lit (String x) -> x
+          | e ->
+              Fmt.failwith "SLCmd: malformed bound logical variable %a" Expr.pp
+                e)
+        xs
+  | _ -> []
+
 (* -- decoding -- *)
 
 let dec_str : Expr.t -> string = function

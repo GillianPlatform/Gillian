@@ -657,6 +657,13 @@ module SLCmd : sig
   (** [of_action name args] is the inverse of {!to_action}: it rebuilds the
       command for one of the four reserved action names, or [None] otherwise. *)
   val of_action : string -> Expr.t list -> t option
+
+  (** The unfold action returns the logical variables its out-parameters bound;
+      these encode and decode that list, which the state uses to keep them from
+      being simplified away. *)
+  val enc_bound_lvars : string list -> Expr.t
+
+  val dec_bound_lvars : Expr.t list -> string list
 end
 
 (** @canonical Gillian.Gil_syntax.LCmd *)

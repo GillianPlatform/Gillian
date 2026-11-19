@@ -673,24 +673,9 @@ struct
               in
               let state =
                 match sl_cmd with
-                | SLCmd.Unfold (pname, les, bindings, _) ->
-                    (* The binders, and the logical variables the given
-                       out-parameters are made of, must survive the
-                       simplification below: the unfold is what binds them. *)
-                    let binders =
-                      Option.fold ~none:[] ~some:(List.map fst) bindings
-                    in
-                    let out_lvars =
-                      match Hashtbl.find_opt prog.preds pname with
-                      | None -> SS.empty
-                      | Some pred ->
-                          Pred.out_args pred.pred les
-                          |> List.filter_map Fun.id |> List.map Expr.lvars
-                          |> List.fold_left SS.union SS.empty
-                          |> SS.filter Names.is_spec_var_name
-                    in
+                | SLCmd.Unfold (_, _, Some bindings, _) ->
                     State.add_spec_vars state
-                      (Var.Set.union (Var.Set.of_list binders) out_lvars)
+                      (Var.Set.of_list (List.map fst bindings))
                 | _ -> state
               in
               let matching =
@@ -701,7 +686,21 @@ struct
               State.execute_action action state v_args
               |> List.concat_map (function
                    | Error _ as err -> [ err ]
-                   | Ok (state', _) ->
+                   | Ok (state', rets) ->
+                       (* An unfold returns the logical variables its
+                          out-parameters bound: they are what the command
+                          introduced, and must survive the simplification
+                          below. *)
+                       let state' =
+                         match sl_cmd with
+                         | SLCmd.Unfold _ ->
+                             let bound =
+                               List.map Val.to_expr rets
+                               |> SLCmd.dec_bound_lvars |> Var.Set.of_list
+                             in
+                             State.add_spec_vars state' bound
+                         | _ -> state'
+                       in
                        let states =
                          if matching then
                            let _, states =
