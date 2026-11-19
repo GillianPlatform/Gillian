@@ -475,6 +475,20 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
             | _ -> [ x ])
           args
       in
+      let is_lit : Expr.t -> bool = function
+        | Lit _ -> true
+        | _ -> false
+      in
+      (* In-parameters only known to equal an expression built from the
+         values, e.g. [#a] with [#a == #c :: #tail] when looking for [#tail] *)
+      let built_from_values =
+        Pred.in_args pred_def args
+        |> List.filter (fun in_arg ->
+               get_equal_values ms [ in_arg ]
+               |> List.concat_map Expr.base_elements
+               |> List.exists (fun e -> (not (is_lit e)) && List.mem e values))
+        |> List.length
+      in
       let in_args = one_level_list_expander (Pred.in_args pred_def args) in
       let vs = get_equal_values ms values in
       let vs = vs @ List.concat_map Expr.base_elements vs in
@@ -491,7 +505,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
             | _ -> true)
           es_inter
       in
-      Expr.Set.cardinal es_inter
+      Expr.Set.cardinal es_inter + built_from_values
 
     (* Strategy 2: Predicate has all literals as in-parameters *)
     let strategy_2 ~pred_defs ((name, args) : string * Expr.t list) : int =
