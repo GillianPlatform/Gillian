@@ -50,6 +50,16 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     val buffers : (DocumentUri.t, unit Gillian_result.t) Hashtbl.t =
       Hashtbl.create 4
 
+    (* For a fresh progress token per analysis *)
+    val mutable analyses = 0
+
+    (* Each document's latest content not yet analysed, with the [notify_back]
+       of the notification that brought it *)
+    val pending : (DocumentUri.t, Jsonrpc2.notify_back * string) Hashtbl.t =
+      Hashtbl.create 4
+
+    (* Analyses share global state, so one at a time *)
+    val lock = Lwt_mutex.create ()
     method spawn_query_handler f = spawn f
 
     (* We define here a helper method that will:
@@ -58,19 +68,66 @@ class lsp_server (f : string -> unit Gillian_result.t) =
         - return the diagnostics from the new state
     *)
     method
-        private _on_doc
+        private _analyse
         ~(notify_back : Jsonrpc2.notify_back)
         (uri : DocumentUri.t)
         (content : string) =
+      let open Lwt.Syntax in
       let path = DocumentUri.to_path uri in
       let () = Hashtbl.replace Config.file_content_overrides path content in
-      let result = f path in
-      let old_result = Hashtbl.find_opt buffers uri in
-      let () = Usage_logs.Lsp.log path ?old_result ~content result in
-      let diags = result_to_diagnostics ~path result in
-      let () = Config.reset_config () in
-      Hashtbl.replace buffers uri result;
-      notify_back#send_diagnostic diags
+      analyses <- analyses + 1;
+      let token = `String (Fmt.str "gillian-analysis-%d" analyses) in
+      let progress value =
+        notify_back#send_notification (WorkDoneProgress { token; value })
+      in
+      (* Not waiting for the reply: notifications are handled one at a time,
+         so the reply couldn't be read until this handler is done *)
+      let* _ =
+        notify_back#send_request
+          (WorkDoneProgressCreate (WorkDoneProgressCreateParams.create ~token))
+          (fun _ -> Lwt.return ())
+      in
+      let* () =
+        progress
+          (Begin
+             (WorkDoneProgressBegin.create ~title:"Gillian"
+                ~message:("Verifying " ^ Filename.basename path)
+                ()))
+      in
+      (* The analysis blocks, so flush now rather than when Lwt next runs *)
+      let* () = Lwt_io.flush Lwt_io.stdout in
+      Lwt.finalize
+        (fun () ->
+          let result = f path in
+          let old_result = Hashtbl.find_opt buffers uri in
+          let () = Usage_logs.Lsp.log path ?old_result ~content result in
+          let diags = result_to_diagnostics ~path result in
+          let () = Config.reset_config () in
+          Hashtbl.replace buffers uri result;
+          notify_back#send_diagnostic diags)
+        (fun () -> progress (End (WorkDoneProgressEnd.create ())))
+
+    (* Clears the document's diagnostics, and schedules an analysis of its
+       latest content. Edits arriving meanwhile (including during another
+       analysis, which blocks) replace that content, so they're analysed once. *)
+    method private _on_doc ~notify_back uri content =
+      let open Lwt.Syntax in
+      let scheduled = Hashtbl.mem pending uri in
+      Hashtbl.replace pending uri (notify_back, content);
+      let* () = notify_back#send_diagnostic [] in
+      if not scheduled then
+        Lwt.async (fun () ->
+            Lwt_mutex.with_lock lock @@ fun () ->
+            (* Waiting after any earlier analysis, so edits that queued during
+               it are read first.
+               ponytail: fixed debounce; make it configurable if it's felt *)
+            let* () = Lwt_unix.sleep 0.2 in
+            match Hashtbl.find_opt pending uri with
+            | None -> Lwt.return () (* closed meanwhile *)
+            | Some (notify_back, content) ->
+                Hashtbl.remove pending uri;
+                self#_analyse ~notify_back uri content);
+      Lwt.return ()
 
     (* We now override the [on_notify_doc_did_open] method that will be called
         by the server each time a new document is opened. *)
@@ -93,6 +150,7 @@ class lsp_server (f : string -> unit Gillian_result.t) =
       let path = DocumentUri.to_path d.uri in
       Hashtbl.remove Config.file_content_overrides path;
       Hashtbl.remove buffers d.uri;
+      Hashtbl.remove pending d.uri;
       return ()
   end
 
