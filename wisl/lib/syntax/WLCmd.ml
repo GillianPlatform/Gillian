@@ -1,7 +1,7 @@
 open VisitorUtils
 
 type tt =
-  | Fold of string * WLExpr.t list
+  | Fold of string * WLExpr.t option list
   | Unfold of {
       pred : string;
       params : WLExpr.t option list;
@@ -44,8 +44,9 @@ let rec get_by_id id lcmd =
   let lassert_getter = WLAssert.get_by_id id in
   let aux lcmdp =
     match get lcmdp with
-    | Fold (_, lel) | ApplyLem (_, lel, _) -> lexpr_list_visitor lel
-    | Unfold { params; _ } -> lexpr_list_visitor (List.filter_map Fun.id params)
+    | ApplyLem (_, lel, _) -> lexpr_list_visitor lel
+    | Fold (_, params) | Unfold { params; _ } ->
+        lexpr_list_visitor (List.filter_map Fun.id params)
     | Package { lhs = _, lel1; rhs = _, lel2 } ->
         lexpr_list_visitor lel1 |>> (lexpr_list_visitor, lel2)
     | LogicIf (le, lcmdl1, lcmdl2) ->
@@ -56,6 +57,10 @@ let rec get_by_id id lcmd =
   self_or_none |>> (aux, lcmd)
 
 (* TODO: write pretty_print function *)
+(* An omitted out-parameter is printed back as the underscore that the surface
+   syntax uses for it. *)
+let pp_pred_arg = Fmt.option ~none:(Fmt.any "_") WLExpr.pp
+
 let pp fmt lcmd =
   let pp_binds fmt binds =
     match binds with
@@ -72,11 +77,11 @@ let pp fmt lcmd =
   in
   match get lcmd with
   | Fold (pname, wlel) ->
-      Fmt.pf fmt "fold %s(%a)" pname (WPrettyUtils.pp_list WLExpr.pp) wlel
+      Fmt.pf fmt "fold %s(%a)" pname (WPrettyUtils.pp_list pp_pred_arg) wlel
   | Unfold { pred; params; bindings } -> (
       let () =
         Fmt.pf fmt "unfold %s(%a)" pred
-          (WPrettyUtils.pp_list (Fmt.option ~none:(Fmt.any "_") WLExpr.pp))
+          (WPrettyUtils.pp_list pp_pred_arg)
           params
       in
       match bindings with
@@ -108,7 +113,7 @@ let rec substitution subst { wlcnode; wlcid; wlcloc } =
   let fe = WLExpr.substitution subst in
   let wlcnode =
     match wlcnode with
-    | Fold (pname, les) -> Fold (pname, List.map fe les)
+    | Fold (pname, les) -> Fold (pname, List.map (Option.map fe) les)
     | Unfold u -> Unfold { u with params = List.map (Option.map fe) u.params }
     | Package { lhs = lname, largs; rhs = rname, rargs } ->
         Package

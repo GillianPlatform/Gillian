@@ -590,8 +590,9 @@ module SLCmd : sig
   (** GIL Separation-Logic Commands *)
 
   type t =
-    | Fold of string * Expr.t list * (string * (string * Expr.t) list) option
-        (** Fold predicate *)
+    | Fold of
+        string * Expr.t option list * (string * (string * Expr.t) list) option
+        (** Fold predicate. The arguments are read as for {!Unfold}. *)
     | Unfold of
         string * Expr.t option list * (string * string) list option * bool
         (** Unfold predicate. The in-parameters must all be given; the
@@ -1460,7 +1461,7 @@ module Visitors : sig
              'c ->
              SLCmd.t ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * (string * Expr.t) list) option ->
              SLCmd.t
          ; visit_CorePred :
@@ -1714,7 +1715,7 @@ module Visitors : sig
       'c ->
       SLCmd.t ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * (string * Expr.t) list) option ->
       SLCmd.t
 
@@ -1986,7 +1987,7 @@ module Visitors : sig
          ; visit_Fold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * (string * Expr.t) list) option ->
              'f
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
@@ -2211,7 +2212,7 @@ module Visitors : sig
     method visit_Fold :
       'c ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * (string * Expr.t) list) option ->
       'f
 
@@ -2444,7 +2445,7 @@ module Visitors : sig
          ; visit_Fold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * (string * Expr.t) list) option ->
              unit
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
@@ -2667,7 +2668,7 @@ module Visitors : sig
     method visit_Fold :
       'c ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * (string * Expr.t) list) option ->
       unit
 

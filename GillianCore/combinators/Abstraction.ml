@@ -608,6 +608,40 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         in
         Some (actual_pred, args)
 
+  (** The arguments of a [fold] or an [unfold]: the in-parameters have to be
+      given, as they are what identifies the predicate, while the out-parameters
+      are optional — they may be dropped altogether (the argument list is then
+      only as long as there are ins) or given one by one, an underscore standing
+      for an out-parameter that is to be ignored. Returns the in-values together
+      with the out-expressions, padded to the number of out-parameters. *)
+  let pred_cmd_args ~(cmd : string) (pred : Pred.t) (les : Expr.t option list) :
+      Expr.t list * Expr.t option list =
+    let pname = pred.pred_name in
+    let n_ins = pred.ins_number in
+    let n_params = pred.pred_num_params in
+    let n_given = List.length les in
+    let les =
+      if n_given = n_ins then les @ List.init (n_params - n_ins) (fun _ -> None)
+      else if n_given = n_params then les
+      else
+        Fmt.failwith
+          "%s of %s: expected %d argument(s) (the in-parameters) or %d (every \
+           parameter), but got %d"
+          cmd pname n_ins n_params n_given
+    in
+    let in_params = Pred.in_params pred in
+    let vs_ins =
+      Pred.in_args pred les
+      |> List.mapi (fun i -> function
+           | Some e -> e
+           | None ->
+               Fmt.failwith
+                 "%s of %s: the in-parameter %s must be given, it cannot be an \
+                  underscore"
+                 cmd pname (List.nth in_params i))
+    in
+    (vs_ins, Pred.out_args pred les)
+
   (* {2 The recursive knot}
 
      [mem_ops] is the memory-level instantiation of the matching walker; its
@@ -729,7 +763,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         let vs_ins = List.map Option.get vs_ins in
         let folded, errs =
           fold ~in_matching:true ~state:ms ~match_kind:(W.Fold pname) pred
-            vs_ins
+            (List.map Option.some vs_ins)
           |> Res_list.split
         in
         let consumed =
@@ -865,25 +899,24 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       ~match_kind
       ~(state : mstate)
       (pred : MP.pred)
-      (args : Expr.t list) : (mstate, err_t) Res_list.t =
+      (args : Expr.t option list) : (mstate, err_t) Res_list.t =
     let pred_name = pred.pred.pred_name in
     L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pred_name);
     if pred.pred.pred_abstract then
       Fmt.failwith "Impossible: Folding abstract predicate %s" pred_name;
     L.verbose (fun m -> m "Predicate matching plan: %a" MP.pp pred.def_mp);
+    let vs_ins, es_outs = pred_cmd_args ~cmd:"Fold" pred.pred args in
+    let args = List.map Option.some vs_ins @ es_outs in
     let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
+    (* Only the parameters that were given are known going in; matching the
+       definition is what learns the others. *)
     let param_bindings =
-      if List.compare_lengths params args = 0 then List.combine params args
-      else
-        try List.combine (Pred.in_params pred.pred) args
-        with Invalid_argument _ ->
-          Fmt.failwith "invalid number of parameter while folding: %s%a"
-            pred.pred.pred_name
-            Fmt.(parens @@ hbox @@ list ~sep:comma Expr.pp)
-            args
-    in
-    let param_bindings =
-      List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
+      List.map2
+        (fun x -> function
+          | Some v -> Some (Expr.PVar x, v)
+          | None -> None)
+        params args
+      |> List.filter_map Fun.id
     in
     let subst = SVal.SESubst.init (additional_bindings @ param_bindings) in
     let match_result =
@@ -892,22 +925,20 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     let open Res_list.Syntax in
     let** ms', subst', _ = match_result in
     let arg_vs =
-      if List.compare_lengths params args = 0 then args
-      else
-        let out_params = Pred.out_params pred.pred in
-        let vs_outs =
-          List.map
-            (fun x ->
-              match SVal.SESubst.get subst' (PVar x) with
+      List.map2
+        (fun x -> function
+          | Some v -> v
+          | None -> (
+              match SVal.SESubst.get subst' (Expr.PVar x) with
               | Some v_x -> v_x
               | None ->
-                  failwith "DEATH. Didnt learn all the outs while folding.")
-            out_params
-        in
-        L.verbose (fun m ->
-            m "Out parameters : @[<h>%a@]" Fmt.(list ~sep:comma Expr.pp) vs_outs);
-        Pred.combine_ins_outs pred.pred args vs_outs
+                  Fmt.failwith
+                    "DEATH. Didn't learn the out-parameter %s while folding %s"
+                    x pred_name))
+        params args
     in
+    L.verbose (fun m ->
+        m "Folded arguments: @[<h>%a@]" Fmt.(list ~sep:comma Expr.pp) arg_vs);
     (* We extend the list of predicates with our newly folded predicate. *)
     let ms' =
       {
@@ -1004,7 +1035,8 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
           let pred = get_def pname in
           let rets =
             fold ~in_matching:true ~match_kind:(W.Fold pname)
-              ~state:(copy_mstate ms) pred v_args
+              ~state:(copy_mstate ms) pred
+              (List.map Option.some v_args)
           in
           let rets =
             Res_list.map_error
@@ -1715,39 +1747,6 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
                if Pc.is_trivially_false ms.pc then None
                else Some (Branch.make ~pc:ms.pc ~value:ms.st)))
 
-  (** The arguments of an [unfold]: the in-parameters have to be given, as they
-      are what identifies the predicate to unfold, while the out-parameters are
-      optional — they may be dropped altogether (the argument list is then only
-      as long as there are ins) or given one by one, an underscore standing for
-      an out-parameter that is to be ignored. Returns the in-values together
-      with the out-expressions, padded to the number of out-parameters. *)
-  let unfold_args (pred : Pred.t) (pname : string) (les : Expr.t option list) :
-      Expr.t list * Expr.t option list =
-    let n_ins = pred.ins_number in
-    let n_params = pred.pred_num_params in
-    let n_given = List.length les in
-    let les =
-      if n_given = n_ins then les @ List.init (n_params - n_ins) (fun _ -> None)
-      else if n_given = n_params then les
-      else
-        Fmt.failwith
-          "Unfold of %s: expected %d argument(s) (the in-parameters) or %d \
-           (every parameter), but got %d"
-          pname n_ins n_params n_given
-    in
-    let in_params = Pred.in_params pred in
-    let vs_ins =
-      Pred.in_args pred les
-      |> List.mapi (fun i -> function
-           | Some e -> e
-           | None ->
-               Fmt.failwith
-                 "Unfold of %s: the in-parameter %s must be given, it cannot \
-                  be an underscore"
-                 pname (List.nth in_params i))
-    in
-    (vs_ins, Pred.out_args pred les)
-
   (** The logical variables the state already knows something about. An
       out-expression of an [unfold] made of one of those has to agree with the
       predicate found, whereas one made of a variable nothing is known about yet
@@ -1856,7 +1855,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         (* 2) The in-parameters are sufficient to trigger the unfold, so the
            out-parameters may be left out entirely; those that are given are
            kept around to be matched against the predicate we find. *)
-        let vs_ins, es_outs = unfold_args pred.pred pname les in
+        let vs_ins, es_outs = pred_cmd_args ~cmd:"Unfold" pred.pred les in
         let vs = List.map Option.some vs_ins @ es_outs in
         let known = known_lvars ms in
         (* 3) We consume the predicate from the state. *)

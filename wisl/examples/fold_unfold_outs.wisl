@@ -53,3 +53,21 @@ function asserts_known(x) {
     return 0
 }
 { (ret == 0) * list(#x, #alpha) }
+
+// A fold needs only the in-parameters too.
+{ (x == #x) * list(#x, #alpha) }
+function fold_ins_only(x) {
+    [[ unfold list(x) ]];
+    [[ fold list(x) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }
+
+// An underscore leaves an out-parameter of a fold to be worked out.
+{ (x == #x) * cell2(#x, #a, #b) }
+function fold_mixed(x) {
+    [[ unfold cell2(x) ]];
+    [[ fold cell2(x, _, #b) ]];
+    return 0
+}
+{ (ret == 0) * cell2(#x, #a, #b) }

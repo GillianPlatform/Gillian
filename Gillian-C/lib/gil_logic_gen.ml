@@ -609,7 +609,9 @@ let rec trans_lcmd ~fname ~ann lcmd =
       `Normal (make_assert ~bindings aps @ [ SL (ApplyLem (pn, gel, [])) ])
   | CLCmd.Fold (pn, el) ->
       let aps, bindings, gel = split3_expr_comp (List.map trans_expr el) in
-      `Normal (make_assert ~bindings aps @ [ SL (Fold (pn, gel, None)) ])
+      `Normal
+        (make_assert ~bindings aps
+        @ [ SL (Fold (pn, List.map Option.some gel, None)) ])
   | Unfold { pred; params; bindings; recursive } ->
       let ap, vs, gel = split3_expr_comp (List.map trans_expr params) in
       `Normal

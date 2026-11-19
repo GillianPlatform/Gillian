@@ -167,7 +167,7 @@ and assertion = assertion_atom list
 and bindings = string * (string * expr) list
 
 and slcmd =
-  | Fold of string * expr list * bindings option
+  | Fold of string * expr option list * bindings option
   | Unfold of string * expr option list * (string * string) list option * bool
   | Package of { lhs : string * expr list; rhs : string * expr list }
       (** Magic wand packaging *)

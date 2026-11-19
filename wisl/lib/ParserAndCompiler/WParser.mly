@@ -171,7 +171,7 @@ let with_subject e mk =
 %type <WLExpr.t>                                with_variant_def
 %type <WLCmd.t list>                            proof_def
 %type <string * WType.t option>                 pred_param
-%type <WLExpr.t option>                         unfold_param
+%type <WLExpr.t option>                         pred_cmd_param
 %type <(string * string) list>                  unfold_bindings
 %type <string * string>                         unfold_binding
 %type <CodeLoc.t * string list>                 bindings_with_loc
@@ -580,13 +580,13 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make (Package { lhs; rhs }) loc }
   | lstart = FOLD; lpr = IDENTIFIER;
-      LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
+      LBRACE; params = separated_list(COMMA, pred_cmd_param); lend = RBRACE
     { let (_, pr) = lpr in
       let bare_lcmd = WLCmd.Fold (pr, params) in
       let loc = CodeLoc.merge lstart lend in
       WLCmd.make bare_lcmd loc }
   | lstart = UNFOLD; lpr = IDENTIFIER;
-      LBRACE; params = separated_list(COMMA, unfold_param); lend = RBRACE; bindings = option(unfold_bindings)
+      LBRACE; params = separated_list(COMMA, pred_cmd_param); lend = RBRACE; bindings = option(unfold_bindings)
     { let (_, pred) = lpr in
       let bare_lcmd = WLCmd.Unfold { pred; params; bindings } in
       let loc = CodeLoc.merge lstart lend in
@@ -622,9 +622,9 @@ logic_command:
       let bare_lcmd = WLCmd.Invariant (a, b, variant) in
       WLCmd.make bare_lcmd loc }
 
-(* An argument of [unfold]: an out-parameter written as an underscore is one
-   we do not care about. *)
-unfold_param:
+(* An argument of [fold] or [unfold]: an out-parameter written as an
+   underscore is one we do not care about. *)
+pred_cmd_param:
   | UNDERSCORE
     { None }
   | le = logic_expression

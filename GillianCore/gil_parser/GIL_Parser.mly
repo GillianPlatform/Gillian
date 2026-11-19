@@ -42,9 +42,9 @@ module Anon_lvar =
 let is_anon_lvar (x : string) : bool =
   String.starts_with ~prefix:anon_lvar_prefix x
 
-(* The arguments of an [unfold]: an underscore in an out-parameter position
-   means that the parameter is to be ignored. *)
-let unfold_arg (e : Expr.t) : Expr.t option =
+(* The arguments of a [fold] or an [unfold]: an underscore in an
+   out-parameter position means that the parameter is to be ignored. *)
+let pred_arg (e : Expr.t) : Expr.t option =
   match e with
   | Expr.LVar x when is_anon_lvar x -> None
   | e -> Some e
@@ -891,15 +891,15 @@ g_named_assertion_target:
 g_logic_cmd_target:
 (* fold x(e1, ..., en) *)
   | FOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
-    { LCmd.SL (Fold (name, les, fold_info)) }
+    { LCmd.SL (Fold (name, List.map pred_arg les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | UNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { LCmd.SL (Unfold (name, List.map unfold_arg les, unfold_info, false)) }
+    { LCmd.SL (Unfold (name, List.map pred_arg les, unfold_info, false)) }
 
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | RECUNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { LCmd.SL (Unfold (name, List.map unfold_arg les, unfold_info, true)) }
+    { LCmd.SL (Unfold (name, List.map pred_arg les, unfold_info, true)) }
 
   | PACKAGE; LBRACE; lhs = predicate_call; WAND; rhs = predicate_call; RBRACE;
     { let (ln, largs) = lhs and (rn, rargs) = rhs in
