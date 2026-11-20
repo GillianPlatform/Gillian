@@ -1,6 +1,6 @@
 # The verified SMT backend on Gillian's queries
 
-The experiment of Sec. 7.2 of *An End-to-end Theory for Compositional Symbolic
+The experiment of Sec. 7.2 of *An End-to-End Theory for Compositional Symbolic
 Execution: From Expressive Specifications to SMT* (POPL'27). Gillian, run with
 `--certified-smt`, sends every SMT query to two backends and records both:
 
