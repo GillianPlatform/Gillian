@@ -44,7 +44,7 @@ let result_to_diagnostics ~path : unit Gillian_result.t -> Diagnostic.t list =
 
 class lsp_server (f : string -> unit Gillian_result.t) =
   object (self)
-    inherit Jsonrpc2.server
+    inherit Jsonrpc2.server as super
 
     (* one env per document *)
     val buffers : (DocumentUri.t, unit Gillian_result.t) Hashtbl.t =
@@ -52,6 +52,9 @@ class lsp_server (f : string -> unit Gillian_result.t) =
 
     (* For a fresh progress token per analysis *)
     val mutable analyses = 0
+
+    (* Whether the client takes progress reports the server starts *)
+    val mutable work_done_progress = false
 
     (* Each document's latest content not yet analysed, with the [notify_back]
        of the notification that brought it *)
@@ -61,6 +64,12 @@ class lsp_server (f : string -> unit Gillian_result.t) =
     (* Analyses share global state, so one at a time *)
     val lock = Lwt_mutex.create ()
     method spawn_query_handler f = spawn f
+
+    method! on_req_initialize ~notify_back (i : InitializeParams.t) =
+      work_done_progress <-
+        Option.bind i.capabilities.window (fun w -> w.workDoneProgress)
+        |> Option.value ~default:false;
+      super#on_req_initialize ~notify_back i
 
     (* We define here a helper method that will:
         - process a document
@@ -77,15 +86,25 @@ class lsp_server (f : string -> unit Gillian_result.t) =
       let () = Hashtbl.replace Config.file_content_overrides path content in
       analyses <- analyses + 1;
       let token = `String (Fmt.str "gillian-analysis-%d" analyses) in
-      let progress value =
-        notify_back#send_notification (WorkDoneProgress { token; value })
+      (* A token can only be reported on once the client has accepted it *)
+      let* created =
+        if not work_done_progress then Lwt.return false
+        else
+          let created, accepted = Lwt.wait () in
+          let* _ =
+            notify_back#send_request
+              (WorkDoneProgressCreate
+                 (WorkDoneProgressCreateParams.create ~token))
+              (fun reply ->
+                Lwt.wakeup_later accepted (Result.is_ok reply);
+                Lwt.return ())
+          in
+          created
       in
-      (* Not waiting for the reply: notifications are handled one at a time,
-         so the reply couldn't be read until this handler is done *)
-      let* _ =
-        notify_back#send_request
-          (WorkDoneProgressCreate (WorkDoneProgressCreateParams.create ~token))
-          (fun _ -> Lwt.return ())
+      let progress value =
+        if created then
+          notify_back#send_notification (WorkDoneProgress { token; value })
+        else Lwt.return ()
       in
       let* () =
         progress
