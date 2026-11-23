@@ -1783,36 +1783,32 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
                if Pc.is_trivially_false ms.pc then None
                else Some (Branch.make ~pc:ms.pc ~value:ms.st)))
 
-  (** The logical variables the state already knows something about. An
-      out-expression of an [unfold] made of one of those has to agree with the
-      predicate found, whereas one made of a variable nothing is known about yet
-      is free to be bound to it. Scanning the whole state for them is not cheap,
-      hence the [lazy]: most unfolds never need to know. *)
+  (** The logical variables the memory already knows something about (the state
+      above adds those of its store and spec-vars). An out-expression of an
+      [unfold] made of one of those has to agree with the predicate found,
+      whereas one made of a variable nothing is known about yet is free to be
+      bound to it. Typing is not knowledge: evaluating [#h :: #t] types [#t].
+      Scanning the whole memory for them is not cheap, hence the [lazy]: most
+      unfolds never need to know. *)
   let known_lvars (ms : mstate) : Containers.SS.t Lazy.t =
-    lazy
-      (let open Containers in
-       lvars ms.st
-       |> SS.union (PFS.lvars (full_pfs ms.pc))
-       |> SS.union (Type_env.lvars (full_gamma ms.pc)))
+    lazy (Containers.SS.union (lvars ms.st) (PFS.lvars (full_pfs ms.pc)))
 
   (** The out-expressions an [unfold] was given are matched against the values
       of the predicate that was found, once its definition has been produced
       (what the definition says about those values is then available to the
-      equalities below). An out-expression that is a logical variable the state
-      knew nothing about is bound to the value found; any other out-expression
-      has to be equal to it. Returns the variables that were bound, which the
-      state above has to keep alive. *)
+      equalities below). The logical variables of an out-expression that the
+      state knew nothing about are bound, by solving for them in the value
+      found; the out-expression then has to be equal to that value. Returns the
+      variables that were bound, which the state above has to keep alive. *)
   let assert_unfold_outs
       ~(known : Containers.SS.t Lazy.t)
       (ms : mstate)
       (pname : string)
       (es_outs : Expr.t option list)
       (vs_outs : Expr.t list) : (mstate * Containers.SS.t, err_t) Res_list.t =
-    let learn ms f =
-      match assume_pure ~production:false ~time:"unfold outs" ms [ f ] with
-      | Some ms -> Res_list.return ms
-      (* The equality contradicts the state: this branch is unreachable. *)
-      | None -> Res_list.vanish
+    let open Containers in
+    let assume ms fs =
+      assume_pure ~production:false ~time:"unfold outs" ms fs
     in
     let fail e v =
       Res_list.error_with
@@ -1826,8 +1822,34 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
        they count as known for the ones that follow, so that the same name
        given twice over means the two values agree. *)
     let is_fresh bound x =
-      (not (Containers.SS.mem x bound))
-      && not (Containers.SS.mem x (Lazy.force known))
+      (not (SS.mem x bound)) && not (SS.mem x (Lazy.force known))
+    in
+    (* Solves [fresh] for their values in [v], the way the matcher learns the
+       outs of an assertion, and checks that [e] then equals [v]. Assuming
+       [e == v] outright would also assume that [v] has the shape of [e]. *)
+    let solve ms fresh e v =
+      let kb =
+        SS.diff (Expr.lvars e) fresh
+        |> SS.elements
+        |> List.map (fun x -> Expr.LVar x)
+        |> MP.KB.of_list
+      in
+      let defs =
+        MP.learn_expr kb v e
+        |> List.filter (function
+             | Expr.LVar x, _ -> SS.mem x fresh
+             | _ -> false)
+      in
+      let solved =
+        SS.for_all
+          (fun x -> List.exists (fun (y, _) -> Expr.equal y (LVar x)) defs)
+          fresh
+      in
+      let defs = List.map (fun (x, d) -> Expr.BinOp (x, Equal, d)) defs in
+      match if solved then assume ms defs else None with
+      | Some ms when assert_pure ms [ Expr.BinOp (e, Equal, v) ] ->
+          Res_list.return ms
+      | _ -> fail e v
     in
     let rec aux ms bound es vs =
       match (es, vs) with
@@ -1838,33 +1860,28 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       | Some e :: es, v :: vs when Expr.equal e v -> aux ms bound es vs
       | Some e :: es, v :: vs ->
           let eq = Expr.BinOp (e, Equal, v) in
-          let fresh =
-            (* Only a bare, so-far-unknown logical variable may be bound: any
-               richer expression would constrain the value found rather than
-               just name it. *)
-            match e with
-            | Expr.LVar x when is_fresh bound x -> Some x
-            | _ -> None
-          in
+          let fresh = SS.filter (is_fresh bound) (Expr.lvars e) in
           let open Res_list.Syntax in
           let** ms =
-            match fresh with
-            | Some _ -> learn ms eq
-            | None ->
-                if !Config.under_approximation then learn ms eq
-                else if assert_pure ms [ eq ] then Res_list.return ms
-                else fail e v
+            match e with
+            | _ when !Config.under_approximation -> (
+                match assume ms [ eq ] with
+                | Some ms -> Res_list.return ms
+                | None -> Res_list.vanish)
+            (* A bare variable just names the value found; it can only
+               contradict it by its type. *)
+            | Expr.LVar x when SS.mem x fresh -> (
+                match assume ms [ eq ] with
+                | Some ms -> Res_list.return ms
+                | None -> fail e v)
+            | _ when SS.is_empty fresh ->
+                if assert_pure ms [ eq ] then Res_list.return ms else fail e v
+            | _ -> solve ms fresh e v
           in
-          let bound =
-            Option.fold ~none:bound
-              ~some:(fun x -> Containers.SS.add x bound)
-              fresh
-          in
-          aux ms bound es vs
+          aux ms (SS.union fresh bound) es vs
     in
-    if List.for_all Option.is_none es_outs then
-      Res_list.return (ms, Containers.SS.empty)
-    else aux ms Containers.SS.empty es_outs vs_outs
+    if List.for_all Option.is_none es_outs then Res_list.return (ms, SS.empty)
+    else aux ms SS.empty es_outs vs_outs
 
   (* The predicate-manipulating SL commands arrive as reserved actions with
      the [SLCmd] encoding; the state has already evaluated the

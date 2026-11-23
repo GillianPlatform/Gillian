@@ -71,3 +71,14 @@ function fold_mixed(x) {
     return 0
 }
 { (ret == 0) * cell2(#x, #a, #b) }
+
+// The fresh variables of an out-pattern are solved for.
+{ (x == #x) * list(#x, #alpha) * (!(#x == null)) }
+function binds_pattern(x) {
+    [[ unfold list(x, #h :: #t) ]];
+    v := [x];
+    [[ assert (v == #h) ]];
+    [[ fold list(x, #h :: #t) ]];
+    return v
+}
+{ (ret == #h) * list(#x, #alpha) * (#alpha == #h :: #t) }
