@@ -174,15 +174,24 @@ let pp_by_need _ fmt h = pp fmt h
 (* TODO: Implement properly *)
 let get_print_info _ _ = (SS.empty, SS.empty)
 
-let pp_err fmt t =
-  Fmt.string fmt
-    (match t with
-    | WislSHeap.MissingResource _ -> "Missing Resource"
-    | DoubleFree _ -> "Double Free"
-    | UseAfterFree _ -> "Use After Free"
-    | MemoryLeak -> "Memory Leak"
-    | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation _ -> "Invalid Location")
+let pp_err fmt (t : err_t) =
+  match t with
+  | MissingResource (ga, loc, ofs) ->
+      Fmt.pf fmt "Missing %s at %s%a" (WislLActions.str_ga ga) loc
+        Fmt.(option (any ", offset " ++ Expr_pp.pp))
+        ofs
+  | DoubleFree loc -> Fmt.pf fmt "Freed %s twice" loc
+  | UseAfterFree loc -> Fmt.pf fmt "Used %s after freed" loc
+  | MemoryLeak -> Fmt.pf fmt "Memory leak"
+  | OutOfBounds (_, loc, ofs) ->
+      Fmt.pf fmt "Offset %a is out of bounds of %s" Expr_pp.pp ofs loc
+  | InvalidLocation loc ->
+      let loc =
+        match loc with
+        | BinOp (ptr, LstNth, Lit (Int z)) when Z.equal z Z.zero -> ptr
+        | _ -> loc
+      in
+      Fmt.pf fmt "No known memory at %a" Expr_pp.pp loc
 
 let substitution = WislSHeap.substitution
 let lvars = WislSHeap.lvars

@@ -452,6 +452,10 @@ let pp_custom ~pp ft =
 
 let rec pp ft t = pp_custom ~pp ft t
 
+module type Printer = sig
+  val pp_expr : t Fmt.t
+end
+
 let rec full_pp fmt e =
   match e with
   | Lit _ -> Fmt.pf fmt "Lit %a" pp e

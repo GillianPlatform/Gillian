@@ -44,7 +44,9 @@ struct
     mutable frames : frame list;
     mutable variables : (Variable.scope list * Variable.ts) option;
         [@default None]
-    mutable errors : err_t list;
+    node_errors : (L.Report_id.t, string list) Hashtbl.t;
+        [@default Hashtbl.create 0]
+        (** The full errors of each node with any, under each of its ids *)
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable selected_match_steps : (L.Report_id.t * L.Report_id.t) list;
         [@default []]
@@ -85,6 +87,9 @@ struct
     mutable breakpoints : breakpoints; [@default Hashtbl.create 0]
     id_assoc : (L.Report_id.t, string * int) Hashtbl.t;
         [@default Hashtbl.create 0]
+    full_errors : (L.Report_id.t, string list) Hashtbl.t;
+        [@default Hashtbl.create 0]
+        (** Each command's errors in full; the map's nodes hold them briefly *)
     ext : 'ext;
   }
   [@@deriving make]
@@ -507,7 +512,7 @@ struct
 
       let has_unfinished_case = List.exists (fun (_, (next, _)) -> next = None)
 
-      let update_status id (node : Exec_map.Packaged.node) proc_state =
+      let update_status id (node : Exec_map.Packaged.node) proc_state state =
         let is_node_finished =
           match node.next with
           | None -> true
@@ -524,7 +529,21 @@ struct
           | Proc s -> Hashset.add proc_state.submap_procs s
           | _ -> ()
         in
-        proc_state.has_errors <- proc_state.has_errors || node.data.errors <> []
+        if node.data.errors <> [] then (
+          proc_state.has_errors <- true;
+          let ids = List_utils.remove_duplicates (id :: node.data.all_ids) in
+          let full_errors =
+            ids
+            |> List.concat_map (fun id ->
+                   Hashtbl.find_opt state.debug_state.full_errors id
+                   |> Option.value ~default:[])
+          in
+          let full_errors =
+            if List.is_empty full_errors then node.data.errors else full_errors
+          in
+          List.iter
+            (fun id -> Hashtbl.replace proc_state.node_errors id full_errors)
+            ids)
 
       let add_changed_node id node (proc_state : proc_state) state =
         match node with
@@ -539,7 +558,7 @@ struct
                 let () = link_root proc_state.proc_name (show_id id) state in
                 proc_state.root_linked <- true
             in
-            let () = update_status id node proc_state in
+            let () = update_status id node proc_state state in
             convert_node proc_state state node
         | None -> Hashtbl.remove_all state.debug_state.all_nodes (show_id id)
 
@@ -875,10 +894,6 @@ struct
         let () = DL.log (fun m -> m "STOP (%a)" L.Report_id.pp id) in
         (Step, Some id)
 
-    let show_result_errors = function
-      | Exec_res.RSucc _ -> []
-      | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
-
     let errors_of_matches matches =
       matches
       |> List.filter_map (fun (m : Match_map.matching) ->
@@ -891,12 +906,26 @@ struct
                      Some (Fmt.str "Couldn't satisfy precondition of %s" f)
                  | _ -> None))
 
+    (* A failed match's summary first, then the distinct errors *)
+    let node_errors debug_state id exec_errors matches =
+      let show () =
+        errors_of_matches matches
+        @ List_utils.remove_duplicates (List.map show_err_t exec_errors)
+      in
+      Hashtbl.replace debug_state.full_errors id (show ());
+      Error_detail.brief show
+
     let build_final_cmd_data content result prev_id branch_path debug_state =
       let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
       let exec_data =
         let proc_name = (List.hd cmd.callstack).pid in
         let matches = match_final_cmd prev_id ~proc_name result debug_state in
-        let errors = show_result_errors result @ errors_of_matches matches in
+        let errors =
+          match result with
+          | Exec_res.RSucc _ -> errors_of_matches matches
+          | RFail { errors; _ } ->
+              node_errors debug_state prev_id errors matches
+        in
         let next_kind = Exec_map.Zero in
         Lift.make_executed_cmd_data next_kind prev_id cmd ~matches ~errors
           branch_path
@@ -1030,9 +1059,7 @@ struct
               let report =
                 of_yojson_string Logging.ConfigReport.of_yojson content
               in
-              let errors =
-                List.map show_err_t exec_errors @ errors_of_matches matches
-              in
+              let errors = node_errors debug_state id exec_errors matches in
               let exec_data =
                 Lift.make_executed_cmd_data cmd_kind id report ~matches ~errors
                   path
@@ -1074,11 +1101,18 @@ struct
             let () = Inspect.add_changed_node id node proc_state state in
             continue k ()
 
+      (* Stopping at a node with errors is stopping on an exception *)
+      let with_errors_at id proc_state = function
+        | (Step | ReachedEnd) when Hashtbl.mem proc_state.node_errors id ->
+            ExecutionError
+        | stop_reason -> stop_reason
+
       let lifter_call ?interaction lifter_func proc_state state =
         let stop_id, stop_reason =
           with_lifter_effects lifter_func proc_state state
         in
         let++ () = jump_state_to_id stop_id state.debug_state proc_state in
+        let stop_reason = with_errors_at stop_id proc_state stop_reason in
         let () =
           interaction
           |> Option.iter @@ fun kind ->
@@ -1132,8 +1166,11 @@ struct
         let** proc_state = get_proc_state ~cmd_id state in
         let++ () = jump_state_to_id cmd_id state.debug_state proc_state in
         let () = proc_state.selected_match_steps <- matches in
-        Usage_logs.Debug.log_interaction
-          (Jump { is_match = not (List.is_empty matches) })
+        let () =
+          Usage_logs.Debug.log_interaction
+            (Jump { is_match = not (List.is_empty matches) })
+        in
+        with_errors_at cmd_id proc_state Step
     end
 
     include Step
@@ -1239,7 +1276,9 @@ struct
               ~prog_env ?tl_ast ~main_proc_name:proc_name ~report_state_base
               ~init_data ~proc_names ~cur_proc:(proc_name, 0) ~ext ()
           in
-          let ext = Debugger_impl.init (make ()) in
+          let ext =
+            Prog_env.using prog_env @@ fun () -> Debugger_impl.init (make ())
+          in
           make ext
         in
         (cfg, entrypoint)
@@ -1310,21 +1349,16 @@ struct
       | Some vars -> vars
 
     let get_exception_info state =
-      with_prog_env state @@ fun () ->
       let proc_state = get_proc_state_exn state in
-      let error = List.hd proc_state.errors in
-      let non_mem_exception_info =
-        { id = Fmt.to_to_string Logging.pp_err error; description = None }
+      let errors =
+        Option.bind proc_state.cur_report_id
+          (Hashtbl.find_opt proc_state.node_errors)
       in
-      match error with
-      | Exec_err.EState state_error -> (
-          match state_error with
-          | StateErr.EMem merr ->
-              let tl_ast = state.debug_state.tl_ast in
-              Lifter.memory_error_to_exception_info
-                { error = merr; command = proc_state.cur_cmd; tl_ast }
-          | _ -> non_mem_exception_info)
-      | _ -> non_mem_exception_info
+      match errors with
+      | None | Some [] -> { id = "No error here"; description = None }
+      | Some errors ->
+          (* An empty id, as VS Code sets the id apart from the description *)
+          { id = ""; description = Some (String.concat "\n" errors) }
 
     let set_breakpoints source bp_list state =
       with_prog_env state @@ fun () ->

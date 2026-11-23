@@ -444,6 +444,11 @@ module Expr : sig
 
   (** [is_matchable x] returns whether or not the expression [e] is matchable *)
   val is_matchable : t -> bool
+
+  (** A target language's expression printer, for messages *)
+  module type Printer = sig
+    val pp_expr : t Fmt.t
+  end
 end
 
 (** @canonical Gillian.Gil_syntax.Asrt *)
@@ -585,10 +590,14 @@ module SLCmd : sig
   (** GIL Separation-Logic Commands *)
 
   type t =
-    | Fold of string * Expr.t list * (string * (string * Expr.t) list) option
-        (** Fold predicate *)
-    | Unfold of string * Expr.t list * (string * string) list option * bool
-        (** Unfold predicate *)
+    | Fold of
+        string * Expr.t option list * (string * (string * Expr.t) list) option
+        (** Fold predicate. The arguments are read as for {!Unfold}. *)
+    | Unfold of
+        string * Expr.t option list * (string * string) list option * bool
+        (** Unfold predicate. The in-parameters must all be given; the
+            out-parameters may be omitted altogether, or given individually,
+            with [None] for an out-parameter that is explicitly ignored. *)
     | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand packaging *)
     | GUnfold of string  (** Global Unfold *)
@@ -632,6 +641,10 @@ module SLCmd : sig
       correspond to any SL command. *)
   val recover_action : string
 
+  (** Reserved no-op action whose only effect is the memory's eager unfolding of
+      predicates with concrete ins. *)
+  val unfold_concrete_action : string
+
   (** [is_pred_action a] holds iff [a] is one of the reserved actions above. *)
   val is_pred_action : string -> bool
 
@@ -644,6 +657,21 @@ module SLCmd : sig
   (** [of_action name args] is the inverse of {!to_action}: it rebuilds the
       command for one of the four reserved action names, or [None] otherwise. *)
   val of_action : string -> Expr.t list -> t option
+
+  (** The unfold action returns the logical variables its out-parameters bound;
+      these encode and decode that list, which the state uses to keep them from
+      being simplified away. *)
+  val enc_bound_lvars : string list -> Expr.t
+
+  val dec_bound_lvars : Expr.t list -> string list
+
+  (** The memory cannot see every logical variable the state knows of (the store
+      and the spec-vars live in the state), so the state appends those to an
+      unfold's action: an out-parameter naming one of them is then checked
+      against the predicate found, rather than bound to it. *)
+  val add_known_lvars : Expr.t list -> string list -> Expr.t list
+
+  val known_lvars : Expr.t list -> string list
 end
 
 (** @canonical Gillian.Gil_syntax.LCmd *)
@@ -1448,7 +1476,7 @@ module Visitors : sig
              'c ->
              SLCmd.t ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * (string * Expr.t) list) option ->
              SLCmd.t
          ; visit_CorePred :
@@ -1579,7 +1607,7 @@ module Visitors : sig
              'c ->
              SLCmd.t ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * string) list option ->
              bool ->
              SLCmd.t
@@ -1702,7 +1730,7 @@ module Visitors : sig
       'c ->
       SLCmd.t ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * (string * Expr.t) list) option ->
       SLCmd.t
 
@@ -1840,7 +1868,7 @@ module Visitors : sig
       'c ->
       SLCmd.t ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * string) list option ->
       bool ->
       SLCmd.t
@@ -1974,7 +2002,7 @@ module Visitors : sig
          ; visit_Fold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * (string * Expr.t) list) option ->
              'f
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
@@ -2104,7 +2132,7 @@ module Visitors : sig
          ; visit_Unfold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * string) list option ->
              bool ->
              'f
@@ -2199,7 +2227,7 @@ module Visitors : sig
     method visit_Fold :
       'c ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * (string * Expr.t) list) option ->
       'f
 
@@ -2329,7 +2357,12 @@ module Visitors : sig
     method visit_UndefinedType : 'c -> 'f
 
     method visit_Unfold :
-      'c -> string -> Expr.t list -> (string * string) list option -> bool -> 'f
+      'c ->
+      string ->
+      Expr.t option list ->
+      (string * string) list option ->
+      bool ->
+      'f
 
     method visit_Package :
       'c -> string * Expr.t list -> string * Expr.t list -> 'f
@@ -2427,7 +2460,7 @@ module Visitors : sig
          ; visit_Fold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * (string * Expr.t) list) option ->
              unit
          ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
@@ -2549,7 +2582,7 @@ module Visitors : sig
          ; visit_Unfold :
              'c ->
              string ->
-             Expr.t list ->
+             Expr.t option list ->
              (string * string) list option ->
              bool ->
              unit
@@ -2650,7 +2683,7 @@ module Visitors : sig
     method visit_Fold :
       'c ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * (string * Expr.t) list) option ->
       unit
 
@@ -2774,7 +2807,7 @@ module Visitors : sig
     method visit_Unfold :
       'c ->
       string ->
-      Expr.t list ->
+      Expr.t option list ->
       (string * string) list option ->
       bool ->
       unit

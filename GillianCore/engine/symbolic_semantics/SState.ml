@@ -49,7 +49,7 @@ module type S = sig
     t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
-module Make (SMemory : SMemory.S) :
+module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   S
     with type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t
@@ -209,12 +209,29 @@ module Make (SMemory : SMemory.S) :
       ~(spec_vars : SS.t) : t =
     { heap = SMemory.init init_data; store; pfs; gamma; spec_vars }
 
+  (* Lets the memory log its own matching steps as this state. *)
+  let lifting_into (state : t) f =
+    try f ()
+    with effect Matcher.Lift_astate (heap, pfs, gamma), k ->
+      let lifted =
+        match to_yojson { state with pfs; gamma } with
+        | `Assoc fields ->
+            `Assoc
+              (List.map
+                 (fun (f, v) -> (f, if f = "heap" then heap else v))
+                 fields)
+        | json -> json
+      in
+      Effect.Deep.continue k lifted
+
   let execute_action (action : string) (state : t) (args : vt list) : action_ret
       =
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
     let pc = Gpc.make ~matching:false ~pfs ~gamma () in
-    let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
+    let+ Gbranch.{ value; pc } =
+      lifting_into state (fun () -> SMemory.execute_action action heap pc args)
+    in
     match value with
     | Ok (new_heap, vs) ->
         let store = SStore.copy store in
@@ -228,7 +245,9 @@ module Make (SMemory : SMemory.S) :
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
     let pc = Gpc.make ~matching:true ~pfs ~gamma () in
-    let+ Gbranch.{ value; pc } = SMemory.consume core_pred heap pc in_args in
+    let+ Gbranch.{ value; pc } =
+      lifting_into state (fun () -> SMemory.consume core_pred heap pc in_args)
+    in
     match value with
     | Ok (new_heap, vs) ->
         let store = SStore.copy store in
@@ -667,7 +686,7 @@ module Make (SMemory : SMemory.S) :
           | _ -> acc)
         memory_tactic pfs
 
-  let pp_err = StateErr.pp_err SMemory.pp_err SVal.M.pp
+  let pp_err = StateErr.pp_err SMemory.pp_err P.pp_expr
   let can_fix = StateErr.can_fix SMemory.can_fix
 
   let get_failing_constraint (err : err_t) : Expr.t =
@@ -861,10 +880,15 @@ module Make (SMemory : SMemory.S) :
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~matching:true final_state in
-    (* Concrete-ins predicates are eagerly unfolded by the memory itself (as a
-       post-pass on its operations), so there is nothing left to unfold at the
-       state level here. *)
-    List.map (fun final_state -> Ok (final_state, fl)) final_states
+    (* Eagerly unfold concrete-ins predicates the posts produced, like the
+       legacy engine. The memory only does this as a post-pass on its actions
+       (not on produce), so ask it with a no-op action. *)
+    let* final_state = final_states in
+    execute_action SLCmd.unfold_concrete_action final_state []
+    |> List.concat_map @@ function
+       | Ok (st, _) ->
+           List.map (fun st -> Ok (st, fl)) (snd (simplify ~matching:true st))
+       | Error e -> [ Error e ]
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in

@@ -162,8 +162,9 @@ module Event = struct
             |> List.map
                @@
                fun Gillian_result.Error.
-                     { msg; loc; is_preprocessing; in_target }
+                     { msg; details; loc; is_preprocessing; in_target }
                ->
+               let msg = Option.value ~default:msg details in
                let loc = Option.map shrink_loc loc in
                make_analysis_failure ?loc ~is_preprocessing ?in_target msg
           in

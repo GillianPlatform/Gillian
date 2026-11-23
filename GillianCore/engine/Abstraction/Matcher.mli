@@ -157,5 +157,37 @@ module type S = sig
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 end
 
+(** What logging a match needs of a state: how to print it, and how the debugger
+    reads it back. *)
+module type LoggableState = sig
+  type t [@@deriving yojson]
+  type err_t [@@deriving yojson]
+
+  val pp : Format.formatter -> t -> unit
+
+  val pp_by_need :
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Format.formatter ->
+    t ->
+    unit
+
+  val pp_err : Format.formatter -> err_t -> unit
+end
+
+(** Performed by a memory that matches below the state (predicates live in the
+    memory), so that its match reports hold the full state the debugger reads:
+    given the memory's serialisation and its pure context, the handler returns
+    the serialisation of the state that called into the memory. *)
+type _ Effect.t +=
+  | Lift_astate : Yojson.Safe.t * PFS.t * Type_env.t -> Yojson.Safe.t Effect.t
+
+(** The log hooks that write the reports the debugger reads, for any state that
+    [from] turns into a [State.t]. *)
+module Make_logging (State : LoggableState) : sig
+  val log_hooks : ('s -> State.t) -> ('s, State.err_t) Matching_walker.log_hooks
+end
+
 module Make (State : MatchableState) :
   S with type state_t = State.t and type err_t = State.err_t

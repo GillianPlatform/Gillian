@@ -632,7 +632,7 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
 
         if (parse_edk(hdr->alloc, &edk, &cur)) {
 
-            GILLIAN("unfold valid_edk_array_list_ptr(#edk_al, #alloc, #EDKs)");
+            GILLIAN("unfold valid_edk_array_list_ptr(#edk_al, #alloc, #acc)");
             GILLIAN("unfold valid_aws_byte_cursor_ptr(#cur, #ra, #rb, #rc)");
             GILLIAN("apply optBytesConcat(#bptr, #readLength, #cbptr, len #leftEDKs)");
             GILLIAN("unfold optBytes(#bptr, #readLength + (len #leftEDKs), #restOrSomething)");

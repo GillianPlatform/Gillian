@@ -416,20 +416,23 @@ let rec compile_lcmd ?(fname = "main") lcmd =
         (* assert (assertions) {existentials: gvars} *)
         Some cmd
   in
+  (* The arguments of a fold/unfold: those written as an underscore carry
+     nothing to compile, but keep their place in the argument list. *)
+  let compile_pred_cmd_args params =
+    let compiled = List.map (Option.map compile_lexpr) params in
+    let gvars, lasrts, _ = list_split_3 (List.filter_map Fun.id compiled) in
+    ( List.concat gvars,
+      List.concat lasrts,
+      List.map (Option.map (fun (_, _, e) -> e)) compiled )
+  in
   let open WLCmd in
   match get lcmd with
-  | Fold (pname, lel) ->
-      let gvars, lasrts, params = list_split_3 (List.map compile_lexpr lel) in
-      let existentials = List.concat gvars in
-      let to_assert = List.concat lasrts in
+  | Fold (pname, params) ->
+      let existentials, to_assert, params = compile_pred_cmd_args params in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Fold (pname, params, None)) )
   | Unfold { pred; params; bindings } ->
-      let gvars, lasrts, params =
-        list_split_3 (List.map compile_lexpr params)
-      in
-      let existentials = List.concat gvars in
-      let to_assert = List.concat lasrts in
+      let existentials, to_assert, params = compile_pred_cmd_args params in
       ( build_assert existentials to_assert,
         LCmd.SL (SLCmd.Unfold (pred, params, bindings, false)) )
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
@@ -805,7 +808,7 @@ let rec compile_stmt_list
             ctnlab,
             faillab )
       in
-      let failcmd = Cmd.Fail ("InvalidPointer", []) in
+      let failcmd = Cmd.Fail ("InvalidPointer", [ comp_e ]) in
       let lookupcmd =
         Cmd.LAction (v_get, load, [ nth comp_e 0; nth comp_e 1 ])
       in

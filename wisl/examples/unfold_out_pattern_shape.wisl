@@ -1,0 +1,13 @@
+predicate list(x; alpha) {
+    (x == null) * (alpha == nil);
+    (x -> #a, #z) * (alpha == #a :: #beta) * list(#z, #beta)
+}
+
+// Must fail: the list may be empty, so it need not match the pattern.
+{ (x == #x) * list(#x, #alpha) }
+function bad(x) {
+    [[ unfold list(x, #h :: #t) ]];
+    [[ fold list(x, #alpha) ]];
+    return 0
+}
+{ (ret == 0) * list(#x, #alpha) }

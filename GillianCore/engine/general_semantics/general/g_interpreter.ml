@@ -668,6 +668,15 @@ struct
               let action, args =
                 Option.get (SLCmd.to_action evaluated_sl_cmd)
               in
+              let args =
+                match sl_cmd with
+                | SLCmd.Unfold _ ->
+                    Var.Set.union
+                      (Store.lvars (State.get_store state))
+                      (State.get_spec_vars state)
+                    |> Var.Set.elements |> SLCmd.add_known_lvars args
+                | _ -> args
+              in
               let v_args =
                 List.map (fun e -> Option.get (Val.from_expr e)) args
               in
@@ -686,7 +695,21 @@ struct
               State.execute_action action state v_args
               |> List.concat_map (function
                    | Error _ as err -> [ err ]
-                   | Ok (state', _) ->
+                   | Ok (state', rets) ->
+                       (* An unfold returns the logical variables its
+                          out-parameters bound: they are what the command
+                          introduced, and must survive the simplification
+                          below. *)
+                       let state' =
+                         match sl_cmd with
+                         | SLCmd.Unfold _ ->
+                             let bound =
+                               List.map Val.to_expr rets
+                               |> SLCmd.dec_bound_lvars |> Var.Set.of_list
+                             in
+                             State.add_spec_vars state' bound
+                         | _ -> state'
+                       in
                        let states =
                          if matching then
                            let _, states =
@@ -1675,7 +1698,25 @@ struct
         (* Explicit failure *)
         | Fail (fail_code, fail_params) ->
             let fail_params = List.map (State.eval_expr state) fail_params in
-            let err = Exec_err.EFailReached { fail_code; fail_params } in
+            let fail_msg =
+              let ctx : ParserAndCompiler.fail_ctx =
+                {
+                  simplify =
+                    (fun e ->
+                      match Val.from_expr e with
+                      | Some v -> Val.to_expr (State.simplify_val state v)
+                      | None -> e);
+                  get_type =
+                    (fun e ->
+                      Option.bind (Val.from_expr e) (State.get_type state));
+                }
+              in
+              PC.fail_message ctx ~code:fail_code
+                (List.map Val.to_expr fail_params)
+            in
+            let err =
+              Exec_err.EFailReached { fail_code; fail_params; fail_msg }
+            in
             raise (Interpreter_error ([ err ], state))
 
       let f cmd eval_state =

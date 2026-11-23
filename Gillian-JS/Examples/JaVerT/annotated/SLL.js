@@ -38,7 +38,7 @@ function listCopy (lst) {
 function listConcat(la, lb) {
   if (la === null) return lb; 
 
-  /* @tactic unfold SLL(#la, #alpha) */
+  /* @tactic unfold SLL(#la) */
   la.next = listConcat(la.next, lb);
   return la
 }

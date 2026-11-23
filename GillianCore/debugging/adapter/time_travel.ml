@@ -8,6 +8,13 @@ module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
   let run { dbg; rpc; send_stopped_events; _ } =
+    (* The client can't tell that our custom requests resume execution, and
+       keeps the last stop's details (e.g. an exception) unless told *)
+    let send_continued () =
+      Debug_rpc.send_event rpc
+        (module Continued_event)
+        Continued_event.Payload.(make ~thread_id:0 ())
+    in
     let promise, _ = Lwt.task () in
     Lwt.pause ();%lwt
     DL.set_rpc_command_handler rpc ~name:"Continue"
@@ -51,8 +58,9 @@ module Make (Debugger : Debugger.S) = struct
         in
         match dbg |> Debugger.jump id with
         | Error e -> raise (Gillian_result.Exc.Gillian_error e)
-        | Ok () ->
-            send_stopped_events Step;%lwt
+        | Ok stop_reason ->
+            send_continued ();%lwt
+            send_stopped_events stop_reason;%lwt
             Lwt.return ());
     DL.set_rpc_command_handler rpc ~name:"Step specific"
       (module Step_specific_command)
@@ -71,6 +79,7 @@ module Make (Debugger : Debugger.S) = struct
         match result with
         | Error e -> raise (Gillian_result.Exc.Gillian_error e)
         | Ok stop_reason ->
+            send_continued ();%lwt
             send_stopped_events stop_reason;%lwt
             Lwt.return ());
     Lwt.join [ promise ]
