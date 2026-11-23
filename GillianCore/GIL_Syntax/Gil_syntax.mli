@@ -664,6 +664,14 @@ module SLCmd : sig
   val enc_bound_lvars : string list -> Expr.t
 
   val dec_bound_lvars : Expr.t list -> string list
+
+  (** The memory cannot see every logical variable the state knows of (the store
+      and the spec-vars live in the state), so the state appends those to an
+      unfold's action: an out-parameter naming one of them is then checked
+      against the predicate found, rather than bound to it. *)
+  val add_known_lvars : Expr.t list -> string list -> Expr.t list
+
+  val known_lvars : Expr.t list -> string list
 end
 
 (** @canonical Gillian.Gil_syntax.LCmd *)

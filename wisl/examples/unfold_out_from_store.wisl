@@ -1,0 +1,13 @@
+predicate cell(x; a) {
+    (x -> #u) * (a == #u)
+}
+
+// Must fail: #v is the value of v, so naming it as an out-parameter checks
+// it against the predicate's value rather than binding it.
+{ (x == #x) * (v == #v) * cell(#x, 5) }
+function bad(x, v) {
+    [[ unfold cell(x, #v) ]];
+    [[ fold cell(x, 5) ]];
+    return v
+}
+{ (ret == 5) * cell(#x, 5) }

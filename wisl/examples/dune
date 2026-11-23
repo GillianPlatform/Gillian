@@ -11,3 +11,12 @@
  (alias runtest)
  (action
   (run wisl verify -l disabled -R . fold_unfold_outs.wisl)))
+
+(rule
+ (deps wisl_core.gil wisl_pointer_arith.gil unfold_out_from_store.wisl)
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes
+   1
+   (run wisl verify -l disabled -R . unfold_out_from_store.wisl))))
+

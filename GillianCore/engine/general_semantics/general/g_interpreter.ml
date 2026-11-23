@@ -668,6 +668,15 @@ struct
               let action, args =
                 Option.get (SLCmd.to_action evaluated_sl_cmd)
               in
+              let args =
+                match sl_cmd with
+                | SLCmd.Unfold _ ->
+                    Var.Set.union
+                      (Store.lvars (State.get_store state))
+                      (State.get_spec_vars state)
+                    |> Var.Set.elements |> SLCmd.add_known_lvars args
+                | _ -> args
+              in
               let v_args =
                 List.map (fun e -> Option.get (Val.from_expr e)) args
               in

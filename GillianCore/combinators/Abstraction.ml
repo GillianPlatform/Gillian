@@ -1895,7 +1895,12 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
            kept around to be matched against the predicate we find. *)
         let vs_ins, es_outs = pred_cmd_args ~cmd:"Unfold" pred.pred les in
         let vs = List.map Option.some vs_ins @ es_outs in
-        let known = known_lvars ms in
+        let known =
+          lazy
+            (Containers.SS.union
+               (Containers.SS.of_list (SLCmd.known_lvars args))
+               (Lazy.force (known_lvars ms)))
+        in
         (* 3) We consume the predicate from the state. *)
         let cons_res = consume_upred ~no_auto_fold:false ms pname vs in
         let () =

@@ -267,6 +267,13 @@ let dec_bound_lvars : Expr.t list -> string list = function
         xs
   | _ -> []
 
+let add_known_lvars (args : Expr.t list) (xs : string list) : Expr.t list =
+  args @ [ enc_bound_lvars xs ]
+
+let known_lvars : Expr.t list -> string list = function
+  | [ _; _; _; _; known ] -> dec_bound_lvars [ known ]
+  | _ -> []
+
 (* -- decoding -- *)
 
 let dec_str : Expr.t -> string = function
@@ -324,7 +331,8 @@ let of_action (action : string) (args : Expr.t list) : t option =
   match args with
   | [ pname; les; fold_info ] when String.equal action fold_action ->
       Some (Fold (dec_str pname, dec_pred_args les, dec_fold_info fold_info))
-  | [ pname; les; unfold_info; b ] when String.equal action unfold_action ->
+  | ([ pname; les; unfold_info; b ] | [ pname; les; unfold_info; b; _ ])
+    when String.equal action unfold_action ->
       Some
         (Unfold
            ( dec_str pname,
