@@ -154,19 +154,40 @@ module type S = sig
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 end
 
-module Make (State : MatchableState) :
-  S with type state_t = State.t and type err_t = State.err_t = struct
-  open Literal
+(** What logging a match needs of a state: how to print it, and how the debugger
+    reads it back. *)
+module type LoggableState = sig
+  type t [@@deriving yojson]
+  type err_t [@@deriving yojson]
+
+  val pp : Format.formatter -> t -> unit
+
+  val pp_by_need :
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Format.formatter ->
+    t ->
+    unit
+
+  val pp_err : Format.formatter -> err_t -> unit
+end
+
+(** Performed by a memory that matches below the state (predicates live in the
+    memory), so that its match reports hold the full state the debugger reads:
+    given the memory's serialisation and its pure context, the handler returns
+    the serialisation of the state that called into the memory. *)
+type _ Effect.t +=
+  | Lift_astate : Yojson.Safe.t * PFS.t * Type_env.t -> Yojson.Safe.t Effect.t
+
+module Make_logging (State : LoggableState) = struct
   open Containers
   module L = Logging
   module W = Matching_walker
 
   type state_t = State.t [@@deriving yojson]
-  type err_t = State.err_t [@@deriving yojson, show]
+  type err_t = State.err_t [@@deriving yojson]
   type t = State.t
-  type post_res = (Flag.t * Asrt.t list) option
-  type s_state = t * SVal.SESubst.t * MP.t
-  type search_state = s_state list * err_t list
 
   module Logging = struct
     let pp_astate = State.pp
@@ -287,18 +308,7 @@ module Make (State : MatchableState) :
 
   open Logging
 
-  let update_store (astate : t) (x : string) (v : Expr.t) : t =
-    let store = State.get_store astate in
-    let () = SStore.put store x v in
-    State.set_store astate store
-
-  let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
-      SVal.SESubst.t * t list =
-    State.simplify ~save ~kill_new_lvars:false ~matching astate
-
-  let copy_astate (astate : t) : t = State.copy astate
-
-  let log_hooks : (t, err_t) W.log_hooks =
+  let log_hooks (from : 's -> t) : ('s, err_t) W.log_hooks =
     {
       with_assertion_parent =
         (fun astate subst step f ->
@@ -355,21 +365,22 @@ module Make (State : MatchableState) :
             in
 
             AssertionReport.to_loggable pp_astate subst_pp
-              { step; subst; astate = AstateRec.from astate }
+              { step; subst; astate = AstateRec.from (from astate) }
           in
           L.Parent.with_specific assertion_loggable
             L.Logging_constants.Content_type.assertion f);
       with_match_parent =
         (fun astate subst mp match_kind f ->
           MatchReport.as_parent
-            { astate = AstateRec.from astate; subst; mp; match_kind }
+            { astate = AstateRec.from (from astate); subst; mp; match_kind }
             (fun _ -> f ()));
       log_success =
         (fun astate subst posts rest ->
           let remaining_states =
             List.map
               (fun (astate, subst, mp) ->
-                MatchResultReport.{ astate = AstateRec.from astate; subst; mp })
+                MatchResultReport.
+                  { astate = AstateRec.from (from astate); subst; mp })
               rest
           in
           let _ =
@@ -377,7 +388,7 @@ module Make (State : MatchableState) :
               (Success
                  {
                    remaining_states;
-                   astate = AstateRec.from astate;
+                   astate = AstateRec.from (from astate);
                    subst;
                    posts;
                  })
@@ -387,15 +398,45 @@ module Make (State : MatchableState) :
         (fun astate subst cur_step errors ->
           let report =
             MatchResultReport.Failure
-              { astate = AstateRec.from astate; cur_step; subst; errors }
+              { astate = AstateRec.from (from astate); cur_step; subst; errors }
           in
           let _ = MatchResultReport.log report in
           ());
       log_recovery =
         (fun astate tactic num_results ->
           MatchRecoveryReport.(
-            log { astate = AstateRec.from astate; num_results; tactic }));
+            log { astate = AstateRec.from (from astate); num_results; tactic }));
     }
+end
+
+module Make (State : MatchableState) :
+  S with type state_t = State.t and type err_t = State.err_t = struct
+  open Literal
+  module L = Logging
+  module W = Matching_walker
+
+  type state_t = State.t [@@deriving yojson]
+  type err_t = State.err_t [@@deriving yojson, show]
+  type t = State.t
+  type post_res = (Flag.t * Asrt.t list) option
+  type s_state = t * SVal.SESubst.t * MP.t
+  type search_state = s_state list * err_t list
+
+  module Match_logging = Make_logging (State)
+  module Logging = Match_logging.Logging
+  open Logging
+
+  let update_store (astate : t) (x : string) (v : Expr.t) : t =
+    let store = State.get_store astate in
+    let () = SStore.put store x v in
+    State.set_store astate store
+
+  let simplify_astate ?(save = false) ?(matching = false) (astate : t) :
+      SVal.SESubst.t * t list =
+    State.simplify ~save ~kill_new_lvars:false ~matching astate
+
+  let copy_astate (astate : t) : t = State.copy astate
+  let log_hooks = Match_logging.log_hooks Fun.id
 
   (* The state-level instantiation of the matching walker. Predicates and
      wands live in the memory, so this is purely the generic walker plus the

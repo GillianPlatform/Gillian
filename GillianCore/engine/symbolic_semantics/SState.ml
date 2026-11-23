@@ -209,12 +209,29 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       ~(spec_vars : SS.t) : t =
     { heap = SMemory.init init_data; store; pfs; gamma; spec_vars }
 
+  (* Lets the memory log its own matching steps as this state. *)
+  let lifting_into (state : t) f =
+    try f ()
+    with effect Matcher.Lift_astate (heap, pfs, gamma), k ->
+      let lifted =
+        match to_yojson { state with pfs; gamma } with
+        | `Assoc fields ->
+            `Assoc
+              (List.map
+                 (fun (f, v) -> (f, if f = "heap" then heap else v))
+                 fields)
+        | json -> json
+      in
+      Effect.Deep.continue k lifted
+
   let execute_action (action : string) (state : t) (args : vt list) : action_ret
       =
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
     let pc = Gpc.make ~matching:false ~pfs ~gamma () in
-    let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
+    let+ Gbranch.{ value; pc } =
+      lifting_into state (fun () -> SMemory.execute_action action heap pc args)
+    in
     match value with
     | Ok (new_heap, vs) ->
         let store = SStore.copy store in
@@ -228,7 +245,9 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
     let pc = Gpc.make ~matching:true ~pfs ~gamma () in
-    let+ Gbranch.{ value; pc } = SMemory.consume core_pred heap pc in_args in
+    let+ Gbranch.{ value; pc } =
+      lifting_into state (fun () -> SMemory.consume core_pred heap pc in_args)
+    in
     match value with
     | Ok (new_heap, vs) ->
         let store = SStore.copy store in

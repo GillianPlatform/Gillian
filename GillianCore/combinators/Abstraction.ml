@@ -664,6 +664,39 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
      unfolding — this is where the mutual recursion between assertion-level
      matching and predicate reasoning is tied. *)
 
+  (* Memory-level matches (folds, and the auto-folds of a consumption) are
+     logged as the full state that called into the memory, so that the
+     debugger reads them like state-level ones. *)
+  module Logged_mstate = struct
+    type t = { ms : mstate; lifted : Yojson.Safe.t Lazy.t }
+
+    let to_yojson { lifted; _ } = Lazy.force lifted
+    let of_yojson _ = Error "memory-level match states are only written"
+
+    type nonrec err_t = err_t
+
+    let err_t_to_yojson e =
+      StateErr.to_yojson err_t_to_yojson Expr.to_yojson (StateErr.EMem e)
+
+    let err_t_of_yojson _ = Error "memory-level match errors are only written"
+    let pp fmt { ms; _ } = pp fmt ms.st
+    let pp_by_need _ _ _ = pp
+    let pp_err = pp_err_t
+  end
+
+  module Match_logging = Matcher.Make_logging (Logged_mstate)
+
+  let lift_for_logging (ms : mstate) =
+    let lifted =
+      lazy
+        (let mem = to_yojson ms.st in
+         try
+           Effect.perform
+             (Matcher.Lift_astate (mem, full_pfs ms.pc, full_gamma ms.pc))
+         with Effect.Unhandled _ -> mem)
+    in
+    Logged_mstate.{ ms; lifted }
+
   let rec mem_ops : (mstate, err_t) W.ops =
     {
       assume_pure =
@@ -689,18 +722,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       unfold_concrete_preds = (fun ms -> unfold_concrete_preds ms);
       pp = (fun fmt ms -> pp fmt ms.st);
       pp_err = pp_err_t;
-      log =
-        {
-          with_assertion_parent = (fun _ _ _ f -> f None);
-          with_match_parent = (fun _ _ _ _ f -> f ());
-          log_success =
-            (fun _ _ _ _ ->
-              L.verbose (fun m -> m "Memory-level matching: success"));
-          log_failure =
-            (fun _ _ _ _ ->
-              L.verbose (fun m -> m "Memory-level matching: a step failed"));
-          log_recovery = (fun _ _ _ -> None);
-        };
+      log = Match_logging.log_hooks lift_for_logging;
     }
 
   and consume_dispatch
