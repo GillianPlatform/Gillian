@@ -57,7 +57,6 @@ type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
   specs : (string, spec) Hashtbl.t;
   lemmas : (string, lemma) Hashtbl.t;
-  coverage : (string * int, int) Hashtbl.t;
   prog : ('annot, int) Prog.t;
 }
 
@@ -921,10 +920,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : 'a prog =
       init_lemmas lemmas
     in
     let+ specs = init_specs all_specs in
-    let coverage : (string * int, int) Hashtbl.t =
-      Hashtbl.create Config.big_tbl_size
-    in
-    { prog; specs; preds; lemmas; coverage }
+    { prog; specs; preds; lemmas }
   in
   match res with
   | Ok res -> res
@@ -1106,16 +1102,6 @@ let remove_spec (prog : 'a prog) spec_name =
   let proc = Prog.get_proc_exn prog.prog spec_name in
   Hashtbl.replace prog.prog.procs spec_name { proc with proc_spec = None };
   Hashtbl.remove prog.specs spec_name
-
-let update_coverage (prog : 'a prog) (proc_name : string) (index : int) : unit =
-  try
-    let count = Hashtbl.find prog.coverage (proc_name, index) in
-    Hashtbl.replace prog.coverage (proc_name, index) (count + 1)
-  with Not_found -> Hashtbl.replace prog.coverage (proc_name, index) 0
-
-let first_time_running (prog : 'a prog) (proc_name : string) (index : int) :
-    bool =
-  not (Hashtbl.mem prog.coverage (proc_name, index))
 
 let pp_pred_defs fmt pred_defs =
   let pp_binding fmt (_, mp_pred) = Pred.pp fmt mp_pred.pred in

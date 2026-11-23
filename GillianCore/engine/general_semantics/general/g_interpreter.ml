@@ -310,9 +310,13 @@ struct
             in
             State.pp_by_need pvars lvars locs
       in
-      ConfigReport.log state_printer
-        (ConfigReport.make ~proc_name ~proc_line:i ~time:(Unix.gettimeofday ())
-           ~cmd ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
+      (* Skips building the report, as this runs on every command. *)
+      if not (L.Mode.enabled ()) then None
+      else
+        ConfigReport.log state_printer
+          (ConfigReport.make ~proc_name ~proc_line:i
+             ~time:(Unix.gettimeofday ()) ~cmd ~callstack:cs ~annot
+             ~branching:b_counter ~state ?branch_case ())
 
     let print_lconfiguration
         (lcmd : LCmd.t)
@@ -1824,8 +1828,6 @@ struct
         else Nothing
       in
       (* if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1; *)
-      MP.update_coverage prog proc_name i;
-
       log_configuration annot_cmd state cs i b_counter branch_case proc_name
       |> Option.iter (fun report_id ->
              report_id_ref := Some report_id;
