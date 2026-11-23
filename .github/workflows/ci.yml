@@ -266,7 +266,7 @@ jobs:
           find "$PWD/test262/test" -name '*.js' -printf '%h\n' | sort | uniq -c | sort -rn | awk '{print $2}' \
             | xargs -P "$(nproc)" -I{} bash -c \
                 'log=$(mktemp); cd "$(mktemp -d)"; gillian-js test262 "$1"/*.js --ci > "$log" 2>&1 && echo "$1: $(tail -n1 "$log")" || { cat "$log"; exit 1; }' _ {} \
-            | awk '{print} / tests? run\./ {n += $(NF-2)} END {print n " tests run in total"}'
+            | awk '{print; fflush()} / tests? run\./ {n += $(NF-2)} END {print n " tests run in total"}'
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
