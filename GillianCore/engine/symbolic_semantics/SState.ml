@@ -883,23 +883,12 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     (* Eagerly unfold concrete-ins predicates the posts produced, like the
        legacy engine. The memory only does this as a post-pass on its actions
        (not on produce), so ask it with a no-op action. *)
-    final_states
-    |> List.concat_map @@ fun final_state ->
-       let results =
-         execute_action SLCmd.unfold_concrete_action final_state []
-       in
-       let oks = List.filter_map Result.to_option results in
-       (* Errors only: the memory doesn't support this; keep the state. Zero
-          branches: an unfolding vanished, so the path dies. *)
-       let unfolded =
-         match (oks, results) with
-         | [], _ :: _ -> [ final_state ]
-         | _ ->
-             List.concat_map
-               (fun (st, _) -> snd (simplify ~matching:true st))
-               oks
-       in
-       List.map (fun final_state -> Ok (final_state, fl)) unfolded
+    let* final_state = final_states in
+    execute_action SLCmd.unfold_concrete_action final_state []
+    |> List.concat_map @@ function
+       | Ok (st, _) ->
+           List.map (fun st -> Ok (st, fl)) (snd (simplify ~matching:true st))
+       | Error e -> [ Error e ]
 
   let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in

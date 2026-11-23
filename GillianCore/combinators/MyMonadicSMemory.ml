@@ -155,6 +155,9 @@ module Make (Mem : S) (ID : ID) :
       (args : vt list) : action_ret Delayed.t =
     match action_from_str action_name with
     | Some action -> execute_action action state args
+    (* Without predicates, there is nothing to unfold. *)
+    | None when String.equal action_name SLCmd.unfold_concrete_action ->
+        DR.ok (state, [])
     | None -> failwith ("Action not found: " ^ action_name)
 
   let[@inline] consume ~(core_pred : string) (state : t) (args : vt list) :
