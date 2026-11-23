@@ -45,3 +45,7 @@ for b in $bins; do
     || { file "_static/dist/$b"; echo "error: $b is not statically linked"; exit 1; }
 done
 find _static/dist -type f -exec file {} +
+
+# Hand _static back to the repo's owner: the CI runner's user caches _static/opam,
+# and can't read the root-only files (e.g. dune's _build/.lock) left inside it.
+chown -R "$(stat -c %u:%g /src)" _static

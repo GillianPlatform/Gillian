@@ -257,8 +257,16 @@ jobs:
           repository: GillianPlatform/javert-test262
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
+      # One process per directory, most files first, so slow directories start early.
+      # Each process's output is printed in one piece: in full if it failed, else its summary line.
+      # Each runs in its own temp dir, as concurrent Alcotest runs race on symlinks in ./_build/_tests.
       - name: Test262
-        run: "gillian-js test262 test262/test --ci"
+        shell: bash
+        run: |
+          find "$PWD/test262/test" -name '*.js' -printf '%h\n' | sort | uniq -c | sort -rn | awk '{print $2}' \
+            | xargs -P "$(nproc)" -I{} bash -c \
+                'log=$(mktemp); cd "$(mktemp -d)"; gillian-js test262 "$1"/*.js --ci > "$log" 2>&1 && echo "$1: $(tail -n1 "$log")" || { cat "$log"; exit 1; }' _ {} \
+            | awk '{print; fflush()} / tests? run\./ {n += $(NF-2)} END {print n " tests run in total"}'
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')

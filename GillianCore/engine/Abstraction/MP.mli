@@ -35,7 +35,6 @@ type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
   specs : (string, spec) Hashtbl.t;
   lemmas : (string, lemma) Hashtbl.t;
-  coverage : (string * int, int) Hashtbl.t;
   prog : ('annot, int) Prog.t;
 }
 
@@ -114,5 +113,3 @@ val pp_normal_spec :
 val add_spec : 'a prog -> Spec.t -> unit
 val remove_spec : 'a prog -> string -> unit
 val get_lemma : 'a prog -> string -> (lemma, unit) result
-val update_coverage : 'a prog -> string -> int -> unit
-val first_time_running : 'a prog -> string -> int -> bool

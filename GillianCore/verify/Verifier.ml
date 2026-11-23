@@ -637,8 +637,7 @@ struct
         let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
         L.normal (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s@?" msg;
-        (* Reset coverage for every procedure in verification *)
-        { prog with coverage = Hashtbl.create 1 }
+        prog
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
   let verify (prog : annot MP.prog) (test : t) : unit Gillian_result.t =
