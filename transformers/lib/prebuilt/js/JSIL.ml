@@ -1,5 +1,5 @@
 open Gillian.Monadic
-open Utils
+open Prebuilt_utils
 open Gil_syntax
 module ExpMap = Gillian.Combinators.MyUtils.ExpMap
 

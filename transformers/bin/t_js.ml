@@ -1,4 +1,4 @@
-open Prebuilt.Lib.JSIL_Base
+open Prebuilt_js.Lib.JSIL_Base
 
 module SMemory =
   Gillian.Combinators.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)

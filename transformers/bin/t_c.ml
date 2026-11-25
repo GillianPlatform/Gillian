@@ -1,4 +1,4 @@
-open Prebuilt.Lib.C_Base
+open Prebuilt_c.Lib.C_Base
 
 module SMemory =
   Gillian.Combinators.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)

@@ -1,4 +1,4 @@
-open Utils
+open Prebuilt_utils
 open Gil_syntax
 module Delayed = Gillian.Monadic.Delayed
 module DR = Gillian.Monadic.Delayed_result

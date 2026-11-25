@@ -1,4 +1,4 @@
-open Prebuilt.Lib.JSIL_ALocSplit
+open Prebuilt_js.Lib.JSIL_ALocSplit
 
 module SMemory =
   Gillian.Combinators.MyMonadicSMemory.Make (MonadicSMemory) (MyInitData)
