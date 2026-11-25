@@ -1016,11 +1016,6 @@ struct
               | _, _, true -> []
               (* In bi-abduction, recursive call *)
               | true, false, _ -> symb_exec_proc ()
-              (* TODO: When JS internals work
-                 | true, false, false
-                   when List.length
-                          (List.filter is_internal_proc (Call_stack.get_cur_procs cs))
-                        < !Config.bi_no_spec_depth -> symb_exec_proc () *)
               | _ -> spec_exec_proc ())
           | false -> spec_exec_proc ()
 

@@ -108,13 +108,6 @@ module Make (PC : ParserAndCompiler.S) = struct
     in
     Arg.(value & flag & info [ "stats" ] ~doc)
 
-  let no_print_failures =
-    let doc =
-      "Do not print the list of all the failed tests at the end of the bulk \
-       execution"
-    in
-    Arg.(value & flag & info [ "no-print-all-failures" ] ~doc)
-
   let incremental =
     let doc =
       "Perform analysis in incremental mode, where only the changed parts of \
@@ -129,11 +122,6 @@ module Make (PC : ParserAndCompiler.S) = struct
        bi-abduction."
     in
     Arg.(value & opt int default & info [ "bi-unroll" ] ~doc)
-
-  let bi_no_spec_depth =
-    let default = 0 in
-    let doc = "The depth at which we start to re-use specs in bi-abduction." in
-    Arg.(value & opt int default & info [ "bi-no-spec" ] ~doc)
 
   let result_directory =
     (* Default value is taken from the non-modified config *)

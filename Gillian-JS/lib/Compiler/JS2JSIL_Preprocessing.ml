@@ -559,18 +559,6 @@ let translate_specs
     (vis_tbl : vis_tbl_type)
     (old_fun_tbl : pre_fun_tbl_type)
     (new_fun_tbl : fun_tbl_type) =
-  (* Understand bi-abduction *)
-  if Exec_mode.is_biabduction_exec !Config.current_exec_mode then
-    Hashtbl.iter
-      (fun _ (_, _, _, _, (annotations, _, _)) ->
-        List.iter
-          (fun annot ->
-            if annot.annot_type = JS_Parser.Syntax.BiAbduce then
-              Config.bi_dflt := false)
-          annotations)
-      old_fun_tbl
-  else ();
-
   Hashtbl.iter
     (fun _ (f_id, f_args, f_body, strictness, (annotations, _, _)) ->
       let non_main_args =

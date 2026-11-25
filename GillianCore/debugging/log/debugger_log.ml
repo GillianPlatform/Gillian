@@ -31,7 +31,6 @@ module Public = struct
     close_out out
 
   let enabled () = Option.is_some !rpc_ref
-  let should_log_verbose v = !Utils.Config.debug_log_verbose || not v
   let reset () = if Sys.file_exists file_name then Sys.remove file_name else ()
 
   module Log_event = struct
@@ -70,7 +69,10 @@ module Public = struct
     if enabled () then
       let msg, json = get_fmt_with_json f in
       let () = json_msg_to_file msg json in
-      if should_log_verbose v then to_rpc msg json else Lwt.return_unit
+      if not v then to_rpc msg json
+      else
+        (* to_rpc msg json;%lwt *)
+        Lwt.return_unit
     else Lwt.return_unit
 
   let log ?v f = log_async ?v f |> ignore

@@ -34,7 +34,6 @@ let leak_check = ref false
 (* let perform_syntax_checks = ref false *)
 let lemma_proof = ref false
 let dump_annots = ref false
-let debug_log_verbose = ref false
 
 (** {2 Hashtable sizes} *)
 
@@ -68,21 +67,13 @@ let stats = ref false
 
 (** TODO: This should have a better name. *)
 
-let bi_dflt = ref true
 let bi_unfold_depth = ref 1
 let bi_unroll_depth = ref 1
-let bi_no_spec_depth = ref 0
 let bi_ignore_procs : string list ref = ref []
 let delay_entailment = ref true
 
 (* If true, will dump a folder containing all smt queries made to the solver *)
 let dump_smt = ref false
-
-(** {2 Bulk testing} *)
-
-(** If activated, at the end of bulk execution or bulk wpst, and only with the
-    Rely runner, a list of all failures will be printed in [stdout] *)
-let bulk_print_all_failures = ref true
 
 (** {2 Runtime settings} *)
 

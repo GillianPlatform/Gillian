@@ -12,15 +12,14 @@ struct
       let docv = "PATH" in
       Arg.(non_empty & pos_all file [] & info [] ~docv ~doc)
     in
-    let run test_suite_paths npaf incremental () =
+    let run test_suite_paths incremental () =
       let () = Config.current_exec_mode := exec_mode in
-      let () = Config.bulk_print_all_failures := not npaf in
       let () = PC.initialize exec_mode in
       let () = Logging.Mode.set_mode Disabled in
       let () = Printexc.record_backtrace false in
       Runner.run_all runner ~test_suite_paths ~incremental
     in
-    let run_t = Term.(const run $ path_t $ no_print_failures $ incremental) in
+    let run_t = Term.(const run $ path_t $ incremental) in
     let run_info =
       let doc = "Executes a predefined test-suite" in
       let man =
