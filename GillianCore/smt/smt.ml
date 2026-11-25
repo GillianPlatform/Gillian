@@ -30,13 +30,23 @@ let z3_config =
     seed has the same effect, and we exploit it: a query is first tried with a
     short timeout, then retried with other seeds; only the last attempt gets the
     full timeout. Each attempt is a pair of a random seed and a timeout (in ms).
-*)
+    If the full timeout is no longer than a short one, there is a single
+    attempt. *)
 let attempts =
+  let default_timeout = 30_000 in
+  let short_timeout = 1_000 in
+  let short_attempts = 2 in
   let seed =
     Option.fold ~none:0 ~some:int_of_string (Sys.getenv_opt "SMT_RANDOM_SEED")
   in
-  let timeout = try Sys.getenv "SMT_TIMEOUT" with Not_found -> "30000" in
-  [ (seed, "1000"); (seed + 1, "1000"); (seed + 2, timeout) ]
+  let timeout =
+    Option.fold ~none:default_timeout ~some:int_of_string
+      (Sys.getenv_opt "SMT_TIMEOUT")
+  in
+  if timeout <= short_timeout then [ (seed, timeout) ]
+  else
+    List.init short_attempts (fun i -> (seed + i, short_timeout))
+    @ [ (seed + short_attempts, timeout) ]
 
 let () = Sys.(set_signal sigpipe Signal_ignore)
 
@@ -1740,7 +1750,7 @@ let attempt_options (seed, timeout) =
   [
     set_option ":smt.random_seed" seed;
     set_option ":sat.random_seed" seed;
-    set_option ":timeout" timeout;
+    set_option ":timeout" (string_of_int timeout);
   ]
 
 let exec_sat' (fs : Expr.Set.t) (gamma : typenv) : sexp option =
