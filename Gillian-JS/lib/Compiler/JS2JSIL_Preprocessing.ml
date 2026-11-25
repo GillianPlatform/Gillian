@@ -547,7 +547,7 @@ let translate_single_func_specs
   let fun_spec =
     if List.length single_specs > 0 then
       (* TODO: Understand incompleteness *)
-      Some (Spec.init fid fun_args single_specs false false true)
+      Some (Spec.init fid fun_args single_specs false true)
     else None
   in
   fun_spec
@@ -617,7 +617,6 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
           params =
             [ JS2JSIL_Helpers.var_scope; JS2JSIL_Helpers.var_this ] @ params;
           sspecs;
-          normalised = false;
           incomplete = false;
           to_verify = true;
         }

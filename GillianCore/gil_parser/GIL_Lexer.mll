@@ -156,10 +156,8 @@ let int = '-'? digit+ 'i'
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
 let lvar2 = "#lvar_" (letter|digit|'_')*
-let normalised_lvar = "##NORMALISED_LVAR" (letter|digit|'_'|'$')*
 let loc = "$l" (letter|digit|'_')*
 let aloc = "_$l_" (letter|digit|'_')*
-let normalised_aloc = "_$l_#" (letter|digit|'_')*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 
@@ -288,7 +286,6 @@ rule read = parse
   | '"'                  { read_string (Buffer.create 32) lexbuf }
   | loc                  { GIL_Parser.LOC (Lexing.lexeme lexbuf) }
   | aloc                 { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
-  | normalised_aloc      { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
 (* Directives *)
   | "@nopath"            { GIL_Parser.NO_PATH }
   | "@internal"          { GIL_Parser.INTERNAL }
@@ -303,7 +300,6 @@ rule read = parse
 (* Logic variables *)
   | lvar                 { GIL_Parser.LVAR (Lexing.lexeme lexbuf) }
   | lvar2                { GIL_Parser.LVAR (Lexing.lexeme lexbuf) }
-  | normalised_lvar      { GIL_Parser.LVAR (Lexing.lexeme lexbuf) }
 (* EOF *)
   | eof                  { GIL_Parser.EOF }
   | _                    { raise (Syntax_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }

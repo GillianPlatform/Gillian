@@ -24,8 +24,6 @@ let get_loc startpos endpos : Location.t =
     loc_source = startpos.pos_fname;
   }
 
-let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
-
 (* The underscore of the surface syntax stands for a value of no interest; it
    is a logical variable like any other, but one we allocate in a namespace of
    our own so that an [unfold] can tell that an out-parameter was deliberately
@@ -782,11 +780,10 @@ g_spec_target:
   incomplete = option(INCOMPLETE); SPEC; spec_head = spec_head_target;
   spec_sspecs = separated_nonempty_list(SCOLON, g_sspec_target)
   { let (spec_name, spec_params) = spec_head in
-    let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
     let spec_incomplete = Option.is_some incomplete in
     let spec_location = Some (get_loc $startpos $endpos) in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify; spec_location } in
+    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_incomplete; spec_to_verify; spec_location } in
     spec
   }
 ;
@@ -1009,7 +1006,6 @@ g_pred_target:
       if Option.is_some no_path then
         preds_with_no_paths := SS.add pred_name !preds_with_no_paths
     in
-    let pred_normalised = !Config.previously_normalised in
     let rec split_ands = function
       | Expr.BinOp (e1, And, e2) -> (split_ands e1) @ (split_ands e2)
       | e -> [e]
@@ -1032,7 +1028,6 @@ g_pred_target:
         pred_pure;
         pred_abstract;
         pred_nounfold;
-        pred_normalised;
       }
   }
 ;
@@ -1104,13 +1099,11 @@ g_bi_spec_target:
   BISPEC; spec_head = spec_head_target; COLON; asrts = g_mult_spec_line
   {
     let (name, params) = spec_head in
-    let is_normalised = !Config.previously_normalised in
     let bi_spec : BiSpec.t =
       {
         bispec_name       = name;
         bispec_params     = params;
         bispec_pres       = asrts;
-        bispec_normalised = is_normalised
       } in
     bi_spec
   }
@@ -1184,10 +1177,7 @@ type_env_pair_target:
 
 logic_variable_target:
   v = LVAR
-  {
-    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
-    (* Prefixed with _n_ to avoid clashes *)
-    Expr.LVar v_imported }
+  { Expr.LVar v }
 ;
 
 just_logic_variable_target:

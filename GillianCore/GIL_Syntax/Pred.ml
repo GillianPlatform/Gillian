@@ -17,7 +17,6 @@ type t = TypeDef__.pred = {
   pred_pure : bool;  (** Is the predicate pure *)
   pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
-  pred_normalised : bool;  (** If the predicate has been previously normalised *)
 }
 
 (** Creates/populates a Hashtbl from the predicate list pred_defs *)
@@ -240,7 +239,7 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
       List.map
         (fun (pvar : string) ->
           let valid_pvar = List.mem pvar string_of_params in
-          match valid_pvar || predicate.pred_normalised with
+          match valid_pvar with
           | true -> ()
           | false ->
               raise

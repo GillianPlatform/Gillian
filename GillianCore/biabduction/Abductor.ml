@@ -168,7 +168,6 @@ struct
               spec_name = name;
               spec_params = params;
               spec_sspecs = sspecs;
-              spec_normalised = true;
               spec_incomplete = true;
               spec_to_verify = false;
               spec_location = None;

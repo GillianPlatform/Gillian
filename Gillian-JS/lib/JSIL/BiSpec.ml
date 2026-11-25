@@ -3,17 +3,12 @@ type t = {
   name : string;  (** Procedure/spec name *)
   params : string list;  (** Procedure/spec parameters *)
   pre : Asrt.t;  (** Precondition *)
-  normalised : bool;  (** If the spec is already normalised *)
 }
 
 type t_tbl = (string, t) Hashtbl.t
 
-let init
-    (name : string)
-    (params : string list)
-    (pre : Asrt.t)
-    (normalised : bool) : t =
-  { name; params; pre; normalised }
+let init (name : string) (params : string list) (pre : Asrt.t) : t =
+  { name; params; pre }
 
 let init_tbl () : t_tbl = Hashtbl.create Config.medium_tbl_size
 

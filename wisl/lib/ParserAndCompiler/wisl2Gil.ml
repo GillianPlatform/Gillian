@@ -1001,7 +1001,7 @@ let compile_spec
           true
   in
   let location = CodeLoc.to_location sploc in
-  Spec.init fname fparams [ single_spec ] false false true (Some location)
+  Spec.init fname fparams [ single_spec ] false true (Some location)
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; pred_loc; _ }
@@ -1032,7 +1032,6 @@ let compile_pred filepath pred =
       pred_params;
       ins_number;
       pred_definitions = List.map build_def pred_definitions;
-      pred_normalised = false;
       (* FIXME: ADD SUPPORT FOR FACTS, GUARD, ABSTRACT, PURE *)
       pred_facts = [];
       pred_guard = None;
@@ -1332,7 +1331,6 @@ let compile
               bispec_name = name;
               bispec_params = proc.Proc.proc_params;
               bispec_pres = [ (pre, None) ];
-              bispec_normalised = false;
             }
         in
         Hashtbl.replace bi_specs name bispec)

@@ -781,7 +781,6 @@ module Pred : sig
     pred_pure : bool;  (** Is the predicate pure? *)
     pred_abstract : bool;  (** Is the predicate abstract? *)
     pred_nounfold : bool;  (** Should the predicate be unfolded? *)
-    pred_normalised : bool;  (** Has the predicate been previously normalised? *)
   }
 
   (** Populates a Hashtbl from the given predicate list *)
@@ -809,7 +808,7 @@ module Pred : sig
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
 
-  (** Sanity check on program variables inside normalised predicates *)
+  (** Sanity check on program variables inside predicates *)
   val check_pvars : (string, t) Hashtbl.t -> unit
 
   (** Infers parameter types and makes them explicit in the assertions *)
@@ -988,7 +987,6 @@ module Spec : sig
     spec_name : string;  (** Procedure/spec name *)
     spec_params : string list;  (** Procedure/spec parameters *)
     spec_sspecs : st list;  (** List of single specifications *)
-    spec_normalised : bool;  (** If the spec is already normalised *)
     spec_incomplete : bool;  (** If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
     spec_location : Location.t option;
@@ -1005,17 +1003,10 @@ module Spec : sig
     bool ->
     st
 
-  (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify]
+  (** [init spec_name spec_params spec_sspecs spec_incomplete spec_to_verify]
       creates a full specification with the given values *)
   val init :
-    string ->
-    string list ->
-    st list ->
-    bool ->
-    bool ->
-    bool ->
-    Location.t option ->
-    t
+    string -> string list -> st list -> bool -> bool -> Location.t option -> t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
@@ -1053,12 +1044,11 @@ module BiSpec : sig
     bispec_name : string;  (** Procedure/spec name *)
     bispec_params : string list;  (** Procedure/spec parameters *)
     bispec_pres : Asrt.t located list;  (** Possible preconditions *)
-    bispec_normalised : bool;  (** If the spec is already normalised *)
   }
 
   type t_tbl = (string, t) Hashtbl.t
 
-  val init : string -> string list -> Asrt.t located list -> bool -> t
+  val init : string -> string list -> Asrt.t located list -> t
   val init_tbl : unit -> t_tbl
 
   (** Pretty-printer *)

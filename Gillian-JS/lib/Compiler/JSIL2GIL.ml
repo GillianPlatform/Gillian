@@ -139,7 +139,6 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_name = spec.name;
     spec_params = spec.params;
     spec_sspecs = List.map jsil2gil_sspec spec.sspecs;
-    spec_normalised = spec.normalised;
     spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
     spec_location = None;
@@ -187,7 +186,6 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_pure = pred.pure;
     pred_abstract = pred.abstract;
     pred_nounfold = pred.nounfold;
-    pred_normalised = pred.normalised;
   }
 
 let jsil2gil_macro (macro : Macro.t) : GMacro.t =
@@ -203,7 +201,6 @@ let jsil2gil_bispec (bispec : BiSpec.t) : GBiSpec.t =
     bispec_name = bispec.name;
     bispec_params = bispec.params;
     bispec_pres = [ (jsil2gil_asrt bispec.pre, None) ];
-    bispec_normalised = bispec.normalised;
   }
 
 let jsil2core (lab : string option) (cmd : LabCmd.t) :

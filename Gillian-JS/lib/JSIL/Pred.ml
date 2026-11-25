@@ -16,7 +16,6 @@ type t = {
   pure : bool;  (** Is the predicate pure *)
   abstract : bool;  (** Is the predicate abstract *)
   nounfold : bool;  (** Should the predicate be unfolded? *)
-  normalised : bool;  (** If the predicate has been previously normalised *)
 }
 
 (** Creates/populates a Hashtbl from the predicate list pred_defs *)

@@ -669,7 +669,6 @@ let add_closing_tokens preds =
             pred_pure = false;
             pred_abstract = true;
             pred_nounfold = true;
-            pred_normalised = false;
           }
       in
       Hashtbl.replace preds pred_name close_token)

@@ -5,7 +5,6 @@ type t = TypeDef__.bispec = {
   bispec_name : string;  (** Procedure/spec name *)
   bispec_params : string list;  (** Procedure/spec parameters *)
   bispec_pres : Asrt.t located list;  (** Possible preconditions *)
-  bispec_normalised : bool;  (** If the spec is already normalised *)
 }
 
 type t_tbl = (string, t) Hashtbl.t
@@ -13,9 +12,8 @@ type t_tbl = (string, t) Hashtbl.t
 let init
     (bispec_name : string)
     (bispec_params : string list)
-    (bispec_pres : Asrt.t located list)
-    (bispec_normalised : bool) : t =
-  { bispec_name; bispec_params; bispec_pres; bispec_normalised }
+    (bispec_pres : Asrt.t located list) : t =
+  { bispec_name; bispec_params; bispec_pres }
 
 let init_tbl () : t_tbl = Hashtbl.create Config.medium_tbl_size
 

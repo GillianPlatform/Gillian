@@ -165,10 +165,8 @@ let var2 = "_pvar_" (letter|digit|'_')*
 let filename = (letter|digit|'_')+ '.' (letter|digit|'_')+
 let lvar = '#' (letter|digit|'_'|'$')*
 let lvar2 = "#lvar_" (letter|digit|'_')*
-let normalised_lvar = "##NORMALISED_LVAR" (letter|digit|'_'|'$')*
 let loc = "$l" (letter|digit|'_')*
 let aloc = "_$l_" (letter|digit|'_')*
-let normalised_aloc = "_$l_#" (letter|digit|'_')*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 
@@ -275,7 +273,6 @@ rule read = parse
   | '"'                  { read_string (Buffer.create 17) lexbuf }
   | loc                  { Javert_Parser.LOC (Lexing.lexeme lexbuf) }
   | aloc                  { Javert_Parser.ALOC (Lexing.lexeme lexbuf) }
-  | normalised_aloc       { Javert_Parser.ALOC (Lexing.lexeme lexbuf) }
 (* Filenames *)
   | filename             { Javert_Parser.FILENAME (Lexing.lexeme lexbuf) }
 
@@ -289,7 +286,6 @@ rule read = parse
 (* Logic variables *)
   | lvar                 { Javert_Parser.LVAR (Lexing.lexeme lexbuf) }
   | lvar2                { Javert_Parser.LVAR (Lexing.lexeme lexbuf) }
-  | normalised_lvar      { Javert_Parser.LVAR (Lexing.lexeme lexbuf) }
 (* EOF *)
   | eof                  { Javert_Parser.EOF }
   | _                    { raise (Syntax_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }

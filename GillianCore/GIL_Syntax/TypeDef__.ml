@@ -229,7 +229,6 @@ and pred = {
   pred_pure : bool;
   pred_abstract : bool;
   pred_nounfold : bool;
-  pred_normalised : bool;
 }
 
 and lemma_spec = {
@@ -288,7 +287,6 @@ and spec = {
   spec_name : string;
   spec_params : string list;
   spec_sspecs : single_spec list;
-  spec_normalised : bool;
   spec_incomplete : bool;
   spec_to_verify : bool;
   spec_location : location option;
@@ -298,7 +296,6 @@ and bispec = {
   bispec_name : string;
   bispec_params : string list;
   bispec_pres : (assertion * location option) list;
-  bispec_normalised : bool;
 }
 
 and macro = {
