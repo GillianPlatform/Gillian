@@ -90,5 +90,4 @@ let bispec ~ctx ~(compiled : (C2_annot.t, string) Proc.t) (f : Program.Func.t) =
       bispec_name = compiled.proc_name;
       bispec_params = compiled.proc_params;
       bispec_pres = [ (pre, None) ];
-      bispec_normalised = false;
     }

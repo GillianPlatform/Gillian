@@ -275,7 +275,6 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;
-        pred_normalised = false;
         pred_definitions = [ (None, def) ];
       }
   in
@@ -673,7 +672,6 @@ let trans_abs_pred ~filepath cl_pred =
       pred_pure;
       pred_abstract = true;
       pred_nounfold = true;
-      pred_normalised = false;
     }
 
 let trans_pred ~ann ~filepath cl_pred =
@@ -731,7 +729,6 @@ let trans_pred ~ann ~filepath cl_pred =
       pred_pure;
       pred_abstract = false;
       pred_nounfold = no_unfold;
-      pred_normalised = false;
     }
 
 let add_trans_pred filepath ann cl_pred =
@@ -802,7 +799,6 @@ let trans_spec ~ann ?(only_spec = false) cl_spec =
         spec_name = fname;
         spec_params = params;
         spec_sspecs = List.map (trans_sspec ~ann fname) sspecs;
-        spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
         spec_location = None;
@@ -945,7 +941,6 @@ let generate_bispec clight_prog fname ident f =
       bispec_name = fname;
       bispec_params = true_params;
       bispec_pres = [ (pre, None) ];
-      bispec_normalised = false;
     }
 
 let add_bispec ann clight_prog fname ident f =

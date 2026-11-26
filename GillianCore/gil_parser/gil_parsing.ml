@@ -124,14 +124,6 @@ module Make (Annot : Annot.S) = struct
 
   let parse_eprog_from_file (path : string) : parsing_result Gillian_result.t =
     let f path =
-      (* Check that the file is of a valid type *)
-      let extension = Filename.extension path in
-      let prev_normalised = String.equal extension ".ngil" in
-      let () = Config.previously_normalised := prev_normalised in
-      let () =
-        if not (prev_normalised || String.equal extension ".gil") then
-          failwith (Printf.sprintf "Error: %s is not a .gil or .ngil file" path)
-      in
       (* Parse file *)
       let in_channel = open_in path in
       let lexbuf = Lexing.from_channel in_channel in

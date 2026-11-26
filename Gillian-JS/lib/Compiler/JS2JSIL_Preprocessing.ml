@@ -547,7 +547,7 @@ let translate_single_func_specs
   let fun_spec =
     if List.length single_specs > 0 then
       (* TODO: Understand incompleteness *)
-      Some (Spec.init fid fun_args single_specs false false true)
+      Some (Spec.init fid fun_args single_specs false true)
     else None
   in
   fun_spec
@@ -559,18 +559,6 @@ let translate_specs
     (vis_tbl : vis_tbl_type)
     (old_fun_tbl : pre_fun_tbl_type)
     (new_fun_tbl : fun_tbl_type) =
-  (* Understand bi-abduction *)
-  if Exec_mode.is_biabduction_exec !Config.current_exec_mode then
-    Hashtbl.iter
-      (fun _ (_, _, _, _, (annotations, _, _)) ->
-        List.iter
-          (fun annot ->
-            if annot.annot_type = JS_Parser.Syntax.BiAbduce then
-              Config.bi_dflt := false)
-          annotations)
-      old_fun_tbl
-  else ();
-
   Hashtbl.iter
     (fun _ (f_id, f_args, f_body, strictness, (annotations, _, _)) ->
       let non_main_args =
@@ -617,7 +605,6 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
           params =
             [ JS2JSIL_Helpers.var_scope; JS2JSIL_Helpers.var_this ] @ params;
           sspecs;
-          normalised = false;
           incomplete = false;
           to_verify = true;
         }

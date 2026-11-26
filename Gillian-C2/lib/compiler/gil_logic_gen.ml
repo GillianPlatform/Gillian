@@ -246,7 +246,6 @@ let gen_pred_of_struct ctx ann struct_name =
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;
-        pred_normalised = false;
         pred_definitions = [ (None, def) ];
       }
   in
@@ -621,7 +620,6 @@ let trans_abs_pred ~filepath cl_pred =
       pred_pure;
       pred_abstract = true;
       pred_nounfold = true;
-      pred_normalised = false;
     }
 
 let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
@@ -664,7 +662,6 @@ let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
       pred_pure;
       pred_abstract = false;
       pred_nounfold = no_unfold;
-      pred_normalised = false;
     }
 
 let add_trans_pred ~ctx ~pvar_map filepath ann cl_pred =
@@ -754,7 +751,6 @@ let trans_spec ~ctx ?(only_spec = false) cl_spec =
         spec_params;
         spec_sspecs =
           List.map (trans_sspec ~ctx ~pvar_map ~params:fn.params) sspecs;
-        spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = Stdlib.not only_spec;
         spec_location = None;
@@ -810,7 +806,6 @@ module Machine_preds = struct
         pred_pure = true;
         pred_abstract = false;
         pred_nounfold = false;
-        pred_normalised = false;
       }
 
   let int_range_pred pred_name width signed =

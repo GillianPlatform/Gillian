@@ -5,7 +5,6 @@ open Gillian.Gil_syntax
 open! Jsil_syntax
 open Jslogic
 
-let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %}
 
 (***** Token definitions *****)
@@ -415,10 +414,7 @@ nop_target:
 
 expr_target:
   | lit=lit_target { Expr.Lit lit }
-  | v = LVAR {
-    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
-    Expr.LVar v_imported
-  }
+  | v = LVAR { Expr.LVar v }
   | ALOC { Expr.ALoc $1 }
   | v = VAR { Expr.PVar v }
   | e1=expr_target; bop=binop_target; e2=expr_target { Expr.BinOp (e1, bop, e2) }
@@ -488,10 +484,7 @@ program_variable_target:
 
 logic_variable_target:
   v = LVAR
-  {
-    let v_imported = Str.replace_first normalised_lvar_r "#lvar_n" v in
-    (* Prefixed with _n_ to avoid clashes *)
-    Expr.LVar v_imported }
+  { Expr.LVar v }
 
 type_env_pair_target:
   | lvar = logic_variable_target; COLON; the_type=type_target
@@ -732,12 +725,10 @@ spec_target:
   proc_specs = separated_nonempty_list(SCOLON, pre_post_target)
   { let (name, params) = spec_head in
     let incomplete = (incomplete <> None) in
-    let is_normalised = !Config.previously_normalised in
     Spec.{
       name = name;
       params = params;
       sspecs = proc_specs;
-      normalised = is_normalised;
       incomplete;
       to_verify = true }
   }
@@ -834,9 +825,8 @@ pred_target:
     let () = if (abstract <> (definitions = [])) then
       raise (Failure (Format.asprintf "JSIL: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
     in
-    let normalised = !Config.previously_normalised in
     let facts = Option.value ~default:[] facts in
-    Pred.{ name; num_params; params; ins_number; definitions; facts; pure; abstract; nounfold; normalised } }
+    Pred.{ name; num_params; params; ins_number; definitions; facts; pure; abstract; nounfold } }
 
 /* MACROS */
 
@@ -856,9 +846,8 @@ only_spec_target:
   AXIOMATIC; incomplete = option(INCOMPLETE); SPEC; head = spec_head_target;
   sspecs = separated_nonempty_list(SCOLON, pre_post_target);
   { let (name, params) = head in
-    let normalised = !Config.previously_normalised in
     let incomplete = (incomplete <> None) in
-    Spec.{ name; params; sspecs; normalised; incomplete; to_verify = false } }
+    Spec.{ name; params; sspecs; incomplete; to_verify = false } }
 
 
 /* BI ABDUCTION SPECIFICATIONS */
@@ -868,13 +857,11 @@ bi_spec_target:
   BISPEC; spec_head = spec_head_target; COLON; asrt = spec_line
   {
     let (name, params) = spec_head in
-    let is_normalised = !Config.previously_normalised in
     let bi_spec : BiSpec.t =
       {
         name       = name;
         params     = params;
         pre        = asrt;
-        normalised = is_normalised
       } in
     bi_spec
   }

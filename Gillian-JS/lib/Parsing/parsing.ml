@@ -58,16 +58,11 @@ let parse_expr_from_string : string -> Gillian.Gil_syntax.Expr.t =
 
 let parse_jsil_eprog_from_file (path : string) : Jsil_syntax.EProg.t =
   let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
-  let file_previously_normalised = String.equal "njsil" extension in
-  Utils.Config.previously_normalised := file_previously_normalised;
-  (* Check that the file is of a valid type *)
-  (match file_previously_normalised || String.equal "jsil" extension with
+  (match String.equal "jsil" extension with
   | true -> ()
   | false ->
       raise
-        (Failure
-           (Printf.sprintf "Failed to import %s: not a .jsil or .njsil file."
-              path)));
+        (Failure (Printf.sprintf "Failed to import %s: not a .jsil file." path)));
   let inx = open_in path in
   let lexbuf = Lexing.from_channel inx in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };

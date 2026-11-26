@@ -113,7 +113,6 @@ struct
       specs_to_stdout
       incremental
       bi_unroll_depth
-      bi_no_spec_depth
       ignored_specs
       () =
     let () = Config.current_exec_mode := BiAbduction in
@@ -121,7 +120,6 @@ struct
     let () = Config.stats := stats in
     let () = Config.no_heap := no_heap in
     let () = Config.bi_unroll_depth := bi_unroll_depth in
-    let () = Config.bi_no_spec_depth := bi_no_spec_depth in
     let () = Config.specs_to_stdout := specs_to_stdout in
     let () = Config.max_branching := bi_unroll_depth in
     let () = Config.bi_ignore_procs := ignored_specs in
@@ -138,7 +136,7 @@ struct
     Term.(
       const act $ files $ already_compiled $ output_gil $ no_heap $ stats
       $ should_emit_specs $ specs_to_stdout $ incremental $ bi_unroll_depth
-      $ bi_no_spec_depth $ ignored_procs)
+      $ ignored_procs)
 
   let act_info =
     let doc =

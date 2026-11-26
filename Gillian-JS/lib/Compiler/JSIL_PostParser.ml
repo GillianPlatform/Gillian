@@ -284,7 +284,6 @@ let create_pre_scope_pred
     pure = false;
     abstract = false;
     nounfold = false;
-    normalised = false;
   }
 
 let create_function_predicate
@@ -323,7 +322,6 @@ let create_function_predicate
     pure = false;
     abstract = false;
     nounfold = false;
-    normalised = false;
   }
 
 (*
@@ -334,7 +332,6 @@ let create_function_predicate
   ins_number  : int;                                               (** Number of in-params    *)
   definitions : (((string * (string list)) option) * Asrt.t) list; (** Predicate definitions  *)
   pure        : bool;                                              (** Is the predicate pure  *)
-  normalised  : bool;                                              (** If the predicate has been previously normalised *)
 }
 *)
 
@@ -409,7 +406,6 @@ let create_post_scope_pred
     pure = false;
     abstract = false;
     nounfold = false;
-    normalised = false;
   }
 
 let bi_post_parse_cmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
@@ -481,7 +477,7 @@ let create_new_bispec
             (SS.of_list eproc.params)
         in
         let bispec : BiSpec.t =
-          { name = eproc.name; params = eproc.params; pre; normalised = false }
+          { name = eproc.name; params = eproc.params; pre }
         in
         Hashtbl.replace eprog.bi_specs eproc.name bispec;
         ()

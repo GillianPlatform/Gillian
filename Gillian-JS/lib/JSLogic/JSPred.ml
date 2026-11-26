@@ -35,5 +35,4 @@ let js2jsil
     pure = pred_def.pure;
     abstract = pred_def.abstract;
     nounfold = pred_def.nounfold;
-    normalised = false;
   }
