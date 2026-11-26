@@ -321,7 +321,9 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | PVar x -> (
         match CStore.get store x with
         | None ->
-            let err_msg = Fmt.str "Variable %s not found in the store" x in
+            let err_msg =
+              Fmt.str "Variable %a not found in the store" Id.pp x
+            in
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
         | Some v -> v)

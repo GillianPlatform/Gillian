@@ -1,5 +1,3 @@
-open Containers
-
 type outs = (Expr.t * Expr.t) list
 
 val outs_pp : outs Fmt.t
@@ -8,7 +6,7 @@ val outs_pp : outs Fmt.t
     together with the possible learned outs *)
 type step = Asrt.atom * outs [@@deriving yojson]
 
-type label = string * SS.t [@@deriving yojson]
+type label = string * LVar.Set.t [@@deriving yojson]
 type post = Flag.t * Asrt.t list [@@deriving yojson]
 
 val pp_step : step Fmt.t
@@ -64,7 +62,7 @@ val init :
   ?use_params:bool ->
   KB.t ->
   KB.t ->
-  (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
+  (Asrt.t * ((string * LVar.Set.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list) result
 
 val init_prog :

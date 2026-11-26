@@ -446,7 +446,7 @@ struct
       raise
         (Failure (Printf.sprintf "Undefined predecessor: %s %d %d" pid prev i))
 
-  let update_store (state : State.t) (x : string) (v : Val.t) : State.t =
+  let update_store (state : State.t) (x : Var.t) (v : Val.t) : State.t =
     let store = State.get_store state in
     let () = Store.put store x v in
     let state' = State.set_store state store in
@@ -454,12 +454,12 @@ struct
 
   let eval_subst_list
       (state : State.t)
-      (subst_lst : (string * (string * Expr.t) list) option) :
-      (string * (string * Val.t) list) option =
+      (subst_lst : (string * (LVar.t * Expr.t) list) option) :
+      (string * (LVar.t * Val.t) list) option =
     match subst_lst with
     | None -> None
     | Some (lab, subst_lst) ->
-        let subst_lst' : (string * Val.t) list =
+        let subst_lst' : (LVar.t * Val.t) list =
           List.map (fun (x, e) -> (x, State.eval_expr state e)) subst_lst
         in
         Some (lab, subst_lst')
@@ -545,8 +545,8 @@ struct
       | _ -> Res_list.vanish
 
     let eval_freshsvar x state =
-      let new_svar = Generators.fresh_svar () in
-      let state' = State.add_spec_vars state (SS.singleton new_svar) in
+      let new_svar = LVar.of_string (Generators.fresh_svar ()) in
+      let state' = State.add_spec_vars state (LVar.Set.singleton new_svar) in
       let v = Val.from_expr (LVar new_svar) |> Option.get in
       Res_list.return (update_store state' x v)
 
@@ -688,10 +688,10 @@ struct
               let args =
                 match sl_cmd with
                 | SLCmd.Unfold _ ->
-                    Var.Set.union
+                    LVar.Set.union
                       (Store.lvars (State.get_store state))
                       (State.get_spec_vars state)
-                    |> Var.Set.elements |> SLCmd.add_known_lvars args
+                    |> LVar.Set.elements |> SLCmd.add_known_lvars args
                 | _ -> args
               in
               let v_args =
@@ -701,7 +701,7 @@ struct
                 match sl_cmd with
                 | SLCmd.Unfold (_, _, Some bindings, _) ->
                     State.add_spec_vars state
-                      (Var.Set.of_list (List.map fst bindings))
+                      (LVar.Set.of_list (List.map fst bindings))
                 | _ -> state
               in
               let matching =
@@ -722,7 +722,7 @@ struct
                          | SLCmd.Unfold _ ->
                              let bound =
                                List.map Val.to_expr rets
-                               |> SLCmd.dec_bound_lvars |> Var.Set.of_list
+                               |> SLCmd.dec_bound_lvars |> LVar.Set.of_list
                              in
                              State.add_spec_vars state' bound
                          | _ -> state'
@@ -1132,7 +1132,7 @@ struct
             m
               ~json:
                 [
-                  ("x", `String x);
+                  ("x", Var.to_yojson x);
                   ("a", `String a);
                   ("es", `List (List.map Expr.to_yojson es));
                 ]
@@ -1479,7 +1479,7 @@ struct
         DL.log ~v:true (fun m -> m "ECall");
         let pid =
           match pid with
-          | PVar pid -> pid
+          | PVar pid -> Var.to_string pid
           | Lit (String pid) -> pid
           | _ ->
               raise
@@ -1526,7 +1526,7 @@ struct
         } =
           eval_state
         in
-        let v_ret = Store.get store Names.return_variable in
+        let v_ret = Store.get store Var.return_variable in
         let result =
           match (v_ret, cs) with
           | None, _ -> raise (Failure "nm_ret_var not in store (normal return)")
@@ -1597,7 +1597,7 @@ struct
         } =
           eval_state
         in
-        let v_ret = Store.get store Names.return_variable in
+        let v_ret = Store.get store Var.return_variable in
         match (v_ret, cs) with
         | None, _ ->
             raise (Failure "Return variable not in store (error return) ")
@@ -1671,7 +1671,8 @@ struct
         | Assignment (x, e) ->
             DL.log ~v:true (fun m ->
                 m
-                  ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
+                  ~json:
+                    [ ("target", Var.to_yojson x); ("expr", Expr.to_yojson e) ]
                   "Assignment");
             let v = eval_expr e in
             let state' = update_store state x v in
@@ -2423,7 +2424,7 @@ struct
       (ret_fun : result_t -> 'a)
       (prog : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (state : State.t) : 'a cont_func =
     let () = Call_graph.add_proc call_graph name in
     L.normal (fun m ->
@@ -2445,8 +2446,8 @@ struct
     in
     let cs : Call_stack.t =
       Call_stack.push Call_stack.empty ~pid:name ~arguments ~loop_ids:[]
-        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
-        ()
+        ~ret_var:(Var.of_string "out") ~call_index:(-1) ~continue_index:(-1)
+        ~error_index:(-1) ()
     in
     let proc_body_index = 0 in
     let conf : CConf.t =
@@ -2488,7 +2489,7 @@ struct
       (ret_fun : result_t -> 'a)
       (prog : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (state : State.t) : 'a list =
     let init_func = init_evaluate_proc ret_fun prog name params state in
     evaluate_cmd_iter init_func

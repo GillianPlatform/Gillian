@@ -166,21 +166,21 @@ let resolve_list (le : Expr.t) (pfs : Expr.t list) : Expr.t =
   let rec search x pfs =
     match (pfs : Expr.t list) with
     | [] -> None
-    | BinOp (LVar x', Equal, le) :: rest when String.equal x' x -> (
+    | BinOp (LVar x', Equal, le) :: rest when LVar.equal x' x -> (
         let le' = normalise_list_expressions le in
         match le' with
         (* Weird things can happen where x reduces to e.g. `{{ l-nth(x, 0) }}`.
            We check absence of cycles *)
-        | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
-            Some le'
+        | (EList _ | NOp (LstCat, _)) when not (LVar.Set.mem x (Expr.lvars le'))
+          -> Some le'
         | Expr.BinOp (_, LstRepeat, _) as ret
-          when not (SS.mem x (Expr.lvars ret)) -> Some ret
+          when not (LVar.Set.mem x (Expr.lvars ret)) -> Some ret
         | _ -> search x rest)
-    | BinOp (le, Equal, LVar x') :: rest when String.equal x' x -> (
+    | BinOp (le, Equal, LVar x') :: rest when LVar.equal x' x -> (
         let le' = normalise_list_expressions le in
         match le' with
-        | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
-            Some le'
+        | (EList _ | NOp (LstCat, _)) when not (LVar.Set.mem x (Expr.lvars le'))
+          -> Some le'
         | _ -> search x rest)
     | _ :: rest -> search x rest
   in
@@ -546,7 +546,8 @@ let rec list_prefix (pfs : PFS.t) (la : Expr.t) (lb : Expr.t) : bool * Expr.t =
         in
         let candidates =
           List.filter
-            (fun (_, lvars) -> not (SS.is_empty (SS.inter lvars_lb lvars)))
+            (fun (_, lvars) ->
+              not (LVar.Set.is_empty (LVar.Set.inter lvars_lb lvars)))
             candidates
         in
         match candidates with
@@ -558,16 +559,14 @@ let rec list_prefix (pfs : PFS.t) (la : Expr.t) (lb : Expr.t) : bool * Expr.t =
               List.map (fun (x : Expr.t) -> (x, Expr.lvars x)) candidates
             in
             let candidates =
-              List.filter
-                (fun (_, lvars) -> Containers.SS.mem a lvars)
-                candidates
+              List.filter (fun (_, lvars) -> LVar.Set.mem a lvars) candidates
             in
             match candidates with
             | [ (x, _) ] -> f (LVar a) x
             | _ -> nono))
     | _, _ -> nono
 
-let prefix_catch pfs (x : Expr.t) (y : string) =
+let prefix_catch pfs (x : Expr.t) (y : LVar.t) =
   match x with
   | NOp (LstCat, x) ->
       PFS.exists
@@ -981,8 +980,8 @@ and reduce_lexpr_loop
                   BinOp (Lit (Int len), ILessThanEqual, LVar b) ),
               Or,
               BinOp (BinOp (EList c, LstNth, LVar d), Equal, e) ) )
-      when Z.equal z Z.zero && String.equal x a && String.equal a b
-           && String.equal b d
+      when Z.equal z Z.zero && LVar.equal x a && LVar.equal a b
+           && LVar.equal b d
            && Int.equal (List.compare_length_with c (Z.to_int len)) 0 ->
         let rhs = Expr.EList (List_utils.make (Z.to_int len) e) in
         BinOp (EList c, Equal, rhs)
@@ -1031,7 +1030,7 @@ and reduce_lexpr_loop
           reduce_lexpr_loop ~matching ~reduce_lvars new_pfs new_gamma e
         in
         let vars = Expr.lvars re in
-        let bt = List.filter (fun (b, _) -> Containers.SS.mem b vars) bt in
+        let bt = List.filter (fun (b, _) -> LVar.Set.mem b vars) bt in
         (* We remove all quantifiers that aren't used anymore *)
         match (le, bt) with
         | _, [] -> re
@@ -1121,18 +1120,20 @@ and reduce_lexpr_loop
       when Z.equal z Z.zero
            && List.mem (Cint.of_expr e3) (find_list_length_eqs pfs e1) -> e1
     | LstSub (e1, e2, e3)
-      when SS.inter (Expr.lvars e1) (Expr.lvars e3) = SS.empty
+      when LVar.Set.inter (Expr.lvars e1) (Expr.lvars e3) = LVar.Set.empty
            && List.length
                 (List.filter
                    (fun e ->
-                     SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
+                     LVar.Set.inter (Expr.lvars e) (Expr.lvars e3)
+                     != LVar.Set.empty)
                    (get_equal_expressions pfs e1))
               > 0 ->
         let eqs = get_equal_expressions pfs e1 in
         let e1' =
           List.hd
             (List.filter
-               (fun e -> SS.inter (Expr.lvars e) (Expr.lvars e3) != SS.empty)
+               (fun e ->
+                 LVar.Set.inter (Expr.lvars e) (Expr.lvars e3) != LVar.Set.empty)
                eqs)
         in
         L.verbose (fun fmt ->
@@ -1238,7 +1239,7 @@ and reduce_lexpr_loop
                  match le with
                  | LVar x ->
                      List.filter
-                       (fun eq -> not (Containers.SS.mem x (Expr.lvars eq)))
+                       (fun eq -> not (LVar.Set.mem x (Expr.lvars eq)))
                        eqs
                  | _ -> eqs
                in
@@ -1288,7 +1289,7 @@ and reduce_lexpr_loop
                && List.exists
                     (function
                       | (Expr.LVar lx' | NOp (LstCat, LVar lx' :: _))
-                        when String.equal lx lx' -> true
+                        when LVar.equal lx lx' -> true
                       | _ -> false)
                     (get_equal_expressions pfs fle1) ->
             L.tmi (fun fmt -> fmt "Case 8");
@@ -1296,8 +1297,8 @@ and reduce_lexpr_loop
               List.find_map
                 (fun e ->
                   match e with
-                  | Expr.LVar ly when String.equal ly lx -> Some e
-                  | NOp (LstCat, (LVar ly as e) :: _) when String.equal ly lx ->
+                  | Expr.LVar ly when LVar.equal ly lx -> Some e
+                  | NOp (LstCat, (LVar ly as e) :: _) when LVar.equal ly lx ->
                       Some e
                   | _ -> None)
                 (get_equal_expressions pfs fle1)
@@ -1724,7 +1725,7 @@ and reduce_lexpr_loop
         ( LVar lst,
           Equal,
           NOp (LstCat, LstSub (LVar lst', Lit (Int z), split) :: _) )
-      when Z.equal z Z.zero && String.equal lst lst'
+      when Z.equal z Z.zero && LVar.equal lst lst'
            && PFS.mem pfs (BinOp (UnOp (LstLen, LVar lst), ILessThan, split)) ->
         Expr.false_
     (* l U {x} = l' U {x} /\ x ∉ l /\ x ∉ l' <=> l = l' *)
@@ -1773,9 +1774,9 @@ and reduce_lexpr_loop
         (BinOp (LVar x, IPlus, UnOp (IUnaryMinus, LVar y)), Equal, Lit (Int z))
       when Z.equal z Z.zero -> BinOp (LVar x, Equal, LVar y)
     | BinOp (BinOp (Lit (Num x), FPlus, LVar y), Equal, LVar z)
-      when x <> 0. && String.equal y z -> Expr.false_
+      when x <> 0. && LVar.equal y z -> Expr.false_
     | BinOp (BinOp (Lit (Int x), IPlus, LVar y), Equal, LVar z)
-      when (not (Z.equal x Z.zero)) && String.equal y z -> Expr.false_
+      when (not (Z.equal x Z.zero)) && LVar.equal y z -> Expr.false_
     (* FIXME: INTEGER BYTE-BY-BYTE BREAKDOWN *)
     (* 256 * b1 + b0 = n /\ b0,b1 ∈ [0;256[ <==> b1 = n/256 /\ b0 = n-b1
        Opale: The b0 = n-b1 bit is weird?? Why not mod? *)
@@ -2680,18 +2681,19 @@ and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
     le len_eqs
 
 let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
-    string option =
+    Id.Any_loc.t option =
   let max_fuel = 10 in
 
   let loc_name = function
-    | Expr.ALoc loc | Lit (Loc loc) -> Some loc
+    | Expr.ALoc loc -> Some (loc :> Id.Any_loc.t)
+    | Lit (Loc loc) -> Some (loc :> Id.Any_loc.t)
     | _ -> None
   in
 
   let rec resolve_expr_to_location_aux
       (fuel : int)
       (tried : Expr.Set.t)
-      (to_try : Expr.t list) : string option =
+      (to_try : Expr.t list) : Id.Any_loc.t option =
     let open Syntaxes.Option in
     L.tmi (fun m -> m "to_try: %a" (Fmt.Dump.list Expr.pp) to_try);
     let* () = if fuel <= 0 then None else Some () in
@@ -2708,7 +2710,7 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     (* If we find a loc in there, we return it *)
     let/ () = List.find_map loc_name equal_e in
     (* We actually want to try all possible substs! *)
-    let all_lvars = Containers.SS.elements (Expr.lvars e) in
+    let all_lvars = LVar.Set.elements (Expr.lvars e) in
     let subst_for_each_lvar =
       List.map
         (fun x ->
@@ -2758,7 +2760,7 @@ let relate_llen
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (e : Expr.t)
-    (lcat : Expr.t list) : (Expr.t * Containers.SS.t) option =
+    (lcat : Expr.t list) : (Expr.t * LVar.Set.t) option =
   (* Loop *)
   let rec relate_llen_loop
       (llen : Cint.t)
@@ -2787,7 +2789,7 @@ let relate_llen
                 match e with
                 | Expr.Lit (Int _) -> true
                 | e
-                  when Containers.SS.subset (Expr.lvars e)
+                  when LVar.Set.subset (Expr.lvars e)
                          (Expr.lvars (Cint.to_expr llen)) -> true
                 | _ -> false)
               eqs
@@ -2832,14 +2834,13 @@ let relate_llen
               in
               let pf = Expr.BinOp (e, Equal, NOp (LstCat, les @ new_lvars)) in
               L.verbose (fun fmt -> fmt "Constructed equality: %a" Expr.pp pf);
-              Some (pf, Containers.SS.of_list new_vars)
+              Some (pf, LVar.Set.of_list new_vars)
         | false, exp ->
             let rest_var = LVar.alloc () in
             let rest = Expr.LVar rest_var in
             let pfeq = Expr.BinOp (e, Equal, NOp (LstCat, les @ [ rest ])) in
             let pflen = Expr.BinOp (UnOp (LstLen, rest), Equal, exp) in
-            Some
-              (Expr.BinOp (pfeq, And, pflen), Containers.SS.singleton rest_var)
+            Some (Expr.BinOp (pfeq, And, pflen), LVar.Set.singleton rest_var)
         | _ -> failwith "Impossible by construction")
   in
 
@@ -2858,7 +2859,7 @@ let understand_lstcat
     (pfs : PFS.t)
     (gamma : Type_env.t)
     (lcat : Expr.t list)
-    (rcat : Expr.t list) : (Expr.t * Containers.SS.t) option =
+    (rcat : Expr.t list) : (Expr.t * LVar.Set.t) option =
   L.tmi (fun fmt ->
       fmt "Understanding LstCat: %a, %a"
         Fmt.(brackets (list ~sep:semi Expr.pp))
@@ -2953,11 +2954,10 @@ let reduce_assertion_loop
      L.(tmi (fun m -> m "Reduce_assertion: %a -> %a" Asrt.pp a Asrt.pp result)));
   result
 
-let extract_lvar_equalities : Asrt.t -> (string * Expr.t) list =
+let extract_lvar_equalities : Asrt.t -> (LVar.t * Expr.t) list =
   List.filter_map @@ function
   | Asrt.Pure (BinOp (LVar x, Equal, v) | BinOp (v, Equal, LVar x)) ->
-      if Names.is_lvar_name x && not (Names.is_spec_var_name x) then Some (x, v)
-      else None
+      if LVar.is_internal x then Some (x, v) else None
   | _ -> None
 
 let clean_double_equalities (a : Asrt.t) : Asrt.t =
@@ -3038,7 +3038,8 @@ let reduce_assertion
           match x with
           | Lit _ -> subst a
           | LVar w when v <> w -> subst a
-          | EList lx when not (Var.Set.mem v (Expr.lvars (EList lx))) -> subst a
+          | EList lx when not (LVar.Set.mem v (Expr.lvars (EList lx))) ->
+              subst a
           | _ -> a)
         a' equalities
     in

@@ -11,25 +11,20 @@ let substitution_in_place ?(subst_all = false) (subst : SESubst.t) (x : t) :
     let store_subst = SESubst.copy subst in
     SESubst.filter_in_place store_subst (fun u le ->
         match (u, le) with
-        | LVar x, LVar _ when (not subst_all) && Names.is_spec_var_name x ->
-            Some (LVar x)
+        | LVar x, LVar _ when (not subst_all) && LVar.is_spec x -> Some (LVar x)
         | _ -> Some le);
 
     filter_map_inplace x (fun _ value ->
         let substed = SESubst.subst_in_expr store_subst ~partial:true value in
         Some (Reduction.reduce_lexpr substed)))
 
-(** Returns the set containing all the vars occurring in --x-- *)
-let vars (x : t) : SS.t =
-  fold x (fun x le ac -> SS.union ac (SS.add x (Expr.vars le))) SS.empty
-
 (** Returns the set containing all the alocs occurring in --x-- *)
-let alocs (x : t) : SS.t =
-  fold x (fun _ le ac -> SS.union ac (Expr.alocs le)) SS.empty
+let alocs (x : t) : ALoc.Set.t =
+  fold x (fun _ le ac -> ALoc.Set.union ac (Expr.alocs le)) ALoc.Set.empty
 
-(** Returns the set containing all the alocs occurring in --x-- *)
-let clocs (x : t) : SS.t =
-  fold x (fun _ le ac -> SS.union ac (Expr.clocs le)) SS.empty
+(** Returns the set containing all the clocs occurring in --x-- *)
+let clocs (x : t) : Id.Loc.Set.t =
+  fold x (fun _ le ac -> Id.Loc.Set.union ac (Expr.clocs le)) Id.Loc.Set.empty
 
 (** conversts a symbolic store to a list of assertions *)
 let assertions (x : t) : Expr.t list =

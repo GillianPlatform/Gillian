@@ -10,7 +10,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:LVar.Set.t ->
     t
 
   val make_s_from_heap :
@@ -18,7 +18,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:LVar.Set.t ->
     t
 
   val get_init_data : t -> init_data

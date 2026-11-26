@@ -39,17 +39,17 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val substitution : st -> t -> t Delayed.t
-  val lvars : t -> Containers.SS.t
-  val alocs : t -> Containers.SS.t
-  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
+  val lvars : t -> LVar.Set.t
+  val alocs : t -> ALoc.Set.t
+  val assertions : ?to_keep:Var.Set.t -> t -> Asrt.t
   val mem_constraints : t -> Expr.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Expr.t
   val get_fixes : err_t -> Asrt.t list
   val can_fix : err_t -> bool
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
-  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+  val pp_by_need : Id.Any_loc.Set.t -> Format.formatter -> t -> unit
+  val get_print_info : Id.Any_loc.Set.t -> t -> LVar.Set.t * Id.Any_loc.Set.t
   val sure_is_nonempty : t -> bool
 
   (** See {!val:SMemory.S.split_further} *)
@@ -93,7 +93,7 @@ module Lift (MSM : S) :
     Gbranch.{ pc = gpc; value }
 
   let substitution ~pfs ~gamma subst mem :
-      (t * Expr.Set.t * (string * Type.t) list) list =
+      (t * Expr.Set.t * (Id.any_var Id.t * Type.t) list) list =
     let process = substitution subst mem in
     let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
     let branches = Delayed.resolve ~curr_pc process in

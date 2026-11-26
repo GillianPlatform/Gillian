@@ -3,10 +3,8 @@
 
 (***************************************************************)
 
-module SS = Containers.SS
-
-type folding_info = string * (string * Expr.t) list [@@deriving yojson]
-type unfold_info = (string * string) list [@@deriving yojson]
+type folding_info = string * (Id.LVar.t * Expr.t) list [@@deriving yojson]
+type unfold_info = (Id.LVar.t * Id.LVar.t) list [@@deriving yojson]
 
 (** {b GIL Separation Logic commands}. *)
 type t = TypeDef__.slcmd =
@@ -20,12 +18,11 @@ type t = TypeDef__.slcmd =
   | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
       (** Magic wand packaging *)
   | GUnfold of string  (** Global Unfold *)
-  | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
-  | SepAssert of Asrt.t * string list  (** Assert *)
-  | Invariant of Asrt.t * string list  (** Invariant *)
-  | Consume of
-      Asrt.t
-      * string list (* Consumes an assertion. Warning, not frame-preserving *)
+  | ApplyLem of string * Expr.t list * Id.Any_var.t list  (** Apply lemma *)
+  | SepAssert of Asrt.t * Id.Any_var.t list  (** Assert *)
+  | Invariant of Asrt.t * Id.Any_var.t list  (** Invariant *)
+  | Consume of Asrt.t * Id.Any_var.t list
+    (* Consumes an assertion. Warning, not frame-preserving *)
   | Produce of Asrt.t (* Produces an assertion. Warning, not frame-preserving *)
   | SymbExec
 [@@deriving yojson]
@@ -50,73 +47,77 @@ let map (f_a : Asrt.t -> Asrt.t) (f_e : Expr.t -> Expr.t) : t -> t = function
       Package
         { lhs = (lname, List.map f_e largs); rhs = (rname, List.map f_e rargs) }
 
-let fold = List.fold_left SS.union SS.empty
-
-let pvars (slcmd : t) : SS.t =
+let pvars (slcmd : t) : Id.Var.Set.t =
+  let module S = Id.Var.Set in
+  let fold = List.fold_left S.union S.empty in
   let pvars_es es = fold (List.map Expr.pvars es) in
   match slcmd with
   | ApplyLem (_, es, _) -> pvars_es es
   | Fold (_, es, _) | Unfold (_, es, _, _) ->
       pvars_es (List.filter_map Fun.id es)
-  | GUnfold _ -> SS.empty
+  | GUnfold _ -> S.empty
   | Package { lhs = _, les1; rhs = _, les2 } ->
-      SS.union (pvars_es les1) (pvars_es les2)
+      S.union (pvars_es les1) (pvars_es les2)
   | SepAssert (a, _) | Invariant (a, _) | Consume (a, _) | Produce a ->
       Asrt.pvars a
-  | SymbExec -> SS.empty
+  | SymbExec -> S.empty
 
-let lvars (slcmd : t) : SS.t =
+let lvars (slcmd : t) : Id.LVar.Set.t =
+  let module S = Id.LVar.Set in
+  let fold = List.fold_left S.union S.empty in
   let lvars_es es = fold (List.map Expr.lvars es) in
   match slcmd with
   | Fold (_, es, finfo) ->
       let lvars_finfo =
         match finfo with
-        | None -> SS.empty
+        | None -> S.empty
         | Some (_, les) ->
             let _, es = List.split les in
             fold (List.map Expr.lvars es)
       in
-      SS.union lvars_finfo (lvars_es (List.filter_map Fun.id es))
+      S.union lvars_finfo (lvars_es (List.filter_map Fun.id es))
   | Unfold (_, es, _, _) -> lvars_es (List.filter_map Fun.id es)
   | Package { lhs = _, les1; rhs = _, les2 } ->
-      SS.union (lvars_es les1) (lvars_es les2)
+      S.union (lvars_es les1) (lvars_es les2)
   | ApplyLem (_, es, _) -> lvars_es es
-  | GUnfold _ -> SS.empty
+  | GUnfold _ -> S.empty
   | SepAssert (a, binders) | Consume (a, binders) ->
-      SS.union (Asrt.lvars a) (SS.of_list binders)
+      S.union (Asrt.lvars a) (S.of_list (List.filter_map Id.as_lvar binders))
   | Invariant (a, _) | Produce a -> Asrt.lvars a
-  | SymbExec -> SS.empty
+  | SymbExec -> S.empty
 
-let locs (slcmd : t) : SS.t =
+let locs (slcmd : t) : Id.Any_loc.Set.t =
+  let module S = Id.Any_loc.Set in
+  let fold = List.fold_left S.union S.empty in
   let locs_es es = fold (List.map Expr.locs es) in
   match slcmd with
   | Fold (_, es, finfo) ->
       let lvars_finfo =
         match finfo with
-        | None -> SS.empty
+        | None -> S.empty
         | Some (_, les) ->
             let _, es = List.split les in
             fold (List.map Expr.locs es)
       in
-      SS.union lvars_finfo (locs_es (List.filter_map Fun.id es))
+      S.union lvars_finfo (locs_es (List.filter_map Fun.id es))
   | Unfold (_, es, _, _) -> locs_es (List.filter_map Fun.id es)
   | Package { lhs = _, les1; rhs = _, les2 } ->
-      SS.union (locs_es les1) (locs_es les2)
+      S.union (locs_es les1) (locs_es les2)
   | ApplyLem (_, es, _) -> locs_es es
-  | GUnfold _ -> SS.empty
+  | GUnfold _ -> S.empty
   | SepAssert (a, _) | Invariant (a, _) | Consume (a, _) | Produce a ->
       Asrt.locs a
-  | SymbExec -> SS.empty
+  | SymbExec -> S.empty
 
 let pp_folding_info =
-  let pp_ui f (v, le) = Fmt.pf f "(%s := %a)" v Expr.pp le in
+  let pp_ui f (v, le) = Fmt.pf f "(%a := %a)" Id.pp v Expr.pp le in
   let pp_non_opt f (id, uil) =
     Fmt.pf f " [ %s with %a ]" id (Fmt.list ~sep:(Fmt.any " and ") pp_ui) uil
   in
   Fmt.option pp_non_opt
 
 let pp_unfold_info =
-  let pp_ui f (v1, v2) = Fmt.pf f "(%s := %s)" v1 v2 in
+  let pp_ui f (v1, v2) = Fmt.pf f "(%a := %a)" Id.pp v1 Id.pp v2 in
   let pp_non_opt f uil =
     Fmt.pf f " [bind: %a]" (Fmt.list ~sep:(Fmt.any " and ") pp_ui) uil
   in
@@ -132,7 +133,7 @@ let pp fmt lcmd =
   let pp_binders f b =
     match b with
     | [] -> ()
-    | _ -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
+    | _ -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Id.pp) b
   in
   match lcmd with
   | Fold (name, les, fold_info) ->
@@ -161,10 +162,7 @@ let pp fmt lcmd =
       let pp_exs f exs =
         match exs with
         | [] -> ()
-        | _ ->
-            Fmt.pf f "[existentials: %a]"
-              (Fmt.list ~sep:Fmt.comma Fmt.string)
-              exs
+        | _ -> Fmt.pf f "[existentials: %a]" (Fmt.list ~sep:Fmt.comma Id.pp) exs
       in
       Fmt.pf fmt "invariant %a %a" (Fmt.parens Asrt.pp) a pp_exs existentials
   | SymbExec -> Fmt.pf fmt "symb_exec"
@@ -202,10 +200,13 @@ let is_pred_action (a : string) : bool =
 
 (* -- encoding -- *)
 
+(* Identifiers cross the action interface as GIL string literals. *)
+let enc_lvar (x : Id.LVar.t) : Expr.t = Expr.string (Id.LVar.to_string x)
+
 let enc_fold_info : folding_info option -> Expr.t = function
   | None -> Expr.Lit Nono
   | Some (id, bindings) ->
-      let enc_binding (x, e) = Expr.EList [ Expr.string x; e ] in
+      let enc_binding (x, e) = Expr.EList [ enc_lvar x; e ] in
       Expr.EList [ Expr.string id; Expr.EList (List.map enc_binding bindings) ]
 
 (* A fold/unfold argument list may contain holes (the out-parameters the user
@@ -222,7 +223,7 @@ let enc_pred_args (les : Expr.t option list) : Expr.t =
 let enc_unfold_info : unfold_info option -> Expr.t = function
   | None -> Expr.Lit Nono
   | Some l ->
-      let enc_binding (x, y) = Expr.EList [ Expr.string x; Expr.string y ] in
+      let enc_binding (x, y) = Expr.EList [ enc_lvar x; enc_lvar y ] in
       Expr.EList (List.map enc_binding l)
 
 let to_action : t -> (string * Expr.t list) option = function
@@ -253,24 +254,24 @@ let to_action : t -> (string * Expr.t list) option = function
 
 (** The logical variables an [unfold] bound, which the action returns so that
     the state above can keep them alive. *)
-let enc_bound_lvars (xs : string list) : Expr.t =
-  Expr.EList (List.map Expr.string xs)
+let enc_bound_lvars (xs : Id.LVar.t list) : Expr.t =
+  Expr.EList (List.map enc_lvar xs)
 
-let dec_bound_lvars : Expr.t list -> string list = function
+let dec_bound_lvars : Expr.t list -> Id.LVar.t list = function
   | [ Expr.EList xs ] ->
       List.map
         (function
-          | Expr.Lit (String x) -> x
+          | Expr.Lit (String x) -> Id.LVar.of_string x
           | e ->
               Fmt.failwith "SLCmd: malformed bound logical variable %a" Expr.pp
                 e)
         xs
   | _ -> []
 
-let add_known_lvars (args : Expr.t list) (xs : string list) : Expr.t list =
+let add_known_lvars (args : Expr.t list) (xs : Id.LVar.t list) : Expr.t list =
   args @ [ enc_bound_lvars xs ]
 
-let known_lvars : Expr.t list -> string list = function
+let known_lvars : Expr.t list -> Id.LVar.t list = function
   | [ _; _; _; _; known ] -> dec_bound_lvars [ known ]
   | _ -> []
 
@@ -281,6 +282,8 @@ let dec_str : Expr.t -> string = function
   | e ->
       Fmt.failwith "SLCmd.of_action: expected a string literal, got %a" Expr.pp
         e
+
+let dec_lvar (e : Expr.t) : Id.LVar.t = Id.LVar.of_string (dec_str e)
 
 let dec_les : Expr.t -> Expr.t list = function
   | Expr.EList les -> les
@@ -302,7 +305,7 @@ let dec_fold_info : Expr.t -> folding_info option = function
   | Expr.Lit Nono -> None
   | Expr.EList [ id; bindings ] ->
       let dec_binding = function
-        | Expr.EList [ x; e ] -> (dec_str x, e)
+        | Expr.EList [ x; e ] -> (dec_lvar x, e)
         | e ->
             Fmt.failwith "SLCmd.of_action: malformed fold binding %a" Expr.pp e
       in
@@ -313,7 +316,7 @@ let dec_unfold_info : Expr.t -> unfold_info option = function
   | Expr.Lit Nono -> None
   | Expr.EList l ->
       let dec_binding = function
-        | Expr.EList [ x; y ] -> (dec_str x, dec_str y)
+        | Expr.EList [ x; y ] -> (dec_lvar x, dec_lvar y)
         | e ->
             Fmt.failwith "SLCmd.of_action: malformed unfold binding %a" Expr.pp
               e

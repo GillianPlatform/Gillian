@@ -245,28 +245,27 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     | SubPred core_pred, SubError err -> S.split_further s.mem core_pred ins err
     | _ -> None
 
-  let lvars (s : t) : Containers.SS.t =
-    let open Containers in
+  let lvars (s : t) : LVar.Set.t =
     let pred_lvars =
       List.fold_left
         (fun ac (_, vs) ->
-          List.fold_left (fun ac e -> SS.union ac (Expr.lvars e)) ac vs)
-        SS.empty s.preds
+          List.fold_left (fun ac e -> LVar.Set.union ac (Expr.lvars e)) ac vs)
+        LVar.Set.empty s.preds
     in
     let wand_lvars =
       let lvars_val_list el =
         List.fold_left
-          (fun acc expr -> SS.union acc (Expr.lvars expr))
-          SS.empty el
+          (fun acc expr -> LVar.Set.union acc (Expr.lvars expr))
+          LVar.Set.empty el
       in
       List.fold_left
         (fun acc ({ lhs = _, largs; rhs = _, rargs } : wand) ->
           acc
-          |> SS.union (lvars_val_list largs)
-          |> SS.union (lvars_val_list rargs))
-        SS.empty s.wands
+          |> LVar.Set.union (lvars_val_list largs)
+          |> LVar.Set.union (lvars_val_list rargs))
+        LVar.Set.empty s.wands
     in
-    S.lvars s.mem |> SS.union pred_lvars |> SS.union wand_lvars
+    S.lvars s.mem |> LVar.Set.union pred_lvars |> LVar.Set.union wand_lvars
 
   (* {2 The memory-level matching state}
 
@@ -335,7 +334,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
 
   (* Mirrors [SState.assert_a]. *)
   let assert_pure (ms : mstate) (ps : Expr.t list) : bool =
-    FOSolver.check_entailment Containers.SS.empty (full_pfs ms.pc) ps
+    FOSolver.check_entailment LVar.Set.empty (full_pfs ms.pc) ps
       (full_gamma ms.pc)
 
   (* Mirrors [SState.assume_t]. *)
@@ -367,14 +366,24 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
 
   (* Mirrors [SState.unfolding_vals]. *)
   let unfolding_vals (fs : Expr.t list) : Expr.t list =
-    let map to_str to_expr =
-      List.map to_str fs
-      |> List.fold_left Containers.SS.union Containers.SS.empty
-      |> Containers.SS.elements |> List.map to_expr
+    let lvars =
+      List.map Expr.lvars fs
+      |> List.fold_left LVar.Set.union LVar.Set.empty
+      |> LVar.Set.elements
+      |> List.map (fun x -> Expr.LVar x)
     in
-    let lvars = map Expr.lvars (fun x -> Expr.LVar x) in
-    let alocs = map Expr.alocs (fun x -> Expr.ALoc x) in
-    let clocs = map Expr.clocs (fun x -> Expr.Lit (Loc x)) in
+    let alocs =
+      List.map Expr.alocs fs
+      |> List.fold_left ALoc.Set.union ALoc.Set.empty
+      |> ALoc.Set.elements
+      |> List.map (fun x -> Expr.ALoc x)
+    in
+    let clocs =
+      List.map Expr.clocs fs
+      |> List.fold_left Id.Loc.Set.union Id.Loc.Set.empty
+      |> Id.Loc.Set.elements
+      |> List.map (fun x -> Expr.Lit (Loc x))
+    in
     clocs @ alocs @ lvars
 
   (* Runs a sub-memory [Delayed] computation under the current pc with the
@@ -417,7 +426,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         (fun (acc : Expr.t Recovery_tactic.t) -> function
           | BinOp ((ALoc _ as loc), Equal, LVar x)
           | BinOp (LVar x, Equal, (ALoc _ as loc)) ->
-              if Names.is_spec_var_name x then
+              if LVar.is_spec x then
                 let try_fold =
                   Option.map
                     (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
@@ -553,11 +562,9 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     let strategy_4 ((name, args) : string * Expr.t list) : int =
       print_local_info 4 name args;
       let lvars_args =
-        List.fold_left Containers.SS.union Containers.SS.empty
-          (List.map Expr.lvars args)
+        List.fold_left LVar.Set.union LVar.Set.empty (List.map Expr.lvars args)
       in
-      Containers.SS.cardinal
-        (Containers.SS.filter Names.is_spec_var_name lvars_args)
+      LVar.Set.cardinal (LVar.Set.filter LVar.is_spec lvars_args)
   end
 
   let consume_pred_with_vs
@@ -655,9 +662,9 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
            | Some e -> e
            | None ->
                Fmt.failwith
-                 "%s of %s: the in-parameter %s must be given, it cannot be an \
+                 "%s of %s: the in-parameter %a must be given, it cannot be an \
                   underscore"
-                 cmd pname (List.nth in_params i))
+                 cmd pname Id.pp (List.nth in_params i))
     in
     (vs_ins, Pred.out_args pred les)
 
@@ -974,8 +981,8 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
               | Some v_x -> v_x
               | None ->
                   Fmt.failwith
-                    "DEATH. Didn't learn the out-parameter %s while folding %s"
-                    x pred_name))
+                    "DEATH. Didn't learn the out-parameter %a while folding %s"
+                    Id.pp x pred_name))
         params args
     in
     L.verbose (fun m ->
@@ -1023,7 +1030,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     let subst_i = SVal.SESubst.init (List_utils.right_combine params args) in
     L.verbose (fun m ->
         m "unfold with unfold_info with additional bindings@\n%a@\n"
-          Fmt.(Dump.list (pair string string))
+          Fmt.(Dump.list (pair Id.pp Id.pp))
           additional_bindings);
     let () =
       (* Mirrors [extend_subst_with_bindings]: the additional bindings are
@@ -1358,17 +1365,15 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     type split_answer = {
       init_subst : SVal.SESubst.t;
       mp : MP.t;
-      fold_outs_info : SVal.SESubst.t * MP.step * string list * Expr.t list;
+      fold_outs_info : SVal.SESubst.t * MP.step * Var.t list * Expr.t list;
     }
 
     let matchables expr =
       let lvars =
-        Expr.lvars expr |> Containers.SS.to_seq
-        |> Seq.map (fun x -> Expr.LVar x)
+        Expr.lvars expr |> LVar.Set.to_seq |> Seq.map (fun x -> Expr.LVar x)
       in
       let alocs =
-        Expr.alocs expr |> Containers.SS.to_seq
-        |> Seq.map Expr.loc_from_loc_name
+        Expr.alocs expr |> ALoc.Set.to_seq |> Seq.map Expr.loc_from_loc_name
       in
       Seq.append lvars alocs
 
@@ -1424,7 +1429,9 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
             MP.KB.to_seq kb |> Seq.map (fun x -> (x, x)) |> SVal.SESubst.of_seq
           in
           let out_params =
-            List.mapi (fun i _ -> "out___" ^ string_of_int i) outs
+            List.mapi
+              (fun i _ -> Var.of_string ("out___" ^ string_of_int i))
+              outs
           in
           (* Now we build our assertion *)
           let+ new_ins_l, new_outs_learn =
@@ -1444,7 +1451,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
               Seq.concat
               @@ Seq.init cp_amount (fun i ->
                      Seq.init out_amount (fun j ->
-                         let id = Fmt.str "%d:%d" i j in
+                         let id = Var.of_string (Fmt.str "%d:%d" i j) in
                          (Expr.PVar id, all_new_outs.((i * out_amount) + j))))
             in
             SVal.SESubst.of_seq seq
@@ -1493,7 +1500,9 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       let open Syntaxes.List in
       let outs = snd step in
       let pvar_subst =
-        List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) obtained
+        List.mapi
+          (fun i v -> (Expr.PVar (Var.of_string (string_of_int i)), v))
+          obtained
         |> SVal.SESubst.init
       in
       let outs =
@@ -1561,7 +1570,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
                     (fun x ->
                       match SVal.SESubst.get state.subst (PVar x) with
                       | Some x -> x
-                      | None -> Fmt.failwith "Did not learn %s ??" x)
+                      | None -> Fmt.failwith "Did not learn %a ??" Id.pp x)
                     out_params
                 in
                 let+ state =
@@ -1795,8 +1804,8 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       bound to it. Typing is not knowledge: evaluating [#h :: #t] types [#t].
       Scanning the whole memory for them is not cheap, hence the [lazy]: most
       unfolds never need to know. *)
-  let known_lvars (ms : mstate) : Containers.SS.t Lazy.t =
-    lazy (Containers.SS.union (lvars ms.st) (PFS.lvars (full_pfs ms.pc)))
+  let known_lvars (ms : mstate) : LVar.Set.t Lazy.t =
+    lazy (LVar.Set.union (lvars ms.st) (PFS.lvars (full_pfs ms.pc)))
 
   (** The out-expressions an [unfold] was given are matched against the values
       of the predicate that was found, once its definition has been produced
@@ -1806,12 +1815,11 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       found; the out-expression then has to be equal to that value. Returns the
       variables that were bound, which the state above has to keep alive. *)
   let assert_unfold_outs
-      ~(known : Containers.SS.t Lazy.t)
+      ~(known : LVar.Set.t Lazy.t)
       (ms : mstate)
       (pname : string)
       (es_outs : Expr.t option list)
-      (vs_outs : Expr.t list) : (mstate * Containers.SS.t, err_t) Res_list.t =
-    let open Containers in
+      (vs_outs : Expr.t list) : (mstate * LVar.Set.t, err_t) Res_list.t =
     let assume ms fs =
       assume_pure ~production:false ~time:"unfold outs" ms fs
     in
@@ -1827,26 +1835,26 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
        they count as known for the ones that follow, so that the same name
        given twice over means the two values agree. *)
     let is_fresh bound x =
-      (not (SS.mem x bound)) && not (SS.mem x (Lazy.force known))
+      (not (LVar.Set.mem x bound)) && not (LVar.Set.mem x (Lazy.force known))
     in
     (* Solves [fresh] for their values in [v], the way the matcher learns the
        outs of an assertion, and checks that [e] then equals [v]. Assuming
        [e == v] outright would also assume that [v] has the shape of [e]. *)
     let solve ms fresh e v =
       let kb =
-        SS.diff (Expr.lvars e) fresh
-        |> SS.elements
+        LVar.Set.diff (Expr.lvars e) fresh
+        |> LVar.Set.elements
         |> List.map (fun x -> Expr.LVar x)
         |> MP.KB.of_list
       in
       let defs =
         MP.learn_expr kb v e
         |> List.filter (function
-             | Expr.LVar x, _ -> SS.mem x fresh
+             | Expr.LVar x, _ -> LVar.Set.mem x fresh
              | _ -> false)
       in
       let solved =
-        SS.for_all
+        LVar.Set.for_all
           (fun x -> List.exists (fun (y, _) -> Expr.equal y (LVar x)) defs)
           fresh
       in
@@ -1865,7 +1873,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
       | Some e :: es, v :: vs when Expr.equal e v -> aux ms bound es vs
       | Some e :: es, v :: vs ->
           let eq = Expr.BinOp (e, Equal, v) in
-          let fresh = SS.filter (is_fresh bound) (Expr.lvars e) in
+          let fresh = LVar.Set.filter (is_fresh bound) (Expr.lvars e) in
           let open Res_list.Syntax in
           let** ms =
             match e with
@@ -1875,18 +1883,19 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
                 | None -> Res_list.vanish)
             (* A bare variable just names the value found; it can only
                contradict it by its type. *)
-            | Expr.LVar x when SS.mem x fresh -> (
+            | Expr.LVar x when LVar.Set.mem x fresh -> (
                 match assume ms [ eq ] with
                 | Some ms -> Res_list.return ms
                 | None -> fail e v)
-            | _ when SS.is_empty fresh ->
+            | _ when LVar.Set.is_empty fresh ->
                 if assert_pure ms [ eq ] then Res_list.return ms else fail e v
             | _ -> solve ms fresh e v
           in
-          aux ms (SS.union fresh bound) es vs
+          aux ms (LVar.Set.union fresh bound) es vs
     in
-    if List.for_all Option.is_none es_outs then Res_list.return (ms, SS.empty)
-    else aux ms SS.empty es_outs vs_outs
+    if List.for_all Option.is_none es_outs then
+      Res_list.return (ms, LVar.Set.empty)
+    else aux ms LVar.Set.empty es_outs vs_outs
 
   (* The predicate-manipulating SL commands arrive as reserved actions with
      the [SLCmd] encoding; the state has already evaluated the
@@ -1921,8 +1930,8 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         let vs = List.map Option.some vs_ins @ es_outs in
         let known =
           lazy
-            (Containers.SS.union
-               (Containers.SS.of_list (SLCmd.known_lvars args))
+            (LVar.Set.union
+               (LVar.Set.of_list (SLCmd.known_lvars args))
                (Lazy.force (known_lvars ms)))
         in
         (* 3) We consume the predicate from the state. *)
@@ -1952,7 +1961,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
            bindings are what the action returns, as they are only of use to the
            state above, which has to keep them from being simplified away. *)
         let++ ms'', bound = assert_unfold_outs ~known ms'' pname es_outs vs' in
-        (ms'', [ SLCmd.enc_bound_lvars (Containers.SS.elements bound) ])
+        (ms'', [ SLCmd.enc_bound_lvars (LVar.Set.elements bound) ])
     | Some (GUnfold pname) -> unfold_all ms pname |> no_rets
     | Some (Package { lhs; rhs }) ->
         let++ ms' = package_wand ms { lhs; rhs } |> Res_list.of_list_res in
@@ -2069,26 +2078,27 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     let wand_asrts = List.map (wand_to_asrt ~pred_defs) s.wands in
     sub_asrt @ upred_asrts @ wand_asrts
 
-  let alocs (s : t) : Containers.SS.t =
-    let open Containers in
+  let alocs (s : t) : ALoc.Set.t =
     let pred_alocs =
       List.fold_left
         (fun ac (_, vs) ->
-          List.fold_left (fun ac e -> SS.union ac (Expr.alocs e)) ac vs)
-        SS.empty s.preds
+          List.fold_left (fun ac e -> ALoc.Set.union ac (Expr.alocs e)) ac vs)
+        ALoc.Set.empty s.preds
     in
     let wand_alocs =
       let alocs_val_list el =
-        List.fold_left (fun acc v -> SS.union acc (Expr.alocs v)) SS.empty el
+        List.fold_left
+          (fun acc v -> ALoc.Set.union acc (Expr.alocs v))
+          ALoc.Set.empty el
       in
       List.fold_left
         (fun acc ({ lhs = _, largs; rhs = _, rargs } : wand) ->
           acc
-          |> SS.union (alocs_val_list largs)
-          |> SS.union (alocs_val_list rargs))
-        SS.empty s.wands
+          |> ALoc.Set.union (alocs_val_list largs)
+          |> ALoc.Set.union (alocs_val_list rargs))
+        ALoc.Set.empty s.wands
     in
-    S.alocs s.mem |> SS.union pred_alocs |> SS.union wand_alocs
+    S.alocs s.mem |> ALoc.Set.union pred_alocs |> ALoc.Set.union wand_alocs
 
   let sure_is_nonempty (s : t) =
     S.sure_is_nonempty s.mem

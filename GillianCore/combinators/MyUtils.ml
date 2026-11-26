@@ -67,15 +67,17 @@ end) : SymExprMap = struct
               match (k, k') with
               (* THIS IS ONLY TRUE IF WE'RE NOT MATCHING ! *)
               | Expr.ALoc l1, Expr.ALoc l2 when not matching ->
-                  if String.equal l1 l2 then Delayed.return (Some (k', v))
+                  if ALoc.equal l1 l2 then Delayed.return (Some (k', v))
                   else find_match tl
               (* This is already done by the #==, but putting it here speeds it up a tiny bit :) *)
-              | Expr.Lit (Loc l1), Expr.Lit (Loc l2)
+              | Expr.Lit (Loc l1), Expr.Lit (Loc l2) ->
+                  if Id.Loc.equal l1 l2 then Delayed.return (Some (k', v))
+                  else find_match tl
               | Expr.Lit (String l1), Expr.Lit (String l2) ->
                   if String.equal l1 l2 then Delayed.return (Some (k', v))
                   else find_match tl
-              | Expr.ALoc l1, Expr.ALoc l2 when matching && String.equal l1 l2
-                -> Delayed.return (Some (k', v))
+              | Expr.ALoc l1, Expr.ALoc l2 when matching && ALoc.equal l1 l2 ->
+                  Delayed.return (Some (k', v))
               | _ ->
                   Check.check
                     Expr.Infix.(k' == k)
@@ -141,8 +143,8 @@ let get_loc =
   let open Delayed.Syntax in
   let open Delayed_option in
   function
-  | Expr.Lit (Loc loc) -> some loc
-  | Expr.ALoc loc -> some loc
+  | Expr.Lit (Loc loc) -> some (loc :> Id.Any_loc.t)
+  | Expr.ALoc loc -> some (loc :> Id.Any_loc.t)
   | e when not (Expr.is_concrete e) -> (
       let* loc = Delayed.resolve_loc e in
       match loc with
@@ -150,7 +152,7 @@ let get_loc =
       | None ->
           let open Expr.Infix in
           let loc_name = ALoc.alloc () in
-          some ~learned:[ e == ALoc loc_name ] loc_name)
+          some ~learned:[ e == ALoc loc_name ] (loc_name :> Id.Any_loc.t))
   | _ -> none ()
 
 module SMap = Utils.Prelude.Map.Make (struct

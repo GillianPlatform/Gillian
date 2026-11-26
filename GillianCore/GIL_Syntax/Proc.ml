@@ -11,7 +11,7 @@ type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_source_path : string option;
   proc_internal : bool;
   proc_body : ('annot * 'label option * 'label Cmd.t) array;
-  proc_params : string list;
+  proc_params : Id.Var.t list;
   proc_spec : Spec.t option;
   proc_aliases : string list;
   proc_calls : string list;
@@ -91,7 +91,7 @@ let pp
   in
   Fmt.pf fmt "@[%a%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_path_opt path
     pp_internal internal pp_spec_opt spec name
-    (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+    (Fmt.list ~sep:(Fmt.any ", ") Id.pp)
     params
     (Fmt.array ~sep:(Fmt.any ";@\n") pp_cmd_triple)
     body
@@ -202,6 +202,6 @@ let check_proc_spec_correspondence
                       "The spec and procedure definitions for %s have \
                        different arguments.\n\
                        @[<h>%a@] in procedure, @[<h>%a@] in params"
-                      proc.proc_name (Fmt.Dump.list Fmt.string) proc.proc_params
-                      (Fmt.Dump.list Fmt.string) spec.spec_params))))
+                      proc.proc_name (Fmt.Dump.list Id.pp) proc.proc_params
+                      (Fmt.Dump.list Id.pp) spec.spec_params))))
     procedures

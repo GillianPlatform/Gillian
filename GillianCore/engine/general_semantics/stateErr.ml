@@ -32,7 +32,7 @@ let pp_err
   match err with
   | EMem m_err -> pp_m_err fmt m_err
   | EPure f -> Fmt.pf fmt "Pure assertion failed: %a" pp_expr f
-  | EVar x -> Fmt.pf fmt "Undefined variable: %s" x
+  | EVar x -> Fmt.pf fmt "Undefined variable: %a" Id.pp x
   | EAsrt (_, f) -> Fmt.pf fmt "Couldn't assert %a" pp_expr f
   | EOther msg -> Fmt.pf fmt "%s" msg
 

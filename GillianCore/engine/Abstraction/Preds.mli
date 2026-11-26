@@ -17,8 +17,8 @@ val strategic_choice : consume:bool -> t -> (abs_t -> int) -> abs_t option
 
 val remove_by_name : t -> string -> abs_t option
 val find_pabs_by_name : t -> string -> abs_t list
-val get_lvars : t -> SS.t
-val get_alocs : t -> SS.t
+val get_lvars : t -> LVar.Set.t
+val get_alocs : t -> ALoc.Set.t
 val pp : Format.formatter -> t -> unit
 val pp_pabs : Format.formatter -> abs_t -> unit
 

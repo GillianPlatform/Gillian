@@ -1,29 +1,13 @@
-(** @canonical Gillian.Gil_syntax.LVar *)
-module LVar : sig
-  (** Allocator for logical variable names *)
+module Id = Id
 
-  (** @inline *)
-  include Allocators.S with type t = string
-end
+(** @canonical Gillian.Gil_syntax.LVar *)
+module LVar = Id.LVar
 
 (** @canonical Gillian.Gil_syntax.ALoc *)
-module ALoc : sig
-  (** Allocator for (sybolic) memory locations *)
-
-  (** @inline *)
-  include Allocators.S with type t = string
-end
+module ALoc = Id.ALoc
 
 (** @canonical Gillian.Gil_syntax.Var *)
-module Var : sig
-  (** GIL Variables *)
-
-  type t = string [@@deriving yojson, show]
-
-  module Set : module type of Containers.SS
-
-  val str : t -> string
-end
+module Var = Id.Var
 
 (** @canonical Gillian.Gil_syntax.Constant *)
 module Constant : sig
@@ -84,7 +68,7 @@ module Literal : sig
     | Int of Z.t  (** GIL integers: TODO: understand size *)
     | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
     | String of string  (** GIL strings *)
-    | Loc of string  (** GIL locations (uninterpreted symbols) *)
+    | Loc of Id.Loc.t  (** GIL locations (uninterpreted symbols) *)
     | Type of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
@@ -239,21 +223,21 @@ module Expr : sig
 
   type t =
     | Lit of Literal.t  (** GIL literals *)
-    | PVar of string  (** GIL program variables *)
-    | LVar of string  (** GIL logical variables (interpreted symbols) *)
-    | ALoc of string  (** GIL abstract locations (uninterpreted symbols) *)
+    | PVar of Id.Var.t  (** GIL program variables *)
+    | LVar of Id.LVar.t  (** GIL logical variables (interpreted symbols) *)
+    | ALoc of Id.ALoc.t  (** GIL abstract locations (uninterpreted symbols) *)
     | UnOp of UnOp.t * t  (** Unary operators ({!type:UnOp.t}) *)
     | BinOp of t * BinOp.t * t  (** Binary operators ({!type:BinOp.t}) *)
     | LstSub of t * t * t  (** Sublist *)
     | NOp of NOp.t * t list  (** n-ary operators ({!type:NOp.t}) *)
     | EList of t list  (** Lists of expressions *)
     | ESet of t list  (** Sets of expressions *)
-    | Exists of (string * Type.t option) list * t
+    | Exists of (Id.LVar.t * Type.t option) list * t
         (** Existential quantification. *)
-    | ForAll of (string * Type.t option) list * t
+    | ForAll of (Id.LVar.t * Type.t option) list * t
     | ConstructorApp of string * t list
     | FuncApp of string * t list
-    | Cases of t * (string * string list * t) list
+    | Cases of t * (string * Id.LVar.t list * t) list
   [@@deriving yojson]
 
   (** {2: Helpers for building expressions}
@@ -326,7 +310,7 @@ module Expr : sig
     (** Booleans *)
 
     val not : t -> t
-    val forall : (string * Type.t option) list -> t -> t
+    val forall : (Id.LVar.t * Type.t option) list -> t -> t
     val ( == ) : t -> t -> t
     val ( && ) : t -> t -> t
     val ( || ) : t -> t -> t
@@ -370,23 +354,19 @@ module Expr : sig
   val from_list : t list -> t
 
   (** [lvars e] returns all logical variables in [e] *)
-  val lvars : t -> SS.t
+  val lvars : t -> Id.LVar.Set.t
 
   (** [pvars e] returns all program variables in [e] *)
-  val pvars : t -> SS.t
+  val pvars : t -> Id.Var.Set.t
 
   (** [alocs e] returns all abstract locations in [e] *)
-  val alocs : t -> SS.t
+  val alocs : t -> Id.ALoc.Set.t
 
   (** [clocs e] returns all concrete locations in [e] *)
-  val clocs : t -> SS.t
+  val clocs : t -> Id.Loc.Set.t
 
   (** [locs e] returns all concrete and abstract locations in [e] *)
-  val locs : t -> SS.t
-
-  (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and
-      clocs) *)
-  val vars : t -> SS.t
+  val locs : t -> Id.Any_loc.Set.t
 
   (** [push_in_negations e] pushes all negations in e "downwards", recursively
   *)
@@ -399,7 +379,7 @@ module Expr : sig
   val is_boolean_expr : t -> bool
 
   (** [substitutables e] returns all lvars and alocs *)
-  val substitutables : t -> SS.t
+  val substitutables : t -> Id.Substable.Set.t
 
   (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc
   *)
@@ -418,16 +398,11 @@ module Expr : sig
 
   (** [subst_clocs subst e] substitutes expressions of the form [Lit (Loc l)]
       with [subst l] in [e] *)
-  val subst_clocs : (string -> t) -> t -> t
+  val subst_clocs : (Id.Loc.t -> t) -> t -> t
 
-  (** [from_var_name var] returns either an aloc, an lvar or a pvar if [var]
-      name matches one of these types (see {!Utils.Names.is_aloc_name},
-      {!Utils.Names.is_lvar_name} and {!Utils.Names.is_pvar_name}) *)
-  val from_var_name : string -> t
-
-  (** [loc_from_loc_name loc] Has the same behaviour as [from_var_name] except
-      that it returns either an [ALoc loc] or a [Lit (Loc loc)] *)
-  val loc_from_loc_name : string -> t
+  (** [loc_from_loc_name loc] returns either an [ALoc loc] or a [Lit (Loc loc)]
+  *)
+  val loc_from_loc_name : [< Id.any_loc ] Id.t -> t
 
   (** [subst_expr_for_expr ~to_subst ~subst_with expr] substitutes every
       occurence of the expression [to_subst] with the expression [subst_with] in
@@ -438,9 +413,13 @@ module Expr : sig
       abstract locations, and non-list literals in [e] *)
   val base_elements : t -> t list
 
-  (** [var_to_expr x] returns the expression representing the program/logical
-      variable or abstract location [x] *)
-  val var_to_expr : string -> t
+  (** [as_any_var e] is [Some x] when [e] is the program or logical variable [x]
+  *)
+  val as_any_var : t -> Id.any_var Id.t option
+
+  (** [of_any_var x] returns the expression representing the program or logical
+      variable [x] *)
+  val of_any_var : [< Id.any_var ] Id.t -> t
 
   (** [is_matchable x] returns whether or not the expression [e] is matchable *)
   val is_matchable : t -> bool
@@ -536,19 +515,19 @@ module Asrt : sig
   val map : (Expr.t -> Expr.t) -> t -> t
 
   (** Get all the logical variables in [a] *)
-  val lvars : t -> SS.t
+  val lvars : t -> Id.LVar.Set.t
 
   (** Get all the program variables in [a] *)
-  val pvars : t -> SS.t
+  val pvars : t -> Id.Var.Set.t
 
   (** Get all the abstract locations in [a] *)
-  val alocs : t -> SS.t
+  val alocs : t -> Id.ALoc.Set.t
 
   (** Get all the concrete locations in [a] *)
-  val clocs : t -> SS.t
+  val clocs : t -> Id.Loc.Set.t
 
   (** Get all locations in [a] *)
-  val locs : t -> SS.t
+  val locs : t -> Id.Any_loc.Set.t
 
   (** Returns a list with the names of the predicates that occur in [a] *)
   val pred_names : t -> string list
@@ -575,7 +554,7 @@ module Asrt : sig
 
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)]
       with [subst l] in [a] *)
-  val subst_clocs : (string -> Expr.t) -> t -> t
+  val subst_clocs : (Id.Loc.t -> Expr.t) -> t -> t
 
   (** [subst_expr_for_expr ~to_subst ~subst_with a] substitutes every occurence
       of the expression [to_subst] with the expression [subst_with] in [a] *)
@@ -591,20 +570,23 @@ module SLCmd : sig
 
   type t =
     | Fold of
-        string * Expr.t option list * (string * (string * Expr.t) list) option
+        string
+        * Expr.t option list
+        * (string * (Id.LVar.t * Expr.t) list) option
         (** Fold predicate. The arguments are read as for {!Unfold}. *)
     | Unfold of
-        string * Expr.t option list * (string * string) list option * bool
+        string * Expr.t option list * (Id.LVar.t * Id.LVar.t) list option * bool
         (** Unfold predicate. The in-parameters must all be given; the
             out-parameters may be omitted altogether, or given individually,
             with [None] for an out-parameter that is explicitly ignored. *)
     | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand packaging *)
     | GUnfold of string  (** Global Unfold *)
-    | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
-    | SepAssert of Asrt.t * string list  (** Assert *)
-    | Invariant of Asrt.t * string list  (** Invariant *)
-    | Consume of Asrt.t * string list
+    | ApplyLem of string * Expr.t list * Id.any_var Id.t list
+        (** Apply lemma *)
+    | SepAssert of Asrt.t * Id.any_var Id.t list  (** Assert *)
+    | Invariant of Asrt.t * Id.any_var Id.t list  (** Invariant *)
+    | Consume of Asrt.t * Id.any_var Id.t list
     | Produce of Asrt.t
     | SymbExec
 
@@ -612,9 +594,9 @@ module SLCmd : sig
   val map : (Asrt.t -> Asrt.t) -> (Expr.t -> Expr.t) -> t -> t
 
   (** Pretty-printer of folding info *)
-  val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
+  val pp_folding_info : (string * (Id.LVar.t * Expr.t) list) option Fmt.t
 
-  val pp_unfold_info : (string * string) list option Fmt.t
+  val pp_unfold_info : (Id.LVar.t * Id.LVar.t) list option Fmt.t
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
@@ -661,17 +643,17 @@ module SLCmd : sig
   (** The unfold action returns the logical variables its out-parameters bound;
       these encode and decode that list, which the state uses to keep them from
       being simplified away. *)
-  val enc_bound_lvars : string list -> Expr.t
+  val enc_bound_lvars : Id.LVar.t list -> Expr.t
 
-  val dec_bound_lvars : Expr.t list -> string list
+  val dec_bound_lvars : Expr.t list -> Id.LVar.t list
 
   (** The memory cannot see every logical variable the state knows of (the store
       and the spec-vars live in the state), so the state appends those to an
       unfold's action: an out-parameter naming one of them is then checked
       against the predicate found, rather than bound to it. *)
-  val add_known_lvars : Expr.t list -> string list -> Expr.t list
+  val add_known_lvars : Expr.t list -> Id.LVar.t list -> Expr.t list
 
-  val known_lvars : Expr.t list -> string list
+  val known_lvars : Expr.t list -> Id.LVar.t list
 end
 
 (** @canonical Gillian.Gil_syntax.LCmd *)
@@ -685,7 +667,7 @@ module LCmd : sig
     | Assert of Expr.t  (** Assert *)
     | Assume of Expr.t  (** Assume *)
     | AssumeType of Expr.t * Type.t  (** Assume Type *)
-    | FreshSVar of string  (** x := fresh_svar() *)
+    | FreshSVar of Id.Var.t  (** x := fresh_svar() *)
     | SL of SLCmd.t  (** Separation-logic command *)
 
   (** @deprecated Use {!Visitors.endo} instead *)
@@ -700,10 +682,10 @@ module Cmd : sig
   (** GIL Commands *)
 
   (** Optional bindings for procedure calls *)
-  type logic_bindings_t = string * (string * Expr.t) list
+  type logic_bindings_t = string * (Id.LVar.t * Expr.t) list
 
   type function_call = {
-    var_name : string;
+    var_name : Id.Var.t;
     fun_name : Expr.t;
     args : Expr.t list;
     bindings : logic_bindings_t option;
@@ -711,19 +693,20 @@ module Cmd : sig
 
   type 'label t =
     | Skip  (** Skip *)
-    | Assignment of string * Expr.t  (** Variable Assignment *)
-    | LAction of string * string * Expr.t list  (** Action *)
+    | Assignment of Id.Var.t * Expr.t  (** Variable Assignment *)
+    | LAction of Id.Var.t * string * Expr.t list  (** Action *)
     | Logic of LCmd.t  (** Logic commands *)
     | Goto of 'label  (** Unconditional goto *)
     | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
     | Call of function_call * 'label option  (** Procedure call *)
     | Par of function_call list  (** Parallel composition *)
-    | ECall of string * Expr.t * Expr.t list * 'label option
+    | ECall of Id.Var.t * Expr.t * Expr.t list * 'label option
         (** External Procedure call *)
-    | Apply of string * Expr.t * 'label option
+    | Apply of Id.Var.t * Expr.t * 'label option
         (** Application-style procedure call *)
-    | Arguments of string  (** Arguments of the currently executing function *)
-    | PhiAssignment of (string * Expr.t list) list  (** PHI-assignment *)
+    | Arguments of Id.Var.t
+        (** Arguments of the currently executing function *)
+    | PhiAssignment of (Id.Var.t * Expr.t list) list  (** PHI-assignment *)
     | ReturnNormal  (** Normal return *)
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
@@ -742,18 +725,18 @@ module Cmd : sig
   val successors : int t -> int -> int list
 
   (** Program variable collector *)
-  val pvars : 'a t -> Containers.SS.t
+  val pvars : 'a t -> Id.Var.Set.t
 
   (** Logical variable collector *)
-  val lvars : 'a t -> Containers.SS.t
+  val lvars : 'a t -> Id.LVar.Set.t
 
   (** Location collector *)
-  val locs : 'a t -> Containers.SS.t
+  val locs : 'a t -> Id.Any_loc.Set.t
 
   val call :
     ?bindings:logic_bindings_t ->
     ?error:'label ->
-    string ->
+    Id.Var.t ->
     Expr.t ->
     Expr.t list ->
     'label t
@@ -769,12 +752,12 @@ module Pred : sig
     pred_loc : Location.t option;
     pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
-    pred_params : (string * Type.t option) list;
+    pred_params : (Id.Var.t * Type.t option) list;
         (** Parameter names and (optional) types *)
     ins_number : int;
         (** Number of in-parameters: the first [ins_number] parameters are ins,
             and the remaining ones are outs *)
-    pred_definitions : ((string * string list) option * Asrt.t) list;
+    pred_definitions : ((string * Id.LVar.t list) option * Asrt.t) list;
         (** Predicate definitions *)
     pred_facts : Expr.t list;  (** Facts that hold for every definition *)
     pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
@@ -794,13 +777,13 @@ module Pred : sig
   val ins_and_outs : t -> Utils.Containers.SI.t * Utils.Containers.SI.t
 
   (** Returns the names of in-parameters *)
-  val in_params : t -> string list
+  val in_params : t -> Id.Var.t list
 
   (** Returns the in-parameters given all parameters *)
   val in_args : t -> 'a list -> 'a list
 
   (** Returns the names of in-parameters *)
-  val out_params : t -> string list
+  val out_params : t -> Id.Var.t list
 
   (** Returns the out-parameters given all parameters *)
   val out_args : t -> 'a list -> 'a list
@@ -876,11 +859,11 @@ module Lemma : sig
     lemma_name : string;  (** Name *)
     lemma_source_path : string option;
     lemma_internal : bool;
-    lemma_params : string list;  (** Parameters *)
+    lemma_params : Id.Var.t list;  (** Parameters *)
     lemma_specs : spec list;  (** Specs of the Lemma *)
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
-    lemma_existentials : string list; (* Existentials *)
+    lemma_existentials : Id.LVar.t list; (* Existentials *)
     lemma_location : Location.t option;
   }
 
@@ -910,7 +893,7 @@ module Func : sig
     func_source_path : string option;
     func_loc : Location.t option;
     func_num_params : int;
-    func_params : (string * Type.t option) list;
+    func_params : (Id.LVar.t * Type.t option) list;
     func_definition : Expr.t;
   }
 end
@@ -933,7 +916,7 @@ module Macro : sig
 
   type t = {
     macro_name : string;  (** Name of the macro *)
-    macro_params : string list;  (** Actual parameters *)
+    macro_params : Id.Var.t list;  (** Actual parameters *)
     macro_definition : LCmd.t list;  (** Macro definition *)
   }
 
@@ -976,13 +959,13 @@ module Spec : sig
     ss_variant : Expr.t option;  (** Variant *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
-    ss_label : (string * string list) option;
+    ss_label : (string * Id.LVar.t list) option;
   }
 
   (** Full specification *)
   type t = {
     spec_name : string;  (** Procedure/spec name *)
-    spec_params : string list;  (** Procedure/spec parameters *)
+    spec_params : Id.Var.t list;  (** Procedure/spec parameters *)
     spec_sspecs : st list;  (** List of single specifications *)
     spec_incomplete : bool;  (** If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
@@ -992,7 +975,7 @@ module Spec : sig
   (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single
       specification with the given values *)
   val s_init :
-    ?ss_label:string * string list ->
+    ?ss_label:string * Id.LVar.t list ->
     Asrt.t located ->
     Asrt.t located list ->
     Expr.t option ->
@@ -1003,13 +986,13 @@ module Spec : sig
   (** [init spec_name spec_params spec_sspecs spec_incomplete spec_to_verify]
       creates a full specification with the given values *)
   val init :
-    string -> string list -> st list -> bool -> bool -> Location.t option -> t
+    string -> Id.Var.t list -> st list -> bool -> bool -> Location.t option -> t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
 
   (** Return the list of parameters of a Spec *)
-  val get_params : t -> string list
+  val get_params : t -> Id.Var.t list
 
   val pp_sspec : Format.formatter -> st -> unit
   val pp : Format.formatter -> t -> unit
@@ -1021,8 +1004,7 @@ module Spec : sig
         For legacy purposes, some functions use string sets instead of string
         list existentials. This function allows for a smooth translation *)
   val label_vars_to_set :
-    ('a * Utils.Containers.SS.elt list) option ->
-    ('a * Utils.Containers.SS.t) option
+    ('a * Id.LVar.t list) option -> ('a * Id.LVar.Set.t) option
 
   (** {3 Serialization} *)
 
@@ -1039,13 +1021,13 @@ module BiSpec : sig
 
   type t = {
     bispec_name : string;  (** Procedure/spec name *)
-    bispec_params : string list;  (** Procedure/spec parameters *)
+    bispec_params : Id.Var.t list;  (** Procedure/spec parameters *)
     bispec_pres : Asrt.t located list;  (** Possible preconditions *)
   }
 
   type t_tbl = (string, t) Hashtbl.t
 
-  val init : string -> string list -> Asrt.t located list -> t
+  val init : string -> Id.Var.t list -> Asrt.t located list -> t
   val init_tbl : unit -> t_tbl
 
   (** Pretty-printer *)
@@ -1122,7 +1104,7 @@ module Proc : sig
     proc_source_path : string option;
     proc_internal : bool;
     proc_body : ('annot * 'label option * 'label Cmd.t) array;
-    proc_params : string list;
+    proc_params : Id.Var.t list;
     proc_spec : Spec.t option;
     proc_aliases : string list;
     proc_calls : string list;
@@ -1132,7 +1114,7 @@ module Proc : sig
   [@@deriving yojson]
 
   (** Gets the parameters of the procedure *)
-  val get_params : ('a, 'b) t -> string list
+  val get_params : ('a, 'b) t -> Id.Var.t list
 
   (** If the [show_labels] flag is true, the labels will be written before the
       command they correspond to *)
@@ -1388,16 +1370,21 @@ module Visitors : sig
     constraint
     'b = < visit_'annot : 'c -> 'd -> 'd
          ; visit_'label : 'c -> 'f -> 'f
-         ; visit_ALoc : 'c -> Expr.t -> string -> Expr.t
+         ; visit_ALoc : 'c -> Expr.t -> Id.ALoc.t -> Expr.t
          ; visit_And : 'c -> BinOp.t -> BinOp.t
          ; visit_Impl : 'c -> BinOp.t -> BinOp.t
          ; visit_Apply :
-             'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
+             'c -> 'f Cmd.t -> Id.Var.t -> Expr.t -> 'f option -> 'f Cmd.t
          ; visit_ApplyLem :
-             'c -> SLCmd.t -> string -> Expr.t list -> string list -> SLCmd.t
-         ; visit_Arguments : 'c -> 'f Cmd.t -> string -> 'f Cmd.t
+             'c ->
+             SLCmd.t ->
+             string ->
+             Expr.t list ->
+             Id.any_var Id.t list ->
+             SLCmd.t
+         ; visit_Arguments : 'c -> 'f Cmd.t -> Id.Var.t -> 'f Cmd.t
          ; visit_Assert : 'c -> LCmd.t -> Expr.t -> LCmd.t
-         ; visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
+         ; visit_Assignment : 'c -> 'f Cmd.t -> Id.Var.t -> Expr.t -> 'f Cmd.t
          ; visit_Assume : 'c -> LCmd.t -> Expr.t -> LCmd.t
          ; visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
          ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
@@ -1422,7 +1409,7 @@ module Visitors : sig
              'c ->
              Expr.t ->
              Expr.t ->
-             (string * string list * Expr.t) list ->
+             (string * Id.LVar.t list * Expr.t) list ->
              Expr.t
          ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
          ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
@@ -1431,7 +1418,7 @@ module Visitors : sig
          ; visit_ECall :
              'c ->
              'f Cmd.t ->
-             string ->
+             Id.Var.t ->
              Expr.t ->
              Expr.t list ->
              'f option ->
@@ -1439,7 +1426,11 @@ module Visitors : sig
          ; visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
          ; visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
          ; visit_Exists :
-             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+             'c ->
+             Expr.t ->
+             (Id.LVar.t * Type.t option) list ->
+             Expr.t ->
+             Expr.t
          ; visit_Emp : 'c -> Asrt.atom -> Asrt.atom
          ; visit_Empty : 'c -> Literal.t -> Literal.t
          ; visit_EmptyType : 'c -> Type.t -> Type.t
@@ -1452,7 +1443,11 @@ module Visitors : sig
          ; visit_FMinus : 'c -> BinOp.t -> BinOp.t
          ; visit_FMod : 'c -> BinOp.t -> BinOp.t
          ; visit_ForAll :
-             'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+             'c ->
+             Expr.t ->
+             (Id.LVar.t * Type.t option) list ->
+             Expr.t ->
+             Expr.t
          ; visit_FuncApp : 'c -> Expr.t -> string -> Expr.t list -> Expr.t
          ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
          ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
@@ -1464,7 +1459,7 @@ module Visitors : sig
              SLCmd.t ->
              string ->
              Expr.t option list ->
-             (string * (string * Expr.t) list) option ->
+             (string * (Id.LVar.t * Expr.t) list) option ->
              SLCmd.t
          ; visit_CorePred :
              'c ->
@@ -1489,20 +1484,22 @@ module Visitors : sig
              'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
          ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
          ; visit_IntType : 'c -> Type.t -> Type.t
-         ; visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
-         ; visit_Consume : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+         ; visit_Invariant :
+             'c -> SLCmd.t -> Asrt.t -> Id.any_var Id.t list -> SLCmd.t
+         ; visit_Consume :
+             'c -> SLCmd.t -> Asrt.t -> Id.any_var Id.t list -> SLCmd.t
          ; visit_Produce : 'c -> SLCmd.t -> Asrt.t -> SLCmd.t
          ; visit_LAction :
-             'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
+             'c -> 'f Cmd.t -> Id.Var.t -> string -> Expr.t list -> 'f Cmd.t
          ; visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
-         ; visit_LVar : 'c -> Expr.t -> string -> Expr.t
+         ; visit_LVar : 'c -> Expr.t -> Id.LVar.t -> Expr.t
          ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
          ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_IsInt : 'c -> UnOp.t -> UnOp.t
          ; visit_ListType : 'c -> Type.t -> Type.t
          ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
-         ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
+         ; visit_Loc : 'c -> Literal.t -> Id.Loc.t -> Literal.t
          ; visit_LocalTime : 'c -> Constant.t -> Constant.t
          ; visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
          ; visit_LstCat : 'c -> NOp.t -> NOp.t
@@ -1544,16 +1541,17 @@ module Visitors : sig
          ; visit_ObjectType : 'c -> Type.t -> Type.t
          ; visit_Or : 'c -> BinOp.t -> BinOp.t
          ; visit_Par : 'c -> 'f Cmd.t -> Cmd.function_call list -> 'f Cmd.t
-         ; visit_PVar : 'c -> Expr.t -> string -> Expr.t
+         ; visit_PVar : 'c -> Expr.t -> Id.Var.t -> Expr.t
          ; visit_PhiAssignment :
-             'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
+             'c -> 'f Cmd.t -> (Id.Var.t * Expr.t list) list -> 'f Cmd.t
          ; visit_Pi : 'c -> Constant.t -> Constant.t
          ; visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
          ; visit_Random : 'c -> Constant.t -> Constant.t
          ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
          ; visit_SL : 'c -> LCmd.t -> SLCmd.t -> LCmd.t
-         ; visit_SepAssert : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+         ; visit_SepAssert :
+             'c -> SLCmd.t -> Asrt.t -> Id.any_var Id.t list -> SLCmd.t
          ; visit_SetDiff : 'c -> BinOp.t -> BinOp.t
          ; visit_SetInter : 'c -> NOp.t -> NOp.t
          ; visit_SetMem : 'c -> BinOp.t -> BinOp.t
@@ -1565,7 +1563,7 @@ module Visitors : sig
          ; visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
          ; visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
          ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
-         ; visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
+         ; visit_FreshSVar : 'c -> LCmd.t -> Id.Var.t -> LCmd.t
          ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
          ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
          ; visit_StrLess : 'c -> BinOp.t -> BinOp.t
@@ -1595,7 +1593,7 @@ module Visitors : sig
              SLCmd.t ->
              string ->
              Expr.t option list ->
-             (string * string) list option ->
+             (Id.LVar.t * Id.LVar.t) list option ->
              bool ->
              SLCmd.t
          ; visit_Package :
@@ -1611,8 +1609,8 @@ module Visitors : sig
          ; visit_assertion : 'c -> Asrt.t -> Asrt.t
          ; visit_bindings :
              'c ->
-             string * (string * Expr.t) list ->
-             string * (string * Expr.t) list
+             string * (Id.LVar.t * Expr.t) list ->
+             string * (Id.LVar.t * Expr.t) list
          ; visit_binop : 'c -> BinOp.t -> BinOp.t
          ; visit_bispec : 'c -> BiSpec.t -> BiSpec.t
          ; visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1641,19 +1639,19 @@ module Visitors : sig
 
     method visit_'annot : 'c -> 'd -> 'd
     method visit_'label : 'c -> 'f -> 'f
-    method visit_ALoc : 'c -> Expr.t -> string -> Expr.t
+    method visit_ALoc : 'c -> Expr.t -> Id.ALoc.t -> Expr.t
     method visit_And : 'c -> BinOp.t -> BinOp.t
     method visit_Impl : 'c -> BinOp.t -> BinOp.t
 
     method visit_Apply :
-      'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
+      'c -> 'f Cmd.t -> Id.Var.t -> Expr.t -> 'f option -> 'f Cmd.t
 
     method visit_ApplyLem :
-      'c -> SLCmd.t -> string -> Expr.t list -> string list -> SLCmd.t
+      'c -> SLCmd.t -> string -> Expr.t list -> Id.any_var Id.t list -> SLCmd.t
 
-    method visit_Arguments : 'c -> 'f Cmd.t -> string -> 'f Cmd.t
+    method visit_Arguments : 'c -> 'f Cmd.t -> Id.Var.t -> 'f Cmd.t
     method visit_Assert : 'c -> LCmd.t -> Expr.t -> LCmd.t
-    method visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
+    method visit_Assignment : 'c -> 'f Cmd.t -> Id.Var.t -> Expr.t -> 'f Cmd.t
     method visit_Assume : 'c -> LCmd.t -> Expr.t -> LCmd.t
     method visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
     method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
@@ -1678,7 +1676,11 @@ module Visitors : sig
     method visit_Car : 'c -> UnOp.t -> UnOp.t
 
     method visit_Cases :
-      'c -> Expr.t -> Expr.t -> (string * string list * Expr.t) list -> Expr.t
+      'c ->
+      Expr.t ->
+      Expr.t ->
+      (string * Id.LVar.t list * Expr.t) list ->
+      Expr.t
 
     method visit_Cdr : 'c -> UnOp.t -> UnOp.t
     method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
@@ -1687,13 +1689,19 @@ module Visitors : sig
       'c -> Expr.t -> string -> Expr.t list -> Expr.t
 
     method visit_ECall :
-      'c -> 'f Cmd.t -> string -> Expr.t -> Expr.t list -> 'f option -> 'f Cmd.t
+      'c ->
+      'f Cmd.t ->
+      Id.Var.t ->
+      Expr.t ->
+      Expr.t list ->
+      'f option ->
+      'f Cmd.t
 
     method visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
     method visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
 
     method visit_Exists :
-      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+      'c -> Expr.t -> (Id.LVar.t * Type.t option) list -> Expr.t -> Expr.t
 
     method visit_Emp : 'c -> Asrt.atom -> Asrt.atom
     method visit_Empty : 'c -> Literal.t -> Literal.t
@@ -1718,11 +1726,11 @@ module Visitors : sig
       SLCmd.t ->
       string ->
       Expr.t option list ->
-      (string * (string * Expr.t) list) option ->
+      (string * (Id.LVar.t * Expr.t) list) option ->
       SLCmd.t
 
     method visit_ForAll :
-      'c -> Expr.t -> (string * Type.t option) list -> Expr.t -> Expr.t
+      'c -> Expr.t -> (Id.LVar.t * Type.t option) list -> Expr.t -> Expr.t
 
     method visit_CorePred :
       'c -> Asrt.atom -> string -> Expr.t list -> Expr.t list -> Asrt.atom
@@ -1745,22 +1753,27 @@ module Visitors : sig
 
     method visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
     method visit_IntType : 'c -> Type.t -> Type.t
-    method visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
-    method visit_Consume : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+
+    method visit_Invariant :
+      'c -> SLCmd.t -> Asrt.t -> Id.any_var Id.t list -> SLCmd.t
+
+    method visit_Consume :
+      'c -> SLCmd.t -> Asrt.t -> Id.any_var Id.t list -> SLCmd.t
+
     method visit_Produce : 'c -> SLCmd.t -> Asrt.t -> SLCmd.t
 
     method visit_LAction :
-      'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
+      'c -> 'f Cmd.t -> Id.Var.t -> string -> Expr.t list -> 'f Cmd.t
 
     method visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
-    method visit_LVar : 'c -> Expr.t -> string -> Expr.t
+    method visit_LVar : 'c -> Expr.t -> Id.LVar.t -> Expr.t
     method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
     method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
     method visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
     method visit_IsInt : 'c -> UnOp.t -> UnOp.t
     method visit_ListType : 'c -> Type.t -> Type.t
     method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
-    method visit_Loc : 'c -> Literal.t -> string -> Literal.t
+    method visit_Loc : 'c -> Literal.t -> Id.Loc.t -> Literal.t
     method visit_LocalTime : 'c -> Constant.t -> Constant.t
     method visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
     method visit_LstCat : 'c -> NOp.t -> NOp.t
@@ -1802,10 +1815,10 @@ module Visitors : sig
     method visit_ObjectType : 'c -> Type.t -> Type.t
     method visit_Or : 'c -> BinOp.t -> BinOp.t
     method visit_Par : 'c -> 'f Cmd.t -> Cmd.function_call list -> 'f Cmd.t
-    method visit_PVar : 'c -> Expr.t -> string -> Expr.t
+    method visit_PVar : 'c -> Expr.t -> Id.Var.t -> Expr.t
 
     method visit_PhiAssignment :
-      'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
+      'c -> 'f Cmd.t -> (Id.Var.t * Expr.t list) list -> 'f Cmd.t
 
     method visit_Pi : 'c -> Constant.t -> Constant.t
     method visit_Pure : 'c -> Asrt.atom -> Expr.t -> Asrt.atom
@@ -1813,7 +1826,10 @@ module Visitors : sig
     method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
     method visit_SL : 'c -> LCmd.t -> SLCmd.t -> LCmd.t
-    method visit_SepAssert : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+
+    method visit_SepAssert :
+      'c -> SLCmd.t -> Asrt.t -> Id.any_var Id.t list -> SLCmd.t
+
     method visit_SetDiff : 'c -> BinOp.t -> BinOp.t
     method visit_SetInter : 'c -> NOp.t -> NOp.t
     method visit_SetMem : 'c -> BinOp.t -> BinOp.t
@@ -1825,7 +1841,7 @@ module Visitors : sig
     method visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
     method visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
     method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
-    method visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
+    method visit_FreshSVar : 'c -> LCmd.t -> Id.Var.t -> LCmd.t
     method visit_StrCat : 'c -> BinOp.t -> BinOp.t
     method visit_StrLen : 'c -> UnOp.t -> UnOp.t
     method visit_StrLess : 'c -> BinOp.t -> BinOp.t
@@ -1856,7 +1872,7 @@ module Visitors : sig
       SLCmd.t ->
       string ->
       Expr.t option list ->
-      (string * string) list option ->
+      (Id.LVar.t * Id.LVar.t) list option ->
       bool ->
       SLCmd.t
 
@@ -1874,7 +1890,9 @@ module Visitors : sig
     method visit_assertion : 'c -> Asrt.t -> Asrt.t
 
     method visit_bindings :
-      'c -> string * (string * Expr.t) list -> string * (string * Expr.t) list
+      'c ->
+      string * (Id.LVar.t * Expr.t) list ->
+      string * (Id.LVar.t * Expr.t) list
 
     method visit_binop : 'c -> BinOp.t -> BinOp.t
     method visit_bispec : 'c -> BiSpec.t -> BiSpec.t
@@ -1940,14 +1958,15 @@ module Visitors : sig
     constraint
     'b = < visit_'annot : 'c -> 'd -> 'f
          ; visit_'label : 'c -> 'g -> 'f
-         ; visit_ALoc : 'c -> ALoc.t -> 'f
+         ; visit_ALoc : 'c -> Id.ALoc.t -> 'f
          ; visit_And : 'c -> 'f
          ; visit_Impl : 'c -> 'f
-         ; visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
-         ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
-         ; visit_Arguments : 'c -> string -> 'f
+         ; visit_Apply : 'c -> Id.Var.t -> Expr.t -> 'g option -> 'f
+         ; visit_ApplyLem :
+             'c -> string -> Expr.t list -> Id.any_var Id.t list -> 'f
+         ; visit_Arguments : 'c -> Id.Var.t -> 'f
          ; visit_Assert : 'c -> Expr.t -> 'f
-         ; visit_Assignment : 'c -> string -> Expr.t -> 'f
+         ; visit_Assignment : 'c -> Id.Var.t -> Expr.t -> 'f
          ; visit_Assume : 'c -> Expr.t -> 'f
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
@@ -1968,17 +1987,17 @@ module Visitors : sig
          ; visit_Call : 'c -> Cmd.function_call -> 'g option -> 'f
          ; visit_Car : 'c -> 'f
          ; visit_Cases :
-             'c -> Expr.t -> (string * string list * Expr.t) list -> 'f
+             'c -> Expr.t -> (string * Id.LVar.t list * Expr.t) list -> 'f
          ; visit_Cdr : 'c -> 'f
          ; visit_Constant : 'c -> Constant.t -> 'f
          ; visit_ConstructorApp : 'c -> string -> Expr.t list -> 'f
          ; visit_IDiv : 'c -> 'f
          ; visit_FDiv : 'c -> 'f
          ; visit_ECall :
-             'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
+             'c -> Id.Var.t -> Expr.t -> Expr.t list -> 'g option -> 'f
          ; visit_EList : 'c -> Expr.t list -> 'f
          ; visit_ESet : 'c -> Expr.t list -> 'f
-         ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_Exists : 'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> 'f
          ; visit_Emp : 'c -> 'f
          ; visit_Empty : 'c -> 'f
          ; visit_EmptyType : 'c -> 'f
@@ -1990,9 +2009,9 @@ module Visitors : sig
              'c ->
              string ->
              Expr.t option list ->
-             (string * (string * Expr.t) list) option ->
+             (string * (Id.LVar.t * Expr.t) list) option ->
              'f
-         ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+         ; visit_ForAll : 'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> 'f
          ; visit_function_call : 'c -> Cmd.function_call -> 'f
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
          ; visit_DatatypeType : 'c -> string -> 'f
@@ -2000,12 +2019,12 @@ module Visitors : sig
          ; visit_Goto : 'c -> 'g -> 'f
          ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
          ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
-         ; visit_Invariant : 'c -> Asrt.t -> string list -> 'f
-         ; visit_Consume : 'c -> Asrt.t -> string list -> 'f
+         ; visit_Invariant : 'c -> Asrt.t -> Id.any_var Id.t list -> 'f
+         ; visit_Consume : 'c -> Asrt.t -> Id.any_var Id.t list -> 'f
          ; visit_Produce : 'c -> Asrt.t -> 'f
-         ; visit_LAction : 'c -> string -> string -> Expr.t list -> 'f
+         ; visit_LAction : 'c -> Id.Var.t -> string -> Expr.t list -> 'f
          ; visit_LList : 'c -> Literal.t list -> 'f
-         ; visit_LVar : 'c -> LVar.t -> 'f
+         ; visit_LVar : 'c -> Id.LVar.t -> 'f
          ; visit_LeftShift : 'c -> 'f
          ; visit_LeftShiftL : 'c -> 'f
          ; visit_LeftShiftF : 'c -> 'f
@@ -2016,7 +2035,7 @@ module Visitors : sig
          ; visit_FLessThanEqual : 'c -> 'f
          ; visit_ListType : 'c -> 'f
          ; visit_Lit : 'c -> Literal.t -> 'f
-         ; visit_Loc : 'c -> string -> 'f
+         ; visit_Loc : 'c -> Id.Loc.t -> 'f
          ; visit_LocalTime : 'c -> 'f
          ; visit_Logic : 'c -> LCmd.t -> 'f
          ; visit_LstCat : 'c -> 'f
@@ -2064,8 +2083,8 @@ module Visitors : sig
          ; visit_ObjectType : 'c -> 'f
          ; visit_Or : 'c -> 'f
          ; visit_Par : 'c -> Cmd.function_call list -> 'f
-         ; visit_PVar : 'c -> string -> 'f
-         ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
+         ; visit_PVar : 'c -> Id.Var.t -> 'f
+         ; visit_PhiAssignment : 'c -> (Id.Var.t * Expr.t list) list -> 'f
          ; visit_Pi : 'c -> 'f
          ; visit_IPlus : 'c -> 'f
          ; visit_FPlus : 'c -> 'f
@@ -2074,7 +2093,7 @@ module Visitors : sig
          ; visit_ReturnError : 'c -> 'f
          ; visit_ReturnNormal : 'c -> 'f
          ; visit_SL : 'c -> SLCmd.t -> 'f
-         ; visit_SepAssert : 'c -> Asrt.t -> string list -> 'f
+         ; visit_SepAssert : 'c -> Asrt.t -> Id.any_var Id.t list -> 'f
          ; visit_SetDiff : 'c -> 'f
          ; visit_SetInter : 'c -> 'f
          ; visit_SetMem : 'c -> 'f
@@ -2086,7 +2105,7 @@ module Visitors : sig
          ; visit_SignedRightShiftL : 'c -> 'f
          ; visit_SignedRightShiftF : 'c -> 'f
          ; visit_Skip : 'c -> 'f
-         ; visit_FreshSVar : 'c -> string -> 'f
+         ; visit_FreshSVar : 'c -> Id.Var.t -> 'f
          ; visit_FuncApp : 'c -> string -> Expr.t list -> 'f
          ; visit_StrCat : 'c -> 'f
          ; visit_StrLen : 'c -> 'f
@@ -2120,7 +2139,7 @@ module Visitors : sig
              'c ->
              string ->
              Expr.t option list ->
-             (string * string) list option ->
+             (Id.LVar.t * Id.LVar.t) list option ->
              bool ->
              'f
          ; visit_Package :
@@ -2130,7 +2149,7 @@ module Visitors : sig
          ; visit_UnsignedRightShiftF : 'c -> 'f
          ; visit_assertion_atom : 'c -> Asrt.atom -> 'f
          ; visit_assertion : 'c -> Asrt.t -> 'f
-         ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
+         ; visit_bindings : 'c -> string * (Id.LVar.t * Expr.t) list -> 'f
          ; visit_binop : 'c -> BinOp.t -> 'f
          ; visit_bispec : 'c -> BiSpec.t -> 'f
          ; visit_cmd : 'c -> 'g Cmd.t -> 'f
@@ -2160,14 +2179,17 @@ module Visitors : sig
     method virtual private plus : 'f -> 'f -> 'f
     method visit_'annot : 'c -> 'd -> 'f
     method visit_'label : 'c -> 'g -> 'f
-    method visit_ALoc : 'c -> ALoc.t -> 'f
+    method visit_ALoc : 'c -> Id.ALoc.t -> 'f
     method visit_And : 'c -> 'f
     method visit_Impl : 'c -> 'f
-    method visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
-    method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
-    method visit_Arguments : 'c -> string -> 'f
+    method visit_Apply : 'c -> Id.Var.t -> Expr.t -> 'g option -> 'f
+
+    method visit_ApplyLem :
+      'c -> string -> Expr.t list -> Id.any_var Id.t list -> 'f
+
+    method visit_Arguments : 'c -> Id.Var.t -> 'f
     method visit_Assert : 'c -> Expr.t -> 'f
-    method visit_Assignment : 'c -> string -> Expr.t -> 'f
+    method visit_Assignment : 'c -> Id.Var.t -> Expr.t -> 'f
     method visit_Assume : 'c -> Expr.t -> 'f
     method visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
@@ -2189,7 +2211,7 @@ module Visitors : sig
     method visit_Car : 'c -> 'f
 
     method visit_Cases :
-      'c -> Expr.t -> (string * string list * Expr.t) list -> 'f
+      'c -> Expr.t -> (string * Id.LVar.t list * Expr.t) list -> 'f
 
     method visit_Cdr : 'c -> 'f
     method visit_Constant : 'c -> Constant.t -> 'f
@@ -2198,11 +2220,11 @@ module Visitors : sig
     method visit_FDiv : 'c -> 'f
 
     method visit_ECall :
-      'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
+      'c -> Id.Var.t -> Expr.t -> Expr.t list -> 'g option -> 'f
 
     method visit_EList : 'c -> Expr.t list -> 'f
     method visit_ESet : 'c -> Expr.t list -> 'f
-    method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_Exists : 'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> 'f
     method visit_Emp : 'c -> 'f
     method visit_Empty : 'c -> 'f
     method visit_EmptyType : 'c -> 'f
@@ -2215,10 +2237,10 @@ module Visitors : sig
       'c ->
       string ->
       Expr.t option list ->
-      (string * (string * Expr.t) list) option ->
+      (string * (Id.LVar.t * Expr.t) list) option ->
       'f
 
-    method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> 'f
+    method visit_ForAll : 'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> 'f
     method visit_function_call : 'c -> Cmd.function_call -> 'f
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> 'f
     method visit_DatatypeType : 'c -> string -> 'f
@@ -2227,12 +2249,12 @@ module Visitors : sig
     method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
     method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
     method visit_IsInt : 'c -> 'f
-    method visit_Invariant : 'c -> Asrt.t -> string list -> 'f
-    method visit_Consume : 'c -> Asrt.t -> string list -> 'f
+    method visit_Invariant : 'c -> Asrt.t -> Id.any_var Id.t list -> 'f
+    method visit_Consume : 'c -> Asrt.t -> Id.any_var Id.t list -> 'f
     method visit_Produce : 'c -> Asrt.t -> 'f
-    method visit_LAction : 'c -> string -> string -> Expr.t list -> 'f
+    method visit_LAction : 'c -> Id.Var.t -> string -> Expr.t list -> 'f
     method visit_LList : 'c -> Literal.t list -> 'f
-    method visit_LVar : 'c -> LVar.t -> 'f
+    method visit_LVar : 'c -> Id.LVar.t -> 'f
     method visit_LeftShift : 'c -> 'f
     method visit_LeftShiftL : 'c -> 'f
     method visit_LeftShiftF : 'c -> 'f
@@ -2242,7 +2264,7 @@ module Visitors : sig
     method visit_FLessThanEqual : 'c -> 'f
     method visit_ListType : 'c -> 'f
     method visit_Lit : 'c -> Literal.t -> 'f
-    method visit_Loc : 'c -> string -> 'f
+    method visit_Loc : 'c -> Id.Loc.t -> 'f
     method visit_LocalTime : 'c -> 'f
     method visit_Logic : 'c -> LCmd.t -> 'f
     method visit_LstCat : 'c -> 'f
@@ -2290,8 +2312,8 @@ module Visitors : sig
     method visit_ObjectType : 'c -> 'f
     method visit_Or : 'c -> 'f
     method visit_Par : 'c -> Cmd.function_call list -> 'f
-    method visit_PVar : 'c -> string -> 'f
-    method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
+    method visit_PVar : 'c -> Id.Var.t -> 'f
+    method visit_PhiAssignment : 'c -> (Id.Var.t * Expr.t list) list -> 'f
     method visit_Pi : 'c -> 'f
     method visit_IPlus : 'c -> 'f
     method visit_FPlus : 'c -> 'f
@@ -2300,7 +2322,7 @@ module Visitors : sig
     method visit_ReturnError : 'c -> 'f
     method visit_ReturnNormal : 'c -> 'f
     method visit_SL : 'c -> SLCmd.t -> 'f
-    method visit_SepAssert : 'c -> Asrt.t -> string list -> 'f
+    method visit_SepAssert : 'c -> Asrt.t -> Id.any_var Id.t list -> 'f
     method visit_SetDiff : 'c -> 'f
     method visit_SetInter : 'c -> 'f
     method visit_SetMem : 'c -> 'f
@@ -2312,7 +2334,7 @@ module Visitors : sig
     method visit_SignedRightShiftL : 'c -> 'f
     method visit_SignedRightShiftF : 'c -> 'f
     method visit_Skip : 'c -> 'f
-    method visit_FreshSVar : 'c -> string -> 'f
+    method visit_FreshSVar : 'c -> Id.Var.t -> 'f
     method visit_FuncApp : 'c -> string -> Expr.t list -> 'f
     method visit_StrCat : 'c -> 'f
     method visit_StrLen : 'c -> 'f
@@ -2347,7 +2369,7 @@ module Visitors : sig
       'c ->
       string ->
       Expr.t option list ->
-      (string * string) list option ->
+      (Id.LVar.t * Id.LVar.t) list option ->
       bool ->
       'f
 
@@ -2359,7 +2381,7 @@ module Visitors : sig
     method visit_UnsignedRightShiftF : 'c -> 'f
     method visit_assertion_atom : 'c -> Asrt.atom -> 'f
     method visit_assertion : 'c -> Asrt.t -> 'f
-    method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
+    method visit_bindings : 'c -> string * (Id.LVar.t * Expr.t) list -> 'f
     method visit_binop : 'c -> BinOp.t -> 'f
     method visit_bispec : 'c -> BiSpec.t -> 'f
     method visit_cmd : 'c -> 'g Cmd.t -> 'f
@@ -2391,14 +2413,15 @@ module Visitors : sig
     constraint
     'b = < visit_'annot : 'c -> 'd -> unit
          ; visit_'label : 'c -> 'f -> unit
-         ; visit_ALoc : 'c -> string -> unit
+         ; visit_ALoc : 'c -> Id.ALoc.t -> unit
          ; visit_And : 'c -> unit
          ; visit_Impl : 'c -> unit
-         ; visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
-         ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
-         ; visit_Arguments : 'c -> string -> unit
+         ; visit_Apply : 'c -> Id.Var.t -> Expr.t -> 'f option -> unit
+         ; visit_ApplyLem :
+             'c -> string -> Expr.t list -> Id.any_var Id.t list -> unit
+         ; visit_Arguments : 'c -> Id.Var.t -> unit
          ; visit_Assert : 'c -> Expr.t -> unit
-         ; visit_Assignment : 'c -> string -> Expr.t -> unit
+         ; visit_Assignment : 'c -> Id.Var.t -> Expr.t -> unit
          ; visit_Assume : 'c -> Expr.t -> unit
          ; visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
          ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
@@ -2419,15 +2442,16 @@ module Visitors : sig
          ; visit_Call : 'c -> Cmd.function_call -> 'f option -> unit
          ; visit_Car : 'c -> unit
          ; visit_Cases :
-             'c -> Expr.t -> (string * string list * Expr.t) list -> unit
+             'c -> Expr.t -> (string * Id.LVar.t list * Expr.t) list -> unit
          ; visit_Cdr : 'c -> unit
          ; visit_Constant : 'c -> Constant.t -> unit
          ; visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
          ; visit_ECall :
-             'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
+             'c -> Id.Var.t -> Expr.t -> Expr.t list -> 'f option -> unit
          ; visit_EList : 'c -> Expr.t list -> unit
          ; visit_ESet : 'c -> Expr.t list -> unit
-         ; visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
+         ; visit_Exists :
+             'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> unit
          ; visit_Emp : 'c -> unit
          ; visit_Empty : 'c -> unit
          ; visit_EmptyType : 'c -> unit
@@ -2448,9 +2472,10 @@ module Visitors : sig
              'c ->
              string ->
              Expr.t option list ->
-             (string * (string * Expr.t) list) option ->
+             (string * (Id.LVar.t * Expr.t) list) option ->
              unit
-         ; visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
+         ; visit_ForAll :
+             'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> unit
          ; visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
          ; visit_DatatypeType : 'c -> string -> unit
          ; visit_GUnfold : 'c -> string -> unit
@@ -2467,19 +2492,19 @@ module Visitors : sig
          ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
          ; visit_Int : 'c -> Z.t -> unit
          ; visit_IntType : 'c -> unit
-         ; visit_Invariant : 'c -> Asrt.t -> string list -> unit
-         ; visit_Consume : 'c -> Asrt.t -> string list -> unit
+         ; visit_Invariant : 'c -> Asrt.t -> Id.any_var Id.t list -> unit
+         ; visit_Consume : 'c -> Asrt.t -> Id.any_var Id.t list -> unit
          ; visit_Produce : 'c -> Asrt.t -> unit
-         ; visit_LAction : 'c -> string -> string -> Expr.t list -> unit
+         ; visit_LAction : 'c -> Id.Var.t -> string -> Expr.t list -> unit
          ; visit_LList : 'c -> Literal.t list -> unit
-         ; visit_LVar : 'c -> string -> unit
+         ; visit_LVar : 'c -> Id.LVar.t -> unit
          ; visit_LeftShift : 'c -> unit
          ; visit_LeftShiftL : 'c -> unit
          ; visit_LeftShiftF : 'c -> unit
          ; visit_IsInt : 'c -> unit
          ; visit_ListType : 'c -> unit
          ; visit_Lit : 'c -> Literal.t -> unit
-         ; visit_Loc : 'c -> string -> unit
+         ; visit_Loc : 'c -> Id.Loc.t -> unit
          ; visit_LocalTime : 'c -> unit
          ; visit_Logic : 'c -> LCmd.t -> unit
          ; visit_LstCat : 'c -> unit
@@ -2521,15 +2546,15 @@ module Visitors : sig
          ; visit_ObjectType : 'c -> unit
          ; visit_Or : 'c -> unit
          ; visit_Par : 'c -> Cmd.function_call list -> unit
-         ; visit_PVar : 'c -> string -> unit
-         ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
+         ; visit_PVar : 'c -> Id.Var.t -> unit
+         ; visit_PhiAssignment : 'c -> (Id.Var.t * Expr.t list) list -> unit
          ; visit_Pi : 'c -> unit
          ; visit_Pure : 'c -> Expr.t -> unit
          ; visit_Random : 'c -> unit
          ; visit_ReturnError : 'c -> unit
          ; visit_ReturnNormal : 'c -> unit
          ; visit_SL : 'c -> SLCmd.t -> unit
-         ; visit_SepAssert : 'c -> Asrt.t -> string list -> unit
+         ; visit_SepAssert : 'c -> Asrt.t -> Id.any_var Id.t list -> unit
          ; visit_SetDiff : 'c -> unit
          ; visit_SetInter : 'c -> unit
          ; visit_SetMem : 'c -> unit
@@ -2541,7 +2566,7 @@ module Visitors : sig
          ; visit_SignedRightShiftL : 'c -> unit
          ; visit_SignedRightShiftF : 'c -> unit
          ; visit_Skip : 'c -> unit
-         ; visit_FreshSVar : 'c -> string -> unit
+         ; visit_FreshSVar : 'c -> Id.Var.t -> unit
          ; visit_FuncApp : 'c -> string -> Expr.t list -> unit
          ; visit_StrCat : 'c -> unit
          ; visit_StrLen : 'c -> unit
@@ -2570,7 +2595,7 @@ module Visitors : sig
              'c ->
              string ->
              Expr.t option list ->
-             (string * string) list option ->
+             (Id.LVar.t * Id.LVar.t) list option ->
              bool ->
              unit
          ; visit_Package :
@@ -2580,7 +2605,7 @@ module Visitors : sig
          ; visit_UnsignedRightShiftF : 'c -> unit
          ; visit_assertion_atom : 'c -> Asrt.atom -> unit
          ; visit_assertion : 'c -> Asrt.t -> unit
-         ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
+         ; visit_bindings : 'c -> string * (Id.LVar.t * Expr.t) list -> unit
          ; visit_binop : 'c -> BinOp.t -> unit
          ; visit_bispec : 'c -> BiSpec.t -> unit
          ; visit_cmd : 'c -> 'f Cmd.t -> unit
@@ -2609,14 +2634,17 @@ module Visitors : sig
 
     method visit_'annot : 'c -> 'd -> unit
     method visit_'label : 'c -> 'f -> unit
-    method visit_ALoc : 'c -> string -> unit
+    method visit_ALoc : 'c -> Id.ALoc.t -> unit
     method visit_And : 'c -> unit
     method visit_Impl : 'c -> unit
-    method visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
-    method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
-    method visit_Arguments : 'c -> string -> unit
+    method visit_Apply : 'c -> Id.Var.t -> Expr.t -> 'f option -> unit
+
+    method visit_ApplyLem :
+      'c -> string -> Expr.t list -> Id.any_var Id.t list -> unit
+
+    method visit_Arguments : 'c -> Id.Var.t -> unit
     method visit_Assert : 'c -> Expr.t -> unit
-    method visit_Assignment : 'c -> string -> Expr.t -> unit
+    method visit_Assignment : 'c -> Id.Var.t -> Expr.t -> unit
     method visit_Assume : 'c -> Expr.t -> unit
     method visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
     method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
@@ -2638,18 +2666,21 @@ module Visitors : sig
     method visit_Car : 'c -> unit
 
     method visit_Cases :
-      'c -> Expr.t -> (string * string list * Expr.t) list -> unit
+      'c -> Expr.t -> (string * Id.LVar.t list * Expr.t) list -> unit
 
     method visit_Cdr : 'c -> unit
     method visit_Constant : 'c -> Constant.t -> unit
     method visit_ConstructorApp : 'c -> string -> Expr.t list -> unit
 
     method visit_ECall :
-      'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
+      'c -> Id.Var.t -> Expr.t -> Expr.t list -> 'f option -> unit
 
     method visit_EList : 'c -> Expr.t list -> unit
     method visit_ESet : 'c -> Expr.t list -> unit
-    method visit_Exists : 'c -> (string * Type.t option) list -> Expr.t -> unit
+
+    method visit_Exists :
+      'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> unit
+
     method visit_Emp : 'c -> unit
     method visit_Empty : 'c -> unit
     method visit_EmptyType : 'c -> unit
@@ -2671,10 +2702,12 @@ module Visitors : sig
       'c ->
       string ->
       Expr.t option list ->
-      (string * (string * Expr.t) list) option ->
+      (string * (Id.LVar.t * Expr.t) list) option ->
       unit
 
-    method visit_ForAll : 'c -> (string * Type.t option) list -> Expr.t -> unit
+    method visit_ForAll :
+      'c -> (Id.LVar.t * Type.t option) list -> Expr.t -> unit
+
     method visit_CorePred : 'c -> string -> Expr.t list -> Expr.t list -> unit
     method visit_DatatypeType : 'c -> string -> unit
     method visit_GUnfold : 'c -> string -> unit
@@ -2691,19 +2724,19 @@ module Visitors : sig
     method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
     method visit_Int : 'c -> Z.t -> unit
     method visit_IntType : 'c -> unit
-    method visit_Invariant : 'c -> Asrt.t -> string list -> unit
-    method visit_Consume : 'c -> Asrt.t -> string list -> unit
+    method visit_Invariant : 'c -> Asrt.t -> Id.any_var Id.t list -> unit
+    method visit_Consume : 'c -> Asrt.t -> Id.any_var Id.t list -> unit
     method visit_Produce : 'c -> Asrt.t -> unit
-    method visit_LAction : 'c -> string -> string -> Expr.t list -> unit
+    method visit_LAction : 'c -> Id.Var.t -> string -> Expr.t list -> unit
     method visit_LList : 'c -> Literal.t list -> unit
-    method visit_LVar : 'c -> string -> unit
+    method visit_LVar : 'c -> Id.LVar.t -> unit
     method visit_LeftShift : 'c -> unit
     method visit_LeftShiftL : 'c -> unit
     method visit_LeftShiftF : 'c -> unit
     method visit_IsInt : 'c -> unit
     method visit_ListType : 'c -> unit
     method visit_Lit : 'c -> Literal.t -> unit
-    method visit_Loc : 'c -> string -> unit
+    method visit_Loc : 'c -> Id.Loc.t -> unit
     method visit_LocalTime : 'c -> unit
     method visit_Logic : 'c -> LCmd.t -> unit
     method visit_LstCat : 'c -> unit
@@ -2745,15 +2778,15 @@ module Visitors : sig
     method visit_ObjectType : 'c -> unit
     method visit_Or : 'c -> unit
     method visit_Par : 'c -> Cmd.function_call list -> unit
-    method visit_PVar : 'c -> string -> unit
-    method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
+    method visit_PVar : 'c -> Id.Var.t -> unit
+    method visit_PhiAssignment : 'c -> (Id.Var.t * Expr.t list) list -> unit
     method visit_Pi : 'c -> unit
     method visit_Pure : 'c -> Expr.t -> unit
     method visit_Random : 'c -> unit
     method visit_ReturnError : 'c -> unit
     method visit_ReturnNormal : 'c -> unit
     method visit_SL : 'c -> SLCmd.t -> unit
-    method visit_SepAssert : 'c -> Asrt.t -> string list -> unit
+    method visit_SepAssert : 'c -> Asrt.t -> Id.any_var Id.t list -> unit
     method visit_SetDiff : 'c -> unit
     method visit_SetInter : 'c -> unit
     method visit_SetMem : 'c -> unit
@@ -2765,7 +2798,7 @@ module Visitors : sig
     method visit_SignedRightShiftL : 'c -> unit
     method visit_SignedRightShiftF : 'c -> unit
     method visit_Skip : 'c -> unit
-    method visit_FreshSVar : 'c -> string -> unit
+    method visit_FreshSVar : 'c -> Id.Var.t -> unit
     method visit_FuncApp : 'c -> string -> Expr.t list -> unit
     method visit_StrCat : 'c -> unit
     method visit_StrLen : 'c -> unit
@@ -2795,7 +2828,7 @@ module Visitors : sig
       'c ->
       string ->
       Expr.t option list ->
-      (string * string) list option ->
+      (Id.LVar.t * Id.LVar.t) list option ->
       bool ->
       unit
 
@@ -2811,7 +2844,7 @@ module Visitors : sig
 
     method visit_assertion_atom : 'c -> Asrt.atom -> unit
     method visit_assertion : 'c -> Asrt.t -> unit
-    method visit_bindings : 'c -> string * (string * Expr.t) list -> unit
+    method visit_bindings : 'c -> string * (Id.LVar.t * Expr.t) list -> unit
     method visit_binop : 'c -> BinOp.t -> unit
     method visit_bispec : 'c -> BiSpec.t -> unit
     method private visit_bool : 'env. 'env -> bool -> unit

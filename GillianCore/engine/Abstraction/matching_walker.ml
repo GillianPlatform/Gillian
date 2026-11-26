@@ -85,7 +85,7 @@ type ('s, 'err) ops = {
      (it is reached when producing a [ret = e] pure atom of a post-condition);
      the memory-level instantiation fails on it. *)
   copy : 's -> 's;
-  update_store : 's -> string -> Expr.t -> 's;
+  update_store : 's -> Var.t -> Expr.t -> 's;
   (* Errors. *)
   mk_asrt_err : Expr.t list -> Expr.t -> 'err;
   mk_other_err : string -> 'err;
@@ -135,10 +135,9 @@ let subst_in_expr_opt
 let subst_in_expr (subst : SVal.SESubst.t) (le : Expr.t) : Expr.t =
   SVal.SESubst.subst_in_expr subst ~partial:false le
 
-let complete_subst (subst : SVal.SESubst.t) (lab : string * Containers.SS.t) :
-    unit =
+let complete_subst (subst : SVal.SESubst.t) (lab : string * LVar.Set.t) : unit =
   let _, existentials = lab in
-  Containers.SS.iter
+  LVar.Set.iter
     (fun x ->
       let lvar = Expr.LVar x in
       if not (SVal.SESubst.mem subst lvar) then SVal.SESubst.put subst lvar lvar)
@@ -201,13 +200,15 @@ let rec produce_assertion
                   formula")
             opt_res
       | None ->
-          if x = Names.return_variable then
+          if Var.equal x Var.return_variable then
             let v = subst_in_expr subst le in
             Res_list.return (ops.update_store s x v)
           else
             other_state_err
-              ("Produce Simple Assertion: Trying to produce un-substituted \
-                PVar " ^ x))
+              (Fmt.str
+                 "Produce Simple Assertion: Trying to produce un-substituted \
+                  PVar %a"
+                 Id.pp x))
   | Pure f -> (
       L.verbose (fun fmt -> fmt "Pure assertion.");
       let f' = SVal.SESubst.subst_in_expr subst ~partial:false f in
@@ -336,7 +337,7 @@ let rec match_ins_outs_lists
       fmt "Obtained exprs: %a" Fmt.(brackets (list ~sep:semi Expr.pp)) eos);
   (* Substitution of the program variables *)
   let pvar_subst_bindings =
-    List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) vos
+    List.mapi (fun i v -> (Expr.PVar (Var.of_string (string_of_int i)), v)) vos
   in
   let pvar_subst = SVal.SESubst.init pvar_subst_bindings in
   L.verbose (fun fmt -> fmt "Parameter subst\n%a" SVal.SESubst.pp pvar_subst);
@@ -612,7 +613,7 @@ and match_mp'
               m
                 "Reached LabelStep, about to complete substitution with vars: \
                  %a"
-                Fmt.(Dump.iter Containers.SS.iter nop string)
+                Fmt.(Dump.iter LVar.Set.iter nop Id.pp)
                 (snd label));
           complete_subst subst label;
           let current_state = ((astate, subst, rest_mp), prev_id) in

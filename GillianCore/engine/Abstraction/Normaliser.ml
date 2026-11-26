@@ -1,9 +1,9 @@
 open Names
-open Containers
 module L = Logging
 module SESubst = SVal.SESubst
 
-let new_lvar_name var = lvar_prefix ^ var
+let new_lvar_name (var : Var.t) : LVar.t =
+  LVar.of_string (make_lvar_name (Var.to_string var))
 
 module Make (State : SState.S) = struct
   (*  ------------------------------------------------------------------
@@ -223,7 +223,7 @@ module Make (State : SState.S) = struct
             bt;
           let ne = normalise_lexpr ~no_types ~store ~subst new_gamma e in
           let lvars = Expr.lvars ne in
-          let bt = List.filter (fun (x, _) -> SS.mem x lvars) bt in
+          let bt = List.filter (fun (x, _) -> LVar.Set.mem x lvars) bt in
           match (bt, le) with
           | [], _ -> ne
           | _, Exists _ -> Exists (bt, ne)
@@ -244,10 +244,11 @@ module Make (State : SState.S) = struct
     List.iter
       (fun a ->
         match (a : Expr.t) with
-        | BinOp (LVar x, Equal, le)
-        | BinOp (le, Equal, LVar x)
-        | BinOp (PVar x, Equal, le)
-        | BinOp (le, Equal, PVar x) -> (
+        | BinOp ((LVar _ as v), Equal, le)
+        | BinOp (le, Equal, (LVar _ as v))
+        | BinOp ((PVar _ as v), Equal, le)
+        | BinOp (le, Equal, (PVar _ as v)) -> (
+            let x = Option.get (Expr.as_any_var v) in
             let x_type = Type_env.get gamma x in
             match x_type with
             | None ->
@@ -268,7 +269,7 @@ module Make (State : SState.S) = struct
       (store : SStore.t)
       (gamma : Type_env.t)
       (subst : SESubst.t)
-      (args : SS.t option)
+      (args : Var.Set.t option)
       (fs : Expr.t list) : PFS.t =
     let pvar_equalities = Hashtbl.create 1 in
     let non_store_pure_assertions = Stack.create () in
@@ -301,10 +302,12 @@ module Make (State : SState.S) = struct
      * Step 2 - Build a table mapping pvars to integers
      * ------------------------------------------------
      *)
-    let get_vars_tbl (vars : SS.t) : (string, int) Hashtbl.t =
-      let len = SS.cardinal vars in
+    let get_vars_tbl (vars : Var.Set.t) : (Var.t, int) Hashtbl.t =
+      let len = Var.Set.cardinal vars in
       let vars_tbl = Hashtbl.create len in
-      List.iteri (fun i var -> Hashtbl.add vars_tbl var i) (SS.elements vars);
+      List.iteri
+        (fun i var -> Hashtbl.add vars_tbl var i)
+        (Var.Set.elements vars);
       vars_tbl
     in
 
@@ -315,23 +318,23 @@ module Make (State : SState.S) = struct
      * definitions)
      * ------------------------------------------------------------------------
      *)
-    let pvars_graph (p_vars : SS.t) (p_vars_tbl : (string, int) Hashtbl.t) :
+    let pvars_graph (p_vars : Var.Set.t) (p_vars_tbl : (Var.t, int) Hashtbl.t) :
         int list array =
-      let len = SS.cardinal p_vars in
+      let len = Var.Set.cardinal p_vars in
       let graph = Array.make len [] in
 
       List.iteri
         (fun u cur_var ->
           let cur_le = Hashtbl.find pvar_equalities cur_var in
           let cur_var_deps = Expr.pvars cur_le in
-          SS.iter
+          Var.Set.iter
             (fun v ->
               try
                 let v_num = Hashtbl.find p_vars_tbl v in
                 graph.(u) <- v_num :: graph.(u)
               with _ -> ())
             cur_var_deps)
-        (SS.elements p_vars);
+        (Var.Set.elements p_vars);
 
       graph
     in
@@ -351,9 +354,9 @@ module Make (State : SState.S) = struct
      *)
     let normalise_pvar_equalities
         (graph : int list array)
-        (p_vars : SS.t)
-        (_ : (string, int) Hashtbl.t) =
-      let p_vars = Array.of_list (SS.elements p_vars) in
+        (p_vars : Var.Set.t)
+        (_ : (Var.t, int) Hashtbl.t) =
+      let p_vars = Array.of_list (Var.Set.elements p_vars) in
       let len = Array.length p_vars in
       let visited_tbl = Array.make len false in
 
@@ -375,7 +378,7 @@ module Make (State : SState.S) = struct
             Printf.sprintf
               "DEATH. normalise_pure_assertions -> normalise_pvar_equalities \
                -> remove_assignment. Var: %s."
-              var
+              (Var.to_string var)
           in
           raise (Failure msg)
       in
@@ -392,7 +395,7 @@ module Make (State : SState.S) = struct
             Printf.sprintf
               "DEATH. normalise_pure_assertions ->  normalise_pvar_equalities \
                -> rewrite_assignment. Var: %s\n"
-              var
+              (Var.to_string var)
           in
           raise (Failure msg)
       in
@@ -425,10 +428,10 @@ module Make (State : SState.S) = struct
      *)
     let fill_store args =
       let def_pvars =
-        fs |> List.map Expr.pvars |> List.fold_left SS.union SS.empty
+        fs |> List.map Expr.pvars |> List.fold_left Var.Set.union Var.Set.empty
       in
       let p_vars = Option.value ~default:def_pvars args in
-      SS.iter
+      Var.Set.iter
         (fun var ->
           if not (SStore.mem store var) then (
             SStore.put store var (LVar (new_lvar_name var));
@@ -460,7 +463,7 @@ module Make (State : SState.S) = struct
       L.verbose (fun m -> m "About to simplify.");
       let _ =
         Simplifications.simplify_pfs_and_gamma pfs gamma ~matching:true
-          ~save_spec_vars:(SS.empty, true)
+          ~save_spec_vars:(LVar.Set.empty, true)
       in
       L.verbose (fun m -> m "Done simplifying.");
       pfs
@@ -470,12 +473,15 @@ module Make (State : SState.S) = struct
     (* 1 *)
     init_pvar_equalities fs;
     let p_vars =
-      Hashtbl.fold (fun var _ ac -> SS.add var ac) pvar_equalities SS.empty
+      Hashtbl.fold
+        (fun var _ ac -> Var.Set.add var ac)
+        pvar_equalities Var.Set.empty
     in
 
     L.verbose (fun m ->
-        m "PVars in normalise_pvar_equalities: %s\n"
-          (String.concat ", " (SS.elements p_vars)));
+        m "PVars in normalise_pvar_equalities: %a\n"
+          Fmt.(list ~sep:(any ", ") Id.pp)
+          (Var.Set.elements p_vars));
 
     (* 2 *)
     let p_vars_tbl = get_vars_tbl p_vars in
@@ -636,7 +642,7 @@ module Make (State : SState.S) = struct
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : Type_env.t)
-      (svars : SS.t)
+      (svars : LVar.Set.t)
       (subst : SESubst.t)
       (c_asrts : (string * Expr.t list * Expr.t list) list) :
       (string * Expr.t list * Expr.t list) list * SESubst.t * SESubst.t =
@@ -651,11 +657,12 @@ module Make (State : SState.S) = struct
     List.iter (fun fo -> PFS.extend new_pfs fo) fos;
     let subst', _ =
       Simplifications.simplify_pfs_and_gamma new_pfs gamma ~matching:true
-        ~save_spec_vars:(SS.empty, true)
+        ~save_spec_vars:(LVar.Set.empty, true)
     in
     let subst = compose_substs subst subst' in
     let lsvars =
-      Expr.Set.of_list (List.map (fun x -> Expr.LVar x) (SS.elements svars))
+      Expr.Set.of_list
+        (List.map (fun x -> Expr.LVar x) (LVar.Set.elements svars))
     in
     let subst' =
       SESubst.filter subst' (fun x _ -> not (Expr.Set.mem x lsvars))
@@ -680,14 +687,16 @@ module Make (State : SState.S) = struct
   let produce_core_asrts
       (astate : State.t)
       (core_asrts : (string * Expr.t list * Expr.t list) list) : State.t list =
-    let f_aux (es : Expr.t list) : SS.t * SS.t =
+    let f_aux (es : Expr.t list) : LVar.Set.t * ALoc.Set.t =
       List.fold_left
         (fun (ret1, ret2) e ->
-          (SS.union ret1 (Expr.lvars e), SS.union ret2 (Expr.alocs e)))
-        (SS.empty, SS.empty) es
+          ( LVar.Set.union ret1 (Expr.lvars e),
+            ALoc.Set.union ret2 (Expr.alocs e) ))
+        (LVar.Set.empty, ALoc.Set.empty)
+        es
     in
 
-    let (lvars : SS.t), (alocs : SS.t) =
+    let (lvars : LVar.Set.t), (alocs : ALoc.Set.t) =
       List.fold_left
         (fun (ret1, ret2) (id, ins, outs) ->
           L.verbose (fun m ->
@@ -695,17 +704,18 @@ module Make (State : SState.S) = struct
                 outs);
           let lv_ins, al_ins = f_aux ins in
           let lv_outs, al_outs = f_aux outs in
-          let ret1' = SS.union ret1 (SS.union lv_ins lv_outs) in
-          let ret2' = SS.union ret2 (SS.union al_ins al_outs) in
+          let ret1' = LVar.Set.union ret1 (LVar.Set.union lv_ins lv_outs) in
+          let ret2' = ALoc.Set.union ret2 (ALoc.Set.union al_ins al_outs) in
           (ret1', ret2'))
-        (SS.empty, SS.empty) core_asrts
+        (LVar.Set.empty, ALoc.Set.empty)
+        core_asrts
     in
 
     let lv_bnds =
-      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (LVar.Set.elements lvars)
     in
     let al_bnds =
-      List.map (fun l -> (Expr.ALoc l, Expr.ALoc l)) (SS.elements alocs)
+      List.map (fun l -> (Expr.ALoc l, Expr.ALoc l)) (ALoc.Set.elements alocs)
     in
     let subst = SESubst.init (lv_bnds @ al_bnds) in
 
@@ -740,7 +750,8 @@ module Make (State : SState.S) = struct
                  None))
          [ astate ]
 
-  let subst_to_pfs ?(svars : SS.t option) (subst : SESubst.t) : Expr.t list =
+  let subst_to_pfs ?(svars : LVar.Set.t option) (subst : SESubst.t) :
+      Expr.t list =
     let subst_lvs = SESubst.to_list subst in
     let subst_lvs' =
       match svars with
@@ -748,7 +759,7 @@ module Make (State : SState.S) = struct
           List.filter
             (fun (e, _) ->
               match e with
-              | Expr.LVar x -> SS.mem x svars
+              | Expr.LVar x -> LVar.Set.mem x svars
               | _ -> false)
             subst_lvs
       | None ->
@@ -768,10 +779,10 @@ module Make (State : SState.S) = struct
     let find_spec_var_eqs (a : Asrt.atom) =
       match a with
       | Pure (BinOp (LVar x, Equal, LVar y))
-        when is_spec_var_name x && not (is_spec_var_name y) ->
+        when LVar.is_spec x && not (LVar.is_spec y) ->
           SESubst.put subst (LVar y) (LVar x)
       | Pure (BinOp (LVar x, Equal, LVar y))
-        when is_spec_var_name y && not (is_spec_var_name x) ->
+        when LVar.is_spec y && not (LVar.is_spec x) ->
           SESubst.put subst (LVar x) (LVar y)
       | _ -> ()
     in
@@ -786,14 +797,14 @@ module Make (State : SState.S) = struct
   let normalise_assertion
       ~pred_defs:(_ : MP.preds_tbl_t)
       ~(init_data : State.init_data)
-      ?(pvars : SS.t option)
+      ?(pvars : Var.Set.t option)
       (a : Asrt.t) : ((State.t * SESubst.t) list, string) result =
     let falsePFs pfs = PFS.mem pfs Expr.false_ in
     let a = normalise_a_bit a in
-    let svars = SS.filter is_spec_var_name (Asrt.lvars a) in
+    let svars = LVar.Set.filter LVar.is_spec (Asrt.lvars a) in
     L.verbose (fun m ->
         m "@[<v 2>Normalising assertion:@ %a@]@ svars: @[<h>%a@]" Asrt.pp a
-          (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+          (Fmt.iter ~sep:Fmt.comma LVar.Set.iter Id.pp)
           svars);
 
     (* Step 1 -- Preprocess list expressions - resolve l-nth(E, i) when possible  *)

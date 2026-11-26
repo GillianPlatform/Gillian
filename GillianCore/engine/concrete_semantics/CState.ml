@@ -127,9 +127,9 @@ module Make
 
   let run_spec
       (_ : MP.spec)
-      (_ : string)
+      (_ : Var.t)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option)
+      (_ : (string * (LVar.t * vt) list) option)
       (_ : t) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 

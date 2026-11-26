@@ -50,23 +50,12 @@ module Utils = struct
 end
 
 module Collectors = struct
-  let var_collector =
-    object (self)
-      inherit [_] reduce
-      inherit Utils.ss_monoid
-      method! visit_PVar () x = Containers.SS.singleton x
-      method! visit_LVar () x = Containers.SS.singleton x
-      method! visit_ALoc () x = Containers.SS.singleton x
-      method! visit_Loc () x = Containers.SS.singleton x
-      method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () () = self#zero
-    end
-
   let pvar_collector =
     object (self)
       inherit [_] reduce
-      inherit Utils.ss_monoid
-      method! visit_PVar () x = Containers.SS.singleton x
+      method private zero = Id.Var.Set.empty
+      method private plus = Id.Var.Set.union
+      method! visit_PVar () x = Id.Var.Set.singleton x
       method! visit_'label () (_ : int) = self#zero
       method! visit_'annot () () = self#zero
     end
@@ -74,22 +63,23 @@ module Collectors = struct
   let lvar_collector =
     object (self)
       inherit [_] reduce
-      inherit Utils.ss_monoid
+      method private zero = Id.LVar.Set.empty
+      method private plus = Id.LVar.Set.union
 
       method! visit_ForAll exclude binders e =
         (* Quantified variables need to be excluded *)
         let univ_quant = List.to_seq binders |> Seq.map fst in
-        let exclude = Containers.SS.add_seq univ_quant exclude in
+        let exclude = Id.LVar.Set.add_seq univ_quant exclude in
         self#visit_expr exclude e
 
       method! visit_Exists exclude binders e =
         let exist_quants = List.to_seq binders |> Seq.map fst in
-        let exclude = Containers.SS.add_seq exist_quants exclude in
+        let exclude = Id.LVar.Set.add_seq exist_quants exclude in
         self#visit_expr exclude e
 
       method! visit_LVar exclude x =
-        if not (Containers.SS.mem x exclude) then Containers.SS.singleton x
-        else Containers.SS.empty
+        if not (Id.LVar.Set.mem x exclude) then Id.LVar.Set.singleton x
+        else Id.LVar.Set.empty
 
       method! visit_'label _ (_ : int) = self#zero
       method! visit_'annot _ () = self#zero
@@ -98,8 +88,9 @@ module Collectors = struct
   let cloc_collector =
     object (self)
       inherit [_] reduce
-      inherit Utils.ss_monoid
-      method! visit_Loc () x = Containers.SS.singleton x
+      method private zero = Id.Loc.Set.empty
+      method private plus = Id.Loc.Set.union
+      method! visit_Loc () x = Id.Loc.Set.singleton x
       method! visit_'label () (_ : int) = self#zero
       method! visit_'annot () () = self#zero
     end
@@ -107,8 +98,9 @@ module Collectors = struct
   let aloc_collector =
     object (self)
       inherit [_] reduce
-      inherit Utils.ss_monoid
-      method! visit_ALoc () x = Containers.SS.singleton x
+      method private zero = Id.ALoc.Set.empty
+      method private plus = Id.ALoc.Set.union
+      method! visit_ALoc () x = Id.ALoc.Set.singleton x
       method! visit_'label () (_ : int) = self#zero
       method! visit_'annot () () = self#zero
     end
@@ -116,9 +108,10 @@ module Collectors = struct
   let loc_collector =
     object (self)
       inherit [_] reduce
-      inherit Utils.ss_monoid
-      method! visit_ALoc () x = Containers.SS.singleton x
-      method! visit_Loc () x = Containers.SS.singleton x
+      method private zero = Id.Any_loc.Set.empty
+      method private plus = Id.Any_loc.Set.union
+      method! visit_ALoc () x = Id.Any_loc.Set.singleton (x :> Id.Any_loc.t)
+      method! visit_Loc () x = Id.Any_loc.Set.singleton (x :> Id.Any_loc.t)
       method! visit_'label _ (_ : int) = self#zero
       method! visit_'annot _ () = self#zero
     end
@@ -126,9 +119,10 @@ module Collectors = struct
   let substitutable_collector =
     object (self)
       inherit [_] reduce
-      inherit Utils.ss_monoid
-      method! visit_ALoc () x = Containers.SS.singleton x
-      method! visit_LVar () x = Containers.SS.singleton x
+      method private zero = Id.Substable.Set.empty
+      method private plus = Id.Substable.Set.union
+      method! visit_ALoc () x = Id.Substable.Set.singleton (x :> Id.Substable.t)
+      method! visit_LVar () x = Id.Substable.Set.singleton (x :> Id.Substable.t)
       method! visit_'label () (_ : int) = self#zero
       method! visit_'annot () () = self#zero
     end

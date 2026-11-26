@@ -1,5 +1,4 @@
 open Literal
-open Names
 module L = Logging
 module SSubst = SVal.SESubst
 
@@ -24,7 +23,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:LVar.Set.t ->
     t
 
   val make_s_from_heap :
@@ -32,7 +31,7 @@ module type S = sig
     store:store_t ->
     pfs:PFS.t ->
     gamma:Type_env.t ->
-    spec_vars:SS.t ->
+    spec_vars:LVar.Set.t ->
     t
 
   val get_init_data : t -> init_data
@@ -64,7 +63,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     store : store_t;
     pfs : PFS.t;
     gamma : Type_env.t;
-    spec_vars : SS.t;
+    spec_vars : LVar.Set.t;
   }
   [@@deriving yojson]
 
@@ -83,7 +82,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       ~(store : store_t)
       ~(pfs : PFS.t)
       ~(gamma : Type_env.t)
-      ~(spec_vars : SS.t) : t =
+      ~(spec_vars : LVar.Set.t) : t =
     { heap; store; pfs; gamma; spec_vars }
 
   exception Internal_State_Error of err_t list * t
@@ -109,7 +108,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
        @\n\
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
-      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+      (Fmt.iter ~sep:Fmt.comma LVar.Set.iter Id.pp)
       spec_vars SStore.pp store pp_heap heap PFS.pp pfs Type_env.pp gamma
 
   let sure_is_nonempty { heap; _ } = SMemory.sure_is_nonempty heap
@@ -117,58 +116,56 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   let pp_by_need pvars cmd_lvars cmd_locs fmt state =
     let { heap = memory; store; pfs; gamma; spec_vars } = state in
 
-    let rec get_print_info (lvars : SS.t) (locs : SS.t) : SS.t * SS.t =
-      (* let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
-         let () =
-           L.verbose (fun fmt ->
-               fmt "get_print_info:@\nLVars: %a@\nLocs:%a\n" pp_str_list
-                 (SS.elements lvars) pp_str_list (SS.elements locs))
-         in *)
+    let rec get_print_info (lvars : LVar.Set.t) (locs : Id.Any_loc.Set.t) :
+        LVar.Set.t * Id.Any_loc.Set.t =
       (* Get locs from lvars... *)
       let pfs_locs =
-        SS.fold
+        LVar.Set.fold
           (fun x ac ->
             match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
-            | Some loc -> SS.add loc ac
+            | Some loc -> Id.Any_loc.Set.add loc ac
             | None -> ac)
-          lvars SS.empty
+          lvars Id.Any_loc.Set.empty
       in
       (* ...and add them to the current locs *)
-      let new_locs = SS.union locs pfs_locs in
+      let new_locs = Id.Any_loc.Set.union locs pfs_locs in
       (* Get relevant lvars and locs from the memory... *)
       let mem_lvars, mem_locs = SMemory.get_print_info new_locs memory in
       (* ...and add them accordingly *)
-      let new_lvars = SS.union lvars mem_lvars in
-      let new_locs = SS.union new_locs mem_locs in
+      let new_lvars = LVar.Set.union lvars mem_lvars in
+      let new_locs = Id.Any_loc.Set.union new_locs mem_locs in
       (* Learn more from the pfs... *)
       let _, more_lvars, more_locs =
         PFS.get_relevant_info pvars new_lvars new_locs pfs
       in
       (* ...and add that accordingly *)
-      let new_lvars = SS.union new_lvars more_lvars in
-      let new_locs = SS.union new_locs more_locs in
+      let new_lvars = LVar.Set.union new_lvars more_lvars in
+      let new_locs = Id.Any_loc.Set.union new_locs more_locs in
       (* If nothing has been learned, stop; otherwise, retry *)
-      if SS.equal lvars new_lvars && SS.equal locs new_locs then (lvars, locs)
+      if LVar.Set.equal lvars new_lvars && Id.Any_loc.Set.equal locs new_locs
+      then (lvars, locs)
       else get_print_info new_lvars new_locs
     in
 
     (* Logical variables and locations from the store *)
     let store_lvars, store_locs =
-      SS.fold
+      Var.Set.fold
         (fun pvar ac ->
           match SStore.get store pvar with
           | None -> ac
           | Some e ->
-              (SS.union (fst ac) (Expr.lvars e), SS.union (snd ac) (Expr.locs e)))
-        pvars (SS.empty, SS.empty)
+              ( LVar.Set.union (fst ac) (Expr.lvars e),
+                Id.Any_loc.Set.union (snd ac) (Expr.locs e) ))
+        pvars
+        (LVar.Set.empty, Id.Any_loc.Set.empty)
     in
     (* LVars: commands + store *)
-    let lvars = SS.union cmd_lvars store_lvars in
-    let locs = SS.union cmd_locs store_locs in
+    let lvars = LVar.Set.union cmd_lvars store_lvars in
+    let locs = Id.Any_loc.Set.union cmd_locs store_locs in
     (* Locations found in the pfs *)
     let lvars, locs = get_print_info lvars locs in
     (* Filter spec vars *)
-    let spec_vars = SS.filter (fun x -> SS.mem x lvars) spec_vars in
+    let spec_vars = LVar.Set.filter (fun x -> LVar.Set.mem x lvars) spec_vars in
 
     (* TODO: Locations for the heap *)
     (* TODO: Logical variables for the pfs and gamma *)
@@ -190,11 +187,11 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
        @\n\
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
-      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+      (Fmt.iter ~sep:Fmt.comma LVar.Set.iter Id.pp)
       spec_vars (SStore.pp_by_need pvars) store pp_memory memory
       (PFS.pp_by_need (pvars, lvars, locs))
       pfs
-      (Type_env.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
+      (Type_env.pp_by_need (pvars, lvars))
       gamma
 
   let init init_data =
@@ -203,7 +200,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       store = SStore.init [];
       pfs = PFS.init ();
       gamma = Type_env.init ();
-      spec_vars = SS.empty;
+      spec_vars = LVar.Set.empty;
     }
 
   let make_s
@@ -211,7 +208,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       ~(store : SStore.t)
       ~(pfs : PFS.t)
       ~(gamma : Type_env.t)
-      ~(spec_vars : SS.t) : t =
+      ~(spec_vars : LVar.Set.t) : t =
     { heap = SMemory.init init_data; store; pfs; gamma; spec_vars }
 
   (* Lets the memory log its own matching steps as this state. *)
@@ -393,7 +390,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     FOSolver.check_satisfiability_with_model (fs @ PFS.to_list pfs) gamma
 
   let assert_a ({ pfs; gamma; _ } : t) (ps : Expr.t list) : bool =
-    FOSolver.check_entailment SS.empty pfs ps gamma
+    FOSolver.check_entailment LVar.Set.empty pfs ps gamma
 
   let equals ({ pfs; gamma; _ } : t) (le1 : vt) (le2 : vt) : bool =
     let result = FOSolver.is_equal ~pfs ~gamma le1 le2 in
@@ -411,7 +408,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       (state : t) : st * t list =
     let { heap; store; pfs; gamma; spec_vars } = state in
     let save_spec_vars =
-      if save then (SS.empty, true) else (spec_vars, false)
+      if save then (LVar.Set.empty, true) else (spec_vars, false)
     in
     L.verbose (fun m ->
         m
@@ -427,7 +424,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let subst =
       SSubst.filter subst (fun x _ ->
           match x with
-          | LVar x | PVar x | ALoc x -> not (SS.mem x spec_vars)
+          | LVar x -> not (LVar.Set.mem x spec_vars)
           | _ -> true)
     in
     (* Sometimes, [simplify_pfs_and_gamma] leaves abstract locations on the
@@ -528,25 +525,26 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     in
     result
 
-  let add_spec_vars (state : t) (xs : Var.Set.t) : t =
-    let spec_vars = SS.union xs state.spec_vars in
+  let add_spec_vars (state : t) (xs : LVar.Set.t) : t =
+    let spec_vars = LVar.Set.union xs state.spec_vars in
     { state with spec_vars }
 
-  let get_spec_vars ({ spec_vars; _ } : t) : SS.t = spec_vars
+  let get_spec_vars ({ spec_vars; _ } : t) : LVar.Set.t = spec_vars
 
-  let get_lvars (state : t) : Var.Set.t =
+  let get_lvars (state : t) : LVar.Set.t =
     let { heap; store; pfs; gamma; spec_vars } = state in
     SMemory.lvars heap
-    |> SS.union (SStore.lvars store)
-    |> SS.union (PFS.lvars pfs)
-    |> SS.union (Type_env.lvars gamma)
-    |> SS.union spec_vars
+    |> LVar.Set.union (SStore.lvars store)
+    |> LVar.Set.union (PFS.lvars pfs)
+    |> LVar.Set.union (Type_env.lvars gamma)
+    |> LVar.Set.union spec_vars
 
-  let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t =
+  let to_assertions ?(to_keep : Var.Set.t option) (state : t) : Asrt.t =
     let { heap; store; pfs; gamma; _ } = state in
     let store' =
       Option.fold
-        ~some:(fun store_dom -> SStore.projection store (SS.elements store_dom))
+        ~some:(fun store_dom ->
+          SStore.projection store (Var.Set.elements store_dom))
         ~none:store to_keep
     in
     let asrts_pfs =
@@ -569,14 +567,24 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   let get_init_data { heap; _ } = SMemory.get_init_data heap
 
   let unfolding_vals (_ : t) (fs : Expr.t list) : vt list =
-    let map to_str to_expr =
-      List.map to_str fs
-      |> List.fold_left SS.union SS.empty
-      |> SS.elements |> List.map to_expr
+    let lvars =
+      List.map Expr.lvars fs
+      |> List.fold_left LVar.Set.union LVar.Set.empty
+      |> LVar.Set.elements
+      |> List.map (fun x -> Expr.LVar x)
     in
-    let lvars = map Expr.lvars (fun x -> Expr.LVar x) in
-    let alocs = map Expr.alocs (fun x -> Expr.ALoc x) in
-    let clocs = map Expr.clocs (fun x -> Expr.Lit (Loc x)) in
+    let alocs =
+      List.map Expr.alocs fs
+      |> List.fold_left ALoc.Set.union ALoc.Set.empty
+      |> ALoc.Set.elements
+      |> List.map (fun x -> Expr.ALoc x)
+    in
+    let clocs =
+      List.map Expr.clocs fs
+      |> List.fold_left Id.Loc.Set.union Id.Loc.Set.empty
+      |> Id.Loc.Set.elements
+      |> List.map (fun x -> Expr.Lit (Loc x))
+    in
     clocs @ alocs @ lvars
 
   let substitution_in_place ?(subst_all = false) (subst : st) (state : t) :
@@ -624,10 +632,10 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
                   match
                     Reduction.resolve_expr_to_location pfs gamma (LVar y)
                   with
-                  | Some loc_name ->
-                      if is_aloc_name loc_name then
-                        (x, Expr.ALoc loc_name) :: ac
-                      else ac
+                  | Some loc_name -> (
+                      match Id.classify_loc loc_name with
+                      | `ALoc loc_name -> (x, Expr.ALoc loc_name) :: ac
+                      | `Loc _ -> ac)
                   | _ -> ac)
               | _ -> ac)
           | _ -> ac)
@@ -636,11 +644,12 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     List.iter (fun (x, e) -> SSubst.put subst x e) new_bindings
 
   (* Auxiliary Functions *)
-  let get_loc_name (loc : Expr.t) state : string option =
+  let get_loc_name (loc : Expr.t) state : Id.Any_loc.t option =
     L.(tmi (fun m -> m "get_loc_name: %s" ((Fmt.to_to_string Expr.pp) loc)));
     let { pfs; gamma; _ } = state in
     match loc with
-    | Lit (Loc loc) | ALoc loc -> Some loc
+    | Lit (Loc loc) -> Some (loc :> Id.Any_loc.t)
+    | ALoc loc -> Some (loc :> Id.Any_loc.t)
     | LVar x -> Reduction.resolve_expr_to_location pfs gamma (LVar x)
     | _ ->
         L.verbose (fun m -> m "Unsupported location MAKESState: %a" Expr.pp loc);
@@ -654,9 +663,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     | Some loc -> (
         let loc_name = get_loc_name loc state in
         match loc_name with
-        | Some loc_name ->
-            if is_aloc_name loc_name then Expr.ALoc loc_name
-            else Expr.Lit (Loc loc_name)
+        | Some loc_name -> Expr.loc_from_loc_name loc_name
         | None -> ALoc (ALoc.alloc ()))
     | None -> ALoc (ALoc.alloc ())
 
@@ -675,7 +682,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
         (fun (acc : vt Recovery_tactic.t) -> function
           | BinOp ((ALoc _ as loc), Equal, LVar x)
           | BinOp (LVar x, Equal, (ALoc _ as loc)) ->
-              if Names.is_spec_var_name x then
+              if LVar.is_spec x then
                 let try_fold =
                   Option.map
                     (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
@@ -800,7 +807,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let produce_core_pred = produce_core_pred
   end)
 
-  let update_store (state : t) (x : string option) (v : Expr.t) : t =
+  let update_store (state : t) (x : Var.t option) (v : Expr.t) : t =
     match x with
     | None -> state
     | Some x ->
@@ -813,11 +820,11 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       compose with bi-abduction at the spec level *)
   let rec run_spec_aux
       ?(more_specs = [])
-      ?(existential_bindings : (string * vt) list = [])
+      ?(existential_bindings : (LVar.t * vt) list = [])
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (mp : MP.t)
-      (x : string option)
+      (x : Var.t option)
       (args : vt list)
       (astate : t) : (t * Flag.t, SMatcher.err_t) Res_list.t =
     let open Res_list.Syntax in
@@ -884,7 +891,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let* final_state = SMatcher.produce_posts frame_state subst posts in
 
     let final_store = get_store final_state in
-    let v_ret = SStore.get final_store Names.return_variable in
+    let v_ret = SStore.get final_store Var.return_variable in
     let final_state = set_store final_state (SStore.copy frame_store) in
     let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
@@ -899,8 +906,8 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
            List.map (fun st -> Ok (st, fl)) (snd (simplify ~matching:true st))
        | Error e -> [ Error e ]
 
-  let fresh_subst (xs : SS.t) : SVal.SESubst.t =
-    let xs = SS.elements xs in
+  let fresh_subst (xs : LVar.Set.t) : SVal.SESubst.t =
+    let xs = LVar.Set.elements xs in
     let bindings =
       List.map (fun x -> (Expr.LVar x, Expr.LVar (LVar.alloc ()))) xs
     in
@@ -910,24 +917,27 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvars_subst =
-      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (LVar.Set.elements lvars)
     in
     let alocs_subst =
-      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (ALoc.Set.elements alocs)
     in
     let subst_lst = lvars_subst @ alocs_subst in
     SVal.SESubst.init subst_lst
 
   let consume astate (a : Asrt.t) binders =
-    if not (List.for_all Names.is_lvar_name binders) then
-      failwith "Binding of pure variables in *-assert.";
+    let binders =
+      match Id.as_lvars binders with
+      | Some binders -> binders
+      | None -> failwith "Binding of pure variables in *-assert."
+    in
     let store = get_store astate in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
-    let pvars_diff = SS.diff pvars_a pvars_store in
-    (if not (SS.is_empty pvars_diff) then
+    let pvars_diff = Var.Set.diff pvars_a pvars_store in
+    (if not (Var.Set.is_empty pvars_diff) then
        let pvars_errs : err_t list =
-         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+         List.map (fun pvar : err_t -> EVar pvar) (Var.Set.elements pvars_diff)
        in
        raise (Internal_State_Error (pvars_errs, astate)));
     let store_subst = SStore.to_ssubst store in
@@ -935,26 +945,30 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
     let state_lvars = get_lvars astate in
     let known_lvars =
-      SS.elements
-        (SS.diff (SS.inter state_lvars (Asrt.lvars a)) (SS.of_list binders))
+      LVar.Set.elements
+        (LVar.Set.diff
+           (LVar.Set.inter state_lvars (Asrt.lvars a))
+           (LVar.Set.of_list binders))
     in
     let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
     let asrt_alocs =
-      List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+      List.map (fun x -> Expr.ALoc x) (ALoc.Set.elements (Asrt.alocs a))
     in
     let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
     let mp = MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ] in
-    let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
+    let vars_to_forget =
+      LVar.Set.inter state_lvars (LVar.Set.of_list binders)
+    in
     let astate =
       (* The memory is immutable, so the substituted state must be used (the
          pure part of the state is still substituted in place). *)
-      if SS.is_empty vars_to_forget then astate
+      if LVar.Set.is_empty vars_to_forget then astate
       else
         let oblivion_subst = fresh_subst vars_to_forget in
         L.verbose (fun m ->
             m "Forget @[%a@] with subst: %a"
-              Fmt.(iter ~sep:comma SS.iter string)
+              Fmt.(iter ~sep:comma LVar.Set.iter Id.pp)
               vars_to_forget SVal.SESubst.pp oblivion_subst);
 
         (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
@@ -1016,7 +1030,9 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
         let open Res_list.Syntax in
         let result =
           let** new_astate = SMatcher.produce new_state full_subst a_produce in
-          let new_state' = add_spec_vars new_astate (SS.of_list binders) in
+          let new_state' =
+            add_spec_vars new_astate (LVar.Set.of_list binders)
+          in
           let _, new_states = simplify ~kill_new_lvars:true new_state' in
           let+ new_state = new_states in
           Ok new_state
@@ -1053,10 +1069,10 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let store = get_store astate in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
-    let pvars_diff = SS.diff pvars_a pvars_store in
-    (if not (SS.is_empty pvars_diff) then
+    let pvars_diff = Var.Set.diff pvars_a pvars_store in
+    (if not (Var.Set.is_empty pvars_diff) then
        let pvars_errs : err_t list =
-         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+         List.map (fun pvar : err_t -> EVar pvar) (Var.Set.elements pvars_diff)
        in
        raise (Internal_State_Error (pvars_errs, astate)));
     let store_subst = SStore.to_ssubst store in
@@ -1073,31 +1089,39 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       (revisited : bool)
       (astate : t)
       (a : Asrt.t)
-      (binders : string list) : (t * t, err_t) Res_list.t =
+      (binders : Id.Any_var.t list) : (t * t, err_t) Res_list.t =
     let store = get_store astate in
     let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
-    let pvars_diff = SS.diff pvars_a pvars_store in
-    L.verbose (fun m -> m "%s" (String.concat ", " (SS.elements pvars_diff)));
-    (if not (SS.is_empty pvars_diff) then
+    let pvars_diff = Var.Set.diff pvars_a pvars_store in
+    L.verbose (fun m ->
+        m "%a" Fmt.(list ~sep:(any ", ") Id.pp) (Var.Set.elements pvars_diff));
+    (if not (Var.Set.is_empty pvars_diff) then
        let pvars_errs : err_t list =
-         List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+         List.map (fun pvar : err_t -> EVar pvar) (Var.Set.elements pvars_diff)
        in
        raise (Internal_State_Error (pvars_errs, astate)));
     let lvar_binders, pvar_binders =
-      List.partition Names.is_lvar_name binders
+      List.partition_map
+        (fun x ->
+          match Id.classify_var x with
+          | `LVar x -> Left x
+          | `Var x -> Right x)
+        binders
     in
-    let known_pvars = List.map Expr.from_var_name (SS.elements pvars_a) in
+    let known_pvars =
+      List.map (fun x -> Expr.PVar x) (Var.Set.elements pvars_a)
+    in
     let state_lvars = get_lvars astate in
     let known_lvars =
-      SS.elements
-        (SS.diff
-           (SS.inter state_lvars (Asrt.lvars a))
-           (SS.of_list lvar_binders))
+      LVar.Set.elements
+        (LVar.Set.diff
+           (LVar.Set.inter state_lvars (Asrt.lvars a))
+           (LVar.Set.of_list lvar_binders))
     in
     let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
     let asrt_alocs =
-      List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+      List.map (fun x -> Expr.ALoc x) (ALoc.Set.elements (Asrt.alocs a))
     in
     let known_matchables =
       Expr.Set.of_list (known_pvars @ known_lvars @ asrt_alocs)
@@ -1108,13 +1132,15 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     in
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
-    let vars_to_forget = SS.inter state_lvars (SS.of_list lvar_binders) in
+    let vars_to_forget =
+      LVar.Set.inter state_lvars (LVar.Set.of_list lvar_binders)
+    in
     let astate =
-      if vars_to_forget <> SS.empty then (
+      if not (LVar.Set.is_empty vars_to_forget) then (
         let oblivion_subst = fresh_subst vars_to_forget in
         L.verbose (fun m ->
             m "Forget @[%a@] with subst: %a"
-              Fmt.(iter ~sep:comma SS.iter string)
+              Fmt.(iter ~sep:comma LVar.Set.iter Id.pp)
               vars_to_forget SVal.SESubst.pp oblivion_subst);
 
         (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
@@ -1203,7 +1229,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
                 (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp))))
             bindings);
       let known_pvars =
-        SS.elements (SS.diff pvars_a (SS.of_list pvar_binders))
+        Var.Set.elements (Var.Set.diff pvars_a (Var.Set.of_list pvar_binders))
       in
       let bindings =
         (if revisited then new_bindings @ bindings else bindings)
@@ -1256,7 +1282,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       match res with
       | Ok new_astate ->
           let invariant_state =
-            add_spec_vars new_astate (SS.of_list lvar_binders)
+            add_spec_vars new_astate (LVar.Set.of_list lvar_binders)
           in
           let _, invariant_states =
             simplify ~kill_new_lvars:true invariant_state
@@ -1321,17 +1347,24 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
           failwith
             "Fold/Unfold/GUnfold/Package must be routed through execute_action"
       | SepAssert (a, binders) -> (
-          if not (List.for_all Names.is_lvar_name binders) then
-            failwith "Binding of pure variables in *-assert.";
+          let binders =
+            match Id.as_lvars binders with
+            | Some binders -> binders
+            | None -> failwith "Binding of pure variables in *-assert."
+          in
           let store = get_store astate in
           let pvars_store = SStore.domain store in
           let pvars_a = Asrt.pvars a in
-          let pvars_diff = SS.diff pvars_a pvars_store in
+          let pvars_diff = Var.Set.diff pvars_a pvars_store in
           L.verbose (fun m ->
-              m "%s" (String.concat ", " (SS.elements pvars_diff)));
-          (if not (SS.is_empty pvars_diff) then
+              m "%a"
+                Fmt.(list ~sep:(any ", ") Id.pp)
+                (Var.Set.elements pvars_diff));
+          (if not (Var.Set.is_empty pvars_diff) then
              let pvars_errs : err_t list =
-               List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
+               List.map
+                 (fun pvar : err_t -> EVar pvar)
+                 (Var.Set.elements pvars_diff)
              in
              raise (Internal_State_Error (pvars_errs, astate)));
           let store_subst = SStore.to_ssubst store in
@@ -1339,30 +1372,32 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
           (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
           let state_lvars = get_lvars astate in
           let known_lvars =
-            SS.elements
-              (SS.diff
-                 (SS.inter state_lvars (Asrt.lvars a))
-                 (SS.of_list binders))
+            LVar.Set.elements
+              (LVar.Set.diff
+                 (LVar.Set.inter state_lvars (Asrt.lvars a))
+                 (LVar.Set.of_list binders))
           in
           let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
           let asrt_alocs =
-            List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+            List.map (fun x -> Expr.ALoc x) (ALoc.Set.elements (Asrt.alocs a))
           in
           let known_matchables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
 
           let mp =
             MP.init known_matchables Expr.Set.empty [ (a, (None, None)) ]
           in
-          let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
+          let vars_to_forget =
+            LVar.Set.inter state_lvars (LVar.Set.of_list binders)
+          in
           let astate =
             (* The memory is immutable, so the substituted state must be used
                (the pure part of the state is still substituted in place). *)
-            if SS.is_empty vars_to_forget then astate
+            if LVar.Set.is_empty vars_to_forget then astate
             else
               let oblivion_subst = fresh_subst vars_to_forget in
               L.verbose (fun m ->
                   m "Forget @[%a@] with subst: %a"
-                    Fmt.(iter ~sep:comma SS.iter string)
+                    Fmt.(iter ~sep:comma LVar.Set.iter Id.pp)
                     vars_to_forget SVal.SESubst.pp oblivion_subst);
 
               (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
@@ -1439,7 +1474,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
                   SMatcher.produce new_state full_subst a_produce
                 in
                 let new_state' =
-                  add_spec_vars new_astate (SS.of_list binders)
+                  add_spec_vars new_astate (LVar.Set.of_list binders)
                 in
                 let _, new_states = simplify ~kill_new_lvars:true new_state' in
                 let+ new_state = new_states in
@@ -1476,8 +1511,11 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       | Consume (asrt, binders) -> consume astate asrt binders
       | Produce asrt -> produce_lcmd astate asrt
       | ApplyLem (lname, args, binders) ->
-          if not (List.for_all Names.is_lvar_name binders) then
-            failwith "Binding of pure variables in lemma application.";
+          let binders =
+            match Id.as_lvars binders with
+            | Some binders -> binders
+            | None -> failwith "Binding of pure variables in lemma application."
+          in
           let lemma =
             match MP.get_lemma prog lname with
             | Error _ -> Fmt.failwith "Lemma %s does not exist" lname
@@ -1493,7 +1531,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
             run_spec_aux ~existential_bindings lname lemma.data.lemma_params
               lemma.mp None v_args astate
           in
-          let astate = add_spec_vars astate (Var.Set.of_list binders) in
+          let astate = add_spec_vars astate (LVar.Set.of_list binders) in
           let _, astates = simplify ~matching:true astate in
           Res_list.just_oks astates
       | Invariant _ ->
@@ -1505,9 +1543,9 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
 
   let run_spec
       (spec : MP.spec)
-      (x : string)
+      (x : Var.t)
       (args : vt list)
-      (subst : (string * (string * vt) list) option)
+      (subst : (string * (LVar.t * vt) list) option)
       (astate : t) : (t * Flag.t, err_t) Res_list.t =
     run_spec_aux ?existential_bindings:(Option.map snd subst)
       spec.data.spec_name spec.data.spec_params spec.mp (Some x) args astate
@@ -1516,7 +1554,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let specs =
       List.map
         (fun ((spec, x, args, subst) :
-               MP.spec * string * vt list * (string * (string * vt) list) option)
+               MP.spec * Var.t * vt list * (string * (LVar.t * vt) list) option)
            ->
           ( spec.data.spec_name,
             spec.data.spec_params,

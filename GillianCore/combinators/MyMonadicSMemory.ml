@@ -73,10 +73,10 @@ module type S = sig
   val get_recovery_tactic : t -> err_t -> Expr.t Recovery_tactic.t
 
   (** The set of logical variables in the state *)
-  val lvars : t -> Containers.SS.t
+  val lvars : t -> LVar.Set.t
 
   (** The set of abstract locations in the state *)
-  val alocs : t -> Containers.SS.t
+  val alocs : t -> ALoc.Set.t
 
   (** Applies a substitution to the state. This can branch, eg. when attempting
       to resolve equality of expressions. *)
@@ -100,7 +100,7 @@ module Defaults = struct
   type st = Subst.t
 
   let is_overlapping_asrt _ = false
-  let get_print_info _ _ = (Containers.SS.empty, Containers.SS.empty)
+  let get_print_info _ _ = (LVar.Set.empty, Id.Any_loc.Set.empty)
   let sure_is_nonempty _ = false
 
   let get_failing_constraint _ =

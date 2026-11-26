@@ -35,7 +35,7 @@ type frame = {
 [@@deriving make]
 
 type 'memory astate = {
-  store : (string * Expr.t) list;
+  store : (Var.t * Expr.t) list;
   memory : 'memory;
   pfs : PFS.t option;
   types : Type_env.t option;

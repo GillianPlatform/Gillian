@@ -31,7 +31,7 @@ module type BiProcessingS = sig
   val normalise_assertion :
     init_data:init_data ->
     prog:'a MP.prog ->
-    pvars:SS.t ->
+    pvars:Var.Set.t ->
     Asrt.t ->
     state_t list
 
@@ -58,7 +58,7 @@ struct
 
   type state_t = Interp.state_t
   type result_t = Interp.result_t
-  type t = { name : string; params : string list; state : state_t }
+  type t = { name : string; params : Var.t list; state : state_t }
   type annot = PC.Annot.t
   type init_data = PC.init_data
 
@@ -66,10 +66,10 @@ struct
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvar_bindings =
-      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (LVar.Set.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (ALoc.Set.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -84,7 +84,7 @@ struct
 
   let make_spec
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (bi_state_i : state_t)
       (bi_state_f : state_t)
       (fl : Flag.t) : Spec.t option =
@@ -96,19 +96,19 @@ struct
       (* let _              = SBAState.simplify ~kill_new_lvars:true bi_state_f in *)
       let state_i, _ = BiProcess.bistate_to_state_and_af bi_state_i in
       let state_f, af_asrt = BiProcess.bistate_to_state_and_af bi_state_f in
-      let pvars = SS.of_list (Names.return_variable :: params) in
+      let pvars = Var.Set.of_list (Var.return_variable :: params) in
 
       L.verbose (fun m ->
           m
             "Going to create a spec for @[<h>%s(%a)@]@\n\
              @[<v 0>@[<v 2>AF:@ %a@] @[<v 2>Final STATE: %a@]@]"
             name
-            Fmt.(list ~sep:comma string)
+            Fmt.(list ~sep:comma Id.pp)
             params Asrt.pp af_asrt BiProcess.NonBiState.pp state_f);
       (* Drop all pvars except ret/err from the state *)
       let () =
         SStore.filter_map_inplace (BiProcess.NonBiState.get_store state_f)
-          (fun x v -> if x = Names.return_variable then Some v else None)
+          (fun x v -> if Var.equal x Var.return_variable then Some v else None)
       in
       let* post =
         let _, finals_simplified =
@@ -138,11 +138,11 @@ struct
       in
       let post_clocs = Asrt.clocs post in
       let pre_clocs = Asrt.clocs pre in
-      let new_clocs = SS.diff post_clocs pre_clocs in
+      let new_clocs = Id.Loc.Set.diff post_clocs pre_clocs in
       let subst = Hashtbl.create Config.medium_tbl_size in
       List.iter
         (fun cloc -> Hashtbl.replace subst cloc (Expr.ALoc (ALoc.alloc ())))
-        (SS.elements new_clocs);
+        (Id.Loc.Set.elements new_clocs);
       let subst_fun cloc =
         match Hashtbl.find_opt subst cloc with
         | Some e -> e
@@ -179,14 +179,14 @@ struct
                the spec:@\n\
                %a@]"
               name
-              Fmt.(list ~sep:comma string)
+              Fmt.(list ~sep:comma Id.pp)
               params Spec.pp spec);
         Some spec
 
   let testify ~init_data ~(prog : annot MP.prog) (bi_spec : BiSpec.t) : t list =
     let open Syntaxes.List in
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
-    let params = SS.of_list bi_spec.bispec_params in
+    let params = Var.Set.of_list bi_spec.bispec_params in
     (* For each pre in the bispec *)
     let* pre, _ = bi_spec.bispec_pres in
     let+ state =
@@ -226,7 +226,7 @@ struct
   let process_sym_exec_result
       (prog : annot MP.prog)
       (name : string)
-      (params : string list)
+      (params : Var.t list)
       (state_i : state_t)
       (result : result_t) : (Spec.t * Flag.t) option =
     let open Syntaxes.Option in
@@ -581,7 +581,7 @@ module Make
       let normalise_assertion
           ~(init_data : init_data)
           ~(prog : 'a MP.prog)
-          ~(pvars : SS.t)
+          ~(pvars : Var.Set.t)
           assertion =
         let open Syntaxes.List in
         let+ ss_pre, _ =

@@ -41,14 +41,20 @@ let test_expr_base_elements () =
         EList
           [
             Lit (LList [ Bool false ]);
-            BinOp (UnOp (Not, Lit (Num 32.)), FPlus, PVar "b");
+            BinOp (UnOp (Not, Lit (Num 32.)), FPlus, PVar (Var.of_string "b"));
           ];
-        LVar "a";
-        ALoc "e";
+        LVar (LVar.of_string "a");
+        ALoc (ALoc.of_string "e");
       ]
   in
   let expected =
-    [ Lit Undefined; Lit (Bool false); Lit (Num 32.); LVar "a"; ALoc "e" ]
+    [
+      Lit Undefined;
+      Lit (Bool false);
+      Lit (Num 32.);
+      LVar (LVar.of_string "a");
+      ALoc (ALoc.of_string "e");
+    ]
   in
   Alcotest.check list_expr "Get base elements in recursive list"
     (base_elements rec_expr_list)

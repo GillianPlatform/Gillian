@@ -23,12 +23,7 @@ module type MatchableState = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
   val copy : t -> t
@@ -170,12 +165,7 @@ module type LoggableState = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
 end

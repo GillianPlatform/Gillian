@@ -84,12 +84,10 @@ module Make (Mem : MyMonadicSMemory.S) :
   (* Variables *)
 
   let lvars s =
-    let open Utils.Containers in
-    Mem.lvars s.state |> SS.union (Fix.lvars s.anti_frame)
+    Mem.lvars s.state |> Gil_syntax.LVar.Set.union (Fix.lvars s.anti_frame)
 
   let alocs s =
-    let open Utils.Containers in
-    Mem.alocs s.state |> SS.union (Fix.alocs s.anti_frame)
+    Mem.alocs s.state |> Gil_syntax.ALoc.Set.union (Fix.alocs s.anti_frame)
 
   let substitution subst s =
     let open Monadic.Delayed.Syntax in

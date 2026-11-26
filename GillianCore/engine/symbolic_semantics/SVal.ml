@@ -22,7 +22,7 @@ struct
   let to_expr le = le
   let from_expr le = Some le
   let from_list = Expr.from_list
-  let from_lvar_name x = Expr.LVar x
+  let from_lvar x = Expr.LVar x
   let to_list = Expr.to_list
 end
 

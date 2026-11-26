@@ -1,24 +1,22 @@
-open Names
-
 (** GIL Expressions *)
 type t = TypeDef__.expr =
   | Lit of Literal.t  (** GIL literals *)
-  | PVar of string  (** GIL program variables *)
-  | LVar of LVar.t  (** GIL logical variables *)
-  | ALoc of string  (** GIL abstract locations *)
+  | PVar of Id.Var.t  (** GIL program variables *)
+  | LVar of Id.LVar.t  (** GIL logical variables *)
+  | ALoc of Id.ALoc.t  (** GIL abstract locations *)
   | UnOp of UnOp.t * t  (** Unary operators *)
   | BinOp of t * BinOp.t * t  (** Binary operators *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
   | NOp of NOp.t * t list  (** n-ary operators *)
   | EList of t list  (** Lists of expressions *)
   | ESet of t list  (** Sets of expressions *)
-  | Exists of (string * Type.t option) list * t
+  | Exists of (Id.LVar.t * Type.t option) list * t
       (** Existential quantification. *)
-  | ForAll of (string * Type.t option) list * t
+  | ForAll of (Id.LVar.t * Type.t option) list * t
       (** Universal quantification. *)
   | ConstructorApp of string * t list  (** Datatype constructor *)
   | FuncApp of string * t list  (** Function application *)
-  | Cases of t * (string * string list * t) list
+  | Cases of t * (string * Id.LVar.t list * t) list
 [@@deriving eq, ord]
 
 let to_yojson = TypeDef__.expr_to_yojson
@@ -399,13 +397,15 @@ let rec map_opt
 (** Printer *)
 let pp_custom ~pp ft =
   let pp_var_with_type fmt (x, t_opt) =
-    Fmt.pf fmt "%s%a" x
+    Fmt.pf fmt "%a%a" Id.pp x
       (Fmt.option (fun fm t -> Fmt.pf fm " : %s" (Type.str t)))
       t_opt
   in
   function
   | Lit l -> Literal.pp ft l
-  | PVar v | LVar v | ALoc v -> Fmt.string ft v
+  | PVar v -> Id.pp ft v
+  | LVar v -> Id.pp ft v
+  | ALoc v -> Id.pp ft v
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth | LstRepeat ->
@@ -442,7 +442,7 @@ let pp_custom ~pp ft =
           | [] -> ()
           | _ ->
               Fmt.pf ft "(";
-              Fmt.pf ft "%a" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) binders;
+              Fmt.pf ft "%a" (Fmt.list ~sep:(Fmt.any ", ") Id.pp) binders;
               Fmt.pf ft ")");
           Fmt.pf ft " -> %a" pp expr;
           if i < List.length branches - 1 then Fmt.pf ft ";@,"
@@ -488,18 +488,21 @@ let to_literal = function
   | _ -> None
 
 (** Get all the logical variables in --e-- *)
-let lvars : t -> SS.t = Visitors.Collectors.lvar_collector#visit_expr SS.empty
+let lvars : t -> Id.LVar.Set.t =
+  Visitors.Collectors.lvar_collector#visit_expr Id.LVar.Set.empty
 
 (** Get all the abstract locations in --e-- *)
-let alocs : t -> SS.t = Visitors.Collectors.aloc_collector#visit_expr ()
+let alocs : t -> Id.ALoc.Set.t =
+  Visitors.Collectors.aloc_collector#visit_expr ()
 
 (** Get all the concrete locations in --e-- *)
-let clocs : t -> SS.t = Visitors.Collectors.cloc_collector#visit_expr ()
+let clocs : t -> Id.Loc.Set.t = Visitors.Collectors.cloc_collector#visit_expr ()
 
-let locs : t -> SS.t = Visitors.Collectors.loc_collector#visit_expr ()
+let locs : t -> Id.Any_loc.Set.t =
+  Visitors.Collectors.loc_collector#visit_expr ()
 
 (** Get all substitutables in --e-- *)
-let substitutables : t -> SS.t =
+let substitutables : t -> Id.Substable.Set.t =
   Visitors.Collectors.substitutable_collector#visit_expr ()
 
 let rec is_concrete (le : t) : bool =
@@ -523,9 +526,6 @@ let is_concrete_zero_i : t -> bool = function
   | Lit (Int z) -> Z.equal Z.zero z
   | _ -> false
 
-(** Get all the variables in --e-- *)
-let vars : t -> SS.t = Visitors.Collectors.var_collector#visit_expr ()
-
 (** Are all expressions in the list literals? *)
 let all_literals =
   List.for_all (function
@@ -544,17 +544,13 @@ let rec from_lit_list (lit : Literal.t) : t =
 let lists (le : t) : t list =
   Visitors.Collectors.list_collector#visit_expr () le
 
-let subst_clocs (subst : string -> t) (e : t) : t =
+let subst_clocs (subst : Id.Loc.t -> t) (e : t) : t =
   (new Visitors.Substs.subst_clocs subst)#visit_expr () e
 
-let from_var_name (var_name : string) : t =
-  if is_aloc_name var_name then ALoc var_name
-  else if is_lvar_name var_name then LVar var_name
-  else if is_pvar_name var_name then PVar var_name
-  else Fmt.failwith "Invalid var name : %s" var_name
-
-let loc_from_loc_name (loc_name : string) : t =
-  if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
+let loc_from_loc_name (loc : [< Id.any_loc ] Id.t) : t =
+  match Id.classify_loc loc with
+  | `ALoc l -> ALoc l
+  | `Loc l -> Lit (Loc l)
 
 (** {2 Visitors} *)
 
@@ -628,13 +624,17 @@ let base_elements (expr : t) : t list =
   in
   v#visit_expr () expr
 
-let pvars : t -> SS.t = Visitors.Collectors.pvar_collector#visit_expr ()
+let pvars : t -> Id.Var.Set.t = Visitors.Collectors.pvar_collector#visit_expr ()
 
-let var_to_expr (x : string) : t =
-  if Names.is_lvar_name x then LVar x
-  else if is_aloc_name x then ALoc x
-  else if is_pvar_name x then PVar x
-  else raise (Failure ("var_to_expr: Impossible matchable: " ^ x))
+let as_any_var : t -> Id.Any_var.t option = function
+  | LVar x -> Some (x :> Id.Any_var.t)
+  | PVar x -> Some (x :> Id.Any_var.t)
+  | _ -> None
+
+let of_any_var (x : [< Id.any_var ] Id.t) : t =
+  match Id.classify_var x with
+  | `LVar x -> LVar x
+  | `Var x -> PVar x
 
 let is_matchable = function
   | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
@@ -644,7 +644,7 @@ let is_matchable = function
 let rec pvars_to_lvars (e : t) : t =
   let f = pvars_to_lvars in
   match e with
-  | PVar x -> LVar ("#__" ^ x)
+  | PVar x -> LVar (Id.LVar.of_string ("#__" ^ Id.Var.to_string x))
   | UnOp (op, e) -> UnOp (op, f e)
   | BinOp (e1, op, e2) -> BinOp (f e1, op, f e2)
   | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)

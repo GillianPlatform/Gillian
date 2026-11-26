@@ -10,7 +10,7 @@ val check_satisfiability_with_model :
 val check_satisfiability :
   ?matching:bool ->
   ?time:string ->
-  ?relevant_info:Containers.SS.t * Containers.SS.t * Containers.SS.t ->
+  ?relevant_info:Var.Set.t * LVar.Set.t * Id.Any_loc.Set.t ->
   Gil_syntax.Expr.t list ->
   Type_env.t ->
   bool
@@ -25,7 +25,7 @@ val sat :
     environment [gamma]. *)
 val check_entailment :
   ?matching:bool ->
-  Utils.Containers.SS.t ->
+  LVar.Set.t ->
   PFS.t ->
   Gil_syntax.Expr.t list ->
   Type_env.t ->
@@ -58,4 +58,4 @@ val num_is_less_or_equal :
   bool
 
 val resolve_loc_name :
-  pfs:PFS.t -> gamma:Type_env.t -> Gil_syntax.Expr.t -> string option
+  pfs:PFS.t -> gamma:Type_env.t -> Gil_syntax.Expr.t -> Id.Any_loc.t option

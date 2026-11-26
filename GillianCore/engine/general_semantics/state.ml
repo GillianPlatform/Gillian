@@ -87,12 +87,7 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
   val get_recovery_tactic : t -> err_t list -> vt Recovery_tactic.t
@@ -101,16 +96,16 @@ module type S = sig
   val copy : t -> t
 
   (** Add Spec Var *)
-  val add_spec_vars : t -> Var.Set.t -> t
+  val add_spec_vars : t -> LVar.Set.t -> t
 
   (** Get Spec Vars *)
-  val get_spec_vars : t -> Var.Set.t
+  val get_spec_vars : t -> LVar.Set.t
 
   (** Get all logical variables *)
-  val get_lvars : t -> Var.Set.t
+  val get_lvars : t -> LVar.Set.t
 
   (** Turns a state into a list of assertions *)
-  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
+  val to_assertions : ?to_keep:Var.Set.t -> t -> Asrt.t
 
   val evaluate_slcmd : 'a MP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
@@ -119,20 +114,20 @@ module type S = sig
       and the second one is the invariant, i.e. the state obtained by producing
       the invariant *)
   val match_invariant :
-    bool -> t -> Asrt.t -> string list -> (t * t, err_t) Res_list.t
+    bool -> t -> Asrt.t -> Id.Any_var.t list -> (t * t, err_t) Res_list.t
 
   val frame_on : t -> (string * t) list -> string list -> (t, err_t) Res_list.t
 
   val run_spec :
     MP.spec ->
-    string ->
+    Var.t ->
     vt list ->
-    (string * (string * vt) list) option ->
+    (string * (LVar.t * vt) list) option ->
     t ->
     (t * Flag.t, err_t) Res_list.t
 
   val run_par_spec :
-    (MP.spec * string * vt list * (string * (string * vt) list) option) list ->
+    (MP.spec * Var.t * vt list * (string * (LVar.t * vt) list) option) list ->
     t ->
     (t * Flag.t, err_t) Res_list.t
 

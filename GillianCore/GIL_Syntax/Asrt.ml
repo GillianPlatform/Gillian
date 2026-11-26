@@ -148,7 +148,7 @@ let prioritise (a1 : atom) (a2 : atom) =
     | PVar _, _ -> -1
     | _, PVar _ -> 1
     | LVar v, LVar v' -> (
-        match (Names.is_spec_var_name v, Names.is_spec_var_name v') with
+        match (Id.LVar.is_spec v, Id.LVar.is_spec v') with
         | true, true -> 0
         | true, false -> -1
         | false, true -> 1
@@ -181,20 +181,24 @@ let map (f_e : Expr.t -> Expr.t) : t -> t =
     | CorePred (x, es1, es2) -> CorePred (x, List.map f_e es1, List.map f_e es2))
 
 (* Get all the logical variables in --a-- *)
-let lvars : t -> SS.t =
-  Visitors.Collectors.lvar_collector#visit_assertion SS.empty
+let lvars : t -> Id.LVar.Set.t =
+  Visitors.Collectors.lvar_collector#visit_assertion Id.LVar.Set.empty
 
 (* Get all the program variables in --a-- *)
-let pvars : t -> SS.t = Visitors.Collectors.pvar_collector#visit_assertion ()
+let pvars : t -> Id.Var.Set.t =
+  Visitors.Collectors.pvar_collector#visit_assertion ()
 
 (* Get all the abstract locations in --a-- *)
-let alocs : t -> SS.t = Visitors.Collectors.aloc_collector#visit_assertion ()
+let alocs : t -> Id.ALoc.Set.t =
+  Visitors.Collectors.aloc_collector#visit_assertion ()
 
 (* Get all the concrete locations in [a] *)
-let clocs : t -> SS.t = Visitors.Collectors.cloc_collector#visit_assertion ()
+let clocs : t -> Id.Loc.Set.t =
+  Visitors.Collectors.cloc_collector#visit_assertion ()
 
 (* Get all the concrete locations in [a] *)
-let locs : t -> SS.t = Visitors.Collectors.loc_collector#visit_assertion ()
+let locs : t -> Id.Any_loc.Set.t =
+  Visitors.Collectors.loc_collector#visit_assertion ()
 
 (* Returns a list with the names of the predicates that occur in --a-- *)
 let pred_names : t -> string list =
@@ -284,7 +288,7 @@ let pp_atom_full = _pp_atom ~e_pp:Expr.full_pp
 let pp = _pp ~e_pp:Expr.pp
 let full_pp = _pp ~e_pp:Expr.full_pp
 
-let subst_clocs (subst : string -> Expr.t) : t -> t =
+let subst_clocs (subst : Id.Loc.t -> Expr.t) : t -> t =
   map (Expr.subst_clocs subst)
 
 let subst_expr_for_expr ~(to_subst : Expr.t) ~(subst_with : Expr.t) : t -> t =
