@@ -354,11 +354,6 @@ let pp_ins_outs (pred : t) pp_in pp_out =
   pp_iter2 (iter_ins_outs pred) pp_in pp_out
 
 let empty_pred_tbl () = Hashtbl.create Config.small_tbl_size
-
-let get (pred_defs : (string, t) Hashtbl.t) (name : string) : t =
-  try Hashtbl.find pred_defs name
-  with _ -> raise (Failure "DEATH. PRED NOT FOUND!")
-
 let close_suffix = "€€close"
 
 (* Given a predicate name, if it is a guarded predicate, returns the name of the

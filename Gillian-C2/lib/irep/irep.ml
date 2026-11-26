@@ -16,10 +16,10 @@ let make ?(sub = []) ?(named_sub = []) id =
   { id; sub; named_sub; unique_id = fresh_id () }
 
 let nil = make Nil
-let lookup_opt name irep = List.assoc_opt name irep.named_sub
+let lookup name irep = List.assoc_opt name irep.named_sub
 
-let lookup name irep =
-  match lookup_opt name irep with
+let lookup_exn name irep =
+  match lookup name irep with
   | Some x -> x
   | None ->
       let msg =
@@ -28,14 +28,14 @@ let lookup name irep =
       raise (Kutils.Gillian_result.Exc.internal_error msg)
 
 module Infix = struct
-  let ( $ ) irep name = lookup name irep
-  let ( $$ ) irep name = lookup (Id.of_string name) irep
-  let ( $? ) irep name = lookup_opt name irep
-  let ( $$? ) irep name = lookup_opt (Id.of_string name) irep
+  let ( $ ) irep name = lookup_exn name irep
+  let ( $$ ) irep name = lookup_exn (Id.of_string name) irep
+  let ( $? ) irep name = lookup name irep
+  let ( $$? ) irep name = lookup (Id.of_string name) irep
 end
 
 let as_just_string irep = Id.to_string irep.id
-let as_just_int irep = Id.to_int irep.id
+let as_just_int irep = Id.to_int_exn irep.id
 
 let as_just_bitpattern ~width ~signed irep =
   Id.to_bitpattern ~width ~signed irep.id

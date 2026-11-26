@@ -848,9 +848,6 @@ module Pred : sig
     'a list * 'b list ->
     unit
 
-  (** Retrieves a predicate definition by name *)
-  val get : (string, t) Hashtbl.t -> string -> t
-
   (** Given a guarded predicate, return the name of its close token. Fails if
       the predicate isn't guarded. *)
   val close_token_name : t -> string

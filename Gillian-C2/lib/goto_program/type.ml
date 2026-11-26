@@ -94,13 +94,13 @@ let rec of_irep ~(machine : Machine_model.t) (irep : Irep.t) : t =
   | CBool -> CInteger I_bool
   | Unsignedbv -> (
       let width = irep $ Width |> Irep.as_just_int in
-      let int_ty = IntType.which_int_type_opt ~machine ~signed:false ~width in
+      let int_ty = IntType.which_int_type ~machine ~signed:false ~width in
       match int_ty with
       | Some int_ty -> CInteger int_ty
       | None -> Unsignedbv { width })
   | Signedbv -> (
       let width = irep $ Width |> Irep.as_just_int in
-      let int_ty = IntType.which_int_type_opt ~machine ~signed:true ~width in
+      let int_ty = IntType.which_int_type ~machine ~signed:true ~width in
       match int_ty with
       | Some int_ty -> CInteger int_ty
       | None -> Signedbv { width })

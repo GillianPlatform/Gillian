@@ -1157,7 +1157,7 @@ module M = struct
   let action_to_str = str_ac
   let action_from_str s = try Some (ac_from_str s) with _ -> None
   let pred_to_str = str_ga
-  let pred_from_str s = try Some (ga_from_str s) with _ -> None
+  let pred_from_str s = try Some (ga_from_str_exn s) with _ -> None
 
   let list_actions _ =
     [
@@ -1614,7 +1614,7 @@ module M = struct
         ] ) ->
         let perm = ValueTranslation.permission_of_string perm_string in
         let chunk = ValueTranslation.chunk_of_string chunk_string in
-        let arr = SVArr.of_gil_expr_exn arr_e in
+        let arr = SVArr.of_gil_expr arr_e in
         prod_array s ofs size chunk arr perm |> filter_errors
     | Hole, [ low; high; Expr.Lit (String perm_string) ] ->
         let perm = ValueTranslation.permission_of_string perm_string in

@@ -99,7 +99,7 @@ let str_genv_ga = function
   | Definition -> "def"
   | Symbol -> "symb"
 
-let mem_ga_from_str = function
+let mem_ga_from_str_exn = function
   | "single" -> Single
   | "array" -> Array
   | "bounds" -> Bounds
@@ -108,7 +108,7 @@ let mem_ga_from_str = function
   | "freed" -> Freed
   | str -> failwith ("Unknown memory assertion : " ^ str)
 
-let genv_ga_from_str = function
+let genv_ga_from_str_exn = function
   | "symb" -> Symbol
   | "def" -> Definition
   | str -> failwith ("Unknown global assertion : " ^ str)
@@ -117,15 +117,16 @@ let str_ga = function
   | GMem mem_ga -> mem_prefix ^ separator_string ^ str_mem_ga mem_ga
   | GGenv genv_ga -> genv_prefix ^ separator_string ^ str_genv_ga genv_ga
 
-let ga_from_str str =
+let ga_from_str_exn str =
   match String.split_on_char separator_char str with
-  | [ pref; ga ] when String.equal pref mem_prefix -> GMem (mem_ga_from_str ga)
+  | [ pref; ga ] when String.equal pref mem_prefix ->
+      GMem (mem_ga_from_str_exn ga)
   | [ pref; ga ] when String.equal pref genv_prefix ->
-      GGenv (genv_ga_from_str ga)
+      GGenv (genv_ga_from_str_exn ga)
   | _ -> failwith ("Unknown GA : " ^ str)
 
-let ga_to_action_str action str = ga_from_str str |> action |> str_ac
+let ga_to_action_str action str = ga_from_str_exn str |> action |> str_ac
 
 (** Additional stuff *)
 
-let is_overlapping_asrt_str str = ga_from_str str |> is_overlapping_asrt
+let is_overlapping_asrt_str str = ga_from_str_exn str |> is_overlapping_asrt

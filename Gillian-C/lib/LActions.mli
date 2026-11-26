@@ -31,7 +31,7 @@ val ac_from_str : string -> ac
 (** {3 Global assertion serialization} *)
 
 val str_ga : ga -> string
-val ga_from_str : string -> ga
+val ga_from_str_exn : string -> ga
 
 (** {3 Gillian-related things} *)
 

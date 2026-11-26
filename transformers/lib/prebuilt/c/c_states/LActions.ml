@@ -23,7 +23,7 @@ let str_ga = function
   | Zeros -> "zeros"
   | Bounds -> "bounds"
 
-let ga_from_str = function
+let ga_from_str_exn = function
   | "single" -> Single
   | "array" -> Array
   | "bounds" -> Bounds

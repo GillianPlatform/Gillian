@@ -556,7 +556,7 @@ let execute_prod_array heap params =
   ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let arr = MonadicSVal.SVArray.of_gil_expr_exn arr_e in
+      let arr = MonadicSVal.SVArray.of_gil_expr arr_e in
       let++ mem = Mem.prod_array heap.mem loc ofs size chunk arr perm in
       { heap with mem }
   | _ -> fail_ungracefully "set_single" params
@@ -639,7 +639,7 @@ let execute_prod_bounds heap params =
 let execute_genvgetdef heap params =
   match params with
   | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> (
-      match Global_env.find_def_opt heap.genv loc with
+      match Global_env.find_def heap.genv loc with
       | Some def ->
           let v = Global_env.serialize_def def in
           DR.ok (make_branch ~heap ~rets:[ Expr.Lit (Loc loc); Expr.Lit v ] ())
@@ -723,7 +723,7 @@ let consume ~core_pred heap params =
   Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open LActions in
   let a_ret =
-    match ga_from_str core_pred with
+    match ga_from_str_exn core_pred with
     | Single -> execute_cons_single heap params
     | Array -> execute_cons_array heap params
     | Hole -> execute_cons_hole heap params
@@ -740,7 +740,7 @@ let produce ~core_pred heap params =
   Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open LActions in
   let+ a_ret =
-    match ga_from_str core_pred with
+    match ga_from_str_exn core_pred with
     | Single -> execute_prod_single heap params |> filter_errors
     | Array -> execute_prod_array heap params |> filter_errors
     | Hole -> execute_prod_hole heap params |> filter_errors

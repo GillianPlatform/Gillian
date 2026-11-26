@@ -367,7 +367,7 @@ module SVArray = struct
     let e, learned = to_gil_expr_undelayed ~chunk ~range svarr in
     Delayed.return ~learned e
 
-  let of_gil_expr_exn expr = Arr expr
+  let of_gil_expr expr = Arr expr
 
   (** Only call on Mint8Unsigned arrays *)
   let learn_chunk ~chunk ~size arr =

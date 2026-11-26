@@ -146,9 +146,6 @@ let map_node map id f =
   | Some () -> true
   | None -> false
 
-(* Maps a node at an ID. Raises [Not_found] if not found. *)
-let map_node_exn map id f = if map_node map f id then () else raise Not_found
-
 let insert map ~id ~all_ids node =
   let () =
     List.iter (fun id' -> Hashtbl.replace map.entries id' (Alias id)) all_ids

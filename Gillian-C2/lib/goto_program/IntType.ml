@@ -17,7 +17,7 @@ module Bv_encoding = struct
            encode booleans as bitvectors"
 end
 
-let which_int_type_opt ~machine ~signed ~width =
+let which_int_type ~machine ~signed ~width =
   List.find_opt
     (fun it ->
       Bv_encoding.equal { signed; width } (Bv_encoding.encode ~machine it))

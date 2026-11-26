@@ -52,9 +52,6 @@ let right_combine (lst1 : 'a list) (lst2 : 'b list) : ('a * 'b) list =
   in
   loop lst1 lst2 []
 
-(** Filters [None]s from a list while unwrapping the [Some]s *)
-let get_list_somes (lst : 'a option list) : 'a list = List.filter_map Fun.id lst
-
 (** Splits a list at a specified index *)
 let split_at (lst : 'a list) (len : int) : 'a list * 'a list =
   let rec f (i : int) (l_lst : 'a list) (r_list : 'a list) : 'a list * 'a list =
@@ -119,20 +116,6 @@ let nth_or_size list n =
   in
   aux 0 list n
 
-(** Tests if a list starts with another
-
-    Uses polymorphic [=] *)
-let rec starts_with a b =
-  match (a, b) with
-  | _, [] -> true
-  | a' :: a, b' :: b when a' = b' -> starts_with a b
-  | _, _ -> false
-
-(** Tests if a list ends with another
-
-    Uses polymorphic [=] *)
-let ends_with a b = starts_with (List.rev a) (List.rev b)
-
 (** Returns the list without the first element that matches the predicate, and
     the removed element if it exists *)
 let pop_where f =
@@ -165,12 +148,6 @@ let hd_opt = function
   | x :: _ -> Some x
   | [] -> None
 
-(** [Option]-returning version of {!List.tl}*)
-let rec tl_opt = function
-  | [] -> None
-  | [ x ] -> Some x
-  | _ :: rest -> tl_opt rest
-
 (** Prepends an element if it is [Some] *)
 let cons_opt x xs =
   match x with
@@ -199,22 +176,6 @@ let iter_results f l =
   in
   aux l
 
-let for_alli f l =
-  let rec aux i = function
-    | [] -> true
-    | x :: xs -> if f i x then aux (i + 1) xs else false
-  in
-  aux 0 l
-
-let at_least_two f l =
-  let rec aux ~found_one = function
-    | [] -> false
-    | x :: r ->
-        if f x then if found_one then true else aux ~found_one:true r
-        else aux ~found_one r
-  in
-  aux ~found_one:false l
-
 let rec last = function
   | [] -> None
   | [ x ] -> Some x
@@ -241,10 +202,6 @@ let get_and_remove_nth n l =
   in
   (!found, aux 0 l)
 
-let map_head f = function
-  | [] -> []
-  | x :: xs -> f x :: xs
-
 let[@tail_mod_cons] rec map_last f l =
   match l with
   | [] -> []
@@ -255,11 +212,6 @@ let[@tail_mod_cons] rec assoc_replace k v = function
   | [] -> [ (k, v) ]
   | (k', _) :: r when k = k' -> (k, v) :: r
   | x :: r -> x :: assoc_replace k v r
-
-let[@tail_mod_cons] rec drop n = function
-  | [] -> []
-  | l when n = 0 -> l
-  | _ :: r -> drop (n - 1) r
 
 let get_single = function
   | [ x ] -> Some x

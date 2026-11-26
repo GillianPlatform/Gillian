@@ -78,7 +78,7 @@ let str_ga = function
   | Bounds -> "mem_bounds"
   | Freed -> "mem_freed"
 
-let ga_from_str = function
+let ga_from_str_exn = function
   | "mem_single" -> Single
   | "mem_array" -> Array
   | "mem_bounds" -> Bounds
@@ -89,4 +89,4 @@ let ga_from_str = function
 
 (** Additional stuff *)
 
-let is_overlapping_asrt_str str = ga_from_str str |> is_overlapping_asrt
+let is_overlapping_asrt_str str = ga_from_str_exn str |> is_overlapping_asrt

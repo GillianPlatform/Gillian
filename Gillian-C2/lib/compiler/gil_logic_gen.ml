@@ -76,7 +76,7 @@ let already_annot_structs = ref Str_set.empty
 let get_structs_not_annot ctx =
   let struct_names =
     ctx.prog.types |> Hashtbl.to_seq_values
-    |> Seq.filter_map (Ctx.resolve_struct_tag_opt ctx)
+    |> Seq.filter_map (Ctx.resolve_struct_tag ctx)
     |> Str_set.of_seq |> Str_set.to_list
   in
   let already_annot = !already_annot_structs in
@@ -115,7 +115,7 @@ let convert_struct_field
     match type_ with
     | Struct _ | StructTag _ ->
         (* If the field is a struct, then pack the inner fields into a list *)
-        let tag = Ctx.resolve_struct_tag_opt ctx type_ |> Option.get in
+        let tag = Ctx.resolve_struct_tag ctx type_ |> Option.get in
         let pred_name = pred_name_of_struct tag in
         let components = Ctx.resolve_struct_components ctx type_ in
         let field_args, _ =
