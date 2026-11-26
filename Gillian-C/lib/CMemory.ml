@@ -138,9 +138,12 @@ let execute_genvgetdef heap params =
       Ok (heap, [ Literal.Loc loc; v ])
   | _ -> failwith "invalid call to genvgetdef"
 
-let execute_action name heap params =
+type action = LActions.ac
+
+let action_from_str = LActions.ac_from_str
+
+let execute_action action heap params =
   let open LActions in
-  let action = ac_from_str name in
   match action with
   | AMem Alloc -> execute_alloc heap params
   | AMem DropPerm -> execute_drop_perm heap params

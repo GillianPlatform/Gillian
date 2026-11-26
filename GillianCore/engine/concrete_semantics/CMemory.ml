@@ -19,8 +19,12 @@ module type S = sig
   (** Initialisation *)
   val init : init_data -> t
 
+  type action
+
+  val action_from_str : string -> action option
+
   (** Execute action *)
-  val execute_action : string -> t -> vt list -> action_ret
+  val execute_action : action -> t -> vt list -> action_ret
 
   (** State Copy *)
   val copy : t -> t

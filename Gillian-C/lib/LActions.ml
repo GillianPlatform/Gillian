@@ -38,23 +38,23 @@ let str_mem_ac = function
   | SetZeros -> "setZeros"
 
 let mem_ac_from_str = function
-  | "alloc" -> Alloc
-  | "dropperm" -> DropPerm
-  | "weakvalidpointer" -> WeakValidPointer
-  | "getcurperm" -> GetCurPerm
-  | "store" -> Store
-  | "load" -> Load
-  | "free" -> Free
-  | "move" -> Move
-  | "setZeros" -> SetZeros
-  | s -> failwith ("Unkown Memory Action : " ^ s)
+  | "alloc" -> Some Alloc
+  | "dropperm" -> Some DropPerm
+  | "weakvalidpointer" -> Some WeakValidPointer
+  | "getcurperm" -> Some GetCurPerm
+  | "store" -> Some Store
+  | "load" -> Some Load
+  | "free" -> Some Free
+  | "move" -> Some Move
+  | "setZeros" -> Some SetZeros
+  | _ -> None
 
 let str_genv_ac = function
   | GetDef -> "getdef"
 
 let genv_ac_from_str = function
-  | "getdef" -> GetDef
-  | s -> failwith ("Unkown Global Env Action : " ^ s)
+  | "getdef" -> Some GetDef
+  | _ -> None
 
 let separator_char = '_'
 let separator_string = String.make 1 separator_char
@@ -65,10 +65,11 @@ let str_ac = function
 
 let ac_from_str str =
   match String.split_on_char separator_char str with
-  | [ pref; ac ] when String.equal pref mem_prefix -> AMem (mem_ac_from_str ac)
+  | [ pref; ac ] when String.equal pref mem_prefix ->
+      Option.map (fun ac -> AMem ac) (mem_ac_from_str ac)
   | [ pref; ac ] when String.equal pref genv_prefix ->
-      AGEnv (genv_ac_from_str ac)
-  | _ -> failwith ("Unkown action : " ^ str)
+      Option.map (fun ac -> AGEnv ac) (genv_ac_from_str ac)
+  | _ -> None
 
 let str_ga = function
   | Single -> "mem_single"

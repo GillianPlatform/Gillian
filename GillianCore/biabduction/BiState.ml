@@ -459,8 +459,12 @@ module Make (State : SState.S) = struct
   let get_failing_constraint e = State.get_failing_constraint (unlift_error e)
   let can_fix e = State.can_fix (unlift_error e)
 
+  type action = State.action
+
+  let action_from_str = State.action_from_str
+
   let rec execute_action
-      (action : string)
+      (action : action)
       ({ state; af_state } : t)
       (args : Expr.t list) : action_ret =
     let open Syntaxes.List in

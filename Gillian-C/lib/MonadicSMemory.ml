@@ -751,13 +751,18 @@ let produce ~core_pred heap params =
   Logging.verbose (fun m -> m "Resultin in: %a" pp a_ret);
   a_ret
 
-let execute_action ~action_name heap params =
+type action = LActions.ac
+
+let action_from_str = LActions.ac_from_str
+
+let execute_action action heap params =
   Logging.verbose (fun fmt ->
-      fmt "Executing action %s with params %a" action_name pp_params params);
+      fmt "Executing action %s with params %a" (LActions.str_ac action)
+        pp_params params);
   Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open LActions in
   let a_ret =
-    match ac_from_str action_name with
+    match action with
     | AMem Alloc -> execute_alloc heap params
     | AMem GetCurPerm -> execute_getcurperm heap params
     | AMem WeakValidPointer -> execute_weak_valid_pointer heap params

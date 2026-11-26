@@ -20,9 +20,13 @@ module type S = sig
   val get_init_data : t -> init_data
   val clear : t -> t
 
+  type action
+
+  val action_from_str : string -> action option
+
   (** Execute action *)
   val execute_action :
-    string -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex.result
+    action -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex.result
 
   (* Consumers have the same signature as action executors,
      but take a core-predicate name as parameter instead of action name.
@@ -90,7 +94,15 @@ module Dummy : S with type init_data = unit = struct
   let init () = ()
   let get_init_data () = ()
   let clear () = ()
-  let execute_action _ _ _ _ = failwith "Please implement SMemory"
+
+  type action = |
+
+  let action_from_str _ = None
+
+  let execute_action (a : action) _ _ _ =
+    match a with
+    | _ -> .
+
   let consume _ _ _ _ = failwith "Please implement SMemory"
   let produce _ _ _ _ = failwith "Please implement SMemory"
   let is_overlapping_asrt _ = failwith "Please implement SMemory"

@@ -24,9 +24,12 @@ module type S = sig
   val get_init_data : t -> init_data
   val clear : t -> t
 
+  type action
+
+  val action_from_str : string -> action option
+
   (** Execute action *)
-  val execute_action :
-    action_name:string -> t -> vt list -> action_ret Delayed.t
+  val execute_action : action -> t -> vt list -> action_ret Delayed.t
 
   val consume : core_pred:string -> t -> vt list -> action_ret Delayed.t
   val produce : core_pred:string -> t -> vt list -> t Delayed.t
@@ -65,9 +68,9 @@ module Lift (MSM : S) :
   let assertions ?to_keep t =
     Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
-  let execute_action action_name mem gpc params =
+  let execute_action action mem gpc params =
     let open Syntaxes.List in
-    let process = execute_action ~action_name mem params in
+    let process = execute_action action mem params in
     let curr_pc = Pc.of_gpc gpc in
     let+ Branch.{ pc; value } = Delayed.resolve ~curr_pc process in
     let gpc = Pc.to_gpc pc in

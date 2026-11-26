@@ -80,8 +80,11 @@ let dispose heap params =
            "Invalid parameters for Wisl Dispose Local Action : [ %s ] "
            (String.concat ", " (List.map vstr l)))
 
-let execute_action name heap params =
-  let action = WislLActions.ac_from_str name in
+type action = WislLActions.ac
+
+let action_from_str = WislLActions.ac_from_str
+
+let execute_action action heap params =
   WislLActions.(
     match action with
     | GetCell -> get_cell heap params

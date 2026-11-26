@@ -2,7 +2,9 @@ module CState = Test262_outcome.State
 
 let get_metadata cstate cval =
   let act_ret =
-    CState.execute_action JSILNames.getMetadata cstate
+    CState.execute_action
+      (Option.get (CState.action_from_str JSILNames.getMetadata))
+      cstate
       [ CState.eval_expr cstate (Lit cval) ]
   in
   try
@@ -13,7 +15,9 @@ let get_metadata cstate cval =
 
 let get_cell cstate loc prop =
   let act_ret =
-    CState.execute_action JSILNames.getCell cstate
+    CState.execute_action
+      (Option.get (CState.action_from_str JSILNames.getCell))
+      cstate
       [ CState.eval_expr cstate (Lit loc); CState.eval_expr cstate (Lit prop) ]
   in
   try

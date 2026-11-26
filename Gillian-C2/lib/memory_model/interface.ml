@@ -46,19 +46,19 @@ let str_mem_ac = function
   | GetBounds -> "getBounds"
 
 let mem_ac_from_str = function
-  | "alloc" -> Alloc
-  | "dropperm" -> DropPerm
-  | "weakvalidpointer" -> WeakValidPointer
-  | "getcurperm" -> GetCurPerm
-  | "store" -> Store
-  | "load" -> Load
-  | "free" -> Free
-  | "move" -> Move
-  | "poison" -> Poison
-  | "zeroinit" -> ZeroInit
-  | "getArray" -> GetArray
-  | "getBounds" -> GetBounds
-  | s -> failwith ("Unknown Memory Action : " ^ s)
+  | "alloc" -> Some Alloc
+  | "dropperm" -> Some DropPerm
+  | "weakvalidpointer" -> Some WeakValidPointer
+  | "getcurperm" -> Some GetCurPerm
+  | "store" -> Some Store
+  | "load" -> Some Load
+  | "free" -> Some Free
+  | "move" -> Some Move
+  | "poison" -> Some Poison
+  | "zeroinit" -> Some ZeroInit
+  | "getArray" -> Some GetArray
+  | "getBounds" -> Some GetBounds
+  | _ -> None
 
 let str_genv_ac = function
   | GetSymbol -> "getsymbol"
@@ -67,11 +67,11 @@ let str_genv_ac = function
   | SetDef -> "setdef"
 
 let genv_ac_from_str = function
-  | "getsymbol" -> GetSymbol
-  | "setsymbol" -> SetSymbol
-  | "getdef" -> GetDef
-  | "setdef" -> SetDef
-  | s -> failwith ("Unknown Global Env Action : " ^ s)
+  | "getsymbol" -> Some GetSymbol
+  | "setsymbol" -> Some SetSymbol
+  | "getdef" -> Some GetDef
+  | "setdef" -> Some SetDef
+  | _ -> None
 
 let separator_char = '_'
 let separator_string = String.make 1 separator_char
@@ -82,10 +82,11 @@ let str_ac = function
 
 let ac_from_str str =
   match String.split_on_char separator_char str with
-  | [ pref; ac ] when String.equal pref mem_prefix -> AMem (mem_ac_from_str ac)
+  | [ pref; ac ] when String.equal pref mem_prefix ->
+      Option.map (fun ac -> AMem ac) (mem_ac_from_str ac)
   | [ pref; ac ] when String.equal pref genv_prefix ->
-      AGEnv (genv_ac_from_str ac)
-  | _ -> failwith ("Unknown action : " ^ str)
+      Option.map (fun ac -> AGEnv ac) (genv_ac_from_str ac)
+  | _ -> None
 
 let str_mem_ga = function
   | Single -> "single"

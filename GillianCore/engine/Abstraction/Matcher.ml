@@ -59,8 +59,12 @@ module type MatchableState = sig
   val can_fix : err_t -> bool
   val get_recovery_tactic : t -> err_t list -> Expr.t Recovery_tactic.t
 
+  type action
+
+  val action_from_str : string -> action option
+
   val execute_action :
-    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+    action -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
 
   val consume_core_pred :
     string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
@@ -436,6 +440,10 @@ module Make (State : MatchableState) :
     State.simplify ~save ~kill_new_lvars:false ~matching astate
 
   let copy_astate (astate : t) : t = State.copy astate
+
+  let recover_action =
+    lazy (Option.get (State.action_from_str SLCmd.recover_action))
+
   let log_hooks = Match_logging.log_hooks Fun.id
 
   (* The state-level instantiation of the matching walker. Predicates and
@@ -511,7 +519,9 @@ module Make (State : MatchableState) :
         enc_tried;
       ]
     in
-    let results = State.execute_action SLCmd.recover_action astate enc_args in
+    let results =
+      State.execute_action (Lazy.force recover_action) astate enc_args
+    in
     let oks =
       List.filter_map
         (function

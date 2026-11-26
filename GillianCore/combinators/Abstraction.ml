@@ -153,32 +153,37 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
     | None, None -> S.is_overlapping_asrt s
     | _ -> false
 
-  type action =
+  type reserved_action =
     | Fold
     | Unfold
     | GUnfold
     | Package
     | Recover
     | UnfoldConcrete
-    | SubAction of string
 
-  let action_from_str str =
-    if str = SLCmd.fold_action then Fold
-    else if str = SLCmd.unfold_action then Unfold
-    else if str = SLCmd.gunfold_action then GUnfold
-    else if str = SLCmd.package_action then Package
-    else if str = SLCmd.recover_action then Recover
-    else if str = SLCmd.unfold_concrete_action then UnfoldConcrete
-    else SubAction str
+  type action = Reserved of reserved_action | SubAction of S.action
 
-  let action_to_str = function
+  let reserved_action_from_str str =
+    if str = SLCmd.fold_action then Some Fold
+    else if str = SLCmd.unfold_action then Some Unfold
+    else if str = SLCmd.gunfold_action then Some GUnfold
+    else if str = SLCmd.package_action then Some Package
+    else if str = SLCmd.recover_action then Some Recover
+    else if str = SLCmd.unfold_concrete_action then Some UnfoldConcrete
+    else None
+
+  let reserved_action_to_str = function
     | Fold -> SLCmd.fold_action
     | Unfold -> SLCmd.unfold_action
     | GUnfold -> SLCmd.gunfold_action
     | Package -> SLCmd.package_action
     | Recover -> SLCmd.recover_action
     | UnfoldConcrete -> SLCmd.unfold_concrete_action
-    | SubAction a -> a
+
+  let action_from_str str =
+    match reserved_action_from_str str with
+    | Some act -> Some (Reserved act)
+    | None -> Option.map (fun act -> SubAction act) (S.action_from_str str)
 
   let pred_from_str str : pred =
     match (Asrt.as_user_pred_name str, Asrt.as_wand_name str) with
@@ -1726,10 +1731,10 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
      the reserved recover action (which ends with a state-level simplify —
      recovering here would skip that canonicalization, leaving alias chains
      that force every later action on the same structure to re-unfold it). *)
-  let execute_sub_action action_name (ms : mstate) (args : Expr.t list) :
+  let execute_sub_action action (ms : mstate) (args : Expr.t list) :
       (mstate * Expr.t list, err_t) Res_list.t =
     resolve_with_matching ~matching:false ms
-      (S.execute_action ~action_name ms.st.mem args)
+      (S.execute_action action ms.st.mem args)
     |> List.map (fun (res, ms') ->
            match res with
            | Ok (mem', vs) ->
@@ -1886,11 +1891,13 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
   (* The predicate-manipulating SL commands arrive as reserved actions with
      the [SLCmd] encoding; the state has already evaluated the
      store-dependent sub-expressions. *)
-  let execute_pred_action (act : action) (ms : mstate) (args : Expr.t list) :
-      (mstate * Expr.t list, err_t) Res_list.t =
+  let execute_pred_action
+      (act : reserved_action)
+      (ms : mstate)
+      (args : Expr.t list) : (mstate * Expr.t list, err_t) Res_list.t =
     let open Res_list.Syntax in
     let no_rets = List.map (Result.map (fun ms -> (ms, []))) in
-    match SLCmd.of_action (action_to_str act) args with
+    match SLCmd.of_action (reserved_action_to_str act) args with
     | Some (Fold (pname, les, fold_info)) ->
         let pred = get_def pname in
         let additional_bindings =
@@ -1958,7 +1965,7 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
           [] )
     | Some _ | None ->
         Fmt.failwith "Invalid predicate-action encoding for %s"
-          (action_to_str act)
+          (reserved_action_to_str act)
 
   (* The [recover_action] boundary: the state asks the memory to recover from
      a failure by folding/unfolding. The arguments encode the tactic; the
@@ -2015,17 +2022,17 @@ module Make (S : MonadicSMemory.S) (P : Expr.Printer) = struct
         | _ -> Fmt.failwith "Invalid recover-action level %s" level)
     | _ -> Fmt.failwith "Invalid recover-action encoding"
 
-  let execute_action ~(action_name : string) (s : t) (args : Expr.t list) =
+  let execute_action (action : action) (s : t) (args : Expr.t list) =
     Delayed.of_resolver (fun ~curr_pc ->
         let ms = { st = s; pc = curr_pc } in
         let results =
-          match action_from_str action_name with
-          | SubAction action_name -> execute_sub_action action_name ms args
-          | (Fold | Unfold | GUnfold | Package) as act ->
+          match action with
+          | SubAction action -> execute_sub_action action ms args
+          | Reserved ((Fold | Unfold | GUnfold | Package) as act) ->
               execute_pred_action act ms args
-          | Recover -> execute_recover ms args
+          | Reserved Recover -> execute_recover ms args
           (* The post-pass does the work. *)
-          | UnfoldConcrete -> [ Ok (ms, []) ]
+          | Reserved UnfoldConcrete -> [ Ok (ms, []) ]
         in
         results |> post_pass |> to_branches ~entry_pc:curr_pc)
 

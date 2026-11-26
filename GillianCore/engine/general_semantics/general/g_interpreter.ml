@@ -371,6 +371,19 @@ struct
 
   let call_graph = Call_graph.make ~init_capacity:128 ()
   let reset_call_graph () = Call_graph.reset call_graph
+  let actions : (string, State.action) Hashtbl.t = Hashtbl.create 32
+
+  let resolve_action name =
+    match Hashtbl.find_opt actions name with
+    | Some action -> action
+    | None ->
+        let action =
+          match State.action_from_str name with
+          | Some action -> action
+          | None -> Fmt.failwith "Unknown action: %s" name
+        in
+        Hashtbl.add actions name action;
+        action
 
   (* Often-used values *)
   let vtrue = Val.from_literal (Bool true)
@@ -696,7 +709,7 @@ struct
                 | SLCmd.Unfold _ | SLCmd.GUnfold _ -> true
                 | _ -> false
               in
-              State.execute_action action state v_args
+              State.execute_action (resolve_action action) state v_args
               |> List.concat_map (function
                    | Error _ as err -> [ err ]
                    | Ok (state', rets) ->
@@ -1127,7 +1140,9 @@ struct
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let open Utils.Syntaxes.List in
         let v_es = List.map eval_expr es in
-        let oks, errors = State.execute_action a state v_es |> split_results in
+        let oks, errors =
+          State.execute_action (resolve_action a) state v_es |> split_results
+        in
         let oks =
           match oks with
           | [] -> []

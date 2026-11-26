@@ -101,8 +101,11 @@ let dispose heap loc =
   let++ heap = WislSHeap.dispose heap loc in
   (heap, [])
 
-let execute_action ~action_name heap args =
-  let action = WislLActions.ac_from_str action_name in
+type action = WislLActions.ac
+
+let action_from_str = WislLActions.ac_from_str
+
+let execute_action (action : WislLActions.ac) heap args =
   match (action, args) with
   | Store, [ loc; ofs; value ] -> store heap loc ofs value
   | Load, [ loc; ofs ] -> load heap loc ofs
@@ -129,17 +132,17 @@ let execute_action ~action_name heap args =
 
 let consume ~core_pred heap args =
   (* let core_pred = WislLActions.ga_from_str core_pred in *)
-  let getter = WislLActions.ga_to_getter_str core_pred in
-  let deleter = WislLActions.ga_to_deleter_str core_pred in
-  let** heap', vs = execute_action ~action_name:getter heap args in
+  let getter = WislLActions.(ga_to_getter (ga_from_str_exn core_pred)) in
+  let deleter = WislLActions.(ga_to_deleter (ga_from_str_exn core_pred)) in
+  let** heap', vs = execute_action getter heap args in
   let vs_ins, vs_outs = List_utils.split_at vs (List.length args) in
-  let++ heap'', _ = execute_action ~action_name:deleter heap' vs_ins in
+  let++ heap'', _ = execute_action deleter heap' vs_ins in
   (heap'', vs_outs)
 
 let produce ~core_pred heap args =
   (* let core_pred = WislLActions.ga_from_str core_pred in *)
-  let setter = WislLActions.ga_to_setter_str core_pred in
-  let deleter = WislLActions.ga_to_deleter_str core_pred in
+  let setter = WislLActions.(ga_to_setter (ga_from_str_exn core_pred)) in
+  let deleter = WislLActions.(ga_to_deleter (ga_from_str_exn core_pred)) in
   let del_args =
     match (WislLActions.ga_from_str_exn core_pred, args) with
     | Cell, loc :: ofs :: perm :: _ -> [ loc; ofs; perm ]
@@ -147,7 +150,7 @@ let produce ~core_pred heap args =
     | Freed, loc :: _ -> [ loc ]
     | _ -> failwith "Invalid arguments for produce"
   in
-  let* del_res = execute_action ~action_name:deleter heap del_args in
+  let* del_res = execute_action deleter heap del_args in
   (* HACK: rather than properly implementing produce/consume, we reuse existing mechanisms;
      all core predicates of WISL's memory are exclusively owned, meaning they can't be produced
      "on top" of each other. Thus, to make sure we're not over-writing something, we try deleting
@@ -159,7 +162,7 @@ let produce ~core_pred heap args =
     | Error _ -> Delayed.return ()
     | Ok _ -> vanish ()
   in
-  let* set_res = execute_action ~action_name:setter heap args in
+  let* set_res = execute_action setter heap args in
   match set_res with
   | Error _ ->
       (* It's ok for failing producers to vanish, no unsoundness *)

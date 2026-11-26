@@ -30,7 +30,11 @@ module type S = sig
   type action_ret = (t * vt list, err_t) Res_list.t
   type init_data
 
-  val execute_action : string -> t -> vt list -> action_ret
+  (** Memory actions, resolved from their name once by the interpreter *)
+  type action
+
+  val action_from_str : string -> action option
+  val execute_action : action -> t -> vt list -> action_ret
   val is_overlapping_asrt : string -> bool
 
   (** Expression Evaluation *)

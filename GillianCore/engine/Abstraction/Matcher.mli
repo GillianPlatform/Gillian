@@ -59,8 +59,12 @@ module type MatchableState = sig
   val can_fix : err_t -> bool
   val get_recovery_tactic : t -> err_t list -> Expr.t Recovery_tactic.t
 
+  type action
+
+  val action_from_str : string -> action option
+
   val execute_action :
-    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+    action -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
 
   val consume_core_pred :
     string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t

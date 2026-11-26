@@ -34,7 +34,11 @@ module Make
 
   let init init_data : t = (CMemory.init init_data, CStore.init [], [])
 
-  let execute_action (action : string) (state : t) (args : vt list) : action_ret
+  type action = CMemory.action
+
+  let action_from_str = CMemory.action_from_str
+
+  let execute_action (action : action) (state : t) (args : vt list) : action_ret
       =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with

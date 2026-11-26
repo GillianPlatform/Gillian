@@ -411,75 +411,79 @@ module M = struct
     in
     Ok (heap, [])
 
-  let execute_action ~action_name:(action : string) (heap : t) (args : vt list)
-      : action_ret Delayed.t =
-    if action = JSILNames.getCell then
-      match args with
-      | [ loc; prop ] -> get_cell heap loc prop
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.setCell then
-      match args with
-      | [ loc; prop; v ] -> set_cell heap loc prop v
-      | _ -> raise (Failure "Internal Error. execute_action. setCell")
-    else if action = JSILNames.delCell then
-      match args with
-      | [ loc; prop ] -> remove_cell heap loc prop
-      | _ -> raise (Failure "Internal Error. execute_action. delCell")
-    else if action = JSILNames.alloc then
-      match args with
-      | [ Lit Empty; m_loc ] -> alloc heap None (Some m_loc)
-      | [ loc; m_loc ] -> alloc heap (Some loc) (Some m_loc)
-      | _ -> raise (Failure "Internal Error. execute_action. alloc")
-    else if action = JSILNames.delObj then
-      match args with
-      | [ loc ] -> delete_object heap loc
-      | _ -> raise (Failure "Internal Error. execute_action. delObj")
-    else if action = JSILNames.getAllProps then
-      match args with
-      | [ loc ] -> get_full_domain heap loc
-      | _ -> raise (Failure "Internal Error. execute_action. getAllProps")
-    else if action = JSILNames.getMetadata then
-      match args with
-      | [ loc ] -> get_metadata heap loc
-      | _ -> raise (Failure "Internal Error. execute_action. getMetadata")
-    else if action = JSILNames.setMetadata then
-      match args with
-      | [ loc; loc_m ] -> set_metadata heap loc loc_m
-      | _ -> raise (Failure "Internal Error. execute_action. setMetadata")
-    else if action = JSILNames.delMetadata then
-      match args with
-      | [ _ ] -> DR.ok (heap, [])
-      | _ -> raise (Failure "Internal Error. execute_action. delMetadata")
-    else if action = JSILNames.getProps then
-      match args with
-      | [ loc; props ] -> get_partial_domain heap loc props
-      | _ -> raise (Failure "Internal Error. execute_action. getProps")
-    else if action = JSILNames.setProps then
-      match args with
-      | [ loc; props ] -> set_domain heap loc props
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.delProps then
-      match args with
-      | [ loc; _ ] -> remove_domain heap loc
-      | _ -> raise (Failure "Internal Error. execute_action. remove_domain")
-    else raise (Failure "Internal Error. execute_action")
+  type action = JSILNames.action
 
-  let ga_to_setter (a_id : string) : string =
-    if a_id = JSILNames.aCell then JSILNames.setCell
-    else if a_id = JSILNames.aMetadata then JSILNames.setMetadata
-    else if a_id = JSILNames.aProps then JSILNames.setProps
+  let action_from_str = JSILNames.action_from_str
+
+  let execute_action (action : action) (heap : t) (args : vt list) :
+      action_ret Delayed.t =
+    match action with
+    | GetCell -> (
+        match args with
+        | [ loc; prop ] -> get_cell heap loc prop
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | SetCell -> (
+        match args with
+        | [ loc; prop; v ] -> set_cell heap loc prop v
+        | _ -> raise (Failure "Internal Error. execute_action. setCell"))
+    | DelCell -> (
+        match args with
+        | [ loc; prop ] -> remove_cell heap loc prop
+        | _ -> raise (Failure "Internal Error. execute_action. delCell"))
+    | Alloc -> (
+        match args with
+        | [ Lit Empty; m_loc ] -> alloc heap None (Some m_loc)
+        | [ loc; m_loc ] -> alloc heap (Some loc) (Some m_loc)
+        | _ -> raise (Failure "Internal Error. execute_action. alloc"))
+    | DelObj -> (
+        match args with
+        | [ loc ] -> delete_object heap loc
+        | _ -> raise (Failure "Internal Error. execute_action. delObj"))
+    | GetAllProps -> (
+        match args with
+        | [ loc ] -> get_full_domain heap loc
+        | _ -> raise (Failure "Internal Error. execute_action. getAllProps"))
+    | GetMetadata -> (
+        match args with
+        | [ loc ] -> get_metadata heap loc
+        | _ -> raise (Failure "Internal Error. execute_action. getMetadata"))
+    | SetMetadata -> (
+        match args with
+        | [ loc; loc_m ] -> set_metadata heap loc loc_m
+        | _ -> raise (Failure "Internal Error. execute_action. setMetadata"))
+    | DelMetadata -> (
+        match args with
+        | [ _ ] -> DR.ok (heap, [])
+        | _ -> raise (Failure "Internal Error. execute_action. delMetadata"))
+    | GetProps -> (
+        match args with
+        | [ loc; props ] -> get_partial_domain heap loc props
+        | _ -> raise (Failure "Internal Error. execute_action. getProps"))
+    | SetProps -> (
+        match args with
+        | [ loc; props ] -> set_domain heap loc props
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | DelProps -> (
+        match args with
+        | [ loc; _ ] -> remove_domain heap loc
+        | _ -> raise (Failure "Internal Error. execute_action. remove_domain"))
+
+  let ga_to_setter (a_id : string) : JSILNames.action =
+    if a_id = JSILNames.aCell then SetCell
+    else if a_id = JSILNames.aMetadata then SetMetadata
+    else if a_id = JSILNames.aProps then SetProps
     else raise (Failure "DEATH. ga_to_setter")
 
-  let ga_to_getter (a_id : string) : string =
-    if a_id = JSILNames.aCell then JSILNames.getCell
-    else if a_id = JSILNames.aMetadata then JSILNames.getMetadata
-    else if a_id = JSILNames.aProps then JSILNames.getProps
+  let ga_to_getter (a_id : string) : JSILNames.action =
+    if a_id = JSILNames.aCell then GetCell
+    else if a_id = JSILNames.aMetadata then GetMetadata
+    else if a_id = JSILNames.aProps then GetProps
     else raise (Failure "DEATH. ga_to_setter")
 
-  let ga_to_deleter (a_id : string) : string =
-    if a_id = JSILNames.aCell then JSILNames.delCell
-    else if a_id = JSILNames.aMetadata then JSILNames.delMetadata
-    else if a_id = JSILNames.aProps then JSILNames.delProps
+  let ga_to_deleter (a_id : string) : JSILNames.action =
+    if a_id = JSILNames.aCell then DelCell
+    else if a_id = JSILNames.aMetadata then DelMetadata
+    else if a_id = JSILNames.aProps then DelProps
     else raise (Failure "DEATH. ga_to_setter")
 
   (* Consuming a core predicate is achieved by getting it and then deleting
@@ -488,16 +492,16 @@ module M = struct
       action_ret Delayed.t =
     let getter = ga_to_getter core_pred in
     let deleter = ga_to_deleter core_pred in
-    let** heap', vs = execute_action ~action_name:getter heap args in
+    let** heap', vs = execute_action getter heap args in
     let vs_ins, vs_outs = List_utils.split_at vs (List.length args) in
-    let++ heap'', _ = execute_action ~action_name:deleter heap' vs_ins in
+    let++ heap'', _ = execute_action deleter heap' vs_ins in
     (heap'', vs_outs)
 
   (* Producing a core predicate is achieved by setting it; failing producers
      are allowed to vanish, there is no unsoundness *)
   let produce ~(core_pred : string) (heap : t) (args : vt list) : t Delayed.t =
     let setter = ga_to_setter core_pred in
-    let* set_res = execute_action ~action_name:setter heap args in
+    let* set_res = execute_action setter heap args in
     match set_res with
     | Error _ -> Delayed.vanish ()
     | Ok (heap', _) -> Delayed.return heap'

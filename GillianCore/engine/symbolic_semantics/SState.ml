@@ -71,6 +71,12 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
   type init_data = SMemory.init_data
   type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
+  type action = SMemory.action
+
+  let action_from_str = SMemory.action_from_str
+  let reserved_action name = lazy (Option.get (SMemory.action_from_str name))
+  let recover_action = reserved_action SLCmd.recover_action
+  let unfold_concrete_action = reserved_action SLCmd.unfold_concrete_action
 
   let make_s_from_heap
       ~(heap : heap_t)
@@ -223,7 +229,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
       in
       Effect.Deep.continue k lifted
 
-  let execute_action (action : string) (state : t) (args : vt list) : action_ret
+  let execute_action (action : action) (state : t) (args : vt list) : action_ret
       =
     let open Syntaxes.List in
     let { heap; store; pfs; gamma; spec_vars } = state in
@@ -785,6 +791,10 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
     let unfolding_vals = unfolding_vals
     let can_fix = can_fix
     let get_recovery_tactic = get_recovery_tactic
+
+    type nonrec action = action
+
+    let action_from_str = action_from_str
     let execute_action = execute_action
     let consume_core_pred = consume_core_pred
     let produce_core_pred = produce_core_pred
@@ -883,7 +893,7 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
        legacy engine. The memory only does this as a post-pass on its actions
        (not on produce), so ask it with a no-op action. *)
     let* final_state = final_states in
-    execute_action SLCmd.unfold_concrete_action final_state []
+    execute_action (Lazy.force unfold_concrete_action) final_state []
     |> List.concat_map @@ function
        | Ok (st, _) ->
            List.map (fun st -> Ok (st, fl)) (snd (simplify ~matching:true st))
@@ -1564,7 +1574,9 @@ module Make (SMemory : SMemory.S) (P : Expr.Printer) :
             Expr.EList [];
           ]
         in
-        let results = execute_action SLCmd.recover_action astate' enc_args in
+        let results =
+          execute_action (Lazy.force recover_action) astate' enc_args
+        in
         let oks =
           List.filter_map
             (function

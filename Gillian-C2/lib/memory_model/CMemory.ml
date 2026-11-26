@@ -8,7 +8,15 @@ type t = unit
 type action_ret = (t * vt list, err_t) result
 
 let init () = ()
-let execute_action _ _ _ = failwith "c_memory not implemented in Gillian-C2"
+
+type action = |
+
+let action_from_str _ = None
+
+let execute_action (a : action) _ _ =
+  match a with
+  | _ -> .
+
 let copy () = ()
 let pp _ () = ()
 let pp_err _ () = ()
