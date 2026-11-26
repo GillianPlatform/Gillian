@@ -147,3 +147,13 @@ module type S = sig
   val get_equal_values : t -> vt list -> vt list
   val get_heap : t -> heap_t
 end
+
+(** States the interpreter can run from scratch, i.e. that can be built from
+    [init_data].
+
+    @canonical Gillian.General.State.Executable *)
+module type Executable = sig
+  include S
+
+  val init : init_data -> t
+end

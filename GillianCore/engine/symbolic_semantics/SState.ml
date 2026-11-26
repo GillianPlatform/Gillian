@@ -14,7 +14,7 @@ let () =
 
 module type S = sig
   include
-    State.S
+    State.Executable
       with type vt = Expr.t
        and type st = SVal.SESubst.t
        and type store_t = SStore.t
@@ -35,7 +35,6 @@ module type S = sig
     spec_vars:SS.t ->
     t
 
-  val init : init_data -> t
   val get_init_data : t -> init_data
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
