@@ -1,7 +1,7 @@
 let nullptr =
   let open Gil_syntax.Expr in
   let open Gil_syntax.Literal in
-  Lit (LList [ Loc "$l_null"; Int Z.zero ])
+  Lit (LList [ Loc (Gil_syntax.Id.Loc.of_string "$l_null"); Int Z.zero ])
 
 module Internal_functions = struct
   let malloc = "i__malloc"
@@ -68,7 +68,7 @@ module CBMC_names = struct
 end
 
 module Gillian_C2_names = struct
-  let return_by_copy_name = "i___ret"
+  let return_by_copy_name = Gil_syntax.Var.of_string "i___ret"
   let ret_label = "ret"
 end
 

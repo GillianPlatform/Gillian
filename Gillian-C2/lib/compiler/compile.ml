@@ -26,6 +26,8 @@ module Mem_interface = Memory_model.Interface
 open Helpers
 open Compile_expr
 
+let u = Var.of_string "u"
+
 let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
   let b =
     let loc = Option.map Body_item.compile_location fn.location in
@@ -40,7 +42,7 @@ let set_global_function (fn : Program.Func.t) : Body_item.t Seq.t =
   in
   let target = Expr.string target in
   let glob_set_fun = Expr.string Constants.Internal_functions.glob_set_fun in
-  let call = b @@ Cmd.call "u" glob_set_fun [ symbol; target ] in
+  let call = b @@ Cmd.call u glob_set_fun [ symbol; target ] in
   Seq.return call
 
 (* This is to be used without a current body.
@@ -56,15 +58,17 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
   else
     (* We start by allocating the variable *)
     let size = Ctx.size_of ctx gv.type_ in
-    let loc_expr, alloc_cmd = Memory.alloc ~loc_var:"ll" ~size in
+    let loc_expr, alloc_cmd =
+      Memory.alloc ~loc_var:(Var.of_string "ll") ~size
+    in
     let alloc_cmd = b alloc_cmd in
     let size = Expr.int size in
-    let loc = "loc" in
+    let loc = Var.of_string "loc" in
     let assign_cmd = b @@ Cmd.Assignment (loc, loc_expr) in
     let loc = Expr.PVar loc in
     let store_zeros_cmd =
       let store_zeros = Constants.Internal_functions.store_zeros in
-      b @@ Cmd.call "u" (Lit (String store_zeros)) [ loc; size ]
+      b @@ Cmd.call u (Lit (String store_zeros)) [ loc; size ]
     in
 
     let store_value_cmds =
@@ -76,7 +80,7 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
           let store_value =
             match v with
             | ByValue v ->
-                [ b (Memory.store_scalar ~ctx ~var:"u" dst v gv.type_) ]
+                [ b (Memory.store_scalar ~ctx ~var:u dst v gv.type_) ]
             | ByCompositValue { writes; _ } ->
                 Memory.write_composit ~ctx ~annot:b ~dst writes
             | _ -> Error.unexpected "compile_global_var: not by value"
@@ -86,18 +90,18 @@ let set_global_var ~ctx (gv : Program.Global_var.t) : Body_item.t Seq.t =
     let drom_perm_cmd =
       let drop_perm = Mem_interface.(str_ac (AMem DropPerm)) in
       let perm_string = Expr.Lit (String (Perm.to_string Writable)) in
-      b @@ Cmd.LAction ("u", drop_perm, [ loc; Expr.zero_i; size; perm_string ])
+      b @@ Cmd.LAction (u, drop_perm, [ loc; Expr.zero_i; size; perm_string ])
     in
     let symexpr = Expr.Lit (String gv.symbol) in
     let set_symbol_cmd =
       let set_symbol = Mem_interface.(str_ac (AGEnv SetSymbol)) in
-      b @@ Cmd.LAction ("u", set_symbol, [ symexpr; loc ])
+      b @@ Cmd.LAction (u, set_symbol, [ symexpr; loc ])
     in
     let set_def_cmd =
       let set_def = Mem_interface.(str_ac (AGEnv SetDef)) in
       b
       @@ Cmd.LAction
-           ("u", set_def, [ loc; EList [ Lit (String "variable"); symexpr ] ])
+           (u, set_def, [ loc; EList [ Lit (String "variable"); symexpr ] ])
     in
     [ alloc_cmd; assign_cmd; store_zeros_cmd ]
     @ store_value_cmds
@@ -113,13 +117,13 @@ let set_global_env_proc (ctx : Ctx.t) =
   let constructor_calls =
     Seq.map
       (fun c ->
-        let cmd = Cmd.call "u" (Expr.string c) [] in
+        let cmd = Cmd.call u (Expr.string c) [] in
         Body_item.make cmd)
       (Hashset.to_seq ctx.prog.constrs)
   in
   let ret =
     let b = Body_item.make in
-    let assign = b @@ Cmd.Assignment (Kutils.Names.return_variable, Lit Null) in
+    let assign = b @@ Cmd.Assignment (Var.return_variable, Lit Null) in
     let ret = b Cmd.ReturnNormal in
     Seq.cons assign (Seq.return ret)
   in
@@ -163,7 +167,9 @@ let compile_alloc_params ~ctx params =
   List.concat_map
     (fun (param, type_) ->
       if Ctx.is_zst_access ctx type_ then []
-      else if Ctx.representable_in_store ctx type_ && Ctx.in_memory ctx param
+      else if
+        Ctx.representable_in_store ctx type_
+        && Ctx.in_memory ctx (Var.to_string param)
       then
         let ptr, cmda = Memory.alloc_ptr ~ctx type_ in
         let cmdb = Memory.store_scalar ~ctx ptr (PVar param) type_ in
@@ -222,7 +228,7 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
       (fun x ->
         match x.Param.identifier with
         | None -> (Ctx.fresh_v ctx, x.type_)
-        | Some s -> (s, x.type_))
+        | Some s -> (Var.of_string s, x.type_))
       func.params
   in
   let proc_spec = None in
@@ -231,9 +237,7 @@ let compile_function ?map_body ~ctx (func : Program.Func.t) :
   let b ?(cmd_kind = C2_annot.Hidden) =
     Body_item.make_hloc ?loc:func.location ~cmd_kind
   in
-  let return_undef =
-    b (Assignment (Kutils.Names.return_variable, Lit Undefined))
-  in
+  let return_undef = b (Assignment (Var.return_variable, Lit Undefined)) in
   let return_block =
     set_first_label
       ~annot:(b ~loop:[] ?display:None ?cmd_kind:None)
@@ -294,7 +298,7 @@ module Start_for_harness = struct
          (fun (p : Param.t) ->
            let ident =
              match p.identifier with
-             | None -> Ctx.fresh_v ctx
+             | None -> Var.to_string (Ctx.fresh_v ctx)
              | Some ident -> ident
            in
            let lhs = expr p.type_ (Symbol ident) in
@@ -368,7 +372,7 @@ module Machine_procs = struct
       let annot = C2_annot.make ~cmd_kind:Internal () in
       Cmd.
         [|
-          (annot, None, Assignment (Utils.Names.return_variable, expr));
+          (annot, None, Assignment (Var.return_variable, expr));
           (annot, None, ReturnNormal);
         |]
     in

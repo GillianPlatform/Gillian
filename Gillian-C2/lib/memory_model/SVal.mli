@@ -6,8 +6,8 @@ module SVal : sig
 
   val make : chunk:Chunk.t -> value:Gil_syntax.Expr.t -> t
   val pp : Format.formatter -> t -> unit
-  val alocs : t -> SS.t
-  val lvars : t -> SS.t
+  val alocs : t -> ALoc.Set.t
+  val lvars : t -> LVar.Set.t
   val sure_is_zero : t -> bool
   val substitution : le_subst:(Expr.t -> Expr.t) -> t -> t
   val syntactic_equal : t -> t -> bool
@@ -24,8 +24,8 @@ module SVArray : sig
   type t [@@deriving yojson]
 
   val make : chunk:Chunk.t -> values:Expr.t -> t
-  val alocs : t -> SS.t
-  val lvars : t -> SS.t
+  val alocs : t -> ALoc.Set.t
+  val lvars : t -> LVar.Set.t
   val reduce : t -> t Monadic.Delayed.t
   val pp : Format.formatter -> t -> unit
   val sure_is_all_zeros : t -> bool

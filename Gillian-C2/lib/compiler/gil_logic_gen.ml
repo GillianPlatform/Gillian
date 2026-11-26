@@ -6,8 +6,8 @@ module Str_set = Gillian.Utils.Containers.SS
 module CoreP = Constr.Core
 open Expr.Infix
 
-let loc_param_name = "loc"
-let ofs_param_name = "ofs"
+let loc_param_name = Var.of_string "loc"
+let ofs_param_name = Var.of_string "ofs"
 
 let pred_name_of_struct struct_name =
   Prefix.generated_pred ^ "struct_" ^ struct_name
@@ -19,8 +19,11 @@ let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_pred ^ "opt_rec_struct_" ^ struct_name
 
 let lvar_pre = Utils.Names.lvar_prefix ^ "c_"
-let fresh_lvar ?(fname = "") () = Generators.gen_str ~fname lvar_pre
-let location_of_symbol s = Prefix.location ^ s
+
+let fresh_lvar ?(fname = "") () =
+  LVar.of_string (Generators.gen_str ~fname lvar_pre)
+
+let location_of_symbol s = Id.Loc.of_string (Prefix.location ^ s)
 
 let rec split3_expr_comp = function
   | [] -> ([], [], [])
@@ -104,11 +107,11 @@ let convert_struct_field
     ~offset
     ~struct_name
     name
-    (type_ : Goto_lib.Type.t) : (string * GilType.t option) list * Asrt.t * int
-    =
+    (type_ : Goto_lib.Type.t) : (Var.t * GilType.t option) list * Asrt.t * int =
   let pvloc = Expr.PVar loc_param_name in
   let pvofs = Expr.PVar ofs_param_name in
-  let pvmember = Expr.PVar name in
+  let member = Var.of_string name in
+  let pvmember = Expr.PVar member in
   let size = Ctx.size_of ctx type_ in
   let ofs = pvofs + Expr.int offset in
   let gil_type, asrts =
@@ -123,7 +126,9 @@ let convert_struct_field
             (fun (acc, i) field ->
               match field with
               | Datatype_component.Field { name; _ } ->
-                  let arg = Expr.LVar (Fmt.str "i__%s_%d" name i) in
+                  let arg =
+                    Expr.LVar (LVar.of_string (Fmt.str "i__%s_%d" name i))
+                  in
                   (arg :: acc, Stdlib.(i + 1))
               | Padding _ -> (acc, i))
             ([], 0) components
@@ -191,7 +196,7 @@ let convert_struct_field
         in
         (gil_type, extra_asrts @ [ mem ])
   in
-  ([ (name, gil_type) ], asrts, Stdlib.(offset + size))
+  ([ (member, gil_type) ], asrts, Stdlib.(offset + size))
 
 let convert_struct_padding ~offset ~struct_name ~bits =
   let open Stdlib in
@@ -277,9 +282,9 @@ let trans_nop : CNOp.t -> NOp.t = function
 let trans_simpl_expr ~pvar_map : CSimplExpr.t -> Expr.t = function
   | PVar s ->
       let s' = List.assoc_opt s pvar_map |> Option.value ~default:s in
-      PVar s'
-  | LVar s -> LVar s
-  | Loc s -> Lit (Loc s)
+      PVar (Var.of_string s')
+  | LVar s -> LVar (LVar.of_string s)
+  | Loc s -> Lit (Loc (Id.Loc.of_string s))
   | Int i -> Lit (Int i)
   | Bool b -> Lit (Bool b)
   | String s -> Lit (String s)
@@ -287,7 +292,7 @@ let trans_simpl_expr ~pvar_map : CSimplExpr.t -> Expr.t = function
 (* The first element of the result should be a pure assertion : either a formula, or overlapping assertions,
    The second element is the list of created variables, the third is the expression to be used
 *)
-let trans_sval ~pvar_map (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
+let trans_sval ~pvar_map (sv : CSVal.t) : Asrt.t * LVar.t list * Expr.t =
   let tnum = types Type.NumberType in
   let tint = types Type.IntType in
   let tloc = types Type.ObjectType in
@@ -309,7 +314,7 @@ let trans_sval ~pvar_map (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
 
 (** Returns assertions that are necessary to define the expression, the created
     variable for binding when necessary, and the used expression *)
-let rec trans_expr ~pvar_map (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
+let rec trans_expr ~pvar_map (e : CExpr.t) : Asrt.t * LVar.t list * Expr.t =
   let te = trans_expr ~pvar_map in
   match e with
   | CExpr.SExpr se -> ([], [], trans_simpl_expr ~pvar_map se)
@@ -357,7 +362,7 @@ let rec trans_expr ~pvar_map (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
       let a3, v3, len = te len in
       (a1 @ a2 @ a3, v1 @ v2 @ v3, Expr.list_sub ~lst ~start ~size:len)
 
-let rec trans_form ~pvar_map (f : CFormula.t) : Asrt.t * Var.t list * Expr.t =
+let rec trans_form ~pvar_map (f : CFormula.t) : Asrt.t * LVar.t list * Expr.t =
   let te = trans_expr ~pvar_map in
   let tf = trans_form ~pvar_map in
   match f with
@@ -396,6 +401,7 @@ let rec trans_form ~pvar_map (f : CFormula.t) : Asrt.t * Var.t list * Expr.t =
       (a1 @ a2, v1 @ v2, fp1 ==> fp2)
   | ForAll (lvts, f) ->
       let a, v, fp = tf f in
+      let lvts = List.map (fun (x, t) -> (LVar.of_string x, t)) lvts in
       (a, v, ForAll (lvts, fp))
 
 let malloc_chunk_asrt loc beg_ofs struct_sz =
@@ -548,7 +554,9 @@ let rec trans_lcmd ~ctx ~pvar_map lcmd =
   let trans_asrt = trans_asrt ~pvar_map in
   let make_assert ~bindings = function
     | [] | [ Asrt.Emp ] -> []
-    | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
+    | a ->
+        let bindings = List.map (fun x -> (x :> Id.Any_var.t)) bindings in
+        [ LCmd.SL (SepAssert (a, bindings)) ]
   in
   match lcmd with
   | CLCmd.Apply (pn, el) ->
@@ -561,12 +569,19 @@ let rec trans_lcmd ~ctx ~pvar_map lcmd =
         @ [ SL (Fold (pn, List.map Option.some gel, None)) ])
   | Unfold { pred; params; bindings; recursive } ->
       let ap, vs, gel = split3_expr_comp (List.map trans_expr params) in
+      let bindings =
+        Option.map
+          (List.map (fun (a, b) -> (LVar.of_string a, LVar.of_string b)))
+          bindings
+      in
       `Normal
         (make_assert ~bindings:vs ap
         @ [ SL (Unfold (pred, List.map Option.some gel, bindings, recursive)) ]
         )
   | Unfold_all pred_name -> `Normal [ SL (GUnfold pred_name) ]
-  | Assert (a, ex) -> `Normal [ SL (SepAssert (trans_asrt ~ctx a, ex)) ]
+  | Assert (a, ex) ->
+      let ex = List.map Id.Any_var.of_string ex in
+      `Normal [ SL (SepAssert (trans_asrt ~ctx a, ex)) ]
   | Branch f ->
       let to_assert, bindings, f_gil = trans_form ~pvar_map f in
       `Normal (make_assert ~bindings to_assert @ [ Branch f_gil ])
@@ -583,6 +598,7 @@ let rec trans_lcmd ~ctx ~pvar_map lcmd =
       `Normal (make_assert ~bindings:vs f @ [ If (ge, gcl1, gcl2) ])
   | Invariant { bindings; assertion } ->
       let asrt = trans_asrt ~ctx assertion in
+      let bindings = List.map Id.Any_var.of_string bindings in
       `Invariant (SLCmd.Invariant (asrt, bindings))
   | SymbExec -> `Normal [ SL SymbExec ]
 
@@ -591,6 +607,7 @@ let trans_asrt_annot da =
   let exs, typsb =
     existentials
     |> ( List.map @@ fun (ex, topt) ->
+         let ex = LVar.of_string ex in
          match topt with
          | None -> (ex, Asrt.Emp)
          | Some t -> (ex, types t (Expr.LVar ex)) )
@@ -604,6 +621,7 @@ let trans_abs_pred ~filepath cl_pred =
       =
     cl_pred
   in
+  let pred_params = List.map (fun (x, t) -> (Var.of_string x, t)) pred_params in
   let pred_num_params = List.length pred_params in
   Pred.
     {
@@ -635,6 +653,7 @@ let trans_pred ~ctx ~pvar_map ~filepath cl_pred =
         } =
     cl_pred
   in
+  let pred_params = List.map (fun (x, t) -> (Var.of_string x, t)) pred_params in
   let pred_num_params = List.length pred_params in
   let pred_definitions =
     List.map
@@ -682,7 +701,7 @@ let get_param_typasrt param =
     | _ -> None
   in
   match (pred, param.identifier) with
-  | Some pred, Some id -> Some (Asrt.pred pred [ PVar id ] [])
+  | Some pred, Some id -> Some (Asrt.pred pred [ PVar (Var.of_string id) ] [])
   | _ -> None
 
 let trans_sspec ~ctx ~pvar_map ~params sspecs =
@@ -729,7 +748,7 @@ let trans_lemma ~ctx ~pvar_map ~filepath lemma =
   Lemma.
     {
       lemma_name = name;
-      lemma_params = params;
+      lemma_params = List.map Var.of_string params;
       lemma_source_path = Some filepath;
       lemma_existentials = [];
       lemma_internal = false;
@@ -743,7 +762,9 @@ let trans_spec ~ctx ?(only_spec = false) cl_spec =
   let CSpec.{ fname; params; sspecs } = cl_spec in
   let fn = Hashtbl.find ctx.Ctx.prog.funs fname in
   let pvar_map = fn.param_map in
-  let spec_params = List.map (fun p -> List.assoc p pvar_map) params in
+  let spec_params =
+    List.map (fun p -> Var.of_string (List.assoc p pvar_map)) params
+  in
   let result =
     Spec.
       {
@@ -789,7 +810,7 @@ module Machine_preds = struct
       params
       |> List.map (fun (p, ty, is_in) ->
              let () = if is_in then incr ins_number in
-             (p, ty))
+             (Var.of_string p, ty))
     in
     Pred.
       {
@@ -820,7 +841,7 @@ module Machine_preds = struct
     let params = [ ("n", Some Type.IntType, true) ] in
     let def =
       let open Expr in
-      let n = PVar "n" in
+      let n = PVar (Var.of_string "n") in
       let e_min = int_z min <= n in
       let e_max = n <= int_z max in
       Asrt.[ Pure e_min; Pure e_max ]
@@ -833,7 +854,7 @@ module Machine_preds = struct
     in
     let def =
       let pw = ctx.machine.pointer_width in
-      let l = Expr.LVar "#l" in
+      let l = Expr.LVar (LVar.of_string "#l") in
       let start = Expr.int Stdlib.(-(pw / 8)) in
       let chunk =
         Chunk.int_type_to_string ~signed:true ~size:pw |> Expr.string
@@ -841,15 +862,17 @@ module Machine_preds = struct
       let perm = Expr.string Perm.(to_string Freeable) in
       Asrt.
         [
-          Asrt.pred Internal_Predicates.ptr_get [ PVar "p"; l; Expr.zero_i ] [];
+          Asrt.pred Internal_Predicates.ptr_get
+            [ PVar (Var.of_string "p"); l; Expr.zero_i ]
+            [];
           CorePred
             ( LActions.(str_ga Single),
               [ l; start; chunk ],
-              [ PVar "bytes"; perm ] );
+              [ PVar (Var.of_string "bytes"); perm ] );
           CorePred
             ( LActions.(str_ga Bounds),
               [ l ],
-              [ Expr.list [ start; PVar "bytes" ] ] );
+              [ Expr.list [ start; PVar (Var.of_string "bytes") ] ] );
         ]
     in
     mk_pred Internal_Predicates.malloced params def

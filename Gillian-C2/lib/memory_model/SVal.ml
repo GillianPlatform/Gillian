@@ -74,7 +74,7 @@ module SVal = struct
     let learned_types, learned =
       match chunk with
       | I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 ->
-          let learned_types = [ (lvar, Type.IntType) ] in
+          let learned_types = [ ((lvar :> Id.any_var Id.t), Type.IntType) ] in
           let learned =
             match Chunk.bounds chunk with
             | Some (low, high) ->
@@ -84,7 +84,9 @@ module SVal = struct
           in
           (learned_types, learned)
       | F32 | F64 ->
-          let learned_types = [ (lvar, Type.NumberType) ] in
+          let learned_types =
+            [ ((lvar :> Id.any_var Id.t), Type.NumberType) ]
+          in
           let learned = [] in
           (learned_types, learned)
       | Ptr ->
@@ -94,9 +96,9 @@ module SVal = struct
           let lvar_offset_e = Expr.LVar lvar_offset in
           let learned_types =
             [
-              (lvar, Type.ListType);
-              (lvar_block, Type.ObjectType);
-              (lvar_offset, Type.IntType);
+              ((lvar :> Id.any_var Id.t), Type.ListType);
+              ((lvar_block :> Id.any_var Id.t), Type.ObjectType);
+              ((lvar_offset :> Id.any_var Id.t), Type.IntType);
             ]
           in
           let learned =
@@ -148,7 +150,9 @@ module SVal = struct
     in
     (* We can't just Seq.init, because it would recreate a LVar every time *)
     let array = List.init size (fun _ -> LVar.alloc ()) in
-    let learned_types = List.map (fun lvar -> (lvar, Type.IntType)) array in
+    let learned_types =
+      List.map (fun lvar -> ((lvar :> Id.any_var Id.t), Type.IntType)) array
+    in
     let exprs = List.map (fun lvar -> Expr.LVar lvar) array in
     let all_bytes =
       List.map
@@ -315,7 +319,9 @@ module SVArray = struct
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         let zero = Expr.zero_i in
-        let learned_types = [ (values_var, Type.ListType) ] in
+        let learned_types =
+          [ ((values_var :> Id.any_var Id.t), Type.ListType) ]
+        in
         let correct_length = Expr.list_length values == size in
         let all_zero =
           forall
@@ -347,7 +353,10 @@ module SVArray = struct
           let first = LVar.alloc () in
           let second = LVar.alloc () in
           let learned_types =
-            [ (first, Type.NumberType); (second, Type.NumberType) ]
+            [
+              ((first :> Id.any_var Id.t), Type.NumberType);
+              ((second :> Id.any_var Id.t), Type.NumberType);
+            ]
           in
           let values = Expr.EList [ Expr.LVar first; Expr.LVar second ] in
           let array = make ~chunk ~values in

@@ -138,8 +138,8 @@ type access =
       (** For copy, we just need the size, not the type. However, in the future,
           we might copy fields one-by-one to preserve the correct semantics of C
       *)
-  | Direct of string
-  | ListMember of { list : string; index : int; total_size : int }
+  | Direct of Var.t
+  | ListMember of { list : Var.t; index : int; total_size : int }
       (** When a value is represented as a list in the store, one can access or
           override one of the members by. For now this only used for overflow
           result. However, we could also model fat pointers like this. *)
@@ -703,11 +703,13 @@ let rec lvalue_as_access ~ctx ~pvar_map ~read (lvalue : GExpr.t) :
         Cs.return (InMemoryComposit { ptr; type_ = lvalue.type_ })
     | Symbol x ->
         if Ctx.is_local ctx x then
+          let var = Var.of_string x in
           if not (Ctx.representable_in_store ctx lvalue.type_) then
-            Cs.return (InMemoryComposit { ptr = PVar x; type_ = lvalue.type_ })
+            Cs.return
+              (InMemoryComposit { ptr = PVar var; type_ = lvalue.type_ })
           else if Ctx.in_memory ctx x then
-            Cs.return (InMemoryScalar { ptr = PVar x; loaded = None })
-          else (Direct x, [])
+            Cs.return (InMemoryScalar { ptr = PVar var; loaded = None })
+          else (Direct var, [])
         else if Ctx.is_function_symbol ctx x then Cs.return (DirectFunction x)
         else
           let+ ptr = Genv.lookup_symbol ~ctx x |> Cs.map_l b in
@@ -1194,7 +1196,8 @@ and compile_address_of ~ctx ~pvar_map ~b (expr : GExpr.t) x =
   | DirectFunction symbol ->
       let+ ptr = Genv.lookup_symbol ~ctx symbol |> Cs.map_l b in
       Val_repr.ByValue ptr
-  | Direct x -> Error.code_error ("address of direct access to " ^ x)
+  | Direct x ->
+      Error.code_error ("address of direct access to " ^ Var.to_string x)
   | ListMember _ -> Error.code_error "address of list member access"
 
 and compile_expr
@@ -1581,7 +1584,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
             | Procedure _ -> Error.code_error "Return value is a procedure")
         | None -> Cs.return ~app:[] (Expr.Lit Undefined)
       in
-      let variable = Utils.Names.return_variable in
+      let variable = Var.return_variable in
       let c =
         s
         @ add_annot
@@ -1600,14 +1603,15 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
          and a unique decision procedure for that. *)
       let ty = glhs.type_ in
       let lhs = GExpr.as_symbol glhs in
+      let lhs_var = Var.of_string lhs in
       (* ZSTs are just (GIL) Null values *)
       let c =
         if Ctx.is_zst_access ctx ty then
-          let cmd = Cmd.Assignment (lhs, Lit Null) in
+          let cmd = Cmd.Assignment (lhs_var, Lit Null) in
           [ b ~cmd_kind:(Normal true) cmd ] |> void
         else if not (Ctx.representable_in_store ctx ty) then
           let ptr, alloc_cmd = Memory.alloc_ptr ~ctx ty in
-          let assign = Cmd.Assignment (lhs, ptr) in
+          let assign = Cmd.Assignment (lhs_var, ptr) in
           let write =
             match value with
             | None -> []
@@ -1626,7 +1630,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
           |> void
         else if Ctx.in_memory ctx lhs then
           let ptr, action_cmd = Memory.alloc_ptr ~ctx ty in
-          let assign = Cmd.Assignment (lhs, ptr) in
+          let assign = Cmd.Assignment (lhs_var, ptr) in
           let pre, write =
             match value with
             | None -> ([], [])
@@ -1637,7 +1641,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
                     ~msg:"declaration initial value for in-memory scalar access"
                     v
                 in
-                let write = Memory.store_scalar ~ctx (Expr.PVar lhs) v ty in
+                let write = Memory.store_scalar ~ctx (Expr.PVar lhs_var) v ty in
                 (pre, [ b write ])
           in
           pre
@@ -1657,7 +1661,7 @@ and compile_statement ~ctx ~pvar_map (stmt : Stmt.t) :
                 (e, s)
             | None -> (Lit Undefined, [])
           in
-          s @ [ b ~cmd_kind:(Normal true) (Assignment (lhs, v)) ] |> void
+          s @ [ b ~cmd_kind:(Normal true) (Assignment (lhs_var, v)) ] |> void
       in
       let pvar_map =
         match Hashtbl.find_opt ctx.prog.base_names lhs with
