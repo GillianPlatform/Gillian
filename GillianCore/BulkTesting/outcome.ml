@@ -5,15 +5,11 @@ module type S = sig
   module ESubst : ESubst.S with type vt = Val.t and type t = Val.et
   module Store : Store.S with type vt = Val.t
 
-  module State : sig
-    include
-      State.S
-        with type vt = Val.t
-         and type st = ESubst.t
-         and type store_t = Store.t
-
-    val init : init_data -> t
-  end
+  module State :
+    State.Executable
+      with type vt = Val.t
+       and type st = ESubst.t
+       and type store_t = Store.t
 
   module ParserAndCompiler :
     ParserAndCompiler.S with type init_data = State.init_data
@@ -37,15 +33,11 @@ module Make
     (ValP : Val.S)
     (ESubstP : ESubst.S with type vt = ValP.t and type t = ValP.et)
     (StoreP : Store.S with type vt = ValP.t)
-    (StateP : sig
-      include
-        State.S
-          with type vt = ValP.t
-           and type st = ESubstP.t
-           and type store_t = StoreP.t
-
-      val init : init_data -> t
-    end)
+    (StateP :
+      State.Executable
+        with type vt = ValP.t
+         and type st = ESubstP.t
+         and type store_t = StoreP.t)
     (PC : ParserAndCompiler.S with type init_data = StateP.init_data)
     (ExternalP : External.T(PC.Annot).S) :
   S
