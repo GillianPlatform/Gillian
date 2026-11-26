@@ -6,23 +6,19 @@ open Literal
 (*                   *)
 (*********************)
 
-module type S = sig
-  include
-    State.Executable
-      with type st = CVal.CESubst.t
-       and type vt = Literal.t
-       and type store_t = CStore.t
-end
+module type S =
+  State.Executable
+    with type st = CVal.CESubst.t
+     and type vt = Literal.t
+     and type store_t = CStore.t
 
 module Make
-    (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) : sig
-  include
-    State.Executable
-      with type st = CVal.CESubst.t
-       and type vt = Literal.t
-       and type store_t = CStore.t
-       and type init_data = CMemory.init_data
-end = struct
+    (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) :
+  State.Executable
+    with type st = CVal.CESubst.t
+     and type vt = Literal.t
+     and type store_t = CStore.t
+     and type init_data = CMemory.init_data = struct
   type vt = CVal.M.t [@@deriving yojson, show]
   type st = CVal.CESubst.t
   type store_t = CStore.t
