@@ -9,11 +9,11 @@ module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 
 type err =
-  | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree of string
-  | UseAfterFree of string
+  | MissingResource of (WislLActions.ga * Id.Any_loc.t * Expr.t option)
+  | DoubleFree of Id.Any_loc.t
+  | UseAfterFree of Id.Any_loc.t
   | MemoryLeak
-  | OutOfBounds of (int option * string * Expr.t)
+  | OutOfBounds of (int option * Id.Any_loc.t * Expr.t)
   | InvalidLocation of Expr.t
 [@@deriving yojson, show]
 
@@ -54,9 +54,9 @@ module Block = struct
 
   let pp ~loc fmt block =
     match block with
-    | Freed -> Fmt.pf fmt "%s -> FREED" loc
+    | Freed -> Fmt.pf fmt "%a -> FREED" Id.pp loc
     | Allocated { data; bound } ->
-        Fmt.pf fmt "%s -> @[<v>BOUND: %a@ %a@]" loc
+        Fmt.pf fmt "%a -> @[<v>BOUND: %a@ %a@]" Id.pp loc
           (Fmt.option ~none:(Fmt.any "NONE") Fmt.int)
           bound
           (Fmt.braces @@ Fmt.vbox
@@ -66,24 +66,16 @@ module Block = struct
 
   let lvars block =
     match block with
-    | Freed -> SS.empty
+    | Freed -> LVar.Set.empty
     | Allocated { data; _ } -> SFVL.lvars data
 
   let alocs block =
     match block with
-    | Freed -> SS.empty
+    | Freed -> ALoc.Set.empty
     | Allocated { data; _ } -> SFVL.alocs data
 end
 
-module SMap = Gillian.Utils.Prelude.Map.Make (struct
-  include String
-
-  let of_yojson = function
-    | `String s -> Ok s
-    | _ -> Error "string_of_yojson: expected string"
-
-  let to_yojson s = `String s
-end)
+module SMap = Gillian.Utils.Prelude.Map.Make (Id.Any_loc)
 
 type t = Block.t SMap.t [@@deriving yojson]
 
@@ -98,10 +90,10 @@ let update heap loc block =
 
 (****** Types and functions for logging when blocks have been freed ********)
 
-type set_freed_info = { loc : string } [@@deriving yojson]
+type set_freed_info = { loc : Id.Any_loc.t } [@@deriving yojson]
 
 let set_freed_info_pp fmt set_freed =
-  Fmt.pf fmt "Set Freed at location %s" set_freed.loc
+  Fmt.pf fmt "Set Freed at location %a" Id.pp set_freed.loc
 
 let set_freed_with_logging heap loc =
   let set_freed_info = { loc } in
@@ -126,7 +118,7 @@ let alloc (heap : t) size =
   let l = get_list (size - 1) in
   let sfvl = SFVL.of_list l in
   let block = Block.Allocated { data = sfvl; bound = Some size } in
-  (SMap.add loc block heap, loc)
+  (SMap.add (loc :> Id.Any_loc.t) block heap, loc)
 
 let dispose (heap : t) loc =
   match SMap.find_opt loc heap with
@@ -293,13 +285,13 @@ let substitution subst heap : t Delayed.t =
       (fun aloc new_loc (heap, acc) ->
         let old_loc =
           match aloc with
-          | ALoc loc -> loc
+          | ALoc loc -> (loc :> Id.Any_loc.t)
           | _ -> raise (Failure "Impossible by construction")
         in
         let new_loc =
           match new_loc with
-          | Expr.Lit (Literal.Loc loc) -> loc
-          | Expr.ALoc loc -> loc
+          | Expr.Lit (Literal.Loc loc) -> (loc :> Id.Any_loc.t)
+          | Expr.ALoc loc -> (loc :> Id.Any_loc.t)
           | _ ->
               raise
                 (Failure
@@ -314,18 +306,20 @@ let substitution subst heap : t Delayed.t =
 let assertions heap =
   SMap.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
 
-let lvars heap : SS.t =
-  SMap.fold (fun _ block acc -> SS.union (Block.lvars block) acc) heap SS.empty
+let lvars heap : LVar.Set.t =
+  SMap.fold
+    (fun _ block acc -> LVar.Set.union (Block.lvars block) acc)
+    heap LVar.Set.empty
 
-let alocs heap : SS.t =
+let alocs heap : ALoc.Set.t =
   SMap.fold
     (fun loc block acc ->
-      SS.union
-        (SS.union (Block.alocs block) acc)
-        (match Gillian.Utils.Names.is_aloc_name loc with
-        | true -> SS.singleton loc
-        | false -> SS.empty))
-    heap SS.empty
+      ALoc.Set.union
+        (ALoc.Set.union (Block.alocs block) acc)
+        (match Id.classify_loc loc with
+        | `ALoc loc -> ALoc.Set.singleton loc
+        | `Loc _ -> ALoc.Set.empty))
+    heap ALoc.Set.empty
 
 (***** small things useful for printing ******)
 

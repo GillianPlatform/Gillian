@@ -12,11 +12,11 @@ module PFS = Gillian.Symbolic.Pure_context
 module L = Logging
 
 type err =
-  | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree of string
-  | UseAfterFree of string
+  | MissingResource of (WislLActions.ga * Id.Any_loc.t * Expr.t option)
+  | DoubleFree of Id.Any_loc.t
+  | UseAfterFree of Id.Any_loc.t
   | MemoryLeak
-  | OutOfBounds of (int option * string * Expr.t)
+  | OutOfBounds of (int option * Id.Any_loc.t * Expr.t)
   | InvalidLocation of Expr.t
 [@@deriving yojson, show]
 
@@ -65,9 +65,9 @@ module Block = struct
 
   let pp ~loc fmt block =
     match block with
-    | Freed -> Fmt.pf fmt "%s -> FREED" loc
+    | Freed -> Fmt.pf fmt "%a -> FREED" Id.pp loc
     | Allocated { data; bound } ->
-        Fmt.pf fmt "%s -> @[<v>BOUND: %a@ %a@]" loc
+        Fmt.pf fmt "%a -> @[<v>BOUND: %a@ %a@]" Id.pp loc
           (Fmt.Dump.option (Fmt.Dump.pair Fmt.int Expr.pp))
           bound
           (Fmt.braces @@ Fmt.vbox
@@ -78,28 +78,24 @@ module Block = struct
 
   let lvars block =
     match block with
-    | Freed -> SS.empty
+    | Freed -> LVar.Set.empty
     | Allocated { data; bound } ->
-        SS.union (SFVL.lvars data)
-          (Option.fold ~none:SS.empty ~some:(fun (_, p) -> Expr.lvars p) bound)
+        LVar.Set.union (SFVL.lvars data)
+          (Option.fold ~none:LVar.Set.empty
+             ~some:(fun (_, p) -> Expr.lvars p)
+             bound)
 
   let alocs block =
     match block with
-    | Freed -> SS.empty
+    | Freed -> ALoc.Set.empty
     | Allocated { data; bound } ->
-        SS.union (SFVL.alocs data)
-          (Option.fold ~none:SS.empty ~some:(fun (_, p) -> Expr.alocs p) bound)
+        ALoc.Set.union (SFVL.alocs data)
+          (Option.fold ~none:ALoc.Set.empty
+             ~some:(fun (_, p) -> Expr.alocs p)
+             bound)
 end
 
-module SMap = Gillian.Utils.Prelude.Map.Make (struct
-  include String
-
-  let of_yojson = function
-    | `String s -> Ok s
-    | _ -> Error "string_of_yojson: expected string"
-
-  let to_yojson s = `String s
-end)
+module SMap = Gillian.Utils.Prelude.Map.Make (Id.Any_loc)
 
 type t = Block.t SMap.t [@@deriving yojson]
 
@@ -125,7 +121,7 @@ let alloc (heap : t) size =
   let block =
     Block.Allocated { data = sfvl; bound = Some (size, Lit (Num 1.0)) }
   in
-  (SMap.add loc block heap, loc)
+  (SMap.add (loc :> Id.Any_loc.t) block heap, loc)
 
 let dispose (heap : t) loc =
   match SMap.find_opt loc heap with
@@ -386,13 +382,13 @@ let substitution subst heap =
       (fun aloc new_loc heap ->
         let aloc =
           match aloc with
-          | ALoc loc -> loc
+          | ALoc loc -> (loc :> Id.Any_loc.t)
           | _ -> failwith "Impossible by construction"
         in
         let new_loc_str =
           match new_loc with
-          | Expr.Lit (Loc loc) -> loc
-          | Expr.ALoc loc -> loc
+          | Expr.Lit (Loc loc) -> (loc :> Id.Any_loc.t)
+          | Expr.ALoc loc -> (loc :> Id.Any_loc.t)
           | _ ->
               Fmt.failwith "Heap substitution fail for loc: %a" Expr.pp new_loc
         in
@@ -406,18 +402,20 @@ let is_empty t = SMap.for_all (fun _ block -> Block.is_empty block) t
 let assertions heap =
   SMap.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
 
-let lvars heap : SS.t =
-  SMap.fold (fun _ block acc -> SS.union (Block.lvars block) acc) heap SS.empty
+let lvars heap : LVar.Set.t =
+  SMap.fold
+    (fun _ block acc -> LVar.Set.union (Block.lvars block) acc)
+    heap LVar.Set.empty
 
-let alocs heap : SS.t =
+let alocs heap : ALoc.Set.t =
   SMap.fold
     (fun loc block acc ->
-      SS.union
-        (SS.union (Block.alocs block) acc)
-        (match Gillian.Utils.Names.is_aloc_name loc with
-        | true -> SS.singleton loc
-        | false -> SS.empty))
-    heap SS.empty
+      ALoc.Set.union
+        (ALoc.Set.union (Block.alocs block) acc)
+        (match Id.classify_loc loc with
+        | `ALoc loc -> ALoc.Set.singleton loc
+        | `Loc _ -> ALoc.Set.empty))
+    heap ALoc.Set.empty
 
 let to_seq (heap : t) =
   SMap.to_seq heap
@@ -453,8 +451,8 @@ let get_store_vars store is_gil_file =
         in
         let value =
           match value with
-          | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
-            -> match_offset rest loc Fmt.string
+          | Expr.EList (Lit (Loc loc) :: rest) -> match_offset rest loc Id.pp
+          | Expr.EList (LVar loc :: rest) -> match_offset rest loc Id.pp
           | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
         in
         Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
@@ -490,7 +488,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   smemory |> SMap.to_seq
   |> Seq.map (fun (loc, blocks) ->
          match blocks with
-         | Block.Freed -> Variable.create_leaf loc "freed" ()
+         | Block.Freed -> Variable.create_leaf (Id.to_string loc) "freed" ()
          | Allocated { data; bound } ->
              let bound =
                match bound with
@@ -506,7 +504,8 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
              let cells = Variable.create_node "cells" cells_id () in
              let loc_id = get_new_scope_id () in
              let () = Hashtbl.replace variables loc_id [ bound; cells ] in
-             Variable.create_node loc loc_id ~value:"allocated" ())
+             Variable.create_node (Id.to_string loc) loc_id ~value:"allocated"
+               ())
   |> List.of_seq
 
 let add_debugger_variables

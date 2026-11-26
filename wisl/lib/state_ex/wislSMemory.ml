@@ -8,7 +8,6 @@ open Delayed_result.Syntax
 module Recovery_tactic = Gillian.General.Recovery_tactic
 module Logging = Gillian.Logging
 module SFVL = SFVL
-module SS = Gillian.Utils.Containers.SS
 
 type init_data = unit
 type vt = Values.t
@@ -28,7 +27,7 @@ let resolve_loc ?(alloc_if_missing = false) loc =
       (* If we can't find the location, we create a new location and we
        add to the path condition that it is equal to the given loc *)
       let al = ALoc.alloc () in
-      ok ~learned:[ BinOp (ALoc al, Equal, loc) ] al
+      ok ~learned:[ BinOp (ALoc al, Equal, loc) ] (al :> Id.Any_loc.t)
 
 let get_cell heap (loc : vt) (offset : vt) =
   let** loc = resolve_loc loc in
@@ -81,6 +80,7 @@ let rem_freed heap loc =
 
 let alloc heap (size : int) =
   let heap, loc = WislSHeap.alloc heap size in
+  let loc = Id.Loc.of_string (Id.to_string loc) in
   ok (heap, [ Expr.Lit (Loc loc); Lit (Int Z.zero) ])
 
 let dispose heap loc =
@@ -163,19 +163,19 @@ let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 let pp_by_need _ fmt h = pp fmt h
 
 (* TODO: Implement properly *)
-let get_print_info _ _ = (SS.empty, SS.empty)
+let get_print_info _ _ = (LVar.Set.empty, Id.Any_loc.Set.empty)
 
 let pp_err fmt (t : err_t) =
   match t with
   | MissingResource (ga, loc, ofs) ->
-      Fmt.pf fmt "Missing %s at %s%a" (WislLActions.str_ga ga) loc
+      Fmt.pf fmt "Missing %s at %a%a" (WislLActions.str_ga ga) Id.pp loc
         Fmt.(option (any ", offset " ++ Expr_pp.pp))
         ofs
-  | DoubleFree loc -> Fmt.pf fmt "Freed %s twice" loc
-  | UseAfterFree loc -> Fmt.pf fmt "Used %s after freed" loc
+  | DoubleFree loc -> Fmt.pf fmt "Freed %a twice" Id.pp loc
+  | UseAfterFree loc -> Fmt.pf fmt "Used %a after freed" Id.pp loc
   | MemoryLeak -> Fmt.pf fmt "Memory leak"
   | OutOfBounds (_, loc, ofs) ->
-      Fmt.pf fmt "Offset %a is out of bounds of %s" Expr_pp.pp ofs loc
+      Fmt.pf fmt "Offset %a is out of bounds of %a" Expr_pp.pp ofs Id.pp loc
   | InvalidLocation loc ->
       let loc =
         match loc with

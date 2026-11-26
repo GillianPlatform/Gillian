@@ -871,7 +871,7 @@ struct
         let open WislLActions in
         match gil_cmd with
         | Some (Cmd.LAction (_, name, [ _; Expr.BinOp (PVar var, _, _) ]), _)
-          when name = str_ac GetCell -> Some var
+          when name = str_ac GetCell -> Some (Var.to_string var)
         | _ -> None)
 
   let free_error_to_string msg_prefix prev_annot gil_cmd wisl_ast =
@@ -890,9 +890,9 @@ struct
           let* cmd, _ = gil_cmd in
           match cmd with
           | Cmd.LAction (_, name, [ Expr.BinOp (PVar var, _, _) ])
-            when name = str_ac Dispose -> Some var
+            when name = str_ac Dispose -> Some (Var.to_string var)
           | Cmd.LAction (_, name, [ _; Expr.BinOp (PVar var, _, _) ])
-            when name = str_ac GetCell -> Some var
+            when name = str_ac GetCell -> Some (Var.to_string var)
           | _ -> None)
     in
     let var = Option.value ~default:"" var in
@@ -910,7 +910,9 @@ struct
             Fmt.str "%s at %a" msg_prefix Location.pp origin_loc)
 
   let get_previously_freed_annot loc =
-    let annot = Logging.Log_queryer.get_previously_freed_annot loc in
+    let annot =
+      Logging.Log_queryer.get_previously_freed_annot (Id.to_string loc)
+    in
     match annot with
     | None -> None
     | Some annot ->
@@ -928,9 +930,9 @@ struct
     let core_pred, loc, offset = missing_resource_error_info in
     let default_err_msg =
       let prefix =
-        Fmt.str "Missing %s at location='%s'"
+        Fmt.str "Missing %s at location='%a'"
           (WislLActions.str_ga core_pred)
-          loc
+          Id.pp loc
       in
       match offset with
       | None -> prefix
@@ -1305,22 +1307,25 @@ struct
     let get_store_vars store =
       List.filter_map
         (fun (var, (value : Gil_syntax.Expr.t)) ->
-          if Str.string_match (Str.regexp "gvar") var 0 then None
+          if Str.string_match (Str.regexp "gvar") (Var.to_string var) 0 then
+            None
           else
             let match_offset lst loc =
               match lst with
               | [ Expr.Lit (Int offset) ] ->
-                  Fmt.str "-> (%s, %d)" loc (Z.to_int offset)
-              | [ offset ] -> Fmt.str "-> (%s, %a)" loc pp_expr offset
+                  Fmt.str "-> (%a, %d)" Id.pp loc (Z.to_int offset)
+              | [ offset ] -> Fmt.str "-> (%a, %a)" Id.pp loc pp_expr offset
               | _ -> Fmt.to_to_string pp_expr value
             in
             let value =
               match value with
-              | Expr.EList (Lit (Loc loc) :: rest)
+              | Expr.EList (Lit (Loc loc) :: rest) -> match_offset rest loc
               | Expr.EList (LVar loc :: rest) -> match_offset rest loc
               | _ -> Fmt.to_to_string pp_expr value
             in
-            Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
+            Some
+              ({ name = Var.to_string var; value; type_ = None; var_ref = 0 }
+                : Variable.t))
         store
       |> List.sort Stdlib.compare
 
@@ -1355,7 +1360,7 @@ struct
       memory |> WislSHeap.to_seq
       |> Seq.map (fun (loc, blocks) ->
              match blocks with
-             | None -> Variable.create_leaf loc "freed" ()
+             | None -> Variable.create_leaf (Id.to_string loc) "freed" ()
              | Some (data, bound) ->
                  let bound =
                    match bound with
@@ -1375,7 +1380,8 @@ struct
                  let cells = Variable.create_node "cells" cells_id () in
                  let loc_id = new_var_ref () in
                  let () = Hashtbl.replace variables loc_id [ bound; cells ] in
-                 Variable.create_node loc loc_id ~value:"allocated" ())
+                 Variable.create_node (Id.to_string loc) loc_id
+                   ~value:"allocated" ())
       |> List.of_seq
 
     let pr_list_axiom =
@@ -1408,25 +1414,30 @@ struct
              { name = ""; value; type_ = None; var_ref = 0 })
       |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
+    let is_loc_name v =
+      let v = Id.to_string v in
+      Names.(is_aloc_name v || is_lloc_name v)
+
     let is_ptr_val =
       let open Expr in
       function
       | EList [ (Lit (Loc _) | ALoc _); _ ] -> true
-      | EList [ (LVar v | PVar v); _ ] ->
-          Names.(is_aloc_name v || is_lloc_name v)
+      | EList [ LVar v; _ ] -> is_loc_name v
+      | EList [ PVar v; _ ] -> is_loc_name v
       | _ -> false
 
     let is_ptr_in_store ~store name =
-      match List.assoc_opt name store with
-      | Some v -> is_ptr_val v
-      | None -> false
+      List.exists
+        (fun (x, v) -> Id.equal (x :> Id.any_var Id.t) name && is_ptr_val v)
+        store
 
     let is_ptr_in_pfs ~pfs name =
       let open Expr in
       pfs
       |> List.exists @@ fun pf ->
          match pf with
-         | BinOp (LVar name', Equal, v) -> name = name' && is_ptr_val v
+         | BinOp (LVar name', Equal, v) ->
+             Id.equal name (name' :> Id.any_var Id.t) && is_ptr_val v
          | _ -> false
 
     let is_ptr ~store ~pfs name typ =
@@ -1441,7 +1452,8 @@ struct
                else if value = Type.ObjectType then "Block identifier"
                else Type.str value
              in
-             Variable.{ name; value; type_ = None; var_ref = 0 })
+             Variable.
+               { name = Id.to_string name; value; type_ = None; var_ref = 0 })
       |> List.sort Variable.(fun v w -> Stdlib.compare v.name w.name)
 
     let f _ { store; memory; pfs; types; preds; _ } _ =
