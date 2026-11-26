@@ -848,7 +848,7 @@ let consume ~core_pred heap params =
   Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open Interface in
   let a_ret =
-    match ga_from_str core_pred with
+    match ga_from_str_exn core_pred with
     | GMem Single -> execute_cons_single heap params
     | GMem Array -> execute_cons_array heap params
     | GMem Hole -> execute_cons_hole heap params
@@ -867,7 +867,7 @@ let produce ~core_pred heap params =
   Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open Interface in
   let+ a_ret =
-    match ga_from_str core_pred with
+    match ga_from_str_exn core_pred with
     | GMem Single -> execute_prod_single heap params |> filter_errors
     | GMem Array -> execute_prod_array heap params |> filter_errors
     | GMem Hole -> execute_prod_hole heap params |> filter_errors

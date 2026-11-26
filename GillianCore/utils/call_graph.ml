@@ -76,15 +76,15 @@ let id_of_name name = function
   | Pred -> id_of_pred_name name
   | Lemma -> id_of_lemma_name name
 
-let get_node_opt call_graph id = Hashtbl.find_opt call_graph.nodes id
+let get_node call_graph id = Hashtbl.find_opt call_graph.nodes id
 
-let get_node call_graph id =
-  match get_node_opt call_graph id with
+let get_node_exn call_graph id =
+  match get_node call_graph id with
   | Some node -> node
   | None -> failwith (Printf.sprintf "could not find node with id '%s'" id)
 
 let get_or_make_node call_graph id ntype name =
-  match get_node_opt call_graph id with
+  match get_node call_graph id with
   | Some node -> node
   | None ->
       let node = Node.make id ntype name [] in
@@ -128,8 +128,8 @@ let add_proc_lemma_use call_graph proc_name lemma_name =
 let add_lemma_pred_use calL_graph lemma_name pred_name =
   add_edge calL_graph Lemma lemma_name Pred pred_name
 
-let get_name call_graph id = (get_node call_graph id).name
-let get_children call_graph id = (get_node call_graph id).children
+let get_name call_graph id = (get_node_exn call_graph id).name
+let get_children call_graph id = (get_node_exn call_graph id).children
 
 let get_proc_names call_graph =
   Hashtbl.fold
@@ -155,7 +155,7 @@ let get_lemma_names call_graph =
       | _ -> acc)
     call_graph.nodes []
 
-let contains_id call_graph id = Option.is_some (get_node_opt call_graph id)
+let contains_id call_graph id = Option.is_some (get_node call_graph id)
 
 let contains_proc call_graph proc_name =
   contains_id call_graph (id_of_proc_name proc_name)
@@ -167,17 +167,17 @@ let contains_lemma call_graph lemma_name =
   contains_id call_graph (id_of_lemma_name lemma_name)
 
 let is_proc call_graph id =
-  match (get_node call_graph id).ntype with
+  match (get_node_exn call_graph id).ntype with
   | Proc -> true
   | _ -> false
 
 let is_pred call_graph id =
-  match (get_node call_graph id).ntype with
+  match (get_node_exn call_graph id).ntype with
   | Pred -> true
   | _ -> false
 
 let is_lemma call_graph id =
-  match (get_node call_graph id).ntype with
+  match (get_node_exn call_graph id).ntype with
   | Lemma -> true
   | _ -> false
 
@@ -202,7 +202,7 @@ let to_reverse_graph call_graph =
       (fun _ (node : Node.t) ->
         List.iter
           (fun child_id ->
-            let child = get_node call_graph child_id in
+            let child = get_node_exn call_graph child_id in
             add_edge reverse_graph child.ntype child.name node.ntype node.name)
           node.children;
         (* Include entry for node (in case it did not have any children) *)

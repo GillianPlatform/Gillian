@@ -266,7 +266,7 @@ let mangle_proc proc mangled_syms =
 
 let optimise_calls_in_proc proc genv =
   let open Gil_syntax.Cmd in
-  let get_fname loc = Global_env.find_function_opt genv loc in
+  let get_fname loc = Global_env.find_function genv loc in
   let call_replacer =
     object
       inherit [_] Gillian.Gil_syntax.Visitors.endo

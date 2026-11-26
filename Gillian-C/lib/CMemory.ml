@@ -133,7 +133,7 @@ let execute_drop_perm heap params =
 let execute_genvgetdef heap params =
   match params with
   | [ Literal.Loc loc ] ->
-      let def = Global_env.find_def heap.genv loc in
+      let def = Global_env.find_def_exn heap.genv loc in
       let v = Global_env.serialize_def def in
       Ok (heap, [ Literal.Loc loc; v ])
   | _ -> failwith "invalid call to genvgetdef"

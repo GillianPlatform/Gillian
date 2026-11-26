@@ -18,13 +18,11 @@ let of_definition_list defs =
       add_def genv loc def)
     empty defs
 
-let find_def genv loc = String_map.find loc genv
+let find_def genv loc = String_map.find_opt loc genv
+let find_def_exn genv loc = String_map.find loc genv
 
-let find_def_opt genv loc =
-  try Some (find_def genv loc) with Not_found -> None
-
-let find_function_opt genv loc =
-  match find_def_opt genv loc with
+let find_function genv loc =
+  match find_def genv loc with
   | Some (FunDef f) -> Some f
   | Some (GlobVar _) ->
       failwith "Gillian-C.Global_env.find_function: Not a function!"

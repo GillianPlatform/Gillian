@@ -100,7 +100,7 @@ module IntType : sig
     val encode : machine:Kcommons.Machine_model.t -> int_type -> t
   end
 
-  val which_int_type_opt :
+  val which_int_type :
     machine:Kcommons.Machine_model.t -> signed:bool -> width:int -> t option
 end
 

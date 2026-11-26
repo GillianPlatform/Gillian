@@ -165,10 +165,10 @@ let register_allocated_temp ctx ~name:symbol ~type_ ~location =
   let local = Local.{ symbol; type_; location } in
   Hashset.add ctx.allocated_temps local
 
-let rec resolve_struct_tag_opt ctx (ty : Type.t) =
+let rec resolve_struct_tag ctx (ty : Type.t) =
   match ty with
   | Struct { tag; _ } -> Some tag
-  | StructTag x -> resolve_struct_tag_opt ctx (tag_lookup ctx x)
+  | StructTag x -> resolve_struct_tag ctx (tag_lookup ctx x)
   | _ -> None
 
 let rec resolve_struct_components ctx (ty : Type.t) =
