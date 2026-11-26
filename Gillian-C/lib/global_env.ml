@@ -1,15 +1,18 @@
 type err_t = Symbol_not_found of string
 type def = FunDef of string | GlobVar of string
 
-let location_of_symbol str = Gillian.Utils.Names.lloc_prefix ^ str
+module Loc = Gil_syntax.Id.Loc
+
+let location_of_symbol str =
+  Loc.of_string (Gillian.Utils.Names.lloc_prefix ^ str)
 
 (** maps location to definition *)
-type t = def String_map.t
+type t = def Loc.Map.t
 
-let empty = String_map.empty
-let add_fundef genv loc fdef = String_map.add loc (FunDef fdef) genv
-let add_globvar genv loc gvar = String_map.add loc (GlobVar gvar) genv
-let add_def genv loc def = String_map.add loc def genv
+let empty = Loc.Map.empty
+let add_fundef genv loc fdef = Loc.Map.add loc (FunDef fdef) genv
+let add_globvar genv loc gvar = Loc.Map.add loc (GlobVar gvar) genv
+let add_def genv loc def = Loc.Map.add loc def genv
 
 let of_definition_list defs =
   List.fold_left
@@ -18,8 +21,8 @@ let of_definition_list defs =
       add_def genv loc def)
     empty defs
 
-let find_def genv loc = String_map.find_opt loc genv
-let find_def_exn genv loc = String_map.find loc genv
+let find_def genv loc = Loc.Map.find_opt loc genv
+let find_def_exn genv loc = Loc.Map.find loc genv
 
 let find_function genv loc =
   match find_def genv loc with
@@ -40,15 +43,12 @@ let serialize_def def =
 module Serialization = struct
   module Loc = struct
     open Gillian.Utils
-
-    type t = string
+    include Loc
 
     let of_yojson yjs =
       match yjs with
-      | `String str when Names.is_lloc_name str -> Ok str
+      | `String str when Names.is_lloc_name str -> Ok (of_string str)
       | _ -> Error ("invalid symbol location: " ^ Yojson.Safe.to_string yjs)
-
-    let to_yojson loc = `String loc
   end
 
   type kind = Function [@name "fun"] | Variable [@name "var"]
@@ -75,7 +75,7 @@ module Serialization = struct
     List.fold_left add_entry empty entries
 
   let to_definition_list genv =
-    String_map.fold
+    Loc.Map.fold
       (fun loc def acc ->
         let entry =
           match def with
@@ -106,6 +106,6 @@ let pp ft genv =
       | FunDef fdef -> pf ft "%s (Function)" fdef
       | GlobVar gvar -> pf ft "%s (Variable)" gvar
     in
-    pf ft "%s -> %a" loc pp_def def
+    pf ft "%a -> %a" Gil_syntax.Id.pp loc pp_def def
   in
-  (Fmt.iter_bindings ~sep:(any "@\n") String_map.iter pp_binding) ft genv
+  (Fmt.iter_bindings ~sep:(any "@\n") Loc.Map.iter pp_binding) ft genv

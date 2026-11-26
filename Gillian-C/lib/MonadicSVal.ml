@@ -55,7 +55,7 @@ let of_chunk_and_expr chunk e =
           | integer -> return (SVlong e)
           | obj -> (
               match e with
-              | EList [ ALoc l; o ] -> return (Sptr (l, o))
+              | EList [ ALoc l; o ] -> return (Sptr ((l :> Id.Any_loc.t), o))
               | _ ->
                   Fmt.failwith
                     "of_chunk_and_expr: Not a location, but should be: %a"
@@ -65,7 +65,7 @@ let of_chunk_and_expr chunk e =
           | integer -> return (SVint e)
           | obj -> (
               match e with
-              | EList [ ALoc l; o ] -> return (Sptr (l, o))
+              | EList [ ALoc l; o ] -> return (Sptr ((l :> Id.Any_loc.t), o))
               | _ ->
                   Fmt.failwith
                     "of_chunk_and_expr: Not a location, but should be: %a"
@@ -102,7 +102,7 @@ let of_gil_expr sval_e =
         | None ->
             let aloc = ALoc.alloc () in
             let learned = [ loc_expr == ALoc aloc ] in
-            (aloc, learned)
+            ((aloc :> Id.Any_loc.t), learned)
       in
       DO.some ~learned (Sptr (loc, ofs))
   | int_typ -> DO.some (SVint (Expr.list_nth sval_e 1))
@@ -267,7 +267,9 @@ module SVArray = struct
     let open Expr.Infix in
     let allocate_array_lvar (descr : ?size:Expr.t -> Expr.t -> Expr.t) =
       let x = LVar.alloc () in
-      let learned_types = [ (x, Gil_syntax.Type.ListType) ] in
+      let learned_types =
+        [ ((x :> Id.any_var Id.t), Gil_syntax.Type.ListType) ]
+      in
       let x = Expr.LVar x in
       let learned = [ Expr.list_length x == s; descr ~size:s x ] in
       Delayed.return ~learned ~learned_types x

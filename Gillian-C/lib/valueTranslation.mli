@@ -24,8 +24,8 @@ val gil_size_of_compcert : Compcert.Camlcoq.Z.t -> Z.t
 
 (** {3 Block serialization} *)
 
-val loc_name_of_block : Compcert.Camlcoq.P.t -> string
-val block_of_loc_name : string -> Compcert.Camlcoq.P.t
+val loc_name_of_block : Compcert.Camlcoq.P.t -> Gillian.Gil_syntax.Id.Loc.t
+val block_of_loc_name : Gillian.Gil_syntax.Id.Loc.t -> Compcert.Camlcoq.P.t
 
 (** {3 Permission serialization} *)
 

@@ -15,9 +15,10 @@ let chunk_of_string = Chunk.of_string
 let loc_name_of_block block =
   let int_block = Camlcoq.P.to_int block in
   let string_block = string_of_int int_block in
-  Prefix.loc ^ string_block
+  Gillian.Gil_syntax.Id.Loc.of_string (Prefix.loc ^ string_block)
 
-let block_of_loc_name loc_name =
+let block_of_loc_name loc =
+  let loc_name = Gillian.Gil_syntax.Id.Loc.to_string loc in
   let size_int = String.length loc_name - 2 in
   let string_block = String.sub loc_name 2 size_int in
   let int_block = int_of_string string_block in
