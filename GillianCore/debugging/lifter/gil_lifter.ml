@@ -235,6 +235,7 @@ functor
       let get_store_vars store =
         store
         |> List.map (fun (name, value) : Variable.t ->
+               let name = Var.to_string name in
                let value = expr_to_string value in
                make ~name ~value ())
         |> List.sort compare_name
@@ -242,6 +243,7 @@ functor
       let get_type_env_vars (types : Type_env.t) : Variable.t list =
         Type_env.to_list types
         |> List.map (fun (name, value) ->
+               let name = Id.to_string name in
                let value = Type.str value in
                make ~name ~value ())
         |> List.sort compare_name

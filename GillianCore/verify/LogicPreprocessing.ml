@@ -280,7 +280,7 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
     (fun (name, _) ->
       let pred = Hashtbl.find preds name in
       L.verbose (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
-      let definitions' : ((string * string list) option * Asrt.t) list =
+      let definitions' : ((string * LVar.t list) option * Asrt.t) list =
         List.concat_map
           (fun (os, a) ->
             List.map (fun a -> (os, a)) (auto_unfold preds recursion_info a))
@@ -407,12 +407,11 @@ let remove_equalities_between_binders_and_lvars binders assertion =
     | true, false -> `Greater
     | false, true -> `Lower
   in
-  let equal = String.equal in
-  let uf = Union_find.init ~priority ~equal in
+  let uf = Union_find.init ~priority ~equal:Id.equal in
   let rec union_expr (e1 : Expr.t) (e2 : Expr.t) =
-    match (e1, e2) with
-    | (LVar x | PVar x), (LVar y | PVar y) -> Union_find.union uf x y
-    | EList x, EList y -> (
+    match (Expr.as_any_var e1, Expr.as_any_var e2, e1, e2) with
+    | Some x, Some y, _, _ -> Union_find.union uf x y
+    | _, _, EList x, EList y -> (
         try List.iter2 union_expr x y
         with Invalid_argument _ ->
           Fmt.failwith "Equality between two lists of different sizes")
@@ -430,11 +429,11 @@ let remove_equalities_between_binders_and_lvars binders assertion =
       inherit [_] Visitors.endo as super
 
       method! visit_expr () e =
-        match e with
-        | LVar x | PVar x ->
+        match Expr.as_any_var e with
+        | Some x ->
             let rep = Union_find.rep uf x in
-            if String.equal x rep then e else Expr.var_to_expr rep
-        | _ -> super#visit_expr () e
+            if Id.equal x rep then e else Expr.of_any_var rep
+        | None -> super#visit_expr () e
     end
   in
   substitutor#visit_assertion () assertion

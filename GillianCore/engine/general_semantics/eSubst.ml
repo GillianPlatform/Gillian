@@ -71,7 +71,8 @@ module type S = sig
   val full_pp : Format.formatter -> t -> unit
 
   (** Selective Pretty Printer *)
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+  val pp_by_need :
+    Var.Set.t * LVar.Set.t * Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val filter_in_place : t -> (Expr.t -> vt -> vt option) -> unit
 
@@ -92,7 +93,6 @@ module type S = sig
 end
 
 module Make (Val : Val.S) : S with type vt = Val.t = struct
-  open Containers
   module L = Logging
 
   (** Type of GIL values *)
@@ -258,7 +258,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     in
     Fmt.pf fmt "@[<hv 2>[ %a ]@]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
 
-  let pp_by_need (filter_vars : Containers.SS.t) fmt (subst : t) =
+  let pp_by_need (pvars, lvars, locs) fmt (subst : t) =
     let pp_pair fmt (e, e_val) =
       Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.pp e_val
     in
@@ -269,13 +269,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let bindings =
       List.filter
         (fun (v, _) ->
-          let pvars, lvars, alocs =
-            (Expr.pvars v, Expr.lvars v, Expr.alocs v)
-          in
-          Containers.SS.inter
-            (SS.union pvars (SS.union lvars alocs))
-            filter_vars
-          <> Containers.SS.empty)
+          (not (Var.Set.disjoint (Expr.pvars v) pvars))
+          || (not (LVar.Set.disjoint (Expr.lvars v) lvars))
+          || not (Id.Any_loc.Set.disjoint (Expr.locs v) locs))
         bindings
     in
     Fmt.pf fmt "@[<hv 2>[ %a ]@]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
@@ -363,9 +359,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             L.(
               verbose (fun m ->
                   m
-                    "General: Subst in lexpr: PVar %s not in subst, generating \
-                     fresh: %s"
-                    x lvar));
+                    "General: Subst in lexpr: PVar %a not in subst, generating \
+                     fresh: %a"
+                    Id.pp x Id.pp lvar));
             Expr.LVar lvar)
           this
 
@@ -382,9 +378,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           |> Seq.filter_map (fun x ->
                  Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
         in
-        Seq.iter
-          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
-          binders;
+        Seq.iter (fun x -> put self_subst (LVar x) (Val.from_lvar x)) binders;
         let new_expr = self#visit_expr () e in
         Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
         if new_expr == e then this else Exists (bt, new_expr)
@@ -396,9 +390,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           |> Seq.filter_map (fun x ->
                  Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
         in
-        Seq.iter
-          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
-          binders;
+        Seq.iter (fun x -> put self_subst (LVar x) (Val.from_lvar x)) binders;
         let new_expr = self#visit_expr () e in
         Seq.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binder_substs;
         if new_expr == e then this else ForAll (bt, new_expr)

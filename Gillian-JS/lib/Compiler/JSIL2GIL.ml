@@ -29,6 +29,7 @@ let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
 let fresh_then, reset_then = fresh_sth "glab_then_"
 let fresh_else, reset_else = fresh_sth "glab_else_"
 let fresh_var, reset_var = fresh_sth "gvar_aux_"
+let fresh_var () = Gil.Var.of_string (fresh_var ())
 
 let resource_error args =
   if Utils.Exec_mode.is_biabduction_exec !Config.current_exec_mode then
@@ -121,7 +122,7 @@ let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
 
 let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =
   let ss_label =
-    Option.map (fun (l, vl) -> (l, Containers.SS.elements vl)) sspec.label
+    Option.map (fun (l, vl) -> (l, Gil.LVar.Set.elements vl)) sspec.label
   in
   (* TODO: add locs *)
   {

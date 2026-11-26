@@ -1,4 +1,3 @@
-open Containers
 open Literal
 module L = Logging
 
@@ -109,7 +108,7 @@ module Make (State : SState.S) = struct
           let svars = State.get_spec_vars state in
           SVal.SESubst.filter_in_place af_subst (fun x x_v ->
               match x with
-              | LVar x -> if SS.mem x svars then None else Some x_v
+              | LVar x -> if LVar.Set.mem x svars then None else Some x_v
               | _ -> Some x_v);
           List.map
             (fun af_state -> { state; af_state })
@@ -129,15 +128,15 @@ module Make (State : SState.S) = struct
   (* TODO: By-need formatter *)
   let pp_by_need _ _ _ fmt state = pp fmt state
 
-  let add_spec_vars (bi_state : t) (vs : Var.Set.t) : t =
+  let add_spec_vars (bi_state : t) (vs : LVar.Set.t) : t =
     let { state; _ } = bi_state in
     let state' = State.add_spec_vars state vs in
     { bi_state with state = state' }
 
-  let get_spec_vars ({ state; _ } : t) : Var.Set.t = State.get_spec_vars state
-  let get_lvars ({ state; _ } : t) : Var.Set.t = State.get_lvars state
+  let get_spec_vars ({ state; _ } : t) : LVar.Set.t = State.get_spec_vars state
+  let get_lvars ({ state; _ } : t) : LVar.Set.t = State.get_lvars state
 
-  let to_assertions ?(to_keep : SS.t option) ({ state; _ } : t) : Asrt.t =
+  let to_assertions ?(to_keep : Var.Set.t option) ({ state; _ } : t) : Asrt.t =
     State.to_assertions ?to_keep state
 
   let evaluate_slcmd (prog : 'a MP.prog) (lcmd : SLCmd.t) (bi_state : t) :
@@ -278,7 +277,7 @@ module Make (State : SState.S) = struct
                 let svars = State.get_spec_vars state' in
                 SVal.SESubst.filter_in_place new_subst (fun x x_v ->
                     match x with
-                    | LVar x -> if SS.mem x svars then None else Some x_v
+                    | LVar x -> if LVar.Set.mem x svars then None else Some x_v
                     | _ -> Some x_v);
                 let subst_afs =
                   State.substitution_in_place new_subst af_state'
@@ -308,8 +307,7 @@ module Make (State : SState.S) = struct
     in
     search (state, af_state, subst, mp)
 
-  let update_store (state : State.t) (x : string option) (v : Expr.t) : State.t
-      =
+  let update_store (state : State.t) (x : Var.t option) (v : Expr.t) : State.t =
     match x with
     | None -> state
     | Some x ->
@@ -320,9 +318,9 @@ module Make (State : SState.S) = struct
 
   let run_spec
       (spec : MP.spec)
-      (x : string)
+      (x : Var.t)
       (args : Expr.t list)
-      (_ : (string * (string * Expr.t) list) option)
+      (_ : (string * (LVar.t * Expr.t) list) option)
       (bi_state : t) : (t * Flag.t) list =
     (* let start_time = time() in *)
     L.(
@@ -391,7 +389,7 @@ module Make (State : SState.S) = struct
     let+ final_state = State.produce_posts frame_state subst posts in
     let af_state' : State.t = State.copy af_state in
     let final_store : SStore.t = State.get_store final_state in
-    let v_ret : Expr.t option = SStore.get final_store Names.return_variable in
+    let v_ret : Expr.t option = SStore.get final_store Var.return_variable in
     let final_state' : State.t =
       State.set_store final_state (SStore.copy old_store)
     in
@@ -414,9 +412,9 @@ module Make (State : SState.S) = struct
 
   let run_spec
       (spec : MP.spec)
-      (x : string)
+      (x : Var.t)
       (args : Expr.t list)
-      (_ : (string * (string * Expr.t) list) option)
+      (_ : (string * (LVar.t * Expr.t) list) option)
       (bi_state : t) =
     Res_list.just_oks (run_spec spec x args None bi_state)
 
@@ -459,8 +457,12 @@ module Make (State : SState.S) = struct
   let get_failing_constraint e = State.get_failing_constraint (unlift_error e)
   let can_fix e = State.can_fix (unlift_error e)
 
+  type action = State.action
+
+  let action_from_str = State.action_from_str
+
   let rec execute_action
-      (action : string)
+      (action : action)
       ({ state; af_state } : t)
       (args : Expr.t list) : action_ret =
     let open Syntaxes.List in

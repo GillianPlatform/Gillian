@@ -3,16 +3,18 @@ open Gil_syntax
 exception SMT_unknown
 exception SMT_error of string
 
-val exec_sat : Expr.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
-val is_sat : Expr.Set.t -> (string, Type.t) Hashtbl.t -> bool
+val exec_sat :
+  Expr.Set.t -> (Id.any_var Id.t, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
+
+val is_sat : Expr.Set.t -> (Id.any_var Id.t, Type.t) Hashtbl.t -> bool
 
 val check_sat :
-  Expr.Set.t -> (string, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
+  Expr.Set.t -> (Id.any_var Id.t, Type.t) Hashtbl.t -> Sexplib.Sexp.t option
 
 val lift_model :
   Sexplib.Sexp.t ->
-  (string, Type.t) Hashtbl.t ->
-  (string -> Expr.t -> unit) ->
+  (Id.any_var Id.t, Type.t) Hashtbl.t ->
+  (LVar.t -> Expr.t -> unit) ->
   Expr.Set.t ->
   unit
 

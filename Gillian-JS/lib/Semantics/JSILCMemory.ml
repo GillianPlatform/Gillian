@@ -109,7 +109,7 @@ module M : Memory_S with type init_data = unit = struct
   let alloc (heap : t) (loc : vt option) (mv : vt) : action_ret =
     let new_loc =
       match loc with
-      | None -> Generators.fresh_loc ()
+      | None -> Id.Loc.alloc ()
       | Some (Loc loc) -> loc
       | _ -> raise (Failure "C Allocation: non-loc loc argument")
     in
@@ -117,39 +117,44 @@ module M : Memory_S with type init_data = unit = struct
     let new_loc_lit : Literal.t = Loc new_loc in
     Ok (heap, [ new_loc_lit ])
 
+  type action = JSILNames.action
+
+  let action_from_str = JSILNames.action_from_str
+
   (** Execute action *)
-  let execute_action (action : string) (heap : t) (args : vt list) : action_ret
+  let execute_action (action : action) (heap : t) (args : vt list) : action_ret
       =
-    if action = JSILNames.getCell then
-      match args with
-      | [ loc; prop ] -> get_cell heap loc prop
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.setCell then
-      match args with
-      | [ loc; prop; v ] -> set_cell heap loc prop (Some v)
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.delCell then
-      match args with
-      | [ loc; prop ] -> set_cell heap loc prop None
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.alloc then
-      match args with
-      | [ Empty; m_loc ] -> alloc heap None m_loc
-      | [ loc; m_loc ] -> alloc heap (Some loc) m_loc
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.delObj then
-      match args with
-      | [ loc ] -> delete_object heap loc
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.getAllProps then
-      match args with
-      | [ loc ] -> get_domain heap loc
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else if action = JSILNames.getMetadata then
-      match args with
-      | [ loc ] -> get_metadata heap loc
-      | _ -> raise (Failure "Internal Error. execute_action")
-    else raise (Failure "Internal Error. execute_action")
+    match action with
+    | GetCell -> (
+        match args with
+        | [ loc; prop ] -> get_cell heap loc prop
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | SetCell -> (
+        match args with
+        | [ loc; prop; v ] -> set_cell heap loc prop (Some v)
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | DelCell -> (
+        match args with
+        | [ loc; prop ] -> set_cell heap loc prop None
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | Alloc -> (
+        match args with
+        | [ Empty; m_loc ] -> alloc heap None m_loc
+        | [ loc; m_loc ] -> alloc heap (Some loc) m_loc
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | DelObj -> (
+        match args with
+        | [ loc ] -> delete_object heap loc
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | GetAllProps -> (
+        match args with
+        | [ loc ] -> get_domain heap loc
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | GetMetadata -> (
+        match args with
+        | [ loc ] -> get_metadata heap loc
+        | _ -> raise (Failure "Internal Error. execute_action"))
+    | _ -> raise (Failure "Internal Error. execute_action")
 
   let pp_err _ _ = ()
 end

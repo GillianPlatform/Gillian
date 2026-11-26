@@ -23,8 +23,13 @@ module Make (S : SMemory.S) = struct
   let get_init_data = m1 "get_init_data" get_init_data
   let clear = m1 "clear" clear
 
-  let[@inline] execute_action a =
-    m3 (Format.asprintf "execute_action/%s" a) (execute_action a)
+  type action = string * S.action
+
+  let action_from_str name =
+    Option.map (fun a -> (name, a)) (S.action_from_str name)
+
+  let[@inline] execute_action (name, a) =
+    m3 ("execute_action/" ^ name) (execute_action a)
 
   let[@inline] consume p = m3 (Format.asprintf "consume/%s" p) (consume p)
   let[@inline] produce p = m3 (Format.asprintf "produce/%s" p) (produce p)

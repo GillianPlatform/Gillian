@@ -20,9 +20,13 @@ module type S = sig
   val get_init_data : t -> init_data
   val clear : t -> t
 
+  type action
+
+  val action_from_str : string -> action option
+
   (** Execute action *)
   val execute_action :
-    string -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex.result
+    action -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex.result
 
   (* Consumers have the same signature as action executors,
      but take a core-predicate name as parameter instead of action name.
@@ -38,19 +42,19 @@ module type S = sig
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
-  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+  val pp_by_need : Id.Any_loc.Set.t -> Format.formatter -> t -> unit
+  val get_print_info : Id.Any_loc.Set.t -> t -> LVar.Set.t * Id.Any_loc.Set.t
 
   val substitution :
     pfs:PFS.t ->
     gamma:Type_env.t ->
     st ->
     t ->
-    (t * Expr.Set.t * (string * Type.t) list) list
+    (t * Expr.Set.t * (Id.any_var Id.t * Type.t) list) list
 
-  val lvars : t -> Containers.SS.t
-  val alocs : t -> Containers.SS.t
-  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
+  val lvars : t -> LVar.Set.t
+  val alocs : t -> ALoc.Set.t
+  val assertions : ?to_keep:Var.Set.t -> t -> Asrt.t
   val mem_constraints : t -> Expr.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
@@ -90,7 +94,15 @@ module Dummy : S with type init_data = unit = struct
   let init () = ()
   let get_init_data () = ()
   let clear () = ()
-  let execute_action _ _ _ _ = failwith "Please implement SMemory"
+
+  type action = |
+
+  let action_from_str _ = None
+
+  let execute_action (a : action) _ _ _ =
+    match a with
+    | _ -> .
+
   let consume _ _ _ _ = failwith "Please implement SMemory"
   let produce _ _ _ _ = failwith "Please implement SMemory"
   let is_overlapping_asrt _ = failwith "Please implement SMemory"

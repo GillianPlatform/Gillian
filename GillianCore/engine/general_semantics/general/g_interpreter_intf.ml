@@ -164,7 +164,7 @@ module type S = sig
     (result_t -> 'a) ->
     annot MP.prog ->
     string ->
-    string list ->
+    Var.t list ->
     state_t ->
     'a cont_func
 
@@ -174,7 +174,7 @@ module type S = sig
     (result_t -> 'a) ->
     annot MP.prog ->
     string ->
-    string list ->
+    Var.t list ->
     state_t ->
     'a list
 

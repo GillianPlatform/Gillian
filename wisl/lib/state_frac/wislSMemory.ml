@@ -7,7 +7,6 @@ open Delayed_result
 module Recovery_tactic = Gillian.General.Recovery_tactic
 module Logging = Gillian.Logging
 module SFVL = SFVL
-module SS = Gillian.Utils.Containers.SS
 
 type init_data = unit
 type err_t = WislSHeap.err [@@deriving yojson, show]
@@ -31,7 +30,9 @@ let resolve_loc_or_alloc loc =
   | Some loc_name -> Delayed.return loc_name
   | None ->
       let al = ALoc.alloc () in
-      Delayed.return ~learned:[ BinOp (ALoc al, Equal, loc) ] al
+      Delayed.return
+        ~learned:[ BinOp (ALoc al, Equal, loc) ]
+        (al :> Id.Any_loc.t)
 
 let store heap loc offset value =
   let* loc = resolve_loc_or_alloc loc in
@@ -101,8 +102,11 @@ let dispose heap loc =
   let++ heap = WislSHeap.dispose heap loc in
   (heap, [])
 
-let execute_action ~action_name heap args =
-  let action = WislLActions.ac_from_str action_name in
+type action = WislLActions.ac
+
+let action_from_str = WislLActions.ac_from_str
+
+let execute_action (action : WislLActions.ac) heap args =
   match (action, args) with
   | Store, [ loc; ofs; value ] -> store heap loc ofs value
   | Load, [ loc; ofs ] -> load heap loc ofs
@@ -129,17 +133,17 @@ let execute_action ~action_name heap args =
 
 let consume ~core_pred heap args =
   (* let core_pred = WislLActions.ga_from_str core_pred in *)
-  let getter = WislLActions.ga_to_getter_str core_pred in
-  let deleter = WislLActions.ga_to_deleter_str core_pred in
-  let** heap', vs = execute_action ~action_name:getter heap args in
+  let getter = WislLActions.(ga_to_getter (ga_from_str_exn core_pred)) in
+  let deleter = WislLActions.(ga_to_deleter (ga_from_str_exn core_pred)) in
+  let** heap', vs = execute_action getter heap args in
   let vs_ins, vs_outs = List_utils.split_at vs (List.length args) in
-  let++ heap'', _ = execute_action ~action_name:deleter heap' vs_ins in
+  let++ heap'', _ = execute_action deleter heap' vs_ins in
   (heap'', vs_outs)
 
 let produce ~core_pred heap args =
   (* let core_pred = WislLActions.ga_from_str core_pred in *)
-  let setter = WislLActions.ga_to_setter_str core_pred in
-  let deleter = WislLActions.ga_to_deleter_str core_pred in
+  let setter = WislLActions.(ga_to_setter (ga_from_str_exn core_pred)) in
+  let deleter = WislLActions.(ga_to_deleter (ga_from_str_exn core_pred)) in
   let del_args =
     match (WislLActions.ga_from_str_exn core_pred, args) with
     | Cell, loc :: ofs :: perm :: _ -> [ loc; ofs; perm ]
@@ -147,7 +151,7 @@ let produce ~core_pred heap args =
     | Freed, loc :: _ -> [ loc ]
     | _ -> failwith "Invalid arguments for produce"
   in
-  let* del_res = execute_action ~action_name:deleter heap del_args in
+  let* del_res = execute_action deleter heap del_args in
   (* HACK: rather than properly implementing produce/consume, we reuse existing mechanisms;
      all core predicates of WISL's memory are exclusively owned, meaning they can't be produced
      "on top" of each other. Thus, to make sure we're not over-writing something, we try deleting
@@ -159,7 +163,7 @@ let produce ~core_pred heap args =
     | Error _ -> Delayed.return ()
     | Ok _ -> vanish ()
   in
-  let* set_res = execute_action ~action_name:setter heap args in
+  let* set_res = execute_action setter heap args in
   match set_res with
   | Error _ ->
       (* It's ok for failing producers to vanish, no unsoundness *)
@@ -172,19 +176,19 @@ let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 let pp_by_need _ fmt h = pp fmt h
 
 (* TODO: Implement properly *)
-let get_print_info _ _ = (SS.empty, SS.empty)
+let get_print_info _ _ = (LVar.Set.empty, Id.Any_loc.Set.empty)
 
 let pp_err fmt (t : err_t) =
   match t with
   | MissingResource (ga, loc, ofs) ->
-      Fmt.pf fmt "Missing %s at %s%a" (WislLActions.str_ga ga) loc
+      Fmt.pf fmt "Missing %s at %a%a" (WislLActions.str_ga ga) Id.pp loc
         Fmt.(option (any ", offset " ++ Expr_pp.pp))
         ofs
-  | DoubleFree loc -> Fmt.pf fmt "Freed %s twice" loc
-  | UseAfterFree loc -> Fmt.pf fmt "Used %s after freed" loc
+  | DoubleFree loc -> Fmt.pf fmt "Freed %a twice" Id.pp loc
+  | UseAfterFree loc -> Fmt.pf fmt "Used %a after freed" Id.pp loc
   | MemoryLeak -> Fmt.pf fmt "Memory leak"
   | OutOfBounds (_, loc, ofs) ->
-      Fmt.pf fmt "Offset %a is out of bounds of %s" Expr_pp.pp ofs loc
+      Fmt.pf fmt "Offset %a is out of bounds of %a" Expr_pp.pp ofs Id.pp loc
   | InvalidLocation loc ->
       let loc =
         match loc with

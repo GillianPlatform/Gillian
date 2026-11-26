@@ -73,10 +73,10 @@ module type S = sig
   val get_recovery_tactic : t -> err_t -> Expr.t Recovery_tactic.t
 
   (** The set of logical variables in the state *)
-  val lvars : t -> Containers.SS.t
+  val lvars : t -> LVar.Set.t
 
   (** The set of abstract locations in the state *)
-  val alocs : t -> Containers.SS.t
+  val alocs : t -> ALoc.Set.t
 
   (** Applies a substitution to the state. This can branch, eg. when attempting
       to resolve equality of expressions. *)
@@ -100,7 +100,7 @@ module Defaults = struct
   type st = Subst.t
 
   let is_overlapping_asrt _ = false
-  let get_print_info _ _ = (Containers.SS.empty, Containers.SS.empty)
+  let get_print_info _ _ = (LVar.Set.empty, Id.Any_loc.Set.empty)
   let sure_is_nonempty _ = false
 
   let get_failing_constraint _ =
@@ -149,16 +149,21 @@ module Make (Mem : S) (ID : ID) :
 
   (* Wrap action / consume / produce with a nice type *)
 
-  let[@inline] execute_action
-      ~(action_name : string)
-      (state : t)
-      (args : vt list) : action_ret Delayed.t =
-    match action_from_str action_name with
-    | Some action -> execute_action action state args
+  type action = Mem_action of Mem.action | Unfold_concrete
+
+  let action_from_str name =
+    match Mem.action_from_str name with
+    | Some action -> Some (Mem_action action)
+    | None when String.equal name SLCmd.unfold_concrete_action ->
+        Some Unfold_concrete
+    | None -> None
+
+  let[@inline] execute_action (action : action) (state : t) (args : vt list) :
+      action_ret Delayed.t =
+    match action with
+    | Mem_action action -> Mem.execute_action action state args
     (* Without predicates, there is nothing to unfold. *)
-    | None when String.equal action_name SLCmd.unfold_concrete_action ->
-        DR.ok (state, [])
-    | None -> failwith ("Action not found: " ^ action_name)
+    | Unfold_concrete -> DR.ok (state, [])
 
   let[@inline] consume ~(core_pred : string) (state : t) (args : vt list) :
       action_ret Delayed.t =

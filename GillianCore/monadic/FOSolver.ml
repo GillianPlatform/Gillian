@@ -54,7 +54,7 @@ let check_entailment ~(pc : Pc.t) formula =
     | Lit (Bool b) -> b
     | _ ->
         FOSolver.check_entailment ~matching:pc.matching
-          Utils.Containers.SS.empty pfs [ f ] gamma
+          Gil_syntax.LVar.Set.empty pfs [ f ] gamma
   with Engine.Reduction.ReductionException (e, msg) ->
     Logging.verbose (fun m ->
         m

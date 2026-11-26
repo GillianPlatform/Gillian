@@ -13,14 +13,17 @@ type cc_tbl_type = (string, var_to_fid_tbl_type) Hashtbl.t
 
 type fun_tbl_type =
   ( string,
-    string * string list * JS_Parser.Syntax.exp option * bool * Spec.t option
-  )
+    string
+    * Gillian.Gil_syntax.Var.t list
+    * JS_Parser.Syntax.exp option
+    * bool
+    * Spec.t option )
   Hashtbl.t
 
 type pre_fun_tbl_type =
   ( string,
     string
-    * string list
+    * Gillian.Gil_syntax.Var.t list
     * JS_Parser.Syntax.exp option
     * bool
     * (JS_Parser.Syntax.annotation list
@@ -53,15 +56,15 @@ let initial_heap_pre_pred_name = "initialHeapPre"
 let initial_heap_post_pred_name = "initialHeapPost"
 let function_object_pred_name = "function_object"
 let standard_object_pred_name = "standardObject"
-let this_logic_var_name = "#this"
-let locGlobName = "$lg"
-let var_te = "x__te"
-let var_se = "x__se"
-let var_er = "x__er"
-let var_this = "x__this"
-let var_scope = "x__scope"
-let logic_var_scope = "#x__scope"
-let var_scope_final = "x__scope_f"
+let this_lvar = Gillian.Gil_syntax.LVar.of_string "#this"
+let locGlobName = Gillian.Gil_syntax.Id.Loc.of_string "$lg"
+let var_te = Gillian.Gil_syntax.Var.of_string "x__te"
+let var_se = Gillian.Gil_syntax.Var.of_string "x__se"
+let var_er = Gillian.Gil_syntax.Var.of_string "x__er"
+let var_this = Gillian.Gil_syntax.Var.of_string "x__this"
+let var_scope = Gillian.Gil_syntax.Var.of_string "x__scope"
+let logic_var_scope = Gillian.Gil_syntax.LVar.of_string "#x__scope"
+let var_scope_final = Gillian.Gil_syntax.Var.of_string "x__scope_f"
 let funobj_pred_name = "JSFunctionObject"
 let js_obj_internal_fields = [ "@proto"; "@class"; "@extensible" ]
 

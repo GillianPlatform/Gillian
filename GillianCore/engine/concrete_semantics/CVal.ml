@@ -21,7 +21,7 @@ struct
 
   let from_list = Literal.from_list
 
-  let from_lvar_name _ =
+  let from_lvar _ =
     failwith "Cannot create a concrete value from a logical variable"
 
   let to_list = Literal.to_list

@@ -24,7 +24,7 @@ struct
     store
     |> List.map (fun (var, value) : Variable.t ->
            let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           Variable.create_leaf var value ())
+           Variable.create_leaf (Var.to_string var) value ())
     |> List.sort (fun (v : Variable.t) (w : Variable.t) ->
            Stdlib.compare v.name w.name)
 
@@ -87,19 +87,20 @@ struct
       let () =
         Hashtbl.replace variables loc_id [ properties; domain; metadata ]
       in
-      Variable.create_node loc loc_id ()
+      Variable.create_node (Id.to_string loc) loc_id ()
     in
     List.map value_nodes sorted_locs_with_vals
 
   let rec add_loc_vars
-      (loc : string)
+      (loc : Id.Any_loc.t)
       smemory
       get_new_scope_id
       (variables : Variable.ts)
-      (loc_to_scope_id : (string, int) Hashtbl.t) : unit =
+      (loc_to_scope_id : (Id.Any_loc.t, int) Hashtbl.t) : unit =
     let rec add_lit_vars name lit : Variable.t =
       match lit with
       | Literal.Loc loc ->
+          let loc = (loc :> Id.Any_loc.t) in
           let () =
             add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
           in
@@ -120,6 +121,7 @@ struct
     let add_expr_vars name expr =
       match expr with
       | Expr.ALoc loc ->
+          let loc = (loc :> Id.Any_loc.t) in
           let () =
             add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
           in
@@ -214,6 +216,7 @@ struct
                 | Some metadata -> (
                     match metadata with
                     | Expr.ALoc child_loc ->
+                        let child_loc = (child_loc :> Id.Any_loc.t) in
                         let () =
                           add_loc_vars child_loc smemory get_new_scope_id
                             variables loc_to_scope_id
@@ -278,20 +281,20 @@ struct
       let local_scope =
         List.filter_map
           (fun (var, value) ->
-            if var = Js2jsil_lib.JS2JSIL_Helpers.var_sc_first then
+            if Var.equal var Js2jsil_lib.JS2JSIL_Helpers.var_sc_first then
               Some (var, value)
             else None)
           store
       in
       let local_scope_loc =
-        if List.length local_scope == 0 then ""
-        else
-          match List.hd local_scope with
-          | _, Expr.EList [ _; ALoc loc ] -> loc
-          | _ -> ""
+        match local_scope with
+        | (_, Expr.EList [ _; ALoc loc ]) :: _ -> Some (loc :> Id.Any_loc.t)
+        | _ -> None
       in
       let local_id : int =
-        match Hashtbl.find_opt loc_to_scope_id local_scope_loc with
+        match
+          Option.bind local_scope_loc (Hashtbl.find_opt loc_to_scope_id)
+        with
         | None ->
             let local_id = get_new_scope_id () in
             let () = Hashtbl.replace variables local_id [] in
@@ -299,7 +302,10 @@ struct
         | Some local_id -> local_id
       in
       let global_id : int =
-        match Hashtbl.find_opt loc_to_scope_id "$lg" with
+        match
+          Hashtbl.find_opt loc_to_scope_id
+            (Js2jsil_lib.JS2JSIL_Helpers.locGlobName :> Id.Any_loc.t)
+        with
         | None ->
             let global_id = get_new_scope_id () in
             let () = Hashtbl.replace variables global_id [] in

@@ -11,14 +11,14 @@ type t = TypeDef__.lemma = {
   (* Name of the lemma *)
   lemma_source_path : string option;
   lemma_internal : bool;
-  lemma_params : string list;
+  lemma_params : Id.Var.t list;
   (* Params *)
   lemma_specs : spec list;
   lemma_proof : LCmd.t list option;
   (* (Optional) Proof body *)
   lemma_variant : Expr.t option;
   (* The paramater to treat as the variant. Will trigger termination checks *)
-  lemma_existentials : string list;
+  lemma_existentials : Id.LVar.t list;
   lemma_location : Location.t option;
 }
 
@@ -45,7 +45,7 @@ let pp fmt lemma =
   Fmt.pf fmt "%a%a@[<v 2>lemma %s(%a)@ %a@ %a@]" pp_path_opt
     lemma.lemma_source_path pp_internal lemma.lemma_internal
     (Pp_utils.maybe_quote_ident lemma.lemma_name)
-    (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+    (Fmt.list ~sep:(Fmt.any ", ") Id.pp)
     lemma.lemma_params
     (Fmt.list ~sep:Fmt.sp pp_spec)
     lemma.lemma_specs (Fmt.option pp_proof) lemma.lemma_proof
@@ -71,7 +71,11 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
 
 let add_param_bindings (lemma : t) =
   let params = lemma.lemma_params in
-  let lvar_params = List.map (fun x -> "#" ^ x) params in
+  let lvar_params =
+    List.map
+      (fun x -> Id.LVar.of_string (Names.make_svar_name (Id.Var.to_string x)))
+      params
+  in
   let param_eqs =
     List.map2
       (fun pv lv -> Asrt.Pure (Expr.BinOp (PVar pv, Equal, LVar lv)))

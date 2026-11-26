@@ -6,7 +6,7 @@ module Make (State : SState.S) : sig
   val normalise_assertion :
     pred_defs:MP.preds_tbl_t ->
     init_data:State.init_data ->
-    ?pvars:Utils.Containers.SS.t ->
+    ?pvars:Var.Set.t ->
     Asrt.t ->
     ((State.t * SVal.SESubst.t) list, string) result
 end

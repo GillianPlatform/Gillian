@@ -7,13 +7,13 @@ type st = TypeDef__.single_spec = {
   ss_variant : Expr.t option;  (** Variant *)
   ss_flag : Flag.t;  (** Return flag *)
   ss_to_verify : bool;  (** Should the spec be verified? *)
-  ss_label : (string * string list) option;
+  ss_label : (string * Id.LVar.t list) option;
 }
 
 (** {b Full GIL specifications}. *)
 type t = TypeDef__.spec = {
   spec_name : string;  (** Procedure/spec name *)
-  spec_params : string list;  (** Procedure/spec parameters *)
+  spec_params : Id.Var.t list;  (** Procedure/spec parameters *)
   spec_sspecs : st list;  (** List of single specifications *)
   spec_incomplete : bool;  (** If the spec is incomplete *)
   spec_to_verify : bool;  (** Should the spec be verified? *)
@@ -22,7 +22,7 @@ type t = TypeDef__.spec = {
 
 (** Creates a GIL specification given its components *)
 let s_init
-    ?(ss_label : (string * string list) option)
+    ?(ss_label : (string * Id.LVar.t list) option)
     (ss_pre : Asrt.t Location.located)
     (ss_posts : Asrt.t Location.located list)
     (ss_variant : Expr.t option)
@@ -32,7 +32,7 @@ let s_init
 
 let init
     (spec_name : string)
-    (spec_params : string list)
+    (spec_params : Id.Var.t list)
     (spec_sspecs : st list)
     (spec_incomplete : bool)
     (spec_to_verify : bool)
@@ -49,13 +49,13 @@ let init
 let extend (spec : t) (sspecs : st list) : t =
   { spec with spec_sspecs = sspecs @ spec.spec_sspecs }
 
-let get_params (spec : t) : string list = spec.spec_params
+let get_params (spec : t) : Id.Var.t list = spec.spec_params
 
 let pp_sspec fmt sspec =
   let pp_lab fmt' (lab, exs) =
     match exs with
     | [] -> Fmt.pf fmt' "<%s>@\n" lab
-    | exs -> Fmt.pf fmt' "<%s: %a>@\n" lab Fmt.(list ~sep:comma string) exs
+    | exs -> Fmt.pf fmt' "<%s: %a>@\n" lab Fmt.(list ~sep:comma Id.pp) exs
   in
   Fmt.pf fmt "%a[[  @[<hv 0>%a@]  ]]@\n[[  @[<hv 0>%a@]  ]]@\n%s"
     (Fmt.option pp_lab) sspec.ss_label Asrt.pp (fst sspec.ss_pre)
@@ -71,7 +71,7 @@ let pp fmt spec =
   let name = Pp_utils.maybe_quote_ident spec.spec_name in
   Fmt.pf fmt "@[<v 2>@[<h>%aspec %s(%a)@]@\n%a@]" pp_incomplete
     spec.spec_incomplete name
-    Fmt.(list ~sep:comma string)
+    Fmt.(list ~sep:comma Id.pp)
     spec.spec_params
     Fmt.(list ~sep:semi pp_sspec)
     spec.spec_sspecs
@@ -95,7 +95,7 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
   { spec with spec_sspecs = List.map pt_sspec spec.spec_sspecs }
 
 let label_vars_to_set lab =
-  Option.map (fun (l, vl) -> (l, Containers.SS.of_list vl)) lab
+  Option.map (fun (l, vl) -> (l, Id.LVar.Set.of_list vl)) lab
 
 let to_yojson = TypeDef__.spec_to_yojson
 let of_yojson = TypeDef__.spec_of_yojson

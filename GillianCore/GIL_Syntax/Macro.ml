@@ -2,7 +2,7 @@
 
 type t = TypeDef__.macro = {
   macro_name : string;  (** Name of the macro *)
-  macro_params : string list;  (** Actual parameters *)
+  macro_params : Id.Var.t list;  (** Actual parameters *)
   macro_definition : LCmd.t list;  (** Macro definition *)
 }
 
@@ -15,7 +15,7 @@ let get (macros : t_tbl) (name : string) : t option =
 
 let pp fmt macro =
   Fmt.pf fmt "@[<v 2>macro %s(%a)@\n%a@]" macro.macro_name
-    (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+    (Fmt.list ~sep:(Fmt.any ", ") Id.pp)
     macro.macro_params
     (Fmt.list ~sep:(Fmt.any "@\n") LCmd.pp)
     macro.macro_definition

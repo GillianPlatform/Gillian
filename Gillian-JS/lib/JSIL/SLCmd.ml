@@ -1,33 +1,34 @@
 module SSubst = Gillian.Symbolic.Subst
 module Expr = Gillian.Gil_syntax.Expr
-module SS = Containers.SS
+module Id = Gillian.Gil_syntax.Id
+module LVar = Gillian.Gil_syntax.LVar
 
 (***************************************************************)
 (** Separation Logic Commmands **)
 
 (***************************************************************)
 
-type folding_info = string * (string * Expr.t) list
-type unfold_info = (string * string) list
+type folding_info = string * (LVar.t * Expr.t) list
+type unfold_info = (LVar.t * LVar.t) list
 
 (** {b JSIL Separation Logic commands}. *)
 type t =
   | Fold of string * Expr.t list * folding_info option  (** Fold *)
   | Unfold of string * Expr.t list * unfold_info option * bool  (** Unfold *)
   | GUnfold of string  (** Global Unfold *)
-  | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
-  | SepAssert of Asrt.t * string list  (** Assert *)
-  | Invariant of Asrt.t * string list  (** Invariant *)
+  | ApplyLem of string * Expr.t list * Id.any_var Id.t list  (** Apply lemma *)
+  | SepAssert of Asrt.t * Id.any_var Id.t list  (** Assert *)
+  | Invariant of Asrt.t * Id.any_var Id.t list  (** Invariant *)
 
 let pp_folding_info =
-  let pp_ui f (v, le) = Fmt.pf f "(%s := %a)" v Expr.pp le in
+  let pp_ui f (v, le) = Fmt.pf f "(%a := %a)" Id.pp v Expr.pp le in
   let pp_non_opt f (id, uil) =
     Fmt.pf f " [ %s with %a ]" id (Fmt.list ~sep:(Fmt.any " and ") pp_ui) uil
   in
   Fmt.option pp_non_opt
 
 let pp_unfold_info =
-  let pp_ui f (v1, v2) = Fmt.pf f "(%s := %s)" v1 v2 in
+  let pp_ui f (v1, v2) = Fmt.pf f "(%a := %a)" Id.pp v1 Id.pp v2 in
   let pp_non_opt f uil =
     Fmt.pf f " [bind: %a]" (Fmt.list ~sep:(Fmt.any " and ") pp_ui) uil
   in
@@ -38,7 +39,7 @@ let pp fmt (lcmd : t) : unit =
   let pp_binders f b =
     match b with
     | [] -> ()
-    | _ -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
+    | _ -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Id.pp) b
   in
   match lcmd with
   | Fold (name, les, fold_info) ->

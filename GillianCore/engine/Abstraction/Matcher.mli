@@ -23,12 +23,7 @@ module type MatchableState = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
   val copy : t -> t
@@ -59,8 +54,12 @@ module type MatchableState = sig
   val can_fix : err_t -> bool
   val get_recovery_tactic : t -> err_t list -> Expr.t Recovery_tactic.t
 
+  type action
+
+  val action_from_str : string -> action option
+
   val execute_action :
-    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+    action -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
 
   val consume_core_pred :
     string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
@@ -166,12 +165,7 @@ module type LoggableState = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
 end

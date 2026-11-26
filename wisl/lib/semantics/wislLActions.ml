@@ -31,20 +31,20 @@ let str_ac = function
   | RemBound -> "rembound"
 
 let ac_from_str = function
-  | "store" -> Store
-  | "load" -> Load
-  | "setcell" -> SetCell
-  | "getcell" -> GetCell
-  | "remcell" -> RemCell
-  | "getfreed" -> GetFreed
-  | "setfreed" -> SetFreed
-  | "remfreed" -> RemFreed
-  | "getbound" -> GetBound
-  | "setbound" -> SetBound
-  | "rembound" -> RemBound
-  | "alloc" -> Alloc
-  | "dispose" -> Dispose
-  | ac -> failwith ("Unknown local action for wisl : " ^ ac)
+  | "store" -> Some Store
+  | "load" -> Some Load
+  | "setcell" -> Some SetCell
+  | "getcell" -> Some GetCell
+  | "remcell" -> Some RemCell
+  | "getfreed" -> Some GetFreed
+  | "setfreed" -> Some SetFreed
+  | "remfreed" -> Some RemFreed
+  | "getbound" -> Some GetBound
+  | "setbound" -> Some SetBound
+  | "rembound" -> Some RemBound
+  | "alloc" -> Some Alloc
+  | "dispose" -> Some Dispose
+  | _ -> None
 
 let str_ga = function
   | Cell -> "cell"
@@ -77,10 +77,6 @@ let ga_to_deleter = function
   | Bound -> RemBound
   | Freed -> RemFreed
 
-let ga_to_action_str action str = ga_from_str_exn str |> action |> str_ac
-let ga_to_setter_str = ga_to_action_str ga_to_setter
-let ga_to_getter_str = ga_to_action_str ga_to_getter
-let ga_to_deleter_str = ga_to_action_str ga_to_deleter
 let ga_to_yojson x = `String (str_ga x)
 
 let ga_of_yojson x =

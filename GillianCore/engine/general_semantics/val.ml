@@ -36,8 +36,8 @@ module type S = sig
   (** Convert a list of values to a single value, always possible *)
   val from_list : t list -> t
 
-  (** Converts a logical variable name into a value *)
-  val from_lvar_name : string -> t
+  (** Converts a logical variable into a value *)
+  val from_lvar : LVar.t -> t
 
   (** Convert a value to a list of values, if possible *)
   val to_list : t -> t list option

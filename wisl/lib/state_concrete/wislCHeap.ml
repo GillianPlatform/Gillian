@@ -1,14 +1,15 @@
 open Gillian.Concrete
 module Literal = Gillian.Gil_syntax.Literal
+module Id = Gillian.Gil_syntax.Id
 
-type t = (string * int, Values.t) Hashtbl.t
+type t = (Id.Loc.t * int, Values.t) Hashtbl.t
 
 let init () = Hashtbl.create 1
 let get heap loc offset = Hashtbl.find_opt heap (loc, offset)
 let set heap loc offset value = Hashtbl.replace heap (loc, offset) value
 
 let alloc heap size =
-  let loc = Gillian.Utils.Generators.fresh_loc () in
+  let loc = Id.Loc.alloc () in
   let rec aux current_offset =
     if current_offset < 0 then ()
     else
@@ -22,7 +23,7 @@ let remove heap loc offset = Hashtbl.remove heap (loc, offset)
 
 let dispose heap loc =
   Hashtbl.filter_map_inplace
-    (fun (l, _) v -> if loc = l then None else Some v)
+    (fun (l, _) v -> if Id.equal loc l then None else Some v)
     heap
 
 let copy heap = Hashtbl.copy heap
@@ -40,7 +41,7 @@ let get_beautiful_list heap =
     let rec aux rest =
       match rest with
       | [] -> [ (loc, [ (offset, value) ]) ]
-      | (locp, assocs) :: r when String.equal loc locp ->
+      | (locp, assocs) :: r when Id.equal loc locp ->
           (locp, insert (offset, value) assocs) :: r
       | a :: r -> a :: aux r
     in
@@ -54,7 +55,7 @@ let str heap =
     String.concat "\n"
       (List.map
          (fun (offset, value) ->
-           Printf.sprintf "(%s, %i) -> %s" loc offset (vstr value))
+           Fmt.str "(%a, %i) -> %s" Id.pp loc offset (vstr value))
          l)
   in
   let bl = get_beautiful_list heap in

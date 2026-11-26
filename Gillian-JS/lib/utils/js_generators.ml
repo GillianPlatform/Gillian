@@ -9,6 +9,7 @@ let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   (f, r)
 
 let fresh_lvar, reset_lvar = fresh_sth "#lvar_js_"
+let fresh_lvar () = Gillian.Gil_syntax.LVar.of_string (fresh_lvar ())
 
 (* The underscore of the surface syntax stands for a value of no interest. It
    is a logical variable like any other, but one allocated in a namespace of
@@ -16,9 +17,11 @@ let fresh_lvar, reset_lvar = fresh_sth "#lvar_js_"
    left out (see [is_anon_lvar]). *)
 let anon_lvar_prefix = "#lvar_js_anon_"
 let fresh_anon_lvar, reset_anon_lvar = fresh_sth anon_lvar_prefix
+let fresh_anon_lvar () = Gillian.Gil_syntax.LVar.of_string (fresh_anon_lvar ())
 
-let is_anon_lvar (x : string) : bool =
-  String.starts_with ~prefix:anon_lvar_prefix x
+let is_anon_lvar (x : Gillian.Gil_syntax.LVar.t) : bool =
+  String.starts_with ~prefix:anon_lvar_prefix
+    (Gillian.Gil_syntax.LVar.to_string x)
 
 let fresh_pvar, reset_pvar = fresh_sth "pvar_js_"
 

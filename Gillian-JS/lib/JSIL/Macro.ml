@@ -1,11 +1,12 @@
 (** {2 Macros} **)
 module Expr = Gillian.Gil_syntax.Expr
 
+module Id = Gillian.Gil_syntax.Id
 module SSubst = Gillian.Symbolic.Subst
 
 type t = {
   name : string;  (** Name of the macro *)
-  params : string list;  (** Actual parameters *)
+  params : Id.Var.t list;  (** Actual parameters *)
   definition : LCmd.t list;  (** Macro definition *)
 }
 
@@ -18,7 +19,7 @@ let get (macros : t_tbl) (name : string) : t option =
 
 let pp fmt macro =
   Fmt.pf fmt "@[<v 2>macro %s(%a)@ %a@]" macro.name
-    (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+    (Fmt.list ~sep:(Fmt.any ", ") Id.pp)
     macro.params
     (Fmt.list ~sep:(Fmt.any "@ ") LCmd.pp)
     macro.definition

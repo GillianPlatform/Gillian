@@ -2,9 +2,9 @@ open Gillian.Gil_syntax
 
 type t =
   | Lit of Literal.t
-  | LVar of string
-  | ALoc of string
-  | PVar of string
+  | LVar of LVar.t
+  | ALoc of ALoc.t
+  | PVar of Var.t
   | UnOp of UnOp.t * t
   | BinOp of t * BinOp.t * t
   | LstSub of t * t * t
@@ -27,7 +27,7 @@ let rec js2jsil (scope_le : Expr.t option) (le : t) : Expr.t =
   | NOp (op, les) -> Expr.NOp (op, List.map fe les)
   | EList les -> Expr.EList (List.map fe les)
   | ESet les -> Expr.ESet (List.map fe les)
-  | This -> Expr.LVar JSLogicCommon.this_logic_var_name
+  | This -> Expr.LVar JSLogicCommon.this_lvar
   | Scope -> (
       match scope_le with
       | None -> raise (Failure "DEATH: js2jsil_lexpr")
@@ -45,7 +45,9 @@ module SJSExpr = Set.Make (MyJSExpr)
 let rec str (e : t) : string =
   match e with
   | Lit l -> (Fmt.to_to_string Literal.pp) l
-  | PVar v | LVar v | ALoc v -> v
+  | PVar v -> Var.to_string v
+  | LVar v -> LVar.to_string v
+  | ALoc v -> ALoc.to_string v
   (* (e1 bop e2) *)
   | BinOp (e1, op, e2) -> (
       match op with

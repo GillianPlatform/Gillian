@@ -132,18 +132,21 @@ module Infer_types_to_gamma = struct
       | None -> true
     in
     let check_fields = List.for_all2 check_field in
+    (* Variables are reverse-typable if they are already typable *)
+    (* with the target type or if they are not typable           *)
+    let check_var (var : Id.any_var Id.t) =
+      match (Type_env.get gamma var, Type_env.get new_gamma var) with
+      | Some t, None | None, Some t -> t = tt
+      | None, None ->
+          Type_env.update new_gamma var tt;
+          true
+      | Some t1, Some t2 -> t1 = t2
+    in
     match le with
     (* Literals are always typable *)
     | Lit lit -> Literal.type_of lit = tt
-    (* Variables are reverse-typable if they are already typable *)
-    (* with the target type or if they are not typable           *)
-    | LVar var | PVar var -> (
-        match (Type_env.get gamma var, Type_env.get new_gamma var) with
-        | Some t, None | None, Some t -> t = tt
-        | None, None ->
-            Type_env.update new_gamma var tt;
-            true
-        | Some t1, Some t2 -> t1 = t2)
+    | LVar var -> check_var (var :> Id.any_var Id.t)
+    | PVar var -> check_var (var :> Id.any_var Id.t)
     (* Abstract locations are reverse-typable if the target type is ObjectType *)
     | ALoc _ -> tt = ObjectType
     (* EList and ESet are not reverse typable because we lose type information *)
@@ -212,8 +215,10 @@ module Infer_types_to_gamma = struct
           (* We've updated our new_gamma_copy with a bunch of things.
              We need to import everything except the bound variables to the new_gamma *)
           Type_env.iter new_gamma_copy (fun x t ->
-              if not (List.exists (fun y -> String.equal x y) bs) then
-                Type_env.update new_gamma x t);
+              if
+                not
+                  (List.exists (fun y -> Id.equal x (y :> Id.any_var Id.t)) bs)
+              then Type_env.update new_gamma x t);
           ret
         in
         scrutinee_type_check && List.for_all case_type_check cs
@@ -237,8 +242,12 @@ module Infer_types_to_gamma = struct
           (* We've updated our new_gamma_copy with a bunch of things.
              We need to import everything except the quantified variables to the new_gamma *)
           Type_env.iter new_gamma_copy (fun x t ->
-              if not (List.exists (fun (y, _) -> String.equal x y) bt) then
-                Type_env.update new_gamma x t);
+              if
+                not
+                  (List.exists
+                     (fun (y, _) -> Id.equal x (y :> Id.any_var Id.t))
+                     bt)
+              then Type_env.update new_gamma x t);
           ret
 end
 
@@ -598,7 +607,8 @@ module Type_lexpr = struct
       (* Literals are always typable *)
       | Lit lit -> def_pos (Some (Literal.type_of lit))
       (* Variables are typable if in gamma, otherwise no, but typing continues *)
-      | LVar var | PVar var -> def_pos (Type_env.get gamma var)
+      | LVar var -> def_pos (Type_env.get gamma var)
+      | PVar var -> def_pos (Type_env.get gamma var)
       (* Abstract locations are always typable, by construction *)
       | ALoc _ -> def_pos (Some ObjectType)
       (* Lists are always typable *)
@@ -634,7 +644,8 @@ let te_of_list (vt : (Expr.t * Type.t) list) : Type_env.t option =
         | Lit l ->
             let t' = Literal.type_of l in
             if t <> t' then raise Break
-        | LVar x | PVar x ->
+        | LVar _ | PVar _ ->
+            let x = Option.get (Expr.as_any_var e) in
             if Type_env.mem result x then (
               let t' = Type_env.get_exn result x in
               if t <> t' then raise Break)
@@ -669,14 +680,14 @@ let substitution_in_place (subst : SSubst.t) (gamma : Type_env.t) : unit =
   let et_pairs : (Expr.t * Type.t) list =
     List.fold_left
       (fun ac (x, e) ->
-        match x with
-        | Expr.LVar x | PVar x ->
+        match Expr.as_any_var x with
+        | Some x ->
             Option.fold
               ~some:(fun x_type ->
                 Type_env.remove gamma x;
                 (e, x_type) :: ac)
               ~none:ac (Type_env.get gamma x)
-        | _ -> ac)
+        | None -> ac)
       [] ve_pairs
   in
   let gamma' = reverse_type_lexpr true gamma et_pairs in

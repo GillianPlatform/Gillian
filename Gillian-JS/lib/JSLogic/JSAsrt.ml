@@ -12,7 +12,7 @@ type pt =
   | Less of JSExpr.t * JSExpr.t
   | LessEq of JSExpr.t * JSExpr.t
   | StrLess of JSExpr.t * JSExpr.t
-  | ForAll of (string * Type.t) list * pt
+  | ForAll of (LVar.t * Type.t) list * pt
   | SetMem of JSExpr.t * JSExpr.t
   | SetSub of JSExpr.t * JSExpr.t
   | IsInt of JSExpr.t
@@ -24,7 +24,7 @@ type t =
   | MetaData of JSExpr.t * JSExpr.t
   | Emp
   | Pred of string * JSExpr.t list * JSExpr.t list
-  | Types of (string * Type.t) list
+  | Types of (Id.any_var Id.t * Type.t) list
   | Scope of string * JSExpr.t
   | VarSChain of string * string * JSExpr.t * JSExpr.t
   | OSChains of string * JSExpr.t * string * JSExpr.t
@@ -89,7 +89,7 @@ let rec js2jsil
   | MetaData (le1, le2) -> Asrt.MetaData (fe le1, fe le2)
   | Emp -> Asrt.Emp
   | Types vts ->
-      Asrt.Types (List.map (fun (v, t) -> (Expr.from_var_name v, t)) vts)
+      Asrt.Types (List.map (fun (v, t) -> (Expr.of_any_var v, t)) vts)
   | EmptyFields (e, domain) -> Asrt.EmptyFields (fe e, fe domain)
   | Pred (name, ins, outs)
     when (name = "JSFunctionObject" || name = "JSFunctionObjectStrong")
@@ -273,7 +273,7 @@ let js2jsil_tactic
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (scope_var : string)
+    (scope_var : Var.t)
     (a : t) : Asrt.t =
   let vis_list = get_vis_list vis_tbl fid in
   let scope_chain_list = vislist_2_les vis_list (List.length vis_list) in
@@ -288,7 +288,7 @@ let js2jsil_tactic
 
   (*  x__this == #this                *)
   let a_this =
-    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_logic_var_name))
+    Asrt.Pure (BinOp (Expr.PVar var_this, Equal, Expr.LVar this_lvar))
   in
 
   Asrt.star [ a'; a''; a_this ]

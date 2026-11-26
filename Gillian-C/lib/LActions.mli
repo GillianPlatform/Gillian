@@ -26,7 +26,7 @@ type ga = Single | Array | Hole | Zeros | Bounds | Freed
 val str_ac : ac -> string
 
 (** Deserializes a string into an action *)
-val ac_from_str : string -> ac
+val ac_from_str : string -> ac option
 
 (** {3 Global assertion serialization} *)
 

@@ -81,11 +81,11 @@ let instantiate = function
         args
 
 let lvars = function
-  | None -> Containers.SS.empty
+  | None -> LVar.Set.empty
   | Some v -> Expr.lvars v
 
 let alocs = function
-  | None -> Containers.SS.empty
+  | None -> ALoc.Set.empty
   | Some v -> Expr.alocs v
 
 let assertions = function
@@ -104,4 +104,9 @@ let can_fix = function
 
 let get_fixes = function
   | MissingState ->
-      [ [ Fix.CorePred (Ag, [], [ Expr.LVar (Generators.fresh_svar ()) ]) ] ]
+      [
+        [
+          Fix.CorePred
+            (Ag, [], [ Expr.LVar (LVar.of_string (Generators.fresh_svar ())) ]);
+        ];
+      ]

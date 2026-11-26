@@ -1,4 +1,3 @@
-open Utils
 open Monadic
 open Engine.Symbolic
 open Gil_syntax
@@ -200,14 +199,14 @@ module Make (FracA : FracA_S) = struct
     | _ -> failwith "Invalid Fractional instantiation"
 
   let lvars = function
-    | None -> Containers.SS.empty
+    | None -> LVar.Set.empty
     | Some (v, q) ->
-        Containers.SS.union (Expr.lvars v) (Expr.lvars (FracA.to_expr q))
+        LVar.Set.union (Expr.lvars v) (Expr.lvars (FracA.to_expr q))
 
   let alocs = function
-    | None -> Containers.SS.empty
+    | None -> ALoc.Set.empty
     | Some (v, q) ->
-        Containers.SS.union (Expr.alocs v) (Expr.alocs (FracA.to_expr q))
+        ALoc.Set.union (Expr.alocs v) (Expr.alocs (FracA.to_expr q))
 
   let assertions = function
     | None -> []

@@ -82,25 +82,25 @@ let add_with_test
   add actual_ofs new_val sfvl
 
 (** Returns the logical variables occuring in --sfvl-- *)
-let lvars (sfvl : t) : SS.t =
+let lvars (sfvl : t) : Id.LVar.Set.t =
   let gllv = Expr.lvars in
   Expr.Map.fold
     (fun e_field e_val ac ->
       ac
-      |> SS.union (gllv e_field)
-      |> SS.union (gllv e_val.value)
-      |> SS.union (gllv e_val.permission))
-    sfvl SS.empty
+      |> Id.LVar.Set.union (gllv e_field)
+      |> Id.LVar.Set.union (gllv e_val.value)
+      |> Id.LVar.Set.union (gllv e_val.permission))
+    sfvl Id.LVar.Set.empty
 
 (** Returns the abstract locations occuring in --sfvl-- *)
-let alocs (sfvl : t) : SS.t =
+let alocs (sfvl : t) : Id.ALoc.Set.t =
   Expr.Map.fold
     (fun e_field e_val ac ->
       ac
-      |> SS.union (Expr.alocs e_field)
-      |> SS.union (Expr.alocs e_val.value)
-      |> SS.union (Expr.alocs e_val.permission))
-    sfvl SS.empty
+      |> Id.ALoc.Set.union (Expr.alocs e_field)
+      |> Id.ALoc.Set.union (Expr.alocs e_val.value)
+      |> Id.ALoc.Set.union (Expr.alocs e_val.permission))
+    sfvl Id.ALoc.Set.empty
 
 (* Substitution *)
 let substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t =

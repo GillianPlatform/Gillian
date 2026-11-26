@@ -24,9 +24,12 @@ module type S = sig
   val get_init_data : t -> init_data
   val clear : t -> t
 
+  type action
+
+  val action_from_str : string -> action option
+
   (** Execute action *)
-  val execute_action :
-    action_name:string -> t -> vt list -> action_ret Delayed.t
+  val execute_action : action -> t -> vt list -> action_ret Delayed.t
 
   val consume : core_pred:string -> t -> vt list -> action_ret Delayed.t
   val produce : core_pred:string -> t -> vt list -> t Delayed.t
@@ -36,17 +39,17 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val substitution : st -> t -> t Delayed.t
-  val lvars : t -> Containers.SS.t
-  val alocs : t -> Containers.SS.t
-  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t
+  val lvars : t -> LVar.Set.t
+  val alocs : t -> ALoc.Set.t
+  val assertions : ?to_keep:Var.Set.t -> t -> Asrt.t
   val mem_constraints : t -> Expr.t list
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Expr.t
   val get_fixes : err_t -> Asrt.t list
   val can_fix : err_t -> bool
-  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
-  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+  val pp_by_need : Id.Any_loc.Set.t -> Format.formatter -> t -> unit
+  val get_print_info : Id.Any_loc.Set.t -> t -> LVar.Set.t * Id.Any_loc.Set.t
   val sure_is_nonempty : t -> bool
 
   (** See {!val:SMemory.S.split_further} *)
@@ -65,9 +68,9 @@ module Lift (MSM : S) :
   let assertions ?to_keep t =
     Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
-  let execute_action action_name mem gpc params =
+  let execute_action action mem gpc params =
     let open Syntaxes.List in
-    let process = execute_action ~action_name mem params in
+    let process = execute_action action mem params in
     let curr_pc = Pc.of_gpc gpc in
     let+ Branch.{ pc; value } = Delayed.resolve ~curr_pc process in
     let gpc = Pc.to_gpc pc in
@@ -90,7 +93,7 @@ module Lift (MSM : S) :
     Gbranch.{ pc = gpc; value }
 
   let substitution ~pfs ~gamma subst mem :
-      (t * Expr.Set.t * (string * Type.t) list) list =
+      (t * Expr.Set.t * (Id.any_var Id.t * Type.t) list) list =
     let process = substitution subst mem in
     let curr_pc = Pc.make ~matching:false ~pfs ~gamma () in
     let branches = Delayed.resolve ~curr_pc process in

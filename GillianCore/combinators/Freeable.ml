@@ -1,4 +1,3 @@
-open Utils
 open Monadic
 open Engine.Symbolic
 module DR = Delayed_result
@@ -148,11 +147,11 @@ module Make (S : MyMonadicSMemory.S) :
 
   let lvars = function
     | SubState s -> S.lvars s
-    | _ -> Containers.SS.empty
+    | _ -> Gil_syntax.LVar.Set.empty
 
   let alocs = function
     | SubState s -> S.alocs s
-    | _ -> Containers.SS.empty
+    | _ -> Gil_syntax.ALoc.Set.empty
 
   let lift_corepred (p, i, o) = (SubPred p, i, o)
 

@@ -66,7 +66,10 @@ let alloc_temp ~ctx ~location ty : Expr.t Cs.with_cmds =
   let ptr, alloc_cmd = alloc_ptr ~ctx ty in
   let temp = Ctx.fresh_v ctx in
   let assign = Cmd.Assignment (temp, ptr) in
-  let () = Ctx.register_allocated_temp ctx ~name:temp ~type_:ty ~location in
+  let () =
+    Ctx.register_allocated_temp ctx ~name:(Var.to_string temp) ~type_:ty
+      ~location
+  in
   Cs.return ~app:[ alloc_cmd; assign ] (Expr.PVar temp)
 
 (** Should only be called for a local that is in memory*)
@@ -78,7 +81,13 @@ let dealloc_local ~ctx ~cmd_kind (l : Ctx.Local.t) : Body_item.t =
   let var = Ctx.fresh_v ctx in
   let cmd =
     Cmd.LAction
-      (var, free, [ Expr.list_nth (Expr.PVar l.symbol) 0; Expr.zero_i; size ])
+      ( var,
+        free,
+        [
+          Expr.list_nth (Expr.PVar (Var.of_string l.symbol)) 0;
+          Expr.zero_i;
+          size;
+        ] )
   in
   let loc = Option.map Body_item.compile_location l.location in
   Body_item.make ?loc ~cmd_kind cmd
@@ -87,7 +96,7 @@ let dealloc_local ~ctx ~cmd_kind (l : Ctx.Local.t) : Body_item.t =
     created. In any case, the variable containing the value, as well as the load
     command is returned. If a variable is given, the returned variable is always
     equal to it *)
-let load_scalar ~ctx ?var (e : Expr.t) (t : GType.t) : string Cs.with_cmds =
+let load_scalar ~ctx ?var (e : Expr.t) (t : GType.t) : Var.t Cs.with_cmds =
   match chunk_for_type ~ctx t with
   | None ->
       Error.code_error (Fmt.str "load_scalar - unexpected type: %a" GType.pp t)

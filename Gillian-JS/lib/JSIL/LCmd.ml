@@ -1,6 +1,7 @@
 module SSubst = Gillian.Symbolic.Subst
 module Expr = Gillian.Gil_syntax.Expr
 module Type = Gillian.Gil_syntax.Type
+module Id = Gillian.Gil_syntax.Id
 
 (***************************************************************)
 (** Logic Commmands **)
@@ -15,7 +16,7 @@ type t =
   | Assert of Expr.t  (** Assert *)
   | Assume of Expr.t  (** Assume *)
   | AssumeType of Expr.t * Type.t  (** Assume Type *)
-  | FreshSVar of string
+  | FreshSVar of Id.Var.t
   | SL of SLCmd.t
 
 let rec pp fmt lcmd =
@@ -34,7 +35,7 @@ let rec pp fmt lcmd =
   | Macro (name, lparams) -> Fmt.pf fmt "%s(%a)" name pp_params lparams
   | Assert a -> Fmt.pf fmt "assert (%a)" Expr.pp a
   | Assume a -> Fmt.pf fmt "assume (%a)" Expr.pp a
-  | FreshSVar x -> Fmt.pf fmt "%s := fresh_svar()" x
+  | FreshSVar x -> Fmt.pf fmt "%a := fresh_svar()" Id.pp x
   | SL sl_cmd -> SLCmd.pp fmt sl_cmd
   | AssumeType (e, t) ->
       Fmt.pf fmt "assume_type (%a, %s)" Expr.pp e (Type.str t)

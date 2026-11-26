@@ -237,10 +237,14 @@ let parse_annots file =
   wprog
 
 let mangle_proc proc mangled_syms =
-  let reserved_names = SS.of_list [ "pred"; "pure" ] in
+  let open Gil_syntax in
+  let reserved_names =
+    Var.Set.of_list (List.map Var.of_string [ "pred"; "pure" ])
+  in
   let mangle_var var =
-    let prefix = if SS.mem var reserved_names then "v__" else "" in
-    prefix ^ var
+    if Var.Set.mem var reserved_names then
+      Var.of_string ("v__" ^ Var.to_string var)
+    else var
   in
   let mangle_symbol sym =
     match Hashtbl.find_opt mangled_syms sym with
@@ -460,7 +464,7 @@ let parse_and_compile_files paths =
       (fun a b ->
         match (a, b) with
         | ( Cmd.Call ({ args = Lit (Loc a) :: _; _ }, _),
-            Cmd.Call ({ args = Lit (Loc b) :: _; _ }, _) ) -> String.compare a b
+            Cmd.Call ({ args = Lit (Loc b) :: _; _ }, _) ) -> Id.Loc.compare a b
         | _ -> failwith "Wrong init cmd")
       (init_cmds @ genv_init_cmds)
   in

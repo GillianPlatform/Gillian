@@ -2,7 +2,9 @@ module SSubst = Gillian.Symbolic.Subst
 module SVal = Gillian.Symbolic.Values
 module Flag = Gillian.Gil_syntax.Flag
 module Expr = Gillian.Gil_syntax.Expr
-module SS = Containers.SS
+module Id = Gillian.Gil_syntax.Id
+module Var = Gillian.Gil_syntax.Var
+module LVar = Gillian.Gil_syntax.LVar
 
 (** {b Single JSIL specifications}. *)
 type st = {
@@ -10,13 +12,13 @@ type st = {
   posts : Asrt.t list;  (** Postcondition *)
   flag : Flag.t;  (** Return flag ({!type:jsil_return_flag}) *)
   to_verify : bool;  (** Should the spec be verified? *)
-  label : (string * SS.t) option;
+  label : (string * LVar.Set.t) option;
 }
 
 (** {b Full JSIL specifications}. *)
 type t = {
   name : string;  (** Procedure/spec name *)
-  params : string list;  (** Procedure/spec parameters *)
+  params : Var.t list;  (** Procedure/spec parameters *)
   sspecs : st list;  (** List of single specifications *)
   incomplete : bool;  (** If the spec is incomplete *)
   to_verify : bool;  (** Should the spec be verified? *)
@@ -24,7 +26,7 @@ type t = {
 
 (** Creates a JSIL specification given its components *)
 let s_init
-    ?(label : (string * SS.t) option)
+    ?(label : (string * LVar.Set.t) option)
     (pre : Asrt.t)
     (posts : Asrt.t list)
     (flag : Flag.t)
@@ -33,7 +35,7 @@ let s_init
 
 let init
     (name : string)
-    (params : string list)
+    (params : Var.t list)
     (sspecs : st list)
     (incomplete : bool)
     (to_verify : bool) : t =
@@ -42,14 +44,14 @@ let init
 let extend (spec : t) (sspecs : st list) : t =
   { spec with sspecs = sspecs @ spec.sspecs }
 
-let get_params (spec : t) : string list = spec.params
+let get_params (spec : t) : Var.t list = spec.params
 
 let pp_sspec fmt sspec =
   let pp_lab fmt' (lab, exs) =
-    if SS.is_empty exs then Fmt.pf fmt' "<%s>" lab
+    if LVar.Set.is_empty exs then Fmt.pf fmt' "<%s>" lab
     else
       Fmt.pf fmt' "<%s: %a>" lab
-        (Fmt.iter ~sep:(Fmt.any ", ") SS.iter Fmt.string)
+        (Fmt.iter ~sep:(Fmt.any ", ") LVar.Set.iter Id.pp)
         exs
   in
   Fmt.pf fmt "%a[[  @[<hov 0>%a@]  ]]@\n[[  @[<hov 0>%a@]  ]]@\n%s"
@@ -64,7 +66,7 @@ let pp fmt spec =
   in
   Fmt.pf fmt "@[<hov 2>@[<h>%a spec %s(%a)@]@\n%a@]" pp_incomplete
     spec.incomplete spec.name
-    (Fmt.list ~sep:Fmt.comma Fmt.string)
+    (Fmt.list ~sep:Fmt.comma Id.pp)
     spec.params
     (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_sspec)
     spec.sspecs

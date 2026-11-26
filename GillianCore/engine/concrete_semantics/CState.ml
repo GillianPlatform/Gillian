@@ -34,7 +34,11 @@ module Make
 
   let init init_data : t = (CMemory.init init_data, CStore.init [], [])
 
-  let execute_action (action : string) (state : t) (args : vt list) : action_ret
+  type action = CMemory.action
+
+  let action_from_str = CMemory.action_from_str
+
+  let execute_action (action : action) (state : t) (args : vt list) : action_ret
       =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with
@@ -123,9 +127,9 @@ module Make
 
   let run_spec
       (_ : MP.spec)
-      (_ : string)
+      (_ : Var.t)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option)
+      (_ : (string * (LVar.t * vt) list) option)
       (_ : t) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 

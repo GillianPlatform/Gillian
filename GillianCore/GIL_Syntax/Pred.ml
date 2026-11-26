@@ -6,11 +6,11 @@ type t = TypeDef__.pred = {
   pred_loc : Location.t option;
   pred_internal : bool;
   pred_num_params : int;  (** Number of parameters *)
-  pred_params : (string * Type.t option) list;  (** Actual parameters *)
+  pred_params : (Id.Var.t * Type.t option) list;  (** Actual parameters *)
   ins_number : int;
       (** Number of in-parameters: the first [ins_number] parameters are ins,
           and the remaining ones are outs *)
-  pred_definitions : ((string * string list) option * Asrt.t) list;
+  pred_definitions : ((string * Id.LVar.t list) option * Asrt.t) list;
       (** Predicate definitions *)
   pred_facts : Expr.t list;  (** Facts that hold for every definition *)
   pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
@@ -41,13 +41,13 @@ let ins_and_outs (pred : t) : SI.t * SI.t =
   in
   (ins_set, outs_set)
 
-let in_params (pred : t) : string list =
+let in_params (pred : t) : Id.Var.t list =
   List.filteri (fun i _ -> i < pred.ins_number) pred.pred_params |> List.map fst
 
 let in_args (pred : t) (args : 'a list) : 'a list =
   List.filteri (fun i _ -> i < pred.ins_number) args
 
-let out_params (pred : t) : string list =
+let out_params (pred : t) : Id.Var.t list =
   List.filteri (fun i _ -> i >= pred.ins_number) pred.pred_params
   |> List.map fst
 
@@ -57,7 +57,7 @@ let out_args (pred : t) (args : 'a list) : 'a list =
 let pp fmt pred =
   let pp_param fmt' (p, topt) =
     let pp_t fmt'' t = Fmt.pf fmt'' " : %s" (Type.str t) in
-    Fmt.pf fmt' "%s%a" p (Fmt.option pp_t) topt
+    Fmt.pf fmt' "%a%a" Id.pp p (Fmt.option pp_t) topt
   in
   (* Prints the parameters as [(in1, ..., ink; out1, ..., outm)], with the
      in-parameters and out-parameters separated by a semicolon. *)
@@ -72,7 +72,7 @@ let pp fmt pred =
   in
   let pp_id_exs fmt' (id, exs) =
     if List.length exs > 0 then
-      Fmt.pf fmt' "[%s: %a] " id (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) exs
+      Fmt.pf fmt' "[%s: %a] " id (Fmt.list ~sep:(Fmt.any ", ") Id.pp) exs
     else Fmt.pf fmt' "[%s] " id
   in
   let pp_def fmt' (id_exs, asser) =
@@ -222,10 +222,10 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
     (* Step 1 - Extract all the program variables used in the definition
      * -----------------------------------------------------------------------------------
      *)
-    let all_pred_pvars : string list =
+    let all_pred_pvars : Id.Var.t list =
       List.concat
         (List.map
-           (fun (_, ass) -> SS.elements (Asrt.pvars ass))
+           (fun (_, ass) -> Id.Var.Set.elements (Asrt.pvars ass))
            predicate.pred_definitions)
     in
 
@@ -237,7 +237,7 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
     in
     let _ =
       List.map
-        (fun (pvar : string) ->
+        (fun (pvar : Id.Var.t) ->
           let valid_pvar = List.mem pvar string_of_params in
           match valid_pvar with
           | true -> ()
@@ -246,7 +246,7 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
                 (Failure
                    (Printf.sprintf
                       "Undefined variable %s in the definition of predicate %s."
-                      pvar pred_name)))
+                      (Id.Var.to_string pvar) pred_name)))
         all_pred_pvars
     in
     ()

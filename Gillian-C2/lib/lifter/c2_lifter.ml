@@ -390,7 +390,8 @@ struct
         let> pid =
           match CmdReport.(cmd_report.cmd) with
           | Call ({ fun_name = Lit (String pid); _ }, _)
-          | ECall (_, (Lit (String pid) | PVar pid), _, _) -> Some pid
+          | ECall (_, Lit (String pid), _, _) -> Some pid
+          | ECall (_, PVar pid, _, _) -> Some (Var.to_string pid)
           | _ -> None
         in
         let> () = if is_fcall_using_spec pid prog then None else Some () in

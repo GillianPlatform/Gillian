@@ -2,15 +2,16 @@ module SSubst = Gillian.Symbolic.Subst
 module L = Logging
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
+module Id = Gillian.Gil_syntax.Id
 
 (** {b JSIL logic predicate}. *)
 type t = {
   name : string;  (** Name of the predicate *)
   num_params : int;  (** Number of parameters *)
-  params : (string * Type.t option) list;  (** Actual parameters *)
+  params : (Id.Var.t * Type.t option) list;  (** Actual parameters *)
   ins_number : int;
       (** Number of in-parameters (the first [ins_number] ones) *)
-  definitions : ((string * string list) option * Asrt.t) list;
+  definitions : ((string * Id.LVar.t list) option * Asrt.t) list;
       (** Predicate definitions *)
   facts : Expr.t list;  (** Facts about the predicate *)
   pure : bool;  (** Is the predicate pure *)
@@ -30,8 +31,8 @@ let pp fmt pred =
   let { name; params; ins_number; definitions; _ } = pred in
   let pp_param fmt (v, t) =
     match t with
-    | None -> Fmt.pf fmt "%s" v
-    | Some typ -> Fmt.pf fmt "%s : %s" v (Type.str typ)
+    | None -> Id.pp fmt v
+    | Some typ -> Fmt.pf fmt "%a : %s" Id.pp v (Type.str typ)
   in
   (* Prints params as [(in1, ..., ink; out1, ..., outm)] *)
   let pp_params fmt params =
@@ -48,7 +49,7 @@ let pp fmt pred =
     | None -> ()
     | Some (id, exs) ->
         if List.length exs > 0 then
-          Fmt.pf fmt "[%s: %a]" id Fmt.(list ~sep:(any ", ") string) exs
+          Fmt.pf fmt "[%s: %a]" id Fmt.(list ~sep:(any ", ") Id.pp) exs
         else Fmt.pf fmt "[%s]" id
   in
   let pp_abstract fmt = function

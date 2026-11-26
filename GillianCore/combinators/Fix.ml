@@ -29,15 +29,17 @@ let exprs_of_atom = function
   | CorePred (_, ins, outs) -> ins @ outs
   | Types tys -> List.map fst tys
 
-let vars_of ~f (fix : 'cp t) =
-  let open Utils.Containers in
-  List.fold_left
-    (fun acc atom ->
-      List.fold_left (fun acc e -> SS.union acc (f e)) acc (exprs_of_atom atom))
-    SS.empty fix
+let exprs_of (fix : 'cp t) = List.concat_map exprs_of_atom fix
 
-let lvars (fix : 'cp t) = vars_of ~f:Expr.lvars fix
-let alocs (fix : 'cp t) = vars_of ~f:Expr.alocs fix
+let lvars (fix : 'cp t) =
+  List.fold_left
+    (fun acc e -> LVar.Set.union acc (Expr.lvars e))
+    LVar.Set.empty (exprs_of fix)
+
+let alocs (fix : 'cp t) =
+  List.fold_left
+    (fun acc e -> ALoc.Set.union acc (Expr.alocs e))
+    ALoc.Set.empty (exprs_of fix)
 
 let subst (subst : Engine.Symbolic.Subst.t) (fix : 'a t) : 'a t =
   let le_subst = Engine.Symbolic.Subst.subst_in_expr subst ~partial:true in

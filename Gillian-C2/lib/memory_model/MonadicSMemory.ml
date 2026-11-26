@@ -13,7 +13,7 @@ module GEnv = GEnv.Symbolic
 
 (* Some utils first *)
 
-let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
+let resolve_or_create_loc_name (lvar_loc : Expr.t) : Id.Any_loc.t Delayed.t =
   let open Delayed.Syntax in
   let* loc_name = Delayed.resolve_loc lvar_loc in
   match loc_name with
@@ -21,16 +21,13 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
       let new_loc_name = ALoc.alloc () in
       let learned = [ Expr.BinOp (ALoc new_loc_name, Equal, lvar_loc) ] in
       Logging.verbose (fun fmt ->
-          fmt "Couldn't resolve loc %a, created %s" Expr.pp lvar_loc
+          fmt "Couldn't resolve loc %a, created %a" Expr.pp lvar_loc Id.pp
             new_loc_name);
-      Delayed.return ~learned new_loc_name
+      Delayed.return ~learned (new_loc_name :> Id.Any_loc.t)
   | Some l ->
-      Logging.verbose (fun fmt -> fmt "Resolved %a as %s" Expr.pp lvar_loc l);
+      Logging.verbose (fun fmt ->
+          fmt "Resolved %a as %a" Expr.pp lvar_loc Id.pp l);
       Delayed.return l
-
-let expr_of_loc_name loc_name =
-  if GUtils.Names.is_aloc_name loc_name then Expr.ALoc loc_name
-  else Lit (Loc loc_name)
 
 type init_data = unit
 
@@ -42,9 +39,9 @@ type st = Subst.t
 type err_t =
   | InvalidLocation of Expr.t
   | NonPositiveArraySize of Expr.t
-  | MissingLocResource of string
+  | MissingLocResource of Id.Any_loc.t
   | SHeapTreeErr of {
-      at_locations : string list;
+      at_locations : Id.Any_loc.t list;
       sheaptree_err : SHeapTree.err;
     }
   | GEnvErr of GEnv.err_t
@@ -63,41 +60,32 @@ let resolve_loc_result loc =
 
 module Mem = struct
   open Delayed.Syntax
+  module LocMap = GUtils.Prelude.Map.Make (Id.Any_loc)
 
-  module SMap = GUtils.Prelude.Map.Make (struct
-    include String
+  type t = SHeapTree.t LocMap.t
 
-    let of_yojson = function
-      | `String s -> Ok s
-      | _ -> Error "string_of_yojson: expected string"
-
-    let to_yojson s = `String s
-  end)
-
-  type t = SHeapTree.t SMap.t
-
-  let of_yojson json = SMap.of_yojson SHeapTree.of_yojson json
-  let to_yojson map = SMap.to_yojson SHeapTree.to_yojson map
+  let of_yojson json = LocMap.of_yojson SHeapTree.of_yojson json
+  let to_yojson map = LocMap.to_yojson SHeapTree.to_yojson map
   let map_lift_err loc res = DR.map_error res (lift_sheaptree_err loc)
-  let empty = SMap.empty
+  let empty = LocMap.empty
 
   let get_tree_res map loc_name =
     DR.of_option ~none:(MissingLocResource loc_name)
-      (SMap.find_opt loc_name map)
+      (LocMap.find_opt loc_name map)
 
   let get_or_create_tree map loc_name =
-    match SMap.find_opt loc_name map with
+    match LocMap.find_opt loc_name map with
     | Some t -> Delayed.return t
     | None -> Delayed.return SHeapTree.empty
 
   let update_loc loc tree map =
-    if SHeapTree.is_empty tree then SMap.remove loc map
-    else SMap.add loc tree map
+    if SHeapTree.is_empty tree then LocMap.remove loc map
+    else LocMap.add loc tree map
 
-  let alloc (map : t) low high : t * string =
+  let alloc (map : t) low high : t * ALoc.t =
     let loc = ALoc.alloc () in
     let tree = SHeapTree.alloc low high in
-    (SMap.add loc tree map, loc)
+    (LocMap.add (loc :> Id.Any_loc.t) tree map, loc)
 
   let weak_valid_pointer map loc ofs =
     let open DR.Syntax in
@@ -118,7 +106,7 @@ module Mem = struct
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.drop_perm tree low high new_perm)
     in
-    SMap.add loc_name new_tree map
+    LocMap.add loc_name new_tree map
 
   let store map loc chunk ofs value =
     let open DR.Syntax in
@@ -127,7 +115,7 @@ module Mem = struct
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.store tree chunk ofs value)
     in
-    SMap.add loc_name new_tree map
+    LocMap.add loc_name new_tree map
 
   let load map loc chunk ofs =
     let open DR.Syntax in
@@ -136,14 +124,14 @@ module Mem = struct
     let++ value, new_tree =
       map_lift_err loc_name (SHeapTree.load tree chunk ofs)
     in
-    (value, SMap.add loc_name new_tree map)
+    (value, LocMap.add loc_name new_tree map)
 
   let free map loc low high =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
     let** tree = get_tree_res map loc_name in
     let++ new_tree = map_lift_err loc_name (SHeapTree.free tree low high) in
-    SMap.add loc_name new_tree map
+    LocMap.add loc_name new_tree map
 
   let zero_init map loc ofs size =
     let open DR.Syntax in
@@ -152,14 +140,14 @@ module Mem = struct
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.zero_init tree ofs size)
     in
-    SMap.add loc_name new_tree map
+    LocMap.add loc_name new_tree map
 
   let poison map loc ofs size =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
     let** tree = get_tree_res map loc_name in
     let++ new_tree = map_lift_err loc_name (SHeapTree.poison tree ofs size) in
-    SMap.add loc_name new_tree map
+    LocMap.add loc_name new_tree map
 
   let cons_single map loc ofs chunk =
     let open DR.Syntax in
@@ -177,7 +165,7 @@ module Mem = struct
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.prod_single tree ofs chunk sval perm)
     in
-    SMap.add loc_name new_tree map
+    LocMap.add loc_name new_tree map
 
   let get_array map loc ofs size chunk =
     let open DR.Syntax in
@@ -190,7 +178,7 @@ module Mem = struct
       let++ sarr, perm, new_tree =
         map_lift_err loc_name (SHeapTree.get_array tree ofs size chunk)
       in
-      (SMap.add loc_name new_tree map, loc_name, sarr, perm)
+      (LocMap.add loc_name new_tree map, loc_name, sarr, perm)
 
   let cons_array map loc ofs size chunk =
     let open DR.Syntax in
@@ -203,7 +191,7 @@ module Mem = struct
       let++ sarr, perm, new_tree =
         map_lift_err loc_name (SHeapTree.cons_array tree ofs size chunk)
       in
-      (SMap.add loc_name new_tree map, loc_name, sarr, perm)
+      (LocMap.add loc_name new_tree map, loc_name, sarr, perm)
 
   let prod_array map loc ofs size chunk array perm =
     let open DR.Syntax in
@@ -217,7 +205,7 @@ module Mem = struct
           (SHeapTree.prod_array tree ofs size chunk array perm)
       in
       Logging.tmi (fun m -> m "created tree: %a" SHeapTree.pp new_tree);
-      SMap.add loc_name new_tree map
+      LocMap.add loc_name new_tree map
 
   let cons_freed map loc =
     let open DR.Syntax in
@@ -226,11 +214,11 @@ module Mem = struct
     let++ () =
       DR.of_result (SHeapTree.get_freed tree) |> map_lift_err loc_name
     in
-    SMap.remove loc_name map
+    LocMap.remove loc_name map
 
   let prod_freed map loc =
     let+ loc_name = resolve_or_create_loc_name loc in
-    SMap.add loc_name SHeapTree.freed map
+    LocMap.add loc_name SHeapTree.freed map
 
   let cons_simple ~sheap_consumer map loc low high =
     let open DR.Syntax in
@@ -242,7 +230,7 @@ module Mem = struct
       let++ new_tree, perm =
         map_lift_err loc_name (sheap_consumer tree low high)
       in
-      (SMap.add loc_name new_tree map, perm)
+      (LocMap.add loc_name new_tree map, perm)
 
   let prod_simple ~sheap_producer map loc low high perm =
     let open DR.Syntax in
@@ -254,7 +242,7 @@ module Mem = struct
       let++ new_tree =
         map_lift_err loc_name (sheap_producer tree low high perm)
       in
-      SMap.add loc_name new_tree map
+      LocMap.add loc_name new_tree map
 
   let cons_hole = cons_simple ~sheap_consumer:SHeapTree.cons_hole
   let prod_hole = prod_simple ~sheap_producer:SHeapTree.prod_hole
@@ -277,7 +265,7 @@ module Mem = struct
     let++ bounds, new_tree =
       map_lift_err loc_name (DR.of_result (SHeapTree.cons_bounds tree))
     in
-    (bounds, SMap.add loc_name new_tree map)
+    (bounds, LocMap.add loc_name new_tree map)
 
   let prod_bounds map loc bounds =
     let open DR.Syntax in
@@ -286,7 +274,7 @@ module Mem = struct
     let++ tree_set =
       map_lift_err loc_name (DR.of_result (SHeapTree.prod_bounds tree bounds))
     in
-    SMap.add loc_name tree_set map
+    LocMap.add loc_name tree_set map
 
   let move map dst_loc dst_ofs src_loc src_ofs sz =
     let open DR.Syntax in
@@ -306,22 +294,20 @@ module Mem = struct
                 sheaptree_err = err;
               })
       in
-      SMap.add dst_loc_name new_dst_tree map
+      LocMap.add dst_loc_name new_dst_tree map
 
   let lvars map =
-    let open Utils.Containers in
-    SMap.fold
-      (fun _ tree acc -> SS.union (SHeapTree.lvars tree) acc)
-      map SS.empty
+    LocMap.fold
+      (fun _ tree acc -> LVar.Set.union (SHeapTree.lvars tree) acc)
+      map LVar.Set.empty
 
   let alocs map =
-    let open Utils.Containers in
-    SMap.fold
-      (fun _ tree acc -> SS.union (SHeapTree.alocs tree) acc)
-      map SS.empty
+    LocMap.fold
+      (fun _ tree acc -> ALoc.Set.union (SHeapTree.alocs tree) acc)
+      map ALoc.Set.empty
 
   let assertions ~exclude map =
-    SMap.fold
+    LocMap.fold
       (fun loc tree acc ->
         if not (List.mem loc exclude) then SHeapTree.assertions ~loc tree @ acc
         else acc)
@@ -336,12 +322,10 @@ module Mem = struct
       with Not_found -> false
     in
     let iter_exclude f map =
-      SMap.iter (fun loc x -> if not (is_fun loc) then f loc x) map
+      LocMap.iter (fun loc x -> if not (is_fun loc) then f loc x) map
     in
     let open Fmt in
-    pf ft "%a"
-      (Dump.iter_bindings iter_exclude nop string SHeapTree.pp_full)
-      mem
+    pf ft "%a" (Dump.iter_bindings iter_exclude nop Id.pp SHeapTree.pp_full) mem
 
   let substitution ?(genv = GEnv.empty) subst mem : (t, SHeapTree.err) DR.t =
     let open DR.Syntax in
@@ -351,7 +335,7 @@ module Mem = struct
         Subst.fold subst
           (fun l r acc ->
             match l with
-            | ALoc aloc -> (aloc, r) :: acc
+            | ALoc aloc -> ((aloc :> Id.Any_loc.t), r) :: acc
             | _ -> acc)
           []
       in
@@ -361,35 +345,36 @@ module Mem = struct
       let subst_tree =
         SHeapTree.substitution ~le_subst ~sval_subst ~svarr_subst
       in
-      let substituted = SMap.map subst_tree mem in
+      let substituted = LocMap.map subst_tree mem in
 
       List.fold_left
         (fun acc (old_loc, new_loc) ->
           let** acc = acc in
           Logging.verbose (fun fmt ->
-              fmt "SHOULD Merge locs: %s --> %a" old_loc Expr.pp new_loc);
+              fmt "SHOULD Merge locs: %a --> %a" Id.pp old_loc Expr.pp new_loc);
           Logging.tmi (fun fmt -> fmt "IN MEMORY: %a" (pp_full ~genv) acc);
           let new_loc =
             match new_loc with
-            | Lit (Loc loc) | ALoc loc -> loc
+            | Lit (Loc loc) -> (loc :> Id.Any_loc.t)
+            | ALoc loc -> (loc :> Id.Any_loc.t)
             | _ ->
                 Fmt.failwith "Heap substitution failed for loc : %a" Expr.pp
                   new_loc
           in
-          match SMap.find_opt new_loc acc with
+          match LocMap.find_opt new_loc acc with
           | Some new_tree -> (
               try
-                let old_tree = SMap.find old_loc acc in
-                let without_old = SMap.remove old_loc acc in
+                let old_tree = LocMap.find old_loc acc in
+                let without_old = LocMap.remove old_loc acc in
                 Logging.verbose (fun fmt -> fmt "Merging now.");
                 let++ merged = SHeapTree.merge ~new_tree ~old_tree in
                 Logging.verbose (fun fmt -> fmt "Done merging.");
-                SMap.add new_loc merged without_old
+                LocMap.add new_loc merged without_old
               with Not_found -> DR.ok acc)
           | None -> (
               try
-                let tree = SMap.find old_loc acc in
-                DR.ok (SMap.add new_loc tree (SMap.remove old_loc acc))
+                let tree = LocMap.find old_loc acc in
+                DR.ok (LocMap.add new_loc tree (LocMap.remove old_loc acc))
               with Not_found -> DR.ok acc))
         (DR.ok substituted) aloc_subst
 
@@ -402,11 +387,11 @@ module Mem = struct
       with Not_found -> false
     in
     let is_first = ref true in
-    SMap.iter
+    LocMap.iter
       (fun loc tree ->
         if not (is_fun loc) then (
           if !is_first then is_first := false else Fmt.pf ft "@\n";
-          Fmt.pf ft "%s -> @[<v 0>%a@]" loc SHeapTree.pp tree))
+          Fmt.pf ft "%a -> @[<v 0>%a@]" Id.pp loc SHeapTree.pp tree))
       mem
 
   let pp ?(genv = GEnv.empty) fmt map = pp_normal ~genv fmt map
@@ -602,7 +587,7 @@ let execute_get_array heap params =
       let** mem, loc_name, array, perm =
         Mem.get_array heap.mem loc ofs size chunk
       in
-      let loc_e = expr_of_loc_name loc_name in
+      let loc_e = Expr.loc_from_loc_name loc_name in
       let array_e = SVArray.to_gil_expr ~chunk ~size array in
       let perm_string = Perm.opt_to_string perm in
       DR.ok
@@ -797,13 +782,13 @@ let pp_err fmt (e : err_t) =
   | InvalidLocation loc ->
       Fmt.pf fmt "'%a' cannot be resolved as a location" Expr.pp loc
   | MissingLocResource l ->
-      Fmt.pf fmt "No block associated with location '%s'" l
+      Fmt.pf fmt "No block associated with location '%a'" Id.pp l
   | SHeapTreeErr { at_locations; sheaptree_err } ->
       Fmt.pf fmt "Tree at location%a raised: <%a>"
         (fun fmt l ->
           match l with
-          | [ s ] -> Fmt.pf fmt " '%s'" s
-          | l -> Fmt.pf fmt "s %a" (Fmt.Dump.list Fmt.string) l)
+          | [ s ] -> Fmt.pf fmt " '%a'" Id.pp s
+          | l -> Fmt.pf fmt "s %a" (Fmt.Dump.list Id.pp) l)
         at_locations SHeapTree.pp_err sheaptree_err
   | GEnvErr (Symbol_not_found s) -> Fmt.pf fmt "Symbol not found: %s" s
   | NonPositiveArraySize vt ->
@@ -818,8 +803,8 @@ let pp fmt h =
     (Mem.pp ~genv:h.genv)
     h.mem
 
-let pp_by_need (_ : SS.t) fmt h = pp fmt h
-let get_print_info _ _ = (SS.empty, SS.empty)
+let pp_by_need (_ : Id.Any_loc.Set.t) fmt h = pp fmt h
+let get_print_info _ _ = (LVar.Set.empty, Id.Any_loc.Set.empty)
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
@@ -880,13 +865,18 @@ let produce ~core_pred heap params =
   Logging.verbose (fun m -> m "Resultin in: %a" pp a_ret);
   a_ret
 
-let execute_action ~action_name heap params =
+type action = Interface.ac
+
+let action_from_str = Interface.ac_from_str
+
+let execute_action action heap params =
   Logging.verbose (fun fmt ->
-      fmt "Executing action %s with params %a" action_name pp_params params);
+      fmt "Executing action %s with params %a" (Interface.str_ac action)
+        pp_params params);
   Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open Interface in
   let a_ret =
-    match ac_from_str action_name with
+    match action with
     | AMem Alloc -> execute_alloc heap params
     | AMem GetCurPerm -> execute_getcurperm heap params
     | AMem WeakValidPointer -> execute_weak_valid_pointer heap params
@@ -967,7 +957,7 @@ module Lift = struct
     let make_node = make_node ~get_new_scope_id ~variables in
     let heap_id = get_new_scope_id () in
     let heap_vars =
-      Mem.SMap.to_seq mem
+      Mem.LocMap.to_seq mem
       |> Seq.map (fun (loc, tree) ->
              SHeapTree.Lift.get_variable ~make_node ~loc tree)
       |> List.of_seq
@@ -986,7 +976,7 @@ end
 
 let get_recovery_vals _ = function
   | InvalidLocation e ->
-      List.map (fun x -> Expr.LVar x) (SS.elements (Expr.lvars e))
+      List.map (fun x -> Expr.LVar x) (LVar.Set.elements (Expr.lvars e))
   | MissingLocResource l -> [ Expr.loc_from_loc_name l ]
   | SHeapTreeErr { at_locations; _ } ->
       List.map Expr.loc_from_loc_name at_locations

@@ -13,8 +13,11 @@ module Make (InitData : Engine.General.Init_data.S) :
   let init _ = ()
   let copy () = ()
 
-  (* val execute_action : action_name:string -> t -> vt list -> action_ret Delayed.t*)
-  let[@inline] execute_action (action_name : string) (_ : t) (_ : vt list) :
+  type action = string
+
+  let action_from_str name = Some name
+
+  let[@inline] execute_action (action_name : action) (_ : t) (_ : vt list) :
       action_ret =
     failwith
       (Printf.sprintf "Implement here (CMem.execute_action %s)" action_name)

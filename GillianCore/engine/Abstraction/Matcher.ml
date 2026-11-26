@@ -23,12 +23,7 @@ module type MatchableState = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
   val copy : t -> t
@@ -59,8 +54,12 @@ module type MatchableState = sig
   val can_fix : err_t -> bool
   val get_recovery_tactic : t -> err_t list -> Expr.t Recovery_tactic.t
 
+  type action
+
+  val action_from_str : string -> action option
+
   val execute_action :
-    string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
+    action -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
 
   val consume_core_pred :
     string -> t -> Expr.t list -> (t * Expr.t list, err_t) Res_list.t
@@ -163,12 +162,7 @@ module type LoggableState = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need :
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Containers.SS.t ->
-    Format.formatter ->
-    t ->
-    unit
+    Var.Set.t -> LVar.Set.t -> Id.Any_loc.Set.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
 end
@@ -181,7 +175,6 @@ type _ Effect.t +=
   | Lift_astate : Yojson.Safe.t * PFS.t * Type_env.t -> Yojson.Safe.t Effect.t
 
 module Make_logging (State : LoggableState) = struct
-  open Containers
   module L = Logging
   module W = Matching_walker
 
@@ -192,8 +185,7 @@ module Make_logging (State : LoggableState) = struct
   module Logging = struct
     let pp_astate = State.pp
 
-    let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate
-        =
+    let pp_astate_by_need pvars lvars locs fmt astate =
       State.pp_by_need pvars lvars locs fmt astate
 
     module AstateRec = struct
@@ -320,43 +312,40 @@ module Make_logging (State : LoggableState) = struct
             let a_pvars, a_lvars, a_locs =
               (Asrt.pvars [ a ], Asrt.lvars [ a ], Asrt.locs [ a ])
             in
-            let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
 
             (* From the subst, we take any pair that has any of those and
                collect the pvars, lvars, and alocs, from their values *)
             let s_pvars, s_lvars, s_locs =
               SVal.SESubst.fold subst
                 (fun e v (s_pvars, s_lvars, s_locs) ->
-                  let pvars, lvars, locs =
-                    (Expr.pvars e, Expr.lvars e, Expr.locs e)
-                  in
                   if
-                    Containers.SS.inter
-                      (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
-                      filter_vars
-                    <> SS.empty
+                    (not (Var.Set.disjoint (Expr.pvars e) a_pvars))
+                    || (not (LVar.Set.disjoint (Expr.lvars e) a_lvars))
+                    || not (Id.Any_loc.Set.disjoint (Expr.locs e) a_locs)
                   then
-                    ( SS.union s_pvars (Expr.pvars v),
-                      SS.union s_lvars (Expr.lvars v),
-                      SS.union s_locs (Expr.locs v) )
+                    ( Var.Set.union s_pvars (Expr.pvars v),
+                      LVar.Set.union s_lvars (Expr.lvars v),
+                      Id.Any_loc.Set.union s_locs (Expr.locs v) )
                   else (s_pvars, s_lvars, s_locs))
-                (SS.empty, SS.empty, SS.empty)
+                (Var.Set.empty, LVar.Set.empty, Id.Any_loc.Set.empty)
             in
 
             let subst_pp =
               match !Config.pbn with
               | false -> SVal.SESubst.pp
-              | true ->
-                  SVal.SESubst.pp_by_need
-                    (SS.union a_pvars (SS.union a_lvars a_locs))
+              | true -> SVal.SESubst.pp_by_need (a_pvars, a_lvars, a_locs)
             in
 
-            let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+            let pp_id_list fmt l =
+              Fmt.(brackets (list ~sep:comma Id.pp)) fmt l
+            in
 
             L.verbose (fun fmt ->
-                fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars)
-                  pp_str_list (SS.elements s_lvars) pp_str_list
-                  (SS.elements s_locs));
+                fmt "Substs:\n%a\n%a\n%a" pp_id_list (Var.Set.elements s_pvars)
+                  pp_id_list
+                  (LVar.Set.elements s_lvars)
+                  pp_id_list
+                  (Id.Any_loc.Set.elements s_locs));
 
             let pp_astate =
               match !Config.pbn with
@@ -426,7 +415,7 @@ module Make (State : MatchableState) :
   module Logging = Match_logging.Logging
   open Logging
 
-  let update_store (astate : t) (x : string) (v : Expr.t) : t =
+  let update_store (astate : t) (x : Var.t) (v : Expr.t) : t =
     let store = State.get_store astate in
     let () = SStore.put store x v in
     State.set_store astate store
@@ -436,6 +425,10 @@ module Make (State : MatchableState) :
     State.simplify ~save ~kill_new_lvars:false ~matching astate
 
   let copy_astate (astate : t) : t = State.copy astate
+
+  let recover_action =
+    lazy (Option.get (State.action_from_str SLCmd.recover_action))
+
   let log_hooks = Match_logging.log_hooks Fun.id
 
   (* The state-level instantiation of the matching walker. Predicates and
@@ -511,7 +504,9 @@ module Make (State : MatchableState) :
         enc_tried;
       ]
     in
-    let results = State.execute_action SLCmd.recover_action astate enc_args in
+    let results =
+      State.execute_action (Lazy.force recover_action) astate enc_args
+    in
     let oks =
       List.filter_map
         (function

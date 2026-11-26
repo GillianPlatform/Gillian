@@ -60,7 +60,10 @@ module Generators = struct
       incr id;
       ret
 
-  let temp_var () = make "temp__"
+  let temp_var () =
+    let gen = make "temp__" in
+    fun () -> Gil_syntax.Var.of_string (gen ())
+
   let label () = make "cc"
 end
 
@@ -111,7 +114,7 @@ type t = {
   exec_mode : Kutils.Exec_mode.t;
   machine : Machine_model.t;
   prog : Program.t;
-  fresh_v : unit -> string; [@to_yojson fun _ -> `Null]
+  fresh_v : unit -> Gil_syntax.Var.t; [@to_yojson fun _ -> `Null]
   in_memory : string Hashset.t;
   locals : (string, Local.t) Hashtbl.t;
   allocated_temps : Local.t Hashset.t;

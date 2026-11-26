@@ -355,18 +355,18 @@ struct
     let+ h' = I.substitution sub h in
     (h', d')
 
-  let accumulate ~fn_k ~fn_v h =
-    let open Utils.Containers.SS in
-    I.fold (fun k s acc -> fn_v s |> union @@ fn_k k |> union acc) h empty
-
   let lvars (h, d) =
-    let open Utils.Containers.SS in
-    accumulate ~fn_k:Expr.lvars ~fn_v:S.lvars h
+    let open LVar.Set in
+    I.fold
+      (fun k s acc -> S.lvars s |> union @@ Expr.lvars k |> union acc)
+      h empty
     |> union @@ Option.fold ~none:empty ~some:Expr.lvars d
 
   let alocs (h, d) =
-    let open Utils.Containers.SS in
-    accumulate ~fn_k:Expr.alocs ~fn_v:S.alocs h
+    let open ALoc.Set in
+    I.fold
+      (fun k s acc -> S.alocs s |> union @@ Expr.alocs k |> union acc)
+      h empty
     |> union @@ Option.fold ~none:empty ~some:Expr.alocs d
 
   let lift_corepred k (p, i, o) = (SubPred p, k :: i, o)
@@ -530,12 +530,18 @@ struct
 
   let substitution = I.substitution
 
-  let accumulate ~fn_k ~fn_v h =
-    let open Utils.Containers.SS in
-    I.fold (fun k s acc -> fn_v s |> union @@ fn_k k |> union acc) h empty
+  let lvars h =
+    let open LVar.Set in
+    I.fold
+      (fun k s acc -> S.lvars s |> union @@ Expr.lvars k |> union acc)
+      h empty
 
-  let lvars = accumulate ~fn_k:Expr.lvars ~fn_v:S.lvars
-  let alocs = accumulate ~fn_k:Expr.alocs ~fn_v:S.alocs
+  let alocs h =
+    let open ALoc.Set in
+    I.fold
+      (fun k s acc -> S.alocs s |> union @@ Expr.alocs k |> union acc)
+      h empty
+
   let lift_corepred k (p, i, o) = (p, k :: i, o)
 
   let assertions h =
@@ -628,7 +634,7 @@ module IntegerIndex : PMapIndex = struct
     in
     last_index := Some e;
     Delayed.return ~learned:learnt
-      ~learned_types:[ (lvar, Type.IntType) ]
+      ~learned_types:[ ((lvar :> Id.any_var Id.t), Type.IntType) ]
       (Expr.LVar lvar)
 
   let is_valid_index = function
@@ -768,31 +774,31 @@ module SplitImplEnt = MakeSplitImpl (MyUtils.ExpMapEnt)
 
 (** Implementation of an open PMap with abstract locations. *)
 module ALocImpl (S : MyMonadicSMemory.S) = struct
-  module SMap = MyUtils.SMap
+  module LocMap = Id.Any_loc.Map
   module Entry = S
 
-  type t = S.t SMap.t [@@deriving yojson]
+  type t = S.t LocMap.t [@@deriving yojson]
 
   let find_opt_unsafe h idx =
     let open Utils.Syntaxes.Option in
     let* loc =
       match idx with
-      | Expr.Lit (Loc loc) -> Some loc
-      | Expr.ALoc loc -> Some loc
+      | Expr.Lit (Loc loc) -> Some (loc :> Id.Any_loc.t)
+      | Expr.ALoc loc -> Some (loc :> Id.Any_loc.t)
       | _ -> None
     in
-    SMap.find_opt loc h
+    LocMap.find_opt loc h
 
   let mode : index_mode = Static
   let make_fresh () = ALoc.alloc () |> Expr.loc_from_loc_name |> Delayed.return
   let default_instantiation = []
-  let empty = SMap.empty
-  let fold f = SMap.fold (fun k v acc -> f (Expr.loc_from_loc_name k) v acc)
-  let for_all f = SMap.for_all (fun _ v -> f v)
+  let empty = LocMap.empty
+  let fold f = LocMap.fold (fun k v acc -> f (Expr.loc_from_loc_name k) v acc)
+  let for_all f = LocMap.for_all (fun _ v -> f v)
 
   let[@inline] get_loc_fast = function
-    | Expr.Lit (Loc loc) -> loc
-    | Expr.ALoc loc -> loc
+    | Expr.Lit (Loc loc) -> (loc :> Id.Any_loc.t)
+    | Expr.ALoc loc -> (loc :> Id.Any_loc.t)
     | e ->
         Fmt.failwith
           "ALocImpl: get_loc_fast: non-trivial location passed to \
@@ -804,25 +810,25 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
 
   let[@inline] get h idx =
     let idx_s = get_loc_fast idx in
-    match SMap.find_opt idx_s h with
+    match LocMap.find_opt idx_s h with
     | Some v -> DO.some (idx, v)
     | None -> DO.none ()
 
   let[@inline] set ~idx:_ ~idx' s h =
     let idx_s = get_loc_fast idx' in
-    if S.is_empty s then SMap.remove idx_s h else SMap.add idx_s s h
+    if S.is_empty s then LocMap.remove idx_s h else LocMap.add idx_s s h
 
   let compose h1 h2 =
     let open Delayed.Syntax in
     let compose_binding m (k, v) =
       let* m = m in
-      match SMap.find_opt k m with
+      match LocMap.find_opt k m with
       | Some v' ->
           let+ v'' = S.compose v v' in
-          SMap.add k v'' m
-      | None -> Delayed.return (SMap.add k v m)
+          LocMap.add k v'' m
+      | None -> Delayed.return (LocMap.add k v m)
     in
-    List.fold_left compose_binding (Delayed.return h1) (SMap.bindings h2)
+    List.fold_left compose_binding (Delayed.return h1) (LocMap.bindings h2)
 
   let substitution sub h =
     let open Delayed.Syntax in
@@ -830,31 +836,31 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
       Subst.fold sub
         (fun l r acc ->
           match l with
-          | ALoc aloc -> (aloc, r) :: acc
+          | ALoc aloc -> ((aloc :> Id.Any_loc.t), r) :: acc
           | _ -> acc)
         []
     in
     let* substituted =
-      SMap.fold
+      LocMap.fold
         (fun k v acc ->
           let* acc = acc in
           let+ s' = S.substitution sub v in
-          SMap.add k s' acc)
+          LocMap.add k s' acc)
         h
-        (Delayed.return SMap.empty)
+        (Delayed.return LocMap.empty)
     in
     List.fold_left
       (fun acc (idx, idx') ->
         let* acc = acc in
-        match SMap.find_opt idx acc with
+        match LocMap.find_opt idx acc with
         | None -> Delayed.return acc
         | Some s -> (
             let idx' = get_loc_fast idx' in
-            match SMap.find_opt idx' acc with
-            | None -> Delayed.return (SMap.remove idx acc |> SMap.add idx' s)
+            match LocMap.find_opt idx' acc with
+            | None -> Delayed.return (LocMap.remove idx acc |> LocMap.add idx' s)
             | Some s' ->
                 let+ s'' = S.compose s s' in
-                SMap.remove idx acc |> SMap.add idx' s''))
+                LocMap.remove idx acc |> LocMap.add idx' s''))
       (Delayed.return substituted)
       aloc_subst
 end

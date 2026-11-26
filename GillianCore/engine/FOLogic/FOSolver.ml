@@ -52,7 +52,8 @@ let check_satisfiability_with_model (fs : Expr.t list) (gamma : Type_env.t) :
     List.fold_left
       (fun ac vs ->
         let vs =
-          Expr.Set.of_list (List.map (fun x -> Expr.LVar x) (SS.elements vs))
+          Expr.Set.of_list
+            (List.map (fun x -> Expr.LVar x) (LVar.Set.elements vs))
         in
         Expr.Set.union ac vs)
       Expr.Set.empty
@@ -124,7 +125,7 @@ let sat ~matching ~pfs ~gamma formula : bool =
 
 let check_entailment
     ?(matching = false)
-    (existentials : SS.t)
+    (existentials : LVar.Set.t)
     (left_fs : PFS.t)
     (right_fs : Expr.t list)
     (gamma : Type_env.t) : bool =
@@ -137,7 +138,7 @@ let check_entailment
          Right:%a@\n\
          Gamma:@\n\
          %a@\n"
-        (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+        (Fmt.iter ~sep:Fmt.comma LVar.Set.iter Id.pp)
         existentials PFS.pp left_fs PFS.pp (PFS.of_list right_fs) Type_env.pp
         gamma);
 
@@ -154,15 +155,18 @@ let check_entailment
     Simplifications.simplify_implication ~matching existentials left_fs right_fs
       gamma
   in
-  Type_env.filter_vars_in_place gamma (SS.union left_lvars right_lvars);
+  Type_env.filter_vars_in_place gamma (LVar.Set.union left_lvars right_lvars);
 
   (* Separate gamma into existentials and non-existentials *)
   let left_fs = PFS.to_list left_fs in
   let right_fs = PFS.to_list right_fs in
-  let gamma_left =
-    Type_env.filter gamma (fun v -> not (SS.mem v existentials))
+  let is_existential v =
+    match Id.as_lvar v with
+    | Some v -> LVar.Set.mem v existentials
+    | None -> false
   in
-  let gamma_right = Type_env.filter gamma (fun v -> SS.mem v existentials) in
+  let gamma_left = Type_env.filter gamma (fun v -> not (is_existential v)) in
+  let gamma_right = Type_env.filter gamma is_existential in
 
   (* If left side is false, return false *)
   if List.mem Expr.false_ (left_fs @ right_fs) then false
@@ -193,12 +197,12 @@ let check_entailment
       (* let axioms   = get_axioms (left_fs @ right_fs) gamma in *)
       let right_fs = List.map Expr.negate right_fs in
       let right_f : Expr.t =
-        if SS.is_empty existentials then Expr.disjunct right_fs
+        if LVar.Set.is_empty existentials then Expr.disjunct right_fs
         else
           let binders =
             List.map
               (fun x -> (x, Type_env.get gamma_right x))
-              (SS.elements existentials)
+              (LVar.Set.elements existentials)
           in
           ForAll (binders, Expr.disjunct right_fs)
       in
@@ -240,7 +244,7 @@ let is_equal ?matching ~pfs ~gamma e1 e2 =
     match feq with
     | Lit (Bool b) -> b
     | BinOp (_, Equal, _) | BinOp (_, And, _) ->
-        check_entailment ?matching SS.empty pfs [ feq ] gamma
+        check_entailment ?matching LVar.Set.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure
@@ -258,7 +262,7 @@ let is_different ~pfs ~gamma e1 e2 =
   let result =
     match feq with
     | Lit (Bool b) -> b
-    | Expr.UnOp (Not, _) -> check_entailment SS.empty pfs [ feq ] gamma
+    | Expr.UnOp (Not, _) -> check_entailment LVar.Set.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure
@@ -277,7 +281,7 @@ let num_is_less_or_equal ~pfs ~gamma e1 e2 =
     | Lit (Bool b) -> b
     | BinOp (ra, Equal, rb) -> is_equal ~pfs ~gamma ra rb
     | BinOp (_, FLessThanEqual, _) ->
-        check_entailment SS.empty pfs [ feq ] gamma
+        check_entailment LVar.Set.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure
@@ -289,5 +293,6 @@ let num_is_less_or_equal ~pfs ~gamma e1 e2 =
 let resolve_loc_name ~pfs ~gamma loc =
   Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
   match Reduction.reduce_lexpr ~pfs ~gamma loc with
-  | Lit (Loc loc) | ALoc loc -> Some loc
+  | Lit (Loc loc) -> Some (loc :> Id.Any_loc.t)
+  | ALoc loc -> Some (loc :> Id.Any_loc.t)
   | loc' -> Reduction.resolve_expr_to_location pfs gamma loc'

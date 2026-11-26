@@ -43,7 +43,7 @@ module Test_if_sat = struct
       ~gamma:(Engine.Type_env.init ()) ~matching:false ()
 
   let results =
-    let x = Expr.LVar "x" in
+    let x = Expr.LVar (LVar.of_string "x") in
     let curr_pc = starting_pc x in
     resolve ~curr_pc (process x)
 
@@ -67,12 +67,12 @@ module Test_match_ent = struct
       ~gamma:(Engine.Type_env.init ()) ~matching:false ()
 
   let results_no_info =
-    let x = Expr.LVar "x" in
+    let x = Expr.LVar (LVar.of_string "x") in
     let curr_pc = pc_with_no_info in
     resolve ~curr_pc (process x)
 
   let results_two =
-    let x = Expr.LVar "x" in
+    let x = Expr.LVar (LVar.of_string "x") in
     let curr_pc = pc_with_two x in
     resolve ~curr_pc (process x)
 
@@ -103,7 +103,7 @@ module Test_match_sat = struct
       ~gamma:(Engine.Type_env.init ()) ~matching:false ()
 
   let results =
-    let x = Expr.LVar "x" in
+    let x = Expr.LVar (LVar.of_string "x") in
     let curr_pc = starting_pc x in
     resolve ~curr_pc (process x)
 

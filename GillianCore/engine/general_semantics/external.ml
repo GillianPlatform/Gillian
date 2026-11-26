@@ -18,7 +18,7 @@ module T (Annot : Annot.S) = struct
       State.t ->
       Call_stack.t ->
       int ->
-      string ->
+      Var.t ->
       string ->
       Val.t list ->
       int option ->

@@ -1,7 +1,5 @@
 (** {b GIL logic commands}. *)
 
-module SS = Containers.SS
-
 type t = TypeDef__.lcmd =
   | If of Expr.t * t list * t list  (** If-then-else *)
   | Branch of Expr.t  (** branching on a FO formual *)
@@ -9,7 +7,7 @@ type t = TypeDef__.lcmd =
   | Assert of Expr.t  (** Assert *)
   | Assume of Expr.t  (** Assume *)
   | AssumeType of Expr.t * Type.t  (** Assume Type *)
-  | FreshSVar of string  (** x := fresh_svar() *)
+  | FreshSVar of Id.Var.t  (** x := fresh_svar() *)
   | SL of SLCmd.t
 [@@deriving yojson]
 
@@ -25,40 +23,44 @@ let rec map (f_e : Expr.t -> Expr.t) (f_sl : SLCmd.t -> SLCmd.t) (lcmd : t) =
   | FreshSVar _ as lcmd -> lcmd
   | SL sl_cmd -> SL (f_sl sl_cmd)
 
-let fold = List.fold_left SS.union SS.empty
-
-let rec pvars (lcmd : t) : SS.t =
+let rec pvars (lcmd : t) : Id.Var.Set.t =
+  let module S = Id.Var.Set in
+  let fold = List.fold_left S.union S.empty in
   let pvars_es es = fold (List.map Expr.pvars es) in
   let pvars_lcmds es = fold (List.map pvars es) in
   match lcmd with
   | If (e, lthen, lelse) ->
-      SS.union (Expr.pvars e) (SS.union (pvars_lcmds lthen) (pvars_lcmds lelse))
+      S.union (Expr.pvars e) (S.union (pvars_lcmds lthen) (pvars_lcmds lelse))
   | Macro (_, es) -> pvars_es es
   | Branch e | Assert e | Assume e | AssumeType (e, _) -> Expr.pvars e
-  | FreshSVar name -> SS.singleton name
+  | FreshSVar name -> S.singleton name
   | SL slcmd -> SLCmd.pvars slcmd
 
-let rec lvars (lcmd : t) : SS.t =
+let rec lvars (lcmd : t) : Id.LVar.Set.t =
+  let module S = Id.LVar.Set in
+  let fold = List.fold_left S.union S.empty in
   let lvars_es es = fold (List.map Expr.lvars es) in
   let lvars_lcmds es = fold (List.map lvars es) in
   match lcmd with
   | If (e, lthen, lelse) ->
-      SS.union (Expr.lvars e) (SS.union (lvars_lcmds lthen) (lvars_lcmds lelse))
+      S.union (Expr.lvars e) (S.union (lvars_lcmds lthen) (lvars_lcmds lelse))
   | Macro (_, es) -> lvars_es es
   | Branch e | Assert e | Assume e | AssumeType (e, _) -> Expr.lvars e
   | SL slcmd -> SLCmd.lvars slcmd
-  | FreshSVar _ -> SS.empty
+  | FreshSVar _ -> S.empty
 
-let rec locs (lcmd : t) : SS.t =
+let rec locs (lcmd : t) : Id.Any_loc.Set.t =
+  let module S = Id.Any_loc.Set in
+  let fold = List.fold_left S.union S.empty in
   let locs_es es = fold (List.map Expr.locs es) in
   let locs_lcmds es = fold (List.map locs es) in
   match lcmd with
   | If (e, lthen, lelse) ->
-      SS.union (Expr.locs e) (SS.union (locs_lcmds lthen) (locs_lcmds lelse))
+      S.union (Expr.locs e) (S.union (locs_lcmds lthen) (locs_lcmds lelse))
   | Macro (_, es) -> locs_es es
   | Branch e | Assert e | Assume e | AssumeType (e, _) -> Expr.locs e
   | SL slcmd -> SLCmd.locs slcmd
-  | FreshSVar _ -> SS.empty
+  | FreshSVar _ -> S.empty
 
 let rec pp fmt lcmd =
   let pp_list = Fmt.list ~sep:Fmt.semi pp in
@@ -78,4 +80,4 @@ let rec pp fmt lcmd =
   | AssumeType (e, t) ->
       Fmt.pf fmt "assume_type (%a, %s)" Expr.pp e (Type.str t)
   | SL sl_cmd -> SLCmd.pp fmt sl_cmd
-  | FreshSVar x -> Fmt.pf fmt "%s := fresh_svar()" x
+  | FreshSVar x -> Fmt.pf fmt "%a := fresh_svar()" Id.pp x

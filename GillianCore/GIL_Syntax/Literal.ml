@@ -9,7 +9,7 @@ type t = TypeDef__.literal =
   | Int of Z.t  (** GIL integers *)
   | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
   | String of string  (** GIL strings *)
-  | Loc of string  (** GIL object locations *)
+  | Loc of Id.Loc.t  (** GIL object locations *)
   | Type of Type.t  (** GIL types ({!type:Type.t}) *)
   | LList of t list  (** Lists of GIL literals *)
   | Nono
@@ -22,7 +22,8 @@ let rec equal la lb =
   | Bool bl, Bool br -> Bool.equal bl br
   | Int zl, Int zr -> Z.equal zl zr
   | Num za, Num zb -> Int.equal (Stdlib.compare za zb) 0
-  | String sl, String sr | Loc sl, Loc sr -> String.equal sl sr
+  | String sl, String sr -> String.equal sl sr
+  | Loc sl, Loc sr -> Id.Loc.equal sl sr
   | Type tl, Type tr -> Type.equal tl tr
   | LList ll, LList lr -> List.for_all2 equal ll lr
   | _ -> false
@@ -42,7 +43,7 @@ let rec pp fmt x =
   | Int i -> Fmt.pf fmt "%ai" Z.pp_print i
   | Num n -> Fmt.pf fmt "%F" n
   | String x -> Fmt.pf fmt "\"%s\"" x
-  | Loc loc -> Fmt.string fmt loc
+  | Loc loc -> Id.pp fmt loc
   | Type t -> Fmt.string fmt (Type.str t)
   | LList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
 

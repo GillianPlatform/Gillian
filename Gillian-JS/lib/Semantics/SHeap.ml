@@ -3,16 +3,8 @@
 open Gillian.Gil_syntax
 open Javert_utils
 module SSubst = Gillian.Symbolic.Subst
-
-module SMap = Gillian.Utils.Prelude.Map.Make (struct
-  include String
-
-  let of_yojson = function
-    | `String s -> Ok s
-    | _ -> Error "string_of_yojson: expected string"
-
-  let to_yojson s = `String s
-end)
+module SMap = Gillian.Utils.Prelude.Map.Make (Id.Any_loc)
+module Locs = Id.Any_loc.Set
 
 type s_object = (SFVL.t * Expr.t option) * Expr.t option [@@deriving yojson]
 
@@ -30,30 +22,34 @@ type t = s_object SMap.t [@@deriving yojson]
 let init () : t = SMap.empty
 
 (** Symbolic heap read heap(loc) *)
-let get (heap : t) (loc : string) : s_object option = SMap.find_opt loc heap
+let get (heap : t) (loc : Id.Any_loc.t) : s_object option =
+  SMap.find_opt loc heap
 
 (** Symbolic heap read heap(loc) with the normal new obj default *)
-let get_with_default (heap : t) (loc : string) : s_object =
+let get_with_default (heap : t) (loc : Id.Any_loc.t) : s_object =
   Option.value ~default:((SFVL.empty, None), None) (get heap loc)
 
 (** Symbolic heap set heap(loc) is assigned to fv_list *)
 let set
     (heap : t)
-    (loc : string)
+    (loc : Id.Any_loc.t)
     (fv_list : SFVL.t)
     (dom : Expr.t option)
     (metadata : Expr.t option) : t =
   SMap.add loc ((fv_list, dom), metadata) heap
 
 (** Symbolic heap put heap(loc, field) is assigned to value *)
-let set_fv_pair (heap : t) (loc : string) (field : Expr.t) (value : Expr.t) : t
-    =
+let set_fv_pair
+    (heap : t)
+    (loc : Id.Any_loc.t)
+    (field : Expr.t)
+    (value : Expr.t) : t =
   let (fv_list, dom), metadata = get_with_default heap loc in
   set heap loc (SFVL.add field value fv_list) dom metadata
 
 let init_object
     (heap : t)
-    (loc : string)
+    (loc : Id.Any_loc.t)
     ?is_empty:(ie = false)
     (mtdt : Expr.t option) : t =
   if SMap.mem loc heap then raise (Failure "Illegal init_object")
@@ -61,16 +57,16 @@ let init_object
     let dom : Expr.t option = if ie then None else Some (ESet []) in
     set heap loc SFVL.empty dom mtdt
 
-let has_loc (heap : t) (loc : string) : bool = SMap.mem loc heap
+let has_loc (heap : t) (loc : Id.Any_loc.t) : bool = SMap.mem loc heap
 
 (** Removes the object associated with --loc-- in --heap-- *)
-let remove (heap : t) (loc : string) : t = SMap.remove loc heap
+let remove (heap : t) (loc : Id.Any_loc.t) : t = SMap.remove loc heap
 
 (** Retrieves the domain of --heap-- *)
-let domain (heap : t) : SS.t =
-  SMap.fold (fun loc _ acc -> SS.add loc acc) heap SS.empty
+let domain (heap : t) : Locs.t =
+  SMap.fold (fun loc _ acc -> Locs.add loc acc) heap Locs.empty
 
-let merge_loc (heap : t) (new_loc : string) (old_loc : string) : t =
+let merge_loc (heap : t) (new_loc : Id.Any_loc.t) (old_loc : Id.Any_loc.t) : t =
   let (old_fvl, old_dom), old_met = get_with_default heap old_loc in
   let merged =
     match get heap new_loc with
@@ -118,13 +114,13 @@ let substitution (subst : SSubst.t) (heap : t) : t =
       (fun aloc new_loc heap ->
         let aloc =
           match aloc with
-          | Expr.ALoc loc -> loc
+          | Expr.ALoc loc -> (loc :> Id.Any_loc.t)
           | _ -> raise (Failure "Impossible by construction")
         in
         let new_loc =
           match (new_loc : Expr.t) with
-          | Lit (Loc loc) -> loc
-          | ALoc loc -> loc
+          | Lit (Loc loc) -> (loc :> Id.Any_loc.t)
+          | ALoc loc -> (loc :> Id.Any_loc.t)
           | _ ->
               raise
                 (Failure
@@ -135,17 +131,13 @@ let substitution (subst : SSubst.t) (heap : t) : t =
       heap
 
 (** Returns the serialization of --heap-- as a list *)
-let to_list (heap : t) : (string * s_object) list =
+let to_list (heap : t) : (Id.Any_loc.t * s_object) list =
   SMap.fold (fun loc obj ac -> (loc, obj) :: ac) heap []
 
 (** converts a symbolic heap to a list of assertions *)
 let assertions (heap : t) : Asrt.t =
-  let make_loc_lexpr loc =
-    if Names.is_aloc_name loc then Expr.ALoc loc else Expr.Lit (Loc loc)
-  in
-
   let assertions_of_object (loc, ((fv_list, domain), metadata)) =
-    let le_loc = make_loc_lexpr loc in
+    let le_loc = Expr.loc_from_loc_name loc in
     let fv_assertions = SFVL.assertions le_loc fv_list in
     let domain =
       Option.fold
@@ -162,7 +154,7 @@ let assertions (heap : t) : Asrt.t =
 
   to_list heap |> List.concat_map assertions_of_object |> List.sort Asrt.compare
 
-let wf_assertions_of_obj (heap : t) (loc : string) : Expr.t list =
+let wf_assertions_of_obj (heap : t) (loc : Id.Any_loc.t) : Expr.t list =
   let (fv_list, _), _ = get_with_default heap loc in
   let cfvl, sfvl =
     SFVL.partition
@@ -181,8 +173,8 @@ let wf_assertions (heap : t) : Expr.t list =
 let pp ft heap =
   let open Fmt in
   let pp_one ft (loc, ((fv_pairs, domain), metadata)) =
-    pf ft "@[%s |-> [ @[%a@] | @[%a@] ] with metadata %a@]" loc SFVL.pp fv_pairs
-      (option Expr.pp) domain
+    pf ft "@[%a |-> [ @[%a@] | @[%a@] ] with metadata %a@]" Id.pp loc SFVL.pp
+      fv_pairs (option Expr.pp) domain
       (option ~none:(any "unknown") Expr.pp)
       metadata
   in
@@ -191,28 +183,29 @@ let pp ft heap =
 let get_print_info locs heap =
   let domain = domain heap in
   let metadata_locs =
-    SS.fold
+    Locs.fold
       (fun loc locs ->
+        let add x = if Locs.mem x domain then Locs.add x locs else locs in
         match get heap loc with
-        | Some (_, (Some (Lit (Loc x)) | Some (ALoc x))) when SS.mem x domain ->
-            SS.add x locs
+        | Some (_, Some (Lit (Loc x))) -> add (x :> Id.Any_loc.t)
+        | Some (_, Some (ALoc x)) -> add (x :> Id.Any_loc.t)
         | _ -> locs)
-      locs SS.empty
+      locs Locs.empty
   in
   (* TODO: Traverse locations and collect info about other locations and lvars *)
-  (SS.empty, metadata_locs)
+  (LVar.Set.empty, metadata_locs)
 
 let pp_by_need locs ft heap =
-  let existent_locs = SS.inter locs (domain heap) in
+  let existent_locs = Locs.inter locs (domain heap) in
   let sorted_locs_with_vals =
     List.map
       (fun loc -> (loc, Option.get (get heap loc)))
-      (SS.elements existent_locs)
+      (Locs.elements existent_locs)
   in
   let open Fmt in
   let pp_one ft (loc, ((fv_pairs, domain), metadata)) =
-    pf ft "@[%s |-> [ @[%a@] | @[%a@] ] with metadata %a@]" loc SFVL.pp fv_pairs
-      (option Expr.pp) domain
+    pf ft "@[%a |-> [ @[%a@] | @[%a@] ] with metadata %a@]" Id.pp loc SFVL.pp
+      fv_pairs (option Expr.pp) domain
       (option ~none:(any "unknown") Expr.pp)
       metadata
   in
@@ -225,26 +218,23 @@ let get_inv_metadata (heap : t) : Expr.t Expr.Map.t =
       match met with
       | None -> inv_metadata
       | Some e_metadata ->
-          let loc_e =
-            if Names.is_lloc_name loc then Expr.Lit (Loc loc) else ALoc loc
-          in
-          Expr.Map.add e_metadata loc_e inv_metadata)
+          Expr.Map.add e_metadata (Expr.loc_from_loc_name loc) inv_metadata)
     heap Expr.Map.empty
 
-let lvars (heap : t) : Var.Set.t =
-  let of_opt oe = Option.fold ~some:Expr.lvars ~none:Var.Set.empty oe in
+let lvars (heap : t) : LVar.Set.t =
+  let of_opt oe = Option.fold ~some:Expr.lvars ~none:LVar.Set.empty oe in
   SMap.fold
     (fun _ ((fv_list, dom), met) acc ->
-      Var.Set.union acc
-        (Var.Set.union (SFVL.lvars fv_list)
-           (Var.Set.union (of_opt dom) (of_opt met))))
-    heap Var.Set.empty
+      LVar.Set.union acc
+        (LVar.Set.union (SFVL.lvars fv_list)
+           (LVar.Set.union (of_opt dom) (of_opt met))))
+    heap LVar.Set.empty
 
-let alocs (heap : t) : Var.Set.t =
-  let of_opt oe = Option.fold ~some:Expr.alocs ~none:Var.Set.empty oe in
+let alocs (heap : t) : ALoc.Set.t =
+  let of_opt oe = Option.fold ~some:Expr.alocs ~none:ALoc.Set.empty oe in
   SMap.fold
     (fun _ ((fv_list, dom), met) acc ->
-      Var.Set.union acc
-        (Var.Set.union (SFVL.alocs fv_list)
-           (Var.Set.union (of_opt dom) (of_opt met))))
-    heap Var.Set.empty
+      ALoc.Set.union acc
+        (ALoc.Set.union (SFVL.alocs fv_list)
+           (ALoc.Set.union (of_opt dom) (of_opt met))))
+    heap ALoc.Set.empty

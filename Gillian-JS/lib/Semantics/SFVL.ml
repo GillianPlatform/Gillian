@@ -1,6 +1,5 @@
 (** JSIL symbolic field-value list *)
 
-open Containers
 module Expr = Gillian.Gil_syntax.Expr
 module SSubst = Gillian.Symbolic.Subst
 open Gillian.Gil_syntax
@@ -62,18 +61,19 @@ let get_first (f : field_name -> bool) (sfvl : t) :
   Expr.Map.find_first_opt f sfvl
 
 (** Returns the logical variables occuring in --sfvl-- *)
-let lvars (sfvl : t) : SS.t =
+let lvars (sfvl : t) : LVar.Set.t =
   let gllv = Expr.lvars in
   Expr.Map.fold
-    (fun e_field e_val ac -> SS.union ac (SS.union (gllv e_field) (gllv e_val)))
-    sfvl SS.empty
+    (fun e_field e_val ac ->
+      LVar.Set.union ac (LVar.Set.union (gllv e_field) (gllv e_val)))
+    sfvl LVar.Set.empty
 
 (** Returns the abstract locations occuring in --sfvl-- *)
-let alocs (sfvl : t) : SS.t =
+let alocs (sfvl : t) : ALoc.Set.t =
   Expr.Map.fold
     (fun e_field e_val ac ->
-      SS.union ac (SS.union (Expr.alocs e_field) (Expr.alocs e_val)))
-    sfvl SS.empty
+      ALoc.Set.union ac (ALoc.Set.union (Expr.alocs e_field) (Expr.alocs e_val)))
+    sfvl ALoc.Set.empty
 
 let assertions (loc : Expr.t) (sfvl : t) : Asrt.t =
   List.rev
