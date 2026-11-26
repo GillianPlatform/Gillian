@@ -30,8 +30,6 @@ let unfolding = ref true
 let manual_proof = ref false
 let max_branching = ref 100
 let leak_check = ref false
-
-(* let perform_syntax_checks = ref false *)
 let lemma_proof = ref false
 let dump_annots = ref false
 
@@ -41,8 +39,7 @@ let small_tbl_size = 0
 let medium_tbl_size = 0
 let big_tbl_size = 0
 
-(** {2 Bi-abduction config}
-    These values seem to never be modified *)
+(** {2 Bi-abduction config} *)
 
 let specs_to_stdout = ref false
 
@@ -64,8 +61,6 @@ let pbn = ref false
 let stats = ref false
 
 (** {2 Symbolic execution} *)
-
-(** TODO: This should have a better name. *)
 
 let bi_unfold_depth = ref 1
 let bi_unroll_depth = ref 1
