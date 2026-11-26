@@ -21,8 +21,8 @@ val partition : (field_name -> field_value -> bool) -> t -> t * t
 val remove : field_name -> t -> t
 val pp : Format.formatter -> t -> unit
 val union : t -> t -> t
-val lvars : t -> Containers.SS.t
-val alocs : t -> Containers.SS.t
+val lvars : t -> LVar.Set.t
+val alocs : t -> ALoc.Set.t
 val assertions : Expr.t -> t -> Asrt.t
 val substitution : Subst.t -> bool -> t -> t
 val selective_substitution : Subst.t -> bool -> t -> t

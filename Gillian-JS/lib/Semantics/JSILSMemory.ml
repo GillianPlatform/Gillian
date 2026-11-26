@@ -88,8 +88,8 @@ module M = struct
     Recovery_tactic.try_unfold values
 
   let assertions ?to_keep:_ (heap : t) : GAsrt.t = SHeap.assertions heap
-  let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
-  let alocs (heap : t) : Containers.SS.t = SHeap.alocs heap
+  let lvars (heap : t) : LVar.Set.t = SHeap.lvars heap
+  let alocs (heap : t) : ALoc.Set.t = SHeap.alocs heap
 
   let substitution (subst : st) (heap : t) : t Delayed.t =
     Delayed.return (SHeap.substitution subst heap)
@@ -103,7 +103,7 @@ module M = struct
 
   (** Resolves the location to its name, or creates a new abstract location
       equal to it if it cannot be resolved. *)
-  let fresh_loc ?(loc : vt option) () : (string * vt) Delayed.t =
+  let fresh_loc ?(loc : vt option) () : (Id.Any_loc.t * vt) Delayed.t =
     match loc with
     | Some loc -> (
         let* loc_name = Delayed.resolve_loc loc in
@@ -114,10 +114,10 @@ module M = struct
             let al = ALoc.alloc () in
             Delayed.return
               ~learned:[ Expr.BinOp (ALoc al, Equal, loc) ]
-              (al, Expr.ALoc al))
+              ((al :> Id.Any_loc.t), Expr.ALoc al))
     | None ->
         let al = ALoc.alloc () in
-        Delayed.return (al, Expr.ALoc al)
+        Delayed.return ((al :> Id.Any_loc.t), Expr.ALoc al)
 
   let alloc (heap : t) (loc : vt option) ?is_empty:(ie = false) (mv : vt option)
       : action_ret Delayed.t =
@@ -125,14 +125,15 @@ module M = struct
       match (loc : Expr.t option) with
       | None ->
           let loc_name = ALoc.alloc () in
-          Delayed.return (loc_name, Expr.ALoc loc_name)
-      | Some (Lit (Loc loc)) -> Delayed.return (loc, Expr.Lit (Loc loc))
-      | Some (ALoc loc) -> Delayed.return (loc, Expr.ALoc loc)
+          Delayed.return ((loc_name :> Id.Any_loc.t), Expr.ALoc loc_name)
+      | Some (Lit (Loc loc)) ->
+          Delayed.return ((loc :> Id.Any_loc.t), Expr.Lit (Loc loc))
+      | Some (ALoc loc) -> Delayed.return ((loc :> Id.Any_loc.t), Expr.ALoc loc)
       | Some (LVar v) ->
           let loc_name = ALoc.alloc () in
           Delayed.return
             ~learned:[ Expr.BinOp (LVar v, Equal, ALoc loc_name) ]
-            (loc_name, Expr.ALoc loc_name)
+            ((loc_name :> Id.Any_loc.t), Expr.ALoc loc_name)
       | Some le ->
           raise
             (Failure
@@ -161,7 +162,7 @@ module M = struct
 
   let get_cell (heap : t) (loc : vt) (prop : vt) : action_ret Delayed.t =
     let make_gc_error
-        (loc_name : string)
+        (loc_name : Id.Any_loc.t)
         (prop : vt)
         (props : vt list)
         (dom : vt option) : err_t =
@@ -260,7 +261,7 @@ module M = struct
     let* loc_name = Delayed.resolve_loc loc in
     L.tmi (fun m ->
         m "@[<h>GetCell: resolved location: %a -> %a@]" SVal.pp loc
-          Fmt.(option ~none:(any "None") string)
+          Fmt.(option ~none:(any "None") Id.pp)
           loc_name);
     match Option.map (fun ln -> (ln, SHeap.get heap ln)) loc_name with
     | None | Some (_, None) ->
@@ -295,7 +296,7 @@ module M = struct
     Ok (heap, [])
 
   let get_metadata (heap : t) (loc : vt) : action_ret Delayed.t =
-    let make_gm_error (loc_name : string) : err_t =
+    let make_gm_error (loc_name : Id.Any_loc.t) : err_t =
       let loc = Expr.loc_from_loc_name loc_name in
       ([ loc ], [ [ FMetadata loc ] ], Expr.false_)
     in
@@ -658,6 +659,6 @@ module M = struct
   let can_fix _ = true
 
   let sorted_locs_with_vals (heap : t) =
-    let sorted_locs = Containers.SS.elements (SHeap.domain heap) in
+    let sorted_locs = SHeap.Locs.elements (SHeap.domain heap) in
     List.map (fun loc -> (loc, Option.get (SHeap.get heap loc))) sorted_locs
 end

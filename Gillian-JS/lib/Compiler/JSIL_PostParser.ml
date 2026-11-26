@@ -1,4 +1,3 @@
-open Containers
 open Gillian.Gil_syntax
 open Jsil_syntax
 
@@ -13,7 +12,7 @@ let pvar_counter = ref 0
 let fresh_bi_lvar () =
   let v = Utils.Names.lvar_prefix_bi ^ string_of_int !counter in
   counter := !counter + 1;
-  v
+  LVar.of_string v
 
 let populate () : unit =
   Hashtbl.replace reserved_methods "hasOwnProperty" "$lobj_proto";
@@ -75,7 +74,7 @@ let post_parse_eprog (eprog : EProg.t) : EProg.t =
 let expr_from_fid (fid : string) : Expr.t =
   if fid = JS2JSIL_Helpers.main_fid then
     Expr.Lit (Loc JS2JSIL_Helpers.locGlobName)
-  else Expr.LVar (Names.make_lvar_name fid)
+  else Expr.LVar (LVar.of_string (Names.make_lvar_name fid))
 
 let make_sc (vis_list : string list) : Expr.t list =
   let chopped_vis_list =
@@ -116,21 +115,21 @@ let var_assertion (fid : string) (x : string) (x_val : Expr.t) : Asrt.t =
 
 let make_this_assertion () : Asrt.t =
   let var_this = JS2JSIL_Helpers.var_this in
+  let this = Jslogic.JSLogicCommon.this_lvar in
   let f1 : Expr.t =
-    UnOp (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type ListType)))
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar this), Equal, Lit (Type ListType)))
   in
   let f2 : Expr.t =
-    UnOp (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type NumberType)))
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar this), Equal, Lit (Type NumberType)))
   in
   let f3 : Expr.t =
-    UnOp (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type StringType)))
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar this), Equal, Lit (Type StringType)))
   in
   let f4 : Expr.t =
-    UnOp
-      (Not, BinOp (UnOp (TypeOf, LVar "#this"), Equal, Lit (Type BooleanType)))
+    UnOp (Not, BinOp (UnOp (TypeOf, LVar this), Equal, Lit (Type BooleanType)))
   in
-  let f5 : Expr.t = UnOp (Not, BinOp (LVar "#this", Equal, Lit Empty)) in
-  let f6 : Expr.t = BinOp (LVar "#this", Equal, PVar var_this) in
+  let f5 : Expr.t = UnOp (Not, BinOp (LVar this, Equal, Lit Empty)) in
+  let f6 : Expr.t = BinOp (LVar this, Equal, PVar var_this) in
   Asrt.Pure (Expr.conjunct [ f1; f2; f3; f4; f5; f6 ])
 
 let scope_info_to_assertion
@@ -138,7 +137,7 @@ let scope_info_to_assertion
     (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
     (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
     (fid : string)
-    (args : SS.t) : Asrt.t =
+    (args : Var.Set.t) : Asrt.t =
   let vis_list = Jslogic.JSLogicCommon.get_vis_list vis_tbl fid in
   let sc_bindings =
     match List.rev (List.map expr_from_fid vis_list) with
@@ -195,10 +194,12 @@ let scope_info_to_assertion
                   Asrt.Pred ("JSObject", [ proc_x_prototype ], [])
                 in
                 [ fun_obj_asrt; proto_asrt; a_xval ]
-          else if SS.mem x args then
-            let x_val : Expr.t = LVar (Names.make_svar_name x) in
+          else if Var.Set.mem (Var.of_string x) args then
+            let x_val : Expr.t =
+              LVar (LVar.of_string (Names.make_svar_name x))
+            in
             let asrts_x = asrts_js_val x_val in
-            Pure (BinOp (PVar x, Equal, x_val)) :: asrts_x
+            Pure (BinOp (PVar (Var.of_string x), Equal, x_val)) :: asrts_x
           else []
         in
         asrts @ new_asrts)
@@ -217,8 +218,7 @@ let create_pre_scope_pred
     (eprog : EProg.t)
     (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
     (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
-    (fid : string)
-    (_ : SS.t) : Pred.t =
+    (fid : string) : Pred.t =
   let vis_list = Jslogic.JSLogicCommon.get_vis_list vis_tbl fid in
   let sc_bindings =
     match List.rev (List.map expr_from_fid vis_list) with
@@ -236,10 +236,11 @@ let create_pre_scope_pred
       (fun x fid' (p_args, asrts) ->
         let x, new_asrts =
           if fid' <> fid then
-            let a_x = var_assertion fid' x (PVar x) in
+            let x_var = Var.of_string x in
+            let a_x = var_assertion fid' x (PVar x_var) in
             let proc_x = EProg.get_proc eprog x in
             match proc_x with
-            | None -> ([ x ], [ a_x ])
+            | None -> ([ x_var ], [ a_x ])
             | Some proc_x ->
                 let proc_x_prototype =
                   Expr.LVar (Javert_utils.Js_generators.fresh_lvar ())
@@ -252,7 +253,7 @@ let create_pre_scope_pred
                   Asrt.Pred
                     ( "JSFunctionObject",
                       [
-                        PVar x;
+                        PVar x_var;
                         Lit (String proc_x.name);
                         proc_x_sc;
                         Lit (Num (float_of_int (List.length proc_x.params)));
@@ -263,7 +264,7 @@ let create_pre_scope_pred
                 let proto_asrt =
                   Asrt.Pred ("JSObject", [ proc_x_prototype ], [])
                 in
-                ([ x ], [ fun_obj_asrt; proto_asrt; a_x ])
+                ([ x_var ], [ fun_obj_asrt; proto_asrt; a_x ])
           else ([], [])
         in
         (x @ p_args, new_asrts @ asrts))
@@ -290,13 +291,13 @@ let create_function_predicate
     (_ : Jslogic.JSLogicCommon.cc_tbl_type)
     (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
     (fid : string)
-    (fparams : string list) : Pred.t =
+    (fparams : Var.t list) : Pred.t =
   let pred_name = fid ^ "_FO_BI" in
 
-  let x = "x" in
+  let x = Var.of_string "x" in
   let fid_vis_list = Jslogic.JSLogicCommon.get_vis_list vis_tbl fid in
   let fid_x_sc = Expr.EList (make_sc fid_vis_list) in
-  let fid_prototype = Expr.LVar ("#" ^ fid ^ "_prototype") in
+  let fid_prototype = Expr.LVar (LVar.of_string ("#" ^ fid ^ "_prototype")) in
 
   let fo_asrt =
     Asrt.Pred
@@ -315,7 +316,7 @@ let create_function_predicate
   {
     name = pred_name;
     num_params = 1;
-    params = [ ("x", None) ];
+    params = [ (x, None) ];
     ins_number = 1;
     definitions = [ (None, Asrt.star [ fo_asrt; proto_asrt ]) ];
     facts = [];
@@ -339,8 +340,7 @@ let create_post_scope_pred
     (_ : EProg.t)
     (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
     (_ : Jslogic.JSLogicCommon.vis_tbl_type)
-    (fid : string)
-    (_ : SS.t) : Pred.t =
+    (fid : string) : Pred.t =
   (* let args = SS.diff args (SS.of_list [ JS2JSIL_Helpers.var_this; JS2JSIL_Helpers.var_scope ]) in  *)
   let vis_tbl = Jslogic.JSLogicCommon.get_scope_table cc_tbl fid in
   let all_params, out_params, in_params =
@@ -351,14 +351,16 @@ let create_post_scope_pred
       vis_tbl ([], [], [])
   in
   let params =
-    JS2JSIL_Helpers.var_scope :: JS2JSIL_Helpers.var_er :: all_params
+    JS2JSIL_Helpers.var_scope :: JS2JSIL_Helpers.var_er
+    :: List.map Var.of_string all_params
   in
   let params = List.map (fun x -> (x, None)) params in
 
   let args_asrts =
     List.map
       (fun x ->
-        Asrt.PointsTo (PVar JS2JSIL_Helpers.var_er, Lit (String x), PVar x))
+        Asrt.PointsTo
+          (PVar JS2JSIL_Helpers.var_er, Lit (String x), PVar (Var.of_string x)))
       in_params
   in
 
@@ -391,7 +393,7 @@ let create_post_scope_pred
 
   let pre_scope_args =
     Expr.PVar JS2JSIL_Helpers.var_scope
-    :: List.map (fun x -> Expr.PVar x) out_params
+    :: List.map (fun x -> Expr.PVar (Var.of_string x)) out_params
   in
   let pre_scope_asrt = Asrt.Pred (pre_scope_prefix ^ fid, pre_scope_args, []) in
 
@@ -429,7 +431,7 @@ let bi_post_parse_cmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
         LabCmd.LCall
           ( x_r,
             Lit (String JS2JSIL_Helpers.isNativeErrorName),
-            [ PVar Utils.Names.return_variable ],
+            [ PVar Var.return_variable ],
             None,
             None )
       in
@@ -474,7 +476,7 @@ let create_new_bispec
       else
         let pre =
           scope_info_to_assertion eprog cc_tbl vis_tbl eproc.name
-            (SS.of_list eproc.params)
+            (Var.Set.of_list eproc.params)
         in
         let bispec : BiSpec.t =
           { name = eproc.name; params = eproc.params; pre }
@@ -492,11 +494,9 @@ let bi_post_parse_eprog
       let proc' = bi_post_parse_eproc eprog cc_tbl vis_tbl proc in
       let pre_scope_pred =
         create_pre_scope_pred eprog cc_tbl vis_tbl proc.name
-          (SS.of_list proc.params)
       in
       let post_scope_pred =
         create_post_scope_pred eprog cc_tbl vis_tbl proc.name
-          (SS.of_list proc.params)
       in
       let fun_pred =
         create_function_predicate cc_tbl vis_tbl proc.name proc.params

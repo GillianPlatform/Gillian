@@ -58,11 +58,13 @@ let error_has_proto str ret_val ret_state =
     get_cell ret_state md proto_name
   in
   match final_proto with
-  | Some (Loc s) when String.equal s str -> true
+  | Some (Loc s) when Gil_syntax.Id.Loc.equal s str -> true
   | _ -> false
 
-let is_syntax_error = error_has_proto "$lserr_proto"
-let is_ref_error = error_has_proto "$lrferr"
+let is_syntax_error =
+  error_has_proto (Gil_syntax.Id.Loc.of_string "$lserr_proto")
+
+let is_ref_error = error_has_proto (Gil_syntax.Id.Loc.of_string "$lrferr")
 
 let parsing_failure_is_jsparser
     ({ additional_data; _ } : Utils.Gillian_result.Error.compilation_error) =

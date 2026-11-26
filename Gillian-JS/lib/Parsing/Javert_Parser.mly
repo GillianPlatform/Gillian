@@ -1,5 +1,4 @@
 %{
-open Utils.Containers
 open Utils
 open Gillian.Gil_syntax
 open! Jsil_syntax
@@ -48,7 +47,7 @@ open Jslogic
 %token NAN
 %token INFINITY
 %token <string> STRING
-%token <string> LOC
+%token <Gillian.Gil_syntax.Id.Loc.t> LOC
 %token LSTNIL
 %token LSTOPEN
 %token LSTCLOSE
@@ -147,10 +146,10 @@ open Jslogic
 %token THROW
 %token EXTERN
 (* Logic variables *)
-%token <string> LVAR
+%token <Gillian.Gil_syntax.LVar.t> LVAR
 (* Logical expressions *)
 %token LNONE
-%token <string> ALOC
+%token <Gillian.Gil_syntax.ALoc.t> ALOC
 (* Logic assertions *)
 %token OASSERT
 %token CASSERT
@@ -288,7 +287,7 @@ open Jslogic
 %type <Jslogic.JSAsrt.t list>  top_level_js_assertion_list_target
 %type <Gillian.Gil_syntax.Expr.t>  top_level_expr_target
 %type <Jslogic.JSAsrt.t>       top_level_js_assertion_target
-%type <(string * Utils.Containers.SS.t) option * Jslogic.JSAsrt.t> top_level_js_pre_target
+%type <(string * Gillian.Gil_syntax.LVar.Set.t) option * Jslogic.JSAsrt.t> top_level_js_pre_target
 
 %start js_pred_target
 %start js_only_spec_target
@@ -416,7 +415,7 @@ expr_target:
   | lit=lit_target { Expr.Lit lit }
   | v = LVAR { Expr.LVar v }
   | ALOC { Expr.ALoc $1 }
-  | v = VAR { Expr.PVar v }
+  | v = pvar_target { Expr.PVar v }
   | e1=expr_target; bop=binop_target; e2=expr_target { Expr.BinOp (e1, bop, e2) }
   | e1=expr_target; LSTCONS; e2=expr_target { Expr.NOp (LstCat, [ EList [ e1 ]; e2 ]) }
   | e1=expr_target; GREATERTHAN;  e2=expr_target { Expr.BinOp (e2, FLessThan, e1) }
@@ -479,8 +478,11 @@ pure_assertion_target:
   | delimited(LBRACE, pure_assertion_target, RBRACE)
     { $1 }
 
+pvar_target:
+  | v = VAR { Var.of_string v }
+
 program_variable_target:
-  | v = VAR { Expr.PVar v }
+  | v = pvar_target { Expr.PVar v }
 
 logic_variable_target:
   v = LVAR
@@ -519,7 +521,7 @@ assertion_target:
 
 binders_target:
   | LBRACKET; BIND; COLON; xs = separated_list(COMMA, LVAR); RBRACKET
-    { xs }
+    { (xs :> Id.any_var Id.t list) }
 
 macro_head_target:
  | name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
@@ -580,13 +582,13 @@ logic_cmd_target:
     { LCmd.Assume a }
   | ASSUME_TYPE; LBRACE; e=expr_target; COMMA; t=type_target; RBRACE
     { LCmd.AssumeType (e, t) }
-  | v = VAR; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
+  | v = pvar_target; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
     { LCmd.FreshSVar v}
   | BRANCH; LBRACE; fo = pure_assertion_target; RBRACE
      { LCmd.Branch fo }
 
 phi_target:
-  v = VAR; COLON; args = separated_list(COMMA, expr_target)
+  v = pvar_target; COLON; args = separated_list(COMMA, expr_target)
     { (v, args) }
 
 call_with_target:
@@ -610,9 +612,9 @@ new_target:
 cmd_target:
   | SKIP
     { LabCmd.LBasic (Skip) }
-  | v=VAR; DEFEQ; e=expr_target
+  | v = pvar_target; DEFEQ; e=expr_target
     { LabCmd.LBasic (Assignment (v, e)) }
-  | VAR; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
+  | pvar_target; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
     {
       let loc, metadata = (match $5 with
       | Some (Some arg_a, Some arg_b) -> Some arg_a, Some arg_b
@@ -621,7 +623,7 @@ cmd_target:
       | _ -> None, None
       ) in
         LabCmd.LBasic (New ($1, loc, metadata)) }
-  | v=VAR; DEFEQ; LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET
+  | v = pvar_target; DEFEQ; LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET
     { LabCmd.LBasic (Lookup (v, e1, e2)) }
   | LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET; DEFEQ; e3=expr_target
     { LabCmd.LBasic (Mutation (e1, e2, e3)) }
@@ -629,26 +631,26 @@ cmd_target:
     { LabCmd.LBasic (Delete (e1, e2)) }
   | DELETEOBJ; LBRACE; e1=expr_target; RBRACE
     { LabCmd.LBasic (DeleteObj (e1)) }
-  | v=VAR; DEFEQ; HASFIELD; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
+  | v = pvar_target; DEFEQ; HASFIELD; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
     { LabCmd.LBasic (HasField (v, e1, e2)) }
-  | v = VAR; DEFEQ; GETFIELDS; LBRACE; e=expr_target; RBRACE
+  | v = pvar_target; DEFEQ; GETFIELDS; LBRACE; e=expr_target; RBRACE
     { LabCmd.LBasic (GetFields (v, e)) }
-  | v = VAR; DEFEQ; METADATA; LBRACE; e=expr_target; RBRACE
+  | v = pvar_target; DEFEQ; METADATA; LBRACE; e=expr_target; RBRACE
     { LabCmd.LBasic (MetaData (v, e)) }
   | GOTO; i=VAR
     { LabCmd.LGoto i }
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { LabCmd.LGuardedGoto (e, i, j) }
-  | v=VAR; DEFEQ; e=expr_target;
+  | v = pvar_target; DEFEQ; e=expr_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
     { LabCmd.LCall (v, e, es, oi, subst) }
-  | v=VAR; DEFEQ; EXTERN; pname=VAR;
+  | v = pvar_target; DEFEQ; EXTERN; pname=pvar_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target)
     { LabCmd.LECall (v, PVar pname, es, oi) }
-  | v=VAR; DEFEQ; APPLY;
+  | v = pvar_target; DEFEQ; APPLY;
     LBRACE; es=expr_target; RBRACE; oi = option(call_with_target)
     { LabCmd.LApply (v, es, oi) }
-  | v = VAR; DEFEQ; ARGUMENTS
+  | v = pvar_target; DEFEQ; ARGUMENTS
     { (LabCmd.LArguments v) }
   | PHI; LBRACE; phi_args =separated_list(SCOLON, phi_target); RBRACE
     { match phi_args with
@@ -706,9 +708,9 @@ mult_spec_line:
 
 lab_spec_target:
   | LESSTHAN; sspec_name = VAR; COLON; lvars = separated_list (COMMA, LVAR); GREATERTHAN
-    { (sspec_name, SS.of_list lvars) }
+    { (sspec_name, LVar.Set.of_list lvars) }
   | LESSTHAN; sspec_name = VAR; GREATERTHAN
-    { (sspec_name, SS.empty) }
+    { (sspec_name, LVar.Set.empty) }
 
 pre_post_target:
   | lab_spec = option(lab_spec_target); pre = spec_line; posts = mult_spec_line; NORMAL
@@ -717,7 +719,7 @@ pre_post_target:
   { Spec.{ pre; posts; flag = Error; to_verify = true; label = lab_spec} }
 
 spec_head_target:
-  spec_name = VAR; LBRACE; spec_params = separated_list(COMMA, VAR); RBRACE
+  spec_name = VAR; LBRACE; spec_params = separated_list(COMMA, pvar_target); RBRACE
   { (spec_name, spec_params) }
 
 spec_target:
@@ -737,7 +739,7 @@ spec_target:
 /* PROCEDURES */
 
 proc_head_target:
-  PROC; proc_name = VAR; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
+  PROC; proc_name = VAR; LBRACE; param_list = separated_list(COMMA, pvar_target); RBRACE
   { (proc_name, param_list) }
 
 proc_target:
@@ -761,7 +763,7 @@ jsil_lemma_variant_target:
   { variant }
 
 jsil_lemma_head_target:
-  lemma_name = VAR; LBRACE; lemma_params = separated_list(COMMA, VAR); RBRACE
+  lemma_name = VAR; LBRACE; lemma_params = separated_list(COMMA, pvar_target); RBRACE
   {
     (lemma_name, lemma_params)
   }
@@ -788,7 +790,7 @@ named_assertion_target:
 
 pred_param_target:
   (* Program variable with optional type *)
-  | v = VAR; t = option(preceded(COLON, type_target))
+  | v = pvar_target; t = option(preceded(COLON, type_target))
     { (v, t) }
 
 (* Predicate parameters: in-parameters and out-parameters, separated by a
@@ -831,7 +833,7 @@ pred_target:
 /* MACROS */
 
 macro_head_def_target:
- | name = VAR; LBRACE; params = separated_list(COMMA, VAR); RBRACE
+ | name = VAR; LBRACE; params = separated_list(COMMA, pvar_target); RBRACE
    { (name, params) }
 
 macro_target:
@@ -924,7 +926,7 @@ jsil_main_target:
 (* Expressions *)
 
 js_program_variable_target:
-  | v = VAR
+  | v = pvar_target
     { (* let _ = validate_pvar v in *) v }
 
 just_logic_variable_target:
@@ -1002,10 +1004,10 @@ var_js_le_pair_target:
 
 
 js_type_env_pair_target:
-  | v = VAR; COLON; the_type=type_target
-    { (v, the_type) }
+  | v = pvar_target; COLON; the_type=type_target
+    { ((v :> Id.any_var Id.t), the_type) }
   | v = LVAR; COLON; the_type=type_target
-    { (v, the_type) }
+    { ((v :> Id.any_var Id.t), the_type) }
 
 js_pure_assertion_target:
 (* P /\ Q *)
@@ -1261,13 +1263,13 @@ top_level_js_assertion_target:
 
 
 js_sspec_existentials_target: COLON; existentials=separated_list(COMMA, LVAR)
-  { Containers.SS.of_list existentials }
+  { LVar.Set.of_list existentials }
 
 js_sspec_lab_target:
   LBRACKET; lab=VAR; existentials = option(js_sspec_existentials_target); RBRACKET
     {
       match existentials with
-        | None -> (lab, Containers.SS.empty)
+        | None -> (lab, LVar.Set.empty)
         | Some existentials -> (lab, existentials)
     }
 

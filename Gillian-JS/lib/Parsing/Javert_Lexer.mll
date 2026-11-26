@@ -271,8 +271,8 @@ rule read = parse
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                              Javert_Parser.FLOAT n }
   | '"'                  { read_string (Buffer.create 17) lexbuf }
-  | loc                  { Javert_Parser.LOC (Lexing.lexeme lexbuf) }
-  | aloc                  { Javert_Parser.ALOC (Lexing.lexeme lexbuf) }
+  | loc                  { Javert_Parser.LOC (Gillian.Gil_syntax.Id.Loc.of_string (Lexing.lexeme lexbuf)) }
+  | aloc                  { Javert_Parser.ALOC (Gillian.Gil_syntax.ALoc.of_string (Lexing.lexeme lexbuf)) }
 (* Filenames *)
   | filename             { Javert_Parser.FILENAME (Lexing.lexeme lexbuf) }
 
@@ -284,8 +284,8 @@ rule read = parse
 
   | var2                 { Javert_Parser.VAR (Lexing.lexeme lexbuf) }
 (* Logic variables *)
-  | lvar                 { Javert_Parser.LVAR (Lexing.lexeme lexbuf) }
-  | lvar2                { Javert_Parser.LVAR (Lexing.lexeme lexbuf) }
+  | lvar                 { Javert_Parser.LVAR (Gillian.Gil_syntax.LVar.of_string (Lexing.lexeme lexbuf)) }
+  | lvar2                { Javert_Parser.LVAR (Gillian.Gil_syntax.LVar.of_string (Lexing.lexeme lexbuf)) }
 (* EOF *)
   | eof                  { Javert_Parser.EOF }
   | _                    { raise (Syntax_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }

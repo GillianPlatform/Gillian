@@ -6,6 +6,9 @@ open JS2JSIL_Helpers
 open JS_Utils
 open Parsing
 module Flag = Gillian.Gil_syntax.Flag
+module Id = Gillian.Gil_syntax.Id
+module Var = Gillian.Gil_syntax.Var
+module LVar = Gillian.Gil_syntax.LVar
 
 exception CannotHappen
 exception No_Codename
@@ -46,7 +49,11 @@ let update_fun_tbl
     (vis_list : string list) =
   (* let fun_spec, f_rec = process_js_logic_annotations f_id f_args annotations Requires Ensures EnsuresErr var_to_fid_tbl vis_list in *)
   Hashtbl.replace fun_tbl f_id
-    (f_id, f_args, f_body, f_strictness, (annotations, vis_list, var_to_fid_tbl))
+    ( f_id,
+      List.map Var.of_string f_args,
+      f_body,
+      f_strictness,
+      (annotations, vis_list, var_to_fid_tbl) )
 
 let update_cc_tbl
     (cc_tbl : cc_tbl_type)
@@ -394,7 +401,7 @@ let translate_lannots_in_exp
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (scope_var : string)
+    (scope_var : Var.t)
     (inside_stmt_compilation : bool)
     e =
   let is_e_expr = not (is_stmt e) in
@@ -451,8 +458,8 @@ let translate_invariant_in_exp
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (sc_var : string)
-    (e : JS_Parser.Syntax.exp) : (Asrt.t * string list) option =
+    (sc_var : Var.t)
+    (e : JS_Parser.Syntax.exp) : (Asrt.t * Id.any_var Id.t list) option =
   let invariant =
     List.filter
       (fun annot -> annot.annot_type == JS_Parser.Syntax.Invariant)
@@ -481,7 +488,7 @@ let translate_single_func_specs
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
-    (fun_args : string list)
+    (fun_args : Var.t list)
     (annotations : JS_Parser.Syntax.annotation list)
     (requires_flag : JS_Parser.Syntax.annotation_type)
     (ensures_normal_flag : JS_Parser.Syntax.annotation_type)
@@ -525,7 +532,7 @@ let translate_single_func_specs
             else raise (Failure "DEATH: process_js_logic_annotations")
           in
           (* Printf.printf "pre_str: %s. post_str: %s\n" pre_str post_str; *)
-          let (lab_js, pre_js) : (string * SS.t) option * JSAsrt.t =
+          let (lab_js, pre_js) : (string * LVar.Set.t) option * JSAsrt.t =
             parse_js_pre_from_string pre_str
           in
           let posts_js : JSAsrt.t list =
@@ -813,7 +820,7 @@ let preprocess_eval
   let _ = update_cc_tbl cc_tbl fid_parent fid (get_all_vars_f e params) in
   Hashtbl.add pre_fun_tbl fid
     ( fid,
-      [ var_scope; var_this ] @ params,
+      [ var_scope; var_this ] @ List.map Var.of_string params,
       Some e,
       strictness,
       ([], vislist, Hashtbl.create small_tbl_size) );

@@ -34,7 +34,8 @@ let parse_from_string start str =
            str)
 
 let parse_js_pre_from_string :
-    string -> (string * Utils.Containers.SS.t) option * Jslogic.JSAsrt.t =
+    string -> (string * Gillian.Gil_syntax.LVar.Set.t) option * Jslogic.JSAsrt.t
+    =
   parse_from_string Javert_Parser.top_level_js_pre_target
 
 let parse_js_logic_assertion_from_string : string -> Jslogic.JSAsrt.t =
