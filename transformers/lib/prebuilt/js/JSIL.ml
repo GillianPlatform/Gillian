@@ -258,11 +258,10 @@ struct
 
   let pp ft (h : t) =
     let open Fmt in
-    let sorted_locs_with_vals =
-      Gillian.Combinators.MyUtils.SMap.bindings h
-      |> List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2)
+    let sorted_locs_with_vals = Id.Any_loc.Map.bindings h in
+    let pp_one ft (loc, fv_pairs) =
+      pf ft "@[%a |-> %a@]" Id.pp loc S.pp fv_pairs
     in
-    let pp_one ft (loc, fv_pairs) = pf ft "@[%s |-> %a@]" loc S.pp fv_pairs in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
 
   let get_recovery_tactic s e =
@@ -284,7 +283,7 @@ struct
           current_recovery
         else
           let locs_to_add =
-            Gillian.Combinators.MyUtils.SMap.fold
+            Id.Any_loc.Map.fold
               (fun key obj acc ->
                 match S.get_metadata obj with
                 | Some e when List.exists (Expr.equal e) alocs -> key :: acc
@@ -313,7 +312,8 @@ module PatchAlloc (Map : OpenPMapType) = struct
     | "alloc", [ idx; v ] ->
         let* idx =
           match idx with
-          | Expr.Lit Empty -> Delayed.return (Some (ALoc.alloc ()))
+          | Expr.Lit Empty ->
+              Delayed.return (Some (ALoc.alloc () :> Id.Any_loc.t))
           | _ -> Gillian.Combinators.MyUtils.get_loc idx
         in
         let idx =

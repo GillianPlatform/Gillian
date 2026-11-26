@@ -31,10 +31,11 @@ module M : MyMonadicSMemory =
       include OpenALocPMap (EnvAg)
 
       let empty () : t =
-        Cgil_lib.String_map.fold
+        Id.Loc.Map.fold
           (fun k v acc ->
-            Gillian.Combinators.MyUtils.SMap.add k
+            Id.Any_loc.Map.add
+              (k :> Id.Any_loc.t)
               (Some (Expr.Lit (Global_env.serialize_def v)))
               acc)
-          !init_data Gillian.Combinators.MyUtils.SMap.empty
+          !init_data Id.Any_loc.Map.empty
     end)
